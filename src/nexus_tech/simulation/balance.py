@@ -1,4 +1,4 @@
-"""Central tuning values for Phase 3."""
+"""Central tuning values for Phase 4."""
 
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -171,6 +171,83 @@ class BalanceConfig:
     team_debt_bonus_divisor: int = 38
     team_coordination_bonus_divisor: int = 36
     team_burnout_protection_divisor: int = 55
+
+    event_trigger_min_turn: int = 2
+    event_trigger_chance_percent: int = 42
+    event_history_limit: int = 16
+
+    event_bug_incident_weight: int = 8
+    event_bug_incident_cooldown: int = 4
+    event_bug_incident_bug_threshold: int = 32
+    event_bug_incident_debt_threshold: int = 48
+    event_bug_hotfix_cost: Decimal = Decimal("260.00")
+    event_bug_hotfix_bug_reduction: int = 12
+    event_bug_hotfix_quality_loss: int = 1
+    event_bug_hotfix_reputation_loss: int = 1
+    event_bug_hotfix_energy_loss: int = 10
+    event_bug_hotfix_morale_loss: int = 2
+    event_bug_delay_bug_increase: int = 8
+    event_bug_delay_reputation_loss: int = 3
+    event_bug_delay_user_loss_divisor: int = 6
+    event_bug_delay_min_user_loss: int = 3
+    event_bug_delay_energy_loss: int = 2
+    event_bug_delay_morale_loss: int = 3
+
+    event_press_mention_weight: int = 5
+    event_press_mention_cooldown: int = 3
+    event_press_market_fit_threshold: int = 46
+    event_press_min_user_gain: int = 3
+    event_press_user_gain_divisor: int = 12
+    event_press_reputation_gain: int = 2
+    event_press_acquisition_gain: Decimal = Decimal("0.0040")
+    event_press_marketer_morale_gain: int = 2
+
+    event_investor_outreach_weight: int = 5
+    event_investor_outreach_cooldown: int = 5
+    event_investor_reputation_threshold: int = 48
+    event_investor_cash_threshold: Decimal = Decimal("3200.00")
+    event_investor_cash_gain: Decimal = Decimal("2400.00")
+    event_investor_reputation_gain: int = 1
+    event_investor_team_morale_penalty: int = 2
+    event_bootstrap_team_morale_gain: int = 2
+    event_bootstrap_reputation_gain: int = 1
+
+    event_burnout_spike_weight: int = 7
+    event_burnout_spike_cooldown: int = 3
+    event_burnout_spike_energy_threshold: int = 55
+    event_burnout_spike_morale_threshold: int = 50
+    event_burnout_relief_cost: Decimal = Decimal("180.00")
+    event_burnout_relief_energy_gain: int = 18
+    event_burnout_relief_morale_gain: int = 10
+    event_burnout_relief_team_morale_gain: int = 1
+    event_burnout_push_energy_loss: int = 12
+    event_burnout_push_morale_loss: int = 8
+    event_burnout_push_quality_loss: int = 2
+    event_burnout_push_reputation_loss: int = 1
+
+    event_market_trend_weight: int = 6
+    event_market_trend_cooldown: int = 4
+    event_market_trend_fit_threshold: int = 50
+    event_market_trend_invest_cost: Decimal = Decimal("200.00")
+    event_market_trend_big_user_gain: int = 8
+    event_market_trend_small_user_gain: int = 3
+    event_market_trend_acquisition_gain: Decimal = Decimal("0.0070")
+    event_market_trend_reputation_gain: int = 1
+    event_market_trend_energy_loss: int = 4
+
+    event_competitor_pressure_weight: int = 6
+    event_competitor_pressure_cooldown: int = 4
+    event_competitor_pressure_user_threshold: int = 24
+    event_competitor_rush_feature_gain: int = 1
+    event_competitor_rush_market_fit_gain: int = 2
+    event_competitor_rush_bug_increase: int = 6
+    event_competitor_rush_debt_increase: int = 7
+    event_competitor_rush_energy_loss: int = 8
+    event_competitor_focus_quality_gain: int = 3
+    event_competitor_focus_bug_reduction: int = 2
+    event_competitor_focus_market_fit_gain: int = 2
+    event_competitor_focus_user_loss: int = 3
+    event_competitor_focus_reputation_gain: int = 1
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from nexus_tech.domain.models import GameState
+from nexus_tech.domain.models import EventHistoryEntry, GameState, PendingEvent
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
@@ -23,9 +23,9 @@ def render_intro(console: Console, company_name: str, seed: int | None) -> None:
                 f"[bold cyan]NEXUS TECH[/bold cyan]\n"
                 f"Company: [bold]{company_name}[/bold]\n"
                 f"{seed_text}\n\n"
-                "Goal: manage products, grow a team, and survive the payroll pressure."
+                "Goal: manage products, teams, and dynamic business events without losing control."
             ),
-            title="Phase 3 Team Simulation",
+            title="Phase 4 Event Engine",
             border_style="cyan",
         )
     )
@@ -52,6 +52,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
     )
     console.print(_build_portfolio_table(state))
     console.print(_build_action_table(), justify="center")
+    console.print(_build_recent_event_panel(state))
 
 
 def render_team_view(console: Console, state: GameState) -> None:
@@ -103,7 +104,23 @@ def render_turn_resolution(console: Console, resolution: TurnResolution) -> None
 
     console.print(table)
     console.print(product_table)
+    if resolution.event_history_entry is not None:
+        console.print(_build_event_result_panel(resolution.event_history_entry))
+    if resolution.pending_event is not None:
+        console.print(_build_pending_event_panel(resolution.pending_event))
     console.print(Panel(resolution.narrative, title="Outlook", border_style="green"))
+
+
+def render_pending_event(console: Console, pending_event: PendingEvent) -> None:
+    """Render a pending event with its available responses."""
+
+    console.print(_build_pending_event_panel(pending_event))
+
+
+def render_event_result(console: Console, history_entry: EventHistoryEntry) -> None:
+    """Render the outcome of a resolved event."""
+
+    console.print(_build_event_result_panel(history_entry))
 
 
 def render_game_over(console: Console, state: GameState) -> None:
@@ -254,6 +271,51 @@ def _build_action_table() -> Table:
     table.add_row("14", "view_status", "no", "Refresh the dashboard.")
     table.add_row("15", "end_turn", "no", "Run the simulation tick.")
     return table
+
+
+def _build_recent_event_panel(state: GameState) -> Panel:
+    if state.pending_event is not None:
+        body = (
+            f"[bold]{state.pending_event.title}[/bold]\n"
+            f"{state.pending_event.description}\n"
+            "Resolve it before taking the next turn."
+        )
+        return Panel(body, title="Pending Event", border_style="yellow")
+
+    if not state.event_history:
+        return Panel(
+            "No major business events have fired yet.",
+            title="Recent Events",
+            border_style="yellow",
+        )
+
+    recent_history = state.event_history[-3:]
+    body = "\n".join(
+        f"[bold]{entry.title}[/bold] ({entry.selected_option_label})\n{entry.result_text}"
+        for entry in reversed(recent_history)
+    )
+    return Panel(body, title="Recent Events", border_style="yellow")
+
+
+def _build_pending_event_panel(pending_event: PendingEvent) -> Panel:
+    options_table = Table.grid(padding=(0, 1))
+    for index, option in enumerate(pending_event.options, start=1):
+        options_table.add_row(f"{index}.", f"{option.label} - {option.description}")
+
+    panel_body = Table.grid(padding=(0, 1))
+    panel_body.add_row(f"[bold]{pending_event.category.value}[/bold]")
+    panel_body.add_row(pending_event.description)
+    panel_body.add_row(options_table)
+    return Panel(panel_body, title=pending_event.title, border_style="yellow")
+
+
+def _build_event_result_panel(history_entry: EventHistoryEntry) -> Panel:
+    body = (
+        f"[bold]{history_entry.title}[/bold]\n"
+        f"Response: {history_entry.selected_option_label}\n"
+        f"{history_entry.result_text}"
+    )
+    return Panel(body, title="Event Result", border_style="yellow")
 
 
 def _count_assignments_by_product(state: GameState) -> dict:

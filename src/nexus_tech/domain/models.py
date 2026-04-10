@@ -31,6 +31,16 @@ class EmployeeRole(str, Enum):
     PRODUCT_MANAGER = "product_manager"
 
 
+class EventCategory(str, Enum):
+    """Supported event categories for the dynamic event engine."""
+
+    PRODUCT_INCIDENT = "product_incident"
+    MARKET_OPPORTUNITY = "market_opportunity"
+    FUNDING_OPPORTUNITY = "funding_opportunity"
+    REPUTATION_INCIDENT = "reputation_incident"
+    EMPLOYEE_ISSUE = "employee_issue"
+
+
 class Seniority(str, Enum):
     """Seniority band for an employee."""
 
@@ -130,6 +140,47 @@ class Employee(BaseModel):
         return quantize_money(value)
 
 
+class EventOption(BaseModel):
+    """A single response option for a triggered event."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=200)
+
+
+class PendingEvent(BaseModel):
+    """An unresolved event waiting for automatic or player-driven resolution."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    event_id: str = Field(min_length=1, max_length=60)
+    category: EventCategory
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=320)
+    triggered_turn: int = Field(ge=1)
+    cooldown_turns: int = Field(ge=0)
+    target_product_id: Optional[UUID] = None
+    target_employee_id: Optional[UUID] = None
+    options: list[EventOption] = Field(min_length=1, max_length=3)
+
+
+class EventHistoryEntry(BaseModel):
+    """A resolved event kept in in-memory history."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    event_id: str = Field(min_length=1, max_length=60)
+    category: EventCategory
+    title: str = Field(min_length=1, max_length=120)
+    triggered_turn: int = Field(ge=1)
+    resolved_turn: int = Field(ge=1)
+    selected_option_id: str = Field(min_length=1, max_length=40)
+    selected_option_label: str = Field(min_length=1, max_length=80)
+    result_text: str = Field(min_length=1, max_length=240)
+
+
 class GameState(BaseModel):
     """Current in-memory game state."""
 
@@ -138,4 +189,6 @@ class GameState(BaseModel):
     company: Company
     products: list[Product] = Field(min_length=1)
     employees: list[Employee] = Field(default_factory=list)
+    pending_event: Optional[PendingEvent] = None
+    event_history: list[EventHistoryEntry] = Field(default_factory=list)
     action_points_remaining: int = Field(ge=0)

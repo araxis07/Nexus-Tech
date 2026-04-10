@@ -8,8 +8,11 @@ from nexus_tech.domain.models import (
     Company,
     Employee,
     EmployeeRole,
+    EventCategory,
+    EventHistoryEntry,
     GameState,
     LifecycleStage,
+    PendingEvent,
     Product,
     Seniority,
     TurnAction,
@@ -21,8 +24,16 @@ from nexus_tech.simulation.economy import (
     calculate_total_salary_cost,
 )
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
+from nexus_tech.simulation.event_registry import EventDefinition, get_event_registry
+from nexus_tech.simulation.events import (
+    get_eligible_event_definitions,
+    resolve_pending_event,
+    select_event_definition,
+    select_weighted_definition,
+)
 from nexus_tech.simulation.growth import calculate_churned_users
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
+from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.team import calculate_effective_productivity
 
 
@@ -32,6 +43,17 @@ class FixedRandom:
 
     def randint(self, start: int, end: int) -> int:
         return self.value
+
+
+class SequenceRandom:
+    def __init__(self, values: list[int]) -> None:
+        self.values = values
+        self.index = 0
+
+    def randint(self, start: int, end: int) -> int:
+        value = self.values[self.index % len(self.values)]
+        self.index += 1
+        return value
 
 
 def make_product(
@@ -96,11 +118,21 @@ def make_state(
     *products: Product,
     employees: list[Employee] | None = None,
     cash_on_hand: Decimal = Decimal("6000.00"),
+    current_turn: int = 1,
+    pending_event: PendingEvent | None = None,
+    event_history: list[EventHistoryEntry] | None = None,
 ) -> GameState:
     return GameState(
-        company=Company(name="NEXUS TECH", cash_on_hand=cash_on_hand, reputation=50),
+        company=Company(
+            name="NEXUS TECH",
+            cash_on_hand=cash_on_hand,
+            reputation=50,
+            current_turn=current_turn,
+        ),
         products=list(products),
         employees=employees or [],
+        pending_event=pending_event,
+        event_history=event_history or [],
         action_points_remaining=BALANCE.actions_per_turn,
     )
 
@@ -379,3 +411,120 @@ def test_role_specific_contributions_are_visible_in_outcomes() -> None:
 
     assert engineer_quality_gain > marketer_quality_gain
     assert marketer_user_gain > engineer_user_gain
+
+
+def test_weighted_selection_prefers_heavier_event() -> None:
+    lightweight = EventDefinition(
+        event_id="lightweight",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        weight=1,
+        cooldown_turns=0,
+        is_eligible=lambda state: True,
+        build_pending_event=lambda state, rng, cooldown_turns: PendingEvent(
+            event_id="lightweight",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            title="Lightweight",
+            description="Lightweight test event.",
+            triggered_turn=state.company.current_turn,
+            cooldown_turns=cooldown_turns,
+            options=[],
+        ),
+    )
+    heavyweight = EventDefinition(
+        event_id="heavyweight",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        weight=9,
+        cooldown_turns=0,
+        is_eligible=lambda state: True,
+        build_pending_event=lambda state, rng, cooldown_turns: PendingEvent(
+            event_id="heavyweight",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            title="Heavyweight",
+            description="Heavyweight test event.",
+            triggered_turn=state.company.current_turn,
+            cooldown_turns=cooldown_turns,
+            options=[],
+        ),
+    )
+    rng = SequenceRandom(list(range(1, 11)) * 5)
+
+    selected_ids = [
+        select_weighted_definition([lightweight, heavyweight], rng).event_id
+        for _ in range(50)
+    ]
+
+    assert selected_ids.count("heavyweight") > selected_ids.count("lightweight")
+
+
+def test_event_cooldown_filters_recent_event() -> None:
+    product = make_product("Signal", market_fit=60, user_count=45)
+    history_entry = EventHistoryEntry(
+        event_id="sudden_press_mention",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Sudden Press Mention",
+        triggered_turn=2,
+        resolved_turn=2,
+        selected_option_id="ride_the_wave",
+        selected_option_label="Ride the wave",
+        result_text="Users jumped.",
+    )
+    state = make_state(
+        product,
+        current_turn=4,
+        event_history=[history_entry],
+    )
+
+    eligible_ids = {
+        definition.event_id for definition in get_eligible_event_definitions(state)
+    }
+
+    assert "sudden_press_mention" not in eligible_ids
+
+
+def test_event_effect_application_updates_product_company_and_team() -> None:
+    product = make_product("Core", bug_level=48, technical_debt=52)
+    employee = make_employee(
+        "Ada Wong",
+        EmployeeRole.ENGINEER,
+        assigned_product_id=product.id,
+        energy=78,
+        morale=74,
+    )
+    state = make_state(product, employees=[employee], current_turn=3)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "severe_bug_incident"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "hotfix")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].bug_level < state.products[0].bug_level
+    assert outcome.state.employees[0].energy < state.employees[0].energy
+    assert outcome.history_entry.event_id == "severe_bug_incident"
+
+
+def test_event_selection_is_deterministic_under_fixed_seed() -> None:
+    state_a = make_state(
+        make_product("Core", market_fit=62, user_count=50, bug_level=40, technical_debt=52),
+        current_turn=4,
+    )
+    state_b = state_a.model_copy(deep=True)
+
+    definition_a = select_event_definition(
+        state_a,
+        RandomSource(seed=17),
+        enforce_trigger_roll=False,
+    )
+    definition_b = select_event_definition(
+        state_b,
+        RandomSource(seed=17),
+        enforce_trigger_roll=False,
+    )
+
+    assert definition_a is not None
+    assert definition_b is not None
+    assert definition_a.event_id == definition_b.event_id

@@ -14,12 +14,14 @@ from nexus_tech.domain.models import (
     Employee,
     EmployeeRole,
     GameState,
+    PendingEvent,
     Product,
     Seniority,
     TurnAction,
 )
 from nexus_tech.presentation.dashboard import (
     render_dashboard,
+    render_event_result,
     render_game_over,
     render_intro,
     render_team_view,
@@ -34,6 +36,7 @@ from nexus_tech.simulation.engine import (
     get_product_choices,
     resolve_turn,
 )
+from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
 
 app = typer.Typer(add_completion=False, help="NEXUS TECH terminal management simulation.")
@@ -117,6 +120,9 @@ def play(
             resolution = resolve_turn(state, rng)
             state = resolution.state
             render_turn_resolution(console, resolution)
+
+            if state.pending_event is not None:
+                state = handle_pending_event(state)
 
         render_game_over(console, state)
     except KeyboardInterrupt as error:
@@ -270,6 +276,33 @@ def choose_employee_id(
         )
     )
     return employee.id
+
+
+def handle_pending_event(state: GameState) -> GameState:
+    """Prompt for an event choice and apply its effect immediately."""
+
+    pending_event = state.pending_event
+    if pending_event is None:
+        return state
+
+    option_id = choose_event_option_id(pending_event)
+    outcome = resolve_pending_event(state, option_id)
+    render_event_result(console, outcome.history_entry)
+    return outcome.state
+
+
+def choose_event_option_id(pending_event: PendingEvent) -> str:
+    """Prompt for a response to a pending event."""
+
+    option_choices = {
+        str(index): option for index, option in enumerate(pending_event.options, start=1)
+    }
+    selected_key = Prompt.ask(
+        "Choose an event response",
+        choices=list(option_choices),
+        default="1",
+    )
+    return option_choices[selected_key].id
 
 
 def build_product_selection_summary(product: Product) -> str:

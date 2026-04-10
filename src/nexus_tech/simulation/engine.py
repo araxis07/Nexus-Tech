@@ -1,4 +1,4 @@
-"""Turn orchestration for Phase 3."""
+"""Turn orchestration for Phase 4."""
 
 from __future__ import annotations
 
@@ -11,8 +11,10 @@ from nexus_tech.domain.models import (
     Company,
     Employee,
     EmployeeRole,
+    EventHistoryEntry,
     GameState,
     LifecycleStage,
+    PendingEvent,
     Product,
     Seniority,
     TurnAction,
@@ -28,6 +30,7 @@ from nexus_tech.simulation.economy import (
     calculate_total_salary_cost,
     is_game_over,
 )
+from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.product_progression import (
     ProductDrift,
@@ -110,6 +113,8 @@ class TurnResolution:
     reputation_delta: int
     product_summaries: list[ProductTurnSummary]
     team_condition: TeamCondition
+    pending_event: PendingEvent | None
+    event_history_entry: EventHistoryEntry | None
     narrative: str
 
 
@@ -158,6 +163,15 @@ def apply_action(
             state=state,
             message="The company has already shut down.",
             turn_should_end=True,
+        )
+
+    if state.pending_event is not None and action not in (
+        TurnAction.VIEW_STATUS,
+        TurnAction.REVIEW_TEAM,
+    ):
+        return ActionOutcome(
+            state=state,
+            message="Resolve the pending event before taking new actions.",
         )
 
     if action in (TurnAction.VIEW_STATUS, TurnAction.REVIEW_TEAM, TurnAction.END_TURN):
@@ -370,6 +384,10 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         net_cash_flow,
     )
 
+    event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
+    next_state = event_outcome.state
+    team_condition = calculate_team_condition(next_state.employees)
+
     next_state.company.game_over = is_game_over(next_state.company)
     if not next_state.company.game_over:
         next_state.company.current_turn += 1
@@ -396,6 +414,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         reputation_delta=reputation_delta,
         product_summaries=product_summaries,
         team_condition=team_condition,
+        pending_event=event_outcome.pending_event,
+        event_history_entry=event_outcome.history_entry,
         narrative=narrative,
     )
 
