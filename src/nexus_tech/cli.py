@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
 import typer
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.traceback import install as install_rich_traceback
 
 from nexus_tech.domain.models import (
     Employee,
@@ -23,11 +26,14 @@ from nexus_tech.domain.models import (
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
+    render_action_feedback,
     render_dashboard,
+    render_employee_picker,
     render_event_result,
     render_game_over,
     render_intro,
     render_pending_event,
+    render_product_picker,
     render_team_view,
     render_turn_resolution,
 )
@@ -43,10 +49,25 @@ from nexus_tech.simulation.engine import (
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
 
-app = typer.Typer(add_completion=False, help="NEXUS TECH terminal management simulation.")
-console = Console()
+logger = logging.getLogger(__name__)
+
+app = typer.Typer(
+    add_completion=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
+    help=(
+        "NEXUS TECH terminal management simulation.\n\n"
+        "Start a new run, resume a local SQLite save, and play entirely from the terminal."
+    ),
+    rich_markup_mode="rich",
+)
+console = Console(highlight=False, soft_wrap=True)
+DEBUG_MODE = False
 DEFAULT_DB_PATH = Path("nexus-tech.db")
-DB_PATH_OPTION = typer.Option(DEFAULT_DB_PATH, "--db-path", help="SQLite save file path.")
+DB_PATH_OPTION = typer.Option(
+    DEFAULT_DB_PATH,
+    "--db-path",
+    help="SQLite database path used for save, load, and continue commands.",
+)
 
 ACTION_KEYS = {
     "1": TurnAction.CREATE_PRODUCT,
@@ -88,8 +109,16 @@ def root(
     seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
     db_path: Path = DB_PATH_OPTION,
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Enable debug logging and rich tracebacks for development runs.",
+    ),
 ) -> None:
     """Start a new local game when no subcommand is given."""
+
+    configure_cli(debug=debug)
+    ctx.obj = {"debug": debug}
 
     if ctx.invoked_subcommand is not None:
         return
@@ -153,6 +182,7 @@ def load_game_command(
     except PersistenceError as error:
         raise_cli_persistence_error("Load Failed", error)
 
+    logger.debug("Loaded save slot %s from %s.", loaded_game.slot_name, db_path)
     announce_loaded_game(
         db_path=db_path,
         slot_name=loaded_game.slot_name,
@@ -178,6 +208,7 @@ def continue_last_game_command(
     except PersistenceError as error:
         raise_cli_persistence_error("Load Failed", error)
 
+    logger.debug("Continuing last save slot %s from %s.", loaded_game.slot_name, db_path)
     announce_loaded_game(
         db_path=db_path,
         slot_name=loaded_game.slot_name,
@@ -202,6 +233,13 @@ def start_new_game(
 
     state = create_new_game(company_name=company_name, product_name=product_name)
     rng = RandomSource(seed=seed)
+    logger.debug(
+        "Starting new game company=%s product=%s seed=%s slot=%s.",
+        company_name,
+        product_name,
+        seed,
+        slot_name,
+    )
     render_intro(console, company_name=company_name, seed=seed)
     run_game_loop(state=state, rng=rng, db_path=db_path, slot_name=slot_name)
 
@@ -223,7 +261,12 @@ def run_game_loop(
             turn_ended = False
 
             while not turn_ended and not state.company.game_over:
-                choice = Prompt.ask("Choose an action", choices=ALL_MENU_KEYS, default="15")
+                choice = ask_choice_input(
+                    "Choose an action",
+                    choices=ALL_MENU_KEYS,
+                    default="15",
+                    show_choices=False,
+                )
 
                 if choice in UTILITY_ACTION_KEYS:
                     state, rng, slot_name = handle_utility_action(
@@ -259,7 +302,12 @@ def run_game_loop(
                     render_team_view(console, state)
                     continue
 
-                console.print(Panel.fit(outcome.message, title="Action", border_style="cyan"))
+                render_action_feedback(
+                    console,
+                    action_label=action.value,
+                    message=outcome.message,
+                    state=state,
+                )
                 turn_ended = outcome.turn_should_end
 
             if state.company.game_over:
@@ -287,25 +335,27 @@ def collect_action_context(state: GameState, action: TurnAction) -> Optional[Act
         return ActionContext()
 
     if action is TurnAction.CREATE_PRODUCT:
-        return ActionContext(new_product_name=Prompt.ask("New product name").strip())
+        return ActionContext(new_product_name=ask_text_input("New product name"))
 
     if action is TurnAction.HIRE_EMPLOYEE:
-        full_name = Prompt.ask("Employee full name").strip()
-        role_key = Prompt.ask(
+        full_name = ask_text_input("Employee full name")
+        role_key = ask_choice_input(
             "Role",
             choices=["engineer", "designer", "marketer", "product_manager"],
             default="engineer",
+            case_sensitive=False,
         )
-        seniority_key = Prompt.ask(
+        seniority_key = ask_choice_input(
             "Seniority",
             choices=["junior", "mid", "senior"],
             default="mid",
+            case_sensitive=False,
         )
         default_specialization = BALANCE.employee_default_specializations[role_key]
-        specialization = Prompt.ask(
+        specialization = ask_text_input(
             "Specialization",
             default=default_specialization,
-        ).strip()
+        )
         return ActionContext(
             hire_full_name=full_name,
             hire_role=EmployeeRole(role_key),
@@ -369,12 +419,15 @@ def choose_product_id(state: GameState, action: TurnAction) -> Optional[UUID]:
 
     product_choices = {str(index): product for index, product in enumerate(products, start=1)}
     label = action.value.replace("_", " ")
-    selected_key = Prompt.ask(
+    render_product_picker(console, products, action_label=action.value)
+    selected_key = ask_choice_input(
         f"Select a product for {label}",
         choices=list(product_choices),
         default="1",
+        show_choices=False,
     )
     product = product_choices[selected_key]
+    logger.debug("Selected product %s for action %s.", product.name, action.value)
     console.print(
         Panel.fit(
             build_product_selection_summary(product),
@@ -407,12 +460,15 @@ def choose_employee_id(
         str(index): employee for index, employee in enumerate(employees, start=1)
     }
     label = action.value.replace("_", " ")
-    selected_key = Prompt.ask(
+    render_employee_picker(console, employees, state.products, action_label=action.value)
+    selected_key = ask_choice_input(
         f"Select an employee for {label}",
         choices=list(employee_choices),
         default="1",
+        show_choices=False,
     )
     employee = employee_choices[selected_key]
+    logger.debug("Selected employee %s for action %s.", employee.full_name, action.value)
     console.print(
         Panel.fit(
             build_employee_selection_summary(employee, state.products),
@@ -443,12 +499,82 @@ def choose_event_option_id(pending_event: PendingEvent) -> str:
     option_choices = {
         str(index): option for index, option in enumerate(pending_event.options, start=1)
     }
-    selected_key = Prompt.ask(
+    selected_key = ask_choice_input(
         "Choose an event response",
         choices=list(option_choices),
         default="1",
+        show_choices=False,
     )
     return option_choices[selected_key].id
+
+
+def ask_choice_input(
+    prompt: str,
+    *,
+    choices: list[str],
+    default: str,
+    show_choices: bool,
+    case_sensitive: bool = True,
+) -> str:
+    """Ask for a constrained choice and exit cleanly if the session input closes."""
+
+    try:
+        return Prompt.ask(
+            prompt,
+            console=console,
+            choices=choices,
+            default=default,
+            show_choices=show_choices,
+            case_sensitive=case_sensitive,
+        )
+    except EOFError as error:
+        handle_prompt_abort("Input stream closed. Ending the session.", error, exit_code=1)
+    except KeyboardInterrupt as error:
+        handle_prompt_abort("Session interrupted.", error, exit_code=130)
+
+
+def ask_text_input(prompt: str, *, default: str | None = None) -> str:
+    """Ask for free-form text and keep retrying until a non-empty value is given."""
+
+    while True:
+        try:
+            if default is None:
+                value = Prompt.ask(
+                    prompt,
+                    console=console,
+                    show_default=False,
+                    show_choices=False,
+                )
+            else:
+                value = Prompt.ask(
+                    prompt,
+                    console=console,
+                    default=default,
+                    show_choices=False,
+                )
+        except EOFError as error:
+            handle_prompt_abort("Input stream closed. Ending the session.", error, exit_code=1)
+        except KeyboardInterrupt as error:
+            handle_prompt_abort("Session interrupted.", error, exit_code=130)
+
+        cleaned_value = value.strip()
+        if cleaned_value:
+            return cleaned_value
+
+        console.print(
+            Panel.fit(
+                "Enter a value before continuing.",
+                title="Input Needed",
+                border_style="yellow",
+            )
+        )
+
+
+def handle_prompt_abort(message: str, error: BaseException, *, exit_code: int) -> None:
+    """Render a clean prompt-abort message and stop the CLI."""
+
+    console.print(Panel.fit(message, title="Session Ended", border_style="yellow"))
+    raise typer.Exit(code=exit_code) from error
 
 
 def build_product_selection_summary(product: Product) -> str:
@@ -490,13 +616,14 @@ def handle_utility_action(
     coordinator = SaveLoadCoordinator(db_path)
 
     if action_name == "save_game":
-        slot_name = Prompt.ask("Save slot", default=current_slot_name).strip() or current_slot_name
+        slot_name = ask_text_input("Save slot", default=current_slot_name)
         try:
             coordinator.save_game(slot_name=slot_name, state=state, rng=rng)
         except PersistenceError as error:
             console.print(Panel.fit(str(error), title="Save Failed", border_style="red"))
             return state, rng, current_slot_name
 
+        logger.debug("Saved game to slot %s at %s.", slot_name, db_path)
         console.print(
             Panel.fit(
                 f"Saved game to slot '{slot_name}' at {db_path}.",
@@ -507,13 +634,14 @@ def handle_utility_action(
         return state, rng, slot_name
 
     if action_name == "load_game":
-        slot_name = Prompt.ask("Load slot", default=current_slot_name).strip() or current_slot_name
+        slot_name = ask_text_input("Load slot", default=current_slot_name)
         try:
             loaded_game = coordinator.load_game(slot_name)
         except PersistenceError as error:
             console.print(Panel.fit(str(error), title="Load Failed", border_style="red"))
             return state, rng, current_slot_name
 
+        logger.debug("Loaded game from slot %s at %s.", loaded_game.slot_name, db_path)
         console.print(
             Panel.fit(
                 f"Loaded slot '{loaded_game.slot_name}' from {db_path}.",
@@ -539,9 +667,37 @@ def announce_loaded_game(db_path: Path, slot_name: str, seed: Optional[int]) -> 
     )
 
 
+def configure_cli(debug: bool) -> None:
+    """Configure console logging and traceback behavior for the CLI session."""
+
+    global console, DEBUG_MODE
+
+    console = Console(highlight=False, soft_wrap=True)
+    logging.basicConfig(
+        level=logging.DEBUG if debug else logging.WARNING,
+        format="%(message)s",
+        handlers=[
+            RichHandler(
+                console=console,
+                show_time=False,
+                show_path=debug,
+                markup=True,
+                rich_tracebacks=debug,
+                tracebacks_show_locals=debug,
+            )
+        ],
+        force=True,
+    )
+    DEBUG_MODE = debug
+    if debug:
+        install_rich_traceback(console=console, show_locals=True)
+        logger.debug("Debug mode enabled.")
+
+
 def raise_cli_persistence_error(title: str, error: PersistenceError) -> None:
     """Render a persistence failure and exit the command."""
 
+    logger.error("%s: %s", title, error)
     console.print(Panel.fit(str(error), title=title, border_style="red"))
     raise typer.Exit(code=1)
 
@@ -549,7 +705,22 @@ def raise_cli_persistence_error(title: str, error: PersistenceError) -> None:
 def main() -> None:
     """CLI wrapper used by `python -m` and console scripts."""
 
-    app()
+    try:
+        app()
+    except typer.Exit:
+        raise
+    except Exception as error:
+        if DEBUG_MODE:
+            console.print_exception(show_locals=True)
+        else:
+            console.print(
+                Panel.fit(
+                    f"{type(error).__name__}: {error}",
+                    title="Unexpected Error",
+                    border_style="red",
+                )
+            )
+        raise typer.Exit(code=1) from error
 
 
 if __name__ == "__main__":
