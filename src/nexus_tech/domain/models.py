@@ -1,7 +1,10 @@
 """Validated domain entities for the game."""
 
+from __future__ import annotations
+
 from decimal import Decimal
 from enum import Enum
+from typing import Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -19,6 +22,23 @@ class LifecycleStage(str, Enum):
     SUNSET = "sunset"
 
 
+class EmployeeRole(str, Enum):
+    """Supported employee roles in the company."""
+
+    ENGINEER = "engineer"
+    DESIGNER = "designer"
+    MARKETER = "marketer"
+    PRODUCT_MANAGER = "product_manager"
+
+
+class Seniority(str, Enum):
+    """Seniority band for an employee."""
+
+    JUNIOR = "junior"
+    MID = "mid"
+    SENIOR = "senior"
+
+
 class TurnAction(str, Enum):
     """Actions the player can take during a turn."""
 
@@ -28,6 +48,12 @@ class TurnAction(str, Enum):
     REDUCE_TECHNICAL_DEBT = "reduce_technical_debt"
     MARKET_PRODUCT = "market_product"
     SUNSET_PRODUCT = "sunset_product"
+    HIRE_EMPLOYEE = "hire_employee"
+    FIRE_EMPLOYEE = "fire_employee"
+    ASSIGN_EMPLOYEE = "assign_employee"
+    UNASSIGN_EMPLOYEE = "unassign_employee"
+    REST_TEAM = "rest_team"
+    REVIEW_TEAM = "review_team"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
     END_TURN = "end_turn"
@@ -82,6 +108,28 @@ class Product(BaseModel):
         return quantize_rate(value)
 
 
+class Employee(BaseModel):
+    """A single employee in the company."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    full_name: str = Field(min_length=1, max_length=80)
+    role: EmployeeRole
+    seniority: Seniority
+    salary: Decimal = Field(ge=Decimal("0"))
+    energy: int = Field(ge=0, le=100)
+    morale: int = Field(ge=0, le=100)
+    productivity: int = Field(ge=0, le=100)
+    specialization: str = Field(min_length=1, max_length=40)
+    assigned_product_id: Optional[UUID] = None
+
+    @field_validator("salary", mode="before")
+    @classmethod
+    def _normalize_salary(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+
 class GameState(BaseModel):
     """Current in-memory game state."""
 
@@ -89,4 +137,5 @@ class GameState(BaseModel):
 
     company: Company
     products: list[Product] = Field(min_length=1)
+    employees: list[Employee] = Field(default_factory=list)
     action_points_remaining: int = Field(ge=0)

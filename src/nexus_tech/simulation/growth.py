@@ -3,10 +3,11 @@
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-from nexus_tech.domain.models import Company, LifecycleStage, Product
+from nexus_tech.domain.models import Company, Employee, LifecycleStage, Product
 from nexus_tech.domain.money import quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.team import ProductTeamModifier, calculate_product_team_modifier
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,12 @@ STAGE_CHURN_MODIFIER = {
 }
 
 
-def calculate_acquired_users(company: Company, product: Product, rng: RandomLike) -> int:
+def calculate_acquired_users(
+    company: Company,
+    product: Product,
+    rng: RandomLike,
+    team_modifier: ProductTeamModifier,
+) -> int:
     """Estimate new users joining a product this turn."""
 
     if not product.is_active:
@@ -58,11 +64,14 @@ def calculate_acquired_users(company: Company, product: Product, rng: RandomLike
         base_from_rate
         + acquisition_signal
         + STAGE_ACQUISITION_MODIFIER[product.lifecycle_stage]
+        + team_modifier.acquisition_bonus
         + rng.randint(-BALANCE.acquisition_random_swing, BALANCE.acquisition_random_swing)
     )
     acquisition_cap = max(
         BALANCE.acquisition_cap_base,
-        (product.user_count // BALANCE.acquisition_cap_divisor) + BALANCE.acquisition_cap_base,
+        (product.user_count // BALANCE.acquisition_cap_divisor)
+        + BALANCE.acquisition_cap_base
+        + team_modifier.acquisition_bonus,
     )
     return max(0, min(acquisition_cap, acquisition))
 
@@ -99,10 +108,15 @@ def calculate_churned_users(product: Product, rng: RandomLike) -> int:
     return max(0, min(product.user_count, churned_users))
 
 
-def resolve_growth(company: Company, product: Product, rng: RandomLike) -> GrowthResult:
+def resolve_growth(
+    company: Company,
+    product: Product,
+    rng: RandomLike,
+    team_modifier: ProductTeamModifier,
+) -> GrowthResult:
     """Resolve both acquisition and churn for one product."""
 
-    acquired_users = calculate_acquired_users(company, product, rng)
+    acquired_users = calculate_acquired_users(company, product, rng, team_modifier)
     churned_users = calculate_churned_users(product, rng)
     net_user_delta = acquired_users - churned_users
     return GrowthResult(
@@ -115,6 +129,7 @@ def resolve_growth(company: Company, product: Product, rng: RandomLike) -> Growt
 def calculate_company_reputation_delta(
     company: Company,
     products: list[Product],
+    employees: list[Employee],
     rng: RandomLike,
 ) -> int:
     """Move company reputation based on portfolio health."""
@@ -146,5 +161,10 @@ def calculate_company_reputation_delta(
         else:
             base_delta = 0
 
-    delta = base_delta + rng.randint(-1, 1)
-    return max(-2, min(2, delta))
+    reputation_support = sum(
+        calculate_product_team_modifier(employees, product.id).reputation_bonus
+        for product in active_products
+    )
+    designer_bonus = min(1, reputation_support)
+    delta = base_delta + designer_bonus + rng.randint(-1, 1)
+    return max(-2, min(3, delta))

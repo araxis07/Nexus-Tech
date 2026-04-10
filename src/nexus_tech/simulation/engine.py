@@ -1,13 +1,23 @@
-"""Turn orchestration for Phase 2."""
+"""Turn orchestration for Phase 3."""
+
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
-from nexus_tech.domain.models import Company, GameState, LifecycleStage, Product, TurnAction
-from nexus_tech.domain.money import quantize_money
+from nexus_tech.domain.models import (
+    Company,
+    Employee,
+    EmployeeRole,
+    GameState,
+    LifecycleStage,
+    Product,
+    Seniority,
+    TurnAction,
+)
+from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.economy import (
     calculate_product_operating_cost,
@@ -15,6 +25,7 @@ from nexus_tech.simulation.economy import (
     calculate_total_operating_cost,
     calculate_total_product_operating_cost,
     calculate_total_revenue,
+    calculate_total_salary_cost,
     is_game_over,
 )
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
@@ -30,8 +41,33 @@ from nexus_tech.simulation.product_progression import (
     infer_lifecycle_stage,
 )
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.team import (
+    TeamCondition,
+    apply_end_of_turn_team_drift,
+    apply_rest_team,
+    assign_employee,
+    calculate_product_team_modifier,
+    calculate_team_condition,
+    create_employee,
+    get_employee_by_id,
+    unassign_employee,
+    unassign_employees_from_product,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ActionContext:
+    """Optional inputs attached to a player action."""
+
+    target_product_id: UUID | None = None
+    employee_id: UUID | None = None
+    new_product_name: str | None = None
+    hire_full_name: str | None = None
+    hire_role: EmployeeRole | None = None
+    hire_seniority: Seniority | None = None
+    hire_specialization: str | None = None
 
 
 @dataclass(frozen=True)
@@ -68,10 +104,12 @@ class TurnResolution:
     total_revenue: Decimal
     baseline_operating_cost: Decimal
     total_product_operating_cost: Decimal
+    total_salary_cost: Decimal
     total_operating_cost: Decimal
     net_cash_flow: Decimal
     reputation_delta: int
     product_summaries: list[ProductTurnSummary]
+    team_condition: TeamCondition
     narrative: str
 
 
@@ -101,6 +139,7 @@ def create_new_game(company_name: str, product_name: str) -> GameState:
     return GameState(
         company=company,
         products=[product],
+        employees=[],
         action_points_remaining=BALANCE.actions_per_turn,
     )
 
@@ -108,10 +147,11 @@ def create_new_game(company_name: str, product_name: str) -> GameState:
 def apply_action(
     state: GameState,
     action: TurnAction,
-    target_product_id: Optional[UUID] = None,
-    new_product_name: Optional[str] = None,
+    context: ActionContext | None = None,
 ) -> ActionOutcome:
     """Apply a player action without running the end-of-turn simulation."""
+
+    context = context or ActionContext()
 
     if state.company.game_over:
         return ActionOutcome(
@@ -120,27 +160,29 @@ def apply_action(
             turn_should_end=True,
         )
 
-    if action in (TurnAction.VIEW_STATUS, TurnAction.END_TURN):
+    if action in (TurnAction.VIEW_STATUS, TurnAction.REVIEW_TEAM, TurnAction.END_TURN):
         if action is TurnAction.VIEW_STATUS:
             return ActionOutcome(state=state, message="Status refreshed.")
+        if action is TurnAction.REVIEW_TEAM:
+            return ActionOutcome(state=state, message="Team review refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
 
     if state.action_points_remaining <= 0:
         return ActionOutcome(
             state=state,
-            message="No action points remaining. View status or end the turn.",
+            message="No action points remaining. Review status or end the turn.",
         )
 
     next_state = state.model_copy(deep=True)
     next_state.action_points_remaining -= 1
 
     if action is TurnAction.CREATE_PRODUCT:
-        if new_product_name is None:
+        if context.new_product_name is None:
             raise ValueError("A name is required to create a product.")
         if next_state.company.cash_on_hand < BALANCE.create_product_cost:
             raise ValueError("Not enough cash to create a new product.")
 
-        product = create_product(new_product_name, next_state.products)
+        product = create_product(context.new_product_name, next_state.products)
         next_state.company.cash_on_hand = quantize_money(
             next_state.company.cash_on_hand - BALANCE.create_product_cost
         )
@@ -156,29 +198,94 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.HIRE_EMPLOYEE:
+        if (
+            context.hire_full_name is None
+            or context.hire_role is None
+            or context.hire_seniority is None
+        ):
+            raise ValueError("Hiring requires a name, role, and seniority.")
+
+        employee = create_employee(
+            full_name=context.hire_full_name,
+            role=context.hire_role,
+            seniority=context.hire_seniority,
+            specialization=context.hire_specialization,
+            existing_employees=next_state.employees,
+        )
+        next_state.employees.append(employee)
+        team_condition = calculate_team_condition(next_state.employees)
+        logger.debug("Hired employee %s.", employee.full_name)
+        return ActionOutcome(
+            state=next_state,
+            message=(
+                f"Hired {employee.full_name} ({employee.role.value}, {employee.seniority.value}). "
+                f"Salary burn is now {format_money(team_condition.total_salary_cost)} per turn."
+            ),
+        )
+
+    if action is TurnAction.FIRE_EMPLOYEE:
+        employee = get_employee_by_id(next_state.employees, context.employee_id)
+        next_state.employees = [
+            team_member
+            for team_member in next_state.employees
+            if team_member.id != employee.id
+        ]
+        team_condition = calculate_team_condition(next_state.employees)
+        logger.debug("Fired employee %s.", employee.full_name)
+        return ActionOutcome(
+            state=next_state,
+            message=(
+                f"Fired {employee.full_name}. "
+                f"Salary burn is now {format_money(team_condition.total_salary_cost)} per turn."
+            ),
+        )
+
+    if action is TurnAction.ASSIGN_EMPLOYEE:
+        employee = get_employee_by_id(next_state.employees, context.employee_id)
+        product = get_target_product(next_state, context.target_product_id)
+        summary = assign_employee(employee, product.id)
+        logger.debug("Assigned employee %s to %s.", employee.full_name, product.name)
+        return ActionOutcome(
+            state=next_state,
+            message=f"{summary.message} {employee.full_name} -> {product.name}.",
+        )
+
+    if action is TurnAction.UNASSIGN_EMPLOYEE:
+        employee = get_employee_by_id(next_state.employees, context.employee_id)
+        summary = unassign_employee(employee)
+        logger.debug("Unassigned employee %s.", employee.full_name)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.REST_TEAM:
+        summary = apply_rest_team(next_state.employees)
+        logger.debug("Rested the team.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.WAIT:
         logger.debug("Applied wait action.")
         return ActionOutcome(
             state=next_state,
-            message="You held position and let the portfolio breathe for a turn.",
+            message="You held position and let the company breathe for a turn.",
         )
 
-    product = get_target_product(next_state, target_product_id)
+    product = get_target_product(next_state, context.target_product_id)
+    team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
 
     if action is TurnAction.IMPROVE_QUALITY:
-        summary = apply_improve_quality(product)
+        summary = apply_improve_quality(product, team_modifier)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.ADD_FEATURE:
-        summary = apply_add_feature(product)
+        summary = apply_add_feature(product, team_modifier)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.REDUCE_TECHNICAL_DEBT:
-        summary = apply_reduce_technical_debt(product)
+        summary = apply_reduce_technical_debt(product, team_modifier)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.MARKET_PRODUCT:
-        summary = apply_marketing(next_state.company, product)
+        summary = apply_marketing(next_state.company, product, team_modifier)
         next_state.company.game_over = is_game_over(next_state.company)
         return ActionOutcome(
             state=next_state,
@@ -188,13 +295,20 @@ def apply_action(
 
     if action is TurnAction.SUNSET_PRODUCT:
         summary = apply_sunset_product(product)
-        return ActionOutcome(state=next_state, message=summary.message)
+        unassigned_count = unassign_employees_from_product(next_state.employees, product.id)
+        extra_note = ""
+        if unassigned_count > 0:
+            extra_note = f" {unassigned_count} team member(s) were moved to unassigned."
+        return ActionOutcome(
+            state=next_state,
+            message=f"{summary.message}{extra_note}",
+        )
 
     raise ValueError(f"Unsupported action: {action.value}")
 
 
 def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
-    """Run the end-of-turn simulation tick across the portfolio."""
+    """Run the end-of-turn simulation tick across the portfolio and team."""
 
     resolved_turn = state.company.current_turn
     next_state = state.model_copy(deep=True)
@@ -202,7 +316,11 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
 
     total_revenue = calculate_total_revenue(next_state.products)
     total_product_operating_cost = calculate_total_product_operating_cost(next_state.products)
-    total_operating_cost = calculate_total_operating_cost(next_state.products)
+    total_salary_cost = calculate_total_salary_cost(next_state.employees)
+    total_operating_cost = calculate_total_operating_cost(
+        next_state.products,
+        next_state.employees,
+    )
     net_cash_flow = quantize_money(total_revenue - total_operating_cost)
 
     next_state.company.cash_on_hand = quantize_money(
@@ -212,11 +330,12 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     for product in next_state.products:
         revenue = calculate_product_revenue(product)
         operating_cost = calculate_product_operating_cost(product)
+        team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
 
-        growth_result = resolve_growth(next_state.company, product, rng)
+        growth_result = resolve_growth(next_state.company, product, rng, team_modifier)
         product.user_count = max(0, product.user_count + growth_result.net_user_delta)
 
-        drift: ProductDrift = apply_end_of_turn_progression(product, rng)
+        drift: ProductDrift = apply_end_of_turn_progression(product, rng, team_modifier)
 
         product_summaries.append(
             ProductTurnSummary(
@@ -236,12 +355,19 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     reputation_delta = calculate_company_reputation_delta(
         next_state.company,
         next_state.products,
+        next_state.employees,
         rng,
     )
     next_state.company.reputation = clamp_int(
         next_state.company.reputation + reputation_delta,
         0,
         100,
+    )
+
+    team_condition = apply_end_of_turn_team_drift(
+        next_state.employees,
+        next_state.products,
+        net_cash_flow,
     )
 
     next_state.company.game_over = is_game_over(next_state.company)
@@ -253,6 +379,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         net_cash_flow=net_cash_flow,
         reputation_delta=reputation_delta,
         product_summaries=product_summaries,
+        team_condition=team_condition,
         game_over=next_state.company.game_over,
     )
     logger.debug("Resolved turn %s.", resolved_turn)
@@ -263,10 +390,12 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         total_revenue=total_revenue,
         baseline_operating_cost=BALANCE.base_operating_cost,
         total_product_operating_cost=total_product_operating_cost,
+        total_salary_cost=total_salary_cost,
         total_operating_cost=total_operating_cost,
         net_cash_flow=net_cash_flow,
         reputation_delta=reputation_delta,
         product_summaries=product_summaries,
+        team_condition=team_condition,
         narrative=narrative,
     )
 
@@ -279,7 +408,24 @@ def get_product_choices(state: GameState, active_only: bool = True) -> list[Prod
     return list(state.products)
 
 
-def get_target_product(state: GameState, product_id: Optional[UUID]) -> Product:
+def get_employee_choices(
+    state: GameState,
+    assigned_only: bool | None = None,
+) -> list[Employee]:
+    """Return employees available for CLI target selection."""
+
+    if assigned_only is True:
+        return [
+            employee
+            for employee in state.employees
+            if employee.assigned_product_id is not None
+        ]
+    if assigned_only is False:
+        return [employee for employee in state.employees if employee.assigned_product_id is None]
+    return list(state.employees)
+
+
+def get_target_product(state: GameState, product_id: UUID | None) -> Product:
     """Resolve a target product from the current state."""
 
     if product_id is None:
@@ -304,12 +450,13 @@ def build_turn_narrative(
     net_cash_flow: Decimal,
     reputation_delta: int,
     product_summaries: list[ProductTurnSummary],
+    team_condition: TeamCondition,
     game_over: bool,
 ) -> str:
     """Generate a concise story beat for the turn summary."""
 
     if game_over:
-        return "The company ran out of cash. The portfolio could not carry the burn."
+        return "The company ran out of cash. Payroll and product burn outpaced the business."
 
     total_user_delta = sum(summary.net_user_delta for summary in product_summaries)
     declining_products = [
@@ -319,15 +466,17 @@ def build_turn_narrative(
         summary for summary in product_summaries if summary.net_user_delta > 0
     ]
 
-    if net_cash_flow > 0 and len(expanding_products) >= 2:
-        return "The portfolio is compounding. More than one product is pulling its weight."
+    if team_condition.burned_out_count > 0 and net_cash_flow < Decimal("0.00"):
+        return "Burnout is creeping in while the company is still burning cash."
+    if net_cash_flow > Decimal("0.00") and len(expanding_products) >= 2:
+        return "The portfolio and team are compounding together."
     if declining_products and reputation_delta < 0:
-        return "Weak products are dragging the company brand down."
-    if total_user_delta > 0 and net_cash_flow > 0:
-        return "Your strategy is landing. Growth and cash flow moved in the right direction."
-    if net_cash_flow < 0:
-        return "The company is still buying time. Burn discipline matters this turn."
-    return "The portfolio held steady this turn."
+        return "Weak products are dragging the brand down despite the team's effort."
+    if total_user_delta > 0 and net_cash_flow > Decimal("0.00"):
+        return "Your team is converting effort into growth and cash flow."
+    if net_cash_flow < Decimal("0.00"):
+        return "The company is still buying time. Payroll pressure is now part of the puzzle."
+    return "The company held steady this turn."
 
 
 def clamp_int(value: int, minimum: int, maximum: int) -> int:

@@ -1,6 +1,6 @@
-"""Central tuning values for Phase 2."""
+"""Central tuning values for Phase 3."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 
@@ -110,6 +110,67 @@ class BalanceConfig:
     declining_bug_threshold: int = 42
     declining_debt_threshold: int = 55
     declining_market_fit_threshold: int = 28
+
+    employee_starting_energy: int = 82
+    employee_starting_morale: int = 76
+    employee_rest_energy_gain: int = 22
+    employee_rest_morale_gain: int = 14
+    employee_assigned_energy_loss: int = 8
+    employee_assigned_morale_loss: int = 1
+    employee_unassigned_energy_recovery: int = 4
+    employee_unassigned_morale_recovery: int = 1
+    employee_burnout_energy_threshold: int = 35
+    employee_low_morale_threshold: int = 45
+    employee_burnout_morale_penalty: int = 2
+    employee_negative_cash_flow_morale_penalty: int = 1
+    employee_pressure_bug_divisor: int = 18
+    employee_pressure_debt_divisor: int = 24
+    employee_role_base_salary: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "engineer": Decimal("720.00"),
+            "designer": Decimal("620.00"),
+            "marketer": Decimal("640.00"),
+            "product_manager": Decimal("760.00"),
+        }
+    )
+    employee_role_base_productivity: dict[str, int] = field(
+        default_factory=lambda: {
+            "engineer": 66,
+            "designer": 58,
+            "marketer": 62,
+            "product_manager": 60,
+        }
+    )
+    employee_seniority_salary_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "junior": Decimal("0.85"),
+            "mid": Decimal("1.00"),
+            "senior": Decimal("1.25"),
+        }
+    )
+    employee_seniority_productivity_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "junior": -4,
+            "mid": 0,
+            "senior": 8,
+        }
+    )
+    employee_default_specializations: dict[str, str] = field(
+        default_factory=lambda: {
+            "engineer": "platform",
+            "designer": "ux",
+            "marketer": "growth",
+            "product_manager": "delivery",
+        }
+    )
+    team_build_bonus_divisor: int = 44
+    team_stability_bonus_divisor: int = 48
+    team_market_fit_bonus_divisor: int = 52
+    team_acquisition_bonus_divisor: int = 45
+    team_reputation_bonus_divisor: int = 75
+    team_debt_bonus_divisor: int = 38
+    team_coordination_bonus_divisor: int = 36
+    team_burnout_protection_divisor: int = 55
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

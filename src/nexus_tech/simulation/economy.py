@@ -1,8 +1,8 @@
-"""Economy rules for revenue, maintenance, and company burn."""
+"""Economy rules for revenue, maintenance, salary, and company burn."""
 
 from decimal import Decimal
 
-from nexus_tech.domain.models import Company, Product
+from nexus_tech.domain.models import Company, Employee, Product
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 
@@ -49,11 +49,23 @@ def calculate_total_product_operating_cost(products: list[Product]) -> Decimal:
     return quantize_money(total)
 
 
-def calculate_total_operating_cost(products: list[Product]) -> Decimal:
-    """Company burn including baseline cost and active product load."""
+def calculate_total_salary_cost(employees: list[Employee]) -> Decimal:
+    """Aggregate recurring salary burden."""
+
+    total = sum((employee.salary for employee in employees), Decimal("0.00"))
+    return quantize_money(total)
+
+
+def calculate_total_operating_cost(
+    products: list[Product],
+    employees: list[Employee],
+) -> Decimal:
+    """Company burn including baseline cost, product load, and salaries."""
 
     return quantize_money(
-        BALANCE.base_operating_cost + calculate_total_product_operating_cost(products)
+        BALANCE.base_operating_cost
+        + calculate_total_product_operating_cost(products)
+        + calculate_total_salary_cost(employees)
     )
 
 
