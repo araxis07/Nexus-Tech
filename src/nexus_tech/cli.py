@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -19,11 +20,14 @@ from nexus_tech.domain.models import (
     Seniority,
     TurnAction,
 )
+from nexus_tech.persistence.errors import PersistenceError
+from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
     render_dashboard,
     render_event_result,
     render_game_over,
     render_intro,
+    render_pending_event,
     render_team_view,
     render_turn_resolution,
 )
@@ -41,6 +45,8 @@ from nexus_tech.simulation.randomness import RandomSource
 
 app = typer.Typer(add_completion=False, help="NEXUS TECH terminal management simulation.")
 console = Console()
+DEFAULT_DB_PATH = Path("nexus-tech.db")
+DB_PATH_OPTION = typer.Option(DEFAULT_DB_PATH, "--db-path", help="SQLite save file path.")
 
 ACTION_KEYS = {
     "1": TurnAction.CREATE_PRODUCT,
@@ -59,6 +65,11 @@ ACTION_KEYS = {
     "14": TurnAction.VIEW_STATUS,
     "15": TurnAction.END_TURN,
 }
+UTILITY_ACTION_KEYS = {
+    "16": "save_game",
+    "17": "load_game",
+}
+ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
 PRODUCT_TARGETED_ACTIONS = {
     TurnAction.IMPROVE_QUALITY,
@@ -69,26 +80,163 @@ PRODUCT_TARGETED_ACTIONS = {
 }
 
 
-@app.command()
-def play(
+@app.callback(invoke_without_command=True)
+def root(
+    ctx: typer.Context,
     company_name: str = typer.Option("NEXUS TECH", "--company-name", help="Company display name."),
     product_name: str = typer.Option("Nexus One", "--product-name", help="Initial product name."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
+    db_path: Path = DB_PATH_OPTION,
+    slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
 ) -> None:
-    """Start a new local game."""
+    """Start a new local game when no subcommand is given."""
+
+    if ctx.invoked_subcommand is not None:
+        return
+    start_new_game(
+        company_name=company_name,
+        product_name=product_name,
+        seed=seed,
+        db_path=db_path,
+        slot_name=slot,
+    )
+
+
+@app.command("new-game")
+def new_game_command(
+    company_name: str = typer.Option("NEXUS TECH", "--company-name", help="Company display name."),
+    product_name: str = typer.Option("Nexus One", "--product-name", help="Initial product name."),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
+    db_path: Path = DB_PATH_OPTION,
+    slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
+) -> None:
+    """Start a brand new local game."""
+
+    start_new_game(
+        company_name=company_name,
+        product_name=product_name,
+        seed=seed,
+        db_path=db_path,
+        slot_name=slot,
+    )
+
+
+@app.command("play", hidden=True)
+def play_alias(
+    company_name: str = typer.Option("NEXUS TECH", "--company-name", help="Company display name."),
+    product_name: str = typer.Option("Nexus One", "--product-name", help="Initial product name."),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
+    db_path: Path = DB_PATH_OPTION,
+    slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
+) -> None:
+    """Backward-compatible alias for starting a new game."""
+
+    start_new_game(
+        company_name=company_name,
+        product_name=product_name,
+        seed=seed,
+        db_path=db_path,
+        slot_name=slot,
+    )
+
+
+@app.command("load-game")
+def load_game_command(
+    db_path: Path = DB_PATH_OPTION,
+    slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Save slot name."),
+) -> None:
+    """Load one named save slot and continue playing."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        loaded_game = coordinator.load_game(slot)
+    except PersistenceError as error:
+        raise_cli_persistence_error("Load Failed", error)
+
+    announce_loaded_game(
+        db_path=db_path,
+        slot_name=loaded_game.slot_name,
+        seed=loaded_game.rng.seed,
+    )
+    run_game_loop(
+        state=loaded_game.state,
+        rng=loaded_game.rng,
+        db_path=db_path,
+        slot_name=loaded_game.slot_name,
+    )
+
+
+@app.command("continue-last-game")
+def continue_last_game_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Load the most recently updated save slot."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        loaded_game = coordinator.continue_last_game()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Load Failed", error)
+
+    announce_loaded_game(
+        db_path=db_path,
+        slot_name=loaded_game.slot_name,
+        seed=loaded_game.rng.seed,
+    )
+    run_game_loop(
+        state=loaded_game.state,
+        rng=loaded_game.rng,
+        db_path=db_path,
+        slot_name=loaded_game.slot_name,
+    )
+
+
+def start_new_game(
+    company_name: str,
+    product_name: str,
+    seed: Optional[int],
+    db_path: Path,
+    slot_name: str,
+) -> None:
+    """Create a brand new run and enter the interactive loop."""
 
     state = create_new_game(company_name=company_name, product_name=product_name)
     rng = RandomSource(seed=seed)
-
     render_intro(console, company_name=company_name, seed=seed)
+    run_game_loop(state=state, rng=rng, db_path=db_path, slot_name=slot_name)
+
+
+def run_game_loop(
+    state: GameState,
+    rng: RandomSource,
+    db_path: Path,
+    slot_name: str,
+) -> None:
+    """Run the terminal session until the company shuts down or the user exits."""
 
     try:
         while not state.company.game_over:
+            if state.pending_event is not None:
+                state = handle_pending_event(state)
+
             render_dashboard(console, state)
             turn_ended = False
 
             while not turn_ended and not state.company.game_over:
-                choice = Prompt.ask("Choose an action", choices=list(ACTION_KEYS), default="15")
+                choice = Prompt.ask("Choose an action", choices=ALL_MENU_KEYS, default="15")
+
+                if choice in UTILITY_ACTION_KEYS:
+                    state, rng, slot_name = handle_utility_action(
+                        action_name=UTILITY_ACTION_KEYS[choice],
+                        state=state,
+                        rng=rng,
+                        db_path=db_path,
+                        current_slot_name=slot_name,
+                    )
+                    if state.pending_event is not None:
+                        state = handle_pending_event(state)
+                    continue
+
                 action = ACTION_KEYS[choice]
 
                 try:
@@ -120,9 +268,6 @@ def play(
             resolution = resolve_turn(state, rng)
             state = resolution.state
             render_turn_resolution(console, resolution)
-
-            if state.pending_event is not None:
-                state = handle_pending_event(state)
 
         render_game_over(console, state)
     except KeyboardInterrupt as error:
@@ -285,6 +430,7 @@ def handle_pending_event(state: GameState) -> GameState:
     if pending_event is None:
         return state
 
+    render_pending_event(console, pending_event)
     option_id = choose_event_option_id(pending_event)
     outcome = resolve_pending_event(state, option_id)
     render_event_result(console, outcome.history_entry)
@@ -330,6 +476,74 @@ def build_employee_selection_summary(
         f"Energy: {employee.energy} | Morale: {employee.morale} | "
         f"Assignment: {assignment_name}"
     )
+
+
+def handle_utility_action(
+    action_name: str,
+    state: GameState,
+    rng: RandomSource,
+    db_path: Path,
+    current_slot_name: str,
+) -> tuple[GameState, RandomSource, str]:
+    """Handle non-simulation utility actions from the CLI menu."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+
+    if action_name == "save_game":
+        slot_name = Prompt.ask("Save slot", default=current_slot_name).strip() or current_slot_name
+        try:
+            coordinator.save_game(slot_name=slot_name, state=state, rng=rng)
+        except PersistenceError as error:
+            console.print(Panel.fit(str(error), title="Save Failed", border_style="red"))
+            return state, rng, current_slot_name
+
+        console.print(
+            Panel.fit(
+                f"Saved game to slot '{slot_name}' at {db_path}.",
+                title="Save Complete",
+                border_style="green",
+            )
+        )
+        return state, rng, slot_name
+
+    if action_name == "load_game":
+        slot_name = Prompt.ask("Load slot", default=current_slot_name).strip() or current_slot_name
+        try:
+            loaded_game = coordinator.load_game(slot_name)
+        except PersistenceError as error:
+            console.print(Panel.fit(str(error), title="Load Failed", border_style="red"))
+            return state, rng, current_slot_name
+
+        console.print(
+            Panel.fit(
+                f"Loaded slot '{loaded_game.slot_name}' from {db_path}.",
+                title="Load Complete",
+                border_style="green",
+            )
+        )
+        return loaded_game.state, loaded_game.rng, loaded_game.slot_name
+
+    raise ValueError(f"Unsupported utility action: {action_name}")
+
+
+def announce_loaded_game(db_path: Path, slot_name: str, seed: Optional[int]) -> None:
+    """Print a concise load banner before entering the loop."""
+
+    seed_text = seed if seed is not None else "random"
+    console.print(
+        Panel.fit(
+            f"Loaded slot '{slot_name}' from {db_path}\nSeed: {seed_text}",
+            title="Continue Game",
+            border_style="green",
+        )
+    )
+
+
+def raise_cli_persistence_error(title: str, error: PersistenceError) -> None:
+    """Render a persistence failure and exit the command."""
+
+    console.print(Panel.fit(str(error), title=title, border_style="red"))
+    raise typer.Exit(code=1)
 
 
 def main() -> None:

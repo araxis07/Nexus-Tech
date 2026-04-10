@@ -23,9 +23,10 @@ def render_intro(console: Console, company_name: str, seed: int | None) -> None:
                 f"[bold cyan]NEXUS TECH[/bold cyan]\n"
                 f"Company: [bold]{company_name}[/bold]\n"
                 f"{seed_text}\n\n"
-                "Goal: manage products, teams, and dynamic business events without losing control."
+                "Goal: manage products, teams, events, and persistent "
+                "local runs without losing control."
             ),
-            title="Phase 4 Event Engine",
+            title="Phase 5 SQLite Persistence",
             border_style="cyan",
         )
     )
@@ -270,6 +271,8 @@ def _build_action_table() -> Table:
     table.add_row("13", "wait", "no", "Spend no cash and do no work.")
     table.add_row("14", "view_status", "no", "Refresh the dashboard.")
     table.add_row("15", "end_turn", "no", "Run the simulation tick.")
+    table.add_row("16", "save_game", "no", "Persist the current run to SQLite.")
+    table.add_row("17", "load_game", "no", "Load a saved run from SQLite.")
     return table
 
 
