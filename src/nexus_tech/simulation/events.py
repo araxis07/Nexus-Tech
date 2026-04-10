@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from nexus_tech.domain.models import EventHistoryEntry, GameState, PendingEvent
 from nexus_tech.simulation.balance import BALANCE
@@ -20,8 +19,8 @@ class EventTurnOutcome:
     """Result of the event engine for a resolved business turn."""
 
     state: GameState
-    pending_event: Optional[PendingEvent] = None
-    history_entry: Optional[EventHistoryEntry] = None
+    pending_event: PendingEvent | None = None
+    history_entry: EventHistoryEntry | None = None
 
 
 def get_eligible_event_definitions(state: GameState) -> list[EventDefinition]:
@@ -56,7 +55,7 @@ def select_event_definition(
     state: GameState,
     rng: RandomLike,
     enforce_trigger_roll: bool = True,
-) -> Optional[EventDefinition]:
+) -> EventDefinition | None:
     """Choose one weighted eligible event definition, if any."""
 
     if state.pending_event is not None or state.company.game_over:

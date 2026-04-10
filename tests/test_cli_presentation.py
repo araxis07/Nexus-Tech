@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
+from _pytest.monkeypatch import MonkeyPatch
 from rich.console import Console
 from typer.testing import CliRunner
 
@@ -111,7 +112,10 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
     assert "--debug" in result.output
 
 
-def test_root_command_dispatches_to_start_new_game(monkeypatch, tmp_path: Path) -> None:
+def test_root_command_dispatches_to_start_new_game(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_start_new_game(
@@ -158,7 +162,10 @@ def test_root_command_dispatches_to_start_new_game(monkeypatch, tmp_path: Path) 
     }
 
 
-def test_new_game_command_dispatches_to_start_new_game(monkeypatch, tmp_path: Path) -> None:
+def test_new_game_command_dispatches_to_start_new_game(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_start_new_game(
@@ -203,7 +210,10 @@ def test_new_game_command_dispatches_to_start_new_game(monkeypatch, tmp_path: Pa
     assert captured["slot_name"] == "slot-b"
 
 
-def test_load_game_command_resumes_loaded_slot(monkeypatch, tmp_path: Path) -> None:
+def test_load_game_command_resumes_loaded_slot(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     state = make_demo_state()
     captured: dict[str, object] = {}
 
@@ -246,7 +256,10 @@ def test_load_game_command_resumes_loaded_slot(monkeypatch, tmp_path: Path) -> N
     assert captured["loop_slot"] == "showcase"
 
 
-def test_continue_last_game_command_resumes_latest_slot(monkeypatch, tmp_path: Path) -> None:
+def test_continue_last_game_command_resumes_latest_slot(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     state = make_demo_state()
     captured: dict[str, object] = {}
 

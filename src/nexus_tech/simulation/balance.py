@@ -1,4 +1,4 @@
-"""Central tuning values for Phase 4."""
+"""Central tuning values for the simulation."""
 
 from dataclasses import dataclass, field
 from decimal import Decimal

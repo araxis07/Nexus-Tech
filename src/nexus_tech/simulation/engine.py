@@ -1,4 +1,4 @@
-"""Turn orchestration for Phase 4."""
+"""Turn orchestration for the simulation loop."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
+from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     Company,
     Employee,
@@ -44,6 +45,7 @@ from nexus_tech.simulation.product_progression import (
     infer_lifecycle_stage,
 )
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.team import (
     TeamCondition,
     apply_end_of_turn_team_drift,
@@ -372,11 +374,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.employees,
         rng,
     )
-    next_state.company.reputation = clamp_int(
-        next_state.company.reputation + reputation_delta,
-        0,
-        100,
-    )
+    next_state.company.reputation = clamp_int(next_state.company.reputation + reputation_delta)
 
     team_condition = apply_end_of_turn_team_drift(
         next_state.employees,
@@ -486,20 +484,14 @@ def build_turn_narrative(
         summary for summary in product_summaries if summary.net_user_delta > 0
     ]
 
-    if team_condition.burned_out_count > 0 and net_cash_flow < Decimal("0.00"):
+    if team_condition.burned_out_count > 0 and net_cash_flow < ZERO_MONEY:
         return "Burnout is creeping in while the company is still burning cash."
-    if net_cash_flow > Decimal("0.00") and len(expanding_products) >= 2:
+    if net_cash_flow > ZERO_MONEY and len(expanding_products) >= 2:
         return "The portfolio and team are compounding together."
     if declining_products and reputation_delta < 0:
         return "Weak products are dragging the brand down despite the team's effort."
-    if total_user_delta > 0 and net_cash_flow > Decimal("0.00"):
+    if total_user_delta > 0 and net_cash_flow > ZERO_MONEY:
         return "Your team is converting effort into growth and cash flow."
-    if net_cash_flow < Decimal("0.00"):
+    if net_cash_flow < ZERO_MONEY:
         return "The company is still buying time. Payroll pressure is now part of the puzzle."
     return "The company held steady this turn."
-
-
-def clamp_int(value: int, minimum: int, maximum: int) -> int:
-    """Clamp an integer between two bounds."""
-
-    return max(minimum, min(maximum, value))

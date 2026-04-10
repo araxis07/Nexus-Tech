@@ -2,22 +2,17 @@
 
 from decimal import Decimal
 
+from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import Company, Employee, Product
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
-
-
-def iter_active_products(products: list[Product]) -> list[Product]:
-    """Return only products that still contribute to the business."""
-
-    return [product for product in products if product.is_active]
 
 
 def calculate_product_revenue(product: Product) -> Decimal:
     """Revenue earned by one active product during a turn."""
 
     if not product.is_active:
-        return Decimal("0.00")
+        return ZERO_MONEY
     return quantize_money(Decimal(product.user_count) * product.revenue_per_user)
 
 
@@ -25,7 +20,7 @@ def calculate_product_operating_cost(product: Product) -> Decimal:
     """Maintenance and support cost carried by one active product."""
 
     if not product.is_active:
-        return Decimal("0.00")
+        return ZERO_MONEY
 
     support_cost = Decimal(product.user_count) * BALANCE.per_user_support_cost
     debt_cost = Decimal(product.technical_debt) * BALANCE.per_debt_operating_cost
@@ -35,7 +30,7 @@ def calculate_product_operating_cost(product: Product) -> Decimal:
 def calculate_total_revenue(products: list[Product]) -> Decimal:
     """Aggregate revenue across all active products."""
 
-    total = sum((calculate_product_revenue(product) for product in products), Decimal("0.00"))
+    total = sum((calculate_product_revenue(product) for product in products), ZERO_MONEY)
     return quantize_money(total)
 
 
@@ -44,7 +39,7 @@ def calculate_total_product_operating_cost(products: list[Product]) -> Decimal:
 
     total = sum(
         (calculate_product_operating_cost(product) for product in products),
-        Decimal("0.00"),
+        ZERO_MONEY,
     )
     return quantize_money(total)
 
@@ -52,7 +47,7 @@ def calculate_total_product_operating_cost(products: list[Product]) -> Decimal:
 def calculate_total_salary_cost(employees: list[Employee]) -> Decimal:
     """Aggregate recurring salary burden."""
 
-    total = sum((employee.salary for employee in employees), Decimal("0.00"))
+    total = sum((employee.salary for employee in employees), ZERO_MONEY)
     return quantize_money(total)
 
 

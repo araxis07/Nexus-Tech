@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
+from uuid import UUID
 
-from nexus_tech.domain.models import EventHistoryEntry, GameState, PendingEvent
-from nexus_tech.domain.money import quantize_money, quantize_rate
+from nexus_tech.domain.models import Employee, EventHistoryEntry, GameState, PendingEvent, Product
+from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.economy import is_game_over
 from nexus_tech.simulation.event_registry import get_designer_or_marketer_support
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
+from nexus_tech.simulation.support import clamp_int, clamp_rate
 
 
 @dataclass(frozen=True)
@@ -82,28 +83,28 @@ def _apply_severe_bug_incident(state: GameState, event: PendingEvent, option_id:
         state.company.cash_on_hand = quantize_money(
             state.company.cash_on_hand - BALANCE.event_bug_hotfix_cost
         )
-        product.bug_level = _clamp_int(
+        product.bug_level = clamp_int(
             product.bug_level - BALANCE.event_bug_hotfix_bug_reduction,
             0,
             100,
         )
-        product.quality = _clamp_int(
+        product.quality = clamp_int(
             product.quality - BALANCE.event_bug_hotfix_quality_loss,
             0,
             100,
         )
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation - BALANCE.event_bug_hotfix_reputation_loss,
             0,
             100,
         )
         for employee in affected_employees:
-            employee.energy = _clamp_int(
+            employee.energy = clamp_int(
                 employee.energy - BALANCE.event_bug_hotfix_energy_loss,
                 0,
                 100,
             )
-            employee.morale = _clamp_int(
+            employee.morale = clamp_int(
                 employee.morale - BALANCE.event_bug_hotfix_morale_loss,
                 0,
                 100,
@@ -123,24 +124,24 @@ def _apply_severe_bug_incident(state: GameState, event: PendingEvent, option_id:
                 product.user_count // BALANCE.event_bug_delay_user_loss_divisor,
             ),
         )
-        product.bug_level = _clamp_int(
+        product.bug_level = clamp_int(
             product.bug_level + BALANCE.event_bug_delay_bug_increase,
             0,
             100,
         )
         product.user_count = max(0, product.user_count - user_loss)
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation - BALANCE.event_bug_delay_reputation_loss,
             0,
             100,
         )
         for employee in affected_employees:
-            employee.energy = _clamp_int(
+            employee.energy = clamp_int(
                 employee.energy - BALANCE.event_bug_delay_energy_loss,
                 0,
                 100,
             )
-            employee.morale = _clamp_int(
+            employee.morale = clamp_int(
                 employee.morale - BALANCE.event_bug_delay_morale_loss,
                 0,
                 100,
@@ -164,16 +165,16 @@ def _apply_favorable_market_trend(state: GameState, event: PendingEvent, option_
             state.company.cash_on_hand - BALANCE.event_market_trend_invest_cost
         )
         product.user_count += BALANCE.event_market_trend_big_user_gain
-        product.acquisition_rate = _clamp_rate(
+        product.acquisition_rate = clamp_rate(
             product.acquisition_rate + BALANCE.event_market_trend_acquisition_gain
         )
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation + BALANCE.event_market_trend_reputation_gain,
             0,
             100,
         )
         for employee in affected_employees:
-            employee.energy = _clamp_int(
+            employee.energy = clamp_int(
                 employee.energy - BALANCE.event_market_trend_energy_loss,
                 0,
                 100,
@@ -187,7 +188,7 @@ def _apply_favorable_market_trend(state: GameState, event: PendingEvent, option_
 
     if option_id == "bank_it":
         product.user_count += BALANCE.event_market_trend_small_user_gain
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation + BALANCE.event_market_trend_reputation_gain,
             0,
             100,
@@ -209,13 +210,13 @@ def _apply_investor_outreach(state: GameState, event: PendingEvent, option_id: s
         state.company.cash_on_hand = quantize_money(
             state.company.cash_on_hand + BALANCE.event_investor_cash_gain
         )
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation + BALANCE.event_investor_reputation_gain,
             0,
             100,
         )
         for employee in state.employees:
-            employee.morale = _clamp_int(
+            employee.morale = clamp_int(
                 employee.morale - BALANCE.event_investor_team_morale_penalty,
                 0,
                 100,
@@ -227,13 +228,13 @@ def _apply_investor_outreach(state: GameState, event: PendingEvent, option_id: s
         )
 
     if option_id == "stay_bootstrapped":
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation + BALANCE.event_bootstrap_reputation_gain,
             0,
             100,
         )
         for employee in state.employees:
-            employee.morale = _clamp_int(
+            employee.morale = clamp_int(
                 employee.morale + BALANCE.event_bootstrap_team_morale_gain,
                 0,
                 100,
@@ -256,16 +257,16 @@ def _apply_sudden_press_mention(state: GameState, event: PendingEvent, option_id
         product.user_count // BALANCE.event_press_user_gain_divisor,
     )
     product.user_count += gained_users
-    product.acquisition_rate = _clamp_rate(
+    product.acquisition_rate = clamp_rate(
         product.acquisition_rate + BALANCE.event_press_acquisition_gain
     )
-    state.company.reputation = _clamp_int(
+    state.company.reputation = clamp_int(
         state.company.reputation + BALANCE.event_press_reputation_gain,
         0,
         100,
     )
     for employee in get_designer_or_marketer_support(state.employees, product.id):
-        employee.morale = _clamp_int(
+        employee.morale = clamp_int(
             employee.morale + BALANCE.event_press_marketer_morale_gain,
             0,
             100,
@@ -284,12 +285,12 @@ def _apply_team_burnout_spike(state: GameState, event: PendingEvent, option_id: 
         state.company.cash_on_hand = quantize_money(
             state.company.cash_on_hand - BALANCE.event_burnout_relief_cost
         )
-        employee.energy = _clamp_int(
+        employee.energy = clamp_int(
             employee.energy + BALANCE.event_burnout_relief_energy_gain,
             0,
             100,
         )
-        employee.morale = _clamp_int(
+        employee.morale = clamp_int(
             employee.morale + BALANCE.event_burnout_relief_morale_gain,
             0,
             100,
@@ -297,7 +298,7 @@ def _apply_team_burnout_spike(state: GameState, event: PendingEvent, option_id: 
         for teammate in state.employees:
             if teammate.id == employee.id:
                 continue
-            teammate.morale = _clamp_int(
+            teammate.morale = clamp_int(
                 teammate.morale + BALANCE.event_burnout_relief_team_morale_gain,
                 0,
                 100,
@@ -309,24 +310,24 @@ def _apply_team_burnout_spike(state: GameState, event: PendingEvent, option_id: 
         )
 
     if option_id == "push_through":
-        employee.energy = _clamp_int(
+        employee.energy = clamp_int(
             employee.energy - BALANCE.event_burnout_push_energy_loss,
             0,
             100,
         )
-        employee.morale = _clamp_int(
+        employee.morale = clamp_int(
             employee.morale - BALANCE.event_burnout_push_morale_loss,
             0,
             100,
         )
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation - BALANCE.event_burnout_push_reputation_loss,
             0,
             100,
         )
         if employee.assigned_product_id is not None:
             product = _get_product_by_id(state, employee.assigned_product_id)
-            product.quality = _clamp_int(
+            product.quality = clamp_int(
                 product.quality - BALANCE.event_burnout_push_quality_loss,
                 0,
                 100,
@@ -351,23 +352,23 @@ def _apply_competitor_pressure(state: GameState, event: PendingEvent, option_id:
 
     if option_id == "rush_countermove":
         product.feature_count += BALANCE.event_competitor_rush_feature_gain
-        product.market_fit = _clamp_int(
+        product.market_fit = clamp_int(
             product.market_fit + BALANCE.event_competitor_rush_market_fit_gain,
             0,
             100,
         )
-        product.bug_level = _clamp_int(
+        product.bug_level = clamp_int(
             product.bug_level + BALANCE.event_competitor_rush_bug_increase,
             0,
             100,
         )
-        product.technical_debt = _clamp_int(
+        product.technical_debt = clamp_int(
             product.technical_debt + BALANCE.event_competitor_rush_debt_increase,
             0,
             100,
         )
         for employee in affected_employees:
-            employee.energy = _clamp_int(
+            employee.energy = clamp_int(
                 employee.energy - BALANCE.event_competitor_rush_energy_loss,
                 0,
                 100,
@@ -382,23 +383,23 @@ def _apply_competitor_pressure(state: GameState, event: PendingEvent, option_id:
 
     if option_id == "differentiate":
         user_loss = min(product.user_count, BALANCE.event_competitor_focus_user_loss)
-        product.quality = _clamp_int(
+        product.quality = clamp_int(
             product.quality + BALANCE.event_competitor_focus_quality_gain,
             0,
             100,
         )
-        product.bug_level = _clamp_int(
+        product.bug_level = clamp_int(
             product.bug_level - BALANCE.event_competitor_focus_bug_reduction,
             0,
             100,
         )
-        product.market_fit = _clamp_int(
+        product.market_fit = clamp_int(
             product.market_fit + BALANCE.event_competitor_focus_market_fit_gain,
             0,
             100,
         )
         product.user_count = max(0, product.user_count - user_loss)
-        state.company.reputation = _clamp_int(
+        state.company.reputation = clamp_int(
             state.company.reputation + BALANCE.event_competitor_focus_reputation_gain,
             0,
             100,
@@ -413,20 +414,20 @@ def _apply_competitor_pressure(state: GameState, event: PendingEvent, option_id:
     raise ValueError(f"Unsupported option {option_id} for competitor pressure.")
 
 
-def _get_target_product(state: GameState, event: PendingEvent):
+def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
     return _get_product_by_id(state, event.target_product_id)
 
 
-def _get_product_by_id(state: GameState, product_id):
+def _get_product_by_id(state: GameState, product_id: UUID) -> Product:
     for product in state.products:
         if product.id == product_id:
             return product
     raise ValueError("Event product target was not found.")
 
 
-def _get_target_employee(state: GameState, event: PendingEvent):
+def _get_target_employee(state: GameState, event: PendingEvent) -> Employee:
     if event.target_employee_id is None:
         raise ValueError("This event expected an employee target.")
     for employee in state.employees:
@@ -435,18 +436,10 @@ def _get_target_employee(state: GameState, event: PendingEvent):
     raise ValueError("Event employee target was not found.")
 
 
-def _get_assigned_employees(state: GameState, product_id) -> list:
+def _get_assigned_employees(state: GameState, product_id: UUID) -> list[Employee]:
     return [
         employee for employee in state.employees if employee.assigned_product_id == product_id
     ]
-
-
-def _clamp_int(value: int, minimum: int, maximum: int) -> int:
-    return max(minimum, min(maximum, value))
-
-
-def _clamp_rate(value: Decimal) -> Decimal:
-    return quantize_rate(max(Decimal("0.0000"), min(Decimal("1.0000"), value)))
 
 
 EVENT_EFFECT_HANDLERS = {

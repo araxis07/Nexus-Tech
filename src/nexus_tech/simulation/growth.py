@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
 from nexus_tech.domain.models import Company, Employee, LifecycleStage, Product
-from nexus_tech.domain.money import quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.support import clamp_rate
 from nexus_tech.simulation.team import ProductTeamModifier, calculate_product_team_modifier
 
 
@@ -89,7 +89,7 @@ def calculate_effective_churn_rate(product: Product) -> Decimal:
         churn_rate += Decimal(BALANCE.low_market_fit_churn_penalty) / Decimal("100")
 
     churn_rate = max(BALANCE.min_churn_rate, min(BALANCE.max_churn_rate, churn_rate))
-    return quantize_rate(churn_rate)
+    return clamp_rate(churn_rate)
 
 
 def calculate_churned_users(product: Product, rng: RandomLike) -> int:

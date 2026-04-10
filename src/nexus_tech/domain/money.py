@@ -1,9 +1,13 @@
 """Decimal-safe helpers for money and rates."""
 
+from __future__ import annotations
+
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Union
 
-NumberInput = Union[Decimal, int, float, str]
+from nexus_tech.domain.constants import PERCENT_SCALE
+
+NumberInput = Union[Decimal, int, float, str]  # noqa: UP007
 MONEY_PLACES = Decimal("0.01")
 RATE_PLACES = Decimal("0.0001")
 
@@ -29,5 +33,5 @@ def format_money(value: Decimal) -> str:
 def format_rate(value: Decimal) -> str:
     """Render a Decimal rate as a percentage string."""
 
-    percentage = quantize_rate(value) * Decimal("100")
+    percentage = quantize_rate(value) * PERCENT_SCALE
     return f"{percentage:.1f}%"

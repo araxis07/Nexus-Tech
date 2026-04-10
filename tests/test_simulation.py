@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
+from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
     Company,
     Employee,
@@ -99,7 +101,7 @@ def make_employee(
     morale: int = 76,
     productivity: int | None = None,
     specialization: str = "generalist",
-    assigned_product_id=None,
+    assigned_product_id: UUID | None = None,
 ) -> Employee:
     return Employee(
         full_name=full_name,
@@ -135,6 +137,19 @@ def make_state(
         event_history=event_history or [],
         action_points_remaining=BALANCE.actions_per_turn,
     )
+
+
+def test_product_operating_cost_includes_support_and_technical_debt() -> None:
+    product = make_product(
+        "Costly",
+        user_count=25,
+        maintenance_cost=Decimal("300.00"),
+        technical_debt=10,
+    )
+
+    operating_cost = calculate_total_operating_cost([product], [])
+
+    assert operating_cost == Decimal("1210.00")
 
 
 def test_multi_product_revenue_aggregates_only_active_products() -> None:
@@ -411,6 +426,81 @@ def test_role_specific_contributions_are_visible_in_outcomes() -> None:
 
     assert engineer_quality_gain > marketer_quality_gain
     assert marketer_user_gain > engineer_user_gain
+
+
+def test_resolve_turn_resets_action_points_for_next_turn() -> None:
+    state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
+    state.action_points_remaining = 0
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert resolution.state.company.current_turn == 2
+    assert resolution.state.action_points_remaining == BALANCE.actions_per_turn
+
+
+def test_three_turn_gameplay_integration_remains_stable() -> None:
+    state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
+    rng = RandomSource(seed=23)
+    initial_quality = state.products[0].quality
+
+    state = apply_action(
+        state,
+        TurnAction.HIRE_EMPLOYEE,
+        context=ActionContext(
+            hire_full_name="Ada Wong",
+            hire_role=EmployeeRole.ENGINEER,
+            hire_seniority=Seniority.MID,
+            hire_specialization="platform",
+        ),
+    ).state
+    employee_id = state.employees[0].id
+    state = apply_action(
+        state,
+        TurnAction.ASSIGN_EMPLOYEE,
+        context=ActionContext(
+            employee_id=employee_id,
+            target_product_id=state.products[0].id,
+        ),
+    ).state
+    state = resolve_turn(state, rng).state
+
+    state = apply_action(
+        state,
+        TurnAction.IMPROVE_QUALITY,
+        context=ActionContext(target_product_id=state.products[0].id),
+    ).state
+    state = apply_action(
+        state,
+        TurnAction.MARKET_PRODUCT,
+        context=ActionContext(target_product_id=state.products[0].id),
+    ).state
+    state = resolve_turn(state, rng).state
+
+    state = apply_action(
+        state,
+        TurnAction.CREATE_PRODUCT,
+        context=ActionContext(new_product_name="Nexus Flow"),
+    ).state
+    new_product = next(product for product in state.products if product.name == "Nexus Flow")
+    state = apply_action(
+        state,
+        TurnAction.ASSIGN_EMPLOYEE,
+        context=ActionContext(
+            employee_id=employee_id,
+            target_product_id=new_product.id,
+        ),
+    ).state
+    state = resolve_turn(state, rng).state
+
+    assert state.company.game_over is False
+    assert state.company.current_turn == 4
+    assert state.action_points_remaining == BALANCE.actions_per_turn
+    assert len(state.products) == 2
+    assert len(state.employees) == 1
+    assert state.products[0].quality > initial_quality
+    assert state.products[1].name == "Nexus Flow"
+    assert state.employees[0].assigned_product_id == new_product.id
+    assert state.company.cash_on_hand != BALANCE.starting_cash
 
 
 def test_weighted_selection_prefers_heavier_event() -> None:

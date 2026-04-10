@@ -3,10 +3,12 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from nexus_tech.domain.constants import ZERO_MONEY, ZERO_RATE
 from nexus_tech.domain.models import Company, LifecycleStage, Product
 from nexus_tech.domain.money import quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.support import clamp_int, clamp_rate
 from nexus_tech.simulation.team import ProductTeamModifier
 
 
@@ -72,13 +74,9 @@ def apply_improve_quality(
     )
     market_fit_gain = BALANCE.improve_quality_market_fit_gain + team_modifier.market_fit_bonus
 
-    product.quality = clamp_int(product.quality + quality_gain, 0, 100)
-    product.bug_level = clamp_int(product.bug_level - bug_reduction, 0, 100)
-    product.market_fit = clamp_int(
-        product.market_fit + market_fit_gain,
-        0,
-        100,
-    )
+    product.quality = clamp_int(product.quality + quality_gain)
+    product.bug_level = clamp_int(product.bug_level - bug_reduction)
+    product.market_fit = clamp_int(product.market_fit + market_fit_gain)
     product.lifecycle_stage = infer_lifecycle_stage(product)
 
     return ProductActionSummary(
@@ -124,14 +122,10 @@ def apply_add_feature(
     )
 
     product.feature_count += BALANCE.add_feature_feature_gain
-    product.quality = clamp_int(product.quality + quality_gain, 0, 100)
-    product.market_fit = clamp_int(product.market_fit + market_fit_gain, 0, 100)
-    product.bug_level = clamp_int(product.bug_level + bug_increase, 0, 100)
-    product.technical_debt = clamp_int(
-        product.technical_debt + debt_increase,
-        0,
-        100,
-    )
+    product.quality = clamp_int(product.quality + quality_gain)
+    product.market_fit = clamp_int(product.market_fit + market_fit_gain)
+    product.bug_level = clamp_int(product.bug_level + bug_increase)
+    product.technical_debt = clamp_int(product.technical_debt + debt_increase)
     product.maintenance_cost = quantize_money(
         product.maintenance_cost + BALANCE.add_feature_maintenance_increase
     )
@@ -141,7 +135,7 @@ def apply_add_feature(
     product.churn_rate = clamp_rate(
         product.churn_rate
         + max(
-            Decimal("0.0000"),
+            ZERO_RATE,
             BALANCE.add_feature_churn_rate_increase
             - quantize_rate(Decimal(team_modifier.stability_bonus) / Decimal("1000")),
         )
@@ -173,12 +167,12 @@ def apply_reduce_technical_debt(
     )
     quality_gain = BALANCE.reduce_debt_quality_gain + (team_modifier.build_speed_bonus // 2)
 
-    product.technical_debt = clamp_int(product.technical_debt - debt_reduction, 0, 100)
-    product.bug_level = clamp_int(product.bug_level - bug_reduction, 0, 100)
-    product.quality = clamp_int(product.quality + quality_gain, 0, 100)
+    product.technical_debt = clamp_int(product.technical_debt - debt_reduction)
+    product.bug_level = clamp_int(product.bug_level - bug_reduction)
+    product.quality = clamp_int(product.quality + quality_gain)
     product.maintenance_cost = quantize_money(
         max(
-            Decimal("0.00"),
+            ZERO_MONEY,
             product.maintenance_cost - BALANCE.reduce_debt_maintenance_reduction,
         )
     )
@@ -211,11 +205,7 @@ def apply_marketing(
     reputation_gain = BALANCE.marketing_reputation_gain + team_modifier.reputation_bonus
 
     company.cash_on_hand = quantize_money(company.cash_on_hand - BALANCE.marketing_cost)
-    company.reputation = clamp_int(
-        company.reputation + reputation_gain,
-        0,
-        100,
-    )
+    company.reputation = clamp_int(company.reputation + reputation_gain)
     product.user_count = max(0, product.user_count + immediate_users)
     product.acquisition_rate = clamp_rate(
         product.acquisition_rate
@@ -238,9 +228,9 @@ def apply_sunset_product(product: Product) -> ProductActionSummary:
     product.is_active = False
     product.lifecycle_stage = LifecycleStage.SUNSET
     product.user_count = 0
-    product.maintenance_cost = Decimal("0.00")
-    product.acquisition_rate = Decimal("0.0000")
-    product.churn_rate = Decimal("0.0000")
+    product.maintenance_cost = ZERO_MONEY
+    product.acquisition_rate = ZERO_RATE
+    product.churn_rate = ZERO_RATE
 
     return ProductActionSummary(
         message=f"Sunset {product.name}. It no longer earns revenue or adds maintenance cost."
@@ -272,7 +262,7 @@ def apply_end_of_turn_progression(
         bug_delta += rng.randint(0, BALANCE.debt_bug_random_high)
     bug_delta = max(0, bug_delta - team_modifier.stability_bonus)
 
-    product.bug_level = clamp_int(product.bug_level + bug_delta, 0, 100)
+    product.bug_level = clamp_int(product.bug_level + bug_delta)
 
     if (
         product.bug_level >= BALANCE.severe_bug_threshold
@@ -293,7 +283,7 @@ def apply_end_of_turn_progression(
     else:
         quality_delta = 0
 
-    product.quality = clamp_int(product.quality + quality_delta, 0, 100)
+    product.quality = clamp_int(product.quality + quality_delta)
     product.lifecycle_stage = infer_lifecycle_stage(product)
 
     return ProductDrift(
@@ -334,15 +324,3 @@ def infer_lifecycle_stage(product: Product) -> LifecycleStage:
     ):
         return LifecycleStage.GROWTH
     return LifecycleStage.PROTOTYPE
-
-
-def clamp_int(value: int, minimum: int, maximum: int) -> int:
-    """Clamp an integer between two bounds."""
-
-    return max(minimum, min(maximum, value))
-
-
-def clamp_rate(value: Decimal) -> Decimal:
-    """Clamp a rate between 0 and 1."""
-
-    return quantize_rate(max(Decimal("0.00"), min(Decimal("1.00"), value)))

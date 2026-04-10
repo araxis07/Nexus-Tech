@@ -36,7 +36,7 @@ def render_intro(console: Console, company_name: str, seed: int | None) -> None:
                 "Run a focused local software company from the terminal.\n"
                 "Build products, manage the team, react to events, and keep cash alive."
             ),
-            title="Phase 6 Demo Build",
+            title="Phase 7 Hardened Build",
             border_style="cyan",
         )
     )

@@ -14,6 +14,12 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.traceback import install as install_rich_traceback
 
+from nexus_tech.config import (
+    DEFAULT_COMPANY_NAME,
+    DEFAULT_DATABASE_PATH,
+    DEFAULT_PRODUCT_NAME,
+    DEMO_SEED_EXAMPLE,
+)
 from nexus_tech.domain.models import (
     Employee,
     EmployeeRole,
@@ -62,7 +68,7 @@ app = typer.Typer(
 )
 console = Console(highlight=False, soft_wrap=True)
 DEBUG_MODE = False
-DEFAULT_DB_PATH = Path("nexus-tech.db")
+DEFAULT_DB_PATH = DEFAULT_DATABASE_PATH
 DB_PATH_OPTION = typer.Option(
     DEFAULT_DB_PATH,
     "--db-path",
@@ -104,9 +110,21 @@ PRODUCT_TARGETED_ACTIONS = {
 @app.callback(invoke_without_command=True)
 def root(
     ctx: typer.Context,
-    company_name: str = typer.Option("NEXUS TECH", "--company-name", help="Company display name."),
-    product_name: str = typer.Option("Nexus One", "--product-name", help="Initial product name."),
-    seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
+    company_name: str = typer.Option(
+        DEFAULT_COMPANY_NAME,
+        "--company-name",
+        help="Company display name.",
+    ),
+    product_name: str = typer.Option(
+        DEFAULT_PRODUCT_NAME,
+        "--product-name",
+        help="Initial product name.",
+    ),
+    seed: Optional[int] = typer.Option(  # noqa: UP045
+        None,
+        "--seed",
+        help=f"Seed for reproducible simulation and demo runs, for example {DEMO_SEED_EXAMPLE}.",
+    ),
     db_path: Path = DB_PATH_OPTION,
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
     debug: bool = typer.Option(
@@ -133,9 +151,21 @@ def root(
 
 @app.command("new-game")
 def new_game_command(
-    company_name: str = typer.Option("NEXUS TECH", "--company-name", help="Company display name."),
-    product_name: str = typer.Option("Nexus One", "--product-name", help="Initial product name."),
-    seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
+    company_name: str = typer.Option(
+        DEFAULT_COMPANY_NAME,
+        "--company-name",
+        help="Company display name.",
+    ),
+    product_name: str = typer.Option(
+        DEFAULT_PRODUCT_NAME,
+        "--product-name",
+        help="Initial product name.",
+    ),
+    seed: Optional[int] = typer.Option(  # noqa: UP045
+        None,
+        "--seed",
+        help=f"Seed for reproducible simulation and demo runs, for example {DEMO_SEED_EXAMPLE}.",
+    ),
     db_path: Path = DB_PATH_OPTION,
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
 ) -> None:
@@ -152,9 +182,21 @@ def new_game_command(
 
 @app.command("play", hidden=True)
 def play_alias(
-    company_name: str = typer.Option("NEXUS TECH", "--company-name", help="Company display name."),
-    product_name: str = typer.Option("Nexus One", "--product-name", help="Initial product name."),
-    seed: Optional[int] = typer.Option(None, "--seed", help="Seed for reproducible simulation."),
+    company_name: str = typer.Option(
+        DEFAULT_COMPANY_NAME,
+        "--company-name",
+        help="Company display name.",
+    ),
+    product_name: str = typer.Option(
+        DEFAULT_PRODUCT_NAME,
+        "--product-name",
+        help="Initial product name.",
+    ),
+    seed: Optional[int] = typer.Option(  # noqa: UP045
+        None,
+        "--seed",
+        help=f"Seed for reproducible simulation and demo runs, for example {DEMO_SEED_EXAMPLE}.",
+    ),
     db_path: Path = DB_PATH_OPTION,
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
 ) -> None:
@@ -225,7 +267,7 @@ def continue_last_game_command(
 def start_new_game(
     company_name: str,
     product_name: str,
-    seed: Optional[int],
+    seed: int | None,
     db_path: Path,
     slot_name: str,
 ) -> None:
@@ -323,7 +365,7 @@ def run_game_loop(
         raise typer.Exit(code=130) from error
 
 
-def collect_action_context(state: GameState, action: TurnAction) -> Optional[ActionContext]:
+def collect_action_context(state: GameState, action: TurnAction) -> ActionContext | None:
     """Collect the optional context needed for a chosen action."""
 
     if action in (
@@ -403,7 +445,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> Optional[Act
     return ActionContext()
 
 
-def choose_product_id(state: GameState, action: TurnAction) -> Optional[UUID]:
+def choose_product_id(state: GameState, action: TurnAction) -> UUID | None:
     """Prompt the user to select a product for an action."""
 
     products = get_product_choices(state, active_only=True)
@@ -441,8 +483,8 @@ def choose_product_id(state: GameState, action: TurnAction) -> Optional[UUID]:
 def choose_employee_id(
     state: GameState,
     action: TurnAction,
-    assigned_only: Optional[bool] = None,
-) -> Optional[UUID]:
+    assigned_only: bool | None = None,
+) -> UUID | None:
     """Prompt the user to select an employee for an action."""
 
     employees = get_employee_choices(state, assigned_only=assigned_only)
@@ -654,7 +696,7 @@ def handle_utility_action(
     raise ValueError(f"Unsupported utility action: {action_name}")
 
 
-def announce_loaded_game(db_path: Path, slot_name: str, seed: Optional[int]) -> None:
+def announce_loaded_game(db_path: Path, slot_name: str, seed: int | None) -> None:
     """Print a concise load banner before entering the loop."""
 
     seed_text = seed if seed is not None else "random"

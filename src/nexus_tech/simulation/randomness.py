@@ -1,9 +1,11 @@
 """Seedable randomness for deterministic tests."""
 
+from __future__ import annotations
+
 import base64
 import pickle
 import random
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class RandomLike(Protocol):
@@ -16,7 +18,7 @@ class RandomLike(Protocol):
 class RandomSource:
     """Thin wrapper around `random.Random` to make seeding explicit."""
 
-    def __init__(self, seed: Optional[int] = None) -> None:
+    def __init__(self, seed: int | None = None) -> None:
         self.seed = seed
         self._random = random.Random(seed)
 
@@ -32,9 +34,9 @@ class RandomSource:
     @classmethod
     def from_state(
         cls,
-        seed: Optional[int] = None,
-        exported_state: Optional[str] = None,
-    ) -> "RandomSource":
+        seed: int | None = None,
+        exported_state: str | None = None,
+    ) -> RandomSource:
         """Restore an RNG from a serialized state token."""
 
         rng = cls(seed=seed)

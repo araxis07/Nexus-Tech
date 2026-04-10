@@ -22,6 +22,11 @@ from nexus_tech.persistence.errors import CorruptSaveError, PersistenceError, Sa
 from nexus_tech.persistence.product_repository import ProductRepository
 from nexus_tech.simulation.randomness import RandomSource
 
+try:
+    UTC = datetime.UTC
+except AttributeError:  # pragma: no cover - fallback for local verification on Python < 3.11
+    UTC = timezone.utc
+
 DEFAULT_SAVE_SLOT = "active"
 
 
@@ -413,4 +418,4 @@ class SaveLoadCoordinator:
 def utc_now() -> str:
     """Return a UTC ISO timestamp for save metadata."""
 
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

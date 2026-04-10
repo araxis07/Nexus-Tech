@@ -9,10 +9,17 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
 from nexus_tech.domain.money import quantize_money, quantize_rate
 
+try:
+    from enum import StrEnum
+except ImportError:  # pragma: no cover - fallback for local verification on Python < 3.11
+    class StrEnum(str, Enum):  # noqa: UP042
+        """Compatibility fallback for runtimes without `enum.StrEnum`."""
 
-class LifecycleStage(str, Enum):
+
+class LifecycleStage(StrEnum):
     """Product lifecycle stage used by growth and UX."""
 
     PROTOTYPE = "prototype"
@@ -22,7 +29,7 @@ class LifecycleStage(str, Enum):
     SUNSET = "sunset"
 
 
-class EmployeeRole(str, Enum):
+class EmployeeRole(StrEnum):
     """Supported employee roles in the company."""
 
     ENGINEER = "engineer"
@@ -31,7 +38,7 @@ class EmployeeRole(str, Enum):
     PRODUCT_MANAGER = "product_manager"
 
 
-class EventCategory(str, Enum):
+class EventCategory(StrEnum):
     """Supported event categories for the dynamic event engine."""
 
     PRODUCT_INCIDENT = "product_incident"
@@ -41,7 +48,7 @@ class EventCategory(str, Enum):
     EMPLOYEE_ISSUE = "employee_issue"
 
 
-class Seniority(str, Enum):
+class Seniority(StrEnum):
     """Seniority band for an employee."""
 
     JUNIOR = "junior"
@@ -49,7 +56,7 @@ class Seniority(str, Enum):
     SENIOR = "senior"
 
 
-class TurnAction(str, Enum):
+class TurnAction(StrEnum):
     """Actions the player can take during a turn."""
 
     CREATE_PRODUCT = "create_product"
@@ -77,7 +84,7 @@ class Company(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     name: str = Field(min_length=1, max_length=80)
     cash_on_hand: Decimal
-    reputation: int = Field(ge=0, le=100)
+    reputation: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     current_turn: int = Field(default=1, ge=1)
     game_over: bool = False
 
@@ -95,10 +102,10 @@ class Product(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     name: str = Field(min_length=1, max_length=80)
     lifecycle_stage: LifecycleStage
-    quality: int = Field(ge=0, le=100)
-    bug_level: int = Field(ge=0, le=100)
-    market_fit: int = Field(ge=0, le=100)
-    technical_debt: int = Field(ge=0, le=100)
+    quality: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    bug_level: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    market_fit: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    technical_debt: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     user_count: int = Field(ge=0)
     revenue_per_user: Decimal = Field(ge=Decimal("0"))
     feature_count: int = Field(ge=0)
@@ -128,11 +135,11 @@ class Employee(BaseModel):
     role: EmployeeRole
     seniority: Seniority
     salary: Decimal = Field(ge=Decimal("0"))
-    energy: int = Field(ge=0, le=100)
-    morale: int = Field(ge=0, le=100)
-    productivity: int = Field(ge=0, le=100)
+    energy: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    morale: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    productivity: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     specialization: str = Field(min_length=1, max_length=40)
-    assigned_product_id: Optional[UUID] = None
+    assigned_product_id: Optional[UUID] = None  # noqa: UP045
 
     @field_validator("salary", mode="before")
     @classmethod
@@ -161,8 +168,8 @@ class PendingEvent(BaseModel):
     description: str = Field(min_length=1, max_length=320)
     triggered_turn: int = Field(ge=1)
     cooldown_turns: int = Field(ge=0)
-    target_product_id: Optional[UUID] = None
-    target_employee_id: Optional[UUID] = None
+    target_product_id: Optional[UUID] = None  # noqa: UP045
+    target_employee_id: Optional[UUID] = None  # noqa: UP045
     options: list[EventOption] = Field(min_length=1, max_length=3)
 
 
@@ -189,6 +196,6 @@ class GameState(BaseModel):
     company: Company
     products: list[Product] = Field(min_length=1)
     employees: list[Employee] = Field(default_factory=list)
-    pending_event: Optional[PendingEvent] = None
+    pending_event: Optional[PendingEvent] = None  # noqa: UP045
     event_history: list[EventHistoryEntry] = Field(default_factory=list)
     action_points_remaining: int = Field(ge=0)

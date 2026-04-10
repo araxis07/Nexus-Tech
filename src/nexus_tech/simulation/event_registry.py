@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from uuid import UUID
 
 from nexus_tech.domain.models import (
     Employee,
+    EmployeeRole,
     EventCategory,
     EventOption,
     GameState,
@@ -25,8 +28,8 @@ class EventDefinition:
     category: EventCategory
     weight: int
     cooldown_turns: int
-    is_eligible: callable
-    build_pending_event: callable
+    is_eligible: Callable[[GameState], bool]
+    build_pending_event: Callable[[GameState, RandomLike, int], PendingEvent]
 
 
 def get_event_registry() -> tuple[EventDefinition, ...]:
@@ -376,7 +379,7 @@ def _build_competitor_pressure_event(
 def _pick_best_product(
     products: list[Product],
     rng: RandomLike,
-    score: callable,
+    score: Callable[[Product], int],
 ) -> Product:
     best_score = max(score(product) for product in products)
     candidates = [product for product in products if score(product) == best_score]
@@ -386,7 +389,7 @@ def _pick_best_product(
 def _pick_best_employee(
     employees: list[Employee],
     rng: RandomLike,
-    score: callable,
+    score: Callable[[Employee], int],
 ) -> Employee:
     best_score = max(score(employee) for employee in employees)
     candidates = [employee for employee in employees if score(employee) == best_score]
@@ -395,7 +398,7 @@ def _pick_best_employee(
 
 def get_designer_or_marketer_support(
     employees: list[Employee],
-    product_id,
+    product_id: UUID,
 ) -> list[Employee]:
     """Return comms-facing employees assigned to a product."""
 
@@ -403,6 +406,6 @@ def get_designer_or_marketer_support(
         employee
         for employee in employees
         if employee.assigned_product_id == product_id
-        and employee.role.value in {"designer", "marketer"}
+        and employee.role in {EmployeeRole.DESIGNER, EmployeeRole.MARKETER}
         and calculate_effective_productivity(employee) > 0
     ]

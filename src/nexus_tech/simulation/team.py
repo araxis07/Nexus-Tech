@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
+from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import Employee, EmployeeRole, Product, Seniority
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.support import clamp_int
 
 
 @dataclass(frozen=True)
@@ -97,7 +99,7 @@ def calculate_base_productivity(role: EmployeeRole, seniority: Seniority) -> int
 
     base_productivity = BALANCE.employee_role_base_productivity[role.value]
     bonus = BALANCE.employee_seniority_productivity_bonus[seniority.value]
-    return clamp_int(base_productivity + bonus, 1, 100)
+    return clamp_int(base_productivity + bonus, minimum=1)
 
 
 def calculate_effective_productivity(employee: Employee) -> int:
@@ -106,7 +108,7 @@ def calculate_effective_productivity(employee: Employee) -> int:
     energy_factor = Decimal("0.50") + (Decimal(employee.energy) / Decimal("200"))
     morale_factor = Decimal("0.50") + (Decimal(employee.morale) / Decimal("200"))
     effective = Decimal(employee.productivity) * energy_factor * morale_factor
-    return clamp_int(int(effective.to_integral_value()), 0, 100)
+    return clamp_int(int(effective.to_integral_value()))
 
 
 def calculate_product_team_modifier(
@@ -174,13 +176,13 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
     assigned_headcount = sum(
         1 for employee in employees if employee.assigned_product_id is not None
     )
-    total_salary_cost = sum((employee.salary for employee in employees), Decimal("0.00"))
+    total_salary_cost = sum((employee.salary for employee in employees), ZERO_MONEY)
 
     if not employees:
         return TeamCondition(
             headcount=0,
             assigned_headcount=0,
-            total_salary_cost=Decimal("0.00"),
+            total_salary_cost=ZERO_MONEY,
             average_energy=0,
             average_morale=0,
             burned_out_count=0,
@@ -210,13 +212,9 @@ def apply_rest_team(employees: list[Employee]) -> TeamActionSummary:
     for employee in employees:
         employee.energy = clamp_int(
             employee.energy + BALANCE.employee_rest_energy_gain,
-            0,
-            100,
         )
         employee.morale = clamp_int(
             employee.morale + BALANCE.employee_rest_morale_gain,
-            0,
-            100,
         )
 
     condition = calculate_team_condition(employees)
@@ -266,13 +264,9 @@ def apply_end_of_turn_team_drift(
         if employee.assigned_product_id is None:
             employee.energy = clamp_int(
                 employee.energy + BALANCE.employee_unassigned_energy_recovery,
-                0,
-                100,
             )
             employee.morale = clamp_int(
                 employee.morale + BALANCE.employee_unassigned_morale_recovery,
-                0,
-                100,
             )
             continue
 
@@ -292,17 +286,15 @@ def apply_end_of_turn_team_drift(
             BALANCE.employee_assigned_energy_loss + pressure - burnout_protection,
         )
         morale_loss = BALANCE.employee_assigned_morale_loss
-        if net_cash_flow < Decimal("0.00"):
+        if net_cash_flow < ZERO_MONEY:
             morale_loss += BALANCE.employee_negative_cash_flow_morale_penalty
 
-        employee.energy = clamp_int(employee.energy - energy_loss, 0, 100)
-        employee.morale = clamp_int(employee.morale - morale_loss, 0, 100)
+        employee.energy = clamp_int(employee.energy - energy_loss)
+        employee.morale = clamp_int(employee.morale - morale_loss)
 
         if employee.energy <= BALANCE.employee_burnout_energy_threshold:
             employee.morale = clamp_int(
                 employee.morale - BALANCE.employee_burnout_morale_penalty,
-                0,
-                100,
             )
 
     return calculate_team_condition(employees)
@@ -319,9 +311,3 @@ def get_employee_by_id(employees: list[Employee], employee_id: UUID | None) -> E
             return employee
 
     raise ValueError("Selected employee was not found.")
-
-
-def clamp_int(value: int, minimum: int, maximum: int) -> int:
-    """Clamp an integer between bounds."""
-
-    return max(minimum, min(maximum, value))
