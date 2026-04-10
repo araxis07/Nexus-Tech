@@ -1,0 +1,43 @@
+[project]
+name = "nexus-tech"
+version = "0.1.0"
+description = "NEXUS TECH terminal-first management simulation game."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+  "pydantic>=2.11,<3.0",
+  "rich>=14.0.0,<15.0.0",
+  "typer>=0.16.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9.0",
+  "ruff>=0.11,<1.0",
+]
+
+[project.scripts]
+nexus-tech = "nexus_tech.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nexus_tech"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "SIM"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
