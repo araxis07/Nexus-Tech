@@ -1,81 +1,88 @@
-# NEXUS TECH
+# 🚀 NEXUS TECH
 
-`NEXUS TECH` is a terminal-first, single-player business management and simulation game built entirely in Python.
+**NEXUS TECH** is a terminal-first, single-player business simulation game built entirely in Python.
 
-You start with a small amount of capital, one early software product, and a fragile company. From there, you manage a growing product portfolio, hire and assign employees, react to market and team events, and try to build a sustainable software business before cash runs out.
+You start with a small software company, a limited cash reserve, and one early product. From there, your job is to grow the business by making disciplined decisions about product strategy, team management, technical debt, marketing, operating costs, and unexpected business events.
 
-## What The Project Does
+Designed for local play and live demos, the project focuses on clean architecture, deterministic simulation, and a polished CLI experience instead of heavy graphics or web infrastructure.
 
-The current build already supports a complete playable loop in the terminal:
+## 🎮 What Kind of Game Is It?
 
-- turn-based company simulation
-- multiple products under one company
-- product strategy trade-offs such as quality, features, bugs, market fit, churn, and technical debt
-- employee hiring, firing, assignment, burnout, recovery, and role-based impact
-- dynamic business events with weighted selection and cooldowns
-- local save and load with SQLite
-- Rich dashboards, tables, summaries, and event panels for live demos
+NEXUS TECH is a:
 
-## Game Features
+- **single-player** management / simulation game
+- **turn-based** business strategy game
+- **terminal-first** experience powered by Rich and Typer
+- **local and offline-first** project with SQLite save support
 
-### Company Management
+Each turn represents a business interval. You review the company, choose actions, resolve the simulation, react to events, and try to keep the company alive long enough to scale.
 
-- track cash, reputation, current turn, and game-over state
-- manage multiple active and sunset products
-- balance revenue against operating costs, maintenance, and salary burn
+## ✨ Current Features
 
-### Product Management
+### 🏢 Company Simulation
 
-- create new products
-- improve product quality
-- add features
-- reduce technical debt
-- market a product
-- sunset weak products
+- Manage company cash, reputation, turn progression, and failure state
+- Run a growing software business under financial pressure
+- Balance revenue against fixed operating costs, product maintenance, and payroll
 
-### Team Simulation
+### 📦 Product Portfolio Management
 
-- hire and fire employees
-- assign or unassign employees to products
-- manage four core roles:
-  - engineer
-  - designer
-  - marketer
-  - product_manager
-- handle morale, energy, productivity, and burnout pressure
+- Own and manage multiple products at the same time
+- Track quality, bugs, market fit, technical debt, users, acquisition, and churn
+- Create products, improve quality, add features, market products, reduce debt, and sunset weak products
 
-### Dynamic Event System
+### 👥 Employee and Team System
 
-- product incidents
-- market opportunities
-- funding opportunities
-- reputation incidents
-- employee issues
+- Hire and fire employees
+- Assign team members to specific products
+- Manage core roles:
+  - `engineer`
+  - `designer`
+  - `marketer`
+  - `product_manager`
+- Simulate morale, energy, burnout, recovery, and role-based impact on outcomes
 
-### Local Persistence
+### 🎲 Dynamic Event Engine
 
-- save and resume runs locally with SQLite
-- continue the latest save slot
-- keep the project fully offline and local-first
+- Weighted random business events with cooldowns and eligibility rules
+- Event categories include:
+  - product incidents
+  - market opportunities
+  - funding opportunities
+  - reputation incidents
+  - employee issues
+- Some events create meaningful player trade-offs instead of simple bonuses
 
-## Tech Stack
+### 💾 Local Save / Load
 
-- Python 3.14+
-- `uv` for project and dependency management
-- `sqlite3` from the Python standard library for save data
-- `Pydantic v2` for validated domain models
-- `Rich` for terminal UI rendering
-- `Typer` for CLI commands
-- `pytest` for test coverage
-- `Ruff` for linting and formatting
+- Save and load runs locally with SQLite
+- Resume the latest save slot
+- Keep the entire project offline and self-contained
 
-## Install
+### 🖥️ Presentation and CLI
+
+- Rich-powered dashboard panels, tables, summaries, and event notifications
+- Typer-based CLI commands for starting, loading, and continuing runs
+- Seeded demo support for reproducible simulations
+
+## 🧱 Tech Stack
+
+- **Python 3.14+**
+- **uv** for project and dependency management
+- **sqlite3** from the Python standard library for persistence
+- **Pydantic v2** for validated domain models
+- **Rich** for terminal rendering
+- **Typer** for CLI entrypoints
+- **pytest** for tests
+- **Ruff** for linting and formatting
+
+## ▶️ Getting Started
+
+Install dependencies:
 
 ```bash
 uv sync --extra dev
 ```
-
-## Run The Game
 
 Start a new game:
 
@@ -89,75 +96,93 @@ Start a named run:
 uv run nexus-tech new-game --company-name "Atlas Labs" --product-name "Signal"
 ```
 
-Load a save:
+Load a saved game:
 
 ```bash
 uv run nexus-tech load-game --slot active
 ```
 
-Continue the most recent save:
+Continue the latest save:
 
 ```bash
 uv run nexus-tech continue-last-game
 ```
 
-Run with debug output:
+Run in debug mode:
 
 ```bash
 uv run nexus-tech --debug --seed 7
 ```
 
-Show help:
+Show CLI help:
 
 ```bash
 uv run nexus-tech --help
 ```
 
-## How To Play
+## 🕹️ How to Play
 
-Each turn represents a business interval:
+The core loop is simple:
 
-1. Review the dashboard for company, products, team, and recent events.
-2. Spend action points on product or team actions.
-3. End the turn to resolve revenue, costs, growth, churn, burnout, and events.
-4. Save the run locally and continue later if needed.
+1. Review the dashboard for company health, products, team status, and recent events.
+2. Spend action points on product or team decisions.
+3. End the turn to resolve revenue, costs, growth, churn, burnout, and event outcomes.
+4. Save locally and continue the run later if needed.
 
-In practical terms, the main decisions are:
+Typical decisions include:
 
-- which product deserves attention
+- which product should get attention this turn
 - whether to push features or stabilize quality
-- when to reduce technical debt
-- when to hire, rest, or reassign team members
-- how to survive cash pressure while still growing users
+- when technical debt has become too expensive to ignore
+- when to hire, assign, rest, or remove team members
+- how to survive cash pressure while still building growth
 
-## Testing
+## 🧪 Testing
+
+Run the test suite:
 
 ```bash
 uv run pytest
 ```
 
-## Lint And Format
+## 🧹 Linting and Formatting
+
+Check the codebase:
 
 ```bash
 uv run ruff check src tests
+```
+
+Format the project:
+
+```bash
 uv run ruff format src tests
 ```
 
-## Project Structure
+## 🗂️ Project Structure
 
-- `src/nexus_tech/domain`
-  Validated entities, money helpers, and shared constants.
-- `src/nexus_tech/simulation`
-  Economy, growth, product progression, team systems, turn resolution, and events.
-- `src/nexus_tech/persistence`
+- `src/nexus_tech/domain`  
+  Core validated entities, money helpers, and shared constants.
+
+- `src/nexus_tech/simulation`  
+  Economy, product progression, growth, team systems, turn resolution, and event logic.
+
+- `src/nexus_tech/persistence`  
   SQLite schema, repositories, and save/load coordination.
-- `src/nexus_tech/presentation`
-  Rich panels, tables, dashboard rendering, and turn summaries.
-- `src/nexus_tech/cli.py`
+
+- `src/nexus_tech/presentation`  
+  Rich-based terminal UI rendering.
+
+- `src/nexus_tech/cli.py`  
   Typer commands and interactive terminal session flow.
 
-## Notes
+## 📌 Project Notes
 
-- The project is fully local and offline-first.
-- Save data is stored in `nexus-tech.db` by default.
-- Using `--seed` makes demo runs and tests reproducible.
+- The project is intentionally **offline-first** and **local-only**
+- Save data is stored in `nexus-tech.db` by default
+- `--seed` is useful for repeatable demos and deterministic test scenarios
+- The focus is on correctness, stability, maintainability, and presentation quality
+
+## 📄 License
+
+No license file has been added yet.
