@@ -154,8 +154,7 @@ def calculate_product_team_modifier(
         designer_power=designer_power,
         marketer_power=marketer_power,
         product_manager_power=product_manager_power,
-        build_speed_bonus=(engineer_power // BALANCE.team_build_bonus_divisor)
-        + coordination_bonus,
+        build_speed_bonus=(engineer_power // BALANCE.team_build_bonus_divisor) + coordination_bonus,
         stability_bonus=(engineer_power // BALANCE.team_stability_bonus_divisor)
         + coordination_bonus,
         market_fit_bonus=(designer_power // BALANCE.team_market_fit_bonus_divisor)

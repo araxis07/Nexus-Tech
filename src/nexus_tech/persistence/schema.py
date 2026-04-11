@@ -13,6 +13,10 @@ SCHEMA_STATEMENTS = (
         rng_state TEXT,
         scenario_id TEXT NOT NULL DEFAULT 'founder_journey',
         scenario_title TEXT NOT NULL DEFAULT 'Founder Journey',
+        roadmap_focus TEXT NOT NULL DEFAULT 'balanced_execution',
+        roadmap_set_turn INTEGER NOT NULL DEFAULT 1,
+        victory_achieved INTEGER NOT NULL DEFAULT 0,
+        victory_reason TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -49,6 +53,7 @@ SCHEMA_STATEMENTS = (
         acquisition_rate TEXT NOT NULL,
         churn_rate TEXT NOT NULL,
         pricing_tier TEXT NOT NULL DEFAULT 'standard',
+        target_segment TEXT NOT NULL DEFAULT 'startup',
         is_active INTEGER NOT NULL,
         PRIMARY KEY (slot_name, product_id),
         UNIQUE (slot_name, display_order)
@@ -133,6 +138,23 @@ SCHEMA_STATEMENTS = (
         PRIMARY KEY (slot_name, entry_index)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS turn_history (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        entry_index INTEGER NOT NULL,
+        turn INTEGER NOT NULL,
+        total_revenue TEXT NOT NULL,
+        total_operating_cost TEXT NOT NULL,
+        net_cash_flow TEXT NOT NULL,
+        cash_on_hand TEXT NOT NULL,
+        reputation INTEGER NOT NULL,
+        total_users INTEGER NOT NULL,
+        headcount INTEGER NOT NULL,
+        roadmap_focus TEXT NOT NULL,
+        PRIMARY KEY (slot_name, entry_index)
+    )
+    """,
 )
 
 
@@ -156,6 +178,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(
         connection,
+        table_name="products",
+        column_name="target_segment",
+        column_definition="TEXT NOT NULL DEFAULT 'startup'",
+    )
+    _ensure_column(
+        connection,
         table_name="save_slots",
         column_name="scenario_id",
         column_definition="TEXT NOT NULL DEFAULT 'founder_journey'",
@@ -166,7 +194,31 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         column_name="scenario_title",
         column_definition="TEXT NOT NULL DEFAULT 'Founder Journey'",
     )
-    connection.execute("PRAGMA user_version = 3")
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="roadmap_focus",
+        column_definition="TEXT NOT NULL DEFAULT 'balanced_execution'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="roadmap_set_turn",
+        column_definition="INTEGER NOT NULL DEFAULT 1",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="victory_achieved",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="victory_reason",
+        column_definition="TEXT",
+    )
+    connection.execute("PRAGMA user_version = 4")
 
 
 def _ensure_column(
@@ -176,13 +228,8 @@ def _ensure_column(
     column_name: str,
     column_definition: str,
 ) -> None:
-    columns = {
-        row[1]
-        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
-    }
+    columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()}
     if column_name in columns:
         return
 
-    connection.execute(
-        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
-    )
+    connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")

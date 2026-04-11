@@ -16,12 +16,15 @@ from nexus_tech.domain.models import (
     EventOption,
     GameState,
     LifecycleStage,
+    MarketSegment,
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
     PricingTier,
     Product,
+    RoadmapFocus,
     Seniority,
+    TurnLedgerEntry,
 )
 from nexus_tech.persistence.database import DatabaseManager
 from nexus_tech.persistence.errors import CorruptSaveError, SaveNotFoundError
@@ -44,6 +47,7 @@ def make_state() -> GameState:
         acquisition_rate=Decimal("0.0720"),
         churn_rate=Decimal("0.0480"),
         pricing_tier=PricingTier.PREMIUM,
+        target_segment=MarketSegment.ENTERPRISE,
         is_active=True,
     )
     employee = Employee(
@@ -100,6 +104,19 @@ def make_state() -> GameState:
             reward_text="Reputation +2 from visible early traction.",
         )
     ]
+    turn_history = [
+        TurnLedgerEntry(
+            turn=3,
+            total_revenue=Decimal("930.00"),
+            total_operating_cost=Decimal("1610.00"),
+            net_cash_flow=Decimal("-680.00"),
+            cash_on_hand=Decimal("7630.50"),
+            reputation=57,
+            total_users=42,
+            headcount=1,
+            roadmap_focus=RoadmapFocus.GROWTH_PUSH,
+        )
+    ]
     return GameState(
         company=Company(
             name="NEXUS TECH",
@@ -113,6 +130,9 @@ def make_state() -> GameState:
         pending_event=pending_event,
         event_history=event_history,
         milestone_history=milestone_history,
+        roadmap_focus=RoadmapFocus.GROWTH_PUSH,
+        roadmap_set_turn=3,
+        turn_history=turn_history,
         scenario_id="vc_sprint",
         scenario_title="VC Sprint",
         action_points_remaining=1,
@@ -141,15 +161,26 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "pending_event_options",
         "event_history",
         "milestone_history",
+        "turn_history",
     }.issubset(table_names)
 
     with sqlite3.connect(db_path) as connection:
-        columns = {
-            row[1]
-            for row in connection.execute("PRAGMA table_info(save_slots)").fetchall()
+        save_slot_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(save_slots)").fetchall()
+        }
+        product_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(products)").fetchall()
         }
 
-    assert {"scenario_id", "scenario_title"}.issubset(columns)
+    assert {
+        "scenario_id",
+        "scenario_title",
+        "roadmap_focus",
+        "roadmap_set_turn",
+        "victory_achieved",
+        "victory_reason",
+    }.issubset(save_slot_columns)
+    assert {"target_segment"}.issubset(product_columns)
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -305,11 +336,26 @@ def test_invalid_rng_state_raises_corrupt_save_error(tmp_path: Path) -> None:
         connection.execute(
             """
             INSERT INTO products (
-                slot_name, product_id, display_order, name, lifecycle_stage, quality, bug_level,
-                market_fit, technical_debt, user_count, revenue_per_user, feature_count,
-                maintenance_cost, acquisition_rate, churn_rate, pricing_tier, is_active
+                slot_name,
+                product_id,
+                display_order,
+                name,
+                lifecycle_stage,
+                quality,
+                bug_level,
+                market_fit,
+                technical_debt,
+                user_count,
+                revenue_per_user,
+                feature_count,
+                maintenance_cost,
+                acquisition_rate,
+                churn_rate,
+                pricing_tier,
+                target_segment,
+                is_active
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "active",
@@ -328,6 +374,7 @@ def test_invalid_rng_state_raises_corrupt_save_error(tmp_path: Path) -> None:
                 "0.0500",
                 "0.0500",
                 PricingTier.STANDARD.value,
+                MarketSegment.STARTUP.value,
                 1,
             ),
         )

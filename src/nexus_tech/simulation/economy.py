@@ -1,12 +1,16 @@
 """Economy rules for revenue, maintenance, pricing, salary, and company burn."""
 
+from __future__ import annotations
+
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import Company, Employee, Product
+from nexus_tech.domain.models import Company, Employee, Product, RoadmapFocus
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
+from nexus_tech.simulation.roadmap import get_roadmap_profile
+from nexus_tech.simulation.segments import resolve_segment_dynamics
 from nexus_tech.simulation.strategy import get_strategy_profile
 
 
@@ -20,13 +24,30 @@ def calculate_product_revenue(product: Product) -> Decimal:
     )
 
 
-def calculate_product_operating_cost(product: Product) -> Decimal:
+def calculate_product_operating_cost(
+    product: Product,
+    *,
+    current_turn: int = 1,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
+) -> Decimal:
     """Maintenance and support cost carried by one active product."""
 
     if not product.is_active:
         return ZERO_MONEY
 
-    support_cost = Decimal(product.user_count) * BALANCE.per_user_support_cost
+    segment_dynamics = resolve_segment_dynamics(
+        product,
+        current_turn=current_turn,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+        pricing_churn_modifier=Decimal("0.0000"),
+    )
+    support_cost = (
+        Decimal(product.user_count)
+        * BALANCE.per_user_support_cost
+        * segment_dynamics.support_cost_multiplier
+    )
     debt_cost = Decimal(product.technical_debt) * BALANCE.per_debt_operating_cost
     return quantize_money(product.maintenance_cost + support_cost + debt_cost)
 
@@ -38,11 +59,25 @@ def calculate_total_revenue(products: list[Product]) -> Decimal:
     return quantize_money(total)
 
 
-def calculate_total_product_operating_cost(products: list[Product]) -> Decimal:
+def calculate_total_product_operating_cost(
+    products: list[Product],
+    *,
+    current_turn: int = 1,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
+) -> Decimal:
     """Aggregate product-level costs across the portfolio."""
 
     total = sum(
-        (calculate_product_operating_cost(product) for product in products),
+        (
+            calculate_product_operating_cost(
+                product,
+                current_turn=current_turn,
+                roadmap_focus=roadmap_focus,
+                roadmap_set_turn=roadmap_set_turn,
+            )
+            for product in products
+        ),
         ZERO_MONEY,
     )
     return quantize_money(total)
@@ -59,14 +94,28 @@ def calculate_total_operating_cost(
     company: Company,
     products: list[Product],
     employees: list[Employee],
+    *,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
 ) -> Decimal:
     """Company burn including baseline cost, product load, and salaries."""
 
     strategy_profile = get_strategy_profile(company.strategy)
+    roadmap_profile = get_roadmap_profile(
+        roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+        current_turn=company.current_turn,
+    )
     return quantize_money(
         BALANCE.base_operating_cost
         + strategy_profile.operating_cost_modifier
-        + calculate_total_product_operating_cost(products)
+        + roadmap_profile.operating_cost_modifier
+        + calculate_total_product_operating_cost(
+            products,
+            current_turn=company.current_turn,
+            roadmap_focus=roadmap_focus,
+            roadmap_set_turn=roadmap_set_turn,
+        )
         + calculate_total_salary_cost(employees)
     )
 

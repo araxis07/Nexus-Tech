@@ -12,7 +12,9 @@ from nexus_tech.domain.models import (
     CompanyStrategy,
     EmployeeRole,
     LifecycleStage,
+    MarketSegment,
     PricingTier,
+    RoadmapFocus,
     Seniority,
 )
 from nexus_tech.domain.money import quantize_money, quantize_rate
@@ -38,6 +40,7 @@ class ProductTemplateDefinition(BaseModel):
     acquisition_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     churn_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     pricing_tier: PricingTier = PricingTier.STANDARD
+    target_segment: MarketSegment = MarketSegment.STARTUP
 
     @field_validator("revenue_per_user", "maintenance_cost", mode="before")
     @classmethod
@@ -70,6 +73,7 @@ class ScenarioProductSeed(BaseModel):
     acquisition_rate: Optional[Decimal] = None  # noqa: UP045
     churn_rate: Optional[Decimal] = None  # noqa: UP045
     pricing_tier: Optional[PricingTier] = None  # noqa: UP045
+    target_segment: Optional[MarketSegment] = None  # noqa: UP045
     is_active: bool = True
 
     @field_validator("revenue_per_user", "maintenance_cost", mode="before")
@@ -112,6 +116,7 @@ class ScenarioDefinition(BaseModel):
     description: str = Field(min_length=1, max_length=240)
     company_name: str = Field(min_length=1, max_length=80)
     company_strategy: CompanyStrategy = CompanyStrategy.BALANCED
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION
     cash_on_hand: Decimal
     reputation: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     products: list[ScenarioProductSeed] = Field(min_length=1)

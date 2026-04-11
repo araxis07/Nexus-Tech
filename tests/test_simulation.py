@@ -15,11 +15,13 @@ from nexus_tech.domain.models import (
     EventHistoryEntry,
     GameState,
     LifecycleStage,
+    MarketSegment,
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
     PricingTier,
     Product,
+    RoadmapFocus,
     Seniority,
     TurnAction,
 )
@@ -41,6 +43,7 @@ from nexus_tech.simulation.growth import calculate_churned_users
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.team import calculate_effective_productivity
 
 
@@ -78,6 +81,7 @@ def make_product(
     acquisition_rate: Decimal = Decimal("0.0600"),
     churn_rate: Decimal = Decimal("0.0500"),
     pricing_tier: PricingTier = PricingTier.STANDARD,
+    target_segment: MarketSegment = MarketSegment.STARTUP,
     is_active: bool = True,
 ) -> Product:
     return Product(
@@ -94,6 +98,7 @@ def make_product(
         acquisition_rate=acquisition_rate,
         churn_rate=churn_rate,
         pricing_tier=pricing_tier,
+        target_segment=target_segment,
         is_active=is_active,
     )
 
@@ -128,6 +133,7 @@ def make_state(
     employees: list[Employee] | None = None,
     cash_on_hand: Decimal = Decimal("6000.00"),
     strategy: CompanyStrategy = CompanyStrategy.BALANCED,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     current_turn: int = 1,
     pending_event: PendingEvent | None = None,
     event_history: list[EventHistoryEntry] | None = None,
@@ -146,6 +152,8 @@ def make_state(
         pending_event=pending_event,
         event_history=event_history or [],
         milestone_history=milestone_history or [],
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=max(1, current_turn - 1),
         action_points_remaining=BALANCE.actions_per_turn,
     )
 
@@ -269,8 +277,7 @@ def test_adjust_pricing_changes_effective_revenue_and_market_fit() -> None:
     adjusted_product = adjusted.state.products[0]
     assert adjusted_product.pricing_tier is PricingTier.PREMIUM
     assert (
-        calculate_effective_revenue_per_user(adjusted_product)
-        > adjusted_product.revenue_per_user
+        calculate_effective_revenue_per_user(adjusted_product) > adjusted_product.revenue_per_user
     )
     assert adjusted_product.market_fit > state.products[0].market_fit
 
@@ -296,6 +303,34 @@ def test_budget_pricing_reduces_churn_pressure() -> None:
 
     assert calculate_churned_users(budget_product, FixedRandom(0)) < calculate_churned_users(
         premium_product,
+        FixedRandom(0),
+    )
+
+
+def test_enterprise_segment_has_higher_churn_than_indie_under_same_conditions() -> None:
+    indie_product = make_product(
+        "Indie",
+        pricing_tier=PricingTier.PREMIUM,
+        quality=55,
+        market_fit=46,
+        bug_level=24,
+        technical_debt=22,
+        user_count=120,
+        target_segment=MarketSegment.INDIE,
+    )
+    enterprise_product = make_product(
+        "Enterprise",
+        pricing_tier=PricingTier.PREMIUM,
+        quality=55,
+        market_fit=46,
+        bug_level=24,
+        technical_debt=22,
+        user_count=120,
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+
+    assert calculate_churned_users(indie_product, FixedRandom(0)) < calculate_churned_users(
+        enterprise_product,
         FixedRandom(0),
     )
 
@@ -326,6 +361,58 @@ def test_set_company_strategy_action_updates_company_state() -> None:
     )
 
     assert outcome.state.company.strategy is CompanyStrategy.QUALITY
+
+
+def test_set_target_segment_updates_product_segment() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_TARGET_SEGMENT,
+        context=ActionContext(
+            target_product_id=state.products[0].id,
+            target_segment=MarketSegment.SMB,
+        ),
+    )
+
+    assert outcome.state.products[0].target_segment is MarketSegment.SMB
+
+
+def test_set_roadmap_updates_state_and_platform_rebuild_changes_execution_profile() -> None:
+    product = make_product("Core", maintenance_cost=Decimal("260.00"), technical_debt=36)
+    base_state = make_state(product)
+    platform_state = apply_action(
+        base_state,
+        TurnAction.SET_ROADMAP,
+        context=ActionContext(roadmap_focus=RoadmapFocus.PLATFORM_REBUILD),
+    ).state
+
+    baseline_cost = calculate_total_operating_cost(
+        base_state.company,
+        base_state.products,
+        base_state.employees,
+        roadmap_focus=base_state.roadmap_focus,
+        roadmap_set_turn=base_state.roadmap_set_turn,
+    )
+    platform_cost = calculate_total_operating_cost(
+        platform_state.company,
+        platform_state.products,
+        platform_state.employees,
+        roadmap_focus=platform_state.roadmap_focus,
+        roadmap_set_turn=platform_state.roadmap_set_turn,
+    )
+    debt_reduction = apply_action(
+        platform_state,
+        TurnAction.REDUCE_TECHNICAL_DEBT,
+        context=ActionContext(target_product_id=platform_state.products[0].id),
+    )
+
+    assert platform_state.roadmap_focus is RoadmapFocus.PLATFORM_REBUILD
+    assert platform_cost > baseline_cost
+    assert (
+        debt_reduction.state.products[0].technical_debt
+        < platform_state.products[0].technical_debt
+    )
 
 
 def test_create_product_validation_rejects_duplicate_names() -> None:
@@ -442,8 +529,7 @@ def test_assignment_increases_engineer_effect_on_quality_work() -> None:
 
     assigned_gain = assigned_outcome.state.products[0].quality - assigned_state.products[0].quality
     unassigned_gain = (
-        unassigned_outcome.state.products[0].quality
-        - unassigned_state.products[0].quality
+        unassigned_outcome.state.products[0].quality - unassigned_state.products[0].quality
     )
 
     assert assigned_gain > unassigned_gain
@@ -556,6 +642,55 @@ def test_resolve_turn_resets_action_points_for_next_turn() -> None:
     assert resolution.state.action_points_remaining == BALANCE.actions_per_turn
 
 
+def test_resolve_turn_appends_turn_history_and_run_score() -> None:
+    state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert len(resolution.state.turn_history) == 1
+    entry = resolution.state.turn_history[0]
+    assert entry.turn == 1
+    assert entry.total_users == resolution.run_score.total_users
+    assert resolution.run_score.total_score == calculate_run_score(resolution.state).total_score
+
+
+def test_resolve_turn_sets_victory_when_company_hits_scale_threshold() -> None:
+    state = make_state(
+        make_product(
+            "Core",
+            lifecycle_stage=LifecycleStage.MATURE,
+            quality=84,
+            market_fit=82,
+            bug_level=6,
+            technical_debt=10,
+            user_count=260,
+            revenue_per_user=Decimal("40.00"),
+            maintenance_cost=Decimal("220.00"),
+            target_segment=MarketSegment.SMB,
+        ),
+        make_product(
+            "Flow",
+            lifecycle_stage=LifecycleStage.MATURE,
+            quality=80,
+            market_fit=79,
+            bug_level=8,
+            technical_debt=12,
+            user_count=210,
+            revenue_per_user=Decimal("34.00"),
+            maintenance_cost=Decimal("210.00"),
+            target_segment=MarketSegment.STARTUP,
+        ),
+        cash_on_hand=Decimal("22000.00"),
+        current_turn=BALANCE.victory_min_turn,
+    )
+    state.company.reputation = 78
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert resolution.state.victory_achieved is True
+    assert resolution.victory_reason is not None
+
+
 def test_three_turn_gameplay_integration_remains_stable() -> None:
     state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
     rng = RandomSource(seed=23)
@@ -618,6 +753,7 @@ def test_three_turn_gameplay_integration_remains_stable() -> None:
     assert state.products[0].quality > initial_quality
     assert state.products[1].name == "Nexus Flow"
     assert state.employees[0].assigned_product_id == new_product.id
+    assert len(state.turn_history) == 3
     assert state.company.cash_on_hand != BALANCE.starting_cash
 
 
@@ -657,8 +793,7 @@ def test_weighted_selection_prefers_heavier_event() -> None:
     rng = SequenceRandom(list(range(1, 11)) * 5)
 
     selected_ids = [
-        select_weighted_definition([lightweight, heavyweight], rng).event_id
-        for _ in range(50)
+        select_weighted_definition([lightweight, heavyweight], rng).event_id for _ in range(50)
     ]
 
     assert selected_ids.count("heavyweight") > selected_ids.count("lightweight")
@@ -682,9 +817,7 @@ def test_event_cooldown_filters_recent_event() -> None:
         event_history=[history_entry],
     )
 
-    eligible_ids = {
-        definition.event_id for definition in get_eligible_event_definitions(state)
-    }
+    eligible_ids = {definition.event_id for definition in get_eligible_event_definitions(state)}
 
     assert "sudden_press_mention" not in eligible_ids
 

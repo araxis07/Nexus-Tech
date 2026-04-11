@@ -158,8 +158,7 @@ def _build_market_trend_event(
         [
             product
             for product in state.products
-            if product.is_active
-            and product.market_fit >= BALANCE.event_market_trend_fit_threshold
+            if product.is_active and product.market_fit >= BALANCE.event_market_trend_fit_threshold
         ],
         rng,
         score=lambda product: product.market_fit + (product.user_count // 8),

@@ -4,11 +4,18 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY, ZERO_RATE
-from nexus_tech.domain.models import Company, LifecycleStage, PricingTier, Product
+from nexus_tech.domain.models import (
+    Company,
+    LifecycleStage,
+    MarketSegment,
+    PricingTier,
+    Product,
+)
 from nexus_tech.domain.money import quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.pricing import get_pricing_acquisition_bonus
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.roadmap import RoadmapProfile
 from nexus_tech.simulation.strategy import StrategyProfile, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 from nexus_tech.simulation.team import ProductTeamModifier
@@ -46,6 +53,7 @@ def create_product(
     acquisition_rate: Decimal = BALANCE.new_product_acquisition_rate,
     churn_rate: Decimal = BALANCE.new_product_churn_rate,
     pricing_tier: PricingTier = PricingTier.STANDARD,
+    target_segment: MarketSegment = MarketSegment.STARTUP,
     is_active: bool = True,
 ) -> Product:
     """Validate and create a new prototype product."""
@@ -72,6 +80,7 @@ def create_product(
         acquisition_rate=acquisition_rate,
         churn_rate=churn_rate,
         pricing_tier=pricing_tier,
+        target_segment=target_segment,
         is_active=is_active,
     )
 
@@ -80,6 +89,7 @@ def apply_improve_quality(
     product: Product,
     team_modifier: ProductTeamModifier,
     strategy_profile: StrategyProfile,
+    roadmap_profile: RoadmapProfile,
 ) -> ProductActionSummary:
     """Invest in product polish and reliability."""
 
@@ -90,6 +100,7 @@ def apply_improve_quality(
         - debt_penalty
         + team_modifier.build_speed_bonus
         + strategy_profile.quality_bonus,
+        +roadmap_profile.quality_bonus,
     )
     bug_reduction = max(
         BALANCE.improve_quality_min_bug_reduction,
@@ -98,7 +109,12 @@ def apply_improve_quality(
         + team_modifier.stability_bonus
         + strategy_profile.stability_bonus,
     )
-    market_fit_gain = BALANCE.improve_quality_market_fit_gain + team_modifier.market_fit_bonus
+    market_fit_gain = (
+        BALANCE.improve_quality_market_fit_gain
+        + team_modifier.market_fit_bonus
+        + roadmap_profile.market_fit_bonus
+        + roadmap_profile.reputation_bonus
+    )
 
     product.quality = clamp_int(product.quality + quality_gain)
     product.bug_level = clamp_int(product.bug_level - bug_reduction)
@@ -117,6 +133,7 @@ def apply_add_feature(
     product: Product,
     team_modifier: ProductTeamModifier,
     strategy_profile: StrategyProfile,
+    roadmap_profile: RoadmapProfile,
 ) -> ProductActionSummary:
     """Ship a feature and accept the complexity it adds."""
 
@@ -127,18 +144,21 @@ def apply_add_feature(
         - debt_penalty
         + (team_modifier.build_speed_bonus // 2)
         + max(0, strategy_profile.quality_bonus // 2),
+        +max(0, roadmap_profile.quality_bonus // 2),
     )
     market_fit_gain = max(
         1,
         BALANCE.add_feature_market_fit_gain
         - (1 if product.user_count > 75 else 0)
         + team_modifier.market_fit_bonus,
+        +roadmap_profile.market_fit_bonus,
     )
     bug_increase = max(
         1,
         BALANCE.add_feature_bug_increase
         + (product.technical_debt // BALANCE.add_feature_bug_debt_divisor)
         + strategy_profile.feature_risk_modifier
+        + roadmap_profile.feature_risk_modifier
         - team_modifier.stability_bonus
         - (team_modifier.coordination_bonus // 2),
     )
@@ -147,6 +167,7 @@ def apply_add_feature(
         BALANCE.add_feature_debt_increase
         - (team_modifier.debt_reduction_bonus // 2)
         - strategy_profile.debt_reduction_bonus,
+        -roadmap_profile.debt_reduction_bonus,
     )
     acquisition_rate_gain = BALANCE.add_feature_acquisition_rate_gain + quantize_rate(
         Decimal(team_modifier.acquisition_bonus) / Decimal("1000")
@@ -160,9 +181,7 @@ def apply_add_feature(
     product.maintenance_cost = quantize_money(
         product.maintenance_cost + BALANCE.add_feature_maintenance_increase
     )
-    product.acquisition_rate = clamp_rate(
-        product.acquisition_rate + acquisition_rate_gain
-    )
+    product.acquisition_rate = clamp_rate(product.acquisition_rate + acquisition_rate_gain)
     product.churn_rate = clamp_rate(
         product.churn_rate
         + max(
@@ -186,6 +205,7 @@ def apply_reduce_technical_debt(
     product: Product,
     team_modifier: ProductTeamModifier,
     strategy_profile: StrategyProfile,
+    roadmap_profile: RoadmapProfile,
 ) -> ProductActionSummary:
     """Stabilize the codebase and lower future drag."""
 
@@ -194,6 +214,7 @@ def apply_reduce_technical_debt(
         BALANCE.reduce_debt_amount
         + team_modifier.debt_reduction_bonus
         + strategy_profile.debt_reduction_bonus,
+        +roadmap_profile.debt_reduction_bonus,
     )
     bug_reduction = min(
         product.bug_level,
@@ -205,6 +226,7 @@ def apply_reduce_technical_debt(
         BALANCE.reduce_debt_quality_gain
         + (team_modifier.build_speed_bonus // 2)
         + max(0, strategy_profile.quality_bonus // 2)
+        + roadmap_profile.quality_bonus
     )
 
     product.technical_debt = clamp_int(product.technical_debt - debt_reduction)
@@ -230,6 +252,7 @@ def apply_marketing(
     company: Company,
     product: Product,
     team_modifier: ProductTeamModifier,
+    roadmap_profile: RoadmapProfile,
 ) -> ProductActionSummary:
     """Spend money to improve awareness and short-term adoption."""
 
@@ -243,12 +266,14 @@ def apply_marketing(
         + team_modifier.acquisition_bonus
         + get_pricing_acquisition_bonus(product)
         + strategy_profile.marketing_user_bonus
+        + roadmap_profile.acquisition_bonus
     )
     immediate_users = max(1, immediate_users)
     reputation_gain = (
         BALANCE.marketing_reputation_gain
         + team_modifier.reputation_bonus
         + max(0, strategy_profile.reputation_bonus)
+        + roadmap_profile.reputation_bonus
     )
 
     company.cash_on_hand = quantize_money(company.cash_on_hand - BALANCE.marketing_cost)
@@ -289,6 +314,7 @@ def apply_end_of_turn_progression(
     rng: RandomLike,
     team_modifier: ProductTeamModifier,
     strategy_profile: StrategyProfile,
+    roadmap_profile: RoadmapProfile,
 ) -> ProductDrift:
     """Apply passive wear-and-tear after the action phase."""
 
@@ -312,6 +338,7 @@ def apply_end_of_turn_progression(
         0,
         bug_delta
         + strategy_profile.feature_risk_modifier
+        + roadmap_profile.feature_risk_modifier
         - team_modifier.stability_bonus,
     )
 
@@ -336,7 +363,7 @@ def apply_end_of_turn_progression(
     else:
         quality_delta = 0
 
-    quality_delta += max(0, strategy_profile.quality_bonus // 2)
+    quality_delta += max(0, strategy_profile.quality_bonus // 2) + roadmap_profile.quality_bonus
 
     product.quality = clamp_int(product.quality + quality_delta)
     product.lifecycle_stage = infer_lifecycle_stage(product)
@@ -359,13 +386,10 @@ def infer_lifecycle_stage(product: Product) -> LifecycleStage:
 
     if not product.is_active:
         return LifecycleStage.SUNSET
-    if (
-        product.user_count > 0
-        and (
-            product.bug_level >= BALANCE.declining_bug_threshold
-            or product.technical_debt >= BALANCE.declining_debt_threshold
-            or product.market_fit <= BALANCE.declining_market_fit_threshold
-        )
+    if product.user_count > 0 and (
+        product.bug_level >= BALANCE.declining_bug_threshold
+        or product.technical_debt >= BALANCE.declining_debt_threshold
+        or product.market_fit <= BALANCE.declining_market_fit_threshold
     ):
         return LifecycleStage.DECLINING
     if (

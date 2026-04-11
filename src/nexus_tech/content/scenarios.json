@@ -5,6 +5,7 @@
     "description": "A balanced starting run with one early product and just enough cash to survive careful decisions.",
     "company_name": "NEXUS TECH",
     "company_strategy": "balanced",
+    "roadmap_focus": "balanced_execution",
     "cash_on_hand": "8500.00",
     "reputation": 50,
     "products": [
@@ -23,6 +24,7 @@
         "maintenance_cost": "260.00",
         "acquisition_rate": "0.0600",
         "churn_rate": "0.0500",
+        "target_segment": "startup",
         "pricing_tier": "standard"
       }
     ]
@@ -33,6 +35,7 @@
     "description": "Cash is tighter, but the business starts leaner and the team is already used to constraints.",
     "company_name": "Bootstrap Studio",
     "company_strategy": "efficiency",
+    "roadmap_focus": "portfolio_consolidation",
     "cash_on_hand": "6200.00",
     "reputation": 48,
     "products": [
@@ -51,6 +54,7 @@
         "maintenance_cost": "250.00",
         "acquisition_rate": "0.0520",
         "churn_rate": "0.0510",
+        "target_segment": "smb",
         "pricing_tier": "standard"
       }
     ],
@@ -72,6 +76,7 @@
     "description": "You have more capital and more pressure. Growth can be explosive, but payroll and expectations rise fast.",
     "company_name": "Signal Forge",
     "company_strategy": "growth",
+    "roadmap_focus": "growth_push",
     "cash_on_hand": "14500.00",
     "reputation": 55,
     "products": [
@@ -90,6 +95,7 @@
         "maintenance_cost": "235.00",
         "acquisition_rate": "0.0740",
         "churn_rate": "0.0540",
+        "target_segment": "startup",
         "pricing_tier": "budget"
       }
     ],
@@ -120,6 +126,7 @@
     "description": "The product has real traction, but the codebase is fighting back. Stabilising the business is the entire game.",
     "company_name": "Refactor Labs",
     "company_strategy": "quality",
+    "roadmap_focus": "platform_rebuild",
     "cash_on_hand": "7800.00",
     "reputation": 46,
     "products": [
@@ -138,6 +145,7 @@
         "maintenance_cost": "320.00",
         "acquisition_rate": "0.0410",
         "churn_rate": "0.0610",
+        "target_segment": "enterprise",
         "pricing_tier": "premium"
       }
     ],
@@ -159,6 +167,7 @@
     "description": "A services business is trying to turn product. You already have a team and a small portfolio, but focus is your real constraint.",
     "company_name": "Northline Studio",
     "company_strategy": "balanced",
+    "roadmap_focus": "premium_expansion",
     "cash_on_hand": "9800.00",
     "reputation": 53,
     "products": [
@@ -177,6 +186,7 @@
         "maintenance_cost": "310.00",
         "acquisition_rate": "0.0380",
         "churn_rate": "0.0460",
+        "target_segment": "smb",
         "pricing_tier": "standard"
       },
       {
@@ -194,6 +204,7 @@
         "maintenance_cost": "180.00",
         "acquisition_rate": "0.0490",
         "churn_rate": "0.0700",
+        "target_segment": "startup",
         "pricing_tier": "budget"
       }
     ],

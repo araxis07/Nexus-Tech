@@ -22,6 +22,12 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
+from nexus_tech.simulation.reporting import calculate_run_score
+from nexus_tech.simulation.roadmap import (
+    get_effective_roadmap_focus,
+    get_roadmap_turns_remaining,
+    is_roadmap_due,
+)
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
 
 
@@ -45,7 +51,7 @@ def render_intro(
                 "Run a focused local software company from the terminal.\n"
                 "Build products, manage the team, react to events, and keep cash alive."
             ),
-            title="Phase 7 Hardened Build",
+            title="Terminal Management Simulation",
             border_style="cyan",
         )
     )
@@ -72,9 +78,7 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
             scenario.description,
         )
 
-    scenario_ids = ", ".join(
-        f"{scenario.scenario_id} ({scenario.title})" for scenario in scenarios
-    )
+    scenario_ids = ", ".join(f"{scenario.scenario_id} ({scenario.title})" for scenario in scenarios)
     content = Group(
         table,
         "",
@@ -134,6 +138,38 @@ def render_team_view(console: Console, state: GameState) -> None:
     )
 
 
+def render_report(console: Console, state: GameState) -> None:
+    """Render a compact run report with score and turn history."""
+
+    run_score = calculate_run_score(state)
+    history_panel = (
+        Panel(
+            _build_turn_history_table(state),
+            title="Turn History",
+            border_style="green",
+            expand=True,
+        )
+        if state.turn_history
+        else Panel(
+            "No resolved turns yet. End at least one turn to build a report history.",
+            title="Turn History",
+            border_style="green",
+            expand=True,
+        )
+    )
+    console.print(
+        Columns(
+            [
+                _build_report_overview_panel(state, run_score.total_score, run_score.score_tier),
+                _build_report_score_panel(state),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
+    console.print(history_panel)
+
+
 def render_turn_resolution(console: Console, resolution: TurnResolution) -> None:
     """Render the end-of-turn summary."""
 
@@ -153,6 +189,23 @@ def render_turn_resolution(console: Console, resolution: TurnResolution) -> None
     if resolution.unlocked_milestones:
         console.print(_build_milestone_panel(resolution.unlocked_milestones))
     console.print(Panel(resolution.narrative, title="Outlook", border_style="green"))
+
+
+def render_victory(console: Console, state: GameState) -> None:
+    """Render the winning state."""
+
+    run_score = calculate_run_score(state)
+    content = Table.grid(padding=(0, 1))
+    content.add_row("Outcome", state.victory_reason or "The company reached durable scale.")
+    content.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
+    content.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    content.add_row("Portfolio Users", str(run_score.total_users))
+    content.add_row("Active Products", str(run_score.active_products))
+    content.add_row("Mature Products", str(run_score.mature_products))
+    content.add_row("Headcount", str(len(state.employees)))
+    content.add_row("Cash On Hand", format_money(state.company.cash_on_hand))
+    content.add_row("Reputation", str(state.company.reputation))
+    console.print(Panel(content, title="Victory", border_style="green", expand=True))
 
 
 def render_pending_event(console: Console, pending_event: PendingEvent) -> None:
@@ -176,6 +229,11 @@ def render_action_feedback(
 ) -> None:
     """Render a concise action result panel."""
 
+    effective_roadmap = get_effective_roadmap_focus(
+        state.roadmap_focus,
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
     summary = Table.grid(padding=(0, 1))
     summary.add_row("Action", action_label.replace("_", " "))
     summary.add_row("Result", message)
@@ -185,7 +243,8 @@ def render_action_feedback(
             f"Actions left {state.action_points_remaining} | "
             f"Cash {format_money(state.company.cash_on_hand)} | "
             f"Reputation {state.company.reputation} | "
-            f"Strategy {state.company.strategy.value}"
+            f"Strategy {state.company.strategy.value} | "
+            f"Roadmap {effective_roadmap.value}"
         ),
     )
     console.print(Panel(summary, title="Action Summary", border_style="cyan"))
@@ -203,6 +262,7 @@ def render_product_picker(console: Console, products: list[Product], action_labe
     table.add_column("B", justify="right")
     table.add_column("Fit", justify="right")
     table.add_column("Debt", justify="right")
+    table.add_column("Segment")
     table.add_column("Price")
 
     for index, product in enumerate(products, start=1):
@@ -215,6 +275,7 @@ def render_product_picker(console: Console, products: list[Product], action_labe
             str(product.bug_level),
             str(product.market_fit),
             str(product.technical_debt),
+            product.target_segment.value,
             product.pricing_tier.value,
         )
 
@@ -243,6 +304,7 @@ def render_product_template_picker(
     table.add_column("B", justify="right")
     table.add_column("Fit", justify="right")
     table.add_column("Debt", justify="right")
+    table.add_column("Segment")
     table.add_column("Price")
     table.add_column("Description")
 
@@ -255,6 +317,7 @@ def render_product_template_picker(
             str(template.bug_level),
             str(template.market_fit),
             str(template.technical_debt),
+            template.target_segment.value,
             template.pricing_tier.value,
             template.description,
         )
@@ -328,32 +391,60 @@ def render_game_over(console: Console, state: GameState) -> None:
 
 
 def _build_turn_header_panel(state: GameState) -> Panel:
+    effective_roadmap = get_effective_roadmap_focus(
+        state.roadmap_focus,
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
+    roadmap_due = is_roadmap_due(
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
+    turns_remaining = get_roadmap_turns_remaining(
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
+    roadmap_status = (
+        "due now"
+        if roadmap_due
+        else f"{turns_remaining} turns left"
+    )
     body = (
         f"[bold white]Turn {state.company.current_turn}[/bold white]\n"
         f"[cyan]Scenario:[/cyan] {state.scenario_title}\n"
         f"[cyan]Actions Left:[/cyan] {state.action_points_remaining}\n"
+        f"[cyan]Roadmap:[/cyan] {effective_roadmap.value} ({roadmap_status})\n"
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
     return Panel.fit(body, title="Turn Control", border_style="blue")
 
 
 def _build_company_panel(state: GameState) -> Panel:
+    effective_roadmap = get_effective_roadmap_focus(
+        state.roadmap_focus,
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Name", state.company.name)
     table.add_row("Scenario", state.scenario_title)
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Strategy", state.company.strategy.value)
+    table.add_row("Roadmap", effective_roadmap.value)
     table.add_row("Status", "Game Over" if state.company.game_over else "Operating")
     return Panel(table, title="Company Overview", border_style="magenta", expand=True)
 
 
 def _build_totals_panel(state: GameState) -> Panel:
     active_products = [product for product in state.products if product.is_active]
+    run_score = calculate_run_score(state)
     table = Table.grid(padding=(0, 1))
     table.add_row("Active Products", str(len(active_products)))
     table.add_row("Portfolio Users", str(get_total_users(state)))
     table.add_row("Sunset Products", str(len(state.products) - len(active_products)))
+    table.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
+    table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
 
@@ -378,6 +469,7 @@ def _build_portfolio_table(state: GameState) -> Table:
     table.add_column("Product", style="bold")
     table.add_column("Stage")
     table.add_column("Status")
+    table.add_column("Segment")
     table.add_column("Users", justify="right")
     table.add_column("Team", justify="right")
     table.add_column("Q", justify="right")
@@ -395,6 +487,7 @@ def _build_portfolio_table(state: GameState) -> Table:
             product.name,
             product.lifecycle_stage.value,
             "active" if product.is_active else "sunset",
+            product.target_segment.value,
             str(product.user_count),
             str(assignment_counts.get(product.id, 0)),
             str(product.quality),
@@ -413,7 +506,7 @@ def _build_portfolio_table(state: GameState) -> Table:
 def _build_dashboard_team_panel(state: GameState) -> Panel:
     if not state.employees:
         return Panel(
-            "No employees hired yet. Use [bold]9[/bold] to start building the team.",
+            "No employees hired yet. Use [bold]11[/bold] to start building the team.",
             title="Team Table",
             border_style="cyan",
             expand=True,
@@ -495,24 +588,27 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("4", "reduce_technical_debt", "Stabilise future delivery.")
     primary_actions.add_row("5", "market_product", "Spend cash for acquisition.")
     primary_actions.add_row("6", "adjust_pricing", "Change pricing and growth trade-offs.")
-    primary_actions.add_row("7", "sunset_product", "Retire a weak product.")
-    primary_actions.add_row("8", "set_company_strategy", "Shift company-wide focus.")
-    primary_actions.add_row("9", "hire_employee", "Add capability and salary burn.")
-    primary_actions.add_row("10", "fire_employee", "Remove salary burden.")
-    primary_actions.add_row("11", "assign_employee", "Put someone on a product.")
-    primary_actions.add_row("12", "unassign_employee", "Pull someone off product work.")
-    primary_actions.add_row("13", "rest_team", "Recover energy and morale.")
-    primary_actions.add_row("14", "review_team", "Open the detailed team view.")
-    primary_actions.add_row("15", "wait", "Hold position for this action.")
-    primary_actions.add_row("16", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("17", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("7", "set_target_segment", "Retarget a product's customer segment.")
+    primary_actions.add_row("8", "sunset_product", "Retire a weak product.")
+    primary_actions.add_row("9", "set_company_strategy", "Shift company-wide focus.")
+    primary_actions.add_row("10", "set_roadmap", "Pick the quarter's execution plan.")
+    primary_actions.add_row("11", "hire_employee", "Add capability and salary burn.")
+    primary_actions.add_row("12", "fire_employee", "Remove salary burden.")
+    primary_actions.add_row("13", "assign_employee", "Put someone on a product.")
+    primary_actions.add_row("14", "unassign_employee", "Pull someone off product work.")
+    primary_actions.add_row("15", "rest_team", "Recover energy and morale.")
+    primary_actions.add_row("16", "review_team", "Open the detailed team view.")
+    primary_actions.add_row("17", "view_report", "Open the scoring and history report.")
+    primary_actions.add_row("18", "wait", "Hold position for this action.")
+    primary_actions.add_row("19", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("20", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("18", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("19", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("21", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("22", "load_game", "Resume a saved slot from SQLite.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -581,16 +677,32 @@ def _build_turn_finance_table(resolution: TurnResolution) -> Table:
 def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     table = Table.grid(padding=(0, 1))
     table.add_row("Reputation", format_signed_int(resolution.reputation_delta))
-    table.add_row("Avg Energy", str(resolution.team_condition.average_energy))
-    table.add_row("Avg Morale", str(resolution.team_condition.average_morale))
+    table.add_row(
+        "Avg Energy",
+        "-"
+        if resolution.team_condition.headcount == 0
+        else str(resolution.team_condition.average_energy),
+    )
+    table.add_row(
+        "Avg Morale",
+        "-"
+        if resolution.team_condition.headcount == 0
+        else str(resolution.team_condition.average_morale),
+    )
     table.add_row("Burned Out", str(resolution.team_condition.burned_out_count))
     table.add_row("Strategy", resolution.state.company.strategy.value)
+    table.add_row("Roadmap", resolution.roadmap_focus.value)
+    table.add_row(
+        "Run Score", f"{resolution.run_score.total_score} ({resolution.run_score.score_tier})"
+    )
+    table.add_row("Est. Value", format_money(resolution.run_score.estimated_valuation))
     table.add_row("Pending Event", "yes" if resolution.pending_event is not None else "no")
     table.add_row(
         "Resolved Event",
         "yes" if resolution.event_history_entry is not None else "no",
     )
     table.add_row("Milestones", str(len(resolution.unlocked_milestones)))
+    table.add_row("Roadmap Due", "yes" if resolution.roadmap_due else "no")
     return table
 
 
@@ -598,6 +710,7 @@ def _build_turn_product_table(resolution: TurnResolution) -> Table:
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Product", style="bold")
     table.add_column("Stage")
+    table.add_column("Segment")
     table.add_column("Rev", justify="right")
     table.add_column("Cost", justify="right")
     table.add_column("+Users", justify="right")
@@ -605,11 +718,13 @@ def _build_turn_product_table(resolution: TurnResolution) -> Table:
     table.add_column("Net", justify="right")
     table.add_column("Q", justify="right")
     table.add_column("B", justify="right")
+    table.add_column("Pressure", justify="right")
 
     for summary in resolution.product_summaries:
         table.add_row(
             summary.product_name,
             summary.lifecycle_stage.value,
+            summary.target_segment.value,
             format_money(summary.revenue),
             format_money(summary.operating_cost),
             str(summary.acquired_users),
@@ -617,6 +732,7 @@ def _build_turn_product_table(resolution: TurnResolution) -> Table:
             format_signed_int(summary.net_user_delta),
             format_signed_int(summary.quality_delta),
             format_signed_int(summary.bug_delta),
+            str(summary.competitor_pressure),
         )
 
     return table
@@ -650,11 +766,7 @@ def _build_event_result_panel(history_entry: EventHistoryEntry) -> Panel:
 
 def _build_milestone_panel(milestones: list[MilestoneEntry]) -> Panel:
     body = "\n\n".join(
-        (
-            f"[bold]{entry.title}[/bold]\n"
-            f"{entry.description}\n"
-            f"Reward: {entry.reward_text}"
-        )
+        (f"[bold]{entry.title}[/bold]\n{entry.description}\nReward: {entry.reward_text}")
         for entry in milestones
     )
     return Panel(body, title="Milestones Unlocked", border_style="magenta", expand=True)
@@ -681,3 +793,72 @@ def format_signed_money(value: Decimal) -> str:
 
     style = "green" if value > 0 else "red" if value < 0 else "white"
     return f"[{style}]{format_money(value)}[/{style}]"
+
+
+def _build_report_overview_panel(state: GameState, total_score: int, score_tier: str) -> Panel:
+    effective_roadmap = get_effective_roadmap_focus(
+        state.roadmap_focus,
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
+    roadmap_due = is_roadmap_due(
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
+    turns_left = get_roadmap_turns_remaining(
+        roadmap_set_turn=state.roadmap_set_turn,
+        current_turn=state.company.current_turn,
+    )
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Company", state.company.name)
+    table.add_row("Scenario", state.scenario_title)
+    table.add_row("Turn", str(state.company.current_turn))
+    table.add_row("Cash", format_money(state.company.cash_on_hand))
+    table.add_row("Reputation", str(state.company.reputation))
+    table.add_row("Roadmap", effective_roadmap.value)
+    table.add_row("Roadmap State", "due now" if roadmap_due else f"{turns_left} turns left")
+    table.add_row("Run Score", f"{total_score} ({score_tier})")
+    return Panel(table, title="Run Overview", border_style="magenta", expand=True)
+
+
+def _build_report_score_panel(state: GameState) -> Panel:
+    run_score = calculate_run_score(state)
+    active_segments = sorted(
+        {product.target_segment.value for product in state.products if product.is_active}
+    )
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    table.add_row("Active Products", str(run_score.active_products))
+    table.add_row("Mature Products", str(run_score.mature_products))
+    table.add_row("Portfolio Users", str(run_score.total_users))
+    table.add_row("Headcount", str(len(state.employees)))
+    table.add_row("Milestones", str(len(state.milestone_history)))
+    table.add_row("Segments", ", ".join(active_segments) if active_segments else "-")
+    return Panel(table, title="Scorecard", border_style="yellow", expand=True)
+
+
+def _build_turn_history_table(state: GameState) -> Table:
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Turn", justify="right", style="bold cyan")
+    table.add_column("Revenue", justify="right")
+    table.add_column("Cost", justify="right")
+    table.add_column("Net", justify="right")
+    table.add_column("Cash", justify="right")
+    table.add_column("Users", justify="right")
+    table.add_column("Rep", justify="right")
+    table.add_column("Headcount", justify="right")
+    table.add_column("Roadmap")
+
+    for entry in state.turn_history[-8:]:
+        table.add_row(
+            str(entry.turn),
+            format_money(entry.total_revenue),
+            format_money(entry.total_operating_cost),
+            format_signed_money(entry.net_cash_flow),
+            format_money(entry.cash_on_hand),
+            str(entry.total_users),
+            str(entry.reputation),
+            str(entry.headcount),
+            entry.roadmap_focus.value,
+        )
+    return table

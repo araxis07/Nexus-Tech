@@ -6,7 +6,7 @@ import sqlite3
 from decimal import Decimal
 from uuid import UUID
 
-from nexus_tech.domain.models import LifecycleStage, PricingTier, Product
+from nexus_tech.domain.models import LifecycleStage, MarketSegment, PricingTier, Product
 
 
 class ProductRepository:
@@ -40,9 +40,10 @@ class ProductRepository:
                 acquisition_rate,
                 churn_rate,
                 pricing_tier,
+                target_segment,
                 is_active
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -62,6 +63,7 @@ class ProductRepository:
                     str(product.acquisition_rate),
                     str(product.churn_rate),
                     product.pricing_tier.value,
+                    product.target_segment.value,
                     int(product.is_active),
                 )
                 for index, product in enumerate(products)
@@ -88,6 +90,7 @@ class ProductRepository:
                 acquisition_rate,
                 churn_rate,
                 pricing_tier,
+                target_segment,
                 is_active
             FROM products
             WHERE slot_name = ?
@@ -112,6 +115,7 @@ class ProductRepository:
                 acquisition_rate=Decimal(row["acquisition_rate"]),
                 churn_rate=Decimal(row["churn_rate"]),
                 pricing_tier=PricingTier(row["pricing_tier"] or PricingTier.STANDARD.value),
+                target_segment=MarketSegment(row["target_segment"] or MarketSegment.STARTUP.value),
                 is_active=bool(row["is_active"]),
             )
             for row in rows

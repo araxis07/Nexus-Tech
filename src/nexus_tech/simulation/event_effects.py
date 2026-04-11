@@ -437,9 +437,7 @@ def _get_target_employee(state: GameState, event: PendingEvent) -> Employee:
 
 
 def _get_assigned_employees(state: GameState, product_id: UUID) -> list[Employee]:
-    return [
-        employee for employee in state.employees if employee.assigned_product_id == product_id
-    ]
+    return [employee for employee in state.employees if employee.assigned_product_id == product_id]
 
 
 EVENT_EFFECT_HANDLERS = {

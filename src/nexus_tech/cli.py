@@ -25,9 +25,11 @@ from nexus_tech.domain.models import (
     Employee,
     EmployeeRole,
     GameState,
+    MarketSegment,
     PendingEvent,
     PricingTier,
     Product,
+    RoadmapFocus,
     Seniority,
     TurnAction,
 )
@@ -43,9 +45,11 @@ from nexus_tech.presentation.dashboard import (
     render_pending_event,
     render_product_picker,
     render_product_template_picker,
+    render_report,
     render_scenario_catalog,
     render_team_view,
     render_turn_resolution,
+    render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.engine import (
@@ -92,21 +96,24 @@ ACTION_KEYS = {
     "4": TurnAction.REDUCE_TECHNICAL_DEBT,
     "5": TurnAction.MARKET_PRODUCT,
     "6": TurnAction.ADJUST_PRICING,
-    "7": TurnAction.SUNSET_PRODUCT,
-    "8": TurnAction.SET_COMPANY_STRATEGY,
-    "9": TurnAction.HIRE_EMPLOYEE,
-    "10": TurnAction.FIRE_EMPLOYEE,
-    "11": TurnAction.ASSIGN_EMPLOYEE,
-    "12": TurnAction.UNASSIGN_EMPLOYEE,
-    "13": TurnAction.REST_TEAM,
-    "14": TurnAction.REVIEW_TEAM,
-    "15": TurnAction.WAIT,
-    "16": TurnAction.VIEW_STATUS,
-    "17": TurnAction.END_TURN,
+    "7": TurnAction.SET_TARGET_SEGMENT,
+    "8": TurnAction.SUNSET_PRODUCT,
+    "9": TurnAction.SET_COMPANY_STRATEGY,
+    "10": TurnAction.SET_ROADMAP,
+    "11": TurnAction.HIRE_EMPLOYEE,
+    "12": TurnAction.FIRE_EMPLOYEE,
+    "13": TurnAction.ASSIGN_EMPLOYEE,
+    "14": TurnAction.UNASSIGN_EMPLOYEE,
+    "15": TurnAction.REST_TEAM,
+    "16": TurnAction.REVIEW_TEAM,
+    "17": TurnAction.VIEW_REPORT,
+    "18": TurnAction.WAIT,
+    "19": TurnAction.VIEW_STATUS,
+    "20": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "18": "save_game",
-    "19": "load_game",
+    "21": "save_game",
+    "22": "load_game",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -116,6 +123,7 @@ PRODUCT_TARGETED_ACTIONS = {
     TurnAction.REDUCE_TECHNICAL_DEBT,
     TurnAction.MARKET_PRODUCT,
     TurnAction.ADJUST_PRICING,
+    TurnAction.SET_TARGET_SEGMENT,
     TurnAction.SUNSET_PRODUCT,
 }
 
@@ -334,18 +342,18 @@ def run_game_loop(
     """Run the terminal session until the company shuts down or the user exits."""
 
     try:
-        while not state.company.game_over:
+        while not state.company.game_over and not state.victory_achieved:
             if state.pending_event is not None:
                 state = handle_pending_event(state)
 
             render_dashboard(console, state)
             turn_ended = False
 
-            while not turn_ended and not state.company.game_over:
+            while not turn_ended and not state.company.game_over and not state.victory_achieved:
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="17",
+                    default="20",
                     show_choices=False,
                 )
 
@@ -383,6 +391,10 @@ def run_game_loop(
                     render_team_view(console, state)
                     continue
 
+                if action is TurnAction.VIEW_REPORT:
+                    render_report(console, state)
+                    continue
+
                 render_action_feedback(
                     console,
                     action_label=action.value,
@@ -391,14 +403,17 @@ def run_game_loop(
                 )
                 turn_ended = outcome.turn_should_end
 
-            if state.company.game_over:
+            if state.company.game_over or state.victory_achieved:
                 break
 
             resolution = resolve_turn(state, rng)
             state = resolution.state
             render_turn_resolution(console, resolution)
 
-        render_game_over(console, state)
+        if state.victory_achieved:
+            render_victory(console, state)
+        else:
+            render_game_over(console, state)
     except KeyboardInterrupt as error:
         console.print("\n[bold yellow]Session interrupted.[/bold yellow]")
         raise typer.Exit(code=130) from error
@@ -410,6 +425,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     if action in (
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
+        TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,
     ):
@@ -445,6 +461,22 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             case_sensitive=False,
         )
         return ActionContext(strategy=CompanyStrategy(strategy_key))
+
+    if action is TurnAction.SET_ROADMAP:
+        roadmap_key = ask_choice_input(
+            "Roadmap focus",
+            choices=[
+                "balanced_execution",
+                "growth_push",
+                "platform_rebuild",
+                "premium_expansion",
+                "portfolio_consolidation",
+            ],
+            default=state.roadmap_focus.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(roadmap_focus=RoadmapFocus(roadmap_key))
 
     if action is TurnAction.HIRE_EMPLOYEE:
         full_name = ask_text_input("Employee full name")
@@ -509,6 +541,19 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
                 target_product_id=product_id,
                 pricing_tier=PricingTier(pricing_key),
             )
+        if action is TurnAction.SET_TARGET_SEGMENT:
+            product = next(product for product in state.products if product.id == product_id)
+            segment_key = ask_choice_input(
+                "Target segment",
+                choices=["indie", "startup", "smb", "enterprise"],
+                default=product.target_segment.value,
+                show_choices=False,
+                case_sensitive=False,
+            )
+            return ActionContext(
+                target_product_id=product_id,
+                target_segment=MarketSegment(segment_key),
+            )
         return ActionContext(target_product_id=product_id)
 
     return ActionContext()
@@ -563,9 +608,7 @@ def choose_product_template(action: TurnAction) -> ProductTemplateDefinition | N
         )
         return None
 
-    template_choices = {
-        str(index): template for index, template in enumerate(templates, start=1)
-    }
+    template_choices = {str(index): template for index, template in enumerate(templates, start=1)}
     render_product_template_picker(console, templates, action_label=action.value)
     selected_key = ask_choice_input(
         "Select a product template",
@@ -603,9 +646,7 @@ def choose_employee_id(
         )
         return None
 
-    employee_choices = {
-        str(index): employee for index, employee in enumerate(employees, start=1)
-    }
+    employee_choices = {str(index): employee for index, employee in enumerate(employees, start=1)}
     label = action.value.replace("_", " ")
     render_employee_picker(console, employees, state.products, action_label=action.value)
     selected_key = ask_choice_input(
@@ -732,7 +773,7 @@ def build_product_selection_summary(product: Product) -> str:
         f"Stage: {product.lifecycle_stage.value} | Users: {product.user_count} | "
         f"Quality: {product.quality} | Bugs: {product.bug_level} | "
         f"Fit: {product.market_fit} | Debt: {product.technical_debt} | "
-        f"Pricing: {product.pricing_tier.value}"
+        f"Segment: {product.target_segment.value} | Pricing: {product.pricing_tier.value}"
     )
 
 
@@ -744,7 +785,8 @@ def build_product_template_summary(template: ProductTemplateDefinition) -> str:
         f"{template.description}\n"
         f"Stage: {template.lifecycle_stage.value} | Quality: {template.quality} | "
         f"Bugs: {template.bug_level} | Fit: {template.market_fit} | "
-        f"Debt: {template.technical_debt} | Pricing: {template.pricing_tier.value}"
+        f"Debt: {template.technical_debt} | Segment: {template.target_segment.value} | "
+        f"Pricing: {template.pricing_tier.value}"
     )
 
 

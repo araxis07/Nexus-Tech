@@ -16,6 +16,7 @@ from nexus_tech.domain.money import quantize_money, quantize_rate
 try:
     from enum import StrEnum
 except ImportError:  # pragma: no cover - fallback for local verification on Python < 3.11
+
     class StrEnum(str, Enum):  # noqa: UP042
         """Compatibility fallback for runtimes without `enum.StrEnum`."""
 
@@ -56,6 +57,25 @@ class PricingTier(StrEnum):
     PREMIUM = "premium"
 
 
+class MarketSegment(StrEnum):
+    """Primary customer segment targeted by a product."""
+
+    INDIE = "indie"
+    STARTUP = "startup"
+    SMB = "smb"
+    ENTERPRISE = "enterprise"
+
+
+class RoadmapFocus(StrEnum):
+    """Quarter-scale planning posture for the company."""
+
+    BALANCED_EXECUTION = "balanced_execution"
+    GROWTH_PUSH = "growth_push"
+    PLATFORM_REBUILD = "platform_rebuild"
+    PREMIUM_EXPANSION = "premium_expansion"
+    PORTFOLIO_CONSOLIDATION = "portfolio_consolidation"
+
+
 class EventCategory(StrEnum):
     """Supported event categories for the dynamic event engine."""
 
@@ -93,14 +113,17 @@ class TurnAction(StrEnum):
     REDUCE_TECHNICAL_DEBT = "reduce_technical_debt"
     MARKET_PRODUCT = "market_product"
     ADJUST_PRICING = "adjust_pricing"
+    SET_TARGET_SEGMENT = "set_target_segment"
     SUNSET_PRODUCT = "sunset_product"
     SET_COMPANY_STRATEGY = "set_company_strategy"
+    SET_ROADMAP = "set_roadmap"
     HIRE_EMPLOYEE = "hire_employee"
     FIRE_EMPLOYEE = "fire_employee"
     ASSIGN_EMPLOYEE = "assign_employee"
     UNASSIGN_EMPLOYEE = "unassign_employee"
     REST_TEAM = "rest_team"
     REVIEW_TEAM = "review_team"
+    VIEW_REPORT = "view_report"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
     END_TURN = "end_turn"
@@ -144,6 +167,7 @@ class Product(BaseModel):
     acquisition_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     churn_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     pricing_tier: PricingTier = PricingTier.STANDARD
+    target_segment: MarketSegment = MarketSegment.STARTUP
     is_active: bool = True
 
     @field_validator("revenue_per_user", "maintenance_cost", mode="before")
@@ -232,6 +256,33 @@ class MilestoneEntry(BaseModel):
     reward_text: str = Field(min_length=1, max_length=240)
 
 
+class TurnLedgerEntry(BaseModel):
+    """Compact turn history snapshot for reporting and scoring."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    turn: int = Field(ge=1)
+    total_revenue: Decimal
+    total_operating_cost: Decimal
+    net_cash_flow: Decimal
+    cash_on_hand: Decimal
+    reputation: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    total_users: int = Field(ge=0)
+    headcount: int = Field(ge=0)
+    roadmap_focus: RoadmapFocus
+
+    @field_validator(
+        "total_revenue",
+        "total_operating_cost",
+        "net_cash_flow",
+        "cash_on_hand",
+        mode="before",
+    )
+    @classmethod
+    def _normalize_turn_money(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+
 class GameState(BaseModel):
     """Current in-memory game state."""
 
@@ -243,6 +294,11 @@ class GameState(BaseModel):
     pending_event: Optional[PendingEvent] = None  # noqa: UP045
     event_history: list[EventHistoryEntry] = Field(default_factory=list)
     milestone_history: list[MilestoneEntry] = Field(default_factory=list)
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION
+    roadmap_set_turn: int = Field(default=1, ge=1)
+    turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
+    victory_achieved: bool = False
+    victory_reason: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045
     scenario_id: str = Field(
         default=DEFAULT_SCENARIO_ID,
         min_length=1,

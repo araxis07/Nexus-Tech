@@ -64,8 +64,7 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             title="Cash Reserve Built",
             description="The company now has a healthier operating buffer.",
             is_unlocked=lambda state: (
-                state.company.cash_on_hand
-                >= BALANCE.cash_reserve_milestone_threshold
+                state.company.cash_on_hand >= BALANCE.cash_reserve_milestone_threshold
             ),
             apply_reward=_reward_cash_reserve,
         ),
@@ -82,8 +81,10 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             milestone_id=MilestoneId.THREE_ACTIVE_PRODUCTS,
             title="Portfolio Expansion",
             description="You are now carrying a meaningful multi-product portfolio.",
-            is_unlocked=lambda state: sum(1 for product in state.products if product.is_active)
-            >= BALANCE.active_products_milestone_threshold,
+            is_unlocked=lambda state: (
+                sum(1 for product in state.products if product.is_active)
+                >= BALANCE.active_products_milestone_threshold
+            ),
             apply_reward=_reward_three_active_products,
         ),
         MilestoneDefinition(
@@ -121,9 +122,7 @@ def _reward_cash_reserve(state: GameState) -> str:
 
 def _reward_team_of_4(state: GameState) -> str:
     for employee in state.employees:
-        employee.morale = clamp_int(
-            employee.morale + BALANCE.milestone_team_growth_morale_gain
-        )
+        employee.morale = clamp_int(employee.morale + BALANCE.milestone_team_growth_morale_gain)
     state.company.reputation = clamp_int(
         state.company.reputation + BALANCE.milestone_team_growth_reputation_gain
     )
@@ -137,10 +136,7 @@ def _reward_three_active_products(state: GameState) -> str:
     state.company.reputation = clamp_int(
         state.company.reputation + BALANCE.milestone_active_products_reputation_gain
     )
-    return (
-        f"Reputation +{BALANCE.milestone_active_products_reputation_gain} "
-        "for portfolio breadth."
-    )
+    return f"Reputation +{BALANCE.milestone_active_products_reputation_gain} for portfolio breadth."
 
 
 def _reward_first_mature_product(state: GameState) -> str:

@@ -80,6 +80,84 @@ class BalanceConfig:
     pricing_premium_market_fit_bonus: int = 1
     pricing_premium_market_fit_penalty: int = 2
 
+    segment_base_acquisition_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 2,
+            "startup": 1,
+            "smb": 0,
+            "enterprise": -2,
+        }
+    )
+    segment_base_churn_modifier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "indie": Decimal("-0.0060"),
+            "startup": Decimal("0.0000"),
+            "smb": Decimal("0.0060"),
+            "enterprise": Decimal("0.0120"),
+        }
+    )
+    segment_support_cost_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "indie": Decimal("0.85"),
+            "startup": Decimal("1.00"),
+            "smb": Decimal("1.15"),
+            "enterprise": Decimal("1.40"),
+        }
+    )
+    segment_price_sensitivity_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "indie": Decimal("1.35"),
+            "startup": Decimal("1.10"),
+            "smb": Decimal("0.90"),
+            "enterprise": Decimal("0.60"),
+        }
+    )
+    segment_market_fit_threshold: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 38,
+            "startup": 46,
+            "smb": 54,
+            "enterprise": 64,
+        }
+    )
+    segment_quality_threshold: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 40,
+            "startup": 48,
+            "smb": 58,
+            "enterprise": 70,
+        }
+    )
+    segment_bug_tolerance_divisor: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 22,
+            "startup": 18,
+            "smb": 14,
+            "enterprise": 10,
+        }
+    )
+    segment_fit_bonus_divisor: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 16,
+            "startup": 18,
+            "smb": 20,
+            "enterprise": 24,
+        }
+    )
+    competitor_pressure_base: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 1,
+            "startup": 2,
+            "smb": 3,
+            "enterprise": 4,
+        }
+    )
+    competitor_pressure_turn_divisor: int = 4
+    competitor_pressure_user_divisor: int = 45
+    competitor_pressure_cap: int = 8
+    competitor_pressure_growth_penalty_divisor: int = 2
+    competitor_pressure_churn_modifier_divisor: int = 100
+
     acquisition_signal_baseline: int = 150
     acquisition_signal_divisor: int = 20
     acquisition_cap_base: int = 4
@@ -182,6 +260,41 @@ class BalanceConfig:
     team_debt_bonus_divisor: int = 38
     team_coordination_bonus_divisor: int = 36
     team_burnout_protection_divisor: int = 55
+
+    roadmap_duration_turns: int = 4
+    roadmap_growth_acquisition_bonus: int = 2
+    roadmap_growth_operating_cost_modifier: Decimal = Decimal("90.00")
+    roadmap_growth_feature_risk_modifier: int = 2
+    roadmap_growth_competitor_relief: int = 0
+    roadmap_platform_quality_bonus: int = 2
+    roadmap_platform_debt_bonus: int = 5
+    roadmap_platform_operating_cost_modifier: Decimal = Decimal("40.00")
+    roadmap_platform_competitor_relief: int = 2
+    roadmap_premium_quality_bonus: int = 2
+    roadmap_premium_market_fit_bonus: int = 2
+    roadmap_premium_reputation_bonus: int = 1
+    roadmap_premium_acquisition_penalty: int = -1
+    roadmap_premium_competitor_relief: int = 1
+    roadmap_portfolio_efficiency_bonus: int = 2
+    roadmap_portfolio_operating_cost_modifier: Decimal = Decimal("-80.00")
+    roadmap_portfolio_acquisition_penalty: int = -1
+    roadmap_portfolio_competitor_relief: int = 1
+
+    score_cash_divisor: Decimal = Decimal("500.00")
+    score_users_divisor: int = 6
+    score_reputation_multiplier: int = 2
+    score_headcount_multiplier: int = 3
+    score_mature_product_bonus: int = 20
+    score_active_product_bonus: int = 8
+    score_milestone_bonus: int = 10
+    valuation_cash_multiplier: Decimal = Decimal("1.00")
+    valuation_revenue_multiplier: Decimal = Decimal("12.00")
+    valuation_user_multiplier: Decimal = Decimal("14.00")
+    victory_min_turn: int = 10
+    victory_score_threshold: int = 190
+    victory_cash_threshold: Decimal = Decimal("12000.00")
+    victory_users_threshold: int = 180
+    victory_reputation_threshold: int = 62
 
     event_trigger_min_turn: int = 2
     event_trigger_chance_percent: int = 42

@@ -16,6 +16,8 @@ from nexus_tech.domain.models import (
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
+    RoadmapFocus,
+    TurnLedgerEntry,
 )
 from nexus_tech.persistence.company_repository import CompanyRepository
 from nexus_tech.persistence.database import DatabaseManager
@@ -71,6 +73,10 @@ class SaveLoadCoordinator:
                     rng_state=rng.export_state(),
                     scenario_id=state.scenario_id,
                     scenario_title=state.scenario_title,
+                    roadmap_focus=state.roadmap_focus,
+                    roadmap_set_turn=state.roadmap_set_turn,
+                    victory_achieved=state.victory_achieved,
+                    victory_reason=state.victory_reason,
                     timestamp=timestamp,
                 )
                 self.company_repository.save(connection, slot_name, state.company)
@@ -79,6 +85,7 @@ class SaveLoadCoordinator:
                 self._save_pending_event(connection, slot_name, state.pending_event)
                 self._save_event_history(connection, slot_name, state.event_history)
                 self._save_milestone_history(connection, slot_name, state.milestone_history)
+                self._save_turn_history(connection, slot_name, state.turn_history)
         except sqlite3.DatabaseError as error:
             raise PersistenceError(f"Failed to save game: {error}") from error
 
@@ -98,7 +105,11 @@ class SaveLoadCoordinator:
                         rng_seed,
                         rng_state,
                         scenario_id,
-                        scenario_title
+                        scenario_title,
+                        roadmap_focus,
+                        roadmap_set_turn,
+                        victory_achieved,
+                        victory_reason
                     FROM save_slots
                     WHERE slot_name = ?
                     """,
@@ -120,6 +131,7 @@ class SaveLoadCoordinator:
                     pending_event = self._load_pending_event(connection, slot_name)
                     event_history = self._load_event_history(connection, slot_name)
                     milestone_history = self._load_milestone_history(connection, slot_name)
+                    turn_history = self._load_turn_history(connection, slot_name)
                     rng = RandomSource.from_state(
                         seed=slot_row["rng_seed"],
                         exported_state=slot_row["rng_state"],
@@ -139,6 +151,11 @@ class SaveLoadCoordinator:
                         pending_event=pending_event,
                         event_history=event_history,
                         milestone_history=milestone_history,
+                        roadmap_focus=RoadmapFocus(slot_row["roadmap_focus"]),
+                        roadmap_set_turn=slot_row["roadmap_set_turn"],
+                        turn_history=turn_history,
+                        victory_achieved=bool(slot_row["victory_achieved"]),
+                        victory_reason=slot_row["victory_reason"],
                         scenario_id=slot_row["scenario_id"],
                         scenario_title=slot_row["scenario_title"],
                         action_points_remaining=slot_row["action_points_remaining"],
@@ -183,6 +200,10 @@ class SaveLoadCoordinator:
         rng_state: str,
         scenario_id: str,
         scenario_title: str,
+        roadmap_focus: RoadmapFocus,
+        roadmap_set_turn: int,
+        victory_achieved: bool,
+        victory_reason: str | None,
         timestamp: str,
     ) -> None:
         existing = connection.execute(
@@ -199,10 +220,14 @@ class SaveLoadCoordinator:
                     rng_state,
                     scenario_id,
                     scenario_title,
+                    roadmap_focus,
+                    roadmap_set_turn,
+                    victory_achieved,
+                    victory_reason,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
@@ -211,6 +236,10 @@ class SaveLoadCoordinator:
                     rng_state,
                     scenario_id,
                     scenario_title,
+                    roadmap_focus.value,
+                    roadmap_set_turn,
+                    int(victory_achieved),
+                    victory_reason,
                     timestamp,
                     timestamp,
                 ),
@@ -225,6 +254,10 @@ class SaveLoadCoordinator:
                 rng_state = ?,
                 scenario_id = ?,
                 scenario_title = ?,
+                roadmap_focus = ?,
+                roadmap_set_turn = ?,
+                victory_achieved = ?,
+                victory_reason = ?,
                 updated_at = ?
             WHERE slot_name = ?
             """,
@@ -234,6 +267,10 @@ class SaveLoadCoordinator:
                 rng_state,
                 scenario_id,
                 scenario_title,
+                roadmap_focus.value,
+                roadmap_set_turn,
+                int(victory_achieved),
+                victory_reason,
                 timestamp,
                 slot_name,
             ),
@@ -500,6 +537,86 @@ class SaveLoadCoordinator:
                 description=row["description"],
                 unlocked_turn=row["unlocked_turn"],
                 reward_text=row["reward_text"],
+            )
+            for row in rows
+        ]
+
+    def _save_turn_history(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        turn_history: list[TurnLedgerEntry],
+    ) -> None:
+        connection.execute("DELETE FROM turn_history WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO turn_history (
+                slot_name,
+                entry_index,
+                turn,
+                total_revenue,
+                total_operating_cost,
+                net_cash_flow,
+                cash_on_hand,
+                reputation,
+                total_users,
+                headcount,
+                roadmap_focus
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    index,
+                    entry.turn,
+                    str(entry.total_revenue),
+                    str(entry.total_operating_cost),
+                    str(entry.net_cash_flow),
+                    str(entry.cash_on_hand),
+                    entry.reputation,
+                    entry.total_users,
+                    entry.headcount,
+                    entry.roadmap_focus.value,
+                )
+                for index, entry in enumerate(turn_history)
+            ],
+        )
+
+    def _load_turn_history(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[TurnLedgerEntry]:
+        rows = connection.execute(
+            """
+            SELECT
+                turn,
+                total_revenue,
+                total_operating_cost,
+                net_cash_flow,
+                cash_on_hand,
+                reputation,
+                total_users,
+                headcount,
+                roadmap_focus
+            FROM turn_history
+            WHERE slot_name = ?
+            ORDER BY entry_index ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            TurnLedgerEntry(
+                turn=row["turn"],
+                total_revenue=row["total_revenue"],
+                total_operating_cost=row["total_operating_cost"],
+                net_cash_flow=row["net_cash_flow"],
+                cash_on_hand=row["cash_on_hand"],
+                reputation=row["reputation"],
+                total_users=row["total_users"],
+                headcount=row["headcount"],
+                roadmap_focus=RoadmapFocus(row["roadmap_focus"]),
             )
             for row in rows
         ]

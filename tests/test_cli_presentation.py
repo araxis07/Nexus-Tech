@@ -20,11 +20,19 @@ from nexus_tech.domain.models import (
     EventOption,
     GameState,
     LifecycleStage,
+    MarketSegment,
     PendingEvent,
     Product,
+    RoadmapFocus,
     Seniority,
+    TurnLedgerEntry,
 )
-from nexus_tech.presentation.dashboard import render_dashboard, render_turn_resolution
+from nexus_tech.presentation.dashboard import (
+    render_dashboard,
+    render_report,
+    render_turn_resolution,
+    render_victory,
+)
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
@@ -46,6 +54,7 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         maintenance_cost=Decimal("320.00"),
         acquisition_rate=Decimal("0.0650"),
         churn_rate=Decimal("0.0460"),
+        target_segment=MarketSegment.STARTUP,
     )
     secondary_product = Product(
         name="Nexus Flow",
@@ -60,6 +69,7 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         maintenance_cost=Decimal("180.00"),
         acquisition_rate=Decimal("0.0410"),
         churn_rate=Decimal("0.0530"),
+        target_segment=MarketSegment.SMB,
     )
     employee = Employee(
         full_name="Ada Wong",
@@ -90,6 +100,19 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
                 )
             ],
         )
+    turn_history = [
+        TurnLedgerEntry(
+            turn=2,
+            total_revenue=Decimal("1180.00"),
+            total_operating_cost=Decimal("1690.00"),
+            net_cash_flow=Decimal("-510.00"),
+            cash_on_hand=Decimal("8120.00"),
+            reputation=56,
+            total_users=59,
+            headcount=1,
+            roadmap_focus=RoadmapFocus.GROWTH_PUSH,
+        )
+    ]
     return GameState(
         company=Company(
             name="NEXUS TECH",
@@ -100,6 +123,9 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         products=[primary_product, secondary_product],
         employees=[employee],
         pending_event=pending_event,
+        roadmap_focus=RoadmapFocus.GROWTH_PUSH,
+        roadmap_set_turn=2,
+        turn_history=turn_history,
         action_points_remaining=BALANCE.actions_per_turn,
     )
 
@@ -356,6 +382,8 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Event Notification" in output
     assert "Strategy" in output
     assert "Price" in output
+    assert "Roadmap" in output
+    assert "Segment" in output
 
 
 def test_turn_resolution_rendering_contains_summary_sections() -> None:
@@ -370,3 +398,31 @@ def test_turn_resolution_rendering_contains_summary_sections() -> None:
     assert "Portfolio Results" in output
     assert "Outlook" in output
     assert "Cash On Hand" in output
+    assert "Run Score" in output
+
+
+def test_report_rendering_contains_score_and_turn_history() -> None:
+    state = make_demo_state()
+    console = Console(record=True, width=140)
+
+    render_report(console, state)
+    output = console.export_text()
+
+    assert "Run Overview" in output
+    assert "Scorecard" in output
+    assert "Turn History" in output
+    assert "Estimated Value" in output
+
+
+def test_victory_rendering_contains_summary_metrics() -> None:
+    state = make_demo_state()
+    state.victory_achieved = True
+    state.victory_reason = "You built a durable software company."
+    console = Console(record=True, width=140)
+
+    render_victory(console, state)
+    output = console.export_text()
+
+    assert "Victory" in output
+    assert "Run Score" in output
+    assert "Estimated Value" in output

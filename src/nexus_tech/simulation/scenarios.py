@@ -42,6 +42,8 @@ def create_game_state_from_scenario(
         company=company,
         products=products,
         employees=employees,
+        roadmap_focus=scenario.roadmap_focus,
+        roadmap_set_turn=1,
         scenario_id=scenario.scenario_id,
         scenario_title=scenario.title,
         action_points_remaining=BALANCE.actions_per_turn,
@@ -139,6 +141,7 @@ def _instantiate_template_product(
         acquisition_rate=template.acquisition_rate,
         churn_rate=template.churn_rate,
         pricing_tier=template.pricing_tier,
+        target_segment=template.target_segment,
     )
     if seed is None:
         return product
@@ -167,6 +170,8 @@ def _instantiate_template_product(
         product.churn_rate = seed.churn_rate
     if seed.pricing_tier is not None:
         product.pricing_tier = seed.pricing_tier
+    if seed.target_segment is not None:
+        product.target_segment = seed.target_segment
     product.is_active = seed.is_active
     return product
 

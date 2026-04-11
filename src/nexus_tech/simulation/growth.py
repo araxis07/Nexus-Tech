@@ -3,13 +3,15 @@
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-from nexus_tech.domain.models import Company, Employee, LifecycleStage, Product
+from nexus_tech.domain.models import Company, Employee, LifecycleStage, Product, RoadmapFocus
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.pricing import (
     get_pricing_acquisition_bonus,
     get_pricing_churn_modifier,
 )
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.roadmap import get_roadmap_profile
+from nexus_tech.simulation.segments import resolve_segment_dynamics
 from nexus_tech.simulation.strategy import get_strategy_profile
 from nexus_tech.simulation.support import clamp_rate
 from nexus_tech.simulation.team import ProductTeamModifier, calculate_product_team_modifier
@@ -46,6 +48,9 @@ def calculate_acquired_users(
     product: Product,
     rng: RandomLike,
     team_modifier: ProductTeamModifier,
+    *,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
 ) -> int:
     """Estimate new users joining a product this turn."""
 
@@ -57,6 +62,18 @@ def calculate_acquired_users(
         base_from_rate += 1
 
     strategy_profile = get_strategy_profile(company.strategy)
+    roadmap_profile = get_roadmap_profile(
+        roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+        current_turn=company.current_turn,
+    )
+    segment_dynamics = resolve_segment_dynamics(
+        product,
+        current_turn=company.current_turn,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+        pricing_churn_modifier=get_pricing_churn_modifier(product),
+    )
     acquisition_signal = (
         product.quality
         + product.market_fit
@@ -72,7 +89,9 @@ def calculate_acquired_users(
         + STAGE_ACQUISITION_MODIFIER[product.lifecycle_stage]
         + team_modifier.acquisition_bonus
         + get_pricing_acquisition_bonus(product)
+        + segment_dynamics.acquisition_bonus
         + strategy_profile.acquisition_bonus
+        + roadmap_profile.acquisition_bonus
         + rng.randint(-BALANCE.acquisition_random_swing, BALANCE.acquisition_random_swing)
     )
     acquisition_cap = max(
@@ -87,12 +106,31 @@ def calculate_acquired_users(
 def calculate_effective_churn_rate(product: Product) -> Decimal:
     """Build a churn rate that reflects product health."""
 
+    return calculate_effective_churn_rate_for_context(product)
+
+
+def calculate_effective_churn_rate_for_context(
+    product: Product,
+    *,
+    current_turn: int = 1,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
+) -> Decimal:
+    """Build a churn rate that reflects product health and market context."""
+
     churn_rate = product.churn_rate
     churn_rate += Decimal(product.bug_level // BALANCE.churn_bug_divisor) / Decimal("100")
     churn_rate += Decimal(product.technical_debt // BALANCE.churn_debt_divisor) / Decimal("100")
     churn_rate += Decimal(STAGE_CHURN_MODIFIER[product.lifecycle_stage]) / Decimal("100")
     churn_rate -= Decimal(product.quality // BALANCE.churn_quality_relief_divisor) / Decimal("100")
-    churn_rate += get_pricing_churn_modifier(product)
+    segment_dynamics = resolve_segment_dynamics(
+        product,
+        current_turn=current_turn,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+        pricing_churn_modifier=get_pricing_churn_modifier(product),
+    )
+    churn_rate += segment_dynamics.churn_modifier
 
     if product.market_fit < BALANCE.low_market_fit_threshold:
         churn_rate += Decimal(BALANCE.low_market_fit_churn_penalty) / Decimal("100")
@@ -101,13 +139,25 @@ def calculate_effective_churn_rate(product: Product) -> Decimal:
     return clamp_rate(churn_rate)
 
 
-def calculate_churned_users(product: Product, rng: RandomLike) -> int:
+def calculate_churned_users(
+    product: Product,
+    rng: RandomLike,
+    *,
+    current_turn: int = 1,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
+) -> int:
     """Estimate users leaving a product this turn."""
 
     if not product.is_active or product.user_count == 0:
         return 0
 
-    effective_rate = calculate_effective_churn_rate(product)
+    effective_rate = calculate_effective_churn_rate_for_context(
+        product,
+        current_turn=current_turn,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+    )
     raw_churn = Decimal(product.user_count) * effective_rate
     churned_users = int(raw_churn.to_integral_value(rounding=ROUND_HALF_UP))
     if churned_users == 0:
@@ -122,11 +172,27 @@ def resolve_growth(
     product: Product,
     rng: RandomLike,
     team_modifier: ProductTeamModifier,
+    *,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
 ) -> GrowthResult:
     """Resolve both acquisition and churn for one product."""
 
-    acquired_users = calculate_acquired_users(company, product, rng, team_modifier)
-    churned_users = calculate_churned_users(product, rng)
+    acquired_users = calculate_acquired_users(
+        company,
+        product,
+        rng,
+        team_modifier,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+    )
+    churned_users = calculate_churned_users(
+        product,
+        rng,
+        current_turn=company.current_turn,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+    )
     net_user_delta = acquired_users - churned_users
     return GrowthResult(
         acquired_users=acquired_users,
@@ -140,6 +206,9 @@ def calculate_company_reputation_delta(
     products: list[Product],
     employees: list[Employee],
     rng: RandomLike,
+    *,
+    roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
+    roadmap_set_turn: int = 1,
 ) -> int:
     """Move company reputation based on portfolio health."""
 
@@ -148,16 +217,14 @@ def calculate_company_reputation_delta(
         base_delta = -1
     else:
         total_weight = sum(max(1, product.user_count) for product in active_products)
-        weighted_health = sum(
-            (
-                product.quality
-                + product.market_fit
-                - product.bug_level
-                - product.technical_debt
+        weighted_health = (
+            sum(
+                (product.quality + product.market_fit - product.bug_level - product.technical_debt)
+                * max(1, product.user_count)
+                for product in active_products
             )
-            * max(1, product.user_count)
-            for product in active_products
-        ) // total_weight
+            // total_weight
+        )
 
         if weighted_health >= BALANCE.reputation_strong_threshold:
             base_delta = 2
@@ -176,5 +243,16 @@ def calculate_company_reputation_delta(
     )
     designer_bonus = min(1, reputation_support)
     strategy_profile = get_strategy_profile(company.strategy)
-    delta = base_delta + designer_bonus + strategy_profile.reputation_bonus + rng.randint(-1, 1)
+    roadmap_profile = get_roadmap_profile(
+        roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
+        current_turn=company.current_turn,
+    )
+    delta = (
+        base_delta
+        + designer_bonus
+        + strategy_profile.reputation_bonus
+        + roadmap_profile.reputation_bonus
+        + rng.randint(-1, 1)
+    )
     return max(-2, min(3, delta))

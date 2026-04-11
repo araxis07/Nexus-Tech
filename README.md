@@ -30,8 +30,10 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Own and manage multiple products at the same time
 - Track quality, bugs, market fit, technical debt, users, acquisition, and churn
+- Target different customer segments such as `indie`, `startup`, `SMB`, and `enterprise`
 - Adjust pricing tiers to trade off growth, churn, and revenue per user
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
+- Deal with segment-specific trade-offs like support cost, price sensitivity, and competitive pressure
 
 ### 🧩 Data-Driven Content
 
@@ -61,22 +63,27 @@ Each turn represents a business interval. You review the company, choose actions
   - reputation incidents
   - employee issues
 - Some events create meaningful player trade-offs instead of simple bonuses
+- Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
 
 - Unlock company milestones as the business scales
 - Track key moments such as traction, cash reserves, team growth, and portfolio expansion
+- Set quarter-scale roadmap focuses such as growth push, platform rebuild, premium expansion, and portfolio consolidation
+- Track run score, estimated company value, turn history, and victory conditions in the terminal report
 
 ### 💾 Local Save / Load
 
 - Save and load runs locally with SQLite
 - Resume the latest save slot
+- Persist roadmap state, product targeting, event history, team assignments, and turn history
 - Keep the entire project offline and self-contained
 
 ### 🖥️ Presentation and CLI
 
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
+- In-game reporting view for score, valuation, and recent turn history
 - Seeded demo support for reproducible simulations
 
 ## 🧱 Tech Stack
@@ -158,11 +165,14 @@ The core loop is simple:
 Typical decisions include:
 
 - which product should get attention this turn
+- which customer segment each product should target
 - whether to push features or stabilize quality
 - when technical debt has become too expensive to ignore
+- which roadmap focus should shape the next few turns
 - when to hire, assign, rest, or remove team members
 - which scenario opening creates the best long-term position
 - how to survive cash pressure while still building growth
+- when the company is ready to push for a winning end-state instead of just surviving
 
 ## 🧪 Testing
 
