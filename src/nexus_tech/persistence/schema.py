@@ -23,6 +23,7 @@ SCHEMA_STATEMENTS = (
         name TEXT NOT NULL,
         cash_on_hand TEXT NOT NULL,
         reputation INTEGER NOT NULL,
+        strategy TEXT NOT NULL DEFAULT 'balanced',
         current_turn INTEGER NOT NULL,
         game_over INTEGER NOT NULL
     )
@@ -45,6 +46,7 @@ SCHEMA_STATEMENTS = (
         maintenance_cost TEXT NOT NULL,
         acquisition_rate TEXT NOT NULL,
         churn_rate TEXT NOT NULL,
+        pricing_tier TEXT NOT NULL DEFAULT 'standard',
         is_active INTEGER NOT NULL,
         PRIMARY KEY (slot_name, product_id),
         UNIQUE (slot_name, display_order)
@@ -116,6 +118,19 @@ SCHEMA_STATEMENTS = (
         PRIMARY KEY (slot_name, entry_index)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS milestone_history (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        entry_index INTEGER NOT NULL,
+        milestone_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        unlocked_turn INTEGER NOT NULL,
+        reward_text TEXT NOT NULL,
+        PRIMARY KEY (slot_name, entry_index)
+    )
+    """,
 )
 
 
@@ -125,4 +140,35 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA foreign_keys = ON")
     for statement in SCHEMA_STATEMENTS:
         connection.execute(statement)
-    connection.execute("PRAGMA user_version = 1")
+    _ensure_column(
+        connection,
+        table_name="companies",
+        column_name="strategy",
+        column_definition="TEXT NOT NULL DEFAULT 'balanced'",
+    )
+    _ensure_column(
+        connection,
+        table_name="products",
+        column_name="pricing_tier",
+        column_definition="TEXT NOT NULL DEFAULT 'standard'",
+    )
+    connection.execute("PRAGMA user_version = 2")
+
+
+def _ensure_column(
+    connection: sqlite3.Connection,
+    *,
+    table_name: str,
+    column_name: str,
+    column_definition: str,
+) -> None:
+    columns = {
+        row[1]
+        for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name in columns:
+        return
+
+    connection.execute(
+        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+    )

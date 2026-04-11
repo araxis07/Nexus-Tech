@@ -8,6 +8,7 @@ import pytest
 
 from nexus_tech.domain.models import (
     Company,
+    CompanyStrategy,
     Employee,
     EmployeeRole,
     EventCategory,
@@ -15,7 +16,10 @@ from nexus_tech.domain.models import (
     EventOption,
     GameState,
     LifecycleStage,
+    MilestoneEntry,
+    MilestoneId,
     PendingEvent,
+    PricingTier,
     Product,
     Seniority,
 )
@@ -39,6 +43,7 @@ def make_state() -> GameState:
         maintenance_cost=Decimal("280.00"),
         acquisition_rate=Decimal("0.0720"),
         churn_rate=Decimal("0.0480"),
+        pricing_tier=PricingTier.PREMIUM,
         is_active=True,
     )
     employee = Employee(
@@ -86,17 +91,28 @@ def make_state() -> GameState:
             result_text="Users jumped and reputation improved.",
         )
     ]
+    milestone_history = [
+        MilestoneEntry(
+            milestone_id=MilestoneId.FIRST_100_USERS,
+            title="First 100 Users",
+            description="Your portfolio reached its first meaningful usage milestone.",
+            unlocked_turn=4,
+            reward_text="Reputation +2 from visible early traction.",
+        )
+    ]
     return GameState(
         company=Company(
             name="NEXUS TECH",
             cash_on_hand=Decimal("7630.50"),
             reputation=57,
+            strategy=CompanyStrategy.QUALITY,
             current_turn=4,
         ),
         products=[product],
         employees=[employee],
         pending_event=pending_event,
         event_history=event_history,
+        milestone_history=milestone_history,
         action_points_remaining=1,
     )
 
@@ -122,6 +138,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "pending_events",
         "pending_event_options",
         "event_history",
+        "milestone_history",
     }.issubset(table_names)
 
 
@@ -226,3 +243,84 @@ def test_partial_state_handling_raises_corrupt_save_error(tmp_path: Path) -> Non
     coordinator = SaveLoadCoordinator(db_path)
     with pytest.raises(CorruptSaveError, match="missing company state"):
         coordinator.load_game(DEFAULT_SAVE_SLOT)
+
+
+def test_invalid_rng_state_raises_corrupt_save_error(tmp_path: Path) -> None:
+    db_path = tmp_path / "bad-rng.db"
+    manager = DatabaseManager(db_path)
+    manager.initialize()
+
+    with manager.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO save_slots (
+                slot_name, action_points_remaining, rng_seed, rng_state, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                2,
+                7,
+                "aW52YWxpZA==",
+                "2026-04-11T00:00:00+00:00",
+                "2026-04-11T00:00:00+00:00",
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO companies (
+                slot_name,
+                company_id,
+                name,
+                cash_on_hand,
+                reputation,
+                strategy,
+                current_turn,
+                game_over
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                "00000000-0000-0000-0000-000000000001",
+                "Demo",
+                "100.00",
+                50,
+                CompanyStrategy.BALANCED.value,
+                1,
+                0,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO products (
+                slot_name, product_id, display_order, name, lifecycle_stage, quality, bug_level,
+                market_fit, technical_debt, user_count, revenue_per_user, feature_count,
+                maintenance_cost, acquisition_rate, churn_rate, pricing_tier, is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                "00000000-0000-0000-0000-000000000002",
+                0,
+                "P1",
+                "growth",
+                50,
+                10,
+                50,
+                10,
+                10,
+                "10.00",
+                1,
+                "10.00",
+                "0.0500",
+                "0.0500",
+                PricingTier.STANDARD.value,
+                1,
+            ),
+        )
+
+    with pytest.raises(CorruptSaveError, match="invalid structured data"):
+        SaveLoadCoordinator(db_path).load_game(DEFAULT_SAVE_SLOT)

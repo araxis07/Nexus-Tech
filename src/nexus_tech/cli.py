@@ -21,10 +21,12 @@ from nexus_tech.config import (
     DEMO_SEED_EXAMPLE,
 )
 from nexus_tech.domain.models import (
+    CompanyStrategy,
     Employee,
     EmployeeRole,
     GameState,
     PendingEvent,
+    PricingTier,
     Product,
     Seniority,
     TurnAction,
@@ -81,20 +83,22 @@ ACTION_KEYS = {
     "3": TurnAction.ADD_FEATURE,
     "4": TurnAction.REDUCE_TECHNICAL_DEBT,
     "5": TurnAction.MARKET_PRODUCT,
-    "6": TurnAction.SUNSET_PRODUCT,
-    "7": TurnAction.HIRE_EMPLOYEE,
-    "8": TurnAction.FIRE_EMPLOYEE,
-    "9": TurnAction.ASSIGN_EMPLOYEE,
-    "10": TurnAction.UNASSIGN_EMPLOYEE,
-    "11": TurnAction.REST_TEAM,
-    "12": TurnAction.REVIEW_TEAM,
-    "13": TurnAction.WAIT,
-    "14": TurnAction.VIEW_STATUS,
-    "15": TurnAction.END_TURN,
+    "6": TurnAction.ADJUST_PRICING,
+    "7": TurnAction.SUNSET_PRODUCT,
+    "8": TurnAction.SET_COMPANY_STRATEGY,
+    "9": TurnAction.HIRE_EMPLOYEE,
+    "10": TurnAction.FIRE_EMPLOYEE,
+    "11": TurnAction.ASSIGN_EMPLOYEE,
+    "12": TurnAction.UNASSIGN_EMPLOYEE,
+    "13": TurnAction.REST_TEAM,
+    "14": TurnAction.REVIEW_TEAM,
+    "15": TurnAction.WAIT,
+    "16": TurnAction.VIEW_STATUS,
+    "17": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "16": "save_game",
-    "17": "load_game",
+    "18": "save_game",
+    "19": "load_game",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -103,6 +107,7 @@ PRODUCT_TARGETED_ACTIONS = {
     TurnAction.ADD_FEATURE,
     TurnAction.REDUCE_TECHNICAL_DEBT,
     TurnAction.MARKET_PRODUCT,
+    TurnAction.ADJUST_PRICING,
     TurnAction.SUNSET_PRODUCT,
 }
 
@@ -306,7 +311,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="15",
+                    default="17",
                     show_choices=False,
                 )
 
@@ -376,8 +381,30 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     ):
         return ActionContext()
 
+    if action is TurnAction.REST_TEAM:
+        if not state.employees:
+            console.print(
+                Panel.fit(
+                    "No team has been hired yet.",
+                    title="Selection Error",
+                    border_style="red",
+                )
+            )
+            return None
+        return ActionContext()
+
     if action is TurnAction.CREATE_PRODUCT:
         return ActionContext(new_product_name=ask_text_input("New product name"))
+
+    if action is TurnAction.SET_COMPANY_STRATEGY:
+        strategy_key = ask_choice_input(
+            "Company strategy",
+            choices=["balanced", "growth", "quality", "efficiency"],
+            default=state.company.strategy.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(strategy=CompanyStrategy(strategy_key))
 
     if action is TurnAction.HIRE_EMPLOYEE:
         full_name = ask_text_input("Employee full name")
@@ -430,17 +457,19 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         product_id = choose_product_id(state, action)
         if product_id is None:
             return None
-        return ActionContext(target_product_id=product_id)
-
-    if action is TurnAction.REST_TEAM and not state.employees:
-        console.print(
-            Panel.fit(
-                "No team has been hired yet.",
-                title="Selection Error",
-                border_style="red",
+        if action is TurnAction.ADJUST_PRICING:
+            pricing_key = ask_choice_input(
+                "Pricing tier",
+                choices=["budget", "standard", "premium"],
+                default="standard",
+                show_choices=False,
+                case_sensitive=False,
             )
-        )
-        return None
+            return ActionContext(
+                target_product_id=product_id,
+                pricing_tier=PricingTier(pricing_key),
+            )
+        return ActionContext(target_product_id=product_id)
 
     return ActionContext()
 
@@ -626,7 +655,8 @@ def build_product_selection_summary(product: Product) -> str:
         f"{product.name}\n"
         f"Stage: {product.lifecycle_stage.value} | Users: {product.user_count} | "
         f"Quality: {product.quality} | Bugs: {product.bug_level} | "
-        f"Fit: {product.market_fit} | Debt: {product.technical_debt}"
+        f"Fit: {product.market_fit} | Debt: {product.technical_debt} | "
+        f"Pricing: {product.pricing_tier.value}"
     )
 
 

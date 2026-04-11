@@ -8,13 +8,17 @@ import pytest
 from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
     Company,
+    CompanyStrategy,
     Employee,
     EmployeeRole,
     EventCategory,
     EventHistoryEntry,
     GameState,
     LifecycleStage,
+    MilestoneEntry,
+    MilestoneId,
     PendingEvent,
+    PricingTier,
     Product,
     Seniority,
     TurnAction,
@@ -34,6 +38,7 @@ from nexus_tech.simulation.events import (
     select_weighted_definition,
 )
 from nexus_tech.simulation.growth import calculate_churned_users
+from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.team import calculate_effective_productivity
@@ -72,6 +77,7 @@ def make_product(
     maintenance_cost: Decimal = Decimal("260.00"),
     acquisition_rate: Decimal = Decimal("0.0600"),
     churn_rate: Decimal = Decimal("0.0500"),
+    pricing_tier: PricingTier = PricingTier.STANDARD,
     is_active: bool = True,
 ) -> Product:
     return Product(
@@ -87,6 +93,7 @@ def make_product(
         maintenance_cost=maintenance_cost,
         acquisition_rate=acquisition_rate,
         churn_rate=churn_rate,
+        pricing_tier=pricing_tier,
         is_active=is_active,
     )
 
@@ -120,21 +127,25 @@ def make_state(
     *products: Product,
     employees: list[Employee] | None = None,
     cash_on_hand: Decimal = Decimal("6000.00"),
+    strategy: CompanyStrategy = CompanyStrategy.BALANCED,
     current_turn: int = 1,
     pending_event: PendingEvent | None = None,
     event_history: list[EventHistoryEntry] | None = None,
+    milestone_history: list[MilestoneEntry] | None = None,
 ) -> GameState:
     return GameState(
         company=Company(
             name="NEXUS TECH",
             cash_on_hand=cash_on_hand,
             reputation=50,
+            strategy=strategy,
             current_turn=current_turn,
         ),
         products=list(products),
         employees=employees or [],
         pending_event=pending_event,
         event_history=event_history or [],
+        milestone_history=milestone_history or [],
         action_points_remaining=BALANCE.actions_per_turn,
     )
 
@@ -146,8 +157,9 @@ def test_product_operating_cost_includes_support_and_technical_debt() -> None:
         maintenance_cost=Decimal("300.00"),
         technical_debt=10,
     )
+    state = make_state(product)
 
-    operating_cost = calculate_total_operating_cost([product], [])
+    operating_cost = calculate_total_operating_cost(state.company, [product], [])
 
     assert operating_cost == Decimal("1210.00")
 
@@ -220,6 +232,74 @@ def test_technical_debt_penalty_reduces_quality_improvement_efficiency() -> None
     assert low_gain > high_gain
 
 
+def test_company_strategy_changes_operating_cost_profile() -> None:
+    product = make_product("Core")
+    growth_state = make_state(product.model_copy(deep=True), strategy=CompanyStrategy.GROWTH)
+    efficiency_state = make_state(
+        product.model_copy(deep=True),
+        strategy=CompanyStrategy.EFFICIENCY,
+    )
+
+    growth_cost = calculate_total_operating_cost(
+        growth_state.company,
+        growth_state.products,
+        growth_state.employees,
+    )
+    efficiency_cost = calculate_total_operating_cost(
+        efficiency_state.company,
+        efficiency_state.products,
+        efficiency_state.employees,
+    )
+
+    assert growth_cost > efficiency_cost
+
+
+def test_adjust_pricing_changes_effective_revenue_and_market_fit() -> None:
+    state = make_state(make_product("Core", quality=70))
+
+    adjusted = apply_action(
+        state,
+        TurnAction.ADJUST_PRICING,
+        context=ActionContext(
+            target_product_id=state.products[0].id,
+            pricing_tier=PricingTier.PREMIUM,
+        ),
+    )
+
+    adjusted_product = adjusted.state.products[0]
+    assert adjusted_product.pricing_tier is PricingTier.PREMIUM
+    assert (
+        calculate_effective_revenue_per_user(adjusted_product)
+        > adjusted_product.revenue_per_user
+    )
+    assert adjusted_product.market_fit > state.products[0].market_fit
+
+
+def test_budget_pricing_reduces_churn_pressure() -> None:
+    budget_product = make_product(
+        "Budget",
+        pricing_tier=PricingTier.BUDGET,
+        user_count=100,
+        churn_rate=Decimal("0.0600"),
+        bug_level=20,
+        technical_debt=20,
+    )
+    premium_product = make_product(
+        "Premium",
+        pricing_tier=PricingTier.PREMIUM,
+        user_count=100,
+        churn_rate=Decimal("0.0600"),
+        bug_level=20,
+        technical_debt=20,
+        quality=75,
+    )
+
+    assert calculate_churned_users(budget_product, FixedRandom(0)) < calculate_churned_users(
+        premium_product,
+        FixedRandom(0),
+    )
+
+
 def test_sunsetting_product_removes_it_from_active_economy() -> None:
     state = make_state(make_product("Analytics"))
 
@@ -234,6 +314,18 @@ def test_sunsetting_product_removes_it_from_active_economy() -> None:
     assert sunset_product.lifecycle_stage is LifecycleStage.SUNSET
     assert sunset_product.user_count == 0
     assert calculate_total_revenue(outcome.state.products) == Decimal("0.00")
+
+
+def test_set_company_strategy_action_updates_company_state() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_COMPANY_STRATEGY,
+        context=ActionContext(strategy=CompanyStrategy.QUALITY),
+    )
+
+    assert outcome.state.company.strategy is CompanyStrategy.QUALITY
 
 
 def test_create_product_validation_rejects_duplicate_names() -> None:
@@ -265,6 +357,24 @@ def test_resolve_turn_sets_game_over_when_portfolio_burn_exceeds_cash() -> None:
     assert resolution.state.company.cash_on_hand < Decimal("0.00")
 
 
+def test_resolve_turn_unlocks_milestone_when_user_threshold_is_reached() -> None:
+    state = make_state(
+        make_product("Core", user_count=102, quality=72, market_fit=70),
+        current_turn=3,
+    )
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert any(
+        entry.milestone_id is MilestoneId.FIRST_100_USERS
+        for entry in resolution.state.milestone_history
+    )
+    assert any(
+        entry.milestone_id is MilestoneId.FIRST_100_USERS
+        for entry in resolution.unlocked_milestones
+    )
+
+
 def test_hiring_and_firing_change_salary_burden() -> None:
     state = create_new_game("NEXUS TECH", "Nexus One")
 
@@ -280,8 +390,16 @@ def test_hiring_and_firing_change_salary_burden() -> None:
     )
 
     assert calculate_total_salary_cost(hired.state.employees) > Decimal("0.00")
-    assert calculate_total_operating_cost(hired.state.products, hired.state.employees) > (
-        calculate_total_operating_cost(state.products, state.employees)
+    assert calculate_total_operating_cost(
+        hired.state.company,
+        hired.state.products,
+        hired.state.employees,
+    ) > (
+        calculate_total_operating_cost(
+            state.company,
+            state.products,
+            state.employees,
+        )
     )
 
     employee_id = hired.state.employees[0].id

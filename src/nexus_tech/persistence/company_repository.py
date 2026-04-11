@@ -6,7 +6,7 @@ import sqlite3
 from decimal import Decimal
 from uuid import UUID
 
-from nexus_tech.domain.models import Company
+from nexus_tech.domain.models import Company, CompanyStrategy
 
 
 class CompanyRepository:
@@ -27,10 +27,11 @@ class CompanyRepository:
                 name,
                 cash_on_hand,
                 reputation,
+                strategy,
                 current_turn,
                 game_over
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -38,6 +39,7 @@ class CompanyRepository:
                 company.name,
                 str(company.cash_on_hand),
                 company.reputation,
+                company.strategy.value,
                 company.current_turn,
                 int(company.game_over),
             ),
@@ -48,7 +50,7 @@ class CompanyRepository:
 
         row = connection.execute(
             """
-            SELECT company_id, name, cash_on_hand, reputation, current_turn, game_over
+            SELECT company_id, name, cash_on_hand, reputation, strategy, current_turn, game_over
             FROM companies
             WHERE slot_name = ?
             """,
@@ -62,6 +64,7 @@ class CompanyRepository:
             name=row["name"],
             cash_on_hand=Decimal(row["cash_on_hand"]),
             reputation=row["reputation"],
+            strategy=CompanyStrategy(row["strategy"] or CompanyStrategy.BALANCED.value),
             current_turn=row["current_turn"],
             game_over=bool(row["game_over"]),
         )

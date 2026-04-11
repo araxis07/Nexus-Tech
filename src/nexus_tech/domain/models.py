@@ -38,6 +38,23 @@ class EmployeeRole(StrEnum):
     PRODUCT_MANAGER = "product_manager"
 
 
+class CompanyStrategy(StrEnum):
+    """Company-level strategic posture."""
+
+    BALANCED = "balanced"
+    GROWTH = "growth"
+    QUALITY = "quality"
+    EFFICIENCY = "efficiency"
+
+
+class PricingTier(StrEnum):
+    """Product pricing posture used by economy and growth systems."""
+
+    BUDGET = "budget"
+    STANDARD = "standard"
+    PREMIUM = "premium"
+
+
 class EventCategory(StrEnum):
     """Supported event categories for the dynamic event engine."""
 
@@ -56,6 +73,16 @@ class Seniority(StrEnum):
     SENIOR = "senior"
 
 
+class MilestoneId(StrEnum):
+    """Supported one-time business milestones."""
+
+    FIRST_100_USERS = "first_100_users"
+    CASH_RESERVE_12000 = "cash_reserve_12000"
+    TEAM_OF_4 = "team_of_4"
+    THREE_ACTIVE_PRODUCTS = "three_active_products"
+    FIRST_MATURE_PRODUCT = "first_mature_product"
+
+
 class TurnAction(StrEnum):
     """Actions the player can take during a turn."""
 
@@ -64,7 +91,9 @@ class TurnAction(StrEnum):
     ADD_FEATURE = "add_feature"
     REDUCE_TECHNICAL_DEBT = "reduce_technical_debt"
     MARKET_PRODUCT = "market_product"
+    ADJUST_PRICING = "adjust_pricing"
     SUNSET_PRODUCT = "sunset_product"
+    SET_COMPANY_STRATEGY = "set_company_strategy"
     HIRE_EMPLOYEE = "hire_employee"
     FIRE_EMPLOYEE = "fire_employee"
     ASSIGN_EMPLOYEE = "assign_employee"
@@ -85,6 +114,7 @@ class Company(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     cash_on_hand: Decimal
     reputation: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    strategy: CompanyStrategy = CompanyStrategy.BALANCED
     current_turn: int = Field(default=1, ge=1)
     game_over: bool = False
 
@@ -112,6 +142,7 @@ class Product(BaseModel):
     maintenance_cost: Decimal = Field(ge=Decimal("0"))
     acquisition_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     churn_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
+    pricing_tier: PricingTier = PricingTier.STANDARD
     is_active: bool = True
 
     @field_validator("revenue_per_user", "maintenance_cost", mode="before")
@@ -188,6 +219,18 @@ class EventHistoryEntry(BaseModel):
     result_text: str = Field(min_length=1, max_length=240)
 
 
+class MilestoneEntry(BaseModel):
+    """A one-time company milestone unlocked during a run."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    milestone_id: MilestoneId
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=240)
+    unlocked_turn: int = Field(ge=1)
+    reward_text: str = Field(min_length=1, max_length=240)
+
+
 class GameState(BaseModel):
     """Current in-memory game state."""
 
@@ -198,4 +241,5 @@ class GameState(BaseModel):
     employees: list[Employee] = Field(default_factory=list)
     pending_event: Optional[PendingEvent] = None  # noqa: UP045
     event_history: list[EventHistoryEntry] = Field(default_factory=list)
+    milestone_history: list[MilestoneEntry] = Field(default_factory=list)
     action_points_remaining: int = Field(ge=0)

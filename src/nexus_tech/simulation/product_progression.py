@@ -7,7 +7,9 @@ from nexus_tech.domain.constants import ZERO_MONEY, ZERO_RATE
 from nexus_tech.domain.models import Company, LifecycleStage, Product
 from nexus_tech.domain.money import quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.pricing import get_pricing_acquisition_bonus
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.strategy import StrategyProfile, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 from nexus_tech.simulation.team import ProductTeamModifier
 
@@ -58,19 +60,24 @@ def create_product(name: str, existing_products: list[Product]) -> Product:
 def apply_improve_quality(
     product: Product,
     team_modifier: ProductTeamModifier,
+    strategy_profile: StrategyProfile,
 ) -> ProductActionSummary:
     """Invest in product polish and reliability."""
 
     debt_penalty = calculate_delivery_penalty(product)
     quality_gain = max(
         BALANCE.improve_quality_min_gain,
-        BALANCE.improve_quality_quality_gain - debt_penalty + team_modifier.build_speed_bonus,
+        BALANCE.improve_quality_quality_gain
+        - debt_penalty
+        + team_modifier.build_speed_bonus
+        + strategy_profile.quality_bonus,
     )
     bug_reduction = max(
         BALANCE.improve_quality_min_bug_reduction,
         BALANCE.improve_quality_bug_reduction
         - (debt_penalty // 2)
-        + team_modifier.stability_bonus,
+        + team_modifier.stability_bonus
+        + strategy_profile.stability_bonus,
     )
     market_fit_gain = BALANCE.improve_quality_market_fit_gain + team_modifier.market_fit_bonus
 
@@ -90,13 +97,17 @@ def apply_improve_quality(
 def apply_add_feature(
     product: Product,
     team_modifier: ProductTeamModifier,
+    strategy_profile: StrategyProfile,
 ) -> ProductActionSummary:
     """Ship a feature and accept the complexity it adds."""
 
     debt_penalty = calculate_delivery_penalty(product)
     quality_gain = max(
         1,
-        BALANCE.add_feature_quality_gain - debt_penalty + (team_modifier.build_speed_bonus // 2),
+        BALANCE.add_feature_quality_gain
+        - debt_penalty
+        + (team_modifier.build_speed_bonus // 2)
+        + max(0, strategy_profile.quality_bonus // 2),
     )
     market_fit_gain = max(
         1,
@@ -107,15 +118,16 @@ def apply_add_feature(
     bug_increase = max(
         1,
         BALANCE.add_feature_bug_increase
-        + (
-        product.technical_debt // BALANCE.add_feature_bug_debt_divisor
-        )
+        + (product.technical_debt // BALANCE.add_feature_bug_debt_divisor)
+        + strategy_profile.feature_risk_modifier
         - team_modifier.stability_bonus
         - (team_modifier.coordination_bonus // 2),
     )
     debt_increase = max(
         2,
-        BALANCE.add_feature_debt_increase - (team_modifier.debt_reduction_bonus // 2),
+        BALANCE.add_feature_debt_increase
+        - (team_modifier.debt_reduction_bonus // 2)
+        - strategy_profile.debt_reduction_bonus,
     )
     acquisition_rate_gain = BALANCE.add_feature_acquisition_rate_gain + quantize_rate(
         Decimal(team_modifier.acquisition_bonus) / Decimal("1000")
@@ -154,18 +166,27 @@ def apply_add_feature(
 def apply_reduce_technical_debt(
     product: Product,
     team_modifier: ProductTeamModifier,
+    strategy_profile: StrategyProfile,
 ) -> ProductActionSummary:
     """Stabilize the codebase and lower future drag."""
 
     debt_reduction = min(
         product.technical_debt,
-        BALANCE.reduce_debt_amount + team_modifier.debt_reduction_bonus,
+        BALANCE.reduce_debt_amount
+        + team_modifier.debt_reduction_bonus
+        + strategy_profile.debt_reduction_bonus,
     )
     bug_reduction = min(
         product.bug_level,
-        BALANCE.reduce_debt_bug_reduction + team_modifier.stability_bonus,
+        BALANCE.reduce_debt_bug_reduction
+        + team_modifier.stability_bonus
+        + strategy_profile.stability_bonus,
     )
-    quality_gain = BALANCE.reduce_debt_quality_gain + (team_modifier.build_speed_bonus // 2)
+    quality_gain = (
+        BALANCE.reduce_debt_quality_gain
+        + (team_modifier.build_speed_bonus // 2)
+        + max(0, strategy_profile.quality_bonus // 2)
+    )
 
     product.technical_debt = clamp_int(product.technical_debt - debt_reduction)
     product.bug_level = clamp_int(product.bug_level - bug_reduction)
@@ -193,6 +214,7 @@ def apply_marketing(
 ) -> ProductActionSummary:
     """Spend money to improve awareness and short-term adoption."""
 
+    strategy_profile = get_strategy_profile(company.strategy)
     quality_signal = max(0, product.quality - product.bug_level - product.technical_debt)
     immediate_users = (
         BALANCE.marketing_base_user_gain
@@ -200,9 +222,15 @@ def apply_marketing(
         + (quality_signal // BALANCE.marketing_quality_signal_divisor)
         - (product.bug_level // BALANCE.marketing_bug_penalty_divisor)
         + team_modifier.acquisition_bonus
+        + get_pricing_acquisition_bonus(product)
+        + strategy_profile.marketing_user_bonus
     )
     immediate_users = max(1, immediate_users)
-    reputation_gain = BALANCE.marketing_reputation_gain + team_modifier.reputation_bonus
+    reputation_gain = (
+        BALANCE.marketing_reputation_gain
+        + team_modifier.reputation_bonus
+        + max(0, strategy_profile.reputation_bonus)
+    )
 
     company.cash_on_hand = quantize_money(company.cash_on_hand - BALANCE.marketing_cost)
     company.reputation = clamp_int(company.reputation + reputation_gain)
@@ -241,6 +269,7 @@ def apply_end_of_turn_progression(
     product: Product,
     rng: RandomLike,
     team_modifier: ProductTeamModifier,
+    strategy_profile: StrategyProfile,
 ) -> ProductDrift:
     """Apply passive wear-and-tear after the action phase."""
 
@@ -260,7 +289,12 @@ def apply_end_of_turn_progression(
         )
     if product.technical_debt >= BALANCE.debt_bug_extra_threshold:
         bug_delta += rng.randint(0, BALANCE.debt_bug_random_high)
-    bug_delta = max(0, bug_delta - team_modifier.stability_bonus)
+    bug_delta = max(
+        0,
+        bug_delta
+        + strategy_profile.feature_risk_modifier
+        - team_modifier.stability_bonus,
+    )
 
     product.bug_level = clamp_int(product.bug_level + bug_delta)
 
@@ -282,6 +316,8 @@ def apply_end_of_turn_progression(
         quality_delta = 1 + min(1, team_modifier.build_speed_bonus)
     else:
         quality_delta = 0
+
+    quality_delta += max(0, strategy_profile.quality_bonus // 2)
 
     product.quality = clamp_int(product.quality + quality_delta)
     product.lifecycle_stage = infer_lifecycle_stage(product)

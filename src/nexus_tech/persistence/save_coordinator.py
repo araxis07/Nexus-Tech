@@ -13,6 +13,8 @@ from nexus_tech.domain.models import (
     EventHistoryEntry,
     EventOption,
     GameState,
+    MilestoneEntry,
+    MilestoneId,
     PendingEvent,
 )
 from nexus_tech.persistence.company_repository import CompanyRepository
@@ -74,6 +76,7 @@ class SaveLoadCoordinator:
                 self.employee_repository.save_all(connection, slot_name, state.employees)
                 self._save_pending_event(connection, slot_name, state.pending_event)
                 self._save_event_history(connection, slot_name, state.event_history)
+                self._save_milestone_history(connection, slot_name, state.milestone_history)
         except sqlite3.DatabaseError as error:
             raise PersistenceError(f"Failed to save game: {error}") from error
 
@@ -97,33 +100,42 @@ class SaveLoadCoordinator:
                 if slot_row is None:
                     raise SaveNotFoundError(f"Save slot '{slot_name}' was not found.")
 
-                company = self.company_repository.load(connection, slot_name)
-                if company is None:
-                    raise CorruptSaveError("Save slot is missing company state.")
-
-                products = self.product_repository.load_all(connection, slot_name)
-                if not products:
-                    raise CorruptSaveError("Save slot is missing product state.")
-
-                employees = self.employee_repository.load_all(connection, slot_name)
-                pending_event = self._load_pending_event(connection, slot_name)
-                event_history = self._load_event_history(connection, slot_name)
                 try:
+                    company = self.company_repository.load(connection, slot_name)
+                    if company is None:
+                        raise CorruptSaveError("Save slot is missing company state.")
+
+                    products = self.product_repository.load_all(connection, slot_name)
+                    if not products:
+                        raise CorruptSaveError("Save slot is missing product state.")
+
+                    employees = self.employee_repository.load_all(connection, slot_name)
+                    pending_event = self._load_pending_event(connection, slot_name)
+                    event_history = self._load_event_history(connection, slot_name)
+                    milestone_history = self._load_milestone_history(connection, slot_name)
                     rng = RandomSource.from_state(
                         seed=slot_row["rng_seed"],
                         exported_state=slot_row["rng_state"],
                     )
-                except ValueError as error:
-                    raise CorruptSaveError("Saved RNG state could not be restored.") from error
+                except CorruptSaveError:
+                    raise
+                except (ValueError, TypeError, AttributeError) as error:
+                    raise CorruptSaveError(
+                        "Saved state contains invalid structured data."
+                    ) from error
 
-                state = GameState(
-                    company=company,
-                    products=products,
-                    employees=employees,
-                    pending_event=pending_event,
-                    event_history=event_history,
-                    action_points_remaining=slot_row["action_points_remaining"],
-                )
+                try:
+                    state = GameState(
+                        company=company,
+                        products=products,
+                        employees=employees,
+                        pending_event=pending_event,
+                        event_history=event_history,
+                        milestone_history=milestone_history,
+                        action_points_remaining=slot_row["action_points_remaining"],
+                    )
+                except (ValueError, TypeError) as error:
+                    raise CorruptSaveError("Saved state could not be reconstructed.") from error
                 return LoadedGame(slot_name=slot_name, state=state, rng=rng)
         except sqlite3.DatabaseError as error:
             if isinstance(error, PersistenceError):
@@ -410,6 +422,65 @@ class SaveLoadCoordinator:
                 selected_option_id=row["selected_option_id"],
                 selected_option_label=row["selected_option_label"],
                 result_text=row["result_text"],
+            )
+            for row in rows
+        ]
+
+    def _save_milestone_history(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        milestone_history: list[MilestoneEntry],
+    ) -> None:
+        connection.execute("DELETE FROM milestone_history WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO milestone_history (
+                slot_name,
+                entry_index,
+                milestone_id,
+                title,
+                description,
+                unlocked_turn,
+                reward_text
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    index,
+                    entry.milestone_id.value,
+                    entry.title,
+                    entry.description,
+                    entry.unlocked_turn,
+                    entry.reward_text,
+                )
+                for index, entry in enumerate(milestone_history)
+            ],
+        )
+
+    def _load_milestone_history(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[MilestoneEntry]:
+        rows = connection.execute(
+            """
+            SELECT milestone_id, title, description, unlocked_turn, reward_text
+            FROM milestone_history
+            WHERE slot_name = ?
+            ORDER BY entry_index ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            MilestoneEntry(
+                milestone_id=MilestoneId(row["milestone_id"]),
+                title=row["title"],
+                description=row["description"],
+                unlocked_turn=row["unlocked_turn"],
+                reward_text=row["reward_text"],
             )
             for row in rows
         ]

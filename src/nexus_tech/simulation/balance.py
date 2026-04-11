@@ -69,6 +69,17 @@ class BalanceConfig:
     per_user_support_cost: Decimal = Decimal("1.20")
     per_debt_operating_cost: Decimal = Decimal("3.00")
 
+    pricing_budget_revenue_multiplier: Decimal = Decimal("0.85")
+    pricing_premium_revenue_multiplier: Decimal = Decimal("1.25")
+    pricing_budget_acquisition_bonus: int = 2
+    pricing_premium_acquisition_bonus: int = -2
+    pricing_budget_churn_modifier: Decimal = Decimal("-0.0120")
+    pricing_premium_churn_modifier: Decimal = Decimal("0.0140")
+    pricing_budget_market_fit_bonus: int = 1
+    pricing_premium_quality_threshold: int = 62
+    pricing_premium_market_fit_bonus: int = 1
+    pricing_premium_market_fit_penalty: int = 2
+
     acquisition_signal_baseline: int = 150
     acquisition_signal_divisor: int = 20
     acquisition_cap_base: int = 4
@@ -248,6 +259,17 @@ class BalanceConfig:
     event_competitor_focus_market_fit_gain: int = 2
     event_competitor_focus_user_loss: int = 3
     event_competitor_focus_reputation_gain: int = 1
+
+    cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
+    team_growth_milestone_headcount: int = 4
+    active_products_milestone_threshold: int = 3
+    milestone_first_100_users_reputation_gain: int = 2
+    milestone_cash_reserve_reputation_gain: int = 1
+    milestone_team_growth_reputation_gain: int = 1
+    milestone_team_growth_morale_gain: int = 2
+    milestone_active_products_reputation_gain: int = 2
+    milestone_first_mature_product_cash_gain: Decimal = Decimal("450.00")
+    milestone_first_mature_product_reputation_gain: int = 1
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

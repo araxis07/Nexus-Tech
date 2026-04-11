@@ -312,6 +312,8 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Team Table" in output
     assert "Action Menu" in output
     assert "Event Notification" in output
+    assert "Strategy" in output
+    assert "Price" in output
 
 
 def test_turn_resolution_rendering_contains_summary_sections() -> None:
@@ -325,3 +327,4 @@ def test_turn_resolution_rendering_contains_summary_sections() -> None:
     assert f"Turn {resolution.resolved_turn} Summary" in output
     assert "Portfolio Results" in output
     assert "Outlook" in output
+    assert "Cash On Hand" in output

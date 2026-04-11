@@ -7,9 +7,10 @@ from decimal import Decimal
 from uuid import UUID
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import Employee, EmployeeRole, Product, Seniority
+from nexus_tech.domain.models import CompanyStrategy, Employee, EmployeeRole, Product, Seniority
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.strategy import get_strategy_profile
 from nexus_tech.simulation.support import clamp_int
 
 
@@ -255,10 +256,12 @@ def apply_end_of_turn_team_drift(
     employees: list[Employee],
     products: list[Product],
     net_cash_flow: Decimal,
+    company_strategy: CompanyStrategy,
 ) -> TeamCondition:
     """Apply burnout and recovery after the turn resolves."""
 
     product_map = {product.id: product for product in products}
+    strategy_profile = get_strategy_profile(company_strategy)
 
     for employee in employees:
         if employee.assigned_product_id is None:
@@ -283,7 +286,10 @@ def apply_end_of_turn_team_drift(
 
         energy_loss = max(
             1,
-            BALANCE.employee_assigned_energy_loss + pressure - burnout_protection,
+            BALANCE.employee_assigned_energy_loss
+            + pressure
+            - burnout_protection
+            - strategy_profile.burnout_relief,
         )
         morale_loss = BALANCE.employee_assigned_morale_loss
         if net_cash_flow < ZERO_MONEY:

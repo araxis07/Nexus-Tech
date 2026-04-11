@@ -5,7 +5,12 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from nexus_tech.domain.models import Company, Employee, LifecycleStage, Product
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.pricing import (
+    get_pricing_acquisition_bonus,
+    get_pricing_churn_modifier,
+)
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.strategy import get_strategy_profile
 from nexus_tech.simulation.support import clamp_rate
 from nexus_tech.simulation.team import ProductTeamModifier, calculate_product_team_modifier
 
@@ -51,6 +56,7 @@ def calculate_acquired_users(
     if product.user_count == 0 and product.market_fit >= BALANCE.discovery_market_fit_threshold:
         base_from_rate += 1
 
+    strategy_profile = get_strategy_profile(company.strategy)
     acquisition_signal = (
         product.quality
         + product.market_fit
@@ -65,6 +71,8 @@ def calculate_acquired_users(
         + acquisition_signal
         + STAGE_ACQUISITION_MODIFIER[product.lifecycle_stage]
         + team_modifier.acquisition_bonus
+        + get_pricing_acquisition_bonus(product)
+        + strategy_profile.acquisition_bonus
         + rng.randint(-BALANCE.acquisition_random_swing, BALANCE.acquisition_random_swing)
     )
     acquisition_cap = max(
@@ -84,6 +92,7 @@ def calculate_effective_churn_rate(product: Product) -> Decimal:
     churn_rate += Decimal(product.technical_debt // BALANCE.churn_debt_divisor) / Decimal("100")
     churn_rate += Decimal(STAGE_CHURN_MODIFIER[product.lifecycle_stage]) / Decimal("100")
     churn_rate -= Decimal(product.quality // BALANCE.churn_quality_relief_divisor) / Decimal("100")
+    churn_rate += get_pricing_churn_modifier(product)
 
     if product.market_fit < BALANCE.low_market_fit_threshold:
         churn_rate += Decimal(BALANCE.low_market_fit_churn_penalty) / Decimal("100")
@@ -166,5 +175,6 @@ def calculate_company_reputation_delta(
         for product in active_products
     )
     designer_bonus = min(1, reputation_support)
-    delta = base_delta + designer_bonus + rng.randint(-1, 1)
+    strategy_profile = get_strategy_profile(company.strategy)
+    delta = base_delta + designer_bonus + strategy_profile.reputation_bonus + rng.randint(-1, 1)
     return max(-2, min(3, delta))

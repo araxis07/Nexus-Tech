@@ -22,6 +22,7 @@ Each turn represents a business interval. You review the company, choose actions
 ### 🏢 Company Simulation
 
 - Manage company cash, reputation, turn progression, and failure state
+- Set a company-wide strategic posture such as growth, quality, or efficiency
 - Run a growing software business under financial pressure
 - Balance revenue against fixed operating costs, product maintenance, and payroll
 
@@ -29,6 +30,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Own and manage multiple products at the same time
 - Track quality, bugs, market fit, technical debt, users, acquisition, and churn
+- Adjust pricing tiers to trade off growth, churn, and revenue per user
 - Create products, improve quality, add features, market products, reduce debt, and sunset weak products
 
 ### 👥 Employee and Team System
@@ -52,6 +54,11 @@ Each turn represents a business interval. You review the company, choose actions
   - reputation incidents
   - employee issues
 - Some events create meaningful player trade-offs instead of simple bonuses
+
+### 🏁 Progression
+
+- Unlock company milestones as the business scales
+- Track key moments such as traction, cash reserves, team growth, and portfolio expansion
 
 ### 💾 Local Save / Load
 

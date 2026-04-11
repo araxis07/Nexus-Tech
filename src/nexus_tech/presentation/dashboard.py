@@ -15,6 +15,7 @@ from nexus_tech.domain.models import (
     Employee,
     EventHistoryEntry,
     GameState,
+    MilestoneEntry,
     PendingEvent,
     Product,
 )
@@ -109,6 +110,8 @@ def render_turn_resolution(console: Console, resolution: TurnResolution) -> None
         console.print(_build_event_result_panel(resolution.event_history_entry))
     if resolution.pending_event is not None:
         console.print(_build_pending_event_panel(resolution.pending_event))
+    if resolution.unlocked_milestones:
+        console.print(_build_milestone_panel(resolution.unlocked_milestones))
     console.print(Panel(resolution.narrative, title="Outlook", border_style="green"))
 
 
@@ -141,7 +144,8 @@ def render_action_feedback(
         (
             f"Actions left {state.action_points_remaining} | "
             f"Cash {format_money(state.company.cash_on_hand)} | "
-            f"Reputation {state.company.reputation}"
+            f"Reputation {state.company.reputation} | "
+            f"Strategy {state.company.strategy.value}"
         ),
     )
     console.print(Panel(summary, title="Action Summary", border_style="cyan"))
@@ -159,6 +163,7 @@ def render_product_picker(console: Console, products: list[Product], action_labe
     table.add_column("B", justify="right")
     table.add_column("Fit", justify="right")
     table.add_column("Debt", justify="right")
+    table.add_column("Price")
 
     for index, product in enumerate(products, start=1):
         table.add_row(
@@ -170,6 +175,7 @@ def render_product_picker(console: Console, products: list[Product], action_labe
             str(product.bug_level),
             str(product.market_fit),
             str(product.technical_debt),
+            product.pricing_tier.value,
         )
 
     console.print(
@@ -254,6 +260,7 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Name", state.company.name)
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
+    table.add_row("Strategy", state.company.strategy.value)
     table.add_row("Status", "Game Over" if state.company.game_over else "Operating")
     return Panel(table, title="Company Overview", border_style="magenta", expand=True)
 
@@ -295,6 +302,7 @@ def _build_portfolio_table(state: GameState) -> Table:
     table.add_column("Fit", justify="right")
     table.add_column("Debt", justify="right")
     table.add_column("Maint", justify="right")
+    table.add_column("Price")
     table.add_column("Aq", justify="right")
     table.add_column("Ch", justify="right")
 
@@ -311,6 +319,7 @@ def _build_portfolio_table(state: GameState) -> Table:
             str(product.market_fit),
             str(product.technical_debt),
             format_money(product.maintenance_cost),
+            product.pricing_tier.value,
             format_rate(product.acquisition_rate),
             format_rate(product.churn_rate),
         )
@@ -402,23 +411,25 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("3", "add_feature", "Ship faster and risk new bugs.")
     primary_actions.add_row("4", "reduce_technical_debt", "Stabilise future delivery.")
     primary_actions.add_row("5", "market_product", "Spend cash for acquisition.")
-    primary_actions.add_row("6", "sunset_product", "Retire a weak product.")
-    primary_actions.add_row("7", "hire_employee", "Add capability and salary burn.")
-    primary_actions.add_row("8", "fire_employee", "Remove salary burden.")
-    primary_actions.add_row("9", "assign_employee", "Put someone on a product.")
-    primary_actions.add_row("10", "unassign_employee", "Pull someone off product work.")
-    primary_actions.add_row("11", "rest_team", "Recover energy and morale.")
-    primary_actions.add_row("12", "review_team", "Open the detailed team view.")
-    primary_actions.add_row("13", "wait", "Hold position for this action.")
-    primary_actions.add_row("14", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("15", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("6", "adjust_pricing", "Change pricing and growth trade-offs.")
+    primary_actions.add_row("7", "sunset_product", "Retire a weak product.")
+    primary_actions.add_row("8", "set_company_strategy", "Shift company-wide focus.")
+    primary_actions.add_row("9", "hire_employee", "Add capability and salary burn.")
+    primary_actions.add_row("10", "fire_employee", "Remove salary burden.")
+    primary_actions.add_row("11", "assign_employee", "Put someone on a product.")
+    primary_actions.add_row("12", "unassign_employee", "Pull someone off product work.")
+    primary_actions.add_row("13", "rest_team", "Recover energy and morale.")
+    primary_actions.add_row("14", "review_team", "Open the detailed team view.")
+    primary_actions.add_row("15", "wait", "Hold position for this action.")
+    primary_actions.add_row("16", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("17", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("16", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("17", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("18", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("19", "load_game", "Resume a saved slot from SQLite.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -480,6 +491,7 @@ def _build_turn_finance_table(resolution: TurnResolution) -> Table:
     table.add_row("Salary Cost", format_money(resolution.total_salary_cost))
     table.add_row("Total Operating Cost", format_money(resolution.total_operating_cost))
     table.add_row("Net Cash Flow", format_signed_money(resolution.net_cash_flow))
+    table.add_row("Cash On Hand", format_money(resolution.state.company.cash_on_hand))
     return table
 
 
@@ -489,11 +501,13 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     table.add_row("Avg Energy", str(resolution.team_condition.average_energy))
     table.add_row("Avg Morale", str(resolution.team_condition.average_morale))
     table.add_row("Burned Out", str(resolution.team_condition.burned_out_count))
+    table.add_row("Strategy", resolution.state.company.strategy.value)
     table.add_row("Pending Event", "yes" if resolution.pending_event is not None else "no")
     table.add_row(
         "Resolved Event",
         "yes" if resolution.event_history_entry is not None else "no",
     )
+    table.add_row("Milestones", str(len(resolution.unlocked_milestones)))
     return table
 
 
@@ -549,6 +563,18 @@ def _build_event_result_panel(history_entry: EventHistoryEntry) -> Panel:
         f"{history_entry.result_text}"
     )
     return Panel(body, title="Event Result", border_style="yellow", expand=True)
+
+
+def _build_milestone_panel(milestones: list[MilestoneEntry]) -> Panel:
+    body = "\n\n".join(
+        (
+            f"[bold]{entry.title}[/bold]\n"
+            f"{entry.description}\n"
+            f"Reward: {entry.reward_text}"
+        )
+        for entry in milestones
+    )
+    return Panel(body, title="Milestones Unlocked", border_style="magenta", expand=True)
 
 
 def _count_assignments_by_product(state: GameState) -> dict[UUID, int]:

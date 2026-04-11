@@ -10,12 +10,15 @@ from uuid import UUID
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     Company,
+    CompanyStrategy,
     Employee,
     EmployeeRole,
     EventHistoryEntry,
     GameState,
     LifecycleStage,
+    MilestoneEntry,
     PendingEvent,
+    PricingTier,
     Product,
     Seniority,
     TurnAction,
@@ -33,6 +36,8 @@ from nexus_tech.simulation.economy import (
 )
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
+from nexus_tech.simulation.milestones import resolve_new_milestones
+from nexus_tech.simulation.pricing import apply_adjust_pricing
 from nexus_tech.simulation.product_progression import (
     ProductDrift,
     apply_add_feature,
@@ -45,6 +50,7 @@ from nexus_tech.simulation.product_progression import (
     infer_lifecycle_stage,
 )
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.team import (
     TeamCondition,
@@ -73,6 +79,8 @@ class ActionContext:
     hire_role: EmployeeRole | None = None
     hire_seniority: Seniority | None = None
     hire_specialization: str | None = None
+    strategy: CompanyStrategy | None = None
+    pricing_tier: PricingTier | None = None
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,7 @@ class TurnResolution:
     team_condition: TeamCondition
     pending_event: PendingEvent | None
     event_history_entry: EventHistoryEntry | None
+    unlocked_milestones: list[MilestoneEntry]
     narrative: str
 
 
@@ -240,6 +249,14 @@ def apply_action(
             ),
         )
 
+    if action is TurnAction.SET_COMPANY_STRATEGY:
+        if context.strategy is None:
+            raise ValueError("Selecting a company strategy requires a strategy value.")
+
+        summary = apply_set_company_strategy(next_state.company, context.strategy)
+        logger.debug("Changed company strategy to %s.", context.strategy.value)
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.FIRE_EMPLOYEE:
         employee = get_employee_by_id(next_state.employees, context.employee_id)
         next_state.employees = [
@@ -287,17 +304,18 @@ def apply_action(
 
     product = get_target_product(next_state, context.target_product_id)
     team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
+    strategy_profile = get_strategy_profile(next_state.company.strategy)
 
     if action is TurnAction.IMPROVE_QUALITY:
-        summary = apply_improve_quality(product, team_modifier)
+        summary = apply_improve_quality(product, team_modifier, strategy_profile)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.ADD_FEATURE:
-        summary = apply_add_feature(product, team_modifier)
+        summary = apply_add_feature(product, team_modifier, strategy_profile)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.REDUCE_TECHNICAL_DEBT:
-        summary = apply_reduce_technical_debt(product, team_modifier)
+        summary = apply_reduce_technical_debt(product, team_modifier, strategy_profile)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.MARKET_PRODUCT:
@@ -308,6 +326,13 @@ def apply_action(
             message=summary.message,
             turn_should_end=next_state.company.game_over,
         )
+
+    if action is TurnAction.ADJUST_PRICING:
+        if context.pricing_tier is None:
+            raise ValueError("Adjusting pricing requires selecting a pricing tier.")
+
+        summary = apply_adjust_pricing(product, context.pricing_tier)
+        return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.SUNSET_PRODUCT:
         summary = apply_sunset_product(product)
@@ -329,11 +354,17 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     resolved_turn = state.company.current_turn
     next_state = state.model_copy(deep=True)
     product_summaries: list[ProductTurnSummary] = []
+    unlocked_milestones: list[MilestoneEntry] = []
+    company_strategy_profile = get_strategy_profile(next_state.company.strategy)
+    baseline_operating_cost = quantize_money(
+        BALANCE.base_operating_cost + company_strategy_profile.operating_cost_modifier
+    )
 
     total_revenue = calculate_total_revenue(next_state.products)
     total_product_operating_cost = calculate_total_product_operating_cost(next_state.products)
     total_salary_cost = calculate_total_salary_cost(next_state.employees)
     total_operating_cost = calculate_total_operating_cost(
+        next_state.company,
         next_state.products,
         next_state.employees,
     )
@@ -347,11 +378,15 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         revenue = calculate_product_revenue(product)
         operating_cost = calculate_product_operating_cost(product)
         team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
-
         growth_result = resolve_growth(next_state.company, product, rng, team_modifier)
         product.user_count = max(0, product.user_count + growth_result.net_user_delta)
 
-        drift: ProductDrift = apply_end_of_turn_progression(product, rng, team_modifier)
+        drift: ProductDrift = apply_end_of_turn_progression(
+            product,
+            rng,
+            team_modifier,
+            company_strategy_profile,
+        )
 
         product_summaries.append(
             ProductTurnSummary(
@@ -380,11 +415,15 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.employees,
         next_state.products,
         net_cash_flow,
+        next_state.company.strategy,
     )
 
     event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
     next_state = event_outcome.state
     team_condition = calculate_team_condition(next_state.employees)
+    unlocked_milestones = resolve_new_milestones(next_state, unlocked_turn=resolved_turn)
+    if unlocked_milestones:
+        team_condition = calculate_team_condition(next_state.employees)
 
     next_state.company.game_over = is_game_over(next_state.company)
     if not next_state.company.game_over:
@@ -404,7 +443,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         state=next_state,
         resolved_turn=resolved_turn,
         total_revenue=total_revenue,
-        baseline_operating_cost=BALANCE.base_operating_cost,
+        baseline_operating_cost=baseline_operating_cost,
         total_product_operating_cost=total_product_operating_cost,
         total_salary_cost=total_salary_cost,
         total_operating_cost=total_operating_cost,
@@ -414,6 +453,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         team_condition=team_condition,
         pending_event=event_outcome.pending_event,
         event_history_entry=event_outcome.history_entry,
+        unlocked_milestones=unlocked_milestones,
         narrative=narrative,
     )
 

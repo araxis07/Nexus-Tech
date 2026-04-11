@@ -1,4 +1,4 @@
-"""Economy rules for revenue, maintenance, salary, and company burn."""
+"""Economy rules for revenue, maintenance, pricing, salary, and company burn."""
 
 from decimal import Decimal
 
@@ -6,6 +6,8 @@ from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import Company, Employee, Product
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
+from nexus_tech.simulation.strategy import get_strategy_profile
 
 
 def calculate_product_revenue(product: Product) -> Decimal:
@@ -13,7 +15,9 @@ def calculate_product_revenue(product: Product) -> Decimal:
 
     if not product.is_active:
         return ZERO_MONEY
-    return quantize_money(Decimal(product.user_count) * product.revenue_per_user)
+    return quantize_money(
+        Decimal(product.user_count) * calculate_effective_revenue_per_user(product)
+    )
 
 
 def calculate_product_operating_cost(product: Product) -> Decimal:
@@ -52,13 +56,16 @@ def calculate_total_salary_cost(employees: list[Employee]) -> Decimal:
 
 
 def calculate_total_operating_cost(
+    company: Company,
     products: list[Product],
     employees: list[Employee],
 ) -> Decimal:
     """Company burn including baseline cost, product load, and salaries."""
 
+    strategy_profile = get_strategy_profile(company.strategy)
     return quantize_money(
         BALANCE.base_operating_cost
+        + strategy_profile.operating_cost_modifier
         + calculate_total_product_operating_cost(products)
         + calculate_total_salary_cost(employees)
     )
