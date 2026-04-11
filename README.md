@@ -31,7 +31,14 @@ Each turn represents a business interval. You review the company, choose actions
 - Own and manage multiple products at the same time
 - Track quality, bugs, market fit, technical debt, users, acquisition, and churn
 - Adjust pricing tiers to trade off growth, churn, and revenue per user
-- Create products, improve quality, add features, market products, reduce debt, and sunset weak products
+- Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
+
+### 🧩 Data-Driven Content
+
+- Start runs from a scenario catalog instead of a single hard-coded opening
+- Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
+- Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
+- Support custom company and primary product overrides on top of scenario defaults
 
 ### 👥 Employee and Team System
 
@@ -97,10 +104,22 @@ Start a new game:
 uv run nexus-tech --seed 7
 ```
 
+List the available scenarios:
+
+```bash
+uv run nexus-tech list-scenarios
+```
+
 Start a named run:
 
 ```bash
 uv run nexus-tech new-game --company-name "Atlas Labs" --product-name "Signal"
+```
+
+Start from a specific scenario:
+
+```bash
+uv run nexus-tech new-game --scenario vc_sprint --seed 7
 ```
 
 Load a saved game:
@@ -142,6 +161,7 @@ Typical decisions include:
 - whether to push features or stabilize quality
 - when technical debt has become too expensive to ignore
 - when to hire, assign, rest, or remove team members
+- which scenario opening creates the best long-term position
 - how to survive cash pressure while still building growth
 
 ## 🧪 Testing
@@ -172,7 +192,10 @@ uv run ruff format src tests
   Core validated entities, money helpers, and shared constants.
 
 - `src/nexus_tech/simulation`  
-  Economy, product progression, growth, team systems, turn resolution, and event logic.
+  Economy, product progression, growth, team systems, turn resolution, scenario bootstrap, and event logic.
+
+- `src/nexus_tech/content`  
+  JSON-backed scenario definitions and product templates.
 
 - `src/nexus_tech/persistence`  
   SQLite schema, repositories, and save/load coordination.
@@ -188,6 +211,7 @@ uv run ruff format src tests
 - The project is intentionally **offline-first** and **local-only**
 - Save data is stored in `nexus-tech.db` by default
 - `--seed` is useful for repeatable demos and deterministic test scenarios
+- `--scenario` selects a starting setup, while `list-scenarios` shows the current catalog
 - The focus is on correctness, stability, maintainability, and presentation quality
 
 ## 📄 License

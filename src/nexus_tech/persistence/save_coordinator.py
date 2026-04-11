@@ -69,6 +69,8 @@ class SaveLoadCoordinator:
                     action_points_remaining=state.action_points_remaining,
                     rng_seed=rng.seed,
                     rng_state=rng.export_state(),
+                    scenario_id=state.scenario_id,
+                    scenario_title=state.scenario_title,
                     timestamp=timestamp,
                 )
                 self.company_repository.save(connection, slot_name, state.company)
@@ -91,7 +93,12 @@ class SaveLoadCoordinator:
             with self.database.connect() as connection:
                 slot_row = connection.execute(
                     """
-                    SELECT action_points_remaining, rng_seed, rng_state
+                    SELECT
+                        action_points_remaining,
+                        rng_seed,
+                        rng_state,
+                        scenario_id,
+                        scenario_title
                     FROM save_slots
                     WHERE slot_name = ?
                     """,
@@ -132,6 +139,8 @@ class SaveLoadCoordinator:
                         pending_event=pending_event,
                         event_history=event_history,
                         milestone_history=milestone_history,
+                        scenario_id=slot_row["scenario_id"],
+                        scenario_title=slot_row["scenario_title"],
                         action_points_remaining=slot_row["action_points_remaining"],
                     )
                 except (ValueError, TypeError) as error:
@@ -172,6 +181,8 @@ class SaveLoadCoordinator:
         action_points_remaining: int,
         rng_seed: int | None,
         rng_state: str,
+        scenario_id: str,
+        scenario_title: str,
         timestamp: str,
     ) -> None:
         existing = connection.execute(
@@ -186,16 +197,20 @@ class SaveLoadCoordinator:
                     action_points_remaining,
                     rng_seed,
                     rng_state,
+                    scenario_id,
+                    scenario_title,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
                     action_points_remaining,
                     rng_seed,
                     rng_state,
+                    scenario_id,
+                    scenario_title,
                     timestamp,
                     timestamp,
                 ),
@@ -208,6 +223,8 @@ class SaveLoadCoordinator:
             SET action_points_remaining = ?,
                 rng_seed = ?,
                 rng_state = ?,
+                scenario_id = ?,
+                scenario_title = ?,
                 updated_at = ?
             WHERE slot_name = ?
             """,
@@ -215,6 +232,8 @@ class SaveLoadCoordinator:
                 action_points_remaining,
                 rng_seed,
                 rng_state,
+                scenario_id,
+                scenario_title,
                 timestamp,
                 slot_name,
             ),

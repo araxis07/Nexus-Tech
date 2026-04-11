@@ -11,6 +11,8 @@ SCHEMA_STATEMENTS = (
         action_points_remaining INTEGER NOT NULL,
         rng_seed INTEGER,
         rng_state TEXT,
+        scenario_id TEXT NOT NULL DEFAULT 'founder_journey',
+        scenario_title TEXT NOT NULL DEFAULT 'Founder Journey',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -152,7 +154,19 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         column_name="pricing_tier",
         column_definition="TEXT NOT NULL DEFAULT 'standard'",
     )
-    connection.execute("PRAGMA user_version = 2")
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="scenario_id",
+        column_definition="TEXT NOT NULL DEFAULT 'founder_journey'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="scenario_title",
+        column_definition="TEXT NOT NULL DEFAULT 'Founder Journey'",
+    )
+    connection.execute("PRAGMA user_version = 3")
 
 
 def _ensure_column(

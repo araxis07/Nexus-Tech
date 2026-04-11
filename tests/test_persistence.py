@@ -113,6 +113,8 @@ def make_state() -> GameState:
         pending_event=pending_event,
         event_history=event_history,
         milestone_history=milestone_history,
+        scenario_id="vc_sprint",
+        scenario_title="VC Sprint",
         action_points_remaining=1,
     )
 
@@ -140,6 +142,14 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "event_history",
         "milestone_history",
     }.issubset(table_names)
+
+    with sqlite3.connect(db_path) as connection:
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(save_slots)").fetchall()
+        }
+
+    assert {"scenario_id", "scenario_title"}.issubset(columns)
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:

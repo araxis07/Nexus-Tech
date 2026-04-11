@@ -1,0 +1,221 @@
+[
+  {
+    "scenario_id": "founder_journey",
+    "title": "Founder Journey",
+    "description": "A balanced starting run with one early product and just enough cash to survive careful decisions.",
+    "company_name": "NEXUS TECH",
+    "company_strategy": "balanced",
+    "cash_on_hand": "8500.00",
+    "reputation": 50,
+    "products": [
+      {
+        "key": "flagship",
+        "template_id": "saas_tool",
+        "name": "Nexus One",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 18,
+        "market_fit": 52,
+        "technical_debt": 14,
+        "user_count": 35,
+        "revenue_per_user": "30.00",
+        "feature_count": 1,
+        "maintenance_cost": "260.00",
+        "acquisition_rate": "0.0600",
+        "churn_rate": "0.0500",
+        "pricing_tier": "standard"
+      }
+    ]
+  },
+  {
+    "scenario_id": "bootstrap_studio",
+    "title": "Bootstrap Studio",
+    "description": "Cash is tighter, but the business starts leaner and the team is already used to constraints.",
+    "company_name": "Bootstrap Studio",
+    "company_strategy": "efficiency",
+    "cash_on_hand": "6200.00",
+    "reputation": 48,
+    "products": [
+      {
+        "key": "studio",
+        "template_id": "workflow_suite",
+        "name": "ClientDesk",
+        "lifecycle_stage": "growth",
+        "quality": 55,
+        "bug_level": 19,
+        "market_fit": 49,
+        "technical_debt": 18,
+        "user_count": 28,
+        "revenue_per_user": "29.00",
+        "feature_count": 1,
+        "maintenance_cost": "250.00",
+        "acquisition_rate": "0.0520",
+        "churn_rate": "0.0510",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Mina Park",
+        "role": "designer",
+        "seniority": "junior",
+        "specialization": "ux",
+        "assigned_product_key": "studio",
+        "energy": 78,
+        "morale": 74
+      }
+    ]
+  },
+  {
+    "scenario_id": "vc_sprint",
+    "title": "VC Sprint",
+    "description": "You have more capital and more pressure. Growth can be explosive, but payroll and expectations rise fast.",
+    "company_name": "Signal Forge",
+    "company_strategy": "growth",
+    "cash_on_hand": "14500.00",
+    "reputation": 55,
+    "products": [
+      {
+        "key": "launch",
+        "template_id": "growth_app",
+        "name": "Signal Loop",
+        "lifecycle_stage": "growth",
+        "quality": 54,
+        "bug_level": 21,
+        "market_fit": 57,
+        "technical_debt": 24,
+        "user_count": 42,
+        "revenue_per_user": "22.00",
+        "feature_count": 2,
+        "maintenance_cost": "235.00",
+        "acquisition_rate": "0.0740",
+        "churn_rate": "0.0540",
+        "pricing_tier": "budget"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Ava Green",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "growth",
+        "assigned_product_key": "launch",
+        "energy": 81,
+        "morale": 75
+      },
+      {
+        "full_name": "Noah Kim",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "delivery",
+        "assigned_product_key": "launch",
+        "energy": 79,
+        "morale": 72
+      }
+    ]
+  },
+  {
+    "scenario_id": "technical_rebuild",
+    "title": "Technical Rebuild",
+    "description": "The product has real traction, but the codebase is fighting back. Stabilising the business is the entire game.",
+    "company_name": "Refactor Labs",
+    "company_strategy": "quality",
+    "cash_on_hand": "7800.00",
+    "reputation": 46,
+    "products": [
+      {
+        "key": "core",
+        "template_id": "developer_platform",
+        "name": "CoreStack",
+        "lifecycle_stage": "growth",
+        "quality": 57,
+        "bug_level": 30,
+        "market_fit": 48,
+        "technical_debt": 52,
+        "user_count": 46,
+        "revenue_per_user": "36.00",
+        "feature_count": 2,
+        "maintenance_cost": "320.00",
+        "acquisition_rate": "0.0410",
+        "churn_rate": "0.0610",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Iris Chen",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "platform",
+        "assigned_product_key": "core",
+        "energy": 74,
+        "morale": 68
+      }
+    ]
+  },
+  {
+    "scenario_id": "agency_pivot",
+    "title": "Agency Pivot",
+    "description": "A services business is trying to turn product. You already have a team and a small portfolio, but focus is your real constraint.",
+    "company_name": "Northline Studio",
+    "company_strategy": "balanced",
+    "cash_on_hand": "9800.00",
+    "reputation": 53,
+    "products": [
+      {
+        "key": "legacy",
+        "template_id": "workflow_suite",
+        "name": "OpsBoard",
+        "lifecycle_stage": "mature",
+        "quality": 63,
+        "bug_level": 16,
+        "market_fit": 70,
+        "technical_debt": 22,
+        "user_count": 72,
+        "revenue_per_user": "28.00",
+        "feature_count": 3,
+        "maintenance_cost": "310.00",
+        "acquisition_rate": "0.0380",
+        "churn_rate": "0.0460",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "new_bet",
+        "template_id": "growth_app",
+        "name": "FlowPilot",
+        "lifecycle_stage": "prototype",
+        "quality": 46,
+        "bug_level": 20,
+        "market_fit": 38,
+        "technical_debt": 24,
+        "user_count": 8,
+        "revenue_per_user": "20.00",
+        "feature_count": 0,
+        "maintenance_cost": "180.00",
+        "acquisition_rate": "0.0490",
+        "churn_rate": "0.0700",
+        "pricing_tier": "budget"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Lena Ortiz",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "frontend",
+        "assigned_product_key": "new_bet",
+        "energy": 80,
+        "morale": 76
+      },
+      {
+        "full_name": "Marcus Bell",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "demand",
+        "assigned_product_key": "legacy",
+        "energy": 77,
+        "morale": 73
+      }
+    ]
+  }
+]

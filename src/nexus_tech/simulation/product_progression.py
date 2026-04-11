@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY, ZERO_RATE
-from nexus_tech.domain.models import Company, LifecycleStage, Product
+from nexus_tech.domain.models import Company, LifecycleStage, PricingTier, Product
 from nexus_tech.domain.money import quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.pricing import get_pricing_acquisition_bonus
@@ -30,7 +30,24 @@ class ProductDrift:
     lifecycle_stage: LifecycleStage
 
 
-def create_product(name: str, existing_products: list[Product]) -> Product:
+def create_product(
+    name: str,
+    existing_products: list[Product],
+    *,
+    lifecycle_stage: LifecycleStage = LifecycleStage.PROTOTYPE,
+    quality: int = BALANCE.new_product_quality,
+    bug_level: int = BALANCE.new_product_bug_level,
+    market_fit: int = BALANCE.new_product_market_fit,
+    technical_debt: int = BALANCE.new_product_technical_debt,
+    user_count: int = BALANCE.new_product_users,
+    revenue_per_user: Decimal = BALANCE.new_product_revenue_per_user,
+    feature_count: int = BALANCE.new_product_feature_count,
+    maintenance_cost: Decimal = BALANCE.new_product_maintenance_cost,
+    acquisition_rate: Decimal = BALANCE.new_product_acquisition_rate,
+    churn_rate: Decimal = BALANCE.new_product_churn_rate,
+    pricing_tier: PricingTier = PricingTier.STANDARD,
+    is_active: bool = True,
+) -> Product:
     """Validate and create a new prototype product."""
 
     normalized_name = name.strip()
@@ -43,17 +60,19 @@ def create_product(name: str, existing_products: list[Product]) -> Product:
 
     return Product(
         name=normalized_name,
-        lifecycle_stage=LifecycleStage.PROTOTYPE,
-        quality=BALANCE.new_product_quality,
-        bug_level=BALANCE.new_product_bug_level,
-        market_fit=BALANCE.new_product_market_fit,
-        technical_debt=BALANCE.new_product_technical_debt,
-        user_count=BALANCE.new_product_users,
-        revenue_per_user=BALANCE.new_product_revenue_per_user,
-        feature_count=BALANCE.new_product_feature_count,
-        maintenance_cost=BALANCE.new_product_maintenance_cost,
-        acquisition_rate=BALANCE.new_product_acquisition_rate,
-        churn_rate=BALANCE.new_product_churn_rate,
+        lifecycle_stage=lifecycle_stage,
+        quality=quality,
+        bug_level=bug_level,
+        market_fit=market_fit,
+        technical_debt=technical_debt,
+        user_count=user_count,
+        revenue_per_user=revenue_per_user,
+        feature_count=feature_count,
+        maintenance_cost=maintenance_cost,
+        acquisition_rate=acquisition_rate,
+        churn_rate=churn_rate,
+        pricing_tier=pricing_tier,
+        is_active=is_active,
     )
 
 

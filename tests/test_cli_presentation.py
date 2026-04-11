@@ -10,8 +10,10 @@ from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
 from nexus_tech.cli import app
+from nexus_tech.content.models import ScenarioDefinition, ScenarioProductSeed
 from nexus_tech.domain.models import (
     Company,
+    CompanyStrategy,
     Employee,
     EmployeeRole,
     EventCategory,
@@ -119,8 +121,9 @@ def test_root_command_dispatches_to_start_new_game(
     captured: dict[str, object] = {}
 
     def fake_start_new_game(
-        company_name: str,
-        product_name: str,
+        company_name: str | None,
+        product_name: str | None,
+        scenario_id: str,
         seed: int | None,
         db_path: Path,
         slot_name: str,
@@ -128,6 +131,7 @@ def test_root_command_dispatches_to_start_new_game(
         captured.update(
             company_name=company_name,
             product_name=product_name,
+            scenario_id=scenario_id,
             seed=seed,
             db_path=db_path,
             slot_name=slot_name,
@@ -143,6 +147,8 @@ def test_root_command_dispatches_to_start_new_game(
             "Demo Corp",
             "--product-name",
             "Alpha",
+            "--scenario",
+            "vc_sprint",
             "--seed",
             "13",
             "--db-path",
@@ -156,6 +162,7 @@ def test_root_command_dispatches_to_start_new_game(
     assert captured == {
         "company_name": "Demo Corp",
         "product_name": "Alpha",
+        "scenario_id": "vc_sprint",
         "seed": 13,
         "db_path": db_path,
         "slot_name": "showcase",
@@ -169,8 +176,9 @@ def test_new_game_command_dispatches_to_start_new_game(
     captured: dict[str, object] = {}
 
     def fake_start_new_game(
-        company_name: str,
-        product_name: str,
+        company_name: str | None,
+        product_name: str | None,
+        scenario_id: str,
         seed: int | None,
         db_path: Path,
         slot_name: str,
@@ -178,6 +186,7 @@ def test_new_game_command_dispatches_to_start_new_game(
         captured.update(
             company_name=company_name,
             product_name=product_name,
+            scenario_id=scenario_id,
             seed=seed,
             db_path=db_path,
             slot_name=slot_name,
@@ -194,6 +203,8 @@ def test_new_game_command_dispatches_to_start_new_game(
             "Demo Corp",
             "--product-name",
             "Beta",
+            "--scenario",
+            "bootstrap_studio",
             "--seed",
             "21",
             "--db-path",
@@ -205,9 +216,40 @@ def test_new_game_command_dispatches_to_start_new_game(
 
     assert result.exit_code == 0
     assert captured["product_name"] == "Beta"
+    assert captured["scenario_id"] == "bootstrap_studio"
     assert captured["seed"] == 21
     assert captured["db_path"] == db_path
     assert captured["slot_name"] == "slot-b"
+
+
+def test_list_scenarios_command_renders_catalog(monkeypatch: MonkeyPatch) -> None:
+    scenarios = (
+        ScenarioDefinition(
+            scenario_id="bootstrap_studio",
+            title="Bootstrap Studio",
+            description="A lean company with a modest runway.",
+            company_name="Bootstrap Studio",
+            company_strategy=CompanyStrategy.EFFICIENCY,
+            cash_on_hand=Decimal("6400.00"),
+            reputation=47,
+            products=[
+                ScenarioProductSeed(
+                    key="core",
+                    template_id="saas_tool",
+                    name="Studio Suite",
+                )
+            ],
+        ),
+    )
+
+    monkeypatch.setattr(cli_module, "get_available_scenarios", lambda: scenarios)
+
+    result = runner.invoke(app, ["list-scenarios"])
+
+    assert result.exit_code == 0
+    assert "Scenario Catalog" in result.output
+    assert "bootstrap_studio" in result.output
+    assert "Bootstrap Studio" in result.output
 
 
 def test_load_game_command_resumes_loaded_slot(

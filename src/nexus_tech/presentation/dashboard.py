@@ -11,6 +11,7 @@ from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 
+from nexus_tech.content.models import ProductTemplateDefinition, ScenarioDefinition
 from nexus_tech.domain.models import (
     Employee,
     EventHistoryEntry,
@@ -24,7 +25,13 @@ from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
 
 
-def render_intro(console: Console, company_name: str, seed: int | None) -> None:
+def render_intro(
+    console: Console,
+    *,
+    company_name: str,
+    scenario_title: str,
+    seed: int | None,
+) -> None:
     """Print the opening game banner."""
 
     seed_text = f"Seed: {seed}" if seed is not None else "Seed: random"
@@ -33,6 +40,7 @@ def render_intro(console: Console, company_name: str, seed: int | None) -> None:
             (
                 f"[bold cyan]NEXUS TECH[/bold cyan]\n"
                 f"Company: [bold]{company_name}[/bold]\n"
+                f"Scenario: {scenario_title}\n"
                 f"{seed_text}\n\n"
                 "Run a focused local software company from the terminal.\n"
                 "Build products, manage the team, react to events, and keep cash alive."
@@ -41,6 +49,38 @@ def render_intro(console: Console, company_name: str, seed: int | None) -> None:
             border_style="cyan",
         )
     )
+
+
+def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinition, ...]) -> None:
+    """Render the available starting scenarios."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Scenario", style="bold")
+    table.add_column("Company")
+    table.add_column("Strategy")
+    table.add_column("Products", justify="right")
+    table.add_column("Team", justify="right")
+    table.add_column("Description")
+
+    for scenario in scenarios:
+        table.add_row(
+            f"{scenario.title}\n[dim]{scenario.scenario_id}[/dim]",
+            scenario.company_name,
+            scenario.company_strategy.value,
+            str(len(scenario.products)),
+            str(len(scenario.employees)),
+            scenario.description,
+        )
+
+    scenario_ids = ", ".join(
+        f"{scenario.scenario_id} ({scenario.title})" for scenario in scenarios
+    )
+    content = Group(
+        table,
+        "",
+        f"[dim]Use --scenario <id>. Available ids: {scenario_ids}[/dim]",
+    )
+    console.print(Panel(content, title="Scenario Catalog", border_style="cyan", expand=True))
 
 
 def render_dashboard(console: Console, state: GameState) -> None:
@@ -188,6 +228,47 @@ def render_product_picker(console: Console, products: list[Product], action_labe
     )
 
 
+def render_product_template_picker(
+    console: Console,
+    templates: list[ProductTemplateDefinition],
+    action_label: str,
+) -> None:
+    """Render a compact template selection table before prompting."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("#", justify="center", style="bold cyan")
+    table.add_column("Template", style="bold")
+    table.add_column("Stage")
+    table.add_column("Q", justify="right")
+    table.add_column("B", justify="right")
+    table.add_column("Fit", justify="right")
+    table.add_column("Debt", justify="right")
+    table.add_column("Price")
+    table.add_column("Description")
+
+    for index, template in enumerate(templates, start=1):
+        table.add_row(
+            str(index),
+            template.title,
+            template.lifecycle_stage.value,
+            str(template.quality),
+            str(template.bug_level),
+            str(template.market_fit),
+            str(template.technical_debt),
+            template.pricing_tier.value,
+            template.description,
+        )
+
+    console.print(
+        Panel(
+            table,
+            title=f"Product Template: {action_label.replace('_', ' ')}",
+            border_style="blue",
+            expand=True,
+        )
+    )
+
+
 def render_employee_picker(
     console: Console,
     employees: list[Employee],
@@ -249,6 +330,7 @@ def render_game_over(console: Console, state: GameState) -> None:
 def _build_turn_header_panel(state: GameState) -> Panel:
     body = (
         f"[bold white]Turn {state.company.current_turn}[/bold white]\n"
+        f"[cyan]Scenario:[/cyan] {state.scenario_title}\n"
         f"[cyan]Actions Left:[/cyan] {state.action_points_remaining}\n"
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
@@ -258,6 +340,7 @@ def _build_turn_header_panel(state: GameState) -> Panel:
 def _build_company_panel(state: GameState) -> Panel:
     table = Table.grid(padding=(0, 1))
     table.add_row("Name", state.company.name)
+    table.add_row("Scenario", state.scenario_title)
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Strategy", state.company.strategy.value)
@@ -330,7 +413,7 @@ def _build_portfolio_table(state: GameState) -> Table:
 def _build_dashboard_team_panel(state: GameState) -> Panel:
     if not state.employees:
         return Panel(
-            "No employees hired yet. Use [bold]7[/bold] to start building the team.",
+            "No employees hired yet. Use [bold]9[/bold] to start building the team.",
             title="Team Table",
             border_style="cyan",
             expand=True,

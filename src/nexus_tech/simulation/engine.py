@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
+from nexus_tech.config import DEFAULT_PRODUCT_TEMPLATE_ID, DEFAULT_SCENARIO_ID
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
-    Company,
     CompanyStrategy,
     Employee,
     EmployeeRole,
@@ -46,10 +46,12 @@ from nexus_tech.simulation.product_progression import (
     apply_marketing,
     apply_reduce_technical_debt,
     apply_sunset_product,
-    create_product,
-    infer_lifecycle_stage,
 )
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.scenarios import (
+    create_game_state_from_scenario,
+    create_product_from_template,
+)
 from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.team import (
@@ -75,6 +77,7 @@ class ActionContext:
     target_product_id: UUID | None = None
     employee_id: UUID | None = None
     new_product_name: str | None = None
+    new_product_template_id: str | None = None
     hire_full_name: str | None = None
     hire_role: EmployeeRole | None = None
     hire_seniority: Seniority | None = None
@@ -129,34 +132,18 @@ class TurnResolution:
     narrative: str
 
 
-def create_new_game(company_name: str, product_name: str) -> GameState:
-    """Create the initial playable game state."""
+def create_new_game(
+    company_name: str | None = None,
+    product_name: str | None = None,
+    *,
+    scenario_id: str = DEFAULT_SCENARIO_ID,
+) -> GameState:
+    """Create the initial playable game state from a selected scenario."""
 
-    company = Company(
-        name=company_name,
-        cash_on_hand=BALANCE.starting_cash,
-        reputation=BALANCE.starting_reputation,
-    )
-    product = Product(
-        name=product_name,
-        lifecycle_stage=LifecycleStage.GROWTH,
-        quality=BALANCE.starting_quality,
-        bug_level=BALANCE.starting_bug_level,
-        market_fit=BALANCE.starting_market_fit,
-        technical_debt=BALANCE.starting_technical_debt,
-        user_count=BALANCE.starting_users,
-        revenue_per_user=BALANCE.starting_revenue_per_user,
-        feature_count=BALANCE.starting_feature_count,
-        maintenance_cost=BALANCE.starting_maintenance_cost,
-        acquisition_rate=BALANCE.starting_acquisition_rate,
-        churn_rate=BALANCE.starting_churn_rate,
-    )
-    product.lifecycle_stage = infer_lifecycle_stage(product)
-    return GameState(
-        company=company,
-        products=[product],
-        employees=[],
-        action_points_remaining=BALANCE.actions_per_turn,
+    return create_game_state_from_scenario(
+        scenario_id,
+        company_name=company_name,
+        primary_product_name=product_name,
     )
 
 
@@ -207,18 +194,24 @@ def apply_action(
         if next_state.company.cash_on_hand < BALANCE.create_product_cost:
             raise ValueError("Not enough cash to create a new product.")
 
-        product = create_product(context.new_product_name, next_state.products)
+        template_id = context.new_product_template_id or DEFAULT_PRODUCT_TEMPLATE_ID
+        product, template = create_product_from_template(
+            context.new_product_name,
+            next_state.products,
+            template_id=template_id,
+        )
         next_state.company.cash_on_hand = quantize_money(
             next_state.company.cash_on_hand - BALANCE.create_product_cost
         )
         next_state.products.append(product)
         next_state.company.game_over = is_game_over(next_state.company)
-        logger.debug("Created product %s.", product.name)
+        logger.debug("Created product %s from template %s.", product.name, template.template_id)
         return ActionOutcome(
             state=next_state,
             message=(
-                f"Created {product.name}. Cash -{BALANCE.create_product_cost}. "
-                "It enters the portfolio as a prototype."
+                f"Created {product.name} from {template.title}. "
+                f"Cash -{BALANCE.create_product_cost}. "
+                "It enters the portfolio as a new product bet."
             ),
             turn_should_end=next_state.company.game_over,
         )

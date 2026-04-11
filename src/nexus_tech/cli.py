@@ -15,11 +15,11 @@ from rich.prompt import Prompt
 from rich.traceback import install as install_rich_traceback
 
 from nexus_tech.config import (
-    DEFAULT_COMPANY_NAME,
     DEFAULT_DATABASE_PATH,
-    DEFAULT_PRODUCT_NAME,
+    DEFAULT_SCENARIO_ID,
     DEMO_SEED_EXAMPLE,
 )
+from nexus_tech.content.models import ProductTemplateDefinition
 from nexus_tech.domain.models import (
     CompanyStrategy,
     Employee,
@@ -42,6 +42,8 @@ from nexus_tech.presentation.dashboard import (
     render_intro,
     render_pending_event,
     render_product_picker,
+    render_product_template_picker,
+    render_scenario_catalog,
     render_team_view,
     render_turn_resolution,
 )
@@ -56,6 +58,7 @@ from nexus_tech.simulation.engine import (
 )
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.scenarios import get_available_product_templates, get_available_scenarios
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +78,11 @@ DB_PATH_OPTION = typer.Option(
     DEFAULT_DB_PATH,
     "--db-path",
     help="SQLite database path used for save, load, and continue commands.",
+)
+SCENARIO_OPTION = typer.Option(
+    DEFAULT_SCENARIO_ID,
+    "--scenario",
+    help="Starting scenario id. Use 'list-scenarios' to inspect the available catalog.",
 )
 
 ACTION_KEYS = {
@@ -115,16 +123,17 @@ PRODUCT_TARGETED_ACTIONS = {
 @app.callback(invoke_without_command=True)
 def root(
     ctx: typer.Context,
-    company_name: str = typer.Option(
-        DEFAULT_COMPANY_NAME,
+    company_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
         "--company-name",
-        help="Company display name.",
+        help="Company display name override. Defaults to the scenario's company name.",
     ),
-    product_name: str = typer.Option(
-        DEFAULT_PRODUCT_NAME,
+    product_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
         "--product-name",
-        help="Initial product name.",
+        help="Primary product name override. Applies to the first scenario product.",
     ),
+    scenario: str = SCENARIO_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
         None,
         "--seed",
@@ -148,6 +157,7 @@ def root(
     start_new_game(
         company_name=company_name,
         product_name=product_name,
+        scenario_id=scenario,
         seed=seed,
         db_path=db_path,
         slot_name=slot,
@@ -156,16 +166,17 @@ def root(
 
 @app.command("new-game")
 def new_game_command(
-    company_name: str = typer.Option(
-        DEFAULT_COMPANY_NAME,
+    company_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
         "--company-name",
-        help="Company display name.",
+        help="Company display name override. Defaults to the scenario's company name.",
     ),
-    product_name: str = typer.Option(
-        DEFAULT_PRODUCT_NAME,
+    product_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
         "--product-name",
-        help="Initial product name.",
+        help="Primary product name override. Applies to the first scenario product.",
     ),
+    scenario: str = SCENARIO_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
         None,
         "--seed",
@@ -179,6 +190,7 @@ def new_game_command(
     start_new_game(
         company_name=company_name,
         product_name=product_name,
+        scenario_id=scenario,
         seed=seed,
         db_path=db_path,
         slot_name=slot,
@@ -187,16 +199,17 @@ def new_game_command(
 
 @app.command("play", hidden=True)
 def play_alias(
-    company_name: str = typer.Option(
-        DEFAULT_COMPANY_NAME,
+    company_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
         "--company-name",
-        help="Company display name.",
+        help="Company display name override. Defaults to the scenario's company name.",
     ),
-    product_name: str = typer.Option(
-        DEFAULT_PRODUCT_NAME,
+    product_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
         "--product-name",
-        help="Initial product name.",
+        help="Primary product name override. Applies to the first scenario product.",
     ),
+    scenario: str = SCENARIO_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
         None,
         "--seed",
@@ -210,10 +223,18 @@ def play_alias(
     start_new_game(
         company_name=company_name,
         product_name=product_name,
+        scenario_id=scenario,
         seed=seed,
         db_path=db_path,
         slot_name=slot,
     )
+
+
+@app.command("list-scenarios")
+def list_scenarios_command() -> None:
+    """Print the available starting scenarios."""
+
+    render_scenario_catalog(console, get_available_scenarios())
 
 
 @app.command("load-game")
@@ -234,6 +255,7 @@ def load_game_command(
         db_path=db_path,
         slot_name=loaded_game.slot_name,
         seed=loaded_game.rng.seed,
+        scenario_title=loaded_game.state.scenario_title,
     )
     run_game_loop(
         state=loaded_game.state,
@@ -260,6 +282,7 @@ def continue_last_game_command(
         db_path=db_path,
         slot_name=loaded_game.slot_name,
         seed=loaded_game.rng.seed,
+        scenario_title=loaded_game.state.scenario_title,
     )
     run_game_loop(
         state=loaded_game.state,
@@ -270,24 +293,35 @@ def continue_last_game_command(
 
 
 def start_new_game(
-    company_name: str,
-    product_name: str,
+    company_name: str | None,
+    product_name: str | None,
+    scenario_id: str,
     seed: int | None,
     db_path: Path,
     slot_name: str,
 ) -> None:
     """Create a brand new run and enter the interactive loop."""
 
-    state = create_new_game(company_name=company_name, product_name=product_name)
+    state = create_new_game(
+        company_name=company_name,
+        product_name=product_name,
+        scenario_id=scenario_id,
+    )
     rng = RandomSource(seed=seed)
     logger.debug(
-        "Starting new game company=%s product=%s seed=%s slot=%s.",
-        company_name,
-        product_name,
+        "Starting new game scenario=%s company=%s product=%s seed=%s slot=%s.",
+        scenario_id,
+        state.company.name,
+        state.products[0].name,
         seed,
         slot_name,
     )
-    render_intro(console, company_name=company_name, seed=seed)
+    render_intro(
+        console,
+        company_name=state.company.name,
+        scenario_title=state.scenario_title,
+        seed=seed,
+    )
     run_game_loop(state=state, rng=rng, db_path=db_path, slot_name=slot_name)
 
 
@@ -394,7 +428,13 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         return ActionContext()
 
     if action is TurnAction.CREATE_PRODUCT:
-        return ActionContext(new_product_name=ask_text_input("New product name"))
+        product_template = choose_product_template(action)
+        if product_template is None:
+            return None
+        return ActionContext(
+            new_product_name=ask_text_input("New product name", default=product_template.title),
+            new_product_template_id=product_template.template_id,
+        )
 
     if action is TurnAction.SET_COMPANY_STRATEGY:
         strategy_key = ask_choice_input(
@@ -507,6 +547,42 @@ def choose_product_id(state: GameState, action: TurnAction) -> UUID | None:
         )
     )
     return product.id
+
+
+def choose_product_template(action: TurnAction) -> ProductTemplateDefinition | None:
+    """Prompt the user to select a product template for creation."""
+
+    templates = list(get_available_product_templates())
+    if not templates:
+        console.print(
+            Panel.fit(
+                "No product templates are available.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    template_choices = {
+        str(index): template for index, template in enumerate(templates, start=1)
+    }
+    render_product_template_picker(console, templates, action_label=action.value)
+    selected_key = ask_choice_input(
+        "Select a product template",
+        choices=list(template_choices),
+        default="1",
+        show_choices=False,
+    )
+    template = template_choices[selected_key]
+    logger.debug("Selected product template %s.", template.template_id)
+    console.print(
+        Panel.fit(
+            build_product_template_summary(template),
+            title="Template Selected",
+            border_style="blue",
+        )
+    )
+    return template
 
 
 def choose_employee_id(
@@ -660,6 +736,18 @@ def build_product_selection_summary(product: Product) -> str:
     )
 
 
+def build_product_template_summary(template: ProductTemplateDefinition) -> str:
+    """Show concise template stats before creating a product."""
+
+    return (
+        f"{template.title}\n"
+        f"{template.description}\n"
+        f"Stage: {template.lifecycle_stage.value} | Quality: {template.quality} | "
+        f"Bugs: {template.bug_level} | Fit: {template.market_fit} | "
+        f"Debt: {template.technical_debt} | Pricing: {template.pricing_tier.value}"
+    )
+
+
 def build_employee_selection_summary(
     employee: Employee,
     products: list[Product],
@@ -726,13 +814,22 @@ def handle_utility_action(
     raise ValueError(f"Unsupported utility action: {action_name}")
 
 
-def announce_loaded_game(db_path: Path, slot_name: str, seed: int | None) -> None:
+def announce_loaded_game(
+    db_path: Path,
+    slot_name: str,
+    seed: int | None,
+    scenario_title: str,
+) -> None:
     """Print a concise load banner before entering the loop."""
 
     seed_text = seed if seed is not None else "random"
     console.print(
         Panel.fit(
-            f"Loaded slot '{slot_name}' from {db_path}\nSeed: {seed_text}",
+            (
+                f"Loaded slot '{slot_name}' from {db_path}\n"
+                f"Scenario: {scenario_title}\n"
+                f"Seed: {seed_text}"
+            ),
             title="Continue Game",
             border_style="green",
         )

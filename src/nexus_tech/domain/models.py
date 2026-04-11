@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from nexus_tech.config import DEFAULT_SCENARIO_ID, DEFAULT_SCENARIO_TITLE
 from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
 from nexus_tech.domain.money import quantize_money, quantize_rate
 
@@ -242,4 +243,14 @@ class GameState(BaseModel):
     pending_event: Optional[PendingEvent] = None  # noqa: UP045
     event_history: list[EventHistoryEntry] = Field(default_factory=list)
     milestone_history: list[MilestoneEntry] = Field(default_factory=list)
+    scenario_id: str = Field(
+        default=DEFAULT_SCENARIO_ID,
+        min_length=1,
+        max_length=40,
+    )
+    scenario_title: str = Field(
+        default=DEFAULT_SCENARIO_TITLE,
+        min_length=1,
+        max_length=80,
+    )
     action_points_remaining: int = Field(ge=0)
