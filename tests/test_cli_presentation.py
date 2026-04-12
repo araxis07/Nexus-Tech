@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 from _pytest.monkeypatch import MonkeyPatch
 from rich.console import Console
-from typer.testing import CliRunner
 from typer.main import get_command
+from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
 from nexus_tech.cli import app

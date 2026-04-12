@@ -28,41 +28,5 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check src tests
 
-      - name: Run content tests
-        run: uv run pytest tests/test_content.py -q
-
-      - name: Run persistence tests
-        run: uv run pytest tests/test_persistence.py -q
-
-      - name: Run CLI help test
-        run: uv run pytest tests/test_cli_presentation.py::test_cli_help_lists_core_commands_and_debug_flag -q
-
-      - name: Run root dispatch test
-        run: uv run pytest tests/test_cli_presentation.py::test_root_command_dispatches_to_start_new_game -q
-
-      - name: Run new-game dispatch test
-        run: uv run pytest tests/test_cli_presentation.py::test_new_game_command_dispatches_to_start_new_game -q
-
-      - name: Run scenario catalog CLI test
-        run: uv run pytest tests/test_cli_presentation.py::test_list_scenarios_command_renders_catalog -q
-
-      - name: Run load-game CLI test
-        run: uv run pytest tests/test_cli_presentation.py::test_load_game_command_resumes_loaded_slot -q
-
-      - name: Run continue-last-game CLI test
-        run: uv run pytest tests/test_cli_presentation.py::test_continue_last_game_command_resumes_latest_slot -q
-
-      - name: Run dashboard rendering test
-        run: uv run pytest tests/test_cli_presentation.py::test_dashboard_rendering_contains_required_sections -q
-
-      - name: Run turn summary rendering test
-        run: uv run pytest tests/test_cli_presentation.py::test_turn_resolution_rendering_contains_summary_sections -q
-
-      - name: Run report rendering test
-        run: uv run pytest tests/test_cli_presentation.py::test_report_rendering_contains_score_and_turn_history -q
-
-      - name: Run victory rendering test
-        run: uv run pytest tests/test_cli_presentation.py::test_victory_rendering_contains_summary_metrics -q
-
-      - name: Run simulation tests
-        run: uv run pytest tests/test_simulation.py -q
+      - name: Run tests
+        run: uv run pytest -q
