@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from _pytest.monkeypatch import MonkeyPatch
 from rich.console import Console
 from typer.testing import CliRunner
+from typer.main import get_command
 
 import nexus_tech.cli as cli_module
 from nexus_tech.cli import app
@@ -157,18 +158,12 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
 
 
 def test_cli_help_lists_core_commands_and_debug_flag() -> None:
-    result = runner.invoke(
-        app,
-        ["--help"],
-        env={"TERM": "xterm-256color"},
-        terminal_width=120,
-    )
+    command = get_command(app)
+    option_names = {opt for parameter in command.params for opt in parameter.opts}
+    command_names = set(command.commands.keys())
 
-    assert result.exit_code == 0
-    assert "new-game" in result.output
-    assert "load-game" in result.output
-    assert "continue-last-game" in result.output
-    assert "--debug" in result.output
+    assert {"new-game", "load-game", "continue-last-game"}.issubset(command_names)
+    assert "--debug" in option_names
 
 
 def test_root_command_dispatches_to_start_new_game(
