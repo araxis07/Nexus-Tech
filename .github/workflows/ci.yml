@@ -28,5 +28,14 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check src tests
 
-      - name: Run pytest
-        run: uv run pytest -q
+      - name: Run content tests
+        run: uv run pytest tests/test_content.py -q
+
+      - name: Run persistence tests
+        run: uv run pytest tests/test_persistence.py -q
+
+      - name: Run CLI tests
+        run: uv run pytest tests/test_cli_presentation.py -q
+
+      - name: Run simulation tests
+        run: uv run pytest tests/test_simulation.py -q
