@@ -3,7 +3,7 @@ name = "nexus-tech"
 version = "0.1.0"
 description = "NEXUS TECH terminal-first management simulation game."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
   "pydantic>=2.11,<3.0",
   "rich>=14.0.0,<15.0.0",
@@ -36,7 +36,7 @@ console_output_style = "progress"
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
-target-version = "py314"
+target-version = "py313"
 show-fixes = true
 
 [tool.ruff.lint]

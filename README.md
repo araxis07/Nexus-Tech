@@ -104,7 +104,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 ## 🧱 Tech Stack
 
-- **Python 3.14+**
+- **Python 3.13+**
 - **uv** for project and dependency management
 - **sqlite3** from the Python standard library for persistence
 - **Pydantic v2** for validated domain models
