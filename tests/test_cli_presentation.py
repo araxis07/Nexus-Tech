@@ -157,7 +157,12 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
 
 
 def test_cli_help_lists_core_commands_and_debug_flag() -> None:
-    result = runner.invoke(app, ["--help"])
+    result = runner.invoke(
+        app,
+        ["--help"],
+        env={"TERM": "xterm-256color"},
+        terminal_width=120,
+    )
 
     assert result.exit_code == 0
     assert "new-game" in result.output
