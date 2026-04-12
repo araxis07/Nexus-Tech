@@ -407,6 +407,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Action Menu" in output
     assert "Event Notification" in output
     assert "Market Watch" in output
+    assert "Finance" in output
     assert "Strategy" in output
     assert "Price" in output
     assert "Roadmap" in output
@@ -439,6 +440,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Scorecard" in output
     assert "Turn History" in output
     assert "Quarter Plan" in output
+    assert "Finance" in output
     assert "Competitor Watch" in output
     assert "Estimated Value" in output
 

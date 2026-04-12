@@ -347,6 +347,28 @@ class BalanceConfig:
     competitor_product_count_bonus: int = 1
     competitor_price_match_bonus: int = 1
     competitor_pressure_cap_total: int = 12
+    competitor_move_pressure_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "hold": 0,
+            "discount_push": 2,
+            "feature_sprint": 3,
+            "retrench": -2,
+        }
+    )
+    competitor_momentum_divisor: int = 18
+    competitor_move_hold_weight: int = 3
+    competitor_move_discount_weight: int = 3
+    competitor_move_feature_weight: int = 3
+    competitor_move_retrench_weight: int = 2
+    competitor_discount_extra_aggression: int = 4
+    competitor_feature_extra_strength: int = 4
+    competitor_retrench_strength_loss: int = 2
+    competitor_retrench_aggression_loss: int = 3
+    competitor_momentum_change_on_discount: int = 4
+    competitor_momentum_change_on_feature: int = 5
+    competitor_momentum_change_on_hold: int = 1
+    competitor_momentum_change_on_retrench: int = -5
+    competitor_move_summary_limit: int = 3
 
     quarter_plan_revenue_growth_by_roadmap: dict[str, Decimal] = field(
         default_factory=lambda: {
@@ -372,6 +394,38 @@ class BalanceConfig:
         }
     )
 
+    finance_loan_amount: Decimal = Decimal("2500.00")
+    finance_max_total_debt: Decimal = Decimal("9000.00")
+    finance_loan_interest_rate: Decimal = Decimal("0.0350")
+    finance_loan_pressure_gain: int = 3
+    finance_repayment_chunk: Decimal = Decimal("1800.00")
+    finance_repayment_min_cash_buffer: Decimal = Decimal("1200.00")
+    finance_repayment_pressure_relief: int = 2
+    finance_angel_raise_amount: Decimal = Decimal("4200.00")
+    finance_angel_dilution: Decimal = Decimal("0.0800")
+    finance_angel_pressure_gain: int = 7
+    finance_angel_round_limit: int = 2
+    finance_angel_reputation_threshold: int = 46
+    finance_angel_user_threshold: int = 24
+    finance_vc_raise_amount: Decimal = Decimal("9600.00")
+    finance_vc_dilution: Decimal = Decimal("0.1500")
+    finance_vc_pressure_gain: int = 14
+    finance_vc_round_limit: int = 1
+    finance_vc_reputation_threshold: int = 58
+    finance_vc_user_threshold: int = 140
+    finance_pressure_cost_divisor: int = 10
+    finance_pressure_operating_cost_unit: Decimal = Decimal("18.00")
+    finance_debt_distress_threshold: Decimal = Decimal("6000.00")
+    finance_pressure_increase_on_negative_cash_flow: int = 2
+    finance_pressure_increase_on_high_debt: int = 1
+    finance_pressure_relief_on_stability: int = 1
+    finance_pressure_relief_cash_threshold: Decimal = Decimal("7000.00")
+    finance_score_debt_divisor: Decimal = Decimal("600.00")
+    finance_score_pressure_divisor: int = 6
+    finance_score_dilution_multiplier: int = 80
+    finance_valuation_debt_multiplier: Decimal = Decimal("1.00")
+    finance_valuation_dilution_penalty_multiplier: Decimal = Decimal("0.50")
+
     score_cash_divisor: Decimal = Decimal("500.00")
     score_users_divisor: int = 6
     score_reputation_multiplier: int = 2
@@ -387,6 +441,8 @@ class BalanceConfig:
     victory_cash_threshold: Decimal = Decimal("12000.00")
     victory_users_threshold: int = 180
     victory_reputation_threshold: int = 62
+    victory_max_debt_threshold: Decimal = Decimal("3000.00")
+    victory_max_investor_pressure: int = 45
 
     event_trigger_min_turn: int = 2
     event_trigger_chance_percent: int = 42

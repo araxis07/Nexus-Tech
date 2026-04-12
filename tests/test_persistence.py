@@ -16,6 +16,9 @@ from nexus_tech.domain.models import (
     EventCategory,
     EventHistoryEntry,
     EventOption,
+    FinanceState,
+    FundingHistoryEntry,
+    FundingType,
     GameState,
     LifecycleStage,
     MarketCycle,
@@ -129,6 +132,32 @@ def make_state() -> GameState:
         pricing_tier=PricingTier.PREMIUM,
         active_product_count=2,
     )
+    finance = FinanceState(
+        debt_principal=Decimal("3200.00"),
+        loan_interest_rate=Decimal("0.0350"),
+        equity_dilution=Decimal("0.0800"),
+        investor_pressure=9,
+        total_raised=Decimal("7400.00"),
+        last_funding_turn=3,
+    )
+    funding_history = [
+        FundingHistoryEntry(
+            funding_type=FundingType.ANGEL,
+            turn=3,
+            amount=Decimal("4200.00"),
+            dilution_added=Decimal("0.0800"),
+            debt_added=Decimal("0.00"),
+            summary="Closed an angel round to extend runway.",
+        ),
+        FundingHistoryEntry(
+            funding_type=FundingType.LOAN,
+            turn=4,
+            amount=Decimal("3200.00"),
+            dilution_added=Decimal("0.0000"),
+            debt_added=Decimal("3200.00"),
+            summary="Added debt to stabilise the quarter plan.",
+        ),
+    ]
     quarter_plan = QuarterPlan(
         budget_stance=BudgetStance.AGGRESSIVE,
         set_turn=4,
@@ -148,11 +177,13 @@ def make_state() -> GameState:
         ),
         products=[product],
         employees=[employee],
+        finance=finance,
         competitors=[competitor],
         quarter_plan=quarter_plan,
         pending_event=pending_event,
         event_history=event_history,
         milestone_history=milestone_history,
+        funding_history=funding_history,
         roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         roadmap_set_turn=3,
         market_cycle=MarketCycle.EXPANDING,
@@ -182,6 +213,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "companies",
         "products",
         "employees",
+        "finance_state",
+        "funding_history",
         "quarter_plan",
         "competitors",
         "pending_events",
@@ -198,6 +231,10 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         product_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(products)").fetchall()
         }
+        competitor_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(competitors)").fetchall()
+        }
+        user_version = connection.execute("PRAGMA user_version").fetchone()[0]
 
     assert {
         "scenario_id",
@@ -210,6 +247,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "victory_reason",
     }.issubset(save_slot_columns)
     assert {"target_segment"}.issubset(product_columns)
+    assert {"current_move", "momentum"}.issubset(competitor_columns)
+    assert user_version >= 6
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:

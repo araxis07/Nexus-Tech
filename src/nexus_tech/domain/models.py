@@ -93,6 +93,15 @@ class MarketCycle(StrEnum):
     FROTHY = "frothy"
 
 
+class CompetitorMove(StrEnum):
+    """Current tactical posture used by a competitor this turn."""
+
+    HOLD = "hold"
+    DISCOUNT_PUSH = "discount_push"
+    FEATURE_SPRINT = "feature_sprint"
+    RETRENCH = "retrench"
+
+
 class EventCategory(StrEnum):
     """Supported event categories for the dynamic event engine."""
 
@@ -121,6 +130,14 @@ class MilestoneId(StrEnum):
     FIRST_MATURE_PRODUCT = "first_mature_product"
 
 
+class FundingType(StrEnum):
+    """Capital source recorded in the company finance history."""
+
+    ANGEL = "angel"
+    VENTURE = "venture"
+    LOAN = "loan"
+
+
 class TurnAction(StrEnum):
     """Actions the player can take during a turn."""
 
@@ -135,6 +152,11 @@ class TurnAction(StrEnum):
     SET_COMPANY_STRATEGY = "set_company_strategy"
     SET_ROADMAP = "set_roadmap"
     SET_BUDGET_STANCE = "set_budget_stance"
+    TAKE_LOAN = "take_loan"
+    RAISE_ANGEL = "raise_angel"
+    RAISE_VC = "raise_vc"
+    REPAY_DEBT = "repay_debt"
+    REVIEW_FINANCE = "review_finance"
     HIRE_EMPLOYEE = "hire_employee"
     FIRE_EMPLOYEE = "fire_employee"
     ASSIGN_EMPLOYEE = "assign_employee"
@@ -233,6 +255,39 @@ class Competitor(BaseModel):
     aggression: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     pricing_tier: PricingTier = PricingTier.STANDARD
     active_product_count: int = Field(default=1, ge=1, le=6)
+    current_move: CompetitorMove = CompetitorMove.HOLD
+    momentum: int = Field(default=50, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+
+
+class FinanceState(BaseModel):
+    """Financing posture for the current company run."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    debt_principal: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    loan_interest_rate: Decimal = Field(
+        default=Decimal("0.0000"),
+        ge=Decimal("0"),
+        le=Decimal("1"),
+    )
+    equity_dilution: Decimal = Field(
+        default=Decimal("0.0000"),
+        ge=Decimal("0"),
+        le=Decimal("1"),
+    )
+    investor_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    total_raised: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
+
+    @field_validator("debt_principal", "total_raised", mode="before")
+    @classmethod
+    def _normalize_finance_money(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+    @field_validator("loan_interest_rate", "equity_dilution", mode="before")
+    @classmethod
+    def _normalize_finance_rate(cls, value: Decimal) -> Decimal:
+        return quantize_rate(value)
 
 
 class QuarterPlan(BaseModel):
@@ -307,6 +362,29 @@ class MilestoneEntry(BaseModel):
     reward_text: str = Field(min_length=1, max_length=240)
 
 
+class FundingHistoryEntry(BaseModel):
+    """One financing decision recorded in the run history."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    funding_type: FundingType
+    turn: int = Field(ge=1)
+    amount: Decimal = Field(ge=Decimal("0"))
+    dilution_added: Decimal = Field(default=Decimal("0.0000"), ge=Decimal("0"), le=Decimal("1"))
+    debt_added: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    summary: str = Field(min_length=1, max_length=240)
+
+    @field_validator("amount", "debt_added", mode="before")
+    @classmethod
+    def _normalize_funding_money(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+    @field_validator("dilution_added", mode="before")
+    @classmethod
+    def _normalize_funding_rate(cls, value: Decimal) -> Decimal:
+        return quantize_rate(value)
+
+
 class TurnLedgerEntry(BaseModel):
     """Compact turn history snapshot for reporting and scoring."""
 
@@ -342,9 +420,11 @@ class GameState(BaseModel):
     company: Company
     products: list[Product] = Field(min_length=1)
     employees: list[Employee] = Field(default_factory=list)
+    finance: FinanceState = Field(default_factory=FinanceState)
     pending_event: Optional[PendingEvent] = None  # noqa: UP045
     event_history: list[EventHistoryEntry] = Field(default_factory=list)
     milestone_history: list[MilestoneEntry] = Field(default_factory=list)
+    funding_history: list[FundingHistoryEntry] = Field(default_factory=list)
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION
     roadmap_set_turn: int = Field(default=1, ge=1)
     market_cycle: MarketCycle = MarketCycle.STEADY

@@ -22,6 +22,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
+from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.market import get_market_profile
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_score
@@ -117,8 +118,9 @@ def render_dashboard(console: Console, state: GameState) -> None:
             [
                 _build_dashboard_team_panel(state),
                 _build_market_watch_panel(state),
+                _build_finance_panel(state),
             ],
-            equal=True,
+            equal=False,
             expand=True,
         )
     )
@@ -179,15 +181,22 @@ def render_report(console: Console, state: GameState) -> None:
             expand=True,
         )
     )
-    console.print(history_panel)
     console.print(
-        Panel(
-            _build_competitor_table(state),
-            title="Competitor Watch",
-            border_style="red",
+        Columns(
+            [
+                _build_finance_panel(state),
+                Panel(
+                    _build_competitor_table(state),
+                    title="Competitor Watch",
+                    border_style="red",
+                    expand=True,
+                ),
+            ],
+            equal=True,
             expand=True,
         )
     )
+    console.print(history_panel)
 
 
 def render_turn_resolution(console: Console, resolution: TurnResolution) -> None:
@@ -456,6 +465,8 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Roadmap", effective_roadmap.value)
     table.add_row("Budget", state.quarter_plan.budget_stance.value)
     table.add_row("Market", state.market_cycle.value)
+    table.add_row("Debt", format_money(state.finance.debt_principal))
+    table.add_row("Dilution", format_rate(state.finance.equity_dilution))
     table.add_row("Status", "Game Over" if state.company.game_over else "Operating")
     return Panel(table, title="Company Overview", border_style="magenta", expand=True)
 
@@ -469,6 +480,8 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Sunset Products", str(len(state.products) - len(active_products)))
     table.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
+    table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     table.add_row("Competitors", str(len(state.competitors)))
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
@@ -618,23 +631,28 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("9", "set_company_strategy", "Shift company-wide focus.")
     primary_actions.add_row("10", "set_roadmap", "Pick the quarter's execution plan.")
     primary_actions.add_row("11", "set_budget_stance", "Change the quarter's spend posture.")
-    primary_actions.add_row("12", "hire_employee", "Add capability and salary burn.")
-    primary_actions.add_row("13", "fire_employee", "Remove salary burden.")
-    primary_actions.add_row("14", "assign_employee", "Put someone on a product.")
-    primary_actions.add_row("15", "unassign_employee", "Pull someone off product work.")
-    primary_actions.add_row("16", "rest_team", "Recover energy and morale.")
-    primary_actions.add_row("17", "review_team", "Open the detailed team view.")
-    primary_actions.add_row("18", "view_report", "Open the score, plan, and rival report.")
-    primary_actions.add_row("19", "wait", "Hold position for this action.")
-    primary_actions.add_row("20", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("21", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("12", "take_loan", "Trade future burn for runway.")
+    primary_actions.add_row("13", "raise_angel", "Take smaller capital with dilution.")
+    primary_actions.add_row("14", "raise_vc", "Raise a larger round once traction is real.")
+    primary_actions.add_row("15", "repay_debt", "Reduce interest and capital pressure.")
+    primary_actions.add_row("16", "review_finance", "Open the capital and runway view.")
+    primary_actions.add_row("17", "hire_employee", "Add capability and salary burn.")
+    primary_actions.add_row("18", "fire_employee", "Remove salary burden.")
+    primary_actions.add_row("19", "assign_employee", "Put someone on a product.")
+    primary_actions.add_row("20", "unassign_employee", "Pull someone off product work.")
+    primary_actions.add_row("21", "rest_team", "Recover energy and morale.")
+    primary_actions.add_row("22", "review_team", "Open the detailed team view.")
+    primary_actions.add_row("23", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("24", "wait", "Hold position for this action.")
+    primary_actions.add_row("25", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("26", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("22", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("23", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("27", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("28", "load_game", "Resume a saved slot from SQLite.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -694,6 +712,7 @@ def _build_turn_finance_table(resolution: TurnResolution) -> Table:
     table.add_row("Baseline Cost", format_money(resolution.baseline_operating_cost))
     table.add_row("Product Costs", format_money(resolution.total_product_operating_cost))
     table.add_row("Salary Cost", format_money(resolution.total_salary_cost))
+    table.add_row("Finance Cost", format_money(resolution.total_finance_cost))
     table.add_row("Total Operating Cost", format_money(resolution.total_operating_cost))
     table.add_row("Net Cash Flow", format_signed_money(resolution.net_cash_flow))
     table.add_row("Cash On Hand", format_money(resolution.state.company.cash_on_hand))
@@ -720,6 +739,10 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     table.add_row("Budget", resolution.state.quarter_plan.budget_stance.value)
     table.add_row("Roadmap", resolution.roadmap_focus.value)
     table.add_row("Market", resolution.market_cycle.value)
+    table.add_row(
+        "Pressure Δ",
+        format_signed_int(resolution.finance_summary.investor_pressure_delta),
+    )
     table.add_row(
         "Run Score", f"{resolution.run_score.total_score} ({resolution.run_score.score_tier})"
     )
@@ -896,6 +919,23 @@ def _build_market_watch_panel(state: GameState) -> Panel:
     return Panel(table, title="Market Watch", border_style="red", expand=True)
 
 
+def _build_finance_panel(state: GameState) -> Panel:
+    runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
+    turn_interest = (
+        state.finance.debt_principal * state.finance.loan_interest_rate
+        if state.finance.debt_principal > Decimal("0")
+        else Decimal("0.00")
+    )
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Debt", format_money(state.finance.debt_principal))
+    table.add_row("Dilution", format_rate(state.finance.equity_dilution))
+    table.add_row("Investor Pressure", str(state.finance.investor_pressure))
+    table.add_row("Capital Raised", format_money(state.finance.total_raised))
+    table.add_row("Turn Interest", format_money(turn_interest))
+    table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
+    return Panel(table, title="Finance", border_style="cyan", expand=True)
+
+
 def _build_competitor_table(state: GameState) -> Table:
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("#", justify="center", style="bold cyan")
@@ -903,6 +943,8 @@ def _build_competitor_table(state: GameState) -> Table:
     table.add_column("Segment")
     table.add_column("Strength", justify="right")
     table.add_column("Agg", justify="right")
+    table.add_column("Move")
+    table.add_column("Mom", justify="right")
     table.add_column("Products", justify="right")
     table.add_column("Price")
 
@@ -913,10 +955,18 @@ def _build_competitor_table(state: GameState) -> Table:
             competitor.focus_segment.value,
             str(competitor.strength),
             str(competitor.aggression),
+            competitor.current_move.value,
+            str(competitor.momentum),
             str(competitor.active_product_count),
             competitor.pricing_tier.value,
         )
     return table
+
+
+def _latest_net_cash_flow(state: GameState) -> Decimal:
+    if not state.turn_history:
+        return Decimal("0.00")
+    return state.turn_history[-1].net_cash_flow
 
 
 def _build_turn_history_table(state: GameState) -> Table:

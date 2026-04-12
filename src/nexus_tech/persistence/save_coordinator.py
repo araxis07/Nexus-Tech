@@ -12,6 +12,7 @@ from nexus_tech.domain.models import (
     EventCategory,
     EventHistoryEntry,
     EventOption,
+    FinanceState,
     GameState,
     MarketCycle,
     MilestoneEntry,
@@ -25,6 +26,7 @@ from nexus_tech.persistence.competitor_repository import CompetitorRepository
 from nexus_tech.persistence.database import DatabaseManager
 from nexus_tech.persistence.employee_repository import EmployeeRepository
 from nexus_tech.persistence.errors import CorruptSaveError, PersistenceError, SaveNotFoundError
+from nexus_tech.persistence.finance_repository import FinanceRepository
 from nexus_tech.persistence.product_repository import ProductRepository
 from nexus_tech.persistence.quarter_plan_repository import QuarterPlanRepository
 from nexus_tech.simulation.randomness import RandomSource
@@ -56,6 +58,7 @@ class SaveLoadCoordinator:
         self.product_repository = ProductRepository()
         self.employee_repository = EmployeeRepository()
         self.competitor_repository = CompetitorRepository()
+        self.finance_repository = FinanceRepository()
         self.quarter_plan_repository = QuarterPlanRepository()
 
     def initialize(self) -> None:
@@ -90,6 +93,8 @@ class SaveLoadCoordinator:
                 self.product_repository.save_all(connection, slot_name, state.products)
                 self.employee_repository.save_all(connection, slot_name, state.employees)
                 self.competitor_repository.save_all(connection, slot_name, state.competitors)
+                self.finance_repository.save(connection, slot_name, state.finance)
+                self.finance_repository.save_history(connection, slot_name, state.funding_history)
                 self.quarter_plan_repository.save(connection, slot_name, state.quarter_plan)
                 self._save_pending_event(connection, slot_name, state.pending_event)
                 self._save_event_history(connection, slot_name, state.event_history)
@@ -140,6 +145,8 @@ class SaveLoadCoordinator:
 
                     employees = self.employee_repository.load_all(connection, slot_name)
                     competitors = self.competitor_repository.load_all(connection, slot_name)
+                    finance = self.finance_repository.load(connection, slot_name) or FinanceState()
+                    funding_history = self.finance_repository.load_history(connection, slot_name)
                     quarter_plan = self.quarter_plan_repository.load(connection, slot_name)
                     if quarter_plan is None:
                         raise CorruptSaveError("Save slot is missing quarter plan state.")
@@ -163,11 +170,13 @@ class SaveLoadCoordinator:
                         company=company,
                         products=products,
                         employees=employees,
+                        finance=finance,
                         competitors=competitors,
                         quarter_plan=quarter_plan,
                         pending_event=pending_event,
                         event_history=event_history,
                         milestone_history=milestone_history,
+                        funding_history=funding_history,
                         roadmap_focus=RoadmapFocus(slot_row["roadmap_focus"]),
                         roadmap_set_turn=slot_row["roadmap_set_turn"],
                         market_cycle=MarketCycle(slot_row["market_cycle"]),

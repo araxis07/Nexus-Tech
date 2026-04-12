@@ -39,15 +39,24 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Start runs from a scenario catalog instead of a single hard-coded opening
 - Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
+- Expand the catalog with AI copilot, compliance, embedded API, and capital-pressure scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
 ### 🌐 Market and Competition
 
 - Run each company inside a live market cycle such as `cooling`, `steady`, `expanding`, or `frothy`
-- Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, and aggression
+- Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, aggression, and tactical momentum
+- Simulate rival moves such as `hold`, `discount_push`, `feature_sprint`, and `retrench`
 - Feel direct trade-offs between customer demand, churn pressure, rivalry, and product positioning
 - Surface market state and competitor posture in dedicated terminal panels for live demos
+
+### 💰 Finance and Capital
+
+- Take local loans to extend runway and pay recurring interest
+- Raise `angel` or `venture` funding when the company has enough traction
+- Track debt, dilution, investor pressure, total capital raised, and funding history
+- Balance growth capital against repayment pressure, score penalties, and long-term victory quality
 
 ### 👥 Employee and Team System
 
@@ -85,7 +94,8 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Save and load runs locally with SQLite
 - Resume the latest save slot
-- Persist roadmap state, market cycle, quarter plan, competitors, product targeting, event history, team assignments, and turn history
+- Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, product targeting, event history, team assignments, and turn history
+- Use SQLite schema versioning and additive migrations to keep local save files upgradeable
 - Keep the entire project offline and self-contained
 
 ### 🖥️ Presentation and CLI
@@ -188,6 +198,8 @@ Typical decisions include:
 - which roadmap focus should shape the next few turns
 - how the current market cycle changes the right move
 - whether competitor pressure means you should defend, reposition, or consolidate
+- when debt is useful fuel versus when it starts to distort the company
+- whether dilution and investor pressure are worth the extra runway
 - when to hire, assign, rest, or remove team members
 - which scenario opening creates the best long-term position
 - how to survive cash pressure while still building growth
@@ -248,7 +260,7 @@ uv run ruff format src tests
 - Save data is stored in `nexus-tech.db` by default
 - `--seed` is useful for repeatable demos and deterministic test scenarios
 - `--scenario` selects a starting setup, while `list-scenarios` shows the current catalog
-- Market cycles, quarter plans, and competitor rosters are part of the persisted run state
+- Market cycles, quarter plans, competitor rosters, debt, dilution, and funding history are part of the persisted run state
 - The focus is on correctness, stability, maintainability, and presentation quality
 
 ## 📄 License

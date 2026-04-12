@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 
+CURRENT_SCHEMA_VERSION = 6
+
 SCHEMA_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS save_slots (
@@ -141,6 +143,32 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS finance_state (
+        slot_name TEXT PRIMARY KEY
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        debt_principal TEXT NOT NULL,
+        loan_interest_rate TEXT NOT NULL,
+        equity_dilution TEXT NOT NULL,
+        investor_pressure INTEGER NOT NULL,
+        total_raised TEXT NOT NULL,
+        last_funding_turn INTEGER
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS funding_history (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        entry_index INTEGER NOT NULL,
+        funding_type TEXT NOT NULL,
+        turn INTEGER NOT NULL,
+        amount TEXT NOT NULL,
+        dilution_added TEXT NOT NULL,
+        debt_added TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        PRIMARY KEY (slot_name, entry_index)
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS turn_history (
         slot_name TEXT NOT NULL
             REFERENCES save_slots(slot_name) ON DELETE CASCADE,
@@ -182,6 +210,8 @@ SCHEMA_STATEMENTS = (
         aggression INTEGER NOT NULL,
         pricing_tier TEXT NOT NULL,
         active_product_count INTEGER NOT NULL,
+        current_move TEXT NOT NULL DEFAULT 'hold',
+        momentum INTEGER NOT NULL DEFAULT 50,
         PRIMARY KEY (slot_name, competitor_id),
         UNIQUE (slot_name, display_order)
     )
@@ -195,6 +225,7 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA foreign_keys = ON")
     for statement in SCHEMA_STATEMENTS:
         connection.execute(statement)
+    current_version = connection.execute("PRAGMA user_version").fetchone()[0]
     _ensure_column(
         connection,
         table_name="companies",
@@ -261,7 +292,56 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         column_name="victory_reason",
         column_definition="TEXT",
     )
-    connection.execute("PRAGMA user_version = 5")
+    if current_version < 6:
+        _apply_version_6_migration(connection)
+    connection.execute(f"PRAGMA user_version = {CURRENT_SCHEMA_VERSION}")
+
+
+def _apply_version_6_migration(connection: sqlite3.Connection) -> None:
+    """Upgrade older save files with finance and deeper competitor state."""
+
+    _ensure_column(
+        connection,
+        table_name="competitors",
+        column_name="current_move",
+        column_definition="TEXT NOT NULL DEFAULT 'hold'",
+    )
+    _ensure_column(
+        connection,
+        table_name="competitors",
+        column_name="momentum",
+        column_definition="INTEGER NOT NULL DEFAULT 50",
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS finance_state (
+            slot_name TEXT PRIMARY KEY
+                REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+            debt_principal TEXT NOT NULL,
+            loan_interest_rate TEXT NOT NULL,
+            equity_dilution TEXT NOT NULL,
+            investor_pressure INTEGER NOT NULL,
+            total_raised TEXT NOT NULL,
+            last_funding_turn INTEGER
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS funding_history (
+            slot_name TEXT NOT NULL
+                REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+            entry_index INTEGER NOT NULL,
+            funding_type TEXT NOT NULL,
+            turn INTEGER NOT NULL,
+            amount TEXT NOT NULL,
+            dilution_added TEXT NOT NULL,
+            debt_added TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            PRIMARY KEY (slot_name, entry_index)
+        )
+        """
+    )
 
 
 def _ensure_column(

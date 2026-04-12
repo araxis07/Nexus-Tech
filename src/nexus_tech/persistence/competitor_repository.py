@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from uuid import UUID
 
-from nexus_tech.domain.models import Competitor, MarketSegment, PricingTier
+from nexus_tech.domain.models import Competitor, CompetitorMove, MarketSegment, PricingTier
 
 
 class CompetitorRepository:
@@ -31,9 +31,11 @@ class CompetitorRepository:
                 strength,
                 aggression,
                 pricing_tier,
-                active_product_count
+                active_product_count,
+                current_move,
+                momentum
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -46,6 +48,8 @@ class CompetitorRepository:
                     competitor.aggression,
                     competitor.pricing_tier.value,
                     competitor.active_product_count,
+                    competitor.current_move.value,
+                    competitor.momentum,
                 )
                 for index, competitor in enumerate(competitors)
             ],
@@ -63,7 +67,9 @@ class CompetitorRepository:
                 strength,
                 aggression,
                 pricing_tier,
-                active_product_count
+                active_product_count,
+                current_move,
+                momentum
             FROM competitors
             WHERE slot_name = ?
             ORDER BY display_order ASC
@@ -79,6 +85,8 @@ class CompetitorRepository:
                 aggression=row["aggression"],
                 pricing_tier=PricingTier(row["pricing_tier"]),
                 active_product_count=row["active_product_count"],
+                current_move=CompetitorMove(row["current_move"] or CompetitorMove.HOLD.value),
+                momentum=row["momentum"] if row["momentum"] is not None else 50,
             )
             for row in rows
         ]

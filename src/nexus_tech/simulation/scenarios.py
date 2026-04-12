@@ -14,9 +14,10 @@ from nexus_tech.content.models import (
     ScenarioCompetitorSeed,
     ScenarioDefinition,
     ScenarioEmployeeSeed,
+    ScenarioFinanceSeed,
     ScenarioProductSeed,
 )
-from nexus_tech.domain.models import Company, Competitor, Employee, GameState, Product
+from nexus_tech.domain.models import Company, Competitor, Employee, FinanceState, GameState, Product
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.competition import create_competitor
 from nexus_tech.simulation.planning import build_quarter_plan
@@ -46,6 +47,7 @@ def create_game_state_from_scenario(
         company=company,
         products=products,
         employees=employees,
+        finance=_build_scenario_finance(scenario.finance),
         competitors=competitors,
         roadmap_focus=scenario.roadmap_focus,
         roadmap_set_turn=1,
@@ -246,4 +248,19 @@ def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor
         aggression=seed.aggression,
         pricing_tier=seed.pricing_tier,
         active_product_count=seed.active_product_count,
+    )
+
+
+def _build_scenario_finance(seed: ScenarioFinanceSeed | None) -> FinanceState:
+    """Build optional starting finance posture for a scenario."""
+
+    if seed is None:
+        return FinanceState()
+
+    return FinanceState(
+        debt_principal=seed.debt_principal,
+        loan_interest_rate=seed.loan_interest_rate,
+        equity_dilution=seed.equity_dilution,
+        investor_pressure=seed.investor_pressure,
+        total_raised=seed.total_raised,
     )

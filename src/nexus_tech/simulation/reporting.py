@@ -67,6 +67,15 @@ def calculate_run_score(state: GameState) -> RunScore:
         + (mature_products * BALANCE.score_mature_product_bonus)
         + (active_products * BALANCE.score_active_product_bonus)
         + (len(state.milestone_history) * BALANCE.score_milestone_bonus)
+        - int(
+            (state.finance.debt_principal / BALANCE.finance_score_debt_divisor)
+            .to_integral_value()
+        )
+        - (state.finance.investor_pressure // BALANCE.finance_score_pressure_divisor)
+        - int(
+            (state.finance.equity_dilution * Decimal(BALANCE.finance_score_dilution_multiplier))
+            .to_integral_value()
+        )
     )
     if total_score >= 220:
         score_tier = "breakout"
@@ -82,6 +91,17 @@ def calculate_run_score(state: GameState) -> RunScore:
         (state.company.cash_on_hand * BALANCE.valuation_cash_multiplier)
         + (recent_revenue * BALANCE.valuation_revenue_multiplier)
         + (Decimal(total_users) * BALANCE.valuation_user_multiplier)
+        - (state.finance.debt_principal * BALANCE.finance_valuation_debt_multiplier)
+    )
+    estimated_valuation = quantize_money(
+        estimated_valuation
+        * (
+            Decimal("1.00")
+            - (
+                state.finance.equity_dilution
+                * BALANCE.finance_valuation_dilution_penalty_multiplier
+            )
+        )
     )
     return RunScore(
         total_score=total_score,
@@ -106,6 +126,8 @@ def check_victory(state: GameState) -> str | None:
         and score.total_users >= BALANCE.victory_users_threshold
         and state.company.reputation >= BALANCE.victory_reputation_threshold
         and score.active_products >= 2
+        and state.finance.debt_principal <= BALANCE.victory_max_debt_threshold
+        and state.finance.investor_pressure <= BALANCE.victory_max_investor_pressure
     ):
         return (
             "You built a durable software company with enough traction, runway, "

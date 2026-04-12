@@ -102,20 +102,25 @@ ACTION_KEYS = {
     "9": TurnAction.SET_COMPANY_STRATEGY,
     "10": TurnAction.SET_ROADMAP,
     "11": TurnAction.SET_BUDGET_STANCE,
-    "12": TurnAction.HIRE_EMPLOYEE,
-    "13": TurnAction.FIRE_EMPLOYEE,
-    "14": TurnAction.ASSIGN_EMPLOYEE,
-    "15": TurnAction.UNASSIGN_EMPLOYEE,
-    "16": TurnAction.REST_TEAM,
-    "17": TurnAction.REVIEW_TEAM,
-    "18": TurnAction.VIEW_REPORT,
-    "19": TurnAction.WAIT,
-    "20": TurnAction.VIEW_STATUS,
-    "21": TurnAction.END_TURN,
+    "12": TurnAction.TAKE_LOAN,
+    "13": TurnAction.RAISE_ANGEL,
+    "14": TurnAction.RAISE_VC,
+    "15": TurnAction.REPAY_DEBT,
+    "16": TurnAction.REVIEW_FINANCE,
+    "17": TurnAction.HIRE_EMPLOYEE,
+    "18": TurnAction.FIRE_EMPLOYEE,
+    "19": TurnAction.ASSIGN_EMPLOYEE,
+    "20": TurnAction.UNASSIGN_EMPLOYEE,
+    "21": TurnAction.REST_TEAM,
+    "22": TurnAction.REVIEW_TEAM,
+    "23": TurnAction.VIEW_REPORT,
+    "24": TurnAction.WAIT,
+    "25": TurnAction.VIEW_STATUS,
+    "26": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "22": "save_game",
-    "23": "load_game",
+    "27": "save_game",
+    "28": "load_game",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -355,7 +360,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="21",
+                    default="26",
                     show_choices=False,
                 )
 
@@ -393,6 +398,10 @@ def run_game_loop(
                     render_team_view(console, state)
                     continue
 
+                if action is TurnAction.REVIEW_FINANCE:
+                    render_report(console, state)
+                    continue
+
                 if action is TurnAction.VIEW_REPORT:
                     render_report(console, state)
                     continue
@@ -427,6 +436,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     if action in (
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
+        TurnAction.REVIEW_FINANCE,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,

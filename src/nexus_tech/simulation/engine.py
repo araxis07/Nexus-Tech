@@ -12,6 +12,7 @@ from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     BudgetStance,
     CompanyStrategy,
+    Competitor,
     Employee,
     EmployeeRole,
     EventHistoryEntry,
@@ -29,7 +30,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.competition import advance_competitors
+from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
 from nexus_tech.simulation.economy import (
     calculate_product_operating_cost,
     calculate_product_revenue,
@@ -40,6 +41,14 @@ from nexus_tech.simulation.economy import (
     is_game_over,
 )
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
+from nexus_tech.simulation.finance import (
+    FinanceTurnSummary,
+    apply_end_of_turn_finance_drift,
+    apply_raise_angel,
+    apply_raise_vc,
+    apply_repay_debt,
+    apply_take_loan,
+)
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.market import advance_market_cycle
 from nexus_tech.simulation.milestones import resolve_new_milestones
@@ -149,11 +158,13 @@ class TurnResolution:
     baseline_operating_cost: Decimal
     total_product_operating_cost: Decimal
     total_salary_cost: Decimal
+    total_finance_cost: Decimal
     total_operating_cost: Decimal
     net_cash_flow: Decimal
     reputation_delta: int
     product_summaries: list[ProductTurnSummary]
     team_condition: TeamCondition
+    finance_summary: FinanceTurnSummary
     pending_event: PendingEvent | None
     event_history_entry: EventHistoryEntry | None
     unlocked_milestones: list[MilestoneEntry]
@@ -201,6 +212,7 @@ def apply_action(
     if state.pending_event is not None and action not in (
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
+        TurnAction.REVIEW_FINANCE,
         TurnAction.VIEW_REPORT,
     ):
         return ActionOutcome(
@@ -211,6 +223,7 @@ def apply_action(
     if action in (
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
+        TurnAction.REVIEW_FINANCE,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
     ):
@@ -218,6 +231,8 @@ def apply_action(
             return ActionOutcome(state=state, message="Status refreshed.")
         if action is TurnAction.REVIEW_TEAM:
             return ActionOutcome(state=state, message="Team review refreshed.")
+        if action is TurnAction.REVIEW_FINANCE:
+            return ActionOutcome(state=state, message="Finance review refreshed.")
         if action is TurnAction.VIEW_REPORT:
             return ActionOutcome(state=state, message="Run report refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
@@ -328,6 +343,52 @@ def apply_action(
                 f"{budget_profile.summary}"
             ),
         )
+
+    if action is TurnAction.TAKE_LOAN:
+        summary = apply_take_loan(
+            next_state.company,
+            next_state.finance,
+            current_turn=next_state.company.current_turn,
+        )
+        next_state.funding_history.append(summary.history_entry)
+        logger.debug("Took a company loan on turn %s.", next_state.company.current_turn)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RAISE_ANGEL:
+        summary = apply_raise_angel(
+            next_state.company,
+            next_state.finance,
+            next_state.funding_history,
+            current_turn=next_state.company.current_turn,
+            reputation=next_state.company.reputation,
+            total_users=get_total_users(next_state),
+        )
+        next_state.funding_history.append(summary.history_entry)
+        logger.debug("Raised angel capital on turn %s.", next_state.company.current_turn)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RAISE_VC:
+        summary = apply_raise_vc(
+            next_state.company,
+            next_state.finance,
+            next_state.funding_history,
+            current_turn=next_state.company.current_turn,
+            reputation=next_state.company.reputation,
+            total_users=get_total_users(next_state),
+        )
+        next_state.funding_history.append(summary.history_entry)
+        logger.debug("Raised venture capital on turn %s.", next_state.company.current_turn)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.REPAY_DEBT:
+        summary = apply_repay_debt(
+            next_state.company,
+            next_state.finance,
+            current_turn=next_state.company.current_turn,
+        )
+        next_state.funding_history.append(summary.history_entry)
+        logger.debug("Repaid debt on turn %s.", next_state.company.current_turn)
+        return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.FIRE_EMPLOYEE:
         employee = get_employee_by_id(next_state.employees, context.employee_id)
@@ -508,14 +569,23 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.company,
         next_state.products,
         next_state.employees,
+        finance=next_state.finance,
         budget_stance=next_state.quarter_plan.budget_stance,
         roadmap_focus=next_state.roadmap_focus,
         roadmap_set_turn=next_state.roadmap_set_turn,
+    )
+    total_finance_cost = total_operating_cost - (
+        baseline_operating_cost + total_product_operating_cost + total_salary_cost
     )
     net_cash_flow = quantize_money(total_revenue - total_operating_cost)
 
     next_state.company.cash_on_hand = quantize_money(
         next_state.company.cash_on_hand + net_cash_flow
+    )
+    finance_summary = apply_end_of_turn_finance_drift(
+        next_state.finance,
+        next_state.company,
+        net_cash_flow=net_cash_flow,
     )
 
     for product in next_state.products:
@@ -635,6 +705,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         reputation_delta=reputation_delta,
         product_summaries=product_summaries,
         team_condition=team_condition,
+        finance_summary=finance_summary,
+        competitors=next_state.competitors,
         game_over=next_state.company.game_over,
         quarter_plan_due=quarter_plan_due,
         market_cycle=next_state.market_cycle,
@@ -651,11 +723,13 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         baseline_operating_cost=baseline_operating_cost,
         total_product_operating_cost=total_product_operating_cost,
         total_salary_cost=total_salary_cost,
+        total_finance_cost=total_finance_cost,
         total_operating_cost=total_operating_cost,
         net_cash_flow=net_cash_flow,
         reputation_delta=reputation_delta,
         product_summaries=product_summaries,
         team_condition=team_condition,
+        finance_summary=finance_summary,
         pending_event=event_outcome.pending_event,
         event_history_entry=event_outcome.history_entry,
         unlocked_milestones=unlocked_milestones,
@@ -719,6 +793,8 @@ def build_turn_narrative(
     reputation_delta: int,
     product_summaries: list[ProductTurnSummary],
     team_condition: TeamCondition,
+    finance_summary: FinanceTurnSummary,
+    competitors: list[Competitor],
     game_over: bool,
     quarter_plan_due: bool,
     market_cycle: MarketCycle,
@@ -737,13 +813,27 @@ def build_turn_narrative(
             f"The market shifted to {market_cycle.value}. "
             "Re-check the portfolio before momentum drifts."
         )
+    if (
+        finance_summary.investor_pressure_delta > 0
+        and finance_summary.total_finance_cost > ZERO_MONEY
+    ):
+        return (
+            "Capital pressure increased. Finance burn reached "
+            f"{format_money(finance_summary.total_finance_cost)} "
+            "and investors will expect cleaner execution."
+        )
 
     total_user_delta = sum(summary.net_user_delta for summary in product_summaries)
     declining_products = [summary for summary in product_summaries if summary.net_user_delta < 0]
     expanding_products = [summary for summary in product_summaries if summary.net_user_delta > 0]
+    competitor_summary = summarize_competitor_moves(competitors)
 
     if team_condition.burned_out_count > 0 and net_cash_flow < ZERO_MONEY:
         return "Burnout is creeping in while the company is still burning cash."
+    if declining_products and any(
+        summary.competitor_pressure >= 8 for summary in declining_products
+    ):
+        return f"Rivals are pressing harder: {competitor_summary}."
     if net_cash_flow > ZERO_MONEY and len(expanding_products) >= 2:
         return "The portfolio and team are compounding together."
     if declining_products and reputation_delta < 0:

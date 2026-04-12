@@ -11,10 +11,12 @@ from nexus_tech.domain.models import (
     Company,
     CompanyStrategy,
     Competitor,
+    CompetitorMove,
     Employee,
     EmployeeRole,
     EventCategory,
     EventHistoryEntry,
+    FinanceState,
     GameState,
     LifecycleStage,
     MarketCycle,
@@ -143,6 +145,7 @@ def make_state(
     *products: Product,
     employees: list[Employee] | None = None,
     competitors: list[Competitor] | None = None,
+    finance: FinanceState | None = None,
     cash_on_hand: Decimal = Decimal("6000.00"),
     strategy: CompanyStrategy = CompanyStrategy.BALANCED,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
@@ -164,6 +167,7 @@ def make_state(
         ),
         products=list(products),
         employees=employees or [],
+        finance=finance or FinanceState(),
         competitors=competitors or [],
         pending_event=pending_event,
         event_history=event_history or [],
@@ -984,3 +988,101 @@ def test_event_selection_is_deterministic_under_fixed_seed() -> None:
     assert definition_a is not None
     assert definition_b is not None
     assert definition_a.event_id == definition_b.event_id
+
+
+def test_finance_costs_are_included_in_operating_burn() -> None:
+    product = make_product("Core")
+    finance = FinanceState(
+        debt_principal=Decimal("3000.00"),
+        loan_interest_rate=Decimal("0.0350"),
+        investor_pressure=20,
+    )
+    state = make_state(product, finance=finance)
+
+    operating_cost = calculate_total_operating_cost(
+        state.company,
+        state.products,
+        state.employees,
+        finance=state.finance,
+    )
+
+    assert operating_cost == Decimal("1335.00")
+
+
+def test_take_loan_and_repay_debt_change_finance_state() -> None:
+    state = make_state(make_product("Core"), cash_on_hand=Decimal("8000.00"))
+
+    loan_outcome = apply_action(state, TurnAction.TAKE_LOAN)
+
+    assert loan_outcome.state.finance.debt_principal == Decimal("2500.00")
+    assert loan_outcome.state.company.cash_on_hand == Decimal("10500.00")
+
+    repay_outcome = apply_action(loan_outcome.state, TurnAction.REPAY_DEBT)
+
+    assert repay_outcome.state.finance.debt_principal == Decimal("700.00")
+    assert repay_outcome.state.company.cash_on_hand == Decimal("8700.00")
+
+
+def test_raise_vc_requires_real_traction() -> None:
+    weak_state = make_state(make_product("Core", user_count=35), cash_on_hand=Decimal("7000.00"))
+    weak_state.company.reputation = 60
+
+    with pytest.raises(ValueError, match="larger user base"):
+        apply_action(weak_state, TurnAction.RAISE_VC)
+
+    strong_state = make_state(
+        make_product("Core", user_count=150, market_fit=70),
+        cash_on_hand=Decimal("9000.00"),
+        strategy=CompanyStrategy.GROWTH,
+    )
+    strong_state.company.reputation = 60
+
+    outcome = apply_action(strong_state, TurnAction.RAISE_VC)
+
+    assert outcome.state.finance.equity_dilution == Decimal("0.1500")
+    assert outcome.state.company.cash_on_hand == Decimal("18600.00")
+
+
+def test_competitor_move_and_momentum_raise_pressure() -> None:
+    product = make_product(
+        "Core",
+        user_count=8,
+        target_segment=MarketSegment.STARTUP,
+        pricing_tier=PricingTier.STANDARD,
+    )
+    calm_competitor = Competitor(
+        name="Calm Rival",
+        focus_segment=MarketSegment.STARTUP,
+        strength=55,
+        aggression=42,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=1,
+        current_move=CompetitorMove.HOLD,
+        momentum=18,
+    )
+    aggressive_competitor = calm_competitor.model_copy(
+        update={
+            "name": "Aggro Rival",
+            "current_move": CompetitorMove.FEATURE_SPRINT,
+            "momentum": 82,
+            "strength": 68,
+            "aggression": 63,
+        }
+    )
+    calm_state = make_state(
+        product.model_copy(deep=True),
+        competitors=[calm_competitor],
+        current_turn=1,
+    )
+    aggressive_state = make_state(
+        product.model_copy(deep=True),
+        competitors=[aggressive_competitor],
+        current_turn=1,
+    )
+
+    calm_resolution = resolve_turn(calm_state, FixedRandom(0))
+    aggressive_resolution = resolve_turn(aggressive_state, FixedRandom(0))
+
+    assert aggressive_resolution.product_summaries[0].competitor_pressure > (
+        calm_resolution.product_summaries[0].competitor_pressure
+    )

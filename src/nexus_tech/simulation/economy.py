@@ -5,9 +5,17 @@ from __future__ import annotations
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import BudgetStance, Company, Employee, Product, RoadmapFocus
+from nexus_tech.domain.models import (
+    BudgetStance,
+    Company,
+    Employee,
+    FinanceState,
+    Product,
+    RoadmapFocus,
+)
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.finance import calculate_total_finance_cost
 from nexus_tech.simulation.planning import get_budget_profile
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.roadmap import get_roadmap_profile
@@ -96,6 +104,7 @@ def calculate_total_operating_cost(
     products: list[Product],
     employees: list[Employee],
     *,
+    finance: FinanceState | None = None,
     budget_stance: BudgetStance = BudgetStance.BALANCED,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
@@ -121,6 +130,7 @@ def calculate_total_operating_cost(
             roadmap_set_turn=roadmap_set_turn,
         )
         + calculate_total_salary_cost(employees)
+        + calculate_total_finance_cost(finance or FinanceState())
     )
 
 

@@ -11,11 +11,13 @@ from nexus_tech.domain.models import (
     EmployeeRole,
     EventCategory,
     EventOption,
+    FundingType,
     GameState,
     PendingEvent,
     Product,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.finance import count_funding_rounds
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.team import calculate_effective_productivity
 
@@ -190,9 +192,14 @@ def _build_market_trend_event(
 
 
 def _is_investor_outreach_eligible(state: GameState) -> bool:
-    return state.company.current_turn >= 3 and (
+    return (
+        state.company.current_turn >= 3
+        and count_funding_rounds(state.funding_history, FundingType.ANGEL)
+        < BALANCE.finance_angel_round_limit
+        and (
         state.company.reputation >= BALANCE.event_investor_reputation_threshold
         or state.company.cash_on_hand <= BALANCE.event_investor_cash_threshold
+        )
     )
 
 

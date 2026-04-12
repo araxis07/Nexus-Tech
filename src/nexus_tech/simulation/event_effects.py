@@ -10,6 +10,7 @@ from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.economy import is_game_over
 from nexus_tech.simulation.event_registry import get_designer_or_marketer_support
+from nexus_tech.simulation.finance import apply_raise_angel
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 
@@ -207,9 +208,15 @@ def _apply_investor_outreach(state: GameState, event: PendingEvent, option_id: s
     del event
 
     if option_id == "take_capital":
-        state.company.cash_on_hand = quantize_money(
-            state.company.cash_on_hand + BALANCE.event_investor_cash_gain
+        summary = apply_raise_angel(
+            state.company,
+            state.finance,
+            state.funding_history,
+            current_turn=state.company.current_turn,
+            reputation=state.company.reputation,
+            total_users=sum(product.user_count for product in state.products if product.is_active),
         )
+        state.funding_history.append(summary.history_entry)
         state.company.reputation = clamp_int(
             state.company.reputation + BALANCE.event_investor_reputation_gain,
             0,
@@ -222,7 +229,7 @@ def _apply_investor_outreach(state: GameState, event: PendingEvent, option_id: s
                 100,
             )
         return (
-            f"The investor round closed quickly. Cash +{BALANCE.event_investor_cash_gain}, "
+            f"The investor round closed quickly. Cash +{BALANCE.finance_angel_raise_amount}, "
             f"reputation +{BALANCE.event_investor_reputation_gain}, team morale "
             f"-{BALANCE.event_investor_team_morale_penalty}."
         )
@@ -239,6 +246,11 @@ def _apply_investor_outreach(state: GameState, event: PendingEvent, option_id: s
                 0,
                 100,
             )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure - 1,
+            0,
+            100,
+        )
         return (
             f"You stayed bootstrapped. Reputation +{BALANCE.event_bootstrap_reputation_gain}, "
             f"team morale +{BALANCE.event_bootstrap_team_morale_gain}."

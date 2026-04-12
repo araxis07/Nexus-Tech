@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from nexus_tech.config import DEFAULT_SCENARIO_ID
 from nexus_tech.content.loader import get_product_template
 from nexus_tech.domain.models import (
@@ -19,9 +21,12 @@ from nexus_tech.simulation.scenarios import (
 
 def test_scenario_catalog_exposes_expected_default_entry() -> None:
     scenarios = get_available_scenarios()
+    scenario_ids = [scenario.scenario_id for scenario in scenarios]
 
     assert any(scenario.scenario_id == DEFAULT_SCENARIO_ID for scenario in scenarios)
     assert any(scenario.scenario_id == "agency_pivot" for scenario in scenarios)
+    assert any(scenario.scenario_id == "debt_crunch" for scenario in scenarios)
+    assert len(scenario_ids) == len(set(scenario_ids))
 
 
 def test_create_new_game_uses_selected_scenario_defaults() -> None:
@@ -85,3 +90,18 @@ def test_create_product_action_uses_selected_template() -> None:
 
     assert product.pricing_tier is PricingTier.PREMIUM
     assert product.revenue_per_user == get_product_template("developer_platform").revenue_per_user
+
+
+def test_finance_seed_is_loaded_from_scenario_content() -> None:
+    state = create_new_game(scenario_id="debt_crunch")
+
+    assert state.finance.debt_principal == Decimal("4200.00")
+    assert state.finance.loan_interest_rate == Decimal("0.0350")
+    assert state.finance.investor_pressure == 8
+
+
+def test_new_template_catalog_entries_are_available() -> None:
+    template = get_product_template("ai_copilot")
+
+    assert template.title == "AI Copilot"
+    assert template.pricing_tier is PricingTier.PREMIUM

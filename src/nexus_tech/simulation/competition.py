@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from nexus_tech.domain.models import Competitor, MarketCycle, PricingTier, Product, RoadmapFocus
+from nexus_tech.domain.models import (
+    Competitor,
+    CompetitorMove,
+    MarketCycle,
+    PricingTier,
+    Product,
+    RoadmapFocus,
+)
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.market import get_market_profile
 from nexus_tech.simulation.randomness import RandomLike
@@ -18,6 +25,8 @@ def create_competitor(
     aggression: int,
     pricing_tier: PricingTier = PricingTier.STANDARD,
     active_product_count: int = 1,
+    current_move: CompetitorMove = CompetitorMove.HOLD,
+    momentum: int = 50,
 ) -> Competitor:
     """Create one validated competitor model."""
 
@@ -28,6 +37,8 @@ def create_competitor(
         aggression=aggression,
         pricing_tier=pricing_tier,
         active_product_count=active_product_count,
+        current_move=current_move,
+        momentum=momentum,
     )
 
 
@@ -41,6 +52,11 @@ def advance_competitors(
 
     market_profile = get_market_profile(market_cycle)
     for competitor in competitors:
+        competitor.current_move = _choose_competitor_move(
+            competitor,
+            rng,
+            market_cycle=market_cycle,
+        )
         strength_drift = rng.randint(
             -BALANCE.competitor_strength_drift_max,
             BALANCE.competitor_strength_drift_max,
@@ -49,6 +65,26 @@ def advance_competitors(
             -BALANCE.competitor_aggression_drift_max,
             BALANCE.competitor_aggression_drift_max,
         ) + market_profile.competitor_pressure_modifier
+        if competitor.current_move is CompetitorMove.DISCOUNT_PUSH:
+            aggression_drift += BALANCE.competitor_discount_extra_aggression
+            competitor.momentum = clamp_int(
+                competitor.momentum + BALANCE.competitor_momentum_change_on_discount
+            )
+        elif competitor.current_move is CompetitorMove.FEATURE_SPRINT:
+            strength_drift += BALANCE.competitor_feature_extra_strength
+            competitor.momentum = clamp_int(
+                competitor.momentum + BALANCE.competitor_momentum_change_on_feature
+            )
+        elif competitor.current_move is CompetitorMove.RETRENCH:
+            strength_drift -= BALANCE.competitor_retrench_strength_loss
+            aggression_drift -= BALANCE.competitor_retrench_aggression_loss
+            competitor.momentum = clamp_int(
+                competitor.momentum + BALANCE.competitor_momentum_change_on_retrench
+            )
+        else:
+            competitor.momentum = clamp_int(
+                competitor.momentum + BALANCE.competitor_momentum_change_on_hold
+            )
         competitor.strength = clamp_int(competitor.strength + strength_drift)
         competitor.aggression = clamp_int(competitor.aggression + aggression_drift)
 
@@ -91,8 +127,74 @@ def calculate_competitor_pressure(
         )
         if competitor.pricing_tier is product.pricing_tier:
             rival_pressure += BALANCE.competitor_price_match_bonus
+        rival_pressure += BALANCE.competitor_move_pressure_bonus[competitor.current_move.value]
+        rival_pressure += competitor.momentum // BALANCE.competitor_momentum_divisor
     return clamp_int(
         base_pressure + rival_pressure,
         minimum=0,
         maximum=BALANCE.competitor_pressure_cap_total,
     )
+
+
+def summarize_competitor_moves(competitors: list[Competitor]) -> str:
+    """Build a compact summary of the most active rival postures."""
+
+    if not competitors:
+        return "No active rivals are shaping the market right now."
+
+    ranked = sorted(
+        competitors,
+        key=lambda competitor: (
+            competitor.aggression + competitor.strength + competitor.momentum
+        ),
+        reverse=True,
+    )
+    top_rivals = ranked[: BALANCE.competitor_move_summary_limit]
+    return ", ".join(
+        f"{competitor.name}: {competitor.current_move.value.replace('_', ' ')}"
+        for competitor in top_rivals
+    )
+
+
+def _choose_competitor_move(
+    competitor: Competitor,
+    rng: RandomLike,
+    *,
+    market_cycle: MarketCycle,
+) -> CompetitorMove:
+    """Choose one tactical move for a competitor this turn."""
+
+    cooling_penalty = 1 if market_cycle is MarketCycle.COOLING else 0
+    frothy_bonus = 1 if market_cycle is MarketCycle.FROTHY else 0
+    weights = (
+        (
+            CompetitorMove.HOLD,
+            BALANCE.competitor_move_hold_weight + max(0, 1 - cooling_penalty),
+        ),
+        (
+            CompetitorMove.DISCOUNT_PUSH,
+            BALANCE.competitor_move_discount_weight
+            + frothy_bonus
+            + (1 if competitor.pricing_tier is PricingTier.BUDGET else 0),
+        ),
+        (
+            CompetitorMove.FEATURE_SPRINT,
+            BALANCE.competitor_move_feature_weight
+            + frothy_bonus
+            + (1 if competitor.strength >= 60 else 0),
+        ),
+        (
+            CompetitorMove.RETRENCH,
+            BALANCE.competitor_move_retrench_weight
+            + cooling_penalty
+            + (1 if competitor.momentum <= 40 else 0),
+        ),
+    )
+    total_weight = sum(weight for _, weight in weights)
+    roll = rng.randint(1, total_weight)
+    cumulative = 0
+    for move, weight in weights:
+        cumulative += weight
+        if roll <= cumulative:
+            return move
+    return CompetitorMove.HOLD

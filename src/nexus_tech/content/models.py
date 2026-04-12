@@ -121,6 +121,36 @@ class ScenarioCompetitorSeed(BaseModel):
     active_product_count: int = Field(default=1, ge=1, le=6)
 
 
+class ScenarioFinanceSeed(BaseModel):
+    """Optional starting finance posture for a scenario."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    debt_principal: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    loan_interest_rate: Decimal = Field(
+        default=Decimal("0.0000"),
+        ge=Decimal("0"),
+        le=Decimal("1"),
+    )
+    equity_dilution: Decimal = Field(
+        default=Decimal("0.0000"),
+        ge=Decimal("0"),
+        le=Decimal("1"),
+    )
+    investor_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    total_raised: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+
+    @field_validator("debt_principal", "total_raised", mode="before")
+    @classmethod
+    def _normalize_finance_money(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+    @field_validator("loan_interest_rate", "equity_dilution", mode="before")
+    @classmethod
+    def _normalize_finance_rate(cls, value: Decimal) -> Decimal:
+        return quantize_rate(value)
+
+
 class ScenarioDefinition(BaseModel):
     """Scenario definition for a full starting run."""
 
@@ -140,6 +170,7 @@ class ScenarioDefinition(BaseModel):
     products: list[ScenarioProductSeed] = Field(min_length=1)
     employees: list[ScenarioEmployeeSeed] = Field(default_factory=list)
     competitors: list[ScenarioCompetitorSeed] = Field(default_factory=list)
+    finance: Optional[ScenarioFinanceSeed] = None  # noqa: UP045
 
     @field_validator("cash_on_hand", mode="before")
     @classmethod

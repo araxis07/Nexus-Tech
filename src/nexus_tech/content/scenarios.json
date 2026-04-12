@@ -319,7 +319,7 @@
     ]
   },
   {
-    "scenario_id": "enterprise_wedge",
+    "scenario_id": "enterprise_compliance",
     "title": "Enterprise Wedge",
     "description": "You have one high-value enterprise foothold and a fragile budget. Delivery quality matters more than raw volume.",
     "company_name": "Railpoint Systems",
@@ -447,6 +447,234 @@
         "focus_segment": "startup",
         "strength": 53,
         "aggression": 61,
+        "pricing_tier": "standard",
+        "active_product_count": 1
+      }
+    ]
+  },
+  {
+    "scenario_id": "angel_backed_push",
+    "title": "Angel Backed Push",
+    "description": "An early angel round gave the company fuel, but investor pressure has already started to shape the tempo.",
+    "company_name": "Northstar Labs",
+    "company_strategy": "growth",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "11200.00",
+    "reputation": 57,
+    "finance": {
+      "debt_principal": "0.00",
+      "loan_interest_rate": "0.0000",
+      "equity_dilution": "0.0800",
+      "investor_pressure": 11,
+      "total_raised": "4200.00"
+    },
+    "products": [
+      {
+        "key": "copilot",
+        "template_id": "ai_copilot",
+        "name": "Northstar Copilot",
+        "lifecycle_stage": "growth",
+        "quality": 57,
+        "bug_level": 16,
+        "market_fit": 55,
+        "technical_debt": 25,
+        "user_count": 66,
+        "revenue_per_user": "44.00",
+        "feature_count": 2,
+        "maintenance_cost": "310.00",
+        "acquisition_rate": "0.0580",
+        "churn_rate": "0.0570",
+        "target_segment": "startup",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Nina Park",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "ai_platform",
+        "assigned_product_key": "copilot",
+        "energy": 78,
+        "morale": 72
+      },
+      {
+        "full_name": "Marcus Vale",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "demand_gen",
+        "assigned_product_key": "copilot",
+        "energy": 79,
+        "morale": 71
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Prompt Harbor",
+        "focus_segment": "startup",
+        "strength": 63,
+        "aggression": 64,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      },
+      {
+        "name": "Flow Draft",
+        "focus_segment": "startup",
+        "strength": 56,
+        "aggression": 58,
+        "pricing_tier": "budget",
+        "active_product_count": 1
+      }
+    ]
+  },
+  {
+    "scenario_id": "debt_crunch",
+    "title": "Debt Crunch",
+    "description": "The business still has a working product, but debt service is now part of every decision and repayment competes with growth.",
+    "company_name": "Ledger Loop",
+    "company_strategy": "efficiency",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "5400.00",
+    "reputation": 47,
+    "finance": {
+      "debt_principal": "4200.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0000",
+      "investor_pressure": 8,
+      "total_raised": "4200.00"
+    },
+    "products": [
+      {
+        "key": "ops",
+        "template_id": "embedded_api",
+        "name": "Ledger API",
+        "lifecycle_stage": "growth",
+        "quality": 54,
+        "bug_level": 22,
+        "market_fit": 47,
+        "technical_debt": 38,
+        "user_count": 39,
+        "revenue_per_user": "33.00",
+        "feature_count": 2,
+        "maintenance_cost": "285.00",
+        "acquisition_rate": "0.0320",
+        "churn_rate": "0.0610",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Elena Cruz",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "backend",
+        "assigned_product_key": "ops",
+        "energy": 71,
+        "morale": 67
+      }
+    ],
+    "competitors": [
+      {
+        "name": "InfraThread",
+        "focus_segment": "smb",
+        "strength": 61,
+        "aggression": 53,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      }
+    ]
+  },
+  {
+    "scenario_id": "enterprise_wedge",
+    "title": "Enterprise Wedge",
+    "description": "A small team has found an enterprise entry point. The contract sizes are attractive, but quality and delivery pressure are relentless.",
+    "company_name": "Cinder Ridge",
+    "company_strategy": "quality",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "9200.00",
+    "reputation": 59,
+    "products": [
+      {
+        "key": "compliance",
+        "template_id": "compliance_hub",
+        "name": "Cinder Comply",
+        "lifecycle_stage": "growth",
+        "quality": 63,
+        "bug_level": 14,
+        "market_fit": 58,
+        "technical_debt": 24,
+        "user_count": 44,
+        "revenue_per_user": "92.00",
+        "feature_count": 2,
+        "maintenance_cost": "360.00",
+        "acquisition_rate": "0.0260",
+        "churn_rate": "0.0480",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "api",
+        "template_id": "embedded_api",
+        "name": "Wedge Connect",
+        "lifecycle_stage": "prototype",
+        "quality": 48,
+        "bug_level": 16,
+        "market_fit": 34,
+        "technical_debt": 19,
+        "user_count": 8,
+        "revenue_per_user": "30.00",
+        "feature_count": 0,
+        "maintenance_cost": "220.00",
+        "acquisition_rate": "0.0250",
+        "churn_rate": "0.0700",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Rowan Bell",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "enterprise_delivery",
+        "assigned_product_key": "compliance",
+        "energy": 76,
+        "morale": 74
+      },
+      {
+        "full_name": "Aiko Mori",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "workflow_ux",
+        "assigned_product_key": "compliance",
+        "energy": 79,
+        "morale": 77
+      }
+    ],
+    "competitors": [
+      {
+        "name": "AssureStack",
+        "focus_segment": "enterprise",
+        "strength": 69,
+        "aggression": 56,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      },
+      {
+        "name": "Policy Trail",
+        "focus_segment": "smb",
+        "strength": 55,
+        "aggression": 49,
         "pricing_tier": "standard",
         "active_product_count": 1
       }
