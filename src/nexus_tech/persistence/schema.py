@@ -15,6 +15,8 @@ SCHEMA_STATEMENTS = (
         scenario_title TEXT NOT NULL DEFAULT 'Founder Journey',
         roadmap_focus TEXT NOT NULL DEFAULT 'balanced_execution',
         roadmap_set_turn INTEGER NOT NULL DEFAULT 1,
+        market_cycle TEXT NOT NULL DEFAULT 'steady',
+        market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
         victory_reason TEXT,
         created_at TEXT NOT NULL,
@@ -155,6 +157,35 @@ SCHEMA_STATEMENTS = (
         PRIMARY KEY (slot_name, entry_index)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS quarter_plan (
+        slot_name TEXT PRIMARY KEY
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        budget_stance TEXT NOT NULL,
+        set_turn INTEGER NOT NULL,
+        target_turn INTEGER NOT NULL,
+        revenue_target TEXT NOT NULL,
+        user_target INTEGER NOT NULL,
+        cash_reserve_target TEXT NOT NULL,
+        headcount_cap INTEGER NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS competitors (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        competitor_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        focus_segment TEXT NOT NULL,
+        strength INTEGER NOT NULL,
+        aggression INTEGER NOT NULL,
+        pricing_tier TEXT NOT NULL,
+        active_product_count INTEGER NOT NULL,
+        PRIMARY KEY (slot_name, competitor_id),
+        UNIQUE (slot_name, display_order)
+    )
+    """,
 )
 
 
@@ -209,6 +240,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="market_cycle",
+        column_definition="TEXT NOT NULL DEFAULT 'steady'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="market_cycle_turns_remaining",
+        column_definition="INTEGER NOT NULL DEFAULT 3",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="victory_achieved",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
@@ -218,7 +261,7 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         column_name="victory_reason",
         column_definition="TEXT",
     )
-    connection.execute("PRAGMA user_version = 4")
+    connection.execute("PRAGMA user_version = 5")
 
 
 def _ensure_column(

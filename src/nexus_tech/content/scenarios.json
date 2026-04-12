@@ -6,6 +6,9 @@
     "company_name": "NEXUS TECH",
     "company_strategy": "balanced",
     "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
     "cash_on_hand": "8500.00",
     "reputation": 50,
     "products": [
@@ -27,6 +30,24 @@
         "target_segment": "startup",
         "pricing_tier": "standard"
       }
+    ],
+    "competitors": [
+      {
+        "name": "LaunchNest",
+        "focus_segment": "startup",
+        "strength": 54,
+        "aggression": 49,
+        "pricing_tier": "standard",
+        "active_product_count": 1
+      },
+      {
+        "name": "Builder Stack",
+        "focus_segment": "indie",
+        "strength": 46,
+        "aggression": 44,
+        "pricing_tier": "budget",
+        "active_product_count": 1
+      }
     ]
   },
   {
@@ -36,6 +57,9 @@
     "company_name": "Bootstrap Studio",
     "company_strategy": "efficiency",
     "roadmap_focus": "portfolio_consolidation",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 2,
     "cash_on_hand": "6200.00",
     "reputation": 48,
     "products": [
@@ -68,6 +92,16 @@
         "energy": 78,
         "morale": 74
       }
+    ],
+    "competitors": [
+      {
+        "name": "Process Harbor",
+        "focus_segment": "smb",
+        "strength": 57,
+        "aggression": 42,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      }
     ]
   },
   {
@@ -77,6 +111,9 @@
     "company_name": "Signal Forge",
     "company_strategy": "growth",
     "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "frothy",
+    "market_cycle_turns_remaining": 3,
     "cash_on_hand": "14500.00",
     "reputation": 55,
     "products": [
@@ -118,6 +155,24 @@
         "energy": 79,
         "morale": 72
       }
+    ],
+    "competitors": [
+      {
+        "name": "Orbit Funnel",
+        "focus_segment": "startup",
+        "strength": 63,
+        "aggression": 66,
+        "pricing_tier": "budget",
+        "active_product_count": 2
+      },
+      {
+        "name": "Pulse Metric",
+        "focus_segment": "startup",
+        "strength": 58,
+        "aggression": 61,
+        "pricing_tier": "standard",
+        "active_product_count": 1
+      }
     ]
   },
   {
@@ -127,6 +182,9 @@
     "company_name": "Refactor Labs",
     "company_strategy": "quality",
     "roadmap_focus": "platform_rebuild",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
     "cash_on_hand": "7800.00",
     "reputation": 46,
     "products": [
@@ -159,6 +217,16 @@
         "energy": 74,
         "morale": 68
       }
+    ],
+    "competitors": [
+      {
+        "name": "Stack Fortress",
+        "focus_segment": "enterprise",
+        "strength": 71,
+        "aggression": 52,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      }
     ]
   },
   {
@@ -168,6 +236,9 @@
     "company_name": "Northline Studio",
     "company_strategy": "balanced",
     "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 2,
     "cash_on_hand": "9800.00",
     "reputation": 53,
     "products": [
@@ -226,6 +297,158 @@
         "assigned_product_key": "legacy",
         "energy": 77,
         "morale": 73
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Ops Harbor",
+        "focus_segment": "smb",
+        "strength": 60,
+        "aggression": 48,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      },
+      {
+        "name": "FastPilot",
+        "focus_segment": "startup",
+        "strength": 51,
+        "aggression": 58,
+        "pricing_tier": "budget",
+        "active_product_count": 1
+      }
+    ]
+  },
+  {
+    "scenario_id": "enterprise_wedge",
+    "title": "Enterprise Wedge",
+    "description": "You have one high-value enterprise foothold and a fragile budget. Delivery quality matters more than raw volume.",
+    "company_name": "Railpoint Systems",
+    "company_strategy": "quality",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "9100.00",
+    "reputation": 58,
+    "products": [
+      {
+        "key": "wedge",
+        "template_id": "enterprise_suite",
+        "name": "Railpoint Control",
+        "lifecycle_stage": "growth",
+        "quality": 68,
+        "bug_level": 14,
+        "market_fit": 61,
+        "technical_debt": 18,
+        "user_count": 18,
+        "revenue_per_user": "92.00",
+        "feature_count": 2,
+        "maintenance_cost": "340.00",
+        "acquisition_rate": "0.0280",
+        "churn_rate": "0.0400",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Priya Shah",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "backend",
+        "assigned_product_key": "wedge",
+        "energy": 78,
+        "morale": 71
+      },
+      {
+        "full_name": "Jon Meyer",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "enterprise_delivery",
+        "assigned_product_key": "wedge",
+        "energy": 80,
+        "morale": 74
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Fortify Cloud",
+        "focus_segment": "enterprise",
+        "strength": 74,
+        "aggression": 57,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      }
+    ]
+  },
+  {
+    "scenario_id": "creator_wave",
+    "title": "Creator Wave",
+    "description": "The market is hot and noisy. A lightweight creator tool can catch fire fast, but competition is relentless.",
+    "company_name": "Canvas Spark",
+    "company_strategy": "growth",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "frothy",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "7600.00",
+    "reputation": 49,
+    "products": [
+      {
+        "key": "creator",
+        "template_id": "creator_tool",
+        "name": "ClipForge",
+        "lifecycle_stage": "growth",
+        "quality": 52,
+        "bug_level": 17,
+        "market_fit": 60,
+        "technical_debt": 26,
+        "user_count": 54,
+        "revenue_per_user": "16.00",
+        "feature_count": 2,
+        "maintenance_cost": "220.00",
+        "acquisition_rate": "0.0810",
+        "churn_rate": "0.0660",
+        "target_segment": "indie",
+        "pricing_tier": "budget"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Yuki Sato",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "creator_ux",
+        "assigned_product_key": "creator",
+        "energy": 82,
+        "morale": 79
+      },
+      {
+        "full_name": "Leo Grant",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "audience_growth",
+        "assigned_product_key": "creator",
+        "energy": 80,
+        "morale": 77
+      }
+    ],
+    "competitors": [
+      {
+        "name": "SparkCut",
+        "focus_segment": "indie",
+        "strength": 59,
+        "aggression": 68,
+        "pricing_tier": "budget",
+        "active_product_count": 2
+      },
+      {
+        "name": "StudioLoop",
+        "focus_segment": "startup",
+        "strength": 53,
+        "aggression": 61,
+        "pricing_tier": "standard",
+        "active_product_count": 1
       }
     ]
   }

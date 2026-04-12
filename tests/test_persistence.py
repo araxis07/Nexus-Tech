@@ -7,8 +7,10 @@ from pathlib import Path
 import pytest
 
 from nexus_tech.domain.models import (
+    BudgetStance,
     Company,
     CompanyStrategy,
+    Competitor,
     Employee,
     EmployeeRole,
     EventCategory,
@@ -16,12 +18,14 @@ from nexus_tech.domain.models import (
     EventOption,
     GameState,
     LifecycleStage,
+    MarketCycle,
     MarketSegment,
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
     PricingTier,
     Product,
+    QuarterPlan,
     RoadmapFocus,
     Seniority,
     TurnLedgerEntry,
@@ -117,6 +121,23 @@ def make_state() -> GameState:
             roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         )
     ]
+    competitor = Competitor(
+        name="Atlas Cloud",
+        focus_segment=MarketSegment.ENTERPRISE,
+        strength=67,
+        aggression=61,
+        pricing_tier=PricingTier.PREMIUM,
+        active_product_count=2,
+    )
+    quarter_plan = QuarterPlan(
+        budget_stance=BudgetStance.AGGRESSIVE,
+        set_turn=4,
+        target_turn=6,
+        revenue_target=Decimal("1400.00"),
+        user_target=60,
+        cash_reserve_target=Decimal("9000.00"),
+        headcount_cap=3,
+    )
     return GameState(
         company=Company(
             name="NEXUS TECH",
@@ -127,11 +148,15 @@ def make_state() -> GameState:
         ),
         products=[product],
         employees=[employee],
+        competitors=[competitor],
+        quarter_plan=quarter_plan,
         pending_event=pending_event,
         event_history=event_history,
         milestone_history=milestone_history,
         roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         roadmap_set_turn=3,
+        market_cycle=MarketCycle.EXPANDING,
+        market_cycle_turns_remaining=2,
         turn_history=turn_history,
         scenario_id="vc_sprint",
         scenario_title="VC Sprint",
@@ -157,6 +182,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "companies",
         "products",
         "employees",
+        "quarter_plan",
+        "competitors",
         "pending_events",
         "pending_event_options",
         "event_history",
@@ -177,6 +204,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "scenario_title",
         "roadmap_focus",
         "roadmap_set_turn",
+        "market_cycle",
+        "market_cycle_turns_remaining",
         "victory_achieved",
         "victory_reason",
     }.issubset(save_slot_columns)
@@ -256,6 +285,103 @@ def test_load_missing_database_raises_clear_error(tmp_path: Path) -> None:
 
     with pytest.raises(SaveNotFoundError, match="No save database"):
         coordinator.load_game(DEFAULT_SAVE_SLOT)
+
+
+def test_load_missing_quarter_plan_raises_clear_error(tmp_path: Path) -> None:
+    db_path = tmp_path / "missing-quarter-plan.db"
+    manager = DatabaseManager(db_path)
+    manager.initialize()
+
+    with manager.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO save_slots (
+                slot_name, action_points_remaining, rng_seed, rng_state, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                2,
+                7,
+                RandomSource(seed=7).export_state(),
+                "2026-04-11T00:00:00+00:00",
+                "2026-04-11T00:00:00+00:00",
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO companies (
+                slot_name,
+                company_id,
+                name,
+                cash_on_hand,
+                reputation,
+                strategy,
+                current_turn,
+                game_over
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                "00000000-0000-0000-0000-000000000010",
+                "Demo",
+                "1000.00",
+                50,
+                CompanyStrategy.BALANCED.value,
+                1,
+                0,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO products (
+                slot_name,
+                product_id,
+                display_order,
+                name,
+                lifecycle_stage,
+                quality,
+                bug_level,
+                market_fit,
+                technical_debt,
+                user_count,
+                revenue_per_user,
+                feature_count,
+                maintenance_cost,
+                acquisition_rate,
+                churn_rate,
+                pricing_tier,
+                target_segment,
+                is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                "00000000-0000-0000-0000-000000000011",
+                0,
+                "P1",
+                "growth",
+                50,
+                10,
+                50,
+                10,
+                10,
+                "10.00",
+                1,
+                "10.00",
+                "0.0500",
+                "0.0500",
+                PricingTier.STANDARD.value,
+                MarketSegment.STARTUP.value,
+                1,
+            ),
+        )
+
+    with pytest.raises(CorruptSaveError, match="missing quarter plan state"):
+        SaveLoadCoordinator(db_path).load_game(DEFAULT_SAVE_SLOT)
 
 
 def test_partial_state_handling_raises_corrupt_save_error(tmp_path: Path) -> None:
@@ -376,6 +502,31 @@ def test_invalid_rng_state_raises_corrupt_save_error(tmp_path: Path) -> None:
                 PricingTier.STANDARD.value,
                 MarketSegment.STARTUP.value,
                 1,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO quarter_plan (
+                slot_name,
+                budget_stance,
+                set_turn,
+                target_turn,
+                revenue_target,
+                user_target,
+                cash_reserve_target,
+                headcount_cap
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "active",
+                BudgetStance.BALANCED.value,
+                1,
+                4,
+                "100.00",
+                10,
+                "100.00",
+                2,
             ),
         )
 

@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.planning import BudgetProfile
 from nexus_tech.simulation.pricing import get_pricing_acquisition_bonus
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.roadmap import RoadmapProfile
@@ -253,6 +254,7 @@ def apply_marketing(
     product: Product,
     team_modifier: ProductTeamModifier,
     roadmap_profile: RoadmapProfile,
+    budget_profile: BudgetProfile,
 ) -> ProductActionSummary:
     """Spend money to improve awareness and short-term adoption."""
 
@@ -267,6 +269,7 @@ def apply_marketing(
         + get_pricing_acquisition_bonus(product)
         + strategy_profile.marketing_user_bonus
         + roadmap_profile.acquisition_bonus
+        + budget_profile.marketing_bonus
     )
     immediate_users = max(1, immediate_users)
     reputation_gain = (
@@ -276,7 +279,10 @@ def apply_marketing(
         + roadmap_profile.reputation_bonus
     )
 
-    company.cash_on_hand = quantize_money(company.cash_on_hand - BALANCE.marketing_cost)
+    marketing_cost = quantize_money(
+        BALANCE.marketing_cost * budget_profile.marketing_cost_multiplier
+    )
+    company.cash_on_hand = quantize_money(company.cash_on_hand - marketing_cost)
     company.reputation = clamp_int(company.reputation + reputation_gain)
     product.user_count = max(0, product.user_count + immediate_users)
     product.acquisition_rate = clamp_rate(
@@ -288,7 +294,7 @@ def apply_marketing(
 
     return ProductActionSummary(
         message=(
-            f"Marketed {product.name}. Cash -{BALANCE.marketing_cost}, "
+            f"Marketed {product.name}. Cash -{marketing_cost}, "
             f"users +{immediate_users}, reputation +{reputation_gain}."
         )
     )

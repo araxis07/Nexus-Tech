@@ -280,6 +280,98 @@ class BalanceConfig:
     roadmap_portfolio_acquisition_penalty: int = -1
     roadmap_portfolio_competitor_relief: int = 1
 
+    budget_lean_operating_cost_modifier: Decimal = Decimal("-90.00")
+    budget_lean_marketing_cost_multiplier: Decimal = Decimal("0.80")
+    budget_lean_marketing_bonus: int = -1
+    budget_lean_burnout_modifier: int = -1
+    budget_lean_headcount_cap_bonus: int = 0
+    budget_balanced_operating_cost_modifier: Decimal = Decimal("0.00")
+    budget_balanced_marketing_cost_multiplier: Decimal = Decimal("1.00")
+    budget_balanced_marketing_bonus: int = 0
+    budget_balanced_burnout_modifier: int = 0
+    budget_balanced_headcount_cap_bonus: int = 1
+    budget_aggressive_operating_cost_modifier: Decimal = Decimal("80.00")
+    budget_aggressive_marketing_cost_multiplier: Decimal = Decimal("1.20")
+    budget_aggressive_marketing_bonus: int = 2
+    budget_aggressive_burnout_modifier: int = 1
+    budget_aggressive_headcount_cap_bonus: int = 2
+
+    market_cycle_min_duration: int = 2
+    market_cycle_max_duration: int = 4
+    market_cycle_acquisition_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "cooling": -2,
+            "steady": 0,
+            "expanding": 1,
+            "frothy": 2,
+        }
+    )
+    market_cycle_churn_modifier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "cooling": Decimal("0.0100"),
+            "steady": Decimal("0.0000"),
+            "expanding": Decimal("-0.0060"),
+            "frothy": Decimal("0.0030"),
+        }
+    )
+    market_cycle_competitor_pressure_modifier: dict[str, int] = field(
+        default_factory=lambda: {
+            "cooling": 1,
+            "steady": 0,
+            "expanding": 0,
+            "frothy": 1,
+        }
+    )
+    market_cycle_segment_bonus: dict[str, dict[str, int]] = field(
+        default_factory=lambda: {
+            "cooling": {"indie": 0, "startup": -1, "smb": 1, "enterprise": 1},
+            "steady": {"indie": 0, "startup": 0, "smb": 0, "enterprise": 0},
+            "expanding": {"indie": 1, "startup": 1, "smb": 0, "enterprise": 0},
+            "frothy": {"indie": 1, "startup": 2, "smb": 0, "enterprise": -1},
+        }
+    )
+    market_cycle_transition_weights: dict[str, dict[str, int]] = field(
+        default_factory=lambda: {
+            "cooling": {"cooling": 3, "steady": 5, "expanding": 1, "frothy": 0},
+            "steady": {"cooling": 2, "steady": 4, "expanding": 3, "frothy": 1},
+            "expanding": {"cooling": 0, "steady": 3, "expanding": 4, "frothy": 3},
+            "frothy": {"cooling": 1, "steady": 3, "expanding": 3, "frothy": 2},
+        }
+    )
+
+    competitor_strength_drift_max: int = 3
+    competitor_aggression_drift_max: int = 3
+    competitor_segment_match_bonus: int = 2
+    competitor_strength_divisor: int = 18
+    competitor_aggression_divisor: int = 20
+    competitor_product_count_bonus: int = 1
+    competitor_price_match_bonus: int = 1
+    competitor_pressure_cap_total: int = 12
+
+    quarter_plan_revenue_growth_by_roadmap: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "balanced_execution": Decimal("1.08"),
+            "growth_push": Decimal("1.16"),
+            "platform_rebuild": Decimal("1.04"),
+            "premium_expansion": Decimal("1.10"),
+            "portfolio_consolidation": Decimal("1.05"),
+        }
+    )
+    quarter_plan_user_growth_by_budget: dict[str, int] = field(
+        default_factory=lambda: {
+            "lean": 8,
+            "balanced": 14,
+            "aggressive": 22,
+        }
+    )
+    quarter_plan_cash_buffer_by_budget: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "lean": Decimal("1200.00"),
+            "balanced": Decimal("800.00"),
+            "aggressive": Decimal("300.00"),
+        }
+    )
+
     score_cash_divisor: Decimal = Decimal("500.00")
     score_users_divisor: int = 6
     score_reputation_multiplier: int = 2

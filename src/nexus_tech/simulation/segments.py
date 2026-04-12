@@ -5,11 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from nexus_tech.domain.models import MarketSegment, Product, RoadmapFocus
+from nexus_tech.domain.models import (
+    Competitor,
+    MarketCycle,
+    MarketSegment,
+    Product,
+    RoadmapFocus,
+)
 from nexus_tech.domain.money import quantize_rate
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.roadmap import get_roadmap_profile
-from nexus_tech.simulation.support import clamp_int
+from nexus_tech.simulation.competition import (
+    calculate_competitor_pressure as calculate_live_competitor_pressure,
+)
+from nexus_tech.simulation.market import get_market_profile
 
 
 @dataclass(frozen=True)
@@ -61,32 +69,30 @@ def get_market_segment_profile(segment: MarketSegment) -> MarketSegmentProfile:
 
 def calculate_competitor_pressure(
     product: Product,
+    competitors: list[Competitor] | None = None,
     *,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
     current_turn: int,
     roadmap_focus: RoadmapFocus,
     roadmap_set_turn: int,
 ) -> int:
     """Estimate how much market competition is pressing on a product this turn."""
 
-    profile = get_market_segment_profile(product.target_segment)
-    roadmap_profile = get_roadmap_profile(
-        roadmap_focus,
-        roadmap_set_turn=roadmap_set_turn,
+    return calculate_live_competitor_pressure(
+        product,
+        competitors or [],
+        market_cycle=market_cycle,
         current_turn=current_turn,
+        roadmap_focus=roadmap_focus,
+        roadmap_set_turn=roadmap_set_turn,
     )
-    pressure = (
-        profile.competitor_pressure_base
-        + (current_turn // BALANCE.competitor_pressure_turn_divisor)
-        + (product.user_count // BALANCE.competitor_pressure_user_divisor)
-        + (1 if product.lifecycle_stage.value == "mature" else 0)
-        - roadmap_profile.competitor_pressure_relief
-    )
-    return clamp_int(pressure, minimum=0, maximum=BALANCE.competitor_pressure_cap)
 
 
 def resolve_segment_dynamics(
     product: Product,
+    competitors: list[Competitor] | None = None,
     *,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
     current_turn: int,
     roadmap_focus: RoadmapFocus,
     roadmap_set_turn: int,
@@ -95,8 +101,11 @@ def resolve_segment_dynamics(
     """Resolve segment-specific acquisition, churn, and competitive pressure."""
 
     profile = get_market_segment_profile(product.target_segment)
+    market_profile = get_market_profile(market_cycle)
     competitor_pressure = calculate_competitor_pressure(
         product,
+        competitors or [],
+        market_cycle=market_cycle,
         current_turn=current_turn,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
@@ -114,6 +123,7 @@ def resolve_segment_dynamics(
             min(
                 Decimal("0.1500"),
                 profile.base_churn_modifier
+                + market_profile.churn_modifier
                 + price_modifier
                 + quantize_rate(
                     Decimal(competitor_pressure)
@@ -124,6 +134,8 @@ def resolve_segment_dynamics(
     )
     acquisition_bonus = (
         profile.acquisition_bonus
+        + market_profile.acquisition_bonus
+        + market_profile.segment_bonus[product.target_segment]
         + fit_bonus
         + quality_bonus
         - bug_penalty

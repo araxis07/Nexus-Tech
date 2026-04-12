@@ -42,6 +42,13 @@ Each turn represents a business interval. You review the company, choose actions
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
+### 🌐 Market and Competition
+
+- Run each company inside a live market cycle such as `cooling`, `steady`, `expanding`, or `frothy`
+- Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, and aggression
+- Feel direct trade-offs between customer demand, churn pressure, rivalry, and product positioning
+- Surface market state and competitor posture in dedicated terminal panels for live demos
+
 ### 👥 Employee and Team System
 
 - Hire and fire employees
@@ -70,21 +77,30 @@ Each turn represents a business interval. You review the company, choose actions
 - Unlock company milestones as the business scales
 - Track key moments such as traction, cash reserves, team growth, and portfolio expansion
 - Set quarter-scale roadmap focuses such as growth push, platform rebuild, premium expansion, and portfolio consolidation
+- Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
+- Work against a quarter plan with explicit revenue, user, cash, and headcount targets
 - Track run score, estimated company value, turn history, and victory conditions in the terminal report
 
 ### 💾 Local Save / Load
 
 - Save and load runs locally with SQLite
 - Resume the latest save slot
-- Persist roadmap state, product targeting, event history, team assignments, and turn history
+- Persist roadmap state, market cycle, quarter plan, competitors, product targeting, event history, team assignments, and turn history
 - Keep the entire project offline and self-contained
 
 ### 🖥️ Presentation and CLI
 
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
-- In-game reporting view for score, valuation, and recent turn history
+- In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Seeded demo support for reproducible simulations
+
+### 🧪 Quality and Tooling
+
+- Fast deterministic test suite with `pytest`
+- Centralized linting and formatting with `Ruff`
+- `uv`-based project workflow for dependency and run management
+- GitHub Actions CI to run lint and tests on pushes and pull requests
 
 ## 🧱 Tech Stack
 
@@ -166,9 +182,12 @@ Typical decisions include:
 
 - which product should get attention this turn
 - which customer segment each product should target
+- which budget stance fits the current runway and growth pressure
 - whether to push features or stabilize quality
 - when technical debt has become too expensive to ignore
 - which roadmap focus should shape the next few turns
+- how the current market cycle changes the right move
+- whether competitor pressure means you should defend, reposition, or consolidate
 - when to hire, assign, rest, or remove team members
 - which scenario opening creates the best long-term position
 - how to survive cash pressure while still building growth
@@ -180,6 +199,13 @@ Run the test suite:
 
 ```bash
 uv run pytest
+```
+
+Run the local CI-equivalent checks:
+
+```bash
+uv run ruff check src tests
+uv run pytest -q
 ```
 
 ## 🧹 Linting and Formatting
@@ -222,6 +248,7 @@ uv run ruff format src tests
 - Save data is stored in `nexus-tech.db` by default
 - `--seed` is useful for repeatable demos and deterministic test scenarios
 - `--scenario` selects a starting setup, while `list-scenarios` shows the current catalog
+- Market cycles, quarter plans, and competitor rosters are part of the persisted run state
 - The focus is on correctness, stability, maintainability, and presentation quality
 
 ## 📄 License

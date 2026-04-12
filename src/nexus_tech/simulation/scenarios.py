@@ -11,12 +11,15 @@ from nexus_tech.content.loader import (
 )
 from nexus_tech.content.models import (
     ProductTemplateDefinition,
+    ScenarioCompetitorSeed,
     ScenarioDefinition,
     ScenarioEmployeeSeed,
     ScenarioProductSeed,
 )
-from nexus_tech.domain.models import Company, Employee, GameState, Product
+from nexus_tech.domain.models import Company, Competitor, Employee, GameState, Product
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.competition import create_competitor
+from nexus_tech.simulation.planning import build_quarter_plan
 from nexus_tech.simulation.product_progression import create_product
 from nexus_tech.simulation.team import create_employee
 
@@ -38,16 +41,22 @@ def create_game_state_from_scenario(
     )
     products = _build_scenario_products(scenario, primary_product_name=primary_product_name)
     employees = _build_scenario_employees(scenario, products)
-    return GameState(
+    competitors = _build_scenario_competitors(scenario, products)
+    state = GameState(
         company=company,
         products=products,
         employees=employees,
+        competitors=competitors,
         roadmap_focus=scenario.roadmap_focus,
         roadmap_set_turn=1,
+        market_cycle=scenario.market_cycle,
+        market_cycle_turns_remaining=scenario.market_cycle_turns_remaining,
         scenario_id=scenario.scenario_id,
         scenario_title=scenario.title,
         action_points_remaining=BALANCE.actions_per_turn,
     )
+    state.quarter_plan = build_quarter_plan(state, budget_stance=scenario.budget_stance)
+    return state
 
 
 def create_product_from_template(
@@ -117,6 +126,30 @@ def _build_scenario_employees(
         )
         employees.append(employee)
     return employees
+
+
+def _build_scenario_competitors(
+    scenario: ScenarioDefinition,
+    products: list[Product],
+) -> list[Competitor]:
+    competitors: list[Competitor] = []
+    if scenario.competitors:
+        for competitor_seed in scenario.competitors:
+            competitors.append(_instantiate_scenario_competitor(competitor_seed))
+        return competitors
+
+    for product in products[:2]:
+        competitors.append(
+            create_competitor(
+                name=f"{product.name} Rival",
+                focus_segment=product.target_segment,
+                strength=max(35, product.quality - 4),
+                aggression=48,
+                pricing_tier=product.pricing_tier,
+                active_product_count=1,
+            )
+        )
+    return competitors
 
 
 def _instantiate_template_product(
@@ -203,3 +236,14 @@ def _instantiate_scenario_employee(
             )
         employee.assigned_product_id = product_ids_by_key[seed.assigned_product_key]
     return employee
+
+
+def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor:
+    return create_competitor(
+        name=seed.name,
+        focus_segment=seed.focus_segment,
+        strength=seed.strength,
+        aggression=seed.aggression,
+        pricing_tier=seed.pricing_tier,
+        active_product_count=seed.active_product_count,
+    )

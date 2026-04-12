@@ -10,12 +10,14 @@ from uuid import UUID
 from nexus_tech.config import DEFAULT_PRODUCT_TEMPLATE_ID, DEFAULT_SCENARIO_ID
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
+    BudgetStance,
     CompanyStrategy,
     Employee,
     EmployeeRole,
     EventHistoryEntry,
     GameState,
     LifecycleStage,
+    MarketCycle,
     MarketSegment,
     MilestoneEntry,
     PendingEvent,
@@ -27,6 +29,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.competition import advance_competitors
 from nexus_tech.simulation.economy import (
     calculate_product_operating_cost,
     calculate_product_revenue,
@@ -38,7 +41,13 @@ from nexus_tech.simulation.economy import (
 )
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
+from nexus_tech.simulation.market import advance_market_cycle
 from nexus_tech.simulation.milestones import resolve_new_milestones
+from nexus_tech.simulation.planning import (
+    build_quarter_plan,
+    get_budget_profile,
+    is_quarter_plan_due,
+)
 from nexus_tech.simulation.pricing import apply_adjust_pricing
 from nexus_tech.simulation.product_progression import (
     ProductDrift,
@@ -100,6 +109,7 @@ class ActionContext:
     pricing_tier: PricingTier | None = None
     target_segment: MarketSegment | None = None
     roadmap_focus: RoadmapFocus | None = None
+    budget_stance: BudgetStance | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +160,9 @@ class TurnResolution:
     run_score: RunScore
     roadmap_due: bool
     roadmap_focus: RoadmapFocus
+    quarter_plan_due: bool
+    market_cycle: MarketCycle
+    market_cycle_changed: bool
     victory_reason: str | None
     narrative: str
 
@@ -286,6 +299,7 @@ def apply_action(
 
         next_state.roadmap_focus = context.roadmap_focus
         next_state.roadmap_set_turn = next_state.company.current_turn
+        next_state.quarter_plan = build_quarter_plan(next_state)
         roadmap_profile = get_roadmap_profile(
             next_state.roadmap_focus,
             roadmap_set_turn=next_state.roadmap_set_turn,
@@ -295,6 +309,24 @@ def apply_action(
         return ActionOutcome(
             state=next_state,
             message=(f"Roadmap set to {context.roadmap_focus.value}. {roadmap_profile.summary}"),
+        )
+
+    if action is TurnAction.SET_BUDGET_STANCE:
+        if context.budget_stance is None:
+            raise ValueError("Selecting a budget stance requires a budget value.")
+
+        next_state.quarter_plan = build_quarter_plan(
+            next_state,
+            budget_stance=context.budget_stance,
+        )
+        budget_profile = get_budget_profile(context.budget_stance)
+        logger.debug("Changed budget stance to %s.", context.budget_stance.value)
+        return ActionOutcome(
+            state=next_state,
+            message=(
+                f"Budget stance set to {context.budget_stance.value}. "
+                f"{budget_profile.summary}"
+            ),
         )
 
     if action is TurnAction.FIRE_EMPLOYEE:
@@ -348,6 +380,7 @@ def apply_action(
         roadmap_set_turn=next_state.roadmap_set_turn,
         current_turn=next_state.company.current_turn,
     )
+    budget_profile = get_budget_profile(next_state.quarter_plan.budget_stance)
 
     if action is TurnAction.IMPROVE_QUALITY:
         summary = apply_improve_quality(
@@ -382,6 +415,7 @@ def apply_action(
             product,
             team_modifier,
             roadmap_profile,
+            budget_profile,
         )
         next_state.company.game_over = is_game_over(next_state.company)
         return ActionOutcome(
@@ -440,6 +474,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     product_summaries: list[ProductTurnSummary] = []
     unlocked_milestones: list[MilestoneEntry] = []
     company_strategy_profile = get_strategy_profile(next_state.company.strategy)
+    budget_profile = get_budget_profile(next_state.quarter_plan.budget_stance)
     active_roadmap_focus = get_effective_roadmap_focus(
         next_state.roadmap_focus,
         roadmap_set_turn=next_state.roadmap_set_turn,
@@ -457,6 +492,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     baseline_operating_cost = quantize_money(
         BALANCE.base_operating_cost
         + company_strategy_profile.operating_cost_modifier
+        + budget_profile.operating_cost_modifier
         + roadmap_profile.operating_cost_modifier
     )
 
@@ -472,6 +508,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.company,
         next_state.products,
         next_state.employees,
+        budget_stance=next_state.quarter_plan.budget_stance,
         roadmap_focus=next_state.roadmap_focus,
         roadmap_set_turn=next_state.roadmap_set_turn,
     )
@@ -495,6 +532,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
             product,
             rng,
             team_modifier,
+            market_cycle=next_state.market_cycle,
+            competitors=next_state.competitors,
             roadmap_focus=next_state.roadmap_focus,
             roadmap_set_turn=next_state.roadmap_set_turn,
         )
@@ -509,6 +548,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         )
         competitor_pressure = calculate_competitor_pressure(
             product,
+            next_state.competitors,
+            market_cycle=next_state.market_cycle,
             current_turn=resolved_turn,
             roadmap_focus=next_state.roadmap_focus,
             roadmap_set_turn=next_state.roadmap_set_turn,
@@ -546,6 +587,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.products,
         net_cash_flow,
         next_state.company.strategy,
+        budget_burnout_modifier=budget_profile.burnout_modifier,
     )
 
     event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
@@ -554,6 +596,21 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     unlocked_milestones = resolve_new_milestones(next_state, unlocked_turn=resolved_turn)
     if unlocked_milestones:
         team_condition = calculate_team_condition(next_state.employees)
+
+    advance_competitors(
+        next_state.competitors,
+        rng,
+        market_cycle=next_state.market_cycle,
+    )
+    (
+        next_state.market_cycle,
+        next_state.market_cycle_turns_remaining,
+        market_cycle_changed,
+    ) = advance_market_cycle(
+        next_state.market_cycle,
+        next_state.market_cycle_turns_remaining,
+        rng,
+    )
 
     append_turn_history(
         next_state,
@@ -571,6 +628,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     if not next_state.company.game_over and not next_state.victory_achieved:
         next_state.company.current_turn += 1
         next_state.action_points_remaining = BALANCE.actions_per_turn
+    quarter_plan_due = is_quarter_plan_due(next_state)
 
     narrative = build_turn_narrative(
         net_cash_flow=net_cash_flow,
@@ -578,6 +636,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         product_summaries=product_summaries,
         team_condition=team_condition,
         game_over=next_state.company.game_over,
+        quarter_plan_due=quarter_plan_due,
+        market_cycle=next_state.market_cycle,
+        market_cycle_changed=market_cycle_changed,
         victory_reason=victory_reason,
         roadmap_due=roadmap_due,
     )
@@ -601,6 +662,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         run_score=run_score,
         roadmap_due=roadmap_due,
         roadmap_focus=active_roadmap_focus,
+        quarter_plan_due=quarter_plan_due,
+        market_cycle=next_state.market_cycle,
+        market_cycle_changed=market_cycle_changed,
         victory_reason=victory_reason,
         narrative=narrative,
     )
@@ -656,6 +720,9 @@ def build_turn_narrative(
     product_summaries: list[ProductTurnSummary],
     team_condition: TeamCondition,
     game_over: bool,
+    quarter_plan_due: bool,
+    market_cycle: MarketCycle,
+    market_cycle_changed: bool,
     victory_reason: str | None,
     roadmap_due: bool,
 ) -> str:
@@ -665,6 +732,11 @@ def build_turn_narrative(
         return "The company ran out of cash. Payroll and product burn outpaced the business."
     if victory_reason is not None:
         return victory_reason
+    if market_cycle_changed:
+        return (
+            f"The market shifted to {market_cycle.value}. "
+            "Re-check the portfolio before momentum drifts."
+        )
 
     total_user_delta = sum(summary.net_user_delta for summary in product_summaries)
     declining_products = [summary for summary in product_summaries if summary.net_user_delta < 0]
@@ -678,6 +750,11 @@ def build_turn_narrative(
         return "Weak products are dragging the brand down despite the team's effort."
     if roadmap_due:
         return "The quarter plan has gone stale. Pick a fresh roadmap before momentum drifts."
+    if quarter_plan_due:
+        return (
+            "The quarter targets are stale. Reset the budget stance "
+            "and plan before scaling further."
+        )
     if total_user_delta > 0 and net_cash_flow > ZERO_MONEY:
         return "Your team is converting effort into growth and cash flow."
     if net_cash_flow < ZERO_MONEY:

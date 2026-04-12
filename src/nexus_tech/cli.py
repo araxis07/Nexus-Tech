@@ -21,6 +21,7 @@ from nexus_tech.config import (
 )
 from nexus_tech.content.models import ProductTemplateDefinition
 from nexus_tech.domain.models import (
+    BudgetStance,
     CompanyStrategy,
     Employee,
     EmployeeRole,
@@ -100,20 +101,21 @@ ACTION_KEYS = {
     "8": TurnAction.SUNSET_PRODUCT,
     "9": TurnAction.SET_COMPANY_STRATEGY,
     "10": TurnAction.SET_ROADMAP,
-    "11": TurnAction.HIRE_EMPLOYEE,
-    "12": TurnAction.FIRE_EMPLOYEE,
-    "13": TurnAction.ASSIGN_EMPLOYEE,
-    "14": TurnAction.UNASSIGN_EMPLOYEE,
-    "15": TurnAction.REST_TEAM,
-    "16": TurnAction.REVIEW_TEAM,
-    "17": TurnAction.VIEW_REPORT,
-    "18": TurnAction.WAIT,
-    "19": TurnAction.VIEW_STATUS,
-    "20": TurnAction.END_TURN,
+    "11": TurnAction.SET_BUDGET_STANCE,
+    "12": TurnAction.HIRE_EMPLOYEE,
+    "13": TurnAction.FIRE_EMPLOYEE,
+    "14": TurnAction.ASSIGN_EMPLOYEE,
+    "15": TurnAction.UNASSIGN_EMPLOYEE,
+    "16": TurnAction.REST_TEAM,
+    "17": TurnAction.REVIEW_TEAM,
+    "18": TurnAction.VIEW_REPORT,
+    "19": TurnAction.WAIT,
+    "20": TurnAction.VIEW_STATUS,
+    "21": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "21": "save_game",
-    "22": "load_game",
+    "22": "save_game",
+    "23": "load_game",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -353,7 +355,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="20",
+                    default="21",
                     show_choices=False,
                 )
 
@@ -477,6 +479,16 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             case_sensitive=False,
         )
         return ActionContext(roadmap_focus=RoadmapFocus(roadmap_key))
+
+    if action is TurnAction.SET_BUDGET_STANCE:
+        budget_key = ask_choice_input(
+            "Budget stance",
+            choices=["lean", "balanced", "aggressive"],
+            default=state.quarter_plan.budget_stance.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(budget_stance=BudgetStance(budget_key))
 
     if action is TurnAction.HIRE_EMPLOYEE:
         full_name = ask_text_input("Employee full name")

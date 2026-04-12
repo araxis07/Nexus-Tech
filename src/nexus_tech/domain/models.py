@@ -76,6 +76,23 @@ class RoadmapFocus(StrEnum):
     PORTFOLIO_CONSOLIDATION = "portfolio_consolidation"
 
 
+class BudgetStance(StrEnum):
+    """Budget posture for the current quarter plan."""
+
+    LEAN = "lean"
+    BALANCED = "balanced"
+    AGGRESSIVE = "aggressive"
+
+
+class MarketCycle(StrEnum):
+    """Current market environment affecting demand and churn."""
+
+    COOLING = "cooling"
+    STEADY = "steady"
+    EXPANDING = "expanding"
+    FROTHY = "frothy"
+
+
 class EventCategory(StrEnum):
     """Supported event categories for the dynamic event engine."""
 
@@ -117,6 +134,7 @@ class TurnAction(StrEnum):
     SUNSET_PRODUCT = "sunset_product"
     SET_COMPANY_STRATEGY = "set_company_strategy"
     SET_ROADMAP = "set_roadmap"
+    SET_BUDGET_STANCE = "set_budget_stance"
     HIRE_EMPLOYEE = "hire_employee"
     FIRE_EMPLOYEE = "fire_employee"
     ASSIGN_EMPLOYEE = "assign_employee"
@@ -200,6 +218,39 @@ class Employee(BaseModel):
     @field_validator("salary", mode="before")
     @classmethod
     def _normalize_salary(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+
+class Competitor(BaseModel):
+    """A lightweight rival company competing in one segment."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    name: str = Field(min_length=1, max_length=80)
+    focus_segment: MarketSegment
+    strength: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    aggression: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    pricing_tier: PricingTier = PricingTier.STANDARD
+    active_product_count: int = Field(default=1, ge=1, le=6)
+
+
+class QuarterPlan(BaseModel):
+    """Quarter-scale operating plan with targets and spending posture."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    budget_stance: BudgetStance = BudgetStance.BALANCED
+    set_turn: int = Field(default=1, ge=1)
+    target_turn: int = Field(default=4, ge=1)
+    revenue_target: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    user_target: int = Field(default=0, ge=0)
+    cash_reserve_target: Decimal = Field(default=Decimal("0.00"))
+    headcount_cap: int = Field(default=0, ge=0)
+
+    @field_validator("revenue_target", "cash_reserve_target", mode="before")
+    @classmethod
+    def _normalize_plan_money(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
 
 
@@ -296,6 +347,10 @@ class GameState(BaseModel):
     milestone_history: list[MilestoneEntry] = Field(default_factory=list)
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION
     roadmap_set_turn: int = Field(default=1, ge=1)
+    market_cycle: MarketCycle = MarketCycle.STEADY
+    market_cycle_turns_remaining: int = Field(default=3, ge=1)
+    competitors: list[Competitor] = Field(default_factory=list)
+    quarter_plan: QuarterPlan = Field(default_factory=QuarterPlan)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
     victory_achieved: bool = False
     victory_reason: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045

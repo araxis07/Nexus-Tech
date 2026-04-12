@@ -9,9 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
 from nexus_tech.domain.models import (
+    BudgetStance,
     CompanyStrategy,
     EmployeeRole,
     LifecycleStage,
+    MarketCycle,
     MarketSegment,
     PricingTier,
     RoadmapFocus,
@@ -106,6 +108,19 @@ class ScenarioEmployeeSeed(BaseModel):
     productivity: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
 
 
+class ScenarioCompetitorSeed(BaseModel):
+    """One starting competitor defined inside a scenario."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    name: str = Field(min_length=1, max_length=80)
+    focus_segment: MarketSegment
+    strength: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    aggression: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    pricing_tier: PricingTier = PricingTier.STANDARD
+    active_product_count: int = Field(default=1, ge=1, le=6)
+
+
 class ScenarioDefinition(BaseModel):
     """Scenario definition for a full starting run."""
 
@@ -117,10 +132,14 @@ class ScenarioDefinition(BaseModel):
     company_name: str = Field(min_length=1, max_length=80)
     company_strategy: CompanyStrategy = CompanyStrategy.BALANCED
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION
+    budget_stance: BudgetStance = BudgetStance.BALANCED
+    market_cycle: MarketCycle = MarketCycle.STEADY
+    market_cycle_turns_remaining: int = Field(default=3, ge=1)
     cash_on_hand: Decimal
     reputation: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     products: list[ScenarioProductSeed] = Field(min_length=1)
     employees: list[ScenarioEmployeeSeed] = Field(default_factory=list)
+    competitors: list[ScenarioCompetitorSeed] = Field(default_factory=list)
 
     @field_validator("cash_on_hand", mode="before")
     @classmethod

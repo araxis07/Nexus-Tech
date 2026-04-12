@@ -1,9 +1,19 @@
 """User acquisition, churn, and portfolio reputation movement."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-from nexus_tech.domain.models import Company, Employee, LifecycleStage, Product, RoadmapFocus
+from nexus_tech.domain.models import (
+    Company,
+    Competitor,
+    Employee,
+    LifecycleStage,
+    MarketCycle,
+    Product,
+    RoadmapFocus,
+)
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.pricing import (
     get_pricing_acquisition_bonus,
@@ -49,6 +59,8 @@ def calculate_acquired_users(
     rng: RandomLike,
     team_modifier: ProductTeamModifier,
     *,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
+    competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
 ) -> int:
@@ -69,6 +81,8 @@ def calculate_acquired_users(
     )
     segment_dynamics = resolve_segment_dynamics(
         product,
+        competitors or [],
+        market_cycle=market_cycle,
         current_turn=company.current_turn,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
@@ -113,6 +127,8 @@ def calculate_effective_churn_rate_for_context(
     product: Product,
     *,
     current_turn: int = 1,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
+    competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
 ) -> Decimal:
@@ -125,6 +141,8 @@ def calculate_effective_churn_rate_for_context(
     churn_rate -= Decimal(product.quality // BALANCE.churn_quality_relief_divisor) / Decimal("100")
     segment_dynamics = resolve_segment_dynamics(
         product,
+        competitors or [],
+        market_cycle=market_cycle,
         current_turn=current_turn,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
@@ -144,6 +162,8 @@ def calculate_churned_users(
     rng: RandomLike,
     *,
     current_turn: int = 1,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
+    competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
 ) -> int:
@@ -155,6 +175,8 @@ def calculate_churned_users(
     effective_rate = calculate_effective_churn_rate_for_context(
         product,
         current_turn=current_turn,
+        market_cycle=market_cycle,
+        competitors=competitors,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
     )
@@ -173,6 +195,8 @@ def resolve_growth(
     rng: RandomLike,
     team_modifier: ProductTeamModifier,
     *,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
+    competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
 ) -> GrowthResult:
@@ -183,6 +207,8 @@ def resolve_growth(
         product,
         rng,
         team_modifier,
+        market_cycle=market_cycle,
+        competitors=competitors,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
     )
@@ -190,6 +216,8 @@ def resolve_growth(
         product,
         rng,
         current_turn=company.current_turn,
+        market_cycle=market_cycle,
+        competitors=competitors,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
     )

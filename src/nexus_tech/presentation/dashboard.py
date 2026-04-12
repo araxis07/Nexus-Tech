@@ -22,6 +22,8 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
+from nexus_tech.simulation.market import get_market_profile
+from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.roadmap import (
     get_effective_roadmap_focus,
@@ -110,7 +112,16 @@ def render_dashboard(console: Console, state: GameState) -> None:
             expand=True,
         )
     )
-    console.print(_build_dashboard_team_panel(state))
+    console.print(
+        Columns(
+            [
+                _build_dashboard_team_panel(state),
+                _build_market_watch_panel(state),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
     console.print(
         Columns(
             [
@@ -162,12 +173,21 @@ def render_report(console: Console, state: GameState) -> None:
             [
                 _build_report_overview_panel(state, run_score.total_score, run_score.score_tier),
                 _build_report_score_panel(state),
+                _build_report_quarter_plan_panel(state),
             ],
             equal=True,
             expand=True,
         )
     )
     console.print(history_panel)
+    console.print(
+        Panel(
+            _build_competitor_table(state),
+            title="Competitor Watch",
+            border_style="red",
+            expand=True,
+        )
+    )
 
 
 def render_turn_resolution(console: Console, resolution: TurnResolution) -> None:
@@ -414,6 +434,8 @@ def _build_turn_header_panel(state: GameState) -> Panel:
         f"[cyan]Scenario:[/cyan] {state.scenario_title}\n"
         f"[cyan]Actions Left:[/cyan] {state.action_points_remaining}\n"
         f"[cyan]Roadmap:[/cyan] {effective_roadmap.value} ({roadmap_status})\n"
+        f"[cyan]Market:[/cyan] {state.market_cycle.value} | "
+        f"[cyan]Budget:[/cyan] {state.quarter_plan.budget_stance.value}\n"
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
     return Panel.fit(body, title="Turn Control", border_style="blue")
@@ -432,6 +454,8 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Strategy", state.company.strategy.value)
     table.add_row("Roadmap", effective_roadmap.value)
+    table.add_row("Budget", state.quarter_plan.budget_stance.value)
+    table.add_row("Market", state.market_cycle.value)
     table.add_row("Status", "Game Over" if state.company.game_over else "Operating")
     return Panel(table, title="Company Overview", border_style="magenta", expand=True)
 
@@ -445,6 +469,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Sunset Products", str(len(state.products) - len(active_products)))
     table.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    table.add_row("Competitors", str(len(state.competitors)))
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
 
@@ -506,7 +531,7 @@ def _build_portfolio_table(state: GameState) -> Table:
 def _build_dashboard_team_panel(state: GameState) -> Panel:
     if not state.employees:
         return Panel(
-            "No employees hired yet. Use [bold]11[/bold] to start building the team.",
+            "No employees hired yet. Use [bold]12[/bold] to start building the team.",
             title="Team Table",
             border_style="cyan",
             expand=True,
@@ -592,23 +617,24 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("8", "sunset_product", "Retire a weak product.")
     primary_actions.add_row("9", "set_company_strategy", "Shift company-wide focus.")
     primary_actions.add_row("10", "set_roadmap", "Pick the quarter's execution plan.")
-    primary_actions.add_row("11", "hire_employee", "Add capability and salary burn.")
-    primary_actions.add_row("12", "fire_employee", "Remove salary burden.")
-    primary_actions.add_row("13", "assign_employee", "Put someone on a product.")
-    primary_actions.add_row("14", "unassign_employee", "Pull someone off product work.")
-    primary_actions.add_row("15", "rest_team", "Recover energy and morale.")
-    primary_actions.add_row("16", "review_team", "Open the detailed team view.")
-    primary_actions.add_row("17", "view_report", "Open the scoring and history report.")
-    primary_actions.add_row("18", "wait", "Hold position for this action.")
-    primary_actions.add_row("19", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("20", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("11", "set_budget_stance", "Change the quarter's spend posture.")
+    primary_actions.add_row("12", "hire_employee", "Add capability and salary burn.")
+    primary_actions.add_row("13", "fire_employee", "Remove salary burden.")
+    primary_actions.add_row("14", "assign_employee", "Put someone on a product.")
+    primary_actions.add_row("15", "unassign_employee", "Pull someone off product work.")
+    primary_actions.add_row("16", "rest_team", "Recover energy and morale.")
+    primary_actions.add_row("17", "review_team", "Open the detailed team view.")
+    primary_actions.add_row("18", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("19", "wait", "Hold position for this action.")
+    primary_actions.add_row("20", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("21", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("21", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("22", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("22", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("23", "load_game", "Resume a saved slot from SQLite.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -691,7 +717,9 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     )
     table.add_row("Burned Out", str(resolution.team_condition.burned_out_count))
     table.add_row("Strategy", resolution.state.company.strategy.value)
+    table.add_row("Budget", resolution.state.quarter_plan.budget_stance.value)
     table.add_row("Roadmap", resolution.roadmap_focus.value)
+    table.add_row("Market", resolution.market_cycle.value)
     table.add_row(
         "Run Score", f"{resolution.run_score.total_score} ({resolution.run_score.score_tier})"
     )
@@ -703,6 +731,7 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     )
     table.add_row("Milestones", str(len(resolution.unlocked_milestones)))
     table.add_row("Roadmap Due", "yes" if resolution.roadmap_due else "no")
+    table.add_row("Quarter Due", "yes" if resolution.quarter_plan_due else "no")
     return table
 
 
@@ -817,6 +846,8 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Roadmap", effective_roadmap.value)
     table.add_row("Roadmap State", "due now" if roadmap_due else f"{turns_left} turns left")
+    table.add_row("Budget", state.quarter_plan.budget_stance.value)
+    table.add_row("Market", state.market_cycle.value)
     table.add_row("Run Score", f"{total_score} ({score_tier})")
     return Panel(table, title="Run Overview", border_style="magenta", expand=True)
 
@@ -835,6 +866,57 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Milestones", str(len(state.milestone_history)))
     table.add_row("Segments", ", ".join(active_segments) if active_segments else "-")
     return Panel(table, title="Scorecard", border_style="yellow", expand=True)
+
+
+def _build_report_quarter_plan_panel(state: GameState) -> Panel:
+    plan = state.quarter_plan
+    progress = evaluate_quarter_plan(state)
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Target Turn", str(plan.target_turn))
+    table.add_row("Revenue Target", format_money(plan.revenue_target))
+    table.add_row("User Target", str(plan.user_target))
+    table.add_row("Cash Target", format_money(plan.cash_reserve_target))
+    table.add_row("Headcount Cap", str(plan.headcount_cap))
+    table.add_row("Revenue Progress", _format_progress(progress.revenue_progress))
+    table.add_row("User Progress", _format_progress(progress.user_progress))
+    table.add_row("Cash Progress", _format_progress(progress.cash_progress))
+    table.add_row("Headcount OK", "yes" if progress.headcount_within_cap else "no")
+    table.add_row("Plan Due", "yes" if is_quarter_plan_due(state) else "no")
+    return Panel(table, title="Quarter Plan", border_style="cyan", expand=True)
+
+
+def _build_market_watch_panel(state: GameState) -> Panel:
+    market_profile = get_market_profile(state.market_cycle)
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Cycle", state.market_cycle.value)
+    table.add_row("Turns Left", str(state.market_cycle_turns_remaining))
+    table.add_row("Competitors", str(len(state.competitors)))
+    table.add_row("Plan Due", "yes" if is_quarter_plan_due(state) else "no")
+    table.add_row("Summary", market_profile.description)
+    return Panel(table, title="Market Watch", border_style="red", expand=True)
+
+
+def _build_competitor_table(state: GameState) -> Table:
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("#", justify="center", style="bold cyan")
+    table.add_column("Competitor", style="bold")
+    table.add_column("Segment")
+    table.add_column("Strength", justify="right")
+    table.add_column("Agg", justify="right")
+    table.add_column("Products", justify="right")
+    table.add_column("Price")
+
+    for index, competitor in enumerate(state.competitors, start=1):
+        table.add_row(
+            str(index),
+            competitor.name,
+            competitor.focus_segment.value,
+            str(competitor.strength),
+            str(competitor.aggression),
+            str(competitor.active_product_count),
+            competitor.pricing_tier.value,
+        )
+    return table
 
 
 def _build_turn_history_table(state: GameState) -> Table:
@@ -862,3 +944,7 @@ def _build_turn_history_table(state: GameState) -> Table:
             entry.roadmap_focus.value,
         )
     return table
+
+
+def _format_progress(value: float) -> str:
+    return f"{min(999, int(value * 100))}%"

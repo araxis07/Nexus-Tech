@@ -7,14 +7,17 @@ import pytest
 
 from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
+    BudgetStance,
     Company,
     CompanyStrategy,
+    Competitor,
     Employee,
     EmployeeRole,
     EventCategory,
     EventHistoryEntry,
     GameState,
     LifecycleStage,
+    MarketCycle,
     MarketSegment,
     MilestoneEntry,
     MilestoneId,
@@ -39,12 +42,20 @@ from nexus_tech.simulation.events import (
     select_event_definition,
     select_weighted_definition,
 )
-from nexus_tech.simulation.growth import calculate_churned_users
+from nexus_tech.simulation.growth import (
+    calculate_acquired_users,
+    calculate_churned_users,
+    calculate_effective_churn_rate_for_context,
+)
+from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_score
-from nexus_tech.simulation.team import calculate_effective_productivity
+from nexus_tech.simulation.team import (
+    calculate_effective_productivity,
+    calculate_product_team_modifier,
+)
 
 
 class FixedRandom:
@@ -131,15 +142,19 @@ def make_employee(
 def make_state(
     *products: Product,
     employees: list[Employee] | None = None,
+    competitors: list[Competitor] | None = None,
     cash_on_hand: Decimal = Decimal("6000.00"),
     strategy: CompanyStrategy = CompanyStrategy.BALANCED,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     current_turn: int = 1,
+    market_cycle: MarketCycle = MarketCycle.STEADY,
+    market_cycle_turns_remaining: int = 3,
+    budget_stance: BudgetStance = BudgetStance.BALANCED,
     pending_event: PendingEvent | None = None,
     event_history: list[EventHistoryEntry] | None = None,
     milestone_history: list[MilestoneEntry] | None = None,
 ) -> GameState:
-    return GameState(
+    state = GameState(
         company=Company(
             name="NEXUS TECH",
             cash_on_hand=cash_on_hand,
@@ -149,13 +164,18 @@ def make_state(
         ),
         products=list(products),
         employees=employees or [],
+        competitors=competitors or [],
         pending_event=pending_event,
         event_history=event_history or [],
         milestone_history=milestone_history or [],
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=max(1, current_turn - 1),
+        market_cycle=market_cycle,
+        market_cycle_turns_remaining=market_cycle_turns_remaining,
         action_points_remaining=BALANCE.actions_per_turn,
     )
+    state.quarter_plan = build_quarter_plan(state, budget_stance=budget_stance)
+    return state
 
 
 def test_product_operating_cost_includes_support_and_technical_debt() -> None:
@@ -413,6 +433,101 @@ def test_set_roadmap_updates_state_and_platform_rebuild_changes_execution_profil
         debt_reduction.state.products[0].technical_debt
         < platform_state.products[0].technical_debt
     )
+
+
+def test_set_budget_stance_action_refreshes_quarter_plan_targets() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    original_plan = state.quarter_plan.model_copy(deep=True)
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_BUDGET_STANCE,
+        context=ActionContext(budget_stance=BudgetStance.AGGRESSIVE),
+    )
+
+    assert outcome.state.quarter_plan.budget_stance is BudgetStance.AGGRESSIVE
+    assert outcome.state.quarter_plan.set_turn == state.company.current_turn
+    assert outcome.state.quarter_plan.headcount_cap >= original_plan.headcount_cap
+
+
+def test_expanding_market_cycle_improves_acquisition_vs_cooling() -> None:
+    product = make_product(
+        "Core",
+        quality=72,
+        market_fit=68,
+        bug_level=12,
+        technical_debt=16,
+        user_count=80,
+        target_segment=MarketSegment.STARTUP,
+    )
+    company = Company(
+        name="NEXUS TECH",
+        cash_on_hand=Decimal("6000.00"),
+        reputation=58,
+        strategy=CompanyStrategy.BALANCED,
+        current_turn=3,
+    )
+    team_modifier = calculate_product_team_modifier([], product.id)
+
+    cooling = calculate_acquired_users(
+        company,
+        product,
+        FixedRandom(0),
+        team_modifier,
+        market_cycle=MarketCycle.COOLING,
+    )
+    expanding = calculate_acquired_users(
+        company,
+        product,
+        FixedRandom(0),
+        team_modifier,
+        market_cycle=MarketCycle.EXPANDING,
+    )
+
+    assert expanding > cooling
+
+
+def test_matching_competitor_increases_effective_churn_rate() -> None:
+    product = make_product(
+        "Core",
+        pricing_tier=PricingTier.STANDARD,
+        target_segment=MarketSegment.STARTUP,
+        user_count=120,
+        quality=58,
+        market_fit=50,
+        bug_level=22,
+        technical_debt=24,
+    )
+    competitor = Competitor(
+        name="Pressure Labs",
+        focus_segment=MarketSegment.STARTUP,
+        strength=74,
+        aggression=69,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=3,
+    )
+
+    baseline = calculate_effective_churn_rate_for_context(
+        product,
+        current_turn=4,
+        market_cycle=MarketCycle.STEADY,
+        competitors=[],
+    )
+    pressured = calculate_effective_churn_rate_for_context(
+        product,
+        current_turn=4,
+        market_cycle=MarketCycle.STEADY,
+        competitors=[competitor],
+    )
+
+    assert pressured > baseline
+
+
+def test_quarter_plan_due_when_target_turn_has_passed() -> None:
+    state = make_state(make_product("Core"), current_turn=5)
+    state.quarter_plan.target_turn = 4
+
+    assert is_quarter_plan_due(state) is True
 
 
 def test_create_product_validation_rejects_duplicate_names() -> None:

@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from nexus_tech.config import DEFAULT_SCENARIO_ID
 from nexus_tech.content.loader import get_product_template
-from nexus_tech.domain.models import CompanyStrategy, EmployeeRole, PricingTier, TurnAction
+from nexus_tech.domain.models import (
+    BudgetStance,
+    CompanyStrategy,
+    EmployeeRole,
+    MarketCycle,
+    PricingTier,
+    TurnAction,
+)
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game
 from nexus_tech.simulation.scenarios import (
     create_product_from_template,
@@ -26,6 +33,9 @@ def test_create_new_game_uses_selected_scenario_defaults() -> None:
     assert state.company.strategy is CompanyStrategy.BALANCED
     assert len(state.products) == 2
     assert len(state.employees) == 2
+    assert len(state.competitors) >= 1
+    assert state.market_cycle is MarketCycle.EXPANDING
+    assert state.quarter_plan.budget_stance is BudgetStance.BALANCED
     assert state.products[0].name == "OpsBoard"
     assert state.products[1].pricing_tier is PricingTier.BUDGET
     assert state.employees[0].role is EmployeeRole.ENGINEER

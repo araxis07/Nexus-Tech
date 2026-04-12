@@ -70,5 +70,41 @@
     "churn_rate": "0.0820",
     "target_segment": "smb",
     "pricing_tier": "standard"
+  },
+  {
+    "template_id": "enterprise_suite",
+    "title": "Enterprise Suite",
+    "description": "A higher-touch enterprise workflow product with strong monetization and slower acquisition.",
+    "lifecycle_stage": "prototype",
+    "quality": 50,
+    "bug_level": 13,
+    "market_fit": 32,
+    "technical_debt": 18,
+    "user_count": 0,
+    "revenue_per_user": "78.00",
+    "feature_count": 0,
+    "maintenance_cost": "320.00",
+    "acquisition_rate": "0.0240",
+    "churn_rate": "0.0600",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium"
+  },
+  {
+    "template_id": "creator_tool",
+    "title": "Creator Tool",
+    "description": "A lightweight creator-facing tool with fast growth potential, low ARPU, and sharp competitive pressure.",
+    "lifecycle_stage": "prototype",
+    "quality": 43,
+    "bug_level": 19,
+    "market_fit": 40,
+    "technical_debt": 24,
+    "user_count": 0,
+    "revenue_per_user": "14.00",
+    "feature_count": 0,
+    "maintenance_cost": "160.00",
+    "acquisition_rate": "0.0680",
+    "churn_rate": "0.0940",
+    "target_segment": "indie",
+    "pricing_tier": "budget"
   }
 ]

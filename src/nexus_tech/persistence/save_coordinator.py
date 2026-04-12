@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     EventHistoryEntry,
     EventOption,
     GameState,
+    MarketCycle,
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
@@ -20,10 +21,12 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.persistence.company_repository import CompanyRepository
+from nexus_tech.persistence.competitor_repository import CompetitorRepository
 from nexus_tech.persistence.database import DatabaseManager
 from nexus_tech.persistence.employee_repository import EmployeeRepository
 from nexus_tech.persistence.errors import CorruptSaveError, PersistenceError, SaveNotFoundError
 from nexus_tech.persistence.product_repository import ProductRepository
+from nexus_tech.persistence.quarter_plan_repository import QuarterPlanRepository
 from nexus_tech.simulation.randomness import RandomSource
 
 try:
@@ -52,6 +55,8 @@ class SaveLoadCoordinator:
         self.company_repository = CompanyRepository()
         self.product_repository = ProductRepository()
         self.employee_repository = EmployeeRepository()
+        self.competitor_repository = CompetitorRepository()
+        self.quarter_plan_repository = QuarterPlanRepository()
 
     def initialize(self) -> None:
         """Create the database and schema if needed."""
@@ -75,6 +80,8 @@ class SaveLoadCoordinator:
                     scenario_title=state.scenario_title,
                     roadmap_focus=state.roadmap_focus,
                     roadmap_set_turn=state.roadmap_set_turn,
+                    market_cycle=state.market_cycle,
+                    market_cycle_turns_remaining=state.market_cycle_turns_remaining,
                     victory_achieved=state.victory_achieved,
                     victory_reason=state.victory_reason,
                     timestamp=timestamp,
@@ -82,6 +89,8 @@ class SaveLoadCoordinator:
                 self.company_repository.save(connection, slot_name, state.company)
                 self.product_repository.save_all(connection, slot_name, state.products)
                 self.employee_repository.save_all(connection, slot_name, state.employees)
+                self.competitor_repository.save_all(connection, slot_name, state.competitors)
+                self.quarter_plan_repository.save(connection, slot_name, state.quarter_plan)
                 self._save_pending_event(connection, slot_name, state.pending_event)
                 self._save_event_history(connection, slot_name, state.event_history)
                 self._save_milestone_history(connection, slot_name, state.milestone_history)
@@ -108,6 +117,8 @@ class SaveLoadCoordinator:
                         scenario_title,
                         roadmap_focus,
                         roadmap_set_turn,
+                        market_cycle,
+                        market_cycle_turns_remaining,
                         victory_achieved,
                         victory_reason
                     FROM save_slots
@@ -128,6 +139,10 @@ class SaveLoadCoordinator:
                         raise CorruptSaveError("Save slot is missing product state.")
 
                     employees = self.employee_repository.load_all(connection, slot_name)
+                    competitors = self.competitor_repository.load_all(connection, slot_name)
+                    quarter_plan = self.quarter_plan_repository.load(connection, slot_name)
+                    if quarter_plan is None:
+                        raise CorruptSaveError("Save slot is missing quarter plan state.")
                     pending_event = self._load_pending_event(connection, slot_name)
                     event_history = self._load_event_history(connection, slot_name)
                     milestone_history = self._load_milestone_history(connection, slot_name)
@@ -148,11 +163,15 @@ class SaveLoadCoordinator:
                         company=company,
                         products=products,
                         employees=employees,
+                        competitors=competitors,
+                        quarter_plan=quarter_plan,
                         pending_event=pending_event,
                         event_history=event_history,
                         milestone_history=milestone_history,
                         roadmap_focus=RoadmapFocus(slot_row["roadmap_focus"]),
                         roadmap_set_turn=slot_row["roadmap_set_turn"],
+                        market_cycle=MarketCycle(slot_row["market_cycle"]),
+                        market_cycle_turns_remaining=slot_row["market_cycle_turns_remaining"],
                         turn_history=turn_history,
                         victory_achieved=bool(slot_row["victory_achieved"]),
                         victory_reason=slot_row["victory_reason"],
@@ -202,6 +221,8 @@ class SaveLoadCoordinator:
         scenario_title: str,
         roadmap_focus: RoadmapFocus,
         roadmap_set_turn: int,
+        market_cycle: MarketCycle,
+        market_cycle_turns_remaining: int,
         victory_achieved: bool,
         victory_reason: str | None,
         timestamp: str,
@@ -222,12 +243,14 @@ class SaveLoadCoordinator:
                     scenario_title,
                     roadmap_focus,
                     roadmap_set_turn,
+                    market_cycle,
+                    market_cycle_turns_remaining,
                     victory_achieved,
                     victory_reason,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
@@ -238,6 +261,8 @@ class SaveLoadCoordinator:
                     scenario_title,
                     roadmap_focus.value,
                     roadmap_set_turn,
+                    market_cycle.value,
+                    market_cycle_turns_remaining,
                     int(victory_achieved),
                     victory_reason,
                     timestamp,
@@ -256,6 +281,8 @@ class SaveLoadCoordinator:
                 scenario_title = ?,
                 roadmap_focus = ?,
                 roadmap_set_turn = ?,
+                market_cycle = ?,
+                market_cycle_turns_remaining = ?,
                 victory_achieved = ?,
                 victory_reason = ?,
                 updated_at = ?
@@ -269,6 +296,8 @@ class SaveLoadCoordinator:
                 scenario_title,
                 roadmap_focus.value,
                 roadmap_set_turn,
+                market_cycle.value,
+                market_cycle_turns_remaining,
                 int(victory_achieved),
                 victory_reason,
                 timestamp,

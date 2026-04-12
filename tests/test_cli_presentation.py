@@ -12,17 +12,22 @@ import nexus_tech.cli as cli_module
 from nexus_tech.cli import app
 from nexus_tech.content.models import ScenarioDefinition, ScenarioProductSeed
 from nexus_tech.domain.models import (
+    BudgetStance,
     Company,
     CompanyStrategy,
+    Competitor,
     Employee,
     EmployeeRole,
     EventCategory,
     EventOption,
     GameState,
     LifecycleStage,
+    MarketCycle,
     MarketSegment,
     PendingEvent,
+    PricingTier,
     Product,
+    QuarterPlan,
     RoadmapFocus,
     Seniority,
     TurnLedgerEntry,
@@ -113,6 +118,23 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
             roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         )
     ]
+    competitor = Competitor(
+        name="Atlas Rival",
+        focus_segment=MarketSegment.STARTUP,
+        strength=63,
+        aggression=59,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=2,
+    )
+    quarter_plan = QuarterPlan(
+        budget_stance=BudgetStance.BALANCED,
+        set_turn=2,
+        target_turn=4,
+        revenue_target=Decimal("1400.00"),
+        user_target=75,
+        cash_reserve_target=Decimal("9000.00"),
+        headcount_cap=3,
+    )
     return GameState(
         company=Company(
             name="NEXUS TECH",
@@ -122,9 +144,13 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         ),
         products=[primary_product, secondary_product],
         employees=[employee],
+        competitors=[competitor],
+        quarter_plan=quarter_plan,
         pending_event=pending_event,
         roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         roadmap_set_turn=2,
+        market_cycle=MarketCycle.EXPANDING,
+        market_cycle_turns_remaining=2,
         turn_history=turn_history,
         action_points_remaining=BALANCE.actions_per_turn,
     )
@@ -380,6 +406,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Team Table" in output
     assert "Action Menu" in output
     assert "Event Notification" in output
+    assert "Market Watch" in output
     assert "Strategy" in output
     assert "Price" in output
     assert "Roadmap" in output
@@ -411,6 +438,8 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Run Overview" in output
     assert "Scorecard" in output
     assert "Turn History" in output
+    assert "Quarter Plan" in output
+    assert "Competitor Watch" in output
     assert "Estimated Value" in output
 
 
