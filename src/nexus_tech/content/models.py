@@ -10,7 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     CompanyStrategy,
+    DifficultyMode,
     EmployeeRole,
     LifecycleStage,
     MarketCycle,
@@ -161,6 +163,8 @@ class ScenarioDefinition(BaseModel):
     description: str = Field(min_length=1, max_length=240)
     company_name: str = Field(min_length=1, max_length=80)
     company_strategy: CompanyStrategy = CompanyStrategy.BALANCED
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD
+    campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION
     budget_stance: BudgetStance = BudgetStance.BALANCED
     market_cycle: MarketCycle = MarketCycle.STEADY

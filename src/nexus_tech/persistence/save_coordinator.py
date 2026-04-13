@@ -10,6 +10,8 @@ from pathlib import Path
 from uuid import UUID
 
 from nexus_tech.domain.models import (
+    CampaignGoalId,
+    DifficultyMode,
     EventCategory,
     EventHistoryEntry,
     EventOption,
@@ -99,6 +101,8 @@ class SaveLoadCoordinator:
                     rng_state=rng.export_state(),
                     scenario_id=state.scenario_id,
                     scenario_title=state.scenario_title,
+                    difficulty_mode=state.difficulty_mode,
+                    campaign_goal_id=state.campaign_goal_id,
                     roadmap_focus=state.roadmap_focus,
                     roadmap_set_turn=state.roadmap_set_turn,
                     market_cycle=state.market_cycle,
@@ -138,6 +142,8 @@ class SaveLoadCoordinator:
                         rng_state,
                         scenario_id,
                         scenario_title,
+                        difficulty_mode,
+                        campaign_goal_id,
                         roadmap_focus,
                         roadmap_set_turn,
                         market_cycle,
@@ -204,6 +210,8 @@ class SaveLoadCoordinator:
                         victory_reason=slot_row["victory_reason"],
                         scenario_id=slot_row["scenario_id"],
                         scenario_title=slot_row["scenario_title"],
+                        difficulty_mode=DifficultyMode(slot_row["difficulty_mode"]),
+                        campaign_goal_id=CampaignGoalId(slot_row["campaign_goal_id"]),
                         action_points_remaining=slot_row["action_points_remaining"],
                     )
                 except (ValueError, TypeError) as error:
@@ -352,6 +360,8 @@ class SaveLoadCoordinator:
         rng_state: str,
         scenario_id: str,
         scenario_title: str,
+        difficulty_mode: DifficultyMode,
+        campaign_goal_id: CampaignGoalId,
         roadmap_focus: RoadmapFocus,
         roadmap_set_turn: int,
         market_cycle: MarketCycle,
@@ -374,6 +384,8 @@ class SaveLoadCoordinator:
                     rng_state,
                     scenario_id,
                     scenario_title,
+                    difficulty_mode,
+                    campaign_goal_id,
                     roadmap_focus,
                     roadmap_set_turn,
                     market_cycle,
@@ -383,7 +395,7 @@ class SaveLoadCoordinator:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
@@ -392,6 +404,8 @@ class SaveLoadCoordinator:
                     rng_state,
                     scenario_id,
                     scenario_title,
+                    difficulty_mode.value,
+                    campaign_goal_id.value,
                     roadmap_focus.value,
                     roadmap_set_turn,
                     market_cycle.value,
@@ -412,6 +426,8 @@ class SaveLoadCoordinator:
                 rng_state = ?,
                 scenario_id = ?,
                 scenario_title = ?,
+                difficulty_mode = ?,
+                campaign_goal_id = ?,
                 roadmap_focus = ?,
                 roadmap_set_turn = ?,
                 market_cycle = ?,
@@ -427,6 +443,8 @@ class SaveLoadCoordinator:
                 rng_state,
                 scenario_id,
                 scenario_title,
+                difficulty_mode.value,
+                campaign_goal_id.value,
                 roadmap_focus.value,
                 roadmap_set_turn,
                 market_cycle.value,

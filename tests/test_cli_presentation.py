@@ -14,9 +14,11 @@ from nexus_tech.cli import app
 from nexus_tech.content.models import ScenarioDefinition, ScenarioProductSeed
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     Company,
     CompanyStrategy,
     Competitor,
+    DifficultyMode,
     Employee,
     EmployeeRole,
     EventCategory,
@@ -170,6 +172,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "load-game",
         "continue-last-game",
         "list-templates",
+        "list-goals",
         "list-saves",
         "rename-save",
         "delete-save",
@@ -189,6 +192,8 @@ def test_root_command_dispatches_to_start_new_game(
         company_name: str | None,
         product_name: str | None,
         scenario_id: str,
+        difficulty_mode: DifficultyMode | None,
+        campaign_goal_id: CampaignGoalId | None,
         seed: int | None,
         db_path: Path,
         slot_name: str,
@@ -197,6 +202,8 @@ def test_root_command_dispatches_to_start_new_game(
             company_name=company_name,
             product_name=product_name,
             scenario_id=scenario_id,
+            difficulty_mode=difficulty_mode,
+            campaign_goal_id=campaign_goal_id,
             seed=seed,
             db_path=db_path,
             slot_name=slot_name,
@@ -214,6 +221,10 @@ def test_root_command_dispatches_to_start_new_game(
             "Alpha",
             "--scenario",
             "vc_sprint",
+            "--difficulty",
+            "founder",
+            "--goal",
+            "portfolio_empire",
             "--seed",
             "13",
             "--db-path",
@@ -228,6 +239,8 @@ def test_root_command_dispatches_to_start_new_game(
         "company_name": "Demo Corp",
         "product_name": "Alpha",
         "scenario_id": "vc_sprint",
+        "difficulty_mode": DifficultyMode.FOUNDER,
+        "campaign_goal_id": CampaignGoalId.PORTFOLIO_EMPIRE,
         "seed": 13,
         "db_path": db_path,
         "slot_name": "showcase",
@@ -244,6 +257,8 @@ def test_new_game_command_dispatches_to_start_new_game(
         company_name: str | None,
         product_name: str | None,
         scenario_id: str,
+        difficulty_mode: DifficultyMode | None,
+        campaign_goal_id: CampaignGoalId | None,
         seed: int | None,
         db_path: Path,
         slot_name: str,
@@ -252,6 +267,8 @@ def test_new_game_command_dispatches_to_start_new_game(
             company_name=company_name,
             product_name=product_name,
             scenario_id=scenario_id,
+            difficulty_mode=difficulty_mode,
+            campaign_goal_id=campaign_goal_id,
             seed=seed,
             db_path=db_path,
             slot_name=slot_name,
@@ -282,6 +299,8 @@ def test_new_game_command_dispatches_to_start_new_game(
     assert result.exit_code == 0
     assert captured["product_name"] == "Beta"
     assert captured["scenario_id"] == "bootstrap_studio"
+    assert captured["difficulty_mode"] is None
+    assert captured["campaign_goal_id"] is None
     assert captured["seed"] == 21
     assert captured["db_path"] == db_path
     assert captured["slot_name"] == "slot-b"
@@ -329,11 +348,20 @@ def test_list_templates_command_renders_catalog(monkeypatch: MonkeyPatch) -> Non
     assert templates[0].title in result.output
 
 
+def test_list_goals_command_renders_catalog() -> None:
+    result = runner.invoke(app, ["list-goals"])
+
+    assert result.exit_code == 0
+    assert "Campaign Goals" in result.output
+    assert "profit_machine" in result.output
+    assert "portfolio_empire" in result.output
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.3.0" in result.output
+    assert "NEXUS TECH 0.4.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:

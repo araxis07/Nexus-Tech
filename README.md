@@ -49,6 +49,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, aggression, and tactical momentum
 - Simulate rival moves such as `hold`, `discount_push`, `feature_sprint`, and `retrench`
 - Let rival moves reshape product count and pricing posture over time
+- Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
 - Feel direct trade-offs between customer demand, churn pressure, rivalry, and product positioning
 - Surface market state and competitor posture in dedicated terminal panels for live demos
 
@@ -85,6 +86,8 @@ Each turn represents a business interval. You review the company, choose actions
 
 ### 🏁 Progression
 
+- Choose or inherit a campaign goal such as `profit_machine`, `portfolio_empire`, or `category_leader`
+- Run difficulty profiles with `builder`, `standard`, and `founder` pressure tuning
 - Unlock company milestones as the business scales
 - Track key moments such as traction, cash reserves, team growth, and portfolio expansion
 - Recognize profitable streaks and multi-segment reach as the company matures
@@ -155,6 +158,12 @@ List the available product templates:
 uv run nexus-tech list-templates
 ```
 
+List the available campaign goals:
+
+```bash
+uv run nexus-tech list-goals
+```
+
 Start a named run:
 
 ```bash
@@ -165,6 +174,12 @@ Start from a specific scenario:
 
 ```bash
 uv run nexus-tech new-game --scenario vc_sprint --seed 7
+```
+
+Override the difficulty and campaign goal:
+
+```bash
+uv run nexus-tech new-game --scenario vc_sprint --difficulty founder --goal portfolio_empire
 ```
 
 Load a saved game:

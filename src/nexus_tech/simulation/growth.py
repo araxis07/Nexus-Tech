@@ -8,6 +8,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from nexus_tech.domain.models import (
     Company,
     Competitor,
+    DifficultyMode,
     Employee,
     LifecycleStage,
     MarketCycle,
@@ -15,12 +16,14 @@ from nexus_tech.domain.models import (
     RoadmapFocus,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.pricing import (
     get_pricing_acquisition_bonus,
     get_pricing_churn_modifier,
 )
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.roadmap import get_roadmap_profile
+from nexus_tech.simulation.scaling import calculate_product_scale_pressure
 from nexus_tech.simulation.segments import resolve_segment_dynamics
 from nexus_tech.simulation.strategy import get_strategy_profile
 from nexus_tech.simulation.support import clamp_rate
@@ -63,6 +66,9 @@ def calculate_acquired_users(
     competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
+    portfolio_products: list[Product] | None = None,
+    headcount: int = 0,
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD,
 ) -> int:
     """Estimate new users joining a product this turn."""
 
@@ -96,6 +102,13 @@ def calculate_acquired_users(
         - product.technical_debt
         - BALANCE.acquisition_signal_baseline
     ) // BALANCE.acquisition_signal_divisor
+    difficulty_profile = get_difficulty_profile(difficulty_mode)
+    scale_pressure = calculate_product_scale_pressure(
+        product,
+        portfolio_products or [product],
+        headcount=headcount,
+        current_turn=company.current_turn,
+    )
 
     acquisition = (
         base_from_rate
@@ -106,6 +119,8 @@ def calculate_acquired_users(
         + segment_dynamics.acquisition_bonus
         + strategy_profile.acquisition_bonus
         + roadmap_profile.acquisition_bonus
+        + difficulty_profile.acquisition_bonus
+        - scale_pressure.acquisition_penalty
         + rng.randint(-BALANCE.acquisition_random_swing, BALANCE.acquisition_random_swing)
     )
     acquisition_cap = max(
@@ -131,6 +146,9 @@ def calculate_effective_churn_rate_for_context(
     competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
+    portfolio_products: list[Product] | None = None,
+    headcount: int = 0,
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD,
 ) -> Decimal:
     """Build a churn rate that reflects product health and market context."""
 
@@ -149,6 +167,15 @@ def calculate_effective_churn_rate_for_context(
         pricing_churn_modifier=get_pricing_churn_modifier(product),
     )
     churn_rate += segment_dynamics.churn_modifier
+    difficulty_profile = get_difficulty_profile(difficulty_mode)
+    scale_pressure = calculate_product_scale_pressure(
+        product,
+        portfolio_products or [product],
+        headcount=headcount,
+        current_turn=current_turn,
+    )
+    churn_rate += difficulty_profile.churn_modifier
+    churn_rate += scale_pressure.churn_modifier
 
     if product.market_fit < BALANCE.low_market_fit_threshold:
         churn_rate += Decimal(BALANCE.low_market_fit_churn_penalty) / Decimal("100")
@@ -166,6 +193,9 @@ def calculate_churned_users(
     competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
+    portfolio_products: list[Product] | None = None,
+    headcount: int = 0,
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD,
 ) -> int:
     """Estimate users leaving a product this turn."""
 
@@ -179,6 +209,9 @@ def calculate_churned_users(
         competitors=competitors,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
+        portfolio_products=portfolio_products,
+        headcount=headcount,
+        difficulty_mode=difficulty_mode,
     )
     raw_churn = Decimal(product.user_count) * effective_rate
     churned_users = int(raw_churn.to_integral_value(rounding=ROUND_HALF_UP))
@@ -199,6 +232,9 @@ def resolve_growth(
     competitors: list[Competitor] | None = None,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
     roadmap_set_turn: int = 1,
+    portfolio_products: list[Product] | None = None,
+    headcount: int = 0,
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD,
 ) -> GrowthResult:
     """Resolve both acquisition and churn for one product."""
 
@@ -211,6 +247,9 @@ def resolve_growth(
         competitors=competitors,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
+        portfolio_products=portfolio_products,
+        headcount=headcount,
+        difficulty_mode=difficulty_mode,
     )
     churned_users = calculate_churned_users(
         product,
@@ -220,6 +259,9 @@ def resolve_growth(
         competitors=competitors,
         roadmap_focus=roadmap_focus,
         roadmap_set_turn=roadmap_set_turn,
+        portfolio_products=portfolio_products,
+        headcount=headcount,
+        difficulty_mode=difficulty_mode,
     )
     net_user_delta = acquired_users - churned_users
     return GrowthResult(

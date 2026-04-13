@@ -8,9 +8,11 @@ import pytest
 
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     Company,
     CompanyStrategy,
     Competitor,
+    DifficultyMode,
     Employee,
     EmployeeRole,
     EventCategory,
@@ -180,6 +182,8 @@ def make_state() -> GameState:
         finance=finance,
         competitors=[competitor],
         quarter_plan=quarter_plan,
+        difficulty_mode=DifficultyMode.FOUNDER,
+        campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
         pending_event=pending_event,
         event_history=event_history,
         milestone_history=milestone_history,
@@ -239,6 +243,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     assert {
         "scenario_id",
         "scenario_title",
+        "difficulty_mode",
+        "campaign_goal_id",
         "roadmap_focus",
         "roadmap_set_turn",
         "market_cycle",
@@ -248,7 +254,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     }.issubset(save_slot_columns)
     assert {"target_segment"}.issubset(product_columns)
     assert {"current_move", "momentum"}.issubset(competitor_columns)
-    assert user_version >= 6
+    assert user_version >= 7
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:

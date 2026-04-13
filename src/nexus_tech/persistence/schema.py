@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 7
 
 SCHEMA_STATEMENTS = (
     """
@@ -15,6 +15,8 @@ SCHEMA_STATEMENTS = (
         rng_state TEXT,
         scenario_id TEXT NOT NULL DEFAULT 'founder_journey',
         scenario_title TEXT NOT NULL DEFAULT 'Founder Journey',
+        difficulty_mode TEXT NOT NULL DEFAULT 'standard',
+        campaign_goal_id TEXT NOT NULL DEFAULT 'profit_machine',
         roadmap_focus TEXT NOT NULL DEFAULT 'balanced_execution',
         roadmap_set_turn INTEGER NOT NULL DEFAULT 1,
         market_cycle TEXT NOT NULL DEFAULT 'steady',
@@ -255,6 +257,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="save_slots",
         column_name="scenario_title",
         column_definition="TEXT NOT NULL DEFAULT 'Founder Journey'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="difficulty_mode",
+        column_definition="TEXT NOT NULL DEFAULT 'standard'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="campaign_goal_id",
+        column_definition="TEXT NOT NULL DEFAULT 'profit_machine'",
     )
     _ensure_column(
         connection,

@@ -11,8 +11,10 @@ from nexus_tech.config import DEFAULT_PRODUCT_TEMPLATE_ID, DEFAULT_SCENARIO_ID
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     CompanyStrategy,
     Competitor,
+    DifficultyMode,
     Employee,
     EmployeeRole,
     EventHistoryEntry,
@@ -30,7 +32,12 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign import (
+    CampaignGoalProgress,
+    evaluate_campaign_goal,
+)
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
+from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.economy import (
     calculate_product_operating_cost,
     calculate_product_revenue,
@@ -79,6 +86,7 @@ from nexus_tech.simulation.roadmap import (
     get_roadmap_profile,
     is_roadmap_due,
 )
+from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.scenarios import (
     create_game_state_from_scenario,
     create_product_from_template,
@@ -174,6 +182,8 @@ class TurnResolution:
     quarter_plan_due: bool
     market_cycle: MarketCycle
     market_cycle_changed: bool
+    campaign_goal_progress: CampaignGoalProgress
+    scale_pressure_summary: str
     victory_reason: str | None
     narrative: str
 
@@ -183,14 +193,21 @@ def create_new_game(
     product_name: str | None = None,
     *,
     scenario_id: str = DEFAULT_SCENARIO_ID,
+    difficulty_mode: DifficultyMode | None = None,
+    campaign_goal_id: CampaignGoalId | None = None,
 ) -> GameState:
     """Create the initial playable game state from a selected scenario."""
 
-    return create_game_state_from_scenario(
+    state = create_game_state_from_scenario(
         scenario_id,
         company_name=company_name,
         primary_product_name=product_name,
     )
+    if difficulty_mode is not None:
+        state.difficulty_mode = difficulty_mode
+    if campaign_goal_id is not None:
+        state.campaign_goal_id = campaign_goal_id
+    return state
 
 
 def apply_action(
@@ -550,11 +567,20 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         roadmap_set_turn=next_state.roadmap_set_turn,
         current_turn=resolved_turn,
     )
+    difficulty_profile = get_difficulty_profile(next_state.difficulty_mode)
+    scale_pressure = calculate_company_scale_pressure(
+        next_state.products,
+        headcount=len(next_state.employees),
+        current_turn=resolved_turn,
+    )
     baseline_operating_cost = quantize_money(
         BALANCE.base_operating_cost
         + company_strategy_profile.operating_cost_modifier
         + budget_profile.operating_cost_modifier
         + roadmap_profile.operating_cost_modifier
+    )
+    baseline_operating_cost = quantize_money(
+        baseline_operating_cost * difficulty_profile.operating_cost_multiplier
     )
 
     total_revenue = calculate_total_revenue(next_state.products)
@@ -563,6 +589,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         current_turn=resolved_turn,
         roadmap_focus=next_state.roadmap_focus,
         roadmap_set_turn=next_state.roadmap_set_turn,
+        headcount=len(next_state.employees),
+        difficulty_mode=next_state.difficulty_mode,
     )
     total_salary_cost = calculate_total_salary_cost(next_state.employees)
     total_operating_cost = calculate_total_operating_cost(
@@ -573,6 +601,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         budget_stance=next_state.quarter_plan.budget_stance,
         roadmap_focus=next_state.roadmap_focus,
         roadmap_set_turn=next_state.roadmap_set_turn,
+        difficulty_mode=next_state.difficulty_mode,
     )
     total_finance_cost = total_operating_cost - (
         baseline_operating_cost + total_product_operating_cost + total_salary_cost
@@ -595,6 +624,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
             current_turn=resolved_turn,
             roadmap_focus=next_state.roadmap_focus,
             roadmap_set_turn=next_state.roadmap_set_turn,
+            portfolio_products=next_state.products,
+            headcount=len(next_state.employees),
+            difficulty_mode=next_state.difficulty_mode,
         )
         team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
         growth_result = resolve_growth(
@@ -606,6 +638,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
             competitors=next_state.competitors,
             roadmap_focus=next_state.roadmap_focus,
             roadmap_set_turn=next_state.roadmap_set_turn,
+            portfolio_products=next_state.products,
+            headcount=len(next_state.employees),
+            difficulty_mode=next_state.difficulty_mode,
         )
         product.user_count = max(0, product.user_count + growth_result.net_user_delta)
 
@@ -658,6 +693,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         net_cash_flow,
         next_state.company.strategy,
         budget_burnout_modifier=budget_profile.burnout_modifier,
+        coordination_burnout_modifier=scale_pressure.coordination_drag
+        + difficulty_profile.burnout_modifier,
     )
 
     event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
@@ -692,6 +729,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     )
     run_score = calculate_run_score(next_state)
     victory_reason = check_victory(next_state)
+    campaign_goal_progress = evaluate_campaign_goal(next_state)
     next_state.victory_achieved = victory_reason is not None
     next_state.victory_reason = victory_reason
     next_state.company.game_over = is_game_over(next_state.company)
@@ -711,6 +749,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         quarter_plan_due=quarter_plan_due,
         market_cycle=next_state.market_cycle,
         market_cycle_changed=market_cycle_changed,
+        campaign_goal_progress=campaign_goal_progress,
+        scale_pressure_summary=scale_pressure.summary,
         victory_reason=victory_reason,
         roadmap_due=roadmap_due,
     )
@@ -739,6 +779,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         quarter_plan_due=quarter_plan_due,
         market_cycle=next_state.market_cycle,
         market_cycle_changed=market_cycle_changed,
+        campaign_goal_progress=campaign_goal_progress,
+        scale_pressure_summary=scale_pressure.summary,
         victory_reason=victory_reason,
         narrative=narrative,
     )
@@ -799,6 +841,8 @@ def build_turn_narrative(
     quarter_plan_due: bool,
     market_cycle: MarketCycle,
     market_cycle_changed: bool,
+    campaign_goal_progress: CampaignGoalProgress,
+    scale_pressure_summary: str,
     victory_reason: str | None,
     roadmap_due: bool,
 ) -> str:
@@ -808,6 +852,8 @@ def build_turn_narrative(
         return "The company ran out of cash. Payroll and product burn outpaced the business."
     if victory_reason is not None:
         return victory_reason
+    if campaign_goal_progress.completed:
+        return f"Campaign goal complete: {campaign_goal_progress.title}."
     if market_cycle_changed:
         return (
             f"The market shifted to {market_cycle.value}. "
@@ -834,6 +880,11 @@ def build_turn_narrative(
         summary.competitor_pressure >= 8 for summary in declining_products
     ):
         return f"Rivals are pressing harder: {competitor_summary}."
+    if team_condition.burned_out_count > 0 and scale_pressure_summary.startswith("Coordination"):
+        return (
+            "Scale is starting to drag on execution. "
+            "Coordination load now needs active management."
+        )
     if net_cash_flow > ZERO_MONEY and len(expanding_products) >= 2:
         return "The portfolio and team are compounding together."
     if declining_products and reputation_delta < 0:
@@ -849,4 +900,4 @@ def build_turn_narrative(
         return "Your team is converting effort into growth and cash flow."
     if net_cash_flow < ZERO_MONEY:
         return "The company is still buying time. Payroll pressure is now part of the puzzle."
-    return "The company held steady this turn."
+    return scale_pressure_summary

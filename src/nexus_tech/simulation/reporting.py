@@ -9,6 +9,8 @@ from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import GameState, RoadmapFocus, TurnLedgerEntry
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign import check_campaign_goal_victory, evaluate_campaign_goal
+from nexus_tech.simulation.difficulty import get_difficulty_profile
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ def calculate_run_score(state: GameState) -> RunScore:
         + (mature_products * BALANCE.score_mature_product_bonus)
         + (active_products * BALANCE.score_active_product_bonus)
         + (len(state.milestone_history) * BALANCE.score_milestone_bonus)
+        + get_difficulty_profile(state.difficulty_mode).score_modifier
         - int(
             (state.finance.debt_principal / BALANCE.finance_score_debt_divisor)
             .to_integral_value()
@@ -77,6 +80,8 @@ def calculate_run_score(state: GameState) -> RunScore:
             .to_integral_value()
         )
     )
+    if evaluate_campaign_goal(state).completed:
+        total_score += BALANCE.score_campaign_goal_bonus[state.campaign_goal_id.value]
     if total_score >= 220:
         score_tier = "breakout"
     elif total_score >= 170:
@@ -117,7 +122,7 @@ def check_victory(state: GameState) -> str | None:
     """Return a victory reason when the company has reached durable scale."""
 
     if state.company.current_turn < BALANCE.victory_min_turn:
-        return None
+        return check_campaign_goal_victory(state)
 
     score = calculate_run_score(state)
     if (
@@ -133,7 +138,7 @@ def check_victory(state: GameState) -> str | None:
             "You built a durable software company with enough traction, runway, "
             "and portfolio depth to count as a real winner."
         )
-    return None
+    return check_campaign_goal_victory(state)
 
 
 def get_total_users(state: GameState) -> int:

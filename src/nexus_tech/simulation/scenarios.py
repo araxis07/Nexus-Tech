@@ -48,6 +48,8 @@ def create_game_state_from_scenario(
         products=products,
         employees=employees,
         finance=_build_scenario_finance(scenario.finance),
+        difficulty_mode=scenario.difficulty_mode,
+        campaign_goal_id=scenario.campaign_goal_id,
         competitors=competitors,
         roadmap_focus=scenario.roadmap_focus,
         roadmap_set_turn=1,

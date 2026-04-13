@@ -93,6 +93,14 @@ class MarketCycle(StrEnum):
     FROTHY = "frothy"
 
 
+class DifficultyMode(StrEnum):
+    """Run difficulty profile used to tune pressure and pacing."""
+
+    BUILDER = "builder"
+    STANDARD = "standard"
+    FOUNDER = "founder"
+
+
 class CompetitorMove(StrEnum):
     """Current tactical posture used by a competitor this turn."""
 
@@ -138,6 +146,14 @@ class FundingType(StrEnum):
     ANGEL = "angel"
     VENTURE = "venture"
     LOAN = "loan"
+
+
+class CampaignGoalId(StrEnum):
+    """Optional long-form company objective for one run."""
+
+    PROFIT_MACHINE = "profit_machine"
+    PORTFOLIO_EMPIRE = "portfolio_empire"
+    CATEGORY_LEADER = "category_leader"
 
 
 class TurnAction(StrEnum):
@@ -431,6 +447,8 @@ class GameState(BaseModel):
     roadmap_set_turn: int = Field(default=1, ge=1)
     market_cycle: MarketCycle = MarketCycle.STEADY
     market_cycle_turns_remaining: int = Field(default=3, ge=1)
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD
+    campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE
     competitors: list[Competitor] = Field(default_factory=list)
     quarter_plan: QuarterPlan = Field(default_factory=QuarterPlan)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)

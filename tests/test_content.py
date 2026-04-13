@@ -6,7 +6,9 @@ from nexus_tech.config import DEFAULT_SCENARIO_ID
 from nexus_tech.content.loader import get_product_template
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     CompanyStrategy,
+    DifficultyMode,
     EmployeeRole,
     MarketCycle,
     PricingTier,
@@ -42,6 +44,8 @@ def test_create_new_game_uses_selected_scenario_defaults() -> None:
     assert len(state.employees) == 2
     assert len(state.competitors) >= 1
     assert state.market_cycle is MarketCycle.EXPANDING
+    assert state.difficulty_mode is DifficultyMode.STANDARD
+    assert state.campaign_goal_id is CampaignGoalId.PORTFOLIO_EMPIRE
     assert state.quarter_plan.budget_stance is BudgetStance.BALANCED
     assert state.products[0].name == "OpsBoard"
     assert state.products[1].pricing_tier is PricingTier.BUDGET
@@ -54,11 +58,15 @@ def test_create_new_game_applies_company_and_primary_product_overrides() -> None
         company_name="Custom Labs",
         product_name="Custom Flagship",
         scenario_id="technical_rebuild",
+        difficulty_mode=DifficultyMode.BUILDER,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
     )
 
     assert state.company.name == "Custom Labs"
     assert state.products[0].name == "Custom Flagship"
     assert state.scenario_title == "Technical Rebuild"
+    assert state.difficulty_mode is DifficultyMode.BUILDER
+    assert state.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE
 
 
 def test_create_product_from_template_uses_template_metrics() -> None:

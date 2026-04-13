@@ -23,7 +23,9 @@ from nexus_tech.config import (
 from nexus_tech.content.models import ProductTemplateDefinition
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     CompanyStrategy,
+    DifficultyMode,
     Employee,
     EmployeeRole,
     GameState,
@@ -39,6 +41,7 @@ from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
     render_action_feedback,
+    render_campaign_goal_catalog,
     render_dashboard,
     render_employee_picker,
     render_event_result,
@@ -57,6 +60,7 @@ from nexus_tech.presentation.dashboard import (
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
 from nexus_tech.simulation.engine import (
     ActionContext,
     apply_action,
@@ -103,6 +107,16 @@ SCENARIO_OPTION = typer.Option(
     DEFAULT_SCENARIO_ID,
     "--scenario",
     help="Starting scenario id. Use 'list-scenarios' to inspect the available catalog.",
+)
+DIFFICULTY_OPTION = typer.Option(
+    None,
+    "--difficulty",
+    help="Optional run difficulty override: builder, standard, or founder.",
+)
+GOAL_OPTION = typer.Option(
+    None,
+    "--goal",
+    help="Optional campaign goal override. Use 'list-goals' to inspect the catalog.",
 )
 
 ACTION_KEYS = {
@@ -165,6 +179,8 @@ def root(
         help="Primary product name override. Applies to the first scenario product.",
     ),
     scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
         None,
         "--seed",
@@ -196,6 +212,8 @@ def root(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario,
+        difficulty_mode=difficulty,
+        campaign_goal_id=goal,
         seed=seed,
         db_path=db_path,
         slot_name=slot,
@@ -215,6 +233,8 @@ def new_game_command(
         help="Primary product name override. Applies to the first scenario product.",
     ),
     scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
         None,
         "--seed",
@@ -229,6 +249,8 @@ def new_game_command(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario,
+        difficulty_mode=difficulty,
+        campaign_goal_id=goal,
         seed=seed,
         db_path=db_path,
         slot_name=slot,
@@ -248,6 +270,8 @@ def play_alias(
         help="Primary product name override. Applies to the first scenario product.",
     ),
     scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
         None,
         "--seed",
@@ -262,6 +286,8 @@ def play_alias(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario,
+        difficulty_mode=difficulty,
+        campaign_goal_id=goal,
         seed=seed,
         db_path=db_path,
         slot_name=slot,
@@ -280,6 +306,13 @@ def list_templates_command() -> None:
     """Print the available product templates."""
 
     render_product_template_catalog(console, get_available_product_templates())
+
+
+@app.command("list-goals")
+def list_goals_command() -> None:
+    """Print the available campaign goals."""
+
+    render_campaign_goal_catalog(console, list_campaign_goals())
 
 
 @app.command("guide")
@@ -422,6 +455,8 @@ def start_new_game(
     company_name: str | None,
     product_name: str | None,
     scenario_id: str,
+    difficulty_mode: DifficultyMode | None,
+    campaign_goal_id: CampaignGoalId | None,
     seed: int | None,
     db_path: Path,
     slot_name: str,
@@ -432,6 +467,8 @@ def start_new_game(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario_id,
+        difficulty_mode=difficulty_mode,
+        campaign_goal_id=campaign_goal_id,
     )
     rng = RandomSource(seed=seed)
     logger.debug(
@@ -446,6 +483,8 @@ def start_new_game(
         console,
         company_name=state.company.name,
         scenario_title=state.scenario_title,
+        difficulty_label=state.difficulty_mode.value,
+        campaign_goal_title=get_campaign_goal(state.campaign_goal_id).title,
         seed=seed,
     )
     run_game_loop(state=state, rng=rng, db_path=db_path, slot_name=slot_name)

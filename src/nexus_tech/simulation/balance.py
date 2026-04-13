@@ -339,6 +339,49 @@ class BalanceConfig:
         }
     )
 
+    difficulty_builder_acquisition_bonus: int = 1
+    difficulty_standard_acquisition_bonus: int = 0
+    difficulty_founder_acquisition_bonus: int = -1
+    difficulty_builder_churn_modifier: Decimal = Decimal("-0.0060")
+    difficulty_standard_churn_modifier: Decimal = Decimal("0.0000")
+    difficulty_founder_churn_modifier: Decimal = Decimal("0.0080")
+    difficulty_builder_operating_cost_multiplier: Decimal = Decimal("0.94")
+    difficulty_standard_operating_cost_multiplier: Decimal = Decimal("1.00")
+    difficulty_founder_operating_cost_multiplier: Decimal = Decimal("1.08")
+    difficulty_builder_burnout_modifier: int = -1
+    difficulty_standard_burnout_modifier: int = 0
+    difficulty_founder_burnout_modifier: int = 1
+    difficulty_builder_score_modifier: int = -12
+    difficulty_standard_score_modifier: int = 0
+    difficulty_founder_score_modifier: int = 16
+
+    scale_late_game_turn_threshold: int = 8
+    scale_turn_pressure_divisor: int = 4
+    scale_feature_pressure_divisor: int = 6
+    scale_maintenance_multiplier_divisor: int = 18
+    scale_feature_maintenance_divisor: int = 24
+    scale_cannibalization_same_segment_penalty: int = 1
+    scale_cannibalization_price_match_penalty: int = 1
+    scale_coordination_headcount_factor: int = 2
+    scale_coordination_relief_base: int = 1
+    scale_coordination_churn_divisor: int = 200
+    scale_segment_saturation_threshold: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 120,
+            "startup": 170,
+            "smb": 135,
+            "enterprise": 90,
+        }
+    )
+    scale_segment_saturation_divisor: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 60,
+            "startup": 70,
+            "smb": 55,
+            "enterprise": 35,
+        }
+    )
+
     competitor_strength_drift_max: int = 3
     competitor_aggression_drift_max: int = 3
     competitor_segment_match_bonus: int = 2
@@ -435,6 +478,13 @@ class BalanceConfig:
     score_mature_product_bonus: int = 20
     score_active_product_bonus: int = 8
     score_milestone_bonus: int = 10
+    score_campaign_goal_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "profit_machine": 24,
+            "portfolio_empire": 32,
+            "category_leader": 28,
+        }
+    )
     valuation_cash_multiplier: Decimal = Decimal("1.00")
     valuation_revenue_multiplier: Decimal = Decimal("12.00")
     valuation_user_multiplier: Decimal = Decimal("14.00")
@@ -445,6 +495,18 @@ class BalanceConfig:
     victory_reputation_threshold: int = 62
     victory_max_debt_threshold: Decimal = Decimal("3000.00")
     victory_max_investor_pressure: int = 45
+    campaign_goal_profit_machine_min_turn: int = 8
+    campaign_goal_profit_machine_cash_target: Decimal = Decimal("12000.00")
+    campaign_goal_profit_machine_streak_target: int = 3
+    campaign_goal_profit_machine_debt_cap: Decimal = Decimal("4500.00")
+    campaign_goal_portfolio_empire_min_turn: int = 10
+    campaign_goal_portfolio_empire_product_target: int = 3
+    campaign_goal_portfolio_empire_user_target: int = 260
+    campaign_goal_portfolio_empire_segment_target: int = 3
+    campaign_goal_category_leader_min_turn: int = 10
+    campaign_goal_category_leader_reputation_target: int = 76
+    campaign_goal_category_leader_quality_target: int = 68
+    campaign_goal_category_leader_mature_product_target: int = 2
 
     event_trigger_min_turn: int = 2
     event_trigger_chance_percent: int = 42

@@ -23,6 +23,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
+from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.market import get_market_profile
@@ -33,6 +34,7 @@ from nexus_tech.simulation.roadmap import (
     get_roadmap_turns_remaining,
     is_roadmap_due,
 )
+from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
 
 
@@ -41,6 +43,8 @@ def render_intro(
     *,
     company_name: str,
     scenario_title: str,
+    difficulty_label: str,
+    campaign_goal_title: str,
     seed: int | None,
 ) -> None:
     """Print the opening game banner."""
@@ -52,6 +56,8 @@ def render_intro(
                 f"[bold cyan]NEXUS TECH[/bold cyan]\n"
                 f"Company: [bold]{company_name}[/bold]\n"
                 f"Scenario: {scenario_title}\n"
+                f"Difficulty: {difficulty_label}\n"
+                f"Campaign Goal: {campaign_goal_title}\n"
                 f"{seed_text}\n\n"
                 "Run a focused local software company from the terminal.\n"
                 "Build products, manage the team, react to events, and keep cash alive."
@@ -69,6 +75,8 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
     table.add_column("Scenario", style="bold")
     table.add_column("Company")
     table.add_column("Strategy")
+    table.add_column("Difficulty")
+    table.add_column("Goal")
     table.add_column("Products", justify="right")
     table.add_column("Team", justify="right")
     table.add_column("Description")
@@ -78,6 +86,8 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
             f"{scenario.title}\n[dim]{scenario.scenario_id}[/dim]",
             scenario.company_name,
             scenario.company_strategy.value,
+            scenario.difficulty_mode.value,
+            scenario.campaign_goal_id.value,
             str(len(scenario.products)),
             str(len(scenario.employees)),
             scenario.description,
@@ -134,6 +144,34 @@ def render_product_template_catalog(
         Panel(
             content,
             title="Product Template Catalog",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+
+
+def render_campaign_goal_catalog(
+    console: Console,
+    goals: tuple[CampaignGoalDefinition, ...],
+) -> None:
+    """Render all available campaign goals."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Goal", style="bold")
+    table.add_column("Description")
+    table.add_column("Outcome")
+
+    for goal in goals:
+        table.add_row(
+            f"{goal.title}\n[dim]{goal.goal_id.value}[/dim]",
+            goal.description,
+            goal.success_text,
+        )
+
+    console.print(
+        Panel(
+            table,
+            title="Campaign Goals",
             border_style="cyan",
             expand=True,
         )
@@ -599,9 +637,12 @@ def _build_company_panel(state: GameState) -> Panel:
         roadmap_set_turn=state.roadmap_set_turn,
         current_turn=state.company.current_turn,
     )
+    goal_progress = evaluate_campaign_goal(state)
     table = Table.grid(padding=(0, 1))
     table.add_row("Name", state.company.name)
     table.add_row("Scenario", state.scenario_title)
+    table.add_row("Difficulty", state.difficulty_mode.value)
+    table.add_row("Goal", goal_progress.title)
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Strategy", state.company.strategy.value)
@@ -617,6 +658,11 @@ def _build_company_panel(state: GameState) -> Panel:
 def _build_totals_panel(state: GameState) -> Panel:
     active_products = [product for product in state.products if product.is_active]
     run_score = calculate_run_score(state)
+    scale_pressure = calculate_company_scale_pressure(
+        state.products,
+        headcount=len(state.employees),
+        current_turn=state.company.current_turn,
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Active Products", str(len(active_products)))
     table.add_row("Portfolio Users", str(get_total_users(state)))
@@ -626,6 +672,8 @@ def _build_totals_panel(state: GameState) -> Panel:
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     table.add_row("Competitors", str(len(state.competitors)))
+    table.add_row("Scale Drag", str(scale_pressure.coordination_drag))
+    table.add_row("Scale State", scale_pressure.summary)
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
 
@@ -920,9 +968,16 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     )
     table.add_row("Burned Out", str(resolution.team_condition.burned_out_count))
     table.add_row("Strategy", resolution.state.company.strategy.value)
+    table.add_row("Difficulty", resolution.state.difficulty_mode.value)
     table.add_row("Budget", resolution.state.quarter_plan.budget_stance.value)
     table.add_row("Roadmap", resolution.roadmap_focus.value)
     table.add_row("Market", resolution.market_cycle.value)
+    table.add_row("Goal", resolution.campaign_goal_progress.title)
+    table.add_row(
+        "Goal State",
+        "complete" if resolution.campaign_goal_progress.completed else "in progress",
+    )
+    table.add_row("Scale State", resolution.scale_pressure_summary)
     table.add_row(
         "Pressure Δ",
         format_signed_int(resolution.finance_summary.investor_pressure_delta),
@@ -1032,6 +1087,7 @@ def format_signed_money(value: Decimal) -> str:
 
 
 def _build_report_overview_panel(state: GameState, total_score: int, score_tier: str) -> Panel:
+    goal_progress = evaluate_campaign_goal(state)
     effective_roadmap = get_effective_roadmap_focus(
         state.roadmap_focus,
         roadmap_set_turn=state.roadmap_set_turn,
@@ -1048,6 +1104,8 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
     table = Table.grid(padding=(0, 1))
     table.add_row("Company", state.company.name)
     table.add_row("Scenario", state.scenario_title)
+    table.add_row("Difficulty", state.difficulty_mode.value)
+    table.add_row("Goal", goal_progress.title)
     table.add_row("Turn", str(state.company.current_turn))
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
@@ -1056,6 +1114,7 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
     table.add_row("Budget", state.quarter_plan.budget_stance.value)
     table.add_row("Market", state.market_cycle.value)
     table.add_row("Run Score", f"{total_score} ({score_tier})")
+    table.add_row("Goal State", "complete" if goal_progress.completed else "in progress")
     return Panel(table, title="Run Overview", border_style="magenta", expand=True)
 
 
@@ -1078,6 +1137,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
 def _build_report_quarter_plan_panel(state: GameState) -> Panel:
     plan = state.quarter_plan
     progress = evaluate_quarter_plan(state)
+    goal_progress = evaluate_campaign_goal(state)
     table = Table.grid(padding=(0, 1))
     table.add_row("Target Turn", str(plan.target_turn))
     table.add_row("Revenue Target", format_money(plan.revenue_target))
@@ -1089,16 +1149,24 @@ def _build_report_quarter_plan_panel(state: GameState) -> Panel:
     table.add_row("Cash Progress", _format_progress(progress.cash_progress))
     table.add_row("Headcount OK", "yes" if progress.headcount_within_cap else "no")
     table.add_row("Plan Due", "yes" if is_quarter_plan_due(state) else "no")
+    for index, line in enumerate(goal_progress.progress_lines, start=1):
+        table.add_row(f"Goal {index}", line)
     return Panel(table, title="Quarter Plan", border_style="cyan", expand=True)
 
 
 def _build_market_watch_panel(state: GameState) -> Panel:
     market_profile = get_market_profile(state.market_cycle)
+    scale_pressure = calculate_company_scale_pressure(
+        state.products,
+        headcount=len(state.employees),
+        current_turn=state.company.current_turn,
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Cycle", state.market_cycle.value)
     table.add_row("Turns Left", str(state.market_cycle_turns_remaining))
     table.add_row("Competitors", str(len(state.competitors)))
     table.add_row("Plan Due", "yes" if is_quarter_plan_due(state) else "no")
+    table.add_row("Scale Drag", str(scale_pressure.coordination_drag))
     table.add_row("Summary", market_profile.description)
     return Panel(table, title="Market Watch", border_style="red", expand=True)
 

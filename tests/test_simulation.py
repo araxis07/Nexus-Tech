@@ -8,10 +8,12 @@ import pytest
 from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
     BudgetStance,
+    CampaignGoalId,
     Company,
     CompanyStrategy,
     Competitor,
     CompetitorMove,
+    DifficultyMode,
     Employee,
     EmployeeRole,
     EventCategory,
@@ -32,6 +34,7 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors
 from nexus_tech.simulation.economy import (
     calculate_total_operating_cost,
@@ -57,6 +60,10 @@ from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_score
+from nexus_tech.simulation.scaling import (
+    calculate_company_scale_pressure,
+    calculate_product_scale_pressure,
+)
 from nexus_tech.simulation.team import (
     calculate_effective_productivity,
     calculate_product_team_modifier,
@@ -156,6 +163,8 @@ def make_state(
     market_cycle: MarketCycle = MarketCycle.STEADY,
     market_cycle_turns_remaining: int = 3,
     budget_stance: BudgetStance = BudgetStance.BALANCED,
+    difficulty_mode: DifficultyMode = DifficultyMode.STANDARD,
+    campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE,
     pending_event: PendingEvent | None = None,
     event_history: list[EventHistoryEntry] | None = None,
     milestone_history: list[MilestoneEntry] | None = None,
@@ -179,6 +188,8 @@ def make_state(
         roadmap_set_turn=max(1, current_turn - 1),
         market_cycle=market_cycle,
         market_cycle_turns_remaining=market_cycle_turns_remaining,
+        difficulty_mode=difficulty_mode,
+        campaign_goal_id=campaign_goal_id,
         action_points_remaining=BALANCE.actions_per_turn,
     )
     state.quarter_plan = build_quarter_plan(state, budget_stance=budget_stance)
@@ -1215,3 +1226,145 @@ def test_competitor_move_and_momentum_raise_pressure() -> None:
     assert aggressive_resolution.product_summaries[0].competitor_pressure > (
         calm_resolution.product_summaries[0].competitor_pressure
     )
+
+
+def test_founder_difficulty_is_harsher_than_builder() -> None:
+    product = make_product("Core", user_count=48, market_fit=60)
+    builder_state = make_state(
+        product.model_copy(deep=True),
+        difficulty_mode=DifficultyMode.BUILDER,
+    )
+    founder_state = make_state(
+        product.model_copy(deep=True),
+        difficulty_mode=DifficultyMode.FOUNDER,
+    )
+
+    builder_cost = calculate_total_operating_cost(
+        builder_state.company,
+        builder_state.products,
+        builder_state.employees,
+        difficulty_mode=builder_state.difficulty_mode,
+    )
+    founder_cost = calculate_total_operating_cost(
+        founder_state.company,
+        founder_state.products,
+        founder_state.employees,
+        difficulty_mode=founder_state.difficulty_mode,
+    )
+    builder_acquisition = calculate_acquired_users(
+        builder_state.company,
+        builder_state.products[0],
+        FixedRandom(0),
+        calculate_product_team_modifier(builder_state.employees, builder_state.products[0].id),
+        difficulty_mode=builder_state.difficulty_mode,
+    )
+    founder_acquisition = calculate_acquired_users(
+        founder_state.company,
+        founder_state.products[0],
+        FixedRandom(0),
+        calculate_product_team_modifier(founder_state.employees, founder_state.products[0].id),
+        difficulty_mode=founder_state.difficulty_mode,
+    )
+
+    assert builder_cost < founder_cost
+    assert builder_acquisition > founder_acquisition
+
+
+def test_scale_pressure_penalizes_crowded_same_segment_portfolio() -> None:
+    crowded_products = [
+        make_product(
+            f"Startup {index}",
+            user_count=210 if index == 0 else 85,
+            target_segment=MarketSegment.STARTUP,
+            pricing_tier=PricingTier.STANDARD,
+            feature_count=5,
+        )
+        for index in range(3)
+    ]
+    focused_products = [
+        make_product(
+            "Focused Core",
+            user_count=210,
+            target_segment=MarketSegment.STARTUP,
+            pricing_tier=PricingTier.STANDARD,
+            feature_count=5,
+        ),
+        make_product(
+            "Ops",
+            user_count=40,
+            target_segment=MarketSegment.SMB,
+            pricing_tier=PricingTier.PREMIUM,
+        ),
+    ]
+
+    crowded_pressure = calculate_product_scale_pressure(
+        crowded_products[0],
+        crowded_products,
+        headcount=2,
+        current_turn=12,
+    )
+    focused_pressure = calculate_product_scale_pressure(
+        focused_products[0],
+        focused_products,
+        headcount=5,
+        current_turn=12,
+    )
+    crowded_company_pressure = calculate_company_scale_pressure(
+        crowded_products,
+        headcount=2,
+        current_turn=12,
+    )
+
+    assert crowded_pressure.acquisition_penalty > focused_pressure.acquisition_penalty
+    assert crowded_pressure.churn_modifier > focused_pressure.churn_modifier
+    assert crowded_company_pressure.coordination_drag > 0
+
+
+def test_campaign_goal_progress_completes_when_profit_machine_is_stable() -> None:
+    state = make_state(
+        make_product("Core", user_count=95, market_fit=70),
+        cash_on_hand=Decimal("13200.00"),
+        current_turn=9,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        finance=FinanceState(debt_principal=Decimal("3200.00")),
+    )
+    state.turn_history = [
+        TurnLedgerEntry(
+            turn=6,
+            total_revenue=Decimal("1900.00"),
+            total_operating_cost=Decimal("1500.00"),
+            net_cash_flow=Decimal("400.00"),
+            cash_on_hand=Decimal("11100.00"),
+            reputation=58,
+            total_users=90,
+            headcount=0,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+        TurnLedgerEntry(
+            turn=7,
+            total_revenue=Decimal("2100.00"),
+            total_operating_cost=Decimal("1600.00"),
+            net_cash_flow=Decimal("500.00"),
+            cash_on_hand=Decimal("11600.00"),
+            reputation=59,
+            total_users=94,
+            headcount=0,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+        TurnLedgerEntry(
+            turn=8,
+            total_revenue=Decimal("2250.00"),
+            total_operating_cost=Decimal("1680.00"),
+            net_cash_flow=Decimal("570.00"),
+            cash_on_hand=Decimal("12170.00"),
+            reputation=60,
+            total_users=95,
+            headcount=0,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+    ]
+
+    progress = evaluate_campaign_goal(state)
+
+    assert progress.completed is True
+    assert progress.title == "Profit Machine"

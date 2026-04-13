@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 - 2026-04-14
+
+- Added run difficulty profiles with `builder`, `standard`, and `founder` tuning
+- Added campaign goals with alternate progression targets and victory paths
+- Added late-game scale pressure from coordination drag, market saturation, cannibalization, and maintenance load
+- Extended the dashboard, report view, and scenario catalog to surface difficulty, campaign goals, and scale state
+- Persisted difficulty and campaign-goal state through SQLite save/load and schema version `7`
+
 ## 0.3.0 - 2026-04-13
 
 - Added save-slot management with list, rename, and delete flows in the CLI

@@ -258,6 +258,7 @@ def apply_end_of_turn_team_drift(
     company_strategy: CompanyStrategy,
     *,
     budget_burnout_modifier: int = 0,
+    coordination_burnout_modifier: int = 0,
 ) -> TeamCondition:
     """Apply burnout and recovery after the turn resolves."""
 
@@ -290,6 +291,7 @@ def apply_end_of_turn_team_drift(
             BALANCE.employee_assigned_energy_loss
             + pressure
             + budget_burnout_modifier
+            + coordination_burnout_modifier
             - burnout_protection
             - strategy_profile.burnout_relief,
         )
