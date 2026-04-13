@@ -15,6 +15,7 @@ from nexus_tech.content.models import ProductTemplateDefinition, ScenarioDefinit
 from nexus_tech.domain.models import (
     Employee,
     EventHistoryEntry,
+    FundingHistoryEntry,
     GameState,
     MilestoneEntry,
     PendingEvent,
@@ -88,6 +89,54 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
         f"[dim]Use --scenario <id>. Available ids: {scenario_ids}[/dim]",
     )
     console.print(Panel(content, title="Scenario Catalog", border_style="cyan", expand=True))
+
+
+def render_product_template_catalog(
+    console: Console,
+    templates: tuple[ProductTemplateDefinition, ...],
+) -> None:
+    """Render the available product templates."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Template", style="bold")
+    table.add_column("Stage")
+    table.add_column("Segment")
+    table.add_column("Price")
+    table.add_column("Q", justify="right")
+    table.add_column("B", justify="right")
+    table.add_column("Fit", justify="right")
+    table.add_column("Debt", justify="right")
+    table.add_column("Description")
+
+    for template in templates:
+        table.add_row(
+            f"{template.title}\n[dim]{template.template_id}[/dim]",
+            template.lifecycle_stage.value,
+            template.target_segment.value,
+            template.pricing_tier.value,
+            str(template.quality),
+            str(template.bug_level),
+            str(template.market_fit),
+            str(template.technical_debt),
+            template.description,
+        )
+
+    template_ids = ", ".join(
+        f"{template.template_id} ({template.title})" for template in templates
+    )
+    content = Group(
+        table,
+        "",
+        f"[dim]Template ids: {template_ids}[/dim]",
+    )
+    console.print(
+        Panel(
+            content,
+            title="Product Template Catalog",
+            border_style="cyan",
+            expand=True,
+        )
+    )
 
 
 def render_dashboard(console: Console, state: GameState) -> None:
@@ -191,6 +240,17 @@ def render_report(console: Console, state: GameState) -> None:
                     border_style="red",
                     expand=True,
                 ),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
+    console.print(
+        Columns(
+            [
+                _build_funding_history_panel(state),
+                _build_recent_events_panel(state),
+                _build_milestone_history_panel(state),
             ],
             equal=True,
             expand=True,
@@ -931,6 +991,7 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Dilution", format_rate(state.finance.equity_dilution))
     table.add_row("Investor Pressure", str(state.finance.investor_pressure))
     table.add_row("Capital Raised", format_money(state.finance.total_raised))
+    table.add_row("Funding Entries", str(len(state.funding_history)))
     table.add_row("Turn Interest", format_money(turn_interest))
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     return Panel(table, title="Finance", border_style="cyan", expand=True)
@@ -993,6 +1054,95 @@ def _build_turn_history_table(state: GameState) -> Table:
             str(entry.headcount),
             entry.roadmap_focus.value,
         )
+    return table
+
+
+def _build_funding_history_panel(state: GameState) -> Panel:
+    if not state.funding_history:
+        return Panel(
+            "No funding actions recorded yet.",
+            title="Funding History",
+            border_style="green",
+            expand=True,
+        )
+
+    return Panel(
+        _build_funding_history_table(state.funding_history),
+        title="Funding History",
+        border_style="green",
+        expand=True,
+    )
+
+
+def _build_recent_events_panel(state: GameState) -> Panel:
+    if not state.event_history:
+        return Panel(
+            "No resolved events yet.",
+            title="Recent Events",
+            border_style="yellow",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Turn", justify="right", style="bold cyan")
+    table.add_column("Event", style="bold")
+    table.add_column("Choice")
+    table.add_column("Outcome")
+
+    for entry in reversed(state.event_history[-5:]):
+        table.add_row(
+            str(entry.resolved_turn),
+            entry.title,
+            entry.selected_option_label,
+            entry.result_text,
+        )
+
+    return Panel(table, title="Recent Events", border_style="yellow", expand=True)
+
+
+def _build_milestone_history_panel(state: GameState) -> Panel:
+    if not state.milestone_history:
+        return Panel(
+            "No milestones unlocked yet.",
+            title="Milestones",
+            border_style="magenta",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Turn", justify="right", style="bold cyan")
+    table.add_column("Milestone", style="bold")
+    table.add_column("Reward")
+
+    for entry in reversed(state.milestone_history[-5:]):
+        table.add_row(
+            str(entry.unlocked_turn),
+            entry.title,
+            entry.reward_text,
+        )
+
+    return Panel(table, title="Milestones", border_style="magenta", expand=True)
+
+
+def _build_funding_history_table(entries: list[FundingHistoryEntry]) -> Table:
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Turn", justify="right", style="bold cyan")
+    table.add_column("Type", style="bold")
+    table.add_column("Amount", justify="right")
+    table.add_column("Dilution", justify="right")
+    table.add_column("Debt", justify="right")
+    table.add_column("Summary")
+
+    for entry in reversed(entries[-5:]):
+        table.add_row(
+            str(entry.turn),
+            entry.funding_type.value,
+            format_money(entry.amount),
+            format_rate(entry.dilution_added),
+            format_money(entry.debt_added),
+            entry.summary,
+        )
+
     return table
 
 

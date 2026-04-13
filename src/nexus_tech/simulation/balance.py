@@ -521,9 +521,37 @@ class BalanceConfig:
     event_competitor_focus_user_loss: int = 3
     event_competitor_focus_reputation_gain: int = 1
 
+    event_referral_wave_weight: int = 5
+    event_referral_wave_cooldown: int = 4
+    event_referral_quality_threshold: int = 68
+    event_referral_bug_threshold: int = 14
+    event_referral_market_fit_threshold: int = 56
+    event_referral_support_cost: Decimal = Decimal("220.00")
+    event_referral_big_user_gain: int = 10
+    event_referral_small_user_gain: int = 5
+    event_referral_acquisition_gain: Decimal = Decimal("0.0060")
+    event_referral_churn_relief: Decimal = Decimal("0.0040")
+    event_referral_quality_gain: int = 1
+    event_referral_team_morale_gain: int = 1
+
+    event_compliance_review_weight: int = 4
+    event_compliance_review_cooldown: int = 5
+    event_compliance_target_user_threshold: int = 18
+    event_compliance_market_fit_threshold: int = 58
+    event_compliance_debt_threshold: int = 34
+    event_compliance_fund_cost: Decimal = Decimal("280.00")
+    event_compliance_debt_reduction: int = 6
+    event_compliance_market_fit_gain: int = 3
+    event_compliance_reputation_gain: int = 2
+    event_compliance_delay_user_loss: int = 4
+    event_compliance_delay_reputation_loss: int = 2
+    event_compliance_delay_churn_increase: Decimal = Decimal("0.0060")
+
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4
     active_products_milestone_threshold: int = 3
+    profitable_streak_turns: int = 3
+    multi_segment_milestone_threshold: int = 3
     milestone_first_100_users_reputation_gain: int = 2
     milestone_cash_reserve_reputation_gain: int = 1
     milestone_team_growth_reputation_gain: int = 1
@@ -531,6 +559,9 @@ class BalanceConfig:
     milestone_active_products_reputation_gain: int = 2
     milestone_first_mature_product_cash_gain: Decimal = Decimal("450.00")
     milestone_first_mature_product_reputation_gain: int = 1
+    milestone_profitable_streak_reputation_gain: int = 2
+    milestone_profitable_streak_morale_gain: int = 2
+    milestone_multi_segment_reputation_gain: int = 2
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

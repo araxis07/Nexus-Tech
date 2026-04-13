@@ -79,12 +79,14 @@ Each turn represents a business interval. You review the company, choose actions
   - reputation incidents
   - employee issues
 - Some events create meaningful player trade-offs instead of simple bonuses
+- New event content includes referral waves and enterprise compliance review pressure
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
 
 - Unlock company milestones as the business scales
 - Track key moments such as traction, cash reserves, team growth, and portfolio expansion
+- Recognize profitable streaks and multi-segment reach as the company matures
 - Set quarter-scale roadmap focuses such as growth push, platform rebuild, premium expansion, and portfolio consolidation
 - Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
 - Work against a quarter plan with explicit revenue, user, cash, and headcount targets
@@ -103,6 +105,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
+- Report now includes recent events, funding history, and milestone history
 - Seeded demo support for reproducible simulations
 
 ### 🧪 Quality and Tooling
@@ -143,6 +146,12 @@ List the available scenarios:
 uv run nexus-tech list-scenarios
 ```
 
+List the available product templates:
+
+```bash
+uv run nexus-tech list-templates
+```
+
 Start a named run:
 
 ```bash
@@ -177,6 +186,12 @@ Show CLI help:
 
 ```bash
 uv run nexus-tech --help
+```
+
+Show the installed version:
+
+```bash
+uv run nexus-tech --version
 ```
 
 ## 🕹️ How to Play

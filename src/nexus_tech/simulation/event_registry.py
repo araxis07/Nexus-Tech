@@ -86,6 +86,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             is_eligible=_is_competitor_pressure_eligible,
             build_pending_event=_build_competitor_pressure_event,
         ),
+        EventDefinition(
+            event_id="referral_wave",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_referral_wave_weight,
+            cooldown_turns=BALANCE.event_referral_wave_cooldown,
+            is_eligible=_is_referral_wave_eligible,
+            build_pending_event=_build_referral_wave_event,
+        ),
+        EventDefinition(
+            event_id="compliance_review",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_compliance_review_weight,
+            cooldown_turns=BALANCE.event_compliance_review_cooldown,
+            is_eligible=_is_compliance_review_eligible,
+            build_pending_event=_build_compliance_review_event,
+        ),
     )
 
 
@@ -197,8 +213,8 @@ def _is_investor_outreach_eligible(state: GameState) -> bool:
         and count_funding_rounds(state.funding_history, FundingType.ANGEL)
         < BALANCE.finance_angel_round_limit
         and (
-        state.company.reputation >= BALANCE.event_investor_reputation_threshold
-        or state.company.cash_on_hand <= BALANCE.event_investor_cash_threshold
+            state.company.reputation >= BALANCE.event_investor_reputation_threshold
+            or state.company.cash_on_hand <= BALANCE.event_investor_cash_threshold
         )
     )
 
@@ -377,6 +393,120 @@ def _build_competitor_pressure_event(
                 id="differentiate",
                 label="Differentiate on quality",
                 description="Defend the brand with product quality, even if growth pauses.",
+            ),
+        ],
+    )
+
+
+def _is_referral_wave_eligible(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.quality >= BALANCE.event_referral_quality_threshold
+        and product.bug_level <= BALANCE.event_referral_bug_threshold
+        and product.market_fit >= BALANCE.event_referral_market_fit_threshold
+        for product in state.products
+    )
+
+
+def _build_referral_wave_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.quality >= BALANCE.event_referral_quality_threshold
+            and product.bug_level <= BALANCE.event_referral_bug_threshold
+            and product.market_fit >= BALANCE.event_referral_market_fit_threshold
+        ],
+        rng,
+        score=lambda product: product.quality + product.market_fit + (product.user_count // 10),
+    )
+    return PendingEvent(
+        event_id="referral_wave",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Customer Referral Wave",
+        description=(
+            f"Happy customers are starting to refer {target.name}. "
+            "You can staff the wave for a stronger conversion bump or protect service levels "
+            "and take a smaller, cleaner gain."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="staff_referrals",
+                label="Staff the referral wave",
+                description="Spend cash to support the influx and convert more users quickly.",
+            ),
+            EventOption(
+                id="protect_service",
+                label="Protect service quality",
+                description="Take a smaller gain while improving product stability for retention.",
+            ),
+        ],
+    )
+
+
+def _is_compliance_review_eligible(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.target_segment.value == "enterprise"
+        and (
+            product.user_count >= BALANCE.event_compliance_target_user_threshold
+            or product.market_fit >= BALANCE.event_compliance_market_fit_threshold
+        )
+        and product.technical_debt >= BALANCE.event_compliance_debt_threshold
+        for product in state.products
+    )
+
+
+def _build_compliance_review_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.target_segment.value == "enterprise"
+            and (
+                product.user_count >= BALANCE.event_compliance_target_user_threshold
+                or product.market_fit >= BALANCE.event_compliance_market_fit_threshold
+            )
+            and product.technical_debt >= BALANCE.event_compliance_debt_threshold
+        ],
+        rng,
+        score=lambda product: product.technical_debt + product.market_fit + product.user_count,
+    )
+    return PendingEvent(
+        event_id="compliance_review",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Compliance Review Request",
+        description=(
+            f"A larger buyer is asking hard questions about {target.name}. "
+            "You can fund a focused compliance sprint now or defer the work "
+            "and absorb the trust hit."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_review",
+                label="Fund a compliance sprint",
+                description="Spend cash to reduce debt, improve fit, and build enterprise trust.",
+            ),
+            EventOption(
+                id="defer_review",
+                label="Defer and keep shipping",
+                description="Save cash now, but risk user loss and weaker market confidence.",
             ),
         ],
     )

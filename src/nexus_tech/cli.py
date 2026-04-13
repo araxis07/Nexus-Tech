@@ -14,6 +14,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.traceback import install as install_rich_traceback
 
+from nexus_tech import __version__
 from nexus_tech.config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_SCENARIO_ID,
@@ -45,6 +46,7 @@ from nexus_tech.presentation.dashboard import (
     render_intro,
     render_pending_event,
     render_product_picker,
+    render_product_template_catalog,
     render_product_template_picker,
     render_report,
     render_scenario_catalog,
@@ -79,6 +81,17 @@ app = typer.Typer(
 console = Console(highlight=False, soft_wrap=True)
 DEBUG_MODE = False
 DEFAULT_DB_PATH = DEFAULT_DATABASE_PATH
+
+
+def show_version_callback(value: bool) -> None:
+    """Print the current package version and exit immediately."""
+
+    if not value:
+        return
+    console.print(f"NEXUS TECH {__version__}")
+    raise typer.Exit()
+
+
 DB_PATH_OPTION = typer.Option(
     DEFAULT_DB_PATH,
     "--db-path",
@@ -160,6 +173,13 @@ def root(
         False,
         "--debug",
         help="Enable debug logging and rich tracebacks for development runs.",
+    ),
+    version: bool = typer.Option(  # noqa: FBT001
+        False,
+        "--version",
+        callback=show_version_callback,
+        is_eager=True,
+        help="Show the installed NEXUS TECH version and exit.",
     ),
 ) -> None:
     """Start a new local game when no subcommand is given."""
@@ -250,6 +270,13 @@ def list_scenarios_command() -> None:
     """Print the available starting scenarios."""
 
     render_scenario_catalog(console, get_available_scenarios())
+
+
+@app.command("list-templates")
+def list_templates_command() -> None:
+    """Print the available product templates."""
+
+    render_product_template_catalog(console, get_available_product_templates())
 
 
 @app.command("load-game")

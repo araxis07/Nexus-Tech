@@ -426,6 +426,101 @@ def _apply_competitor_pressure(state: GameState, event: PendingEvent, option_id:
     raise ValueError(f"Unsupported option {option_id} for competitor pressure.")
 
 
+def _apply_referral_wave(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    support_employees = get_designer_or_marketer_support(state.employees, product.id)
+
+    if option_id == "staff_referrals":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_referral_support_cost
+        )
+        product.user_count += BALANCE.event_referral_big_user_gain
+        product.acquisition_rate = clamp_rate(
+            product.acquisition_rate + BALANCE.event_referral_acquisition_gain
+        )
+        for employee in support_employees:
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.event_referral_team_morale_gain,
+                0,
+                100,
+            )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You staffed the referral wave around {product.name}. Cash "
+            f"-{BALANCE.event_referral_support_cost}, users "
+            f"+{BALANCE.event_referral_big_user_gain}."
+        )
+
+    if option_id == "protect_service":
+        product.user_count += BALANCE.event_referral_small_user_gain
+        product.quality = clamp_int(
+            product.quality + BALANCE.event_referral_quality_gain,
+            0,
+            100,
+        )
+        product.churn_rate = clamp_rate(
+            product.churn_rate - BALANCE.event_referral_churn_relief
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You protected service quality for {product.name}. Users "
+            f"+{BALANCE.event_referral_small_user_gain}, quality "
+            f"+{BALANCE.event_referral_quality_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for referral wave.")
+
+
+def _apply_compliance_review(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "fund_review":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_compliance_fund_cost
+        )
+        product.technical_debt = clamp_int(
+            product.technical_debt - BALANCE.event_compliance_debt_reduction,
+            0,
+            100,
+        )
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_compliance_market_fit_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_compliance_reputation_gain,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You funded a compliance sprint for {product.name}. Cash "
+            f"-{BALANCE.event_compliance_fund_cost}, debt "
+            f"-{BALANCE.event_compliance_debt_reduction}, reputation "
+            f"+{BALANCE.event_compliance_reputation_gain}."
+        )
+
+    if option_id == "defer_review":
+        user_loss = min(product.user_count, BALANCE.event_compliance_delay_user_loss)
+        product.user_count = max(0, product.user_count - user_loss)
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_compliance_delay_reputation_loss,
+            0,
+            100,
+        )
+        product.churn_rate = clamp_rate(
+            product.churn_rate + BALANCE.event_compliance_delay_churn_increase
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You deferred the review for {product.name}. Users -{user_loss}, reputation "
+            f"-{BALANCE.event_compliance_delay_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for compliance review.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -459,4 +554,6 @@ EVENT_EFFECT_HANDLERS = {
     "sudden_press_mention": _apply_sudden_press_mention,
     "team_burnout_spike": _apply_team_burnout_spike,
     "competitor_pressure": _apply_competitor_pressure,
+    "referral_wave": _apply_referral_wave,
+    "compliance_review": _apply_compliance_review,
 }

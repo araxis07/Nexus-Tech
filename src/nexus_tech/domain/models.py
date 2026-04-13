@@ -128,6 +128,8 @@ class MilestoneId(StrEnum):
     TEAM_OF_4 = "team_of_4"
     THREE_ACTIVE_PRODUCTS = "three_active_products"
     FIRST_MATURE_PRODUCT = "first_mature_product"
+    PROFITABLE_STREAK = "profitable_streak"
+    MULTI_SEGMENT_REACH = "multi_segment_reach"
 
 
 class FundingType(StrEnum):

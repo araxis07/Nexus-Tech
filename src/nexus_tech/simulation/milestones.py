@@ -97,6 +97,22 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             ),
             apply_reward=_reward_first_mature_product,
         ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.PROFITABLE_STREAK,
+            title="Profitable Streak",
+            description="The company posted several positive turns in a row.",
+            is_unlocked=_has_profitable_streak,
+            apply_reward=_reward_profitable_streak,
+        ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.MULTI_SEGMENT_REACH,
+            title="Multi-Segment Reach",
+            description="The portfolio is now competing across multiple customer segments.",
+            is_unlocked=lambda state: (
+                len(_get_active_segments(state)) >= BALANCE.multi_segment_milestone_threshold
+            ),
+            apply_reward=_reward_multi_segment_reach,
+        ),
     )
 
 
@@ -152,5 +168,41 @@ def _reward_first_mature_product(state: GameState) -> str:
     )
 
 
+def _reward_profitable_streak(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_profitable_streak_reputation_gain
+    )
+    for employee in state.employees:
+        employee.morale = clamp_int(
+            employee.morale + BALANCE.milestone_profitable_streak_morale_gain
+        )
+    return (
+        f"Reputation +{BALANCE.milestone_profitable_streak_reputation_gain}, "
+        f"team morale +{BALANCE.milestone_profitable_streak_morale_gain} for sustained execution."
+    )
+
+
+def _reward_multi_segment_reach(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_multi_segment_reputation_gain
+    )
+    return (
+        f"Reputation +{BALANCE.milestone_multi_segment_reputation_gain} "
+        "for proving the portfolio can reach multiple customer segments."
+    )
+
+
 def _get_total_users(state: GameState) -> int:
     return sum(product.user_count for product in state.products if product.is_active)
+
+
+def _has_profitable_streak(state: GameState) -> bool:
+    recent_turns = state.turn_history[-BALANCE.profitable_streak_turns :]
+    return (
+        len(recent_turns) == BALANCE.profitable_streak_turns
+        and all(entry.net_cash_flow > 0 for entry in recent_turns)
+    )
+
+
+def _get_active_segments(state: GameState) -> set[str]:
+    return {product.target_segment.value for product in state.products if product.is_active}

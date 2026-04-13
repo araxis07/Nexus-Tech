@@ -29,6 +29,7 @@ from nexus_tech.domain.models import (
     RoadmapFocus,
     Seniority,
     TurnAction,
+    TurnLedgerEntry,
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.economy import (
@@ -49,6 +50,7 @@ from nexus_tech.simulation.growth import (
     calculate_churned_users,
     calculate_effective_churn_rate_for_context,
 )
+from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
@@ -988,6 +990,97 @@ def test_event_selection_is_deterministic_under_fixed_seed() -> None:
     assert definition_a is not None
     assert definition_b is not None
     assert definition_a.event_id == definition_b.event_id
+
+
+def test_referral_wave_event_rewards_healthy_product() -> None:
+    product = make_product(
+        "Glow",
+        quality=74,
+        bug_level=10,
+        market_fit=64,
+        user_count=55,
+    )
+    state = make_state(product, current_turn=5)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "referral_wave"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "staff_referrals")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].user_count > state.products[0].user_count
+    assert outcome.history_entry.event_id == "referral_wave"
+
+
+def test_compliance_review_event_applies_trust_tradeoff() -> None:
+    product = make_product(
+        "Secure Desk",
+        target_segment=MarketSegment.ENTERPRISE,
+        market_fit=62,
+        technical_debt=48,
+        user_count=24,
+    )
+    state = make_state(product, current_turn=6)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "compliance_review"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "fund_review")
+
+    assert outcome.state.products[0].technical_debt < state.products[0].technical_debt
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.history_entry.event_id == "compliance_review"
+
+
+def test_profitable_streak_milestone_unlocks_after_three_positive_turns() -> None:
+    state = make_state(make_product("Core"), current_turn=6)
+    state.turn_history = [
+        TurnLedgerEntry(
+            turn=3,
+            total_revenue=Decimal("2100.00"),
+            total_operating_cost=Decimal("1600.00"),
+            net_cash_flow=Decimal("500.00"),
+            cash_on_hand=Decimal("9000.00"),
+            reputation=54,
+            total_users=70,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+        TurnLedgerEntry(
+            turn=4,
+            total_revenue=Decimal("2250.00"),
+            total_operating_cost=Decimal("1700.00"),
+            net_cash_flow=Decimal("550.00"),
+            cash_on_hand=Decimal("9550.00"),
+            reputation=55,
+            total_users=78,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+        TurnLedgerEntry(
+            turn=5,
+            total_revenue=Decimal("2400.00"),
+            total_operating_cost=Decimal("1750.00"),
+            net_cash_flow=Decimal("650.00"),
+            cash_on_hand=Decimal("10200.00"),
+            reputation=56,
+            total_users=86,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+    ]
+
+    unlocked = resolve_new_milestones(state, unlocked_turn=6)
+
+    assert any(entry.milestone_id is MilestoneId.PROFITABLE_STREAK for entry in unlocked)
 
 
 def test_finance_costs_are_included_in_operating_burn() -> None:

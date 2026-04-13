@@ -35,6 +35,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.presentation.dashboard import (
     render_dashboard,
+    render_product_template_catalog,
     render_report,
     render_turn_resolution,
     render_victory,
@@ -162,8 +163,11 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
     option_names = {opt for parameter in command.params for opt in parameter.opts}
     command_names = set(command.commands.keys())
 
-    assert {"new-game", "load-game", "continue-last-game"}.issubset(command_names)
+    assert {"new-game", "load-game", "continue-last-game", "list-templates"}.issubset(
+        command_names
+    )
     assert "--debug" in option_names
+    assert "--version" in option_names
 
 
 def test_root_command_dispatches_to_start_new_game(
@@ -302,6 +306,25 @@ def test_list_scenarios_command_renders_catalog(monkeypatch: MonkeyPatch) -> Non
     assert "Scenario Catalog" in result.output
     assert "bootstrap_studio" in result.output
     assert "Bootstrap Studio" in result.output
+
+
+def test_list_templates_command_renders_catalog(monkeypatch: MonkeyPatch) -> None:
+    templates = cli_module.get_available_product_templates()
+    monkeypatch.setattr(cli_module, "get_available_product_templates", lambda: templates[:1])
+
+    result = runner.invoke(app, ["list-templates"])
+
+    assert result.exit_code == 0
+    assert "Product Template Catalog" in result.output
+    assert templates[0].template_id in result.output
+    assert templates[0].title in result.output
+
+
+def test_version_option_prints_installed_version() -> None:
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert "NEXUS TECH 0.2.0" in result.output
 
 
 def test_load_game_command_resumes_loaded_slot(
@@ -443,6 +466,18 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Finance" in output
     assert "Competitor Watch" in output
     assert "Estimated Value" in output
+
+
+def test_template_catalog_rendering_contains_catalog_title() -> None:
+    templates = cli_module.get_available_product_templates()
+    console = Console(record=True, width=140)
+
+    render_product_template_catalog(console, templates[:2])
+    output = console.export_text()
+
+    assert "Product Template Catalog" in output
+    assert templates[0].title in output
+    assert templates[1].title in output
 
 
 def test_victory_rendering_contains_summary_metrics() -> None:
