@@ -268,6 +268,52 @@ def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) 
     assert loaded.rng.randint(1, 100) == expected_next_roll
 
 
+def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
+    db_path = tmp_path / "slots.db"
+    coordinator = SaveLoadCoordinator(db_path)
+
+    coordinator.save_game("slot-a", make_state(), RandomSource(seed=11))
+    state_b = make_state()
+    state_b.company.name = "Atlas Systems"
+    state_b.company.current_turn = 6
+    coordinator.save_game("slot-b", state_b, RandomSource(seed=17))
+
+    summaries = coordinator.list_save_slots()
+
+    assert len(summaries) == 2
+    assert summaries[0].slot_name == "slot-b"
+    assert summaries[0].company_name == "Atlas Systems"
+    assert summaries[0].active_products == 1
+    assert summaries[0].headcount == 1
+
+
+def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:
+    db_path = tmp_path / "rename.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    state = make_state()
+
+    coordinator.save_game("active", state, RandomSource(seed=13))
+    coordinator.rename_save("active", "archive")
+
+    loaded = coordinator.load_game("archive")
+
+    assert loaded.slot_name == "archive"
+    assert loaded.state.company.name == state.company.name
+    with pytest.raises(SaveNotFoundError, match="active"):
+        coordinator.load_game("active")
+
+
+def test_delete_save_removes_slot(tmp_path: Path) -> None:
+    db_path = tmp_path / "delete.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    coordinator.save_game("active", make_state(), RandomSource(seed=19))
+
+    coordinator.delete_save("active")
+
+    with pytest.raises(SaveNotFoundError, match="active"):
+        coordinator.load_game("active")
+
+
 def test_foreign_key_integrity_rejects_assignment_to_unknown_product(tmp_path: Path) -> None:
     db_path = tmp_path / "integrity.db"
     manager = DatabaseManager(db_path)

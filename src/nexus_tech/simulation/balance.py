@@ -368,6 +368,8 @@ class BalanceConfig:
     competitor_momentum_change_on_feature: int = 5
     competitor_momentum_change_on_hold: int = 1
     competitor_momentum_change_on_retrench: int = -5
+    competitor_discount_expansion_momentum_threshold: int = 54
+    competitor_feature_expansion_momentum_threshold: int = 60
     competitor_move_summary_limit: int = 3
 
     quarter_plan_revenue_growth_by_roadmap: dict[str, Decimal] = field(

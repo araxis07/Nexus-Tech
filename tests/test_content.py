@@ -26,6 +26,8 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == DEFAULT_SCENARIO_ID for scenario in scenarios)
     assert any(scenario.scenario_id == "agency_pivot" for scenario in scenarios)
     assert any(scenario.scenario_id == "debt_crunch" for scenario in scenarios)
+    assert any(scenario.scenario_id == "market_shock" for scenario in scenarios)
+    assert any(scenario.scenario_id == "portfolio_machine" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -105,3 +107,13 @@ def test_new_template_catalog_entries_are_available() -> None:
 
     assert template.title == "AI Copilot"
     assert template.pricing_tier is PricingTier.PREMIUM
+
+
+def test_additional_template_catalog_entries_are_available() -> None:
+    analytics = get_product_template("analytics_cloud")
+    support = get_product_template("support_ops")
+
+    assert analytics.title == "Analytics Cloud"
+    assert analytics.target_segment.value == "smb"
+    assert support.title == "Support Ops"
+    assert support.pricing_tier is PricingTier.PREMIUM

@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -46,6 +47,23 @@ class LoadedGame:
     slot_name: str
     state: GameState
     rng: RandomSource
+
+
+@dataclass(frozen=True)
+class SaveSlotSummary:
+    """Compact metadata used for save-slot listing and management."""
+
+    slot_name: str
+    company_name: str
+    scenario_title: str
+    current_turn: int
+    cash_on_hand: Decimal
+    reputation: int
+    active_products: int
+    headcount: int
+    updated_at: str
+    victory_achieved: bool
+    game_over: bool
 
 
 class SaveLoadCoordinator:
@@ -219,6 +237,112 @@ class SaveLoadCoordinator:
 
         return self.load_game(row["slot_name"])
 
+    def list_save_slots(self) -> list[SaveSlotSummary]:
+        """Return all available save slots ordered by last update time."""
+
+        if not self.database.exists():
+            return []
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT
+                        slots.slot_name,
+                        slots.scenario_title,
+                        slots.updated_at,
+                        slots.victory_achieved,
+                        companies.name AS company_name,
+                        companies.current_turn,
+                        companies.cash_on_hand,
+                        companies.reputation,
+                        companies.game_over,
+                        COALESCE((
+                            SELECT COUNT(*)
+                            FROM products
+                            WHERE slot_name = slots.slot_name
+                            AND is_active = 1
+                        ), 0) AS active_products,
+                        COALESCE((
+                            SELECT COUNT(*)
+                            FROM employees
+                            WHERE slot_name = slots.slot_name
+                        ), 0) AS headcount
+                    FROM save_slots AS slots
+                    LEFT JOIN companies ON companies.slot_name = slots.slot_name
+                    ORDER BY slots.updated_at DESC
+                    """
+                ).fetchall()
+        except sqlite3.DatabaseError as error:
+            raise PersistenceError(f"Failed to inspect save slots: {error}") from error
+
+        return [
+            SaveSlotSummary(
+                slot_name=row["slot_name"],
+                company_name=row["company_name"] or "(missing company)",
+                scenario_title=row["scenario_title"],
+                current_turn=row["current_turn"] or 0,
+                cash_on_hand=Decimal(row["cash_on_hand"] or "0.00"),
+                reputation=row["reputation"] or 0,
+                active_products=row["active_products"],
+                headcount=row["headcount"],
+                updated_at=row["updated_at"],
+                victory_achieved=bool(row["victory_achieved"]),
+                game_over=bool(row["game_over"]) if row["game_over"] is not None else False,
+            )
+            for row in rows
+        ]
+
+    def delete_save(self, slot_name: str) -> None:
+        """Delete one save slot and all related rows."""
+
+        if not self.database.exists():
+            raise SaveNotFoundError("No save database was found yet.")
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                cursor = connection.execute(
+                    "DELETE FROM save_slots WHERE slot_name = ?",
+                    (slot_name,),
+                )
+                if cursor.rowcount == 0:
+                    raise SaveNotFoundError(f"Save slot '{slot_name}' was not found.")
+        except sqlite3.DatabaseError as error:
+            if isinstance(error, PersistenceError):
+                raise
+            raise PersistenceError(f"Failed to delete save slot: {error}") from error
+
+    def rename_save(self, from_slot_name: str, to_slot_name: str) -> None:
+        """Rename one save slot by copying its state and removing the old slot."""
+
+        source_name = from_slot_name.strip()
+        target_name = to_slot_name.strip()
+        if not source_name or not target_name:
+            raise PersistenceError("Save slot names must not be empty.")
+        if source_name == target_name:
+            raise PersistenceError("Source and target save slot names must be different.")
+
+        if not self.database.exists():
+            raise SaveNotFoundError("No save database was found yet.")
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                if not self._slot_exists(connection, source_name):
+                    raise SaveNotFoundError(f"Save slot '{source_name}' was not found.")
+                if self._slot_exists(connection, target_name):
+                    raise PersistenceError(f"Save slot '{target_name}' already exists.")
+        except sqlite3.DatabaseError as error:
+            if isinstance(error, PersistenceError):
+                raise
+            raise PersistenceError(f"Failed to inspect save slots: {error}") from error
+
+        loaded = self.load_game(source_name)
+        self.save_game(target_name, loaded.state, loaded.rng)
+        self.delete_save(source_name)
+
     def _upsert_slot_row(
         self,
         connection: sqlite3.Connection,
@@ -313,6 +437,13 @@ class SaveLoadCoordinator:
                 slot_name,
             ),
         )
+
+    def _slot_exists(self, connection: sqlite3.Connection, slot_name: str) -> bool:
+        row = connection.execute(
+            "SELECT 1 FROM save_slots WHERE slot_name = ?",
+            (slot_name,),
+        ).fetchone()
+        return row is not None
 
     def _save_pending_event(
         self,

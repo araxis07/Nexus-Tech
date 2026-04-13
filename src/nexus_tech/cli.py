@@ -48,7 +48,9 @@ from nexus_tech.presentation.dashboard import (
     render_product_picker,
     render_product_template_catalog,
     render_product_template_picker,
+    render_quick_guide,
     render_report,
+    render_save_slot_catalog,
     render_scenario_catalog,
     render_team_view,
     render_turn_resolution,
@@ -134,6 +136,7 @@ ACTION_KEYS = {
 UTILITY_ACTION_KEYS = {
     "27": "save_game",
     "28": "load_game",
+    "29": "show_guide",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -277,6 +280,87 @@ def list_templates_command() -> None:
     """Print the available product templates."""
 
     render_product_template_catalog(console, get_available_product_templates())
+
+
+@app.command("guide")
+def guide_command() -> None:
+    """Print a compact quick-start guide."""
+
+    render_quick_guide(console)
+
+
+@app.command("list-saves")
+def list_saves_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """List all local save slots with compact metadata."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        save_slots = coordinator.list_save_slots()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Save List Failed", error)
+    render_save_slot_catalog(console, save_slots)
+
+
+@app.command("rename-save")
+def rename_save_command(
+    slot: str = typer.Option(..., "--slot", help="Existing save slot name."),
+    to_slot: str = typer.Option(..., "--to-slot", help="New save slot name."),
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Rename one local save slot."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        coordinator.rename_save(slot, to_slot)
+    except PersistenceError as error:
+        raise_cli_persistence_error("Rename Failed", error)
+
+    console.print(
+        Panel.fit(
+            f"Renamed save slot '{slot}' to '{to_slot}'.",
+            title="Rename Complete",
+            border_style="green",
+        )
+    )
+
+
+@app.command("delete-save")
+def delete_save_command(
+    slot: str = typer.Option(..., "--slot", help="Save slot name to remove."),
+    db_path: Path = DB_PATH_OPTION,
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Delete without asking for confirmation.",
+    ),
+) -> None:
+    """Delete one local save slot."""
+
+    if not yes and not typer.confirm(f"Delete save slot '{slot}'?"):
+        console.print(
+            Panel.fit(
+                "Delete cancelled.",
+                title="No Changes",
+                border_style="yellow",
+            )
+        )
+        raise typer.Exit()
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        coordinator.delete_save(slot)
+    except PersistenceError as error:
+        raise_cli_persistence_error("Delete Failed", error)
+
+    console.print(
+        Panel.fit(
+            f"Deleted save slot '{slot}'.",
+            title="Delete Complete",
+            border_style="green",
+        )
+    )
 
 
 @app.command("load-game")
@@ -901,6 +985,10 @@ def handle_utility_action(
             )
         )
         return loaded_game.state, loaded_game.rng, loaded_game.slot_name
+
+    if action_name == "show_guide":
+        render_quick_guide(console)
+        return state, rng, current_slot_name
 
     raise ValueError(f"Unsupported utility action: {action_name}")
 

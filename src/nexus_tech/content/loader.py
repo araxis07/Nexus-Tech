@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from pathlib import Path
+from importlib import resources
 
 from nexus_tech.content.models import (
     ProductTemplateDefinition,
@@ -55,5 +55,5 @@ def _load_product_templates() -> tuple[ProductTemplateDefinition, ...]:
 
 
 def _read_json_file(filename: str) -> list[dict[str, object]]:
-    path = Path(__file__).with_name(filename)
-    return json.loads(path.read_text(encoding="utf-8"))
+    package_root = resources.files("nexus_tech.content")
+    return json.loads(package_root.joinpath(filename).read_text(encoding="utf-8"))

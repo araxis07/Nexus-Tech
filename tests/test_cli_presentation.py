@@ -33,9 +33,11 @@ from nexus_tech.domain.models import (
     Seniority,
     TurnLedgerEntry,
 )
+from nexus_tech.persistence.save_coordinator import SaveSlotSummary
 from nexus_tech.presentation.dashboard import (
     render_dashboard,
     render_product_template_catalog,
+    render_quick_guide,
     render_report,
     render_turn_resolution,
     render_victory,
@@ -163,9 +165,16 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
     option_names = {opt for parameter in command.params for opt in parameter.opts}
     command_names = set(command.commands.keys())
 
-    assert {"new-game", "load-game", "continue-last-game", "list-templates"}.issubset(
-        command_names
-    )
+    assert {
+        "new-game",
+        "load-game",
+        "continue-last-game",
+        "list-templates",
+        "list-saves",
+        "rename-save",
+        "delete-save",
+        "guide",
+    }.issubset(command_names)
     assert "--debug" in option_names
     assert "--version" in option_names
 
@@ -324,7 +333,99 @@ def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.2.0" in result.output
+    assert "NEXUS TECH 0.3.0" in result.output
+
+
+def test_guide_command_renders_quick_start() -> None:
+    result = runner.invoke(app, ["guide"])
+
+    assert result.exit_code == 0
+    assert "Quick Guide" in result.output
+    assert "Opening flow" in result.output
+
+
+def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+    summaries = [
+        SaveSlotSummary(
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_title="Founder Journey",
+            current_turn=4,
+            cash_on_hand=Decimal("8200.00"),
+            reputation=57,
+            active_products=2,
+            headcount=1,
+            updated_at="2026-04-13T01:00:00+00:00",
+            victory_achieved=False,
+            game_over=False,
+        )
+    ]
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            captured["db_path"] = db_path
+
+        def list_save_slots(self) -> list[SaveSlotSummary]:
+            return summaries
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+
+    db_path = tmp_path / "saves.db"
+    result = runner.invoke(app, ["list-saves", "--db-path", str(db_path)])
+
+    assert result.exit_code == 0
+    assert captured["db_path"] == db_path
+    assert "Save Slots" in result.output
+    assert "active" in result.output
+
+
+def test_rename_save_command_calls_coordinator(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            captured["db_path"] = db_path
+
+        def rename_save(self, from_slot_name: str, to_slot_name: str) -> None:
+            captured["from_slot_name"] = from_slot_name
+            captured["to_slot_name"] = to_slot_name
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+
+    db_path = tmp_path / "rename.db"
+    result = runner.invoke(
+        app,
+        ["rename-save", "--slot", "active", "--to-slot", "archive", "--db-path", str(db_path)],
+    )
+
+    assert result.exit_code == 0
+    assert captured["db_path"] == db_path
+    assert captured["from_slot_name"] == "active"
+    assert captured["to_slot_name"] == "archive"
+
+
+def test_delete_save_command_calls_coordinator(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            captured["db_path"] = db_path
+
+        def delete_save(self, slot_name: str) -> None:
+            captured["slot_name"] = slot_name
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+
+    db_path = tmp_path / "delete.db"
+    result = runner.invoke(
+        app,
+        ["delete-save", "--slot", "active", "--yes", "--db-path", str(db_path)],
+    )
+
+    assert result.exit_code == 0
+    assert captured["db_path"] == db_path
+    assert captured["slot_name"] == "active"
 
 
 def test_load_game_command_resumes_loaded_slot(
@@ -435,6 +536,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Price" in output
     assert "Roadmap" in output
     assert "Segment" in output
+    assert "Onboarding" in output
 
 
 def test_turn_resolution_rendering_contains_summary_sections() -> None:
@@ -478,6 +580,16 @@ def test_template_catalog_rendering_contains_catalog_title() -> None:
     assert "Product Template Catalog" in output
     assert templates[0].title in output
     assert templates[1].title in output
+
+
+def test_quick_guide_rendering_contains_opening_flow() -> None:
+    console = Console(record=True, width=120)
+
+    render_quick_guide(console)
+    output = console.export_text()
+
+    assert "Quick Guide" in output
+    assert "Opening flow" in output
 
 
 def test_victory_rendering_contains_summary_metrics() -> None:

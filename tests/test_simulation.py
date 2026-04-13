@@ -32,6 +32,7 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.competition import advance_competitors
 from nexus_tech.simulation.economy import (
     calculate_total_operating_cost,
     calculate_total_revenue,
@@ -990,6 +991,41 @@ def test_event_selection_is_deterministic_under_fixed_seed() -> None:
     assert definition_a is not None
     assert definition_b is not None
     assert definition_a.event_id == definition_b.event_id
+
+
+def test_discount_push_competitor_move_shifts_pricing_and_expands_count() -> None:
+    competitor = Competitor(
+        name="Price Warp",
+        focus_segment=MarketSegment.STARTUP,
+        strength=62,
+        aggression=58,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=1,
+    )
+
+    advance_competitors([competitor], SequenceRandom([5, 0, 0]), market_cycle=MarketCycle.STEADY)
+
+    assert competitor.current_move is CompetitorMove.DISCOUNT_PUSH
+    assert competitor.pricing_tier is PricingTier.BUDGET
+    assert competitor.active_product_count == 2
+
+
+def test_retrench_competitor_move_reduces_product_count() -> None:
+    competitor = Competitor(
+        name="Retrench Labs",
+        focus_segment=MarketSegment.ENTERPRISE,
+        strength=50,
+        aggression=47,
+        pricing_tier=PricingTier.BUDGET,
+        active_product_count=3,
+        momentum=30,
+    )
+
+    advance_competitors([competitor], SequenceRandom([12, 0, 0]), market_cycle=MarketCycle.STEADY)
+
+    assert competitor.current_move is CompetitorMove.RETRENCH
+    assert competitor.active_product_count == 2
+    assert competitor.pricing_tier is PricingTier.PREMIUM
 
 
 def test_referral_wave_event_rewards_healthy_product() -> None:

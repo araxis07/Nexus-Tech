@@ -1,14 +1,30 @@
 [project]
 name = "nexus-tech"
-version = "0.2.0"
+version = "0.3.0"
 description = "NEXUS TECH terminal-first management simulation game."
 readme = "README.md"
 requires-python = ">=3.13"
+license = { text = "MIT" }
+keywords = ["game", "simulation", "terminal", "rich", "typer", "sqlite"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Games/Entertainment :: Simulation",
+]
 dependencies = [
   "pydantic>=2.11,<3.0",
   "rich>=14.0.0,<15.0.0",
   "typer>=0.16.0,<1.0.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/araxis07/Nexus-Tech"
+Issues = "https://github.com/araxis07/Nexus-Tech/issues"
+Changelog = "https://github.com/araxis07/Nexus-Tech/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
@@ -22,6 +38,14 @@ nexus-tech = "nexus_tech.cli:main"
 [build-system]
 requires = ["hatchling>=1.27.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = [
+  "src/nexus_tech/content/*.json",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nexus_tech"]

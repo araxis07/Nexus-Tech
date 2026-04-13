@@ -160,5 +160,41 @@
     "churn_rate": "0.0720",
     "target_segment": "smb",
     "pricing_tier": "standard"
+  },
+  {
+    "template_id": "analytics_cloud",
+    "title": "Analytics Cloud",
+    "description": "A reporting and analytics product with stronger expansion potential, moderate maintenance, and pricing leverage once trust is established.",
+    "lifecycle_stage": "prototype",
+    "quality": 45,
+    "bug_level": 16,
+    "market_fit": 33,
+    "technical_debt": 19,
+    "user_count": 0,
+    "revenue_per_user": "36.00",
+    "feature_count": 0,
+    "maintenance_cost": "250.00",
+    "acquisition_rate": "0.0390",
+    "churn_rate": "0.0710",
+    "target_segment": "smb",
+    "pricing_tier": "standard"
+  },
+  {
+    "template_id": "support_ops",
+    "title": "Support Ops",
+    "description": "A service-operations product with sticky workflow adoption, heavier enterprise expectations, and strong retention if quality stays high.",
+    "lifecycle_stage": "prototype",
+    "quality": 49,
+    "bug_level": 13,
+    "market_fit": 31,
+    "technical_debt": 17,
+    "user_count": 0,
+    "revenue_per_user": "54.00",
+    "feature_count": 0,
+    "maintenance_cost": "290.00",
+    "acquisition_rate": "0.0290",
+    "churn_rate": "0.0640",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium"
   }
 ]

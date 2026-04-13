@@ -39,7 +39,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Start runs from a scenario catalog instead of a single hard-coded opening
 - Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
-- Expand the catalog with AI copilot, compliance, embedded API, and capital-pressure scenarios
+- Expand the catalog with AI copilot, analytics, support-ops, compliance, embedded API, and capital-pressure scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
@@ -48,6 +48,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Run each company inside a live market cycle such as `cooling`, `steady`, `expanding`, or `frothy`
 - Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, aggression, and tactical momentum
 - Simulate rival moves such as `hold`, `discount_push`, `feature_sprint`, and `retrench`
+- Let rival moves reshape product count and pricing posture over time
 - Feel direct trade-offs between customer demand, churn pressure, rivalry, and product positioning
 - Surface market state and competitor posture in dedicated terminal panels for live demos
 
@@ -96,6 +97,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Save and load runs locally with SQLite
 - Resume the latest save slot
+- List, rename, and delete save slots directly from the CLI
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, product targeting, event history, team assignments, and turn history
 - Use SQLite schema versioning and additive migrations to keep local save files upgradeable
 - Keep the entire project offline and self-contained
@@ -104,6 +106,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
+- Built-in quick guide flow for onboarding and live demos
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Report now includes recent events, funding history, and milestone history
 - Seeded demo support for reproducible simulations
@@ -194,6 +197,30 @@ Show the installed version:
 uv run nexus-tech --version
 ```
 
+Show the quick guide:
+
+```bash
+uv run nexus-tech guide
+```
+
+List save slots:
+
+```bash
+uv run nexus-tech list-saves
+```
+
+Rename a save slot:
+
+```bash
+uv run nexus-tech rename-save --slot active --to-slot archive
+```
+
+Delete a save slot:
+
+```bash
+uv run nexus-tech delete-save --slot archive --yes
+```
+
 ## 🕹️ How to Play
 
 The core loop is simple:
@@ -202,6 +229,8 @@ The core loop is simple:
 2. Spend action points on product or team decisions.
 3. End the turn to resolve revenue, costs, growth, churn, burnout, and event outcomes.
 4. Save locally and continue the run later if needed.
+
+If you are new to the game, run `nexus-tech guide` or use the in-session guide utility to get a compact opening checklist.
 
 Typical decisions include:
 

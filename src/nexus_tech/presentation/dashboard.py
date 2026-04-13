@@ -22,6 +22,7 @@ from nexus_tech.domain.models import (
     Product,
 )
 from nexus_tech.domain.money import format_money, format_rate
+from nexus_tech.persistence.save_coordinator import SaveSlotSummary
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.market import get_market_profile
@@ -139,6 +140,85 @@ def render_product_template_catalog(
     )
 
 
+def render_save_slot_catalog(
+    console: Console,
+    save_slots: list[SaveSlotSummary],
+) -> None:
+    """Render available save slots with compact run metadata."""
+
+    if not save_slots:
+        console.print(
+            Panel(
+                "No save slots were found yet. Start a run and use save_game first.",
+                title="Save Slots",
+                border_style="green",
+                expand=True,
+            )
+        )
+        return
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Slot", style="bold")
+    table.add_column("Company")
+    table.add_column("Scenario")
+    table.add_column("Turn", justify="right")
+    table.add_column("Cash", justify="right")
+    table.add_column("Rep", justify="right")
+    table.add_column("Products", justify="right")
+    table.add_column("Team", justify="right")
+    table.add_column("Status")
+    table.add_column("Updated")
+
+    for slot in save_slots:
+        if slot.victory_achieved:
+            status = "victory"
+        elif slot.game_over:
+            status = "shutdown"
+        else:
+            status = "active"
+        table.add_row(
+            slot.slot_name,
+            slot.company_name,
+            slot.scenario_title,
+            str(slot.current_turn),
+            format_money(slot.cash_on_hand),
+            str(slot.reputation),
+            str(slot.active_products),
+            str(slot.headcount),
+            status,
+            slot.updated_at,
+        )
+
+    slot_names = ", ".join(slot.slot_name for slot in save_slots)
+    content = Group(
+        table,
+        "",
+        f"[dim]Available slots: {slot_names}[/dim]",
+    )
+    console.print(Panel(content, title="Save Slots", border_style="green", expand=True))
+
+
+def render_quick_guide(console: Console) -> None:
+    """Render a concise onboarding guide for first-time players."""
+
+    content = Group(
+        "[bold]Opening flow[/bold]",
+        "1. Review the flagship product and current runway.",
+        "2. Spend early actions on quality, marketing, or one key hire.",
+        "3. End the turn and watch revenue, churn, burnout, and rival pressure.",
+        "",
+        "[bold]Useful commands[/bold]",
+        "`nexus-tech guide`, `list-scenarios`, `list-templates`, `list-saves`",
+        "",
+        "[bold]Strong first turns[/bold]",
+        (
+            "Protect quality before bugs compound, keep cash above runway risk, "
+            "and avoid over-hiring before the first clear growth signal."
+        ),
+    )
+    console.print(Panel(content, title="Quick Guide", border_style="blue", expand=True))
+
+
 def render_dashboard(console: Console, state: GameState) -> None:
     """Render the main per-turn dashboard."""
 
@@ -183,6 +263,9 @@ def render_dashboard(console: Console, state: GameState) -> None:
             expand=True,
         )
     )
+    onboarding_panel = _build_onboarding_panel(state)
+    if onboarding_panel is not None:
+        console.print(onboarding_panel)
 
 
 def render_team_view(console: Console, state: GameState) -> None:
@@ -604,7 +687,7 @@ def _build_portfolio_table(state: GameState) -> Table:
 def _build_dashboard_team_panel(state: GameState) -> Panel:
     if not state.employees:
         return Panel(
-            "No employees hired yet. Use [bold]12[/bold] to start building the team.",
+            "No employees hired yet. Use [bold]17[/bold] to start building the team.",
             title="Team Table",
             border_style="cyan",
             expand=True,
@@ -713,6 +796,7 @@ def _build_action_menu_panel() -> Panel:
     utility_actions.add_column("Purpose")
     utility_actions.add_row("27", "save_game", "Write the current run to SQLite.")
     utility_actions.add_row("28", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("29", "show_guide", "Show a compact how-to-play guide.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -747,6 +831,46 @@ def _build_event_notification_panel(state: GameState) -> Panel:
         for entry in reversed(recent_history)
     )
     return Panel(body, title="Event Notification", border_style="yellow", expand=True)
+
+
+def _build_onboarding_panel(state: GameState) -> Panel | None:
+    if state.company.current_turn > 3 and state.turn_history:
+        return None
+
+    suggestions: list[str] = []
+    if not state.employees:
+        suggestions.append(
+            "Use [bold]17[/bold] to hire the first team member once runway is safe."
+        )
+    elif any(employee.assigned_product_id is None for employee in state.employees):
+        suggestions.append(
+            "Use [bold]19[/bold] to assign unallocated teammates to the product that matters most."
+        )
+    else:
+        suggestions.append(
+            "Keep assignments focused. Too much portfolio spread will dilute throughput."
+        )
+
+    if any(product.bug_level >= 25 for product in state.products if product.is_active):
+        suggestions.append(
+            "Use [bold]2[/bold] or [bold]4[/bold] before bugs start dragging growth down."
+        )
+    else:
+        suggestions.append(
+            "Use [bold]2[/bold] to raise quality or [bold]5[/bold] "
+            "to buy demand on the flagship product."
+        )
+
+    if state.company.current_turn == 1:
+        suggestions.append("Use [bold]29[/bold] any time if you want the compact guide again.")
+    if state.company.current_turn >= 2:
+        suggestions.append(
+            "Check [bold]23[/bold] after a turn resolves to read the run report "
+            "and rival pressure."
+        )
+
+    body = "\n".join(f"- {line}" for line in suggestions)
+    return Panel(body, title="Onboarding", border_style="blue", expand=True)
 
 
 def _build_turn_summary_panel(resolution: TurnResolution) -> Panel:

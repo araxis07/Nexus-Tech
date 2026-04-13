@@ -87,6 +87,7 @@ def advance_competitors(
             )
         competitor.strength = clamp_int(competitor.strength + strength_drift)
         competitor.aggression = clamp_int(competitor.aggression + aggression_drift)
+        _apply_competitor_move_side_effects(competitor)
 
 
 def calculate_competitor_pressure(
@@ -151,7 +152,10 @@ def summarize_competitor_moves(competitors: list[Competitor]) -> str:
     )
     top_rivals = ranked[: BALANCE.competitor_move_summary_limit]
     return ", ".join(
-        f"{competitor.name}: {competitor.current_move.value.replace('_', ' ')}"
+        (
+            f"{competitor.name}: {competitor.current_move.value.replace('_', ' ')} / "
+            f"{competitor.pricing_tier.value} / {competitor.active_product_count} product(s)"
+        )
         for competitor in top_rivals
     )
 
@@ -198,3 +202,33 @@ def _choose_competitor_move(
         if roll <= cumulative:
             return move
     return CompetitorMove.HOLD
+
+
+def _apply_competitor_move_side_effects(competitor: Competitor) -> None:
+    """Let rival moves reshape product count and pricing posture over time."""
+
+    if competitor.current_move is CompetitorMove.DISCOUNT_PUSH:
+        competitor.pricing_tier = PricingTier.BUDGET
+        if competitor.momentum >= BALANCE.competitor_discount_expansion_momentum_threshold:
+            competitor.active_product_count = min(6, competitor.active_product_count + 1)
+        return
+
+    if competitor.current_move is CompetitorMove.FEATURE_SPRINT:
+        if competitor.momentum >= BALANCE.competitor_feature_expansion_momentum_threshold:
+            competitor.active_product_count = min(6, competitor.active_product_count + 1)
+        if competitor.focus_segment.value == "enterprise":
+            competitor.pricing_tier = PricingTier.PREMIUM
+        else:
+            competitor.pricing_tier = PricingTier.STANDARD
+        return
+
+    if competitor.current_move is CompetitorMove.RETRENCH:
+        competitor.active_product_count = max(1, competitor.active_product_count - 1)
+        if competitor.focus_segment.value in {"enterprise", "smb"}:
+            competitor.pricing_tier = PricingTier.PREMIUM
+        else:
+            competitor.pricing_tier = PricingTier.STANDARD
+        return
+
+    if competitor.pricing_tier is PricingTier.BUDGET and competitor.momentum <= 45:
+        competitor.pricing_tier = PricingTier.STANDARD
