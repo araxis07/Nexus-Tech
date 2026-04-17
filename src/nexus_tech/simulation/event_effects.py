@@ -521,6 +521,105 @@ def _apply_compliance_review(state: GameState, event: PendingEvent, option_id: s
     raise ValueError(f"Unsupported option {option_id} for compliance review.")
 
 
+def _apply_support_backlog(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    affected_employees = _get_assigned_employees(state, product.id)
+
+    if option_id == "stabilize_ops":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_support_backlog_fix_cost
+        )
+        product.bug_level = clamp_int(
+            product.bug_level - BALANCE.event_support_backlog_fix_bug_reduction,
+            0,
+            100,
+        )
+        product.churn_rate = clamp_rate(
+            product.churn_rate - BALANCE.event_support_backlog_fix_churn_relief
+        )
+        for employee in affected_employees:
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.event_support_backlog_fix_morale_gain,
+                0,
+                100,
+            )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You stabilized the support backlog for {product.name}. Cash "
+            f"-{BALANCE.event_support_backlog_fix_cost}, bugs "
+            f"-{BALANCE.event_support_backlog_fix_bug_reduction}."
+        )
+
+    if option_id == "keep_shipping":
+        user_loss = min(product.user_count, BALANCE.event_support_backlog_push_user_loss)
+        product.user_count = max(0, product.user_count - user_loss)
+        product.quality = clamp_int(
+            product.quality - BALANCE.event_support_backlog_push_quality_loss,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_support_backlog_push_reputation_loss,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"The backlog spilled into the product experience for {product.name}. Users "
+            f"-{user_loss}, reputation -{BALANCE.event_support_backlog_push_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for support backlog.")
+
+
+def _apply_board_scrutiny(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "publish_plan":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_board_scrutiny_plan_cost
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure - BALANCE.event_board_scrutiny_plan_pressure_relief,
+            0,
+            100,
+        )
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.event_board_scrutiny_plan_morale_loss,
+                0,
+                100,
+            )
+        return (
+            "You published a disciplined operating plan. Cash "
+            f"-{BALANCE.event_board_scrutiny_plan_cost}, investor pressure "
+            f"-{BALANCE.event_board_scrutiny_plan_pressure_relief}."
+        )
+
+    if option_id == "promise_growth":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_board_scrutiny_growth_cash_gain
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure + BALANCE.event_board_scrutiny_growth_pressure_gain,
+            0,
+            100,
+        )
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.event_board_scrutiny_growth_morale_loss,
+                0,
+                100,
+            )
+        return (
+            "You bought time with a stronger growth promise. Cash "
+            f"+{BALANCE.event_board_scrutiny_growth_cash_gain}, investor pressure "
+            f"+{BALANCE.event_board_scrutiny_growth_pressure_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for board scrutiny.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -556,4 +655,6 @@ EVENT_EFFECT_HANDLERS = {
     "competitor_pressure": _apply_competitor_pressure,
     "referral_wave": _apply_referral_wave,
     "compliance_review": _apply_compliance_review,
+    "support_backlog": _apply_support_backlog,
+    "board_scrutiny": _apply_board_scrutiny,
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 - 2026-04-17
+
+- Added a late-game operations layer that turns support load, coordination drag, and portfolio sprawl into visible operating pressure
+- Deepened competitor behavior so rivals can pivot toward the player's hottest segment during stronger tactical pushes
+- Expanded content again with new templates and scenarios focused on support overload, price wars, and enterprise scale-up
+- Added new events for support backlog surges and board scrutiny to connect finance and operations pressure back into the run
+- Added a deterministic `simulate-balance` CLI command for multi-run tuning and regression checks
+- Added milestone coverage for cleaner enterprise scale and operational discipline
+- Promoted the package version to `0.5.0`
+
 ## 0.4.0 - 2026-04-14
 
 - Added run difficulty profiles with `builder`, `standard`, and `founder` tuning

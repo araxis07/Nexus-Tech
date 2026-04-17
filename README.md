@@ -50,8 +50,10 @@ Each turn represents a business interval. You review the company, choose actions
 - Simulate rival moves such as `hold`, `discount_push`, `feature_sprint`, and `retrench`
 - Let rival moves reshape product count and pricing posture over time
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
+- Track an explicit operations layer that converts support backlog and portfolio sprawl into real cost, morale drag, and execution risk
 - Feel direct trade-offs between customer demand, churn pressure, rivalry, and product positioning
 - Surface market state and competitor posture in dedicated terminal panels for live demos
+- Let stronger rivals pivot toward the company's hottest customer segment as traction becomes more visible
 
 ### 💰 Finance and Capital
 
@@ -82,6 +84,7 @@ Each turn represents a business interval. You review the company, choose actions
   - employee issues
 - Some events create meaningful player trade-offs instead of simple bonuses
 - New event content includes referral waves and enterprise compliance review pressure
+- Additional event content now includes support backlog surges and board-level scrutiny over capital discipline
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
@@ -91,6 +94,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Unlock company milestones as the business scales
 - Track key moments such as traction, cash reserves, team growth, and portfolio expansion
 - Recognize profitable streaks and multi-segment reach as the company matures
+- Recognize operational discipline and enterprise footholds as higher-scale milestones
 - Set quarter-scale roadmap focuses such as growth push, platform rebuild, premium expansion, and portfolio consolidation
 - Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
 - Work against a quarter plan with explicit revenue, user, cash, and headcount targets
@@ -111,6 +115,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Built-in quick guide flow for onboarding and live demos
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
+- Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
 - Report now includes recent events, funding history, and milestone history
 - Seeded demo support for reproducible simulations
 
@@ -180,6 +185,12 @@ Override the difficulty and campaign goal:
 
 ```bash
 uv run nexus-tech new-game --scenario vc_sprint --difficulty founder --goal portfolio_empire
+```
+
+Run a deterministic balance batch:
+
+```bash
+uv run nexus-tech simulate-balance --scenario founder_journey --difficulty standard --goal profit_machine --runs 5 --turns 10 --seed-base 100
 ```
 
 Load a saved game:

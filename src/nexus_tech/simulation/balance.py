@@ -381,6 +381,51 @@ class BalanceConfig:
             "enterprise": 35,
         }
     )
+    operations_user_load_divisor: int = 28
+    operations_bug_load_divisor: int = 18
+    operations_debt_load_divisor: int = 24
+    operations_feature_load_divisor: int = 2
+    operations_active_product_overhead: int = 1
+    operations_late_turn_threshold: int = 8
+    operations_turn_load_divisor: int = 4
+    operations_assigned_capacity_per_person: int = 3
+    operations_unassigned_capacity_per_person: int = 2
+    operations_company_headcount_capacity: int = 1
+    operations_product_manager_capacity_bonus: int = 2
+    operations_designer_capacity_bonus: int = 1
+    operations_marketer_capacity_bonus: int = 1
+    operations_same_segment_overlap_penalty: int = 1
+    operations_large_user_base_threshold: int = 120
+    operations_overload_cost_per_point: Decimal = Decimal("85.00")
+    operations_energy_penalty_divisor: int = 3
+    operations_morale_penalty_divisor: int = 4
+    operations_max_energy_penalty: int = 4
+    operations_max_morale_penalty: int = 3
+    operations_moderate_overload_threshold: int = 3
+    operations_severe_overload_threshold: int = 6
+    operations_reputation_penalty_threshold: int = 5
+    operations_bug_penalty_threshold: int = 3
+    operations_quality_penalty_threshold: int = 5
+    operations_bug_penalty: int = 2
+    operations_quality_penalty: int = 1
+    operations_affected_product_limit: int = 2
+    operations_segment_load_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 0,
+            "startup": 1,
+            "smb": 2,
+            "enterprise": 3,
+        }
+    )
+    operations_stage_load_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "prototype": 0,
+            "growth": 1,
+            "mature": 2,
+            "declining": 2,
+            "sunset": 0,
+        }
+    )
 
     competitor_strength_drift_max: int = 3
     competitor_aggression_drift_max: int = 3
@@ -414,6 +459,9 @@ class BalanceConfig:
     competitor_discount_expansion_momentum_threshold: int = 54
     competitor_feature_expansion_momentum_threshold: int = 60
     competitor_move_summary_limit: int = 3
+    competitor_focus_pivot_threshold: int = 58
+    competitor_focus_pivot_bonus_strength: int = 2
+    competitor_focus_pivot_bonus_aggression: int = 2
 
     quarter_plan_revenue_growth_by_roadmap: dict[str, Decimal] = field(
         default_factory=lambda: {
@@ -611,11 +659,38 @@ class BalanceConfig:
     event_compliance_delay_reputation_loss: int = 2
     event_compliance_delay_churn_increase: Decimal = Decimal("0.0060")
 
+    event_support_backlog_weight: int = 5
+    event_support_backlog_cooldown: int = 4
+    event_support_backlog_user_threshold: int = 120
+    event_support_backlog_bug_threshold: int = 24
+    event_support_backlog_fix_cost: Decimal = Decimal("260.00")
+    event_support_backlog_fix_bug_reduction: int = 4
+    event_support_backlog_fix_morale_gain: int = 2
+    event_support_backlog_fix_churn_relief: Decimal = Decimal("0.0040")
+    event_support_backlog_push_quality_loss: int = 2
+    event_support_backlog_push_reputation_loss: int = 2
+    event_support_backlog_push_user_loss: int = 5
+
+    event_board_scrutiny_weight: int = 4
+    event_board_scrutiny_cooldown: int = 5
+    event_board_scrutiny_turn_threshold: int = 6
+    event_board_scrutiny_pressure_threshold: int = 24
+    event_board_scrutiny_debt_threshold: Decimal = Decimal("5000.00")
+    event_board_scrutiny_plan_cost: Decimal = Decimal("180.00")
+    event_board_scrutiny_plan_pressure_relief: int = 5
+    event_board_scrutiny_plan_morale_loss: int = 1
+    event_board_scrutiny_growth_cash_gain: Decimal = Decimal("450.00")
+    event_board_scrutiny_growth_pressure_gain: int = 4
+    event_board_scrutiny_growth_morale_loss: int = 2
+
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4
     active_products_milestone_threshold: int = 3
     profitable_streak_turns: int = 3
     multi_segment_milestone_threshold: int = 3
+    operations_machine_user_threshold: int = 180
+    operations_machine_headcount_threshold: int = 4
+    enterprise_footing_user_threshold: int = 65
     milestone_first_100_users_reputation_gain: int = 2
     milestone_cash_reserve_reputation_gain: int = 1
     milestone_team_growth_reputation_gain: int = 1
@@ -626,6 +701,9 @@ class BalanceConfig:
     milestone_profitable_streak_reputation_gain: int = 2
     milestone_profitable_streak_morale_gain: int = 2
     milestone_multi_segment_reputation_gain: int = 2
+    milestone_operations_machine_reputation_gain: int = 2
+    milestone_operations_machine_cash_gain: Decimal = Decimal("350.00")
+    milestone_enterprise_footing_reputation_gain: int = 2
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

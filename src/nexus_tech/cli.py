@@ -41,6 +41,7 @@ from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
     render_action_feedback,
+    render_balance_lab,
     render_campaign_goal_catalog,
     render_dashboard,
     render_employee_picker,
@@ -60,6 +61,7 @@ from nexus_tech.presentation.dashboard import (
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.balance_lab import run_balance_batch
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
 from nexus_tech.simulation.engine import (
     ActionContext,
@@ -117,6 +119,16 @@ GOAL_OPTION = typer.Option(
     None,
     "--goal",
     help="Optional campaign goal override. Use 'list-goals' to inspect the catalog.",
+)
+BALANCE_DIFFICULTY_OPTION = typer.Option(
+    DifficultyMode.STANDARD,
+    "--difficulty",
+    help="Difficulty profile to use for the balance run batch.",
+)
+BALANCE_GOAL_OPTION = typer.Option(
+    CampaignGoalId.PROFIT_MACHINE,
+    "--goal",
+    help="Campaign goal used during the balance run batch.",
 )
 
 ACTION_KEYS = {
@@ -313,6 +325,32 @@ def list_goals_command() -> None:
     """Print the available campaign goals."""
 
     render_campaign_goal_catalog(console, list_campaign_goals())
+
+
+@app.command("simulate-balance")
+def simulate_balance_command(
+    scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode = BALANCE_DIFFICULTY_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(5, "--runs", min=1, help="Number of deterministic runs."),
+    turns: int = typer.Option(10, "--turns", min=1, help="Maximum turns per run."),
+    seed_base: int = typer.Option(
+        100,
+        "--seed-base",
+        help="Base seed. Each run increments from this value.",
+    ),
+) -> None:
+    """Run a deterministic batch of autoplay simulations for balance checks."""
+
+    batch = run_balance_batch(
+        scenario_id=scenario,
+        difficulty_mode=difficulty,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    render_balance_lab(console, batch)
 
 
 @app.command("guide")

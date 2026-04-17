@@ -6,6 +6,7 @@ from nexus_tech.domain.models import (
     Competitor,
     CompetitorMove,
     MarketCycle,
+    MarketSegment,
     PricingTier,
     Product,
     RoadmapFocus,
@@ -47,6 +48,7 @@ def advance_competitors(
     rng: RandomLike,
     *,
     market_cycle: MarketCycle,
+    portfolio_products: list[Product] | None = None,
 ) -> None:
     """Apply a light drift to competitor posture between turns."""
 
@@ -84,10 +86,13 @@ def advance_competitors(
         else:
             competitor.momentum = clamp_int(
                 competitor.momentum + BALANCE.competitor_momentum_change_on_hold
-            )
+        )
         competitor.strength = clamp_int(competitor.strength + strength_drift)
         competitor.aggression = clamp_int(competitor.aggression + aggression_drift)
-        _apply_competitor_move_side_effects(competitor)
+        _apply_competitor_move_side_effects(
+            competitor,
+            portfolio_products=portfolio_products or [],
+        )
 
 
 def calculate_competitor_pressure(
@@ -154,7 +159,8 @@ def summarize_competitor_moves(competitors: list[Competitor]) -> str:
     return ", ".join(
         (
             f"{competitor.name}: {competitor.current_move.value.replace('_', ' ')} / "
-            f"{competitor.pricing_tier.value} / {competitor.active_product_count} product(s)"
+            f"{competitor.focus_segment.value} / {competitor.pricing_tier.value} / "
+            f"{competitor.active_product_count} product(s)"
         )
         for competitor in top_rivals
     )
@@ -204,13 +210,18 @@ def _choose_competitor_move(
     return CompetitorMove.HOLD
 
 
-def _apply_competitor_move_side_effects(competitor: Competitor) -> None:
+def _apply_competitor_move_side_effects(
+    competitor: Competitor,
+    *,
+    portfolio_products: list[Product],
+) -> None:
     """Let rival moves reshape product count and pricing posture over time."""
 
     if competitor.current_move is CompetitorMove.DISCOUNT_PUSH:
         competitor.pricing_tier = PricingTier.BUDGET
         if competitor.momentum >= BALANCE.competitor_discount_expansion_momentum_threshold:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
+        _maybe_pivot_focus_segment(competitor, portfolio_products)
         return
 
     if competitor.current_move is CompetitorMove.FEATURE_SPRINT:
@@ -220,6 +231,7 @@ def _apply_competitor_move_side_effects(competitor: Competitor) -> None:
             competitor.pricing_tier = PricingTier.PREMIUM
         else:
             competitor.pricing_tier = PricingTier.STANDARD
+        _maybe_pivot_focus_segment(competitor, portfolio_products)
         return
 
     if competitor.current_move is CompetitorMove.RETRENCH:
@@ -232,3 +244,34 @@ def _apply_competitor_move_side_effects(competitor: Competitor) -> None:
 
     if competitor.pricing_tier is PricingTier.BUDGET and competitor.momentum <= 45:
         competitor.pricing_tier = PricingTier.STANDARD
+
+
+def _maybe_pivot_focus_segment(
+    competitor: Competitor,
+    portfolio_products: list[Product],
+) -> None:
+    """Let rivals chase the segment where the player has visible traction."""
+
+    hottest_segment = _get_hottest_segment(portfolio_products)
+    if hottest_segment is None or hottest_segment is competitor.focus_segment:
+        return
+    if competitor.momentum < BALANCE.competitor_focus_pivot_threshold:
+        return
+
+    competitor.focus_segment = hottest_segment
+    competitor.strength = clamp_int(
+        competitor.strength + BALANCE.competitor_focus_pivot_bonus_strength,
+    )
+    competitor.aggression = clamp_int(
+        competitor.aggression + BALANCE.competitor_focus_pivot_bonus_aggression,
+    )
+
+
+def _get_hottest_segment(products: list[Product]) -> MarketSegment | None:
+    active_products = [product for product in products if product.is_active]
+    if not active_products:
+        return None
+    return max(
+        active_products,
+        key=lambda product: product.user_count + product.market_fit + product.quality,
+    ).target_segment

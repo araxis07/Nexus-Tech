@@ -138,6 +138,8 @@ class MilestoneId(StrEnum):
     FIRST_MATURE_PRODUCT = "first_mature_product"
     PROFITABLE_STREAK = "profitable_streak"
     MULTI_SEGMENT_REACH = "multi_segment_reach"
+    OPERATIONS_MACHINE = "operations_machine"
+    ENTERPRISE_FOOTING = "enterprise_footing"
 
 
 class FundingType(StrEnum):

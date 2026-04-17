@@ -18,6 +18,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.finance import count_funding_rounds
+from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.team import calculate_effective_productivity
 
@@ -101,6 +102,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_compliance_review_cooldown,
             is_eligible=_is_compliance_review_eligible,
             build_pending_event=_build_compliance_review_event,
+        ),
+        EventDefinition(
+            event_id="support_backlog",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_support_backlog_weight,
+            cooldown_turns=BALANCE.event_support_backlog_cooldown,
+            is_eligible=_is_support_backlog_eligible,
+            build_pending_event=_build_support_backlog_event,
+        ),
+        EventDefinition(
+            event_id="board_scrutiny",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_scrutiny_weight,
+            cooldown_turns=BALANCE.event_board_scrutiny_cooldown,
+            is_eligible=_is_board_scrutiny_eligible,
+            build_pending_event=_build_board_scrutiny_event,
         ),
     )
 
@@ -507,6 +524,100 @@ def _build_compliance_review_event(
                 id="defer_review",
                 label="Defer and keep shipping",
                 description="Save cash now, but risk user loss and weaker market confidence.",
+            ),
+        ],
+    )
+
+
+def _is_support_backlog_eligible(state: GameState) -> bool:
+    summary = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+    )
+    return summary.overload >= BALANCE.operations_moderate_overload_threshold and any(
+        product.is_active
+        and product.user_count >= BALANCE.event_support_backlog_user_threshold
+        and product.bug_level >= BALANCE.event_support_backlog_bug_threshold
+        for product in state.products
+    )
+
+
+def _build_support_backlog_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.user_count >= BALANCE.event_support_backlog_user_threshold
+            and product.bug_level >= BALANCE.event_support_backlog_bug_threshold
+        ],
+        rng,
+        score=lambda product: product.user_count + product.bug_level + product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="support_backlog",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Support Backlog Surge",
+        description=(
+            f"{target.name} is building a visible support backlog. "
+            "You can fund a focused cleanup sprint or keep pushing features and absorb the drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="stabilize_ops",
+                label="Fund the support cleanup",
+                description="Spend cash to stabilize churn, morale, and bug pressure.",
+            ),
+            EventOption(
+                id="keep_shipping",
+                label="Keep shipping through it",
+                description="Save cash now, but accept reputation and user loss.",
+            ),
+        ],
+    )
+
+
+def _is_board_scrutiny_eligible(state: GameState) -> bool:
+    return state.company.current_turn >= BALANCE.event_board_scrutiny_turn_threshold and (
+        state.finance.investor_pressure >= BALANCE.event_board_scrutiny_pressure_threshold
+        or state.finance.debt_principal >= BALANCE.event_board_scrutiny_debt_threshold
+    )
+
+
+def _build_board_scrutiny_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_scrutiny",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Scrutiny",
+        description=(
+            "Investors want a cleaner story around execution and capital discipline. "
+            "You can present a reset plan or overpromise growth and accept the added pressure."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        options=[
+            EventOption(
+                id="publish_plan",
+                label="Publish a disciplined reset plan",
+                description="Spend some cash now to reduce pressure and steady the team.",
+            ),
+            EventOption(
+                id="promise_growth",
+                label="Promise faster growth",
+                description="Bring in a small cash bump, but investors will expect more.",
             ),
         ],
     )

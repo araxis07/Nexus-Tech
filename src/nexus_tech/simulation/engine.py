@@ -59,6 +59,7 @@ from nexus_tech.simulation.finance import (
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.market import advance_market_cycle
 from nexus_tech.simulation.milestones import resolve_new_milestones
+from nexus_tech.simulation.operations import OperationsSummary, apply_end_of_turn_operations
 from nexus_tech.simulation.planning import (
     build_quarter_plan,
     get_budget_profile,
@@ -165,6 +166,7 @@ class TurnResolution:
     total_revenue: Decimal
     baseline_operating_cost: Decimal
     total_product_operating_cost: Decimal
+    total_operations_cost: Decimal
     total_salary_cost: Decimal
     total_finance_cost: Decimal
     total_operating_cost: Decimal
@@ -177,6 +179,7 @@ class TurnResolution:
     event_history_entry: EventHistoryEntry | None
     unlocked_milestones: list[MilestoneEntry]
     run_score: RunScore
+    operations_summary: OperationsSummary
     roadmap_due: bool
     roadmap_focus: RoadmapFocus
     quarter_plan_due: bool
@@ -606,16 +609,6 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     total_finance_cost = total_operating_cost - (
         baseline_operating_cost + total_product_operating_cost + total_salary_cost
     )
-    net_cash_flow = quantize_money(total_revenue - total_operating_cost)
-
-    next_state.company.cash_on_hand = quantize_money(
-        next_state.company.cash_on_hand + net_cash_flow
-    )
-    finance_summary = apply_end_of_turn_finance_drift(
-        next_state.finance,
-        next_state.company,
-        net_cash_flow=net_cash_flow,
-    )
 
     for product in next_state.products:
         revenue = calculate_product_revenue(product)
@@ -687,12 +680,32 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     )
     next_state.company.reputation = clamp_int(next_state.company.reputation + reputation_delta)
 
+    operations_summary = apply_end_of_turn_operations(
+        next_state,
+        current_turn=resolved_turn,
+    )
+    total_operations_cost = operations_summary.added_cost
+    total_operating_cost = quantize_money(total_operating_cost + total_operations_cost)
+    net_cash_flow = quantize_money(total_revenue - total_operating_cost)
+    reputation_delta += operations_summary.reputation_delta
+
+    next_state.company.cash_on_hand = quantize_money(
+        next_state.company.cash_on_hand + net_cash_flow
+    )
+    finance_summary = apply_end_of_turn_finance_drift(
+        next_state.finance,
+        next_state.company,
+        net_cash_flow=net_cash_flow,
+    )
+
     team_condition = apply_end_of_turn_team_drift(
         next_state.employees,
         next_state.products,
         net_cash_flow,
         next_state.company.strategy,
-        budget_burnout_modifier=budget_profile.burnout_modifier,
+        budget_burnout_modifier=(
+            budget_profile.burnout_modifier + operations_summary.team_energy_penalty
+        ),
         coordination_burnout_modifier=scale_pressure.coordination_drag
         + difficulty_profile.burnout_modifier,
     )
@@ -708,6 +721,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.competitors,
         rng,
         market_cycle=next_state.market_cycle,
+        portfolio_products=next_state.products,
     )
     (
         next_state.market_cycle,
@@ -751,6 +765,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         market_cycle_changed=market_cycle_changed,
         campaign_goal_progress=campaign_goal_progress,
         scale_pressure_summary=scale_pressure.summary,
+        operations_summary=operations_summary.summary,
         victory_reason=victory_reason,
         roadmap_due=roadmap_due,
     )
@@ -762,6 +777,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         total_revenue=total_revenue,
         baseline_operating_cost=baseline_operating_cost,
         total_product_operating_cost=total_product_operating_cost,
+        total_operations_cost=total_operations_cost,
         total_salary_cost=total_salary_cost,
         total_finance_cost=total_finance_cost,
         total_operating_cost=total_operating_cost,
@@ -774,6 +790,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         event_history_entry=event_outcome.history_entry,
         unlocked_milestones=unlocked_milestones,
         run_score=run_score,
+        operations_summary=operations_summary,
         roadmap_due=roadmap_due,
         roadmap_focus=active_roadmap_focus,
         quarter_plan_due=quarter_plan_due,
@@ -843,6 +860,7 @@ def build_turn_narrative(
     market_cycle_changed: bool,
     campaign_goal_progress: CampaignGoalProgress,
     scale_pressure_summary: str,
+    operations_summary: str,
     victory_reason: str | None,
     roadmap_due: bool,
 ) -> str:
@@ -876,6 +894,8 @@ def build_turn_narrative(
 
     if team_condition.burned_out_count > 0 and net_cash_flow < ZERO_MONEY:
         return "Burnout is creeping in while the company is still burning cash."
+    if operations_summary.startswith("Support and coordination"):
+        return "Operational load is starting to spill into product execution."
     if declining_products and any(
         summary.competitor_pressure >= 8 for summary in declining_products
     ):
@@ -900,4 +920,6 @@ def build_turn_narrative(
         return "Your team is converting effort into growth and cash flow."
     if net_cash_flow < ZERO_MONEY:
         return "The company is still buying time. Payroll pressure is now part of the puzzle."
+    if operations_summary != "Operational load is under control.":
+        return operations_summary
     return scale_pressure_summary

@@ -30,6 +30,9 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "debt_crunch" for scenario in scenarios)
     assert any(scenario.scenario_id == "market_shock" for scenario in scenarios)
     assert any(scenario.scenario_id == "portfolio_machine" for scenario in scenarios)
+    assert any(scenario.scenario_id == "ops_overload" for scenario in scenarios)
+    assert any(scenario.scenario_id == "price_war" for scenario in scenarios)
+    assert any(scenario.scenario_id == "enterprise_scaleup" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -120,8 +123,14 @@ def test_new_template_catalog_entries_are_available() -> None:
 def test_additional_template_catalog_entries_are_available() -> None:
     analytics = get_product_template("analytics_cloud")
     support = get_product_template("support_ops")
+    security = get_product_template("security_center")
+    revops = get_product_template("revops_console")
+    automation = get_product_template("automation_mesh")
 
     assert analytics.title == "Analytics Cloud"
     assert analytics.target_segment.value == "smb"
     assert support.title == "Support Ops"
     assert support.pricing_tier is PricingTier.PREMIUM
+    assert security.target_segment.value == "enterprise"
+    assert revops.title == "RevOps Console"
+    assert automation.target_segment.value == "startup"

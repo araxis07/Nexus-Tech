@@ -45,6 +45,7 @@ from nexus_tech.presentation.dashboard import (
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.balance_lab import BalanceBatchResult, BalanceRunResult
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
 
@@ -173,6 +174,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "continue-last-game",
         "list-templates",
         "list-goals",
+        "simulate-balance",
         "list-saves",
         "rename-save",
         "delete-save",
@@ -357,11 +359,52 @@ def test_list_goals_command_renders_catalog() -> None:
     assert "portfolio_empire" in result.output
 
 
+def test_simulate_balance_command_renders_batch_summary(monkeypatch: MonkeyPatch) -> None:
+    batch = BalanceBatchResult(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.STANDARD,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=2,
+        turns=6,
+        seed_base=50,
+        results=(
+            BalanceRunResult(
+                seed=50,
+                turns_played=5,
+                game_over=False,
+                victory_achieved=False,
+                final_cash=Decimal("9100.00"),
+                total_users=88,
+                active_products=2,
+                run_score=144,
+            ),
+            BalanceRunResult(
+                seed=51,
+                turns_played=6,
+                game_over=True,
+                victory_achieved=False,
+                final_cash=Decimal("-120.00"),
+                total_users=54,
+                active_products=1,
+                run_score=82,
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_balance_batch", lambda **_: batch)
+
+    result = runner.invoke(app, ["simulate-balance", "--runs", "2", "--turns", "6"])
+
+    assert result.exit_code == 0
+    assert "Balance Lab" in result.output
+    assert "Run Results" in result.output
+    assert "founder_journey" in result.output
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.4.0" in result.output
+    assert "NEXUS TECH 0.5.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:

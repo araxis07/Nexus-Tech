@@ -902,5 +902,276 @@
         "active_product_count": 1
       }
     ]
+  },
+  {
+    "scenario_id": "ops_overload",
+    "title": "Ops Overload",
+    "description": "The portfolio already has traction, but support load and delivery drag are starting to chew through morale and cash.",
+    "company_name": "RelayWorks",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "portfolio_consolidation",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "9600.00",
+    "reputation": 55,
+    "products": [
+      {
+        "key": "ops",
+        "template_id": "support_ops",
+        "name": "Relay Desk",
+        "lifecycle_stage": "growth",
+        "quality": 61,
+        "bug_level": 24,
+        "market_fit": 63,
+        "technical_debt": 28,
+        "user_count": 132,
+        "revenue_per_user": "58.00",
+        "feature_count": 4,
+        "maintenance_cost": "345.00",
+        "acquisition_rate": "0.0320",
+        "churn_rate": "0.0560",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "mesh",
+        "template_id": "automation_mesh",
+        "name": "Relay Flow",
+        "lifecycle_stage": "growth",
+        "quality": 54,
+        "bug_level": 26,
+        "market_fit": 49,
+        "technical_debt": 34,
+        "user_count": 74,
+        "revenue_per_user": "28.00",
+        "feature_count": 3,
+        "maintenance_cost": "250.00",
+        "acquisition_rate": "0.0500",
+        "churn_rate": "0.0700",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Talia Morgan",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "ops_coordination",
+        "assigned_product_key": "ops",
+        "energy": 70,
+        "morale": 66
+      },
+      {
+        "full_name": "Owen Park",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "automation",
+        "assigned_product_key": "mesh",
+        "energy": 72,
+        "morale": 68
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Process Harbor",
+        "focus_segment": "smb",
+        "strength": 64,
+        "aggression": 58,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      },
+      {
+        "name": "Automation Loop",
+        "focus_segment": "startup",
+        "strength": 58,
+        "aggression": 62,
+        "pricing_tier": "budget",
+        "active_product_count": 2
+      }
+    ]
+  },
+  {
+    "scenario_id": "price_war",
+    "title": "Price War",
+    "description": "A noisy market is forcing products downmarket. Cash can move fast, but margin and differentiation are both fragile.",
+    "company_name": "VeloStack",
+    "company_strategy": "growth",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "frothy",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "8800.00",
+    "reputation": 51,
+    "products": [
+      {
+        "key": "console",
+        "template_id": "revops_console",
+        "name": "Velo Console",
+        "lifecycle_stage": "growth",
+        "quality": 55,
+        "bug_level": 20,
+        "market_fit": 57,
+        "technical_debt": 24,
+        "user_count": 86,
+        "revenue_per_user": "44.00",
+        "feature_count": 2,
+        "maintenance_cost": "280.00",
+        "acquisition_rate": "0.0540",
+        "churn_rate": "0.0630",
+        "target_segment": "smb",
+        "pricing_tier": "budget"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Mia Torres",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "acquisition",
+        "assigned_product_key": "console",
+        "energy": 80,
+        "morale": 74
+      },
+      {
+        "full_name": "Gabe Lin",
+        "role": "designer",
+        "seniority": "junior",
+        "specialization": "product_marketing",
+        "assigned_product_key": "console",
+        "energy": 79,
+        "morale": 72
+      }
+    ],
+    "competitors": [
+      {
+        "name": "MarginDrop",
+        "focus_segment": "smb",
+        "strength": 61,
+        "aggression": 72,
+        "pricing_tier": "budget",
+        "active_product_count": 2
+      },
+      {
+        "name": "CloserFlow",
+        "focus_segment": "startup",
+        "strength": 56,
+        "aggression": 65,
+        "pricing_tier": "budget",
+        "active_product_count": 1
+      }
+    ]
+  },
+  {
+    "scenario_id": "enterprise_scaleup",
+    "title": "Enterprise Scale-Up",
+    "description": "You already have an enterprise foothold and a stronger brand, but support burden, board scrutiny, and delivery quality all matter now.",
+    "company_name": "Aegis Works",
+    "company_strategy": "quality",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "13200.00",
+    "reputation": 63,
+    "finance": {
+      "debt_principal": "2600.00",
+      "loan_interest_rate": "0.0280",
+      "equity_dilution": "0.0800",
+      "investor_pressure": 18,
+      "total_raised": "4200.00"
+    },
+    "products": [
+      {
+        "key": "security",
+        "template_id": "security_center",
+        "name": "Aegis Control",
+        "lifecycle_stage": "growth",
+        "quality": 70,
+        "bug_level": 12,
+        "market_fit": 66,
+        "technical_debt": 20,
+        "user_count": 42,
+        "revenue_per_user": "98.00",
+        "feature_count": 2,
+        "maintenance_cost": "390.00",
+        "acquisition_rate": "0.0230",
+        "churn_rate": "0.0440",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "ops",
+        "template_id": "support_ops",
+        "name": "Aegis Service",
+        "lifecycle_stage": "growth",
+        "quality": 62,
+        "bug_level": 18,
+        "market_fit": 59,
+        "technical_debt": 26,
+        "user_count": 76,
+        "revenue_per_user": "56.00",
+        "feature_count": 3,
+        "maintenance_cost": "320.00",
+        "acquisition_rate": "0.0300",
+        "churn_rate": "0.0580",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Rina Vale",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "security_platform",
+        "assigned_product_key": "security",
+        "energy": 76,
+        "morale": 73
+      },
+      {
+        "full_name": "Devin Cross",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "enterprise_delivery",
+        "assigned_product_key": "security",
+        "energy": 78,
+        "morale": 74
+      },
+      {
+        "full_name": "Sara Kim",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "trust_ux",
+        "assigned_product_key": "ops",
+        "energy": 80,
+        "morale": 77
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Fortress Metrics",
+        "focus_segment": "enterprise",
+        "strength": 76,
+        "aggression": 55,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      },
+      {
+        "name": "Ops Relay",
+        "focus_segment": "smb",
+        "strength": 62,
+        "aggression": 58,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      }
+    ]
   }
 ]

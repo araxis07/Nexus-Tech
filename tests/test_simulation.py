@@ -34,6 +34,7 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.balance_lab import run_balance_batch
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors
 from nexus_tech.simulation.economy import (
@@ -55,6 +56,7 @@ from nexus_tech.simulation.growth import (
     calculate_effective_churn_rate_for_context,
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
+from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
@@ -466,6 +468,69 @@ def test_set_budget_stance_action_refreshes_quarter_plan_targets() -> None:
     assert outcome.state.quarter_plan.budget_stance is BudgetStance.AGGRESSIVE
     assert outcome.state.quarter_plan.set_turn == state.company.current_turn
     assert outcome.state.quarter_plan.headcount_cap >= original_plan.headcount_cap
+
+
+def test_operations_summary_adds_cost_when_portfolio_load_outpaces_team() -> None:
+    state = make_state(
+        make_product(
+            "Desk",
+            user_count=150,
+            bug_level=32,
+            technical_debt=38,
+            feature_count=4,
+            target_segment=MarketSegment.SMB,
+        ),
+        make_product(
+            "Mesh",
+            user_count=92,
+            bug_level=28,
+            technical_debt=34,
+            feature_count=3,
+            target_segment=MarketSegment.STARTUP,
+        ),
+        employees=[
+            make_employee("Solo PM", EmployeeRole.PRODUCT_MANAGER, productivity=60),
+        ],
+        current_turn=9,
+    )
+
+    summary = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+    )
+
+    assert summary.overload > 0
+    assert summary.added_cost > Decimal("0.00")
+
+
+def test_resolve_turn_reports_operations_cost_and_summary() -> None:
+    state = make_state(
+        make_product(
+            "Desk",
+            user_count=150,
+            bug_level=32,
+            technical_debt=38,
+            feature_count=4,
+            target_segment=MarketSegment.SMB,
+        ),
+        make_product(
+            "Mesh",
+            user_count=92,
+            bug_level=28,
+            technical_debt=34,
+            feature_count=3,
+            target_segment=MarketSegment.STARTUP,
+        ),
+        employees=[make_employee("Solo PM", EmployeeRole.PRODUCT_MANAGER, productivity=60)],
+        current_turn=9,
+    )
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert resolution.total_operations_cost > Decimal("0.00")
+    assert resolution.operations_summary.overload > 0
+    assert resolution.operations_summary.summary
 
 
 def test_expanding_market_cycle_improves_acquisition_vs_cooling() -> None:
@@ -1021,6 +1086,37 @@ def test_discount_push_competitor_move_shifts_pricing_and_expands_count() -> Non
     assert competitor.active_product_count == 2
 
 
+def test_competitor_feature_sprint_can_pivot_to_hottest_player_segment() -> None:
+    competitor = Competitor(
+        name="Pivot Labs",
+        focus_segment=MarketSegment.INDIE,
+        strength=64,
+        aggression=57,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=1,
+        momentum=72,
+    )
+    portfolio = [
+        make_product(
+            "Enterprise Core",
+            target_segment=MarketSegment.ENTERPRISE,
+            user_count=210,
+            market_fit=78,
+            quality=80,
+        )
+    ]
+
+    advance_competitors(
+        [competitor],
+        SequenceRandom([8, 0, 0]),
+        market_cycle=MarketCycle.STEADY,
+        portfolio_products=portfolio,
+    )
+
+    assert competitor.current_move is CompetitorMove.FEATURE_SPRINT
+    assert competitor.focus_segment is MarketSegment.ENTERPRISE
+
+
 def test_retrench_competitor_move_reduces_product_count() -> None:
     competitor = Competitor(
         name="Retrench Labs",
@@ -1037,6 +1133,29 @@ def test_retrench_competitor_move_reduces_product_count() -> None:
     assert competitor.current_move is CompetitorMove.RETRENCH
     assert competitor.active_product_count == 2
     assert competitor.pricing_tier is PricingTier.PREMIUM
+
+
+def test_balance_batch_is_deterministic_under_fixed_seed_base() -> None:
+    batch_a = run_balance_batch(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.STANDARD,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=2,
+        turns=4,
+        seed_base=40,
+    )
+    batch_b = run_balance_batch(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.STANDARD,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=2,
+        turns=4,
+        seed_base=40,
+    )
+
+    assert batch_a.victories == batch_b.victories
+    assert batch_a.average_score == batch_b.average_score
+    assert batch_a.results == batch_b.results
 
 
 def test_referral_wave_event_rewards_healthy_product() -> None:

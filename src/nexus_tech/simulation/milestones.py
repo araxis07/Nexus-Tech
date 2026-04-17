@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from nexus_tech.domain.models import GameState, MilestoneEntry, MilestoneId
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.support import clamp_int
 
 
@@ -113,6 +114,20 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             ),
             apply_reward=_reward_multi_segment_reach,
         ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.OPERATIONS_MACHINE,
+            title="Operations Machine",
+            description="The company kept support pressure under control while scaling.",
+            is_unlocked=_has_operations_machine,
+            apply_reward=_reward_operations_machine,
+        ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.ENTERPRISE_FOOTING,
+            title="Enterprise Footing",
+            description="An enterprise product has become a meaningful part of the company.",
+            is_unlocked=_has_enterprise_footing,
+            apply_reward=_reward_enterprise_footing,
+        ),
     )
 
 
@@ -192,6 +207,30 @@ def _reward_multi_segment_reach(state: GameState) -> str:
     )
 
 
+def _reward_operations_machine(state: GameState) -> str:
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand + BALANCE.milestone_operations_machine_cash_gain
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_operations_machine_reputation_gain
+    )
+    return (
+        f"Cash +{format_money(BALANCE.milestone_operations_machine_cash_gain)}, "
+        f"reputation +{BALANCE.milestone_operations_machine_reputation_gain} "
+        "for running a cleaner operating machine."
+    )
+
+
+def _reward_enterprise_footing(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_enterprise_footing_reputation_gain
+    )
+    return (
+        f"Reputation +{BALANCE.milestone_enterprise_footing_reputation_gain} "
+        "for proving the company can hold enterprise demand."
+    )
+
+
 def _get_total_users(state: GameState) -> int:
     return sum(product.user_count for product in state.products if product.is_active)
 
@@ -206,3 +245,25 @@ def _has_profitable_streak(state: GameState) -> bool:
 
 def _get_active_segments(state: GameState) -> set[str]:
     return {product.target_segment.value for product in state.products if product.is_active}
+
+
+def _has_operations_machine(state: GameState) -> bool:
+    if _get_total_users(state) < BALANCE.operations_machine_user_threshold:
+        return False
+    if len(state.employees) < BALANCE.operations_machine_headcount_threshold:
+        return False
+    summary = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+    )
+    return summary.overload <= 1
+
+
+def _has_enterprise_footing(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.target_segment.value == "enterprise"
+        and product.user_count >= BALANCE.enterprise_footing_user_threshold
+        for product in state.products
+    )

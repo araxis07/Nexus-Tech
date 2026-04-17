@@ -23,10 +23,12 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
+from nexus_tech.simulation.balance_lab import BalanceBatchResult
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.market import get_market_profile
+from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.roadmap import (
@@ -257,6 +259,59 @@ def render_quick_guide(console: Console) -> None:
     console.print(Panel(content, title="Quick Guide", border_style="blue", expand=True))
 
 
+def render_balance_lab(console: Console, batch: BalanceBatchResult) -> None:
+    """Render aggregate batch-simulation output for tuning work."""
+
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Scenario", batch.scenario_id)
+    overview.add_row("Difficulty", batch.difficulty_mode.value)
+    overview.add_row("Goal", batch.campaign_goal_id.value)
+    overview.add_row("Runs", str(batch.runs))
+    overview.add_row("Turns", str(batch.turns))
+    overview.add_row("Seed Base", str(batch.seed_base))
+    overview.add_row("Victories", str(batch.victories))
+    overview.add_row("Shutdowns", str(batch.shutdowns))
+    overview.add_row("Avg Turns", f"{batch.average_turns:.1f}")
+    overview.add_row("Avg Score", f"{batch.average_score:.1f}")
+
+    runs_table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    runs_table.add_column("Seed", justify="right", style="bold cyan")
+    runs_table.add_column("Outcome")
+    runs_table.add_column("Turn", justify="right")
+    runs_table.add_column("Cash", justify="right")
+    runs_table.add_column("Users", justify="right")
+    runs_table.add_column("Products", justify="right")
+    runs_table.add_column("Score", justify="right")
+
+    for result in batch.results:
+        if result.victory_achieved:
+            outcome = "victory"
+        elif result.game_over:
+            outcome = "shutdown"
+        else:
+            outcome = "active"
+        runs_table.add_row(
+            str(result.seed),
+            outcome,
+            str(result.turns_played),
+            format_money(result.final_cash),
+            str(result.total_users),
+            str(result.active_products),
+            str(result.run_score),
+        )
+
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Balance Lab", border_style="cyan", expand=True),
+                Panel(runs_table, title="Run Results", border_style="green", expand=True),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
+
+
 def render_dashboard(console: Console, state: GameState) -> None:
     """Render the main per-turn dashboard."""
 
@@ -285,6 +340,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
             [
                 _build_dashboard_team_panel(state),
                 _build_market_watch_panel(state),
+                _build_operations_panel(state),
                 _build_finance_panel(state),
             ],
             equal=False,
@@ -355,6 +411,7 @@ def render_report(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_finance_panel(state),
+                _build_operations_panel(state),
                 Panel(
                     _build_competitor_table(state),
                     title="Competitor Watch",
@@ -673,6 +730,13 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     table.add_row("Competitors", str(len(state.competitors)))
     table.add_row("Scale Drag", str(scale_pressure.coordination_drag))
+    operations = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+    )
+    table.add_row("Ops Load", f"{operations.total_load}/{operations.total_capacity}")
+    table.add_row("Ops Cost", format_money(operations.added_cost))
     table.add_row("Scale State", scale_pressure.summary)
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
@@ -943,6 +1007,7 @@ def _build_turn_finance_table(resolution: TurnResolution) -> Table:
     table.add_row("Total Revenue", format_money(resolution.total_revenue))
     table.add_row("Baseline Cost", format_money(resolution.baseline_operating_cost))
     table.add_row("Product Costs", format_money(resolution.total_product_operating_cost))
+    table.add_row("Operations Cost", format_money(resolution.total_operations_cost))
     table.add_row("Salary Cost", format_money(resolution.total_salary_cost))
     table.add_row("Finance Cost", format_money(resolution.total_finance_cost))
     table.add_row("Total Operating Cost", format_money(resolution.total_operating_cost))
@@ -977,6 +1042,14 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
         "Goal State",
         "complete" if resolution.campaign_goal_progress.completed else "in progress",
     )
+    table.add_row(
+        "Ops Load",
+        (
+            f"{resolution.operations_summary.total_load}/"
+            f"{resolution.operations_summary.total_capacity}"
+        ),
+    )
+    table.add_row("Ops State", resolution.operations_summary.summary)
     table.add_row("Scale State", resolution.scale_pressure_summary)
     table.add_row(
         "Pressure Δ",
@@ -1169,6 +1242,27 @@ def _build_market_watch_panel(state: GameState) -> Panel:
     table.add_row("Scale Drag", str(scale_pressure.coordination_drag))
     table.add_row("Summary", market_profile.description)
     return Panel(table, title="Market Watch", border_style="red", expand=True)
+
+
+def _build_operations_panel(state: GameState) -> Panel:
+    operations = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+    )
+    overloaded_products = [
+        risk.product_name for risk in operations.product_risks if risk.overload > 0
+    ]
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Load", str(operations.total_load))
+    table.add_row("Capacity", str(operations.total_capacity))
+    table.add_row("Overload", str(operations.overload))
+    table.add_row("Ops Cost", format_money(operations.added_cost))
+    table.add_row("Energy Drag", str(operations.team_energy_penalty))
+    table.add_row("Morale Drag", str(operations.team_morale_penalty))
+    table.add_row("Hot Spots", ", ".join(overloaded_products[:2]) if overloaded_products else "-")
+    table.add_row("State", operations.summary)
+    return Panel(table, title="Operations", border_style="yellow", expand=True)
 
 
 def _build_finance_panel(state: GameState) -> Panel:
