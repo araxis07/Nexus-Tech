@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 SCHEMA_STATEMENTS = (
     """
@@ -23,6 +23,8 @@ SCHEMA_STATEMENTS = (
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
         victory_reason TEXT,
+        saved_with_version TEXT NOT NULL DEFAULT 'unknown',
+        schema_version INTEGER NOT NULL DEFAULT 8,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -305,6 +307,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="save_slots",
         column_name="victory_reason",
         column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="saved_with_version",
+        column_definition="TEXT NOT NULL DEFAULT 'unknown'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="schema_version",
+        column_definition=f"INTEGER NOT NULL DEFAULT {CURRENT_SCHEMA_VERSION}",
     )
     if current_version < 6:
         _apply_version_6_migration(connection)

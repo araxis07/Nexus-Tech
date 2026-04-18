@@ -17,6 +17,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game
 from nexus_tech.simulation.scenarios import (
     create_product_from_template,
+    get_available_competitor_archetypes,
     get_available_scenarios,
 )
 
@@ -36,6 +37,8 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "renewal_crunch" for scenario in scenarios)
     assert any(scenario.scenario_id == "channel_landgrab" for scenario in scenarios)
     assert any(scenario.scenario_id == "flagship_risk" for scenario in scenarios)
+    assert any(scenario.scenario_id == "talent_race" for scenario in scenarios)
+    assert any(scenario.scenario_id == "moat_builder" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -147,3 +150,25 @@ def test_latest_template_catalog_entries_are_available() -> None:
     assert portal.target_segment.value == "smb"
     assert renewal.pricing_tier is PricingTier.PREMIUM
     assert ops.title == "Ops Intelligence"
+
+
+def test_content_pack_two_templates_are_available() -> None:
+    billing = get_product_template("billing_hub")
+    partner = get_product_template("partner_stack")
+
+    assert billing.pricing_tier is PricingTier.PREMIUM
+    assert partner.target_segment.value == "startup"
+
+
+def test_competitor_archetype_catalog_is_available() -> None:
+    archetypes = get_available_competitor_archetypes()
+    archetype_ids = {archetype.archetype_id for archetype in archetypes}
+
+    assert {"price_raider", "platform_bulwark", "feature_blitzer"}.issubset(archetype_ids)
+
+
+def test_archetype_backed_scenario_bootstraps_competitors() -> None:
+    state = create_new_game(scenario_id="talent_race")
+
+    assert any(competitor.name == "Deal Current" for competitor in state.competitors)
+    assert any(competitor.focus_segment.value == "startup" for competitor in state.competitors)

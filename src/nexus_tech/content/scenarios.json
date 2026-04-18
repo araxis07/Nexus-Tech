@@ -1432,11 +1432,186 @@
     "competitors": [
       {
         "name": "Vault Core",
-        "focus_segment": "enterprise",
+        "archetype_id": "platform_bulwark",
         "strength": 78,
-        "aggression": 58,
-        "pricing_tier": "premium",
-        "active_product_count": 3
+        "aggression": 58
+      }
+    ]
+  },
+  {
+    "scenario_id": "talent_race",
+    "title": "Talent Race",
+    "description": "The company has momentum, but the market for capable operators and builders is getting expensive and noisy.",
+    "company_name": "Signal Harbor",
+    "company_strategy": "growth",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "11600.00",
+    "reputation": 58,
+    "products": [
+      {
+        "key": "growth",
+        "template_id": "partner_stack",
+        "name": "Launch Rail",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 18,
+        "market_fit": 57,
+        "technical_debt": 24,
+        "user_count": 68,
+        "revenue_per_user": "32.00",
+        "feature_count": 3,
+        "maintenance_cost": "240.00",
+        "acquisition_rate": "0.0510",
+        "churn_rate": "0.0700",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "finance",
+        "template_id": "billing_hub",
+        "name": "Cashline",
+        "lifecycle_stage": "growth",
+        "quality": 56,
+        "bug_level": 14,
+        "market_fit": 49,
+        "technical_debt": 18,
+        "user_count": 36,
+        "revenue_per_user": "58.00",
+        "feature_count": 2,
+        "maintenance_cost": "285.00",
+        "acquisition_rate": "0.0340",
+        "churn_rate": "0.0620",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Nina Cole",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "channel_growth",
+        "assigned_product_key": "growth",
+        "energy": 81,
+        "morale": 76
+      },
+      {
+        "full_name": "Owen Park",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "platform",
+        "assigned_product_key": "finance",
+        "energy": 78,
+        "morale": 72
+      },
+      {
+        "full_name": "Mika Drew",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "delivery",
+        "assigned_product_key": "growth",
+        "energy": 80,
+        "morale": 74
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Deal Current",
+        "archetype_id": "price_raider"
+      },
+      {
+        "name": "Feature Dock",
+        "archetype_id": "feature_blitzer",
+        "focus_segment": "startup"
+      }
+    ]
+  },
+  {
+    "scenario_id": "moat_builder",
+    "title": "Moat Builder",
+    "description": "A stronger platform core is emerging, but the company needs cleaner execution to turn technical credibility into durable advantage.",
+    "company_name": "Granite Loop",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "9800.00",
+    "reputation": 55,
+    "products": [
+      {
+        "key": "core",
+        "template_id": "developer_platform",
+        "name": "Granite API",
+        "lifecycle_stage": "growth",
+        "quality": 67,
+        "bug_level": 16,
+        "market_fit": 59,
+        "technical_debt": 18,
+        "user_count": 72,
+        "revenue_per_user": "39.00",
+        "feature_count": 3,
+        "maintenance_cost": "310.00",
+        "acquisition_rate": "0.0380",
+        "churn_rate": "0.0600",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "ops",
+        "template_id": "ops_intelligence",
+        "name": "Granite Ops",
+        "lifecycle_stage": "prototype",
+        "quality": 52,
+        "bug_level": 14,
+        "market_fit": 41,
+        "technical_debt": 19,
+        "user_count": 10,
+        "revenue_per_user": "52.00",
+        "feature_count": 1,
+        "maintenance_cost": "240.00",
+        "acquisition_rate": "0.0290",
+        "churn_rate": "0.0670",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Kei Morgan",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "platform",
+        "assigned_product_key": "core",
+        "energy": 76,
+        "morale": 72
+      },
+      {
+        "full_name": "Ari Stone",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "product_clarity",
+        "assigned_product_key": "core",
+        "energy": 80,
+        "morale": 75
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Granite Rival",
+        "archetype_id": "platform_bulwark"
+      },
+      {
+        "name": "Niche Line",
+        "archetype_id": "niche_defender",
+        "focus_segment": "smb"
       }
     ]
   }

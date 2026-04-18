@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 - 2026-04-18
+
+- Added a competitor-archetype catalog so scenarios can seed stronger rival identities without hard-coding every competitor inline
+- Expanded the content pack again with new billing-hub and partner-stack templates plus talent-race and moat-builder scenarios
+- Added new dynamic events for talent bidding wars and platform breakthroughs to connect team scale and platform quality back into replayable trade-offs
+- Added progression milestones for building a deeper talent bench and stronger platform credibility
+- Added deterministic `balance-matrix` tuning runs across every supported difficulty profile
+- Hardened save metadata with stored build and schema version markers plus a `check-saves` CLI health command
+- Added `list-rivals` to surface available competitor archetypes directly from the terminal
+- Promoted the package version to `0.7.0`
+
 ## 0.6.0 - 2026-04-18
 
 - Added a dedicated late-game pressure layer for renewal risk, concentration risk, and legacy drag so larger runs pick up clearer endgame trade-offs

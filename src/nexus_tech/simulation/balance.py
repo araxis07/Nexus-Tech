@@ -732,6 +732,26 @@ class BalanceConfig:
     event_partner_offer_focus_quality_gain: int = 1
     event_partner_offer_focus_fit_gain: int = 2
 
+    event_talent_bidding_war_weight: int = 4
+    event_talent_bidding_war_cooldown: int = 5
+    event_talent_bidding_war_turn_threshold: int = 5
+    event_talent_bidding_war_headcount_threshold: int = 2
+    event_talent_bidding_war_retain_cost: Decimal = Decimal("280.00")
+    event_talent_bidding_war_retain_morale_gain: int = 3
+    event_talent_bidding_war_hold_line_morale_loss: int = 2
+    event_talent_bidding_war_hold_line_energy_loss: int = 3
+
+    event_platform_breakthrough_weight: int = 4
+    event_platform_breakthrough_cooldown: int = 4
+    event_platform_breakthrough_quality_threshold: int = 64
+    event_platform_breakthrough_debt_threshold: int = 22
+    event_platform_breakthrough_productize_cost: Decimal = Decimal("220.00")
+    event_platform_breakthrough_quality_gain: int = 2
+    event_platform_breakthrough_fit_gain: int = 2
+    event_platform_breakthrough_acquisition_gain: Decimal = Decimal("0.0040")
+    event_platform_breakthrough_bug_reduction: int = 2
+    event_platform_breakthrough_debt_reduction: int = 4
+
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4
     active_products_milestone_threshold: int = 3
@@ -744,6 +764,10 @@ class BalanceConfig:
     category_moat_user_threshold: int = 140
     category_moat_quality_threshold: int = 70
     category_moat_market_fit_threshold: int = 68
+    talent_bench_headcount_threshold: int = 6
+    talent_bench_morale_threshold: int = 70
+    platform_credibility_quality_threshold: int = 72
+    platform_credibility_debt_threshold: int = 12
     milestone_first_100_users_reputation_gain: int = 2
     milestone_cash_reserve_reputation_gain: int = 1
     milestone_team_growth_reputation_gain: int = 1
@@ -760,6 +784,9 @@ class BalanceConfig:
     milestone_debt_free_operator_reputation_gain: int = 2
     milestone_debt_free_operator_cash_gain: Decimal = Decimal("300.00")
     milestone_category_moat_reputation_gain: int = 3
+    milestone_talent_bench_reputation_gain: int = 2
+    milestone_talent_bench_morale_gain: int = 2
+    milestone_platform_credibility_reputation_gain: int = 2
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

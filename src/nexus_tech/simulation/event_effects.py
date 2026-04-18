@@ -715,6 +715,95 @@ def _apply_partner_offer(state: GameState, event: PendingEvent, option_id: str) 
     raise ValueError(f"Unsupported option {option_id} for partner offer.")
 
 
+def _apply_talent_bidding_war(state: GameState, event: PendingEvent, option_id: str) -> str:
+    target = _get_target_employee(state, event)
+
+    if option_id == "retain_team":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_talent_bidding_war_retain_cost
+        )
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.event_talent_bidding_war_retain_morale_gain,
+                0,
+                100,
+            )
+        return (
+            f"You paid to steady the team around {target.full_name}. Cash "
+            f"-{BALANCE.event_talent_bidding_war_retain_cost}, morale "
+            f"+{BALANCE.event_talent_bidding_war_retain_morale_gain}."
+        )
+
+    if option_id == "hold_line":
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.event_talent_bidding_war_hold_line_morale_loss,
+                0,
+                100,
+            )
+            employee.energy = clamp_int(
+                employee.energy - BALANCE.event_talent_bidding_war_hold_line_energy_loss,
+                0,
+                100,
+            )
+        return (
+            "You held the line on compensation. Team morale "
+            f"-{BALANCE.event_talent_bidding_war_hold_line_morale_loss}, energy "
+            f"-{BALANCE.event_talent_bidding_war_hold_line_energy_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for talent bidding war.")
+
+
+def _apply_platform_breakthrough(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "productize_breakthrough":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_platform_breakthrough_productize_cost
+        )
+        product.quality = clamp_int(
+            product.quality + BALANCE.event_platform_breakthrough_quality_gain,
+            0,
+            100,
+        )
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_platform_breakthrough_fit_gain,
+            0,
+            100,
+        )
+        product.acquisition_rate = clamp_rate(
+            product.acquisition_rate + BALANCE.event_platform_breakthrough_acquisition_gain
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You productized the breakthrough in {product.name}. Cash "
+            f"-{BALANCE.event_platform_breakthrough_productize_cost}, quality "
+            f"+{BALANCE.event_platform_breakthrough_quality_gain}, market fit "
+            f"+{BALANCE.event_platform_breakthrough_fit_gain}."
+        )
+
+    if option_id == "bank_the_gain":
+        product.bug_level = clamp_int(
+            product.bug_level - BALANCE.event_platform_breakthrough_bug_reduction,
+            0,
+            100,
+        )
+        product.technical_debt = clamp_int(
+            product.technical_debt - BALANCE.event_platform_breakthrough_debt_reduction,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You banked the platform gain inside {product.name}. Bugs "
+            f"-{BALANCE.event_platform_breakthrough_bug_reduction}, debt "
+            f"-{BALANCE.event_platform_breakthrough_debt_reduction}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for platform breakthrough.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -754,4 +843,6 @@ EVENT_EFFECT_HANDLERS = {
     "board_scrutiny": _apply_board_scrutiny,
     "renewal_risk": _apply_renewal_risk,
     "partner_offer": _apply_partner_offer,
+    "talent_bidding_war": _apply_talent_bidding_war,
+    "platform_breakthrough": _apply_platform_breakthrough,
 }

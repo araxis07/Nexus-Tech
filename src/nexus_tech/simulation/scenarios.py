@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from nexus_tech.config import DEFAULT_PRODUCT_TEMPLATE_ID
 from nexus_tech.content.loader import (
+    get_competitor_archetype,
     get_product_template,
     get_scenario,
+    list_competitor_archetypes,
     list_product_templates,
     list_scenarios,
 )
 from nexus_tech.content.models import (
+    CompetitorArchetypeDefinition,
     ProductTemplateDefinition,
     ScenarioCompetitorSeed,
     ScenarioDefinition,
@@ -17,7 +20,16 @@ from nexus_tech.content.models import (
     ScenarioFinanceSeed,
     ScenarioProductSeed,
 )
-from nexus_tech.domain.models import Company, Competitor, Employee, FinanceState, GameState, Product
+from nexus_tech.domain.models import (
+    Company,
+    Competitor,
+    CompetitorMove,
+    Employee,
+    FinanceState,
+    GameState,
+    PricingTier,
+    Product,
+)
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.competition import create_competitor
 from nexus_tech.simulation.planning import build_quarter_plan
@@ -90,6 +102,12 @@ def get_available_product_templates() -> tuple[ProductTemplateDefinition, ...]:
     """Return all product templates for CLI presentation."""
 
     return list_product_templates()
+
+
+def get_available_competitor_archetypes() -> tuple[CompetitorArchetypeDefinition, ...]:
+    """Return all competitor archetypes for CLI presentation."""
+
+    return list_competitor_archetypes()
 
 
 def _build_scenario_products(
@@ -243,13 +261,32 @@ def _instantiate_scenario_employee(
 
 
 def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor:
+    if seed.archetype_id is not None:
+        archetype = get_competitor_archetype(seed.archetype_id)
+        return create_competitor(
+            name=seed.name,
+            focus_segment=seed.focus_segment or archetype.focus_segment,
+            strength=seed.strength if seed.strength is not None else archetype.strength,
+            aggression=seed.aggression if seed.aggression is not None else archetype.aggression,
+            pricing_tier=seed.pricing_tier or archetype.pricing_tier,
+            active_product_count=(
+                seed.active_product_count
+                if seed.active_product_count is not None
+                else archetype.active_product_count
+            ),
+            current_move=seed.current_move or archetype.current_move,
+            momentum=seed.momentum if seed.momentum is not None else archetype.momentum,
+        )
+
     return create_competitor(
         name=seed.name,
         focus_segment=seed.focus_segment,
         strength=seed.strength,
         aggression=seed.aggression,
-        pricing_tier=seed.pricing_tier,
-        active_product_count=seed.active_product_count,
+        pricing_tier=seed.pricing_tier or PricingTier.STANDARD,
+        active_product_count=seed.active_product_count or 1,
+        current_move=seed.current_move or CompetitorMove.HOLD,
+        momentum=seed.momentum or 50,
     )
 
 

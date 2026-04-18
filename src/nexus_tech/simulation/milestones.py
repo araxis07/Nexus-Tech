@@ -142,6 +142,20 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             is_unlocked=_has_category_moat,
             apply_reward=_reward_category_moat,
         ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.TALENT_BENCH,
+            title="Talent Bench",
+            description="The company built a deeper team without morale slipping.",
+            is_unlocked=_has_talent_bench,
+            apply_reward=_reward_talent_bench,
+        ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.PLATFORM_CREDIBILITY,
+            title="Platform Credibility",
+            description="A product now looks materially stronger, cleaner, and harder to dismiss.",
+            is_unlocked=_has_platform_credibility,
+            apply_reward=_reward_platform_credibility,
+        ),
     )
 
 
@@ -269,6 +283,28 @@ def _reward_category_moat(state: GameState) -> str:
     )
 
 
+def _reward_talent_bench(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_talent_bench_reputation_gain
+    )
+    for employee in state.employees:
+        employee.morale = clamp_int(employee.morale + BALANCE.milestone_talent_bench_morale_gain)
+    return (
+        f"Reputation +{BALANCE.milestone_talent_bench_reputation_gain}, "
+        f"team morale +{BALANCE.milestone_talent_bench_morale_gain}."
+    )
+
+
+def _reward_platform_credibility(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_platform_credibility_reputation_gain
+    )
+    return (
+        f"Reputation +{BALANCE.milestone_platform_credibility_reputation_gain} "
+        "for shipping a cleaner and more credible platform."
+    )
+
+
 def _get_total_users(state: GameState) -> int:
     return sum(product.user_count for product in state.products if product.is_active)
 
@@ -321,5 +357,21 @@ def _has_category_moat(state: GameState) -> bool:
         and product.user_count >= BALANCE.category_moat_user_threshold
         and product.quality >= BALANCE.category_moat_quality_threshold
         and product.market_fit >= BALANCE.category_moat_market_fit_threshold
+        for product in state.products
+    )
+
+
+def _has_talent_bench(state: GameState) -> bool:
+    if len(state.employees) < BALANCE.talent_bench_headcount_threshold:
+        return False
+    average_morale = sum(employee.morale for employee in state.employees) // len(state.employees)
+    return average_morale >= BALANCE.talent_bench_morale_threshold
+
+
+def _has_platform_credibility(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.quality >= BALANCE.platform_credibility_quality_threshold
+        and product.technical_debt <= BALANCE.platform_credibility_debt_threshold
         for product in state.products
     )

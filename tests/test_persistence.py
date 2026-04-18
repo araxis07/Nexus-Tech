@@ -251,10 +251,12 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "market_cycle_turns_remaining",
         "victory_achieved",
         "victory_reason",
+        "saved_with_version",
+        "schema_version",
     }.issubset(save_slot_columns)
     assert {"target_segment"}.issubset(product_columns)
     assert {"current_move", "momentum"}.issubset(competitor_columns)
-    assert user_version >= 7
+    assert user_version >= 8
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -291,6 +293,21 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].company_name == "Atlas Systems"
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
+    assert summaries[0].saved_with_version
+    assert summaries[0].schema_version >= 8
+
+
+def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
+    db_path = tmp_path / "health.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    coordinator.save_game("active", make_state(), RandomSource(seed=31))
+
+    report = coordinator.check_save_health()
+
+    assert report.integrity_ok is True
+    assert report.foreign_key_ok is True
+    assert report.slot_count == 1
+    assert report.schema_version >= 8
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

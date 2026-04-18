@@ -1,0 +1,62 @@
+[
+  {
+    "archetype_id": "price_raider",
+    "title": "Price Raider",
+    "description": "An aggressive budget-first rival that wins with discounting and broad market noise.",
+    "focus_segment": "startup",
+    "strength": 58,
+    "aggression": 72,
+    "pricing_tier": "budget",
+    "active_product_count": 2,
+    "current_move": "discount_push",
+    "momentum": 66
+  },
+  {
+    "archetype_id": "platform_bulwark",
+    "title": "Platform Bulwark",
+    "description": "A slower but technically strong incumbent that leans on enterprise trust and feature breadth.",
+    "focus_segment": "enterprise",
+    "strength": 76,
+    "aggression": 48,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "hold",
+    "momentum": 58
+  },
+  {
+    "archetype_id": "feature_blitzer",
+    "title": "Feature Blitzer",
+    "description": "A product-led rival that ships aggressively and keeps segments noisy with constant launches.",
+    "focus_segment": "smb",
+    "strength": 68,
+    "aggression": 64,
+    "pricing_tier": "standard",
+    "active_product_count": 2,
+    "current_move": "feature_sprint",
+    "momentum": 71
+  },
+  {
+    "archetype_id": "niche_defender",
+    "title": "Niche Defender",
+    "description": "A focused competitor with lower aggression that protects one profitable niche exceptionally well.",
+    "focus_segment": "indie",
+    "strength": 54,
+    "aggression": 38,
+    "pricing_tier": "standard",
+    "active_product_count": 1,
+    "current_move": "hold",
+    "momentum": 46
+  },
+  {
+    "archetype_id": "retreating_incumbent",
+    "title": "Retreating Incumbent",
+    "description": "A mature incumbent that still has strength but is slowly retreating and creating market openings.",
+    "focus_segment": "enterprise",
+    "strength": 70,
+    "aggression": 34,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "retrench",
+    "momentum": 32
+  }
+]

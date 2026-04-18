@@ -34,7 +34,11 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.balance_lab import run_balance_batch, run_balance_comparison
+from nexus_tech.simulation.balance_lab import (
+    run_balance_batch,
+    run_balance_comparison,
+    run_balance_matrix,
+)
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors
 from nexus_tech.simulation.economy import (
@@ -1570,6 +1574,8 @@ def test_new_event_ids_are_registered() -> None:
 
     assert "renewal_risk" in registry_ids
     assert "partner_offer" in registry_ids
+    assert "talent_bidding_war" in registry_ids
+    assert "platform_breakthrough" in registry_ids
 
 
 def test_balance_comparison_returns_ranked_scenarios() -> None:
@@ -1584,3 +1590,40 @@ def test_balance_comparison_returns_ranked_scenarios() -> None:
 
     assert len(comparison.comparisons) == 2
     assert comparison.comparisons[0].average_score >= comparison.comparisons[1].average_score
+
+
+def test_new_milestones_unlock_for_talent_and_platform_credibility() -> None:
+    product = make_product(
+        "Core",
+        quality=74,
+        technical_debt=10,
+        user_count=90,
+    )
+    employees = [
+        make_employee("A", EmployeeRole.ENGINEER, morale=74),
+        make_employee("B", EmployeeRole.DESIGNER, morale=72),
+        make_employee("C", EmployeeRole.MARKETER, morale=71),
+        make_employee("D", EmployeeRole.PRODUCT_MANAGER, morale=70),
+        make_employee("E", EmployeeRole.ENGINEER, morale=73),
+        make_employee("F", EmployeeRole.MARKETER, morale=75),
+    ]
+    state = make_state(product, employees=employees, current_turn=8)
+
+    unlocked = resolve_new_milestones(state, unlocked_turn=8)
+    unlocked_ids = {entry.milestone_id for entry in unlocked}
+
+    assert MilestoneId.TALENT_BENCH in unlocked_ids
+    assert MilestoneId.PLATFORM_CREDIBILITY in unlocked_ids
+
+
+def test_balance_matrix_returns_all_difficulty_cells() -> None:
+    matrix = run_balance_matrix(
+        scenario_ids=["founder_journey", "technical_rebuild"],
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=2,
+        seed_base=30,
+    )
+
+    assert len(matrix.cells) == 6
+    assert {cell.difficulty_mode for cell in matrix.cells} == set(DifficultyMode)

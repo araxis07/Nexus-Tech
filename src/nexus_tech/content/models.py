@@ -5,13 +5,14 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
     CompanyStrategy,
+    CompetitorMove,
     DifficultyMode,
     EmployeeRole,
     LifecycleStage,
@@ -116,11 +117,42 @@ class ScenarioCompetitorSeed(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
 
     name: str = Field(min_length=1, max_length=80)
+    archetype_id: Optional[str] = Field(default=None, min_length=1, max_length=40)  # noqa: UP045
+    focus_segment: Optional[MarketSegment] = None  # noqa: UP045
+    strength: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
+    aggression: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
+    pricing_tier: Optional[PricingTier] = None  # noqa: UP045
+    active_product_count: Optional[int] = Field(default=None, ge=1, le=6)  # noqa: UP045
+    current_move: Optional[CompetitorMove] = None  # noqa: UP045
+    momentum: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
+
+    @model_validator(mode="after")
+    def _validate_competitor_source(self) -> ScenarioCompetitorSeed:
+        if self.archetype_id is not None:
+            return self
+        if self.focus_segment is None or self.strength is None or self.aggression is None:
+            raise ValueError(
+                "Scenario competitors must define focus_segment, strength, and aggression "
+                "unless an archetype_id is provided."
+            )
+        return self
+
+
+class CompetitorArchetypeDefinition(BaseModel):
+    """Data-driven rival blueprint used to expand scenario content cleanly."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    archetype_id: str = Field(min_length=1, max_length=40)
+    title: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=200)
     focus_segment: MarketSegment
     strength: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     aggression: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     pricing_tier: PricingTier = PricingTier.STANDARD
     active_product_count: int = Field(default=1, ge=1, le=6)
+    current_move: CompetitorMove = CompetitorMove.HOLD
+    momentum: int = Field(default=50, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
 
 
 class ScenarioFinanceSeed(BaseModel):

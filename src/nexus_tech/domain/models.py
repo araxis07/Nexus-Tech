@@ -142,6 +142,8 @@ class MilestoneId(StrEnum):
     ENTERPRISE_FOOTING = "enterprise_footing"
     DEBT_FREE_OPERATOR = "debt_free_operator"
     CATEGORY_MOAT = "category_moat"
+    TALENT_BENCH = "talent_bench"
+    PLATFORM_CREDIBILITY = "platform_credibility"
 
 
 class FundingType(StrEnum):

@@ -304,5 +304,41 @@
     "churn_rate": "0.0640",
     "target_segment": "smb",
     "pricing_tier": "premium"
+  },
+  {
+    "template_id": "billing_hub",
+    "title": "Billing Hub",
+    "description": "A monetization and billing control product with healthier cash characteristics and stronger CFO-facing appeal.",
+    "lifecycle_stage": "prototype",
+    "quality": 47,
+    "bug_level": 13,
+    "market_fit": 35,
+    "technical_debt": 16,
+    "user_count": 0,
+    "revenue_per_user": "62.00",
+    "feature_count": 0,
+    "maintenance_cost": "275.00",
+    "acquisition_rate": "0.0300",
+    "churn_rate": "0.0620",
+    "target_segment": "smb",
+    "pricing_tier": "premium"
+  },
+  {
+    "template_id": "partner_stack",
+    "title": "Partner Stack",
+    "description": "A channel and partner workflow product with strong expansion upside if execution stays coordinated.",
+    "lifecycle_stage": "prototype",
+    "quality": 43,
+    "bug_level": 17,
+    "market_fit": 38,
+    "technical_debt": 21,
+    "user_count": 0,
+    "revenue_per_user": "30.00",
+    "feature_count": 0,
+    "maintenance_cost": "215.00",
+    "acquisition_rate": "0.0480",
+    "churn_rate": "0.0770",
+    "target_segment": "startup",
+    "pricing_tier": "standard"
   }
 ]

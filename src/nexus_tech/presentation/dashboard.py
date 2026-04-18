@@ -11,7 +11,11 @@ from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 
-from nexus_tech.content.models import ProductTemplateDefinition, ScenarioDefinition
+from nexus_tech.content.models import (
+    CompetitorArchetypeDefinition,
+    ProductTemplateDefinition,
+    ScenarioDefinition,
+)
 from nexus_tech.domain.models import (
     Employee,
     EventHistoryEntry,
@@ -23,7 +27,11 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
-from nexus_tech.simulation.balance_lab import BalanceBatchResult, BalanceComparisonResult
+from nexus_tech.simulation.balance_lab import (
+    BalanceBatchResult,
+    BalanceComparisonResult,
+    BalanceMatrixResult,
+)
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.finance import estimate_runway
@@ -181,6 +189,52 @@ def render_campaign_goal_catalog(
     )
 
 
+def render_competitor_archetype_catalog(
+    console: Console,
+    archetypes: tuple[CompetitorArchetypeDefinition, ...],
+) -> None:
+    """Render the available competitor archetypes."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Archetype", style="bold")
+    table.add_column("Segment")
+    table.add_column("Price")
+    table.add_column("Move")
+    table.add_column("Strength", justify="right")
+    table.add_column("Aggro", justify="right")
+    table.add_column("Products", justify="right")
+    table.add_column("Description")
+
+    for archetype in archetypes:
+        table.add_row(
+            f"{archetype.title}\n[dim]{archetype.archetype_id}[/dim]",
+            archetype.focus_segment.value,
+            archetype.pricing_tier.value,
+            archetype.current_move.value,
+            str(archetype.strength),
+            str(archetype.aggression),
+            str(archetype.active_product_count),
+            archetype.description,
+        )
+
+    archetype_ids = ", ".join(
+        f"{archetype.archetype_id} ({archetype.title})" for archetype in archetypes
+    )
+    content = Group(
+        table,
+        "",
+        f"[dim]Archetype ids: {archetype_ids}[/dim]",
+    )
+    console.print(
+        Panel(
+            content,
+            title="Competitor Archetypes",
+            border_style="red",
+            expand=True,
+        )
+    )
+
+
 def render_save_slot_catalog(
     console: Console,
     save_slots: list[SaveSlotSummary],
@@ -208,6 +262,8 @@ def render_save_slot_catalog(
     table.add_column("Products", justify="right")
     table.add_column("Team", justify="right")
     table.add_column("Status")
+    table.add_column("Build")
+    table.add_column("Schema", justify="right")
     table.add_column("Updated")
 
     for slot in save_slots:
@@ -227,6 +283,8 @@ def render_save_slot_catalog(
             str(slot.active_products),
             str(slot.headcount),
             status,
+            slot.saved_with_version,
+            str(slot.schema_version),
             slot.updated_at,
         )
 
@@ -249,7 +307,10 @@ def render_quick_guide(console: Console) -> None:
         "3. End the turn and watch revenue, churn, burnout, and rival pressure.",
         "",
         "[bold]Useful commands[/bold]",
-        "`nexus-tech guide`, `list-scenarios`, `list-templates`, `list-saves`",
+        (
+            "`nexus-tech guide`, `list-scenarios`, `list-templates`, "
+            "`list-rivals`, `list-saves`, `check-saves`"
+        ),
         "",
         "[bold]Strong first turns[/bold]",
         (
@@ -347,6 +408,48 @@ def render_balance_comparison(console: Console, comparison: BalanceComparisonRes
             [
                 Panel(overview, title="Balance Compare", border_style="cyan", expand=True),
                 Panel(table, title="Scenario Ranking", border_style="green", expand=True),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
+
+
+def render_balance_matrix(console: Console, matrix: BalanceMatrixResult) -> None:
+    """Render a scenario-versus-difficulty tuning matrix."""
+
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Goal", matrix.campaign_goal_id.value)
+    overview.add_row("Runs / Cell", str(matrix.runs))
+    overview.add_row("Turns", str(matrix.turns))
+    overview.add_row("Seed Base", str(matrix.seed_base))
+    overview.add_row("Cells", str(len(matrix.cells)))
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Scenario", style="bold")
+    table.add_column("Difficulty")
+    table.add_column("Avg Score", justify="right")
+    table.add_column("Avg Cash", justify="right")
+    table.add_column("Avg Users", justify="right")
+    table.add_column("Victories", justify="right")
+    table.add_column("Shutdowns", justify="right")
+
+    for cell in matrix.cells:
+        table.add_row(
+            cell.scenario_id,
+            cell.difficulty_mode.value,
+            f"{cell.average_score:.1f}",
+            format_money(cell.average_cash),
+            f"{cell.average_users:.1f}",
+            str(cell.victories),
+            str(cell.shutdowns),
+        )
+
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Balance Matrix", border_style="cyan", expand=True),
+                Panel(table, title="Scenario x Difficulty", border_style="green", expand=True),
             ],
             equal=False,
             expand=True,

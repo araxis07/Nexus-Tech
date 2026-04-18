@@ -41,6 +41,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
 - Expand the catalog with AI copilot, analytics, support-ops, compliance, embedded API, and capital-pressure scenarios
 - Extend the catalog further with renewal-cloud, customer-portal, and ops-intelligence templates plus channel and concentration-risk scenarios
+- Add a second content-pack pass with billing-hub and partner-stack templates plus talent-race and moat-builder scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
@@ -49,6 +50,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Run each company inside a live market cycle such as `cooling`, `steady`, `expanding`, or `frothy`
 - Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, aggression, and tactical momentum
 - Simulate rival moves such as `hold`, `discount_push`, `feature_sprint`, and `retrench`
+- Define reusable competitor archetypes such as price raiders, platform bulwarks, and feature blitzers
 - Let rival moves reshape product count and pricing posture over time
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
 - Track an explicit operations layer that converts support backlog and portfolio sprawl into real cost, morale drag, and execution risk
@@ -88,6 +90,7 @@ Each turn represents a business interval. You review the company, choose actions
 - New event content includes referral waves and enterprise compliance review pressure
 - Additional event content now includes support backlog surges and board-level scrutiny over capital discipline
 - Mature runs can now surface renewal-risk events and channel partner offers with visible product and GTM trade-offs
+- Scale-stage runs can now trigger talent bidding wars and platform breakthroughs with clearer team and product trade-offs
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
@@ -98,6 +101,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track key moments such as traction, cash reserves, team growth, and portfolio expansion
 - Recognize profitable streaks and multi-segment reach as the company matures
 - Recognize operational discipline and enterprise footholds as higher-scale milestones
+- Add milestone coverage for building a credible talent bench and a stronger platform foundation
 - Set quarter-scale roadmap focuses such as growth push, platform rebuild, premium expansion, and portfolio consolidation
 - Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
 - Work against a quarter plan with explicit revenue, user, cash, and headcount targets
@@ -120,7 +124,9 @@ Each turn represents a business interval. You review the company, choose actions
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
 - Deterministic `compare-balance` scenario rankings for side-by-side tuning across multiple openings
+- Deterministic `balance-matrix` runs to compare the same scenarios across every difficulty profile
 - Report now includes recent events, funding history, and milestone history
+- Add `list-rivals` and `check-saves` so content and local persistence health can be reviewed without entering a run
 - Seeded demo support for reproducible simulations
 
 ### 🧪 Quality and Tooling
@@ -167,6 +173,12 @@ List the available product templates:
 uv run nexus-tech list-templates
 ```
 
+List the available competitor archetypes:
+
+```bash
+uv run nexus-tech list-rivals
+```
+
 List the available campaign goals:
 
 ```bash
@@ -201,6 +213,12 @@ Compare multiple scenarios side by side:
 
 ```bash
 uv run nexus-tech compare-balance --scenario founder_journey --scenario technical_rebuild --runs 3 --turns 10 --seed-base 100
+```
+
+Run a full scenario-versus-difficulty balance matrix:
+
+```bash
+uv run nexus-tech balance-matrix --scenario founder_journey --scenario technical_rebuild --runs 2 --turns 10 --seed-base 100
 ```
 
 Load a saved game:
@@ -243,6 +261,12 @@ List save slots:
 
 ```bash
 uv run nexus-tech list-saves
+```
+
+Check local save integrity after at least one save exists:
+
+```bash
+uv run nexus-tech check-saves
 ```
 
 Rename a save slot:

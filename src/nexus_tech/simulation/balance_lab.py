@@ -107,6 +107,30 @@ class BalanceComparisonResult:
     comparisons: tuple[BalanceScenarioComparison, ...]
 
 
+@dataclass(frozen=True)
+class BalanceMatrixCell:
+    """One scenario/difficulty aggregate inside a balance matrix run."""
+
+    scenario_id: str
+    difficulty_mode: DifficultyMode
+    average_score: float
+    average_cash: Decimal
+    average_users: float
+    victories: int
+    shutdowns: int
+
+
+@dataclass(frozen=True)
+class BalanceMatrixResult:
+    """Deterministic scenario-versus-difficulty comparison grid."""
+
+    campaign_goal_id: CampaignGoalId
+    runs: int
+    turns: int
+    seed_base: int
+    cells: tuple[BalanceMatrixCell, ...]
+
+
 def run_balance_batch(
     *,
     scenario_id: str,
@@ -229,6 +253,50 @@ def run_balance_comparison(
         turns=turns,
         seed_base=seed_base,
         comparisons=tuple(comparisons),
+    )
+
+
+def run_balance_matrix(
+    *,
+    scenario_ids: list[str],
+    campaign_goal_id: CampaignGoalId,
+    runs: int,
+    turns: int,
+    seed_base: int,
+) -> BalanceMatrixResult:
+    """Run deterministic comparisons across scenarios and all difficulty modes."""
+
+    cells: list[BalanceMatrixCell] = []
+    seed_offset = 0
+    for scenario_id in scenario_ids:
+        for difficulty_mode in DifficultyMode:
+            batch = run_balance_batch(
+                scenario_id=scenario_id,
+                difficulty_mode=difficulty_mode,
+                campaign_goal_id=campaign_goal_id,
+                runs=runs,
+                turns=turns,
+                seed_base=seed_base + seed_offset,
+            )
+            seed_offset += max(1, runs) * 100
+            cells.append(
+                BalanceMatrixCell(
+                    scenario_id=scenario_id,
+                    difficulty_mode=difficulty_mode,
+                    average_score=batch.average_score,
+                    average_cash=batch.average_cash,
+                    average_users=batch.average_users,
+                    victories=batch.victories,
+                    shutdowns=batch.shutdowns,
+                )
+            )
+    cells.sort(key=lambda cell: (cell.scenario_id, cell.difficulty_mode.value))
+    return BalanceMatrixResult(
+        campaign_goal_id=campaign_goal_id,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+        cells=tuple(cells),
     )
 
 
@@ -439,6 +507,18 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
             "sign_partner"
             if state.company.cash_on_hand < BALANCE.cash_reserve_milestone_threshold
             else "stay_direct"
+        )
+    elif event.event_id == "talent_bidding_war":
+        option_id = (
+            "retain_team"
+            if state.company.cash_on_hand > BALANCE.event_talent_bidding_war_retain_cost * 2
+            else "hold_line"
+        )
+    elif event.event_id == "platform_breakthrough":
+        option_id = (
+            "productize_breakthrough"
+            if state.company.cash_on_hand > BALANCE.event_platform_breakthrough_productize_cost * 2
+            else "bank_the_gain"
         )
     else:
         option_id = event.options[0].id

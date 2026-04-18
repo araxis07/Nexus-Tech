@@ -43,7 +43,9 @@ from nexus_tech.presentation.dashboard import (
     render_action_feedback,
     render_balance_comparison,
     render_balance_lab,
+    render_balance_matrix,
     render_campaign_goal_catalog,
+    render_competitor_archetype_catalog,
     render_dashboard,
     render_employee_picker,
     render_event_result,
@@ -62,7 +64,11 @@ from nexus_tech.presentation.dashboard import (
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.balance_lab import run_balance_batch, run_balance_comparison
+from nexus_tech.simulation.balance_lab import (
+    run_balance_batch,
+    run_balance_comparison,
+    run_balance_matrix,
+)
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
 from nexus_tech.simulation.engine import (
     ActionContext,
@@ -74,7 +80,11 @@ from nexus_tech.simulation.engine import (
 )
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
-from nexus_tech.simulation.scenarios import get_available_product_templates, get_available_scenarios
+from nexus_tech.simulation.scenarios import (
+    get_available_competitor_archetypes,
+    get_available_product_templates,
+    get_available_scenarios,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -336,6 +346,13 @@ def list_goals_command() -> None:
     render_campaign_goal_catalog(console, list_campaign_goals())
 
 
+@app.command("list-rivals")
+def list_rivals_command() -> None:
+    """Print the available competitor archetypes."""
+
+    render_competitor_archetype_catalog(console, get_available_competitor_archetypes())
+
+
 @app.command("simulate-balance")
 def simulate_balance_command(
     scenario: str = SCENARIO_OPTION,
@@ -389,6 +406,31 @@ def compare_balance_command(
     render_balance_comparison(console, comparison)
 
 
+@app.command("balance-matrix")
+def balance_matrix_command(
+    scenario: Optional[list[str]] = COMPARE_SCENARIOS_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(2, "--runs", min=1, help="Number of deterministic runs."),
+    turns: int = typer.Option(10, "--turns", min=1, help="Maximum turns per run."),
+    seed_base: int = typer.Option(
+        100,
+        "--seed-base",
+        help="Base seed. Each matrix cell gets a deterministic seed range from this value.",
+    ),
+) -> None:
+    """Compare multiple scenarios across all supported difficulty modes."""
+
+    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    matrix = run_balance_matrix(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    render_balance_matrix(console, matrix)
+
+
 @app.command("guide")
 def guide_command() -> None:
     """Print a compact quick-start guide."""
@@ -408,6 +450,35 @@ def list_saves_command(
     except PersistenceError as error:
         raise_cli_persistence_error("Save List Failed", error)
     render_save_slot_catalog(console, save_slots)
+
+
+@app.command("check-saves")
+def check_saves_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Run SQLite integrity and foreign-key checks against local saves."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        report = coordinator.check_save_health()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Save Health Check Failed", error)
+
+    lines = [
+        f"Integrity: {'ok' if report.integrity_ok else 'failed'}",
+        f"Foreign Keys: {'ok' if report.foreign_key_ok else 'failed'}",
+        f"Slots: {report.slot_count}",
+        f"Schema Version: {report.schema_version}",
+        "",
+        report.message,
+    ]
+    console.print(
+        Panel.fit(
+            "\n".join(lines),
+            title="Save Health",
+            border_style="green" if report.integrity_ok and report.foreign_key_ok else "red",
+        )
+    )
 
 
 @app.command("rename-save")

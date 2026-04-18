@@ -9,6 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
+from nexus_tech import __version__
 from nexus_tech.domain.models import (
     CampaignGoalId,
     DifficultyMode,
@@ -32,6 +33,7 @@ from nexus_tech.persistence.errors import CorruptSaveError, PersistenceError, Sa
 from nexus_tech.persistence.finance_repository import FinanceRepository
 from nexus_tech.persistence.product_repository import ProductRepository
 from nexus_tech.persistence.quarter_plan_repository import QuarterPlanRepository
+from nexus_tech.persistence.schema import CURRENT_SCHEMA_VERSION
 from nexus_tech.simulation.randomness import RandomSource
 
 try:
@@ -66,6 +68,19 @@ class SaveSlotSummary:
     updated_at: str
     victory_achieved: bool
     game_over: bool
+    saved_with_version: str
+    schema_version: int
+
+
+@dataclass(frozen=True)
+class SaveHealthReport:
+    """Compact save-database health summary used by CLI diagnostics."""
+
+    integrity_ok: bool
+    foreign_key_ok: bool
+    slot_count: int
+    schema_version: int
+    message: str
 
 
 class SaveLoadCoordinator:
@@ -109,6 +124,8 @@ class SaveLoadCoordinator:
                     market_cycle_turns_remaining=state.market_cycle_turns_remaining,
                     victory_achieved=state.victory_achieved,
                     victory_reason=state.victory_reason,
+                    saved_with_version=__version__,
+                    schema_version=CURRENT_SCHEMA_VERSION,
                     timestamp=timestamp,
                 )
                 self.company_repository.save(connection, slot_name, state.company)
@@ -261,6 +278,8 @@ class SaveLoadCoordinator:
                         slots.scenario_title,
                         slots.updated_at,
                         slots.victory_achieved,
+                        slots.saved_with_version,
+                        slots.schema_version,
                         companies.name AS company_name,
                         companies.current_turn,
                         companies.cash_on_hand,
@@ -298,9 +317,48 @@ class SaveLoadCoordinator:
                 updated_at=row["updated_at"],
                 victory_achieved=bool(row["victory_achieved"]),
                 game_over=bool(row["game_over"]) if row["game_over"] is not None else False,
+                saved_with_version=row["saved_with_version"] or "unknown",
+                schema_version=row["schema_version"] or 0,
             )
             for row in rows
         ]
+
+    def check_save_health(self) -> SaveHealthReport:
+        """Run lightweight integrity checks against the local save database."""
+
+        if not self.database.exists():
+            raise SaveNotFoundError("No save database was found yet.")
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                integrity_rows = connection.execute("PRAGMA integrity_check").fetchall()
+                foreign_key_rows = connection.execute("PRAGMA foreign_key_check").fetchall()
+                slot_count = connection.execute(
+                    "SELECT COUNT(*) FROM save_slots"
+                ).fetchone()[0]
+                schema_version = connection.execute("PRAGMA user_version").fetchone()[0]
+        except sqlite3.DatabaseError as error:
+            raise PersistenceError(f"Failed to inspect save health: {error}") from error
+
+        integrity_ok = all(row[0] == "ok" for row in integrity_rows)
+        foreign_key_ok = len(foreign_key_rows) == 0
+        if integrity_ok and foreign_key_ok:
+            message = "SQLite integrity and foreign keys are healthy."
+        elif not integrity_ok and not foreign_key_ok:
+            message = "Integrity check and foreign key validation both failed."
+        elif not integrity_ok:
+            message = "Integrity check failed. The database file may be damaged."
+        else:
+            message = "Foreign key validation failed. Some saved rows are inconsistent."
+
+        return SaveHealthReport(
+            integrity_ok=integrity_ok,
+            foreign_key_ok=foreign_key_ok,
+            slot_count=slot_count,
+            schema_version=schema_version,
+            message=message,
+        )
 
     def delete_save(self, slot_name: str) -> None:
         """Delete one save slot and all related rows."""
@@ -368,6 +426,8 @@ class SaveLoadCoordinator:
         market_cycle_turns_remaining: int,
         victory_achieved: bool,
         victory_reason: str | None,
+        saved_with_version: str,
+        schema_version: int,
         timestamp: str,
     ) -> None:
         existing = connection.execute(
@@ -392,10 +452,12 @@ class SaveLoadCoordinator:
                     market_cycle_turns_remaining,
                     victory_achieved,
                     victory_reason,
+                    saved_with_version,
+                    schema_version,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
@@ -412,6 +474,8 @@ class SaveLoadCoordinator:
                     market_cycle_turns_remaining,
                     int(victory_achieved),
                     victory_reason,
+                    saved_with_version,
+                    schema_version,
                     timestamp,
                     timestamp,
                 ),
@@ -434,6 +498,8 @@ class SaveLoadCoordinator:
                 market_cycle_turns_remaining = ?,
                 victory_achieved = ?,
                 victory_reason = ?,
+                saved_with_version = ?,
+                schema_version = ?,
                 updated_at = ?
             WHERE slot_name = ?
             """,
@@ -451,6 +517,8 @@ class SaveLoadCoordinator:
                 market_cycle_turns_remaining,
                 int(victory_achieved),
                 victory_reason,
+                saved_with_version,
+                schema_version,
                 timestamp,
                 slot_name,
             ),

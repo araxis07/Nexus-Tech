@@ -37,6 +37,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
 from nexus_tech.presentation.dashboard import (
+    render_competitor_archetype_catalog,
     render_dashboard,
     render_product_template_catalog,
     render_quick_guide,
@@ -48,6 +49,8 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     BalanceBatchResult,
     BalanceComparisonResult,
+    BalanceMatrixCell,
+    BalanceMatrixResult,
     BalanceRunResult,
     BalanceScenarioComparison,
 )
@@ -179,9 +182,12 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "continue-last-game",
         "list-templates",
         "list-goals",
+        "list-rivals",
         "simulate-balance",
         "compare-balance",
+        "balance-matrix",
         "list-saves",
+        "check-saves",
         "rename-save",
         "delete-save",
         "guide",
@@ -365,6 +371,14 @@ def test_list_goals_command_renders_catalog() -> None:
     assert "portfolio_empire" in result.output
 
 
+def test_list_rivals_command_renders_catalog() -> None:
+    result = runner.invoke(app, ["list-rivals"])
+
+    assert result.exit_code == 0
+    assert "Competitor Archetypes" in result.output
+    assert "price_raider" in result.output
+
+
 def test_simulate_balance_command_renders_batch_summary(monkeypatch: MonkeyPatch) -> None:
     batch = BalanceBatchResult(
         scenario_id="founder_journey",
@@ -455,11 +469,48 @@ def test_compare_balance_command_renders_scenario_ranking(monkeypatch: MonkeyPat
     assert "rebuild" in result.output
 
 
+def test_balance_matrix_command_renders_grid(monkeypatch: MonkeyPatch) -> None:
+    matrix = BalanceMatrixResult(
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=6,
+        seed_base=50,
+        cells=(
+            BalanceMatrixCell(
+                scenario_id="founder",
+                difficulty_mode=DifficultyMode.BUILDER,
+                average_score=130.0,
+                average_cash=Decimal("9000.00"),
+                average_users=90.0,
+                victories=0,
+                shutdowns=0,
+            ),
+            BalanceMatrixCell(
+                scenario_id="founder",
+                difficulty_mode=DifficultyMode.FOUNDER,
+                average_score=98.0,
+                average_cash=Decimal("6100.00"),
+                average_users=64.0,
+                victories=0,
+                shutdowns=1,
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_balance_matrix", lambda **_: matrix)
+
+    result = runner.invoke(app, ["balance-matrix", "--scenario", "founder_journey"])
+
+    assert result.exit_code == 0
+    assert "Balance Matrix" in result.output
+    assert "Scenario x Difficulty" in result.output
+    assert "founder" in result.output
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.6.0" in result.output
+    assert "NEXUS TECH 0.7.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -467,7 +518,34 @@ def test_guide_command_renders_quick_start() -> None:
 
     assert result.exit_code == 0
     assert "Quick Guide" in result.output
-    assert "Opening flow" in result.output
+
+
+def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            captured["db_path"] = db_path
+
+        def check_save_health(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                integrity_ok=True,
+                foreign_key_ok=True,
+                slot_count=2,
+                schema_version=8,
+                message="SQLite integrity and foreign keys are healthy.",
+            )
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+    db_path = tmp_path / "health.db"
+    result = runner.invoke(app, ["check-saves", "--db-path", str(db_path)])
+
+    assert result.exit_code == 0
+    assert captured["db_path"] == db_path
+    assert "Save Health" in result.output
+    assert "Integrity: ok" in result.output
+    assert "Foreign Keys: ok" in result.output
+    assert "Schema Version: 8" in result.output
 
 
 def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -485,6 +563,8 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             updated_at="2026-04-13T01:00:00+00:00",
             victory_achieved=False,
             game_over=False,
+            saved_with_version="0.6.0",
+            schema_version=8,
         )
     ]
 
@@ -707,6 +787,17 @@ def test_template_catalog_rendering_contains_catalog_title() -> None:
     assert "Product Template Catalog" in output
     assert templates[0].title in output
     assert templates[1].title in output
+
+
+def test_competitor_archetype_catalog_rendering_contains_title() -> None:
+    archetypes = cli_module.get_available_competitor_archetypes()
+    console = Console(record=True, width=140)
+
+    render_competitor_archetype_catalog(console, archetypes[:2])
+    output = console.export_text()
+
+    assert "Competitor Archetypes" in output
+    assert archetypes[0].title in output
 
 
 def test_quick_guide_rendering_contains_opening_flow() -> None:

@@ -135,6 +135,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             is_eligible=_is_partner_offer_eligible,
             build_pending_event=_build_partner_offer_event,
         ),
+        EventDefinition(
+            event_id="talent_bidding_war",
+            category=EventCategory.EMPLOYEE_ISSUE,
+            weight=BALANCE.event_talent_bidding_war_weight,
+            cooldown_turns=BALANCE.event_talent_bidding_war_cooldown,
+            is_eligible=_is_talent_bidding_war_eligible,
+            build_pending_event=_build_talent_bidding_war_event,
+        ),
+        EventDefinition(
+            event_id="platform_breakthrough",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_platform_breakthrough_weight,
+            cooldown_turns=BALANCE.event_platform_breakthrough_cooldown,
+            is_eligible=_is_platform_breakthrough_eligible,
+            build_pending_event=_build_platform_breakthrough_event,
+        ),
     )
 
 
@@ -749,6 +765,104 @@ def _build_partner_offer_event(
                     "Skip the channel bump and invest the attention back into "
                     "product depth."
                 ),
+            ),
+        ],
+    )
+
+
+def _is_talent_bidding_war_eligible(state: GameState) -> bool:
+    return (
+        state.company.current_turn >= BALANCE.event_talent_bidding_war_turn_threshold
+        and len(state.employees) >= BALANCE.event_talent_bidding_war_headcount_threshold
+    )
+
+
+def _build_talent_bidding_war_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_employee(
+        state.employees,
+        rng,
+        score=lambda employee: calculate_effective_productivity(employee) + employee.morale,
+    )
+    return PendingEvent(
+        event_id="talent_bidding_war",
+        category=EventCategory.EMPLOYEE_ISSUE,
+        title="Talent Bidding War",
+        description=(
+            f"A competitor is trying to poach {target.full_name}. "
+            "You can pay to retain the team mood or hold the line and accept some morale drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_employee_id=target.id,
+        options=[
+            EventOption(
+                id="retain_team",
+                label="Spend to retain the team",
+                description="Pay cash to steady morale and reduce the temperature.",
+            ),
+            EventOption(
+                id="hold_line",
+                label="Hold the line",
+                description="Keep cash now, but accept an energy and morale hit across the team.",
+            ),
+        ],
+    )
+
+
+def _is_platform_breakthrough_eligible(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.quality >= BALANCE.event_platform_breakthrough_quality_threshold
+        and product.technical_debt <= BALANCE.event_platform_breakthrough_debt_threshold
+        for product in state.products
+    )
+
+
+def _build_platform_breakthrough_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.quality >= BALANCE.event_platform_breakthrough_quality_threshold
+            and product.technical_debt <= BALANCE.event_platform_breakthrough_debt_threshold
+        ],
+        rng,
+        score=lambda product: product.quality + product.market_fit - product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="platform_breakthrough",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Platform Breakthrough",
+        description=(
+            f"The team uncovered a cleaner platform improvement path inside {target.name}. "
+            "You can productize it now for a market payoff "
+            "or keep it internal and reduce future drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="productize_breakthrough",
+                label="Productize the breakthrough",
+                description=(
+                    "Spend cash now to turn the internal gain "
+                    "into product and growth leverage."
+                ),
+            ),
+            EventOption(
+                id="bank_the_gain",
+                label="Keep the gain internal",
+                description="Use the improvement to quietly reduce bugs and debt instead.",
             ),
         ],
     )
