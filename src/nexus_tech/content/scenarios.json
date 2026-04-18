@@ -1173,5 +1173,271 @@
         "active_product_count": 2
       }
     ]
+  },
+  {
+    "scenario_id": "renewal_crunch",
+    "title": "Renewal Crunch",
+    "description": "A bigger enterprise product is carrying the company, but renewal pressure and legacy drag are starting to show.",
+    "company_name": "Ledger Horizon",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "13200.00",
+    "reputation": 60,
+    "products": [
+      {
+        "key": "renewal",
+        "template_id": "renewal_cloud",
+        "name": "Renewal OS",
+        "lifecycle_stage": "mature",
+        "quality": 65,
+        "bug_level": 28,
+        "market_fit": 63,
+        "technical_debt": 38,
+        "user_count": 124,
+        "revenue_per_user": "86.00",
+        "feature_count": 5,
+        "maintenance_cost": "370.00",
+        "acquisition_rate": "0.0240",
+        "churn_rate": "0.0600",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "ops",
+        "template_id": "ops_intelligence",
+        "name": "Ops Radar",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 19,
+        "market_fit": 52,
+        "technical_debt": 24,
+        "user_count": 38,
+        "revenue_per_user": "58.00",
+        "feature_count": 3,
+        "maintenance_cost": "300.00",
+        "acquisition_rate": "0.0320",
+        "churn_rate": "0.0650",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Alina Morse",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "renewal",
+        "energy": 75,
+        "morale": 70
+      },
+      {
+        "full_name": "Theo Park",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "enterprise_delivery",
+        "assigned_product_key": "renewal",
+        "energy": 78,
+        "morale": 72
+      },
+      {
+        "full_name": "Jules Hart",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "account_workflows",
+        "assigned_product_key": "ops",
+        "energy": 80,
+        "morale": 76
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Everboard",
+        "focus_segment": "enterprise",
+        "strength": 74,
+        "aggression": 57,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      }
+    ]
+  },
+  {
+    "scenario_id": "channel_landgrab",
+    "title": "Channel Landgrab",
+    "description": "Product quality is good enough to attract partners, but execution can drift if channel expansion outruns the team.",
+    "company_name": "North Peak Systems",
+    "company_strategy": "growth",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "10800.00",
+    "reputation": 57,
+    "products": [
+      {
+        "key": "portal",
+        "template_id": "customer_portal",
+        "name": "Portal HQ",
+        "lifecycle_stage": "growth",
+        "quality": 62,
+        "bug_level": 16,
+        "market_fit": 60,
+        "technical_debt": 22,
+        "user_count": 74,
+        "revenue_per_user": "34.00",
+        "feature_count": 3,
+        "maintenance_cost": "255.00",
+        "acquisition_rate": "0.0490",
+        "churn_rate": "0.0640",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "automation",
+        "template_id": "automation_mesh",
+        "name": "Flow Pilot",
+        "lifecycle_stage": "growth",
+        "quality": 56,
+        "bug_level": 20,
+        "market_fit": 54,
+        "technical_debt": 29,
+        "user_count": 41,
+        "revenue_per_user": "28.00",
+        "feature_count": 4,
+        "maintenance_cost": "235.00",
+        "acquisition_rate": "0.0540",
+        "churn_rate": "0.0760",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Mara Bell",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "channel_growth",
+        "assigned_product_key": "portal",
+        "energy": 82,
+        "morale": 78
+      },
+      {
+        "full_name": "Kenji Sato",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "integrations",
+        "assigned_product_key": "automation",
+        "energy": 79,
+        "morale": 74
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Channel Forge",
+        "focus_segment": "smb",
+        "strength": 65,
+        "aggression": 64,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      },
+      {
+        "name": "Partner Loop",
+        "focus_segment": "startup",
+        "strength": 59,
+        "aggression": 61,
+        "pricing_tier": "budget",
+        "active_product_count": 2
+      }
+    ]
+  },
+  {
+    "scenario_id": "flagship_risk",
+    "title": "Flagship Risk",
+    "description": "One product dominates the company. The money is good, but concentration risk is now part of the game.",
+    "company_name": "Anchor Logic",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "15400.00",
+    "reputation": 63,
+    "products": [
+      {
+        "key": "flagship",
+        "template_id": "security_center",
+        "name": "Anchor Shield",
+        "lifecycle_stage": "mature",
+        "quality": 69,
+        "bug_level": 23,
+        "market_fit": 67,
+        "technical_debt": 31,
+        "user_count": 152,
+        "revenue_per_user": "102.00",
+        "feature_count": 5,
+        "maintenance_cost": "410.00",
+        "acquisition_rate": "0.0220",
+        "churn_rate": "0.0510",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "adjacent",
+        "template_id": "analytics_cloud",
+        "name": "Anchor Pulse",
+        "lifecycle_stage": "growth",
+        "quality": 57,
+        "bug_level": 18,
+        "market_fit": 49,
+        "technical_debt": 24,
+        "user_count": 24,
+        "revenue_per_user": "40.00",
+        "feature_count": 2,
+        "maintenance_cost": "270.00",
+        "acquisition_rate": "0.0360",
+        "churn_rate": "0.0700",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Lena Ross",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "platform_security",
+        "assigned_product_key": "flagship",
+        "energy": 77,
+        "morale": 73
+      },
+      {
+        "full_name": "Dae Kim",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "account_scale",
+        "assigned_product_key": "flagship",
+        "energy": 80,
+        "morale": 74
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Vault Core",
+        "focus_segment": "enterprise",
+        "strength": 78,
+        "aggression": 58,
+        "pricing_tier": "premium",
+        "active_product_count": 3
+      }
+    ]
   }
 ]

@@ -119,6 +119,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             is_eligible=_is_board_scrutiny_eligible,
             build_pending_event=_build_board_scrutiny_event,
         ),
+        EventDefinition(
+            event_id="renewal_risk",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_renewal_risk_weight,
+            cooldown_turns=BALANCE.event_renewal_risk_cooldown,
+            is_eligible=_is_renewal_risk_eligible,
+            build_pending_event=_build_renewal_risk_event,
+        ),
+        EventDefinition(
+            event_id="partner_offer",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_partner_offer_weight,
+            cooldown_turns=BALANCE.event_partner_offer_cooldown,
+            is_eligible=_is_partner_offer_eligible,
+            build_pending_event=_build_partner_offer_event,
+        ),
     )
 
 
@@ -618,6 +634,121 @@ def _build_board_scrutiny_event(
                 id="promise_growth",
                 label="Promise faster growth",
                 description="Bring in a small cash bump, but investors will expect more.",
+            ),
+        ],
+    )
+
+
+def _is_renewal_risk_eligible(state: GameState) -> bool:
+    return state.company.current_turn >= BALANCE.event_renewal_risk_turn_threshold and any(
+        product.is_active
+        and product.user_count >= BALANCE.event_renewal_risk_user_threshold
+        and (
+            product.bug_level >= BALANCE.event_renewal_risk_bug_threshold
+            or product.technical_debt >= BALANCE.event_renewal_risk_debt_threshold
+        )
+        for product in state.products
+    )
+
+
+def _build_renewal_risk_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.user_count >= BALANCE.event_renewal_risk_user_threshold
+            and (
+                product.bug_level >= BALANCE.event_renewal_risk_bug_threshold
+                or product.technical_debt >= BALANCE.event_renewal_risk_debt_threshold
+            )
+        ],
+        rng,
+        score=lambda product: product.user_count + product.bug_level + product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="renewal_risk",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Renewal Risk",
+        description=(
+            f"A larger block of {target.name} customers is approaching renewal. "
+            "You can fund a reliability push now or keep most of them with short-term discounts."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="stabilize_renewals",
+                label="Fund a reliability push",
+                description="Spend cash to clean up the renewal story and reduce product drag.",
+            ),
+            EventOption(
+                id="offer_discounts",
+                label="Offer renewal discounts",
+                description="Save the account volume now, but weaken revenue quality.",
+            ),
+        ],
+    )
+
+
+def _is_partner_offer_eligible(state: GameState) -> bool:
+    return state.company.current_turn >= BALANCE.event_partner_offer_turn_threshold and any(
+        product.is_active
+        and product.market_fit >= BALANCE.event_partner_offer_market_fit_threshold
+        and product.quality >= BALANCE.event_partner_offer_quality_threshold
+        for product in state.products
+    )
+
+
+def _build_partner_offer_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.market_fit >= BALANCE.event_partner_offer_market_fit_threshold
+            and product.quality >= BALANCE.event_partner_offer_quality_threshold
+        ],
+        rng,
+        score=lambda product: product.market_fit + product.quality + product.user_count,
+    )
+    return PendingEvent(
+        event_id="partner_offer",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Channel Partner Offer",
+        description=(
+            f"A reseller wants to take {target.name} into a new set of accounts. "
+            "You can sign the channel deal for immediate expansion or stay direct "
+            "and sharpen the product."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="sign_partner",
+                label="Sign the partner deal",
+                description=(
+                    "Take cash, users, and acquisition lift at the cost "
+                    "of more operating noise."
+                ),
+            ),
+            EventOption(
+                id="stay_direct",
+                label="Stay direct and focused",
+                description=(
+                    "Skip the channel bump and invest the attention back into "
+                    "product depth."
+                ),
             ),
         ],
     )

@@ -23,10 +23,11 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
-from nexus_tech.simulation.balance_lab import BalanceBatchResult
+from nexus_tech.simulation.balance_lab import BalanceBatchResult, BalanceComparisonResult
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.finance import estimate_runway
+from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
@@ -312,6 +313,47 @@ def render_balance_lab(console: Console, batch: BalanceBatchResult) -> None:
     )
 
 
+def render_balance_comparison(console: Console, comparison: BalanceComparisonResult) -> None:
+    """Render side-by-side scenario comparison output for tuning work."""
+
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Difficulty", comparison.difficulty_mode.value)
+    overview.add_row("Goal", comparison.campaign_goal_id.value)
+    overview.add_row("Runs / Scenario", str(comparison.runs))
+    overview.add_row("Turns", str(comparison.turns))
+    overview.add_row("Seed Base", str(comparison.seed_base))
+    overview.add_row("Scenarios", str(len(comparison.comparisons)))
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Scenario", style="bold")
+    table.add_column("Avg Score", justify="right")
+    table.add_column("Avg Cash", justify="right")
+    table.add_column("Avg Users", justify="right")
+    table.add_column("Victories", justify="right")
+    table.add_column("Shutdowns", justify="right")
+
+    for entry in comparison.comparisons:
+        table.add_row(
+            entry.scenario_id,
+            f"{entry.average_score:.1f}",
+            format_money(entry.average_cash),
+            f"{entry.average_users:.1f}",
+            str(entry.victories),
+            str(entry.shutdowns),
+        )
+
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Balance Compare", border_style="cyan", expand=True),
+                Panel(table, title="Scenario Ranking", border_style="green", expand=True),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
+
+
 def render_dashboard(console: Console, state: GameState) -> None:
     """Render the main per-turn dashboard."""
 
@@ -341,6 +383,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
                 _build_dashboard_team_panel(state),
                 _build_market_watch_panel(state),
                 _build_operations_panel(state),
+                _build_late_game_panel(state),
                 _build_finance_panel(state),
             ],
             equal=False,
@@ -412,6 +455,7 @@ def render_report(console: Console, state: GameState) -> None:
             [
                 _build_finance_panel(state),
                 _build_operations_panel(state),
+                _build_late_game_panel(state),
                 Panel(
                     _build_competitor_table(state),
                     title="Competitor Watch",
@@ -1008,6 +1052,7 @@ def _build_turn_finance_table(resolution: TurnResolution) -> Table:
     table.add_row("Baseline Cost", format_money(resolution.baseline_operating_cost))
     table.add_row("Product Costs", format_money(resolution.total_product_operating_cost))
     table.add_row("Operations Cost", format_money(resolution.total_operations_cost))
+    table.add_row("Late-Game Cost", format_money(resolution.total_late_game_cost))
     table.add_row("Salary Cost", format_money(resolution.total_salary_cost))
     table.add_row("Finance Cost", format_money(resolution.total_finance_cost))
     table.add_row("Total Operating Cost", format_money(resolution.total_operating_cost))
@@ -1050,6 +1095,7 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
         ),
     )
     table.add_row("Ops State", resolution.operations_summary.summary)
+    table.add_row("Late State", resolution.late_game_summary.summary)
     table.add_row("Scale State", resolution.scale_pressure_summary)
     table.add_row(
         "Pressure Δ",
@@ -1263,6 +1309,24 @@ def _build_operations_panel(state: GameState) -> Panel:
     table.add_row("Hot Spots", ", ".join(overloaded_products[:2]) if overloaded_products else "-")
     table.add_row("State", operations.summary)
     return Panel(table, title="Operations", border_style="yellow", expand=True)
+
+
+def _build_late_game_panel(state: GameState) -> Panel:
+    late_game = calculate_late_game_summary(
+        state.products,
+        current_turn=state.company.current_turn,
+    )
+    risk_names = [risk.product_name for risk in late_game.product_risks if risk.user_loss > 0]
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Risk", str(late_game.total_risk))
+    table.add_row("Concentration", str(late_game.concentration_risk))
+    table.add_row("Renewal", str(late_game.renewal_risk))
+    table.add_row("Legacy Drag", str(late_game.legacy_drag))
+    table.add_row("Late Cost", format_money(late_game.added_cost))
+    table.add_row("Burnout Mod", str(late_game.burnout_modifier))
+    table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
+    table.add_row("State", late_game.summary)
+    return Panel(table, title="Late-Game", border_style="magenta", expand=True)
 
 
 def _build_finance_panel(state: GameState) -> Panel:

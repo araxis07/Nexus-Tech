@@ -620,6 +620,101 @@ def _apply_board_scrutiny(state: GameState, event: PendingEvent, option_id: str)
     raise ValueError(f"Unsupported option {option_id} for board scrutiny.")
 
 
+def _apply_renewal_risk(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "stabilize_renewals":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_renewal_stabilize_cost
+        )
+        product.bug_level = clamp_int(
+            product.bug_level - BALANCE.event_renewal_stabilize_bug_reduction,
+            0,
+            100,
+        )
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_renewal_stabilize_fit_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_renewal_stabilize_reputation_gain,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You funded a renewal push for {product.name}. Cash "
+            f"-{BALANCE.event_renewal_stabilize_cost}, bugs "
+            f"-{BALANCE.event_renewal_stabilize_bug_reduction}, reputation "
+            f"+{BALANCE.event_renewal_stabilize_reputation_gain}."
+        )
+
+    if option_id == "offer_discounts":
+        product.user_count += BALANCE.event_renewal_discount_user_relief
+        product.revenue_per_user = quantize_money(
+            product.revenue_per_user - BALANCE.event_renewal_discount_revenue_penalty
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_renewal_discount_reputation_loss,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You protected renewals for {product.name} with pricing. Users "
+            f"+{BALANCE.event_renewal_discount_user_relief}, revenue per user "
+            f"-{BALANCE.event_renewal_discount_revenue_penalty}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for renewal risk.")
+
+
+def _apply_partner_offer(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "sign_partner":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_partner_offer_cash_gain
+        )
+        product.user_count += BALANCE.event_partner_offer_user_gain
+        product.acquisition_rate = clamp_rate(
+            product.acquisition_rate + BALANCE.event_partner_offer_acquisition_gain
+        )
+        for employee in get_designer_or_marketer_support(state.employees, product.id):
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.event_partner_offer_morale_gain,
+                0,
+                100,
+            )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You signed a partner deal for {product.name}. Cash "
+            f"+{BALANCE.event_partner_offer_cash_gain}, users "
+            f"+{BALANCE.event_partner_offer_user_gain}."
+        )
+
+    if option_id == "stay_direct":
+        product.quality = clamp_int(
+            product.quality + BALANCE.event_partner_offer_focus_quality_gain,
+            0,
+            100,
+        )
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_partner_offer_focus_fit_gain,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You stayed direct and sharpened {product.name}. Quality "
+            f"+{BALANCE.event_partner_offer_focus_quality_gain}, market fit "
+            f"+{BALANCE.event_partner_offer_focus_fit_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for partner offer.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -657,4 +752,6 @@ EVENT_EFFECT_HANDLERS = {
     "compliance_review": _apply_compliance_review,
     "support_backlog": _apply_support_backlog,
     "board_scrutiny": _apply_board_scrutiny,
+    "renewal_risk": _apply_renewal_risk,
+    "partner_offer": _apply_partner_offer,
 }

@@ -128,6 +128,20 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             is_unlocked=_has_enterprise_footing,
             apply_reward=_reward_enterprise_footing,
         ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.DEBT_FREE_OPERATOR,
+            title="Debt-Free Operator",
+            description="The company cleared its debt while preserving a healthy cash buffer.",
+            is_unlocked=_has_debt_free_operator,
+            apply_reward=_reward_debt_free_operator,
+        ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.CATEGORY_MOAT,
+            title="Category Moat",
+            description="One product now leads its category with durable quality and fit.",
+            is_unlocked=_has_category_moat,
+            apply_reward=_reward_category_moat,
+        ),
     )
 
 
@@ -231,6 +245,30 @@ def _reward_enterprise_footing(state: GameState) -> str:
     )
 
 
+def _reward_debt_free_operator(state: GameState) -> str:
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand + BALANCE.milestone_debt_free_operator_cash_gain
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_debt_free_operator_reputation_gain
+    )
+    return (
+        f"Cash +{format_money(BALANCE.milestone_debt_free_operator_cash_gain)}, "
+        f"reputation +{BALANCE.milestone_debt_free_operator_reputation_gain} "
+        "for proving the company can run cleaner capital discipline."
+    )
+
+
+def _reward_category_moat(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_category_moat_reputation_gain
+    )
+    return (
+        f"Reputation +{BALANCE.milestone_category_moat_reputation_gain} "
+        "for building a product that now looks meaningfully harder to displace."
+    )
+
+
 def _get_total_users(state: GameState) -> int:
     return sum(product.user_count for product in state.products if product.is_active)
 
@@ -265,5 +303,23 @@ def _has_enterprise_footing(state: GameState) -> bool:
         product.is_active
         and product.target_segment.value == "enterprise"
         and product.user_count >= BALANCE.enterprise_footing_user_threshold
+        for product in state.products
+    )
+
+
+def _has_debt_free_operator(state: GameState) -> bool:
+    return (
+        state.company.current_turn >= BALANCE.campaign_goal_profit_machine_min_turn
+        and state.finance.debt_principal <= 0
+        and state.company.cash_on_hand >= BALANCE.debt_free_operator_cash_threshold
+    )
+
+
+def _has_category_moat(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.user_count >= BALANCE.category_moat_user_threshold
+        and product.quality >= BALANCE.category_moat_quality_threshold
+        and product.market_fit >= BALANCE.category_moat_market_fit_threshold
         for product in state.products
     )

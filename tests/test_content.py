@@ -33,6 +33,9 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "ops_overload" for scenario in scenarios)
     assert any(scenario.scenario_id == "price_war" for scenario in scenarios)
     assert any(scenario.scenario_id == "enterprise_scaleup" for scenario in scenarios)
+    assert any(scenario.scenario_id == "renewal_crunch" for scenario in scenarios)
+    assert any(scenario.scenario_id == "channel_landgrab" for scenario in scenarios)
+    assert any(scenario.scenario_id == "flagship_risk" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -134,3 +137,13 @@ def test_additional_template_catalog_entries_are_available() -> None:
     assert security.target_segment.value == "enterprise"
     assert revops.title == "RevOps Console"
     assert automation.target_segment.value == "startup"
+
+
+def test_latest_template_catalog_entries_are_available() -> None:
+    portal = get_product_template("customer_portal")
+    renewal = get_product_template("renewal_cloud")
+    ops = get_product_template("ops_intelligence")
+
+    assert portal.target_segment.value == "smb"
+    assert renewal.pricing_tier is PricingTier.PREMIUM
+    assert ops.title == "Ops Intelligence"

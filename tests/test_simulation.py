@@ -34,7 +34,7 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.balance_lab import run_balance_batch
+from nexus_tech.simulation.balance_lab import run_balance_batch, run_balance_comparison
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors
 from nexus_tech.simulation.economy import (
@@ -54,6 +54,10 @@ from nexus_tech.simulation.growth import (
     calculate_acquired_users,
     calculate_churned_users,
     calculate_effective_churn_rate_for_context,
+)
+from nexus_tech.simulation.late_game import (
+    apply_end_of_turn_late_game,
+    calculate_late_game_summary,
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.operations import calculate_operations_summary
@@ -1487,3 +1491,96 @@ def test_campaign_goal_progress_completes_when_profit_machine_is_stable() -> Non
 
     assert progress.completed is True
     assert progress.title == "Profit Machine"
+
+
+def test_late_game_summary_rises_for_concentrated_portfolio() -> None:
+    flagship = make_product(
+        "Shield",
+        lifecycle_stage=LifecycleStage.MATURE,
+        quality=67,
+        bug_level=29,
+        market_fit=64,
+        technical_debt=37,
+        user_count=158,
+        feature_count=6,
+        target_segment=MarketSegment.ENTERPRISE,
+        pricing_tier=PricingTier.PREMIUM,
+    )
+    adjacent = make_product(
+        "Pulse",
+        lifecycle_stage=LifecycleStage.GROWTH,
+        user_count=24,
+        market_fit=48,
+        technical_debt=22,
+        target_segment=MarketSegment.SMB,
+    )
+
+    summary = calculate_late_game_summary([flagship, adjacent], current_turn=12)
+
+    assert summary.total_risk > 0
+    assert summary.concentration_risk > 0
+    assert summary.renewal_risk > 0
+    assert summary.product_risks
+
+
+def test_apply_end_of_turn_late_game_reduces_users_on_risky_product() -> None:
+    product = make_product(
+        "Renewal OS",
+        lifecycle_stage=LifecycleStage.MATURE,
+        quality=60,
+        bug_level=30,
+        market_fit=35,
+        technical_debt=40,
+        user_count=190,
+        feature_count=7,
+        target_segment=MarketSegment.ENTERPRISE,
+        pricing_tier=PricingTier.PREMIUM,
+    )
+
+    summary = apply_end_of_turn_late_game([product], current_turn=12)
+
+    assert summary.total_risk > 0
+    assert product.user_count == 184
+    assert product.market_fit == 34
+
+
+def test_new_milestones_unlock_for_debt_free_and_category_moat() -> None:
+    state = make_state(
+        make_product(
+            "Moat",
+            lifecycle_stage=LifecycleStage.MATURE,
+            quality=74,
+            market_fit=71,
+            user_count=150,
+        ),
+        cash_on_hand=Decimal("12500.00"),
+        current_turn=8,
+        finance=FinanceState(debt_principal=Decimal("0.00")),
+    )
+
+    unlocked = resolve_new_milestones(state, unlocked_turn=8)
+    unlocked_ids = {entry.milestone_id for entry in unlocked}
+
+    assert MilestoneId.DEBT_FREE_OPERATOR in unlocked_ids
+    assert MilestoneId.CATEGORY_MOAT in unlocked_ids
+
+
+def test_new_event_ids_are_registered() -> None:
+    registry_ids = {definition.event_id for definition in get_event_registry()}
+
+    assert "renewal_risk" in registry_ids
+    assert "partner_offer" in registry_ids
+
+
+def test_balance_comparison_returns_ranked_scenarios() -> None:
+    comparison = run_balance_comparison(
+        scenario_ids=["founder_journey", "technical_rebuild"],
+        difficulty_mode=DifficultyMode.STANDARD,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=2,
+        seed_base=20,
+    )
+
+    assert len(comparison.comparisons) == 2
+    assert comparison.comparisons[0].average_score >= comparison.comparisons[1].average_score

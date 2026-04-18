@@ -71,6 +71,41 @@ class BalanceBatchResult:
     def average_score(self) -> float:
         return sum(result.run_score for result in self.results) / max(1, len(self.results))
 
+    @property
+    def average_cash(self) -> Decimal:
+        if not self.results:
+            return Decimal("0.00")
+        total = sum((result.final_cash for result in self.results), Decimal("0.00"))
+        return total / Decimal(len(self.results))
+
+    @property
+    def average_users(self) -> float:
+        return sum(result.total_users for result in self.results) / max(1, len(self.results))
+
+
+@dataclass(frozen=True)
+class BalanceScenarioComparison:
+    """One scenario summary inside a cross-scenario comparison."""
+
+    scenario_id: str
+    average_score: float
+    average_cash: Decimal
+    average_users: float
+    victories: int
+    shutdowns: int
+
+
+@dataclass(frozen=True)
+class BalanceComparisonResult:
+    """Deterministic comparison across multiple scenarios."""
+
+    difficulty_mode: DifficultyMode
+    campaign_goal_id: CampaignGoalId
+    runs: int
+    turns: int
+    seed_base: int
+    comparisons: tuple[BalanceScenarioComparison, ...]
+
 
 def run_balance_batch(
     *,
@@ -146,6 +181,55 @@ def run_autoplay(state: GameState, rng: RandomSource, *, max_turns: int) -> Game
         state = resolve_turn(state, rng).state
 
     return state
+
+
+def run_balance_comparison(
+    *,
+    scenario_ids: list[str],
+    difficulty_mode: DifficultyMode,
+    campaign_goal_id: CampaignGoalId,
+    runs: int,
+    turns: int,
+    seed_base: int,
+) -> BalanceComparisonResult:
+    """Run one deterministic balance batch per scenario for side-by-side comparison."""
+
+    comparisons: list[BalanceScenarioComparison] = []
+    for index, scenario_id in enumerate(scenario_ids):
+        batch = run_balance_batch(
+            scenario_id=scenario_id,
+            difficulty_mode=difficulty_mode,
+            campaign_goal_id=campaign_goal_id,
+            runs=runs,
+            turns=turns,
+            seed_base=seed_base + (index * max(1, runs) * 100),
+        )
+        comparisons.append(
+            BalanceScenarioComparison(
+                scenario_id=scenario_id,
+                average_score=batch.average_score,
+                average_cash=batch.average_cash,
+                average_users=batch.average_users,
+                victories=batch.victories,
+                shutdowns=batch.shutdowns,
+            )
+        )
+    comparisons.sort(
+        key=lambda comparison: (
+            comparison.average_score,
+            float(comparison.average_cash),
+            comparison.average_users,
+        ),
+        reverse=True,
+    )
+    return BalanceComparisonResult(
+        difficulty_mode=difficulty_mode,
+        campaign_goal_id=campaign_goal_id,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+        comparisons=tuple(comparisons),
+    )
 
 
 @dataclass(frozen=True)
@@ -343,6 +427,18 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
             "publish_plan"
             if state.company.cash_on_hand > BALANCE.event_board_scrutiny_plan_cost * 2
             else "promise_growth"
+        )
+    elif event.event_id == "renewal_risk":
+        option_id = (
+            "stabilize_renewals"
+            if state.company.cash_on_hand > BALANCE.event_renewal_stabilize_cost * 2
+            else "offer_discounts"
+        )
+    elif event.event_id == "partner_offer":
+        option_id = (
+            "sign_partner"
+            if state.company.cash_on_hand < BALANCE.cash_reserve_milestone_threshold
+            else "stay_direct"
         )
     else:
         option_id = event.options[0].id

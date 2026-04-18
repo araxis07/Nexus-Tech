@@ -40,6 +40,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Start runs from a scenario catalog instead of a single hard-coded opening
 - Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
 - Expand the catalog with AI copilot, analytics, support-ops, compliance, embedded API, and capital-pressure scenarios
+- Extend the catalog further with renewal-cloud, customer-portal, and ops-intelligence templates plus channel and concentration-risk scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
@@ -51,6 +52,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Let rival moves reshape product count and pricing posture over time
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
 - Track an explicit operations layer that converts support backlog and portfolio sprawl into real cost, morale drag, and execution risk
+- Add a dedicated late-game layer for renewal risk, concentration risk, and legacy drag once a run reaches real scale
 - Feel direct trade-offs between customer demand, churn pressure, rivalry, and product positioning
 - Surface market state and competitor posture in dedicated terminal panels for live demos
 - Let stronger rivals pivot toward the company's hottest customer segment as traction becomes more visible
@@ -85,6 +87,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Some events create meaningful player trade-offs instead of simple bonuses
 - New event content includes referral waves and enterprise compliance review pressure
 - Additional event content now includes support backlog surges and board-level scrutiny over capital discipline
+- Mature runs can now surface renewal-risk events and channel partner offers with visible product and GTM trade-offs
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
@@ -116,6 +119,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Built-in quick guide flow for onboarding and live demos
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
+- Deterministic `compare-balance` scenario rankings for side-by-side tuning across multiple openings
 - Report now includes recent events, funding history, and milestone history
 - Seeded demo support for reproducible simulations
 
@@ -191,6 +195,12 @@ Run a deterministic balance batch:
 
 ```bash
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty standard --goal profit_machine --runs 5 --turns 10 --seed-base 100
+```
+
+Compare multiple scenarios side by side:
+
+```bash
+uv run nexus-tech compare-balance --scenario founder_journey --scenario technical_rebuild --runs 3 --turns 10 --seed-base 100
 ```
 
 Load a saved game:

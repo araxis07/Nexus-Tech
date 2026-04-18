@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 - 2026-04-18
+
+- Added a dedicated late-game pressure layer for renewal risk, concentration risk, and legacy drag so larger runs pick up clearer endgame trade-offs
+- Expanded the content catalog again with new customer-portal, renewal-cloud, and ops-intelligence templates plus renewal and channel-heavy scenarios
+- Added new dynamic events for renewal risk and channel partner offers to connect mature products and go-to-market trade-offs back into the run
+- Added new progression milestones for debt-free operation and building a stronger category moat
+- Added a deterministic `compare-balance` CLI command to rank scenarios side by side during tuning work
+- Promoted the package version to `0.6.0`
+
 ## 0.5.0 - 2026-04-17
 
 - Added a late-game operations layer that turns support load, coordination drag, and portfolio sprawl into visible operating pressure

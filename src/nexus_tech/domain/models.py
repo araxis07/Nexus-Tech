@@ -140,6 +140,8 @@ class MilestoneId(StrEnum):
     MULTI_SEGMENT_REACH = "multi_segment_reach"
     OPERATIONS_MACHINE = "operations_machine"
     ENTERPRISE_FOOTING = "enterprise_footing"
+    DEBT_FREE_OPERATOR = "debt_free_operator"
+    CATEGORY_MOAT = "category_moat"
 
 
 class FundingType(StrEnum):

@@ -45,7 +45,12 @@ from nexus_tech.presentation.dashboard import (
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.balance_lab import BalanceBatchResult, BalanceRunResult
+from nexus_tech.simulation.balance_lab import (
+    BalanceBatchResult,
+    BalanceComparisonResult,
+    BalanceRunResult,
+    BalanceScenarioComparison,
+)
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
 
@@ -175,6 +180,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "list-templates",
         "list-goals",
         "simulate-balance",
+        "compare-balance",
         "list-saves",
         "rename-save",
         "delete-save",
@@ -400,11 +406,60 @@ def test_simulate_balance_command_renders_batch_summary(monkeypatch: MonkeyPatch
     assert "founder_journey" in result.output
 
 
+def test_compare_balance_command_renders_scenario_ranking(monkeypatch: MonkeyPatch) -> None:
+    comparison = BalanceComparisonResult(
+        difficulty_mode=DifficultyMode.STANDARD,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=2,
+        turns=6,
+        seed_base=50,
+        comparisons=(
+            BalanceScenarioComparison(
+                scenario_id="founder",
+                average_score=142.0,
+                average_cash=Decimal("9200.00"),
+                average_users=88.0,
+                victories=0,
+                shutdowns=0,
+            ),
+            BalanceScenarioComparison(
+                scenario_id="rebuild",
+                average_score=101.0,
+                average_cash=Decimal("6100.00"),
+                average_users=64.0,
+                victories=0,
+                shutdowns=1,
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_balance_comparison", lambda **_: comparison)
+
+    result = runner.invoke(
+        app,
+        [
+            "compare-balance",
+            "--scenario",
+            "founder_journey",
+            "--scenario",
+            "technical_rebuild",
+            "--runs",
+            "2",
+            "--turns",
+            "6",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Balance Compare" in result.output
+    assert "Scenario Ranking" in result.output
+    assert "rebuild" in result.output
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.5.0" in result.output
+    assert "NEXUS TECH 0.6.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -602,6 +657,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Action Menu" in output
     assert "Event Notification" in output
     assert "Market Watch" in output
+    assert "Late-Game" in output
     assert "Finance" in output
     assert "Strategy" in output
     assert "Price" in output

@@ -426,6 +426,29 @@ class BalanceConfig:
             "sunset": 0,
         }
     )
+    late_game_turn_threshold: int = 10
+    late_game_total_user_threshold: int = 180
+    late_game_concentration_share_threshold: int = 58
+    late_game_concentration_divisor: int = 8
+    late_game_large_product_user_threshold: int = 95
+    late_game_renewal_user_divisor: int = 70
+    late_game_bug_threshold: int = 26
+    late_game_bug_divisor: int = 16
+    late_game_debt_threshold: int = 32
+    late_game_debt_divisor: int = 18
+    late_game_declining_stage_legacy_bonus: int = 2
+    late_game_feature_overhang_threshold: int = 4
+    late_game_feature_overhang_divisor: int = 3
+    late_game_cost_per_point: Decimal = Decimal("110.00")
+    late_game_burnout_divisor: int = 4
+    late_game_max_burnout_modifier: int = 3
+    late_game_reputation_penalty_threshold: int = 4
+    late_game_reputation_penalty: int = 1
+    late_game_market_fit_penalty_threshold: int = 3
+    late_game_market_fit_penalty: int = 1
+    late_game_quality_penalty_threshold: int = 4
+    late_game_quality_penalty: int = 1
+    late_game_max_user_loss_per_product: int = 8
 
     competitor_strength_drift_max: int = 3
     competitor_aggression_drift_max: int = 3
@@ -683,6 +706,32 @@ class BalanceConfig:
     event_board_scrutiny_growth_pressure_gain: int = 4
     event_board_scrutiny_growth_morale_loss: int = 2
 
+    event_renewal_risk_weight: int = 4
+    event_renewal_risk_cooldown: int = 5
+    event_renewal_risk_turn_threshold: int = 8
+    event_renewal_risk_user_threshold: int = 95
+    event_renewal_risk_bug_threshold: int = 26
+    event_renewal_risk_debt_threshold: int = 34
+    event_renewal_stabilize_cost: Decimal = Decimal("320.00")
+    event_renewal_stabilize_bug_reduction: int = 5
+    event_renewal_stabilize_fit_gain: int = 2
+    event_renewal_stabilize_reputation_gain: int = 1
+    event_renewal_discount_user_relief: int = 6
+    event_renewal_discount_revenue_penalty: Decimal = Decimal("2.00")
+    event_renewal_discount_reputation_loss: int = 1
+
+    event_partner_offer_weight: int = 4
+    event_partner_offer_cooldown: int = 4
+    event_partner_offer_turn_threshold: int = 5
+    event_partner_offer_market_fit_threshold: int = 56
+    event_partner_offer_quality_threshold: int = 58
+    event_partner_offer_cash_gain: Decimal = Decimal("380.00")
+    event_partner_offer_user_gain: int = 7
+    event_partner_offer_acquisition_gain: Decimal = Decimal("0.0050")
+    event_partner_offer_morale_gain: int = 1
+    event_partner_offer_focus_quality_gain: int = 1
+    event_partner_offer_focus_fit_gain: int = 2
+
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4
     active_products_milestone_threshold: int = 3
@@ -691,6 +740,10 @@ class BalanceConfig:
     operations_machine_user_threshold: int = 180
     operations_machine_headcount_threshold: int = 4
     enterprise_footing_user_threshold: int = 65
+    debt_free_operator_cash_threshold: Decimal = Decimal("10000.00")
+    category_moat_user_threshold: int = 140
+    category_moat_quality_threshold: int = 70
+    category_moat_market_fit_threshold: int = 68
     milestone_first_100_users_reputation_gain: int = 2
     milestone_cash_reserve_reputation_gain: int = 1
     milestone_team_growth_reputation_gain: int = 1
@@ -704,6 +757,9 @@ class BalanceConfig:
     milestone_operations_machine_reputation_gain: int = 2
     milestone_operations_machine_cash_gain: Decimal = Decimal("350.00")
     milestone_enterprise_footing_reputation_gain: int = 2
+    milestone_debt_free_operator_reputation_gain: int = 2
+    milestone_debt_free_operator_cash_gain: Decimal = Decimal("300.00")
+    milestone_category_moat_reputation_gain: int = 3
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

@@ -41,6 +41,7 @@ from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
     render_action_feedback,
+    render_balance_comparison,
     render_balance_lab,
     render_campaign_goal_catalog,
     render_dashboard,
@@ -61,7 +62,7 @@ from nexus_tech.presentation.dashboard import (
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.balance_lab import run_balance_batch
+from nexus_tech.simulation.balance_lab import run_balance_batch, run_balance_comparison
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
 from nexus_tech.simulation.engine import (
     ActionContext,
@@ -109,6 +110,14 @@ SCENARIO_OPTION = typer.Option(
     DEFAULT_SCENARIO_ID,
     "--scenario",
     help="Starting scenario id. Use 'list-scenarios' to inspect the available catalog.",
+)
+COMPARE_SCENARIOS_OPTION = typer.Option(
+    None,
+    "--scenario",
+    help=(
+        "Scenario ids to compare. Repeat the option to compare multiple scenarios. "
+        "Defaults to all scenarios."
+    ),
 )
 DIFFICULTY_OPTION = typer.Option(
     None,
@@ -351,6 +360,33 @@ def simulate_balance_command(
         seed_base=seed_base,
     )
     render_balance_lab(console, batch)
+
+
+@app.command("compare-balance")
+def compare_balance_command(
+    scenario: Optional[list[str]] = COMPARE_SCENARIOS_OPTION,
+    difficulty: DifficultyMode = BALANCE_DIFFICULTY_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(3, "--runs", min=1, help="Number of deterministic runs."),
+    turns: int = typer.Option(10, "--turns", min=1, help="Maximum turns per run."),
+    seed_base: int = typer.Option(
+        100,
+        "--seed-base",
+        help="Base seed. Each scenario gets a deterministic seed range from this value.",
+    ),
+) -> None:
+    """Compare multiple scenarios side by side using deterministic autoplay."""
+
+    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    comparison = run_balance_comparison(
+        scenario_ids=scenario_ids,
+        difficulty_mode=difficulty,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    render_balance_comparison(console, comparison)
 
 
 @app.command("guide")
