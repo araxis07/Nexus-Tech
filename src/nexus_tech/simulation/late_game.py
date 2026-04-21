@@ -31,6 +31,9 @@ class LateGameSummary:
     concentration_risk: int
     renewal_risk: int
     legacy_drag: int
+    org_drag: int
+    maintenance_crisis: int
+    innovation_gap: int
     added_cost: Decimal
     reputation_delta: int
     burnout_modifier: int
@@ -42,6 +45,7 @@ def calculate_late_game_summary(
     products: list[Product],
     *,
     current_turn: int,
+    headcount: int = 0,
 ) -> LateGameSummary:
     """Summarize late-game pressure once a portfolio reaches durable scale."""
 
@@ -52,6 +56,9 @@ def calculate_late_game_summary(
             concentration_risk=0,
             renewal_risk=0,
             legacy_drag=0,
+            org_drag=0,
+            maintenance_crisis=0,
+            innovation_gap=0,
             added_cost=Decimal("0.00"),
             reputation_delta=0,
             burnout_modifier=0,
@@ -69,6 +76,9 @@ def calculate_late_game_summary(
             concentration_risk=0,
             renewal_risk=0,
             legacy_drag=0,
+            org_drag=0,
+            maintenance_crisis=0,
+            innovation_gap=0,
             added_cost=Decimal("0.00"),
             reputation_delta=0,
             burnout_modifier=0,
@@ -78,10 +88,56 @@ def calculate_late_game_summary(
 
     lead_product_users = max(product.user_count for product in active_products)
     lead_share = (lead_product_users * 100) // max(1, total_users)
+    mature_products = [
+        product
+        for product in active_products
+        if product.lifecycle_stage in {LifecycleStage.MATURE, LifecycleStage.DECLINING}
+    ]
+    growth_products = [
+        product
+        for product in active_products
+        if product.lifecycle_stage in {LifecycleStage.PROTOTYPE, LifecycleStage.GROWTH}
+    ]
+    maintenance_total = sum(
+        (product.maintenance_cost for product in active_products),
+        Decimal("0.00"),
+    )
     concentration_risk = max(
         0,
         lead_share - BALANCE.late_game_concentration_share_threshold,
     ) // BALANCE.late_game_concentration_divisor
+    org_drag = max(
+        0,
+        len(active_products) - BALANCE.late_game_org_drag_product_threshold,
+    ) + max(
+        0,
+        headcount - BALANCE.late_game_org_drag_headcount_threshold,
+    ) // BALANCE.late_game_org_drag_divisor
+    maintenance_crisis = max(
+        0,
+        int(
+            (
+                max(
+                    Decimal("0.00"),
+                    maintenance_total - BALANCE.late_game_maintenance_crisis_cost_threshold,
+                )
+                / BALANCE.late_game_maintenance_crisis_cost_divisor
+            )
+        ),
+    )
+    if len(mature_products) >= BALANCE.late_game_maintenance_crisis_mature_threshold:
+        maintenance_crisis += 1
+    innovation_gap = 0
+    if (
+        len(mature_products) >= BALANCE.late_game_innovation_gap_mature_threshold
+        and len(growth_products) <= BALANCE.late_game_innovation_gap_growth_product_cap
+    ):
+        innovation_gap += 2
+    if mature_products and all(
+        product.technical_debt >= BALANCE.late_game_innovation_gap_debt_threshold
+        for product in mature_products
+    ):
+        innovation_gap += 1
 
     product_risks: list[LateGameProductRisk] = []
     renewal_risk_total = 0
@@ -139,7 +195,14 @@ def calculate_late_game_summary(
         renewal_risk_total += renewal_risk
         legacy_drag_total += legacy_drag
 
-    total_risk = concentration_risk + renewal_risk_total + legacy_drag_total
+    total_risk = (
+        concentration_risk
+        + renewal_risk_total
+        + legacy_drag_total
+        + org_drag
+        + maintenance_crisis
+        + innovation_gap
+    )
     added_cost = quantize_money(Decimal(total_risk) * BALANCE.late_game_cost_per_point)
     reputation_delta = (
         -BALANCE.late_game_reputation_penalty
@@ -151,7 +214,13 @@ def calculate_late_game_summary(
         total_risk // BALANCE.late_game_burnout_divisor,
     )
 
-    if total_risk >= 8:
+    if maintenance_crisis >= 3:
+        summary = "Maintenance burden is starting to outgrow the portfolio."
+    elif org_drag >= 3:
+        summary = "Company coordination load is now slowing execution."
+    elif innovation_gap >= 2:
+        summary = "The portfolio is maturing faster than the next product bets are forming."
+    elif total_risk >= 8:
         summary = "Renewal risk and legacy drag are now taxing the portfolio."
     elif concentration_risk > 0:
         summary = "One flagship is carrying too much of the company."
@@ -167,6 +236,9 @@ def calculate_late_game_summary(
         concentration_risk=concentration_risk,
         renewal_risk=renewal_risk_total,
         legacy_drag=legacy_drag_total,
+        org_drag=org_drag,
+        maintenance_crisis=maintenance_crisis,
+        innovation_gap=innovation_gap,
         added_cost=added_cost,
         reputation_delta=reputation_delta,
         burnout_modifier=burnout_modifier,
@@ -179,12 +251,14 @@ def apply_end_of_turn_late_game(
     products: list[Product],
     *,
     current_turn: int,
+    headcount: int = 0,
 ) -> LateGameSummary:
     """Apply late-game user and quality penalties after the main turn resolves."""
 
     summary = calculate_late_game_summary(
         products,
         current_turn=current_turn,
+        headcount=headcount,
     )
     if summary.total_risk == 0:
         return summary

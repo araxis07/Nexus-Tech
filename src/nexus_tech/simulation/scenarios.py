@@ -265,6 +265,7 @@ def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor
         archetype = get_competitor_archetype(seed.archetype_id)
         return create_competitor(
             name=seed.name,
+            archetype_id=seed.archetype_id or archetype.archetype_id,
             focus_segment=seed.focus_segment or archetype.focus_segment,
             strength=seed.strength if seed.strength is not None else archetype.strength,
             aggression=seed.aggression if seed.aggression is not None else archetype.aggression,
@@ -280,6 +281,7 @@ def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor
 
     return create_competitor(
         name=seed.name,
+        archetype_id=seed.archetype_id,
         focus_segment=seed.focus_segment,
         strength=seed.strength,
         aggression=seed.aggression,

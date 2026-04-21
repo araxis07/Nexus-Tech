@@ -27,6 +27,7 @@ class CompetitorRepository:
                 competitor_id,
                 display_order,
                 name,
+                archetype_id,
                 focus_segment,
                 strength,
                 aggression,
@@ -35,7 +36,7 @@ class CompetitorRepository:
                 current_move,
                 momentum
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -43,6 +44,7 @@ class CompetitorRepository:
                     str(competitor.id),
                     index,
                     competitor.name,
+                    competitor.archetype_id,
                     competitor.focus_segment.value,
                     competitor.strength,
                     competitor.aggression,
@@ -63,6 +65,7 @@ class CompetitorRepository:
             SELECT
                 competitor_id,
                 name,
+                archetype_id,
                 focus_segment,
                 strength,
                 aggression,
@@ -80,6 +83,7 @@ class CompetitorRepository:
             Competitor(
                 id=UUID(row["competitor_id"]),
                 name=row["name"],
+                archetype_id=row["archetype_id"],
                 focus_segment=MarketSegment(row["focus_segment"]),
                 strength=row["strength"],
                 aggression=row["aggression"],

@@ -21,6 +21,7 @@ from nexus_tech.simulation.support import clamp_int
 def create_competitor(
     *,
     name: str,
+    archetype_id: str | None = None,
     focus_segment,
     strength: int,
     aggression: int,
@@ -33,6 +34,7 @@ def create_competitor(
 
     return Competitor(
         name=name,
+        archetype_id=archetype_id,
         focus_segment=focus_segment,
         strength=strength,
         aggression=aggression,
@@ -86,7 +88,7 @@ def advance_competitors(
         else:
             competitor.momentum = clamp_int(
                 competitor.momentum + BALANCE.competitor_momentum_change_on_hold
-        )
+            )
         competitor.strength = clamp_int(competitor.strength + strength_drift)
         competitor.aggression = clamp_int(competitor.aggression + aggression_drift)
         _apply_competitor_move_side_effects(
@@ -125,6 +127,10 @@ def calculate_competitor_pressure(
         if competitor.focus_segment is not product.target_segment:
             continue
         rival_pressure += BALANCE.competitor_segment_match_bonus
+        rival_pressure += BALANCE.competitor_archetype_pressure_bonus.get(
+            competitor.archetype_id or "",
+            0,
+        )
         rival_pressure += competitor.strength // BALANCE.competitor_strength_divisor
         rival_pressure += competitor.aggression // BALANCE.competitor_aggression_divisor
         rival_pressure += (
@@ -176,28 +182,41 @@ def _choose_competitor_move(
 
     cooling_penalty = 1 if market_cycle is MarketCycle.COOLING else 0
     frothy_bonus = 1 if market_cycle is MarketCycle.FROTHY else 0
+    move_bias = BALANCE.competitor_archetype_move_bias.get(competitor.archetype_id or "", {})
     weights = (
         (
             CompetitorMove.HOLD,
-            BALANCE.competitor_move_hold_weight + max(0, 1 - cooling_penalty),
+            _adjust_move_weight(
+                BALANCE.competitor_move_hold_weight + max(0, 1 - cooling_penalty),
+                move_bias.get(CompetitorMove.HOLD.value, 0),
+            ),
         ),
         (
             CompetitorMove.DISCOUNT_PUSH,
-            BALANCE.competitor_move_discount_weight
-            + frothy_bonus
-            + (1 if competitor.pricing_tier is PricingTier.BUDGET else 0),
+            _adjust_move_weight(
+                BALANCE.competitor_move_discount_weight
+                + frothy_bonus
+                + (1 if competitor.pricing_tier is PricingTier.BUDGET else 0),
+                move_bias.get(CompetitorMove.DISCOUNT_PUSH.value, 0),
+            ),
         ),
         (
             CompetitorMove.FEATURE_SPRINT,
-            BALANCE.competitor_move_feature_weight
-            + frothy_bonus
-            + (1 if competitor.strength >= 60 else 0),
+            _adjust_move_weight(
+                BALANCE.competitor_move_feature_weight
+                + frothy_bonus
+                + (1 if competitor.strength >= 60 else 0),
+                move_bias.get(CompetitorMove.FEATURE_SPRINT.value, 0),
+            ),
         ),
         (
             CompetitorMove.RETRENCH,
-            BALANCE.competitor_move_retrench_weight
-            + cooling_penalty
-            + (1 if competitor.momentum <= 40 else 0),
+            _adjust_move_weight(
+                BALANCE.competitor_move_retrench_weight
+                + cooling_penalty
+                + (1 if competitor.momentum <= 40 else 0),
+                move_bias.get(CompetitorMove.RETRENCH.value, 0),
+            ),
         ),
     )
     total_weight = sum(weight for _, weight in weights)
@@ -221,12 +240,21 @@ def _apply_competitor_move_side_effects(
         competitor.pricing_tier = PricingTier.BUDGET
         if competitor.momentum >= BALANCE.competitor_discount_expansion_momentum_threshold:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
+        if competitor.archetype_id == "price_raider":
+            competitor.active_product_count = min(6, competitor.active_product_count + 1)
+            competitor.aggression = clamp_int(competitor.aggression + 1)
+        if competitor.archetype_id == "channel_aggregator":
+            competitor.strength = clamp_int(competitor.strength + 1)
         _maybe_pivot_focus_segment(competitor, portfolio_products)
         return
 
     if competitor.current_move is CompetitorMove.FEATURE_SPRINT:
         if competitor.momentum >= BALANCE.competitor_feature_expansion_momentum_threshold:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
+        if competitor.archetype_id == "feature_blitzer":
+            competitor.active_product_count = min(6, competitor.active_product_count + 1)
+        if competitor.archetype_id == "vertical_specialist":
+            competitor.strength = clamp_int(competitor.strength + 1)
         if competitor.focus_segment.value == "enterprise":
             competitor.pricing_tier = PricingTier.PREMIUM
         else:
@@ -240,8 +268,16 @@ def _apply_competitor_move_side_effects(
             competitor.pricing_tier = PricingTier.PREMIUM
         else:
             competitor.pricing_tier = PricingTier.STANDARD
+        if competitor.archetype_id == "retreating_incumbent":
+            competitor.strength = clamp_int(competitor.strength - 1)
         return
 
+    if competitor.archetype_id in {"platform_bulwark", "trust_monolith"}:
+        competitor.pricing_tier = PricingTier.PREMIUM
+        competitor.strength = clamp_int(competitor.strength + 1)
+    elif competitor.archetype_id == "niche_defender":
+        competitor.strength = clamp_int(competitor.strength + 1)
+        competitor.aggression = clamp_int(competitor.aggression - 1)
     if competitor.pricing_tier is PricingTier.BUDGET and competitor.momentum <= 45:
         competitor.pricing_tier = PricingTier.STANDARD
 
@@ -255,7 +291,11 @@ def _maybe_pivot_focus_segment(
     hottest_segment = _get_hottest_segment(portfolio_products)
     if hottest_segment is None or hottest_segment is competitor.focus_segment:
         return
-    if competitor.momentum < BALANCE.competitor_focus_pivot_threshold:
+    pivot_threshold = (
+        BALANCE.competitor_focus_pivot_threshold
+        + BALANCE.competitor_archetype_pivot_threshold_bonus.get(competitor.archetype_id or "", 0)
+    )
+    if competitor.momentum < pivot_threshold:
         return
 
     competitor.focus_segment = hottest_segment
@@ -265,6 +305,12 @@ def _maybe_pivot_focus_segment(
     competitor.aggression = clamp_int(
         competitor.aggression + BALANCE.competitor_focus_pivot_bonus_aggression,
     )
+
+
+def _adjust_move_weight(base_weight: int, bias: int) -> int:
+    """Keep competitor move selection valid after archetype bias is applied."""
+
+    return max(1, base_weight + bias)
 
 
 def _get_hottest_segment(products: list[Product]) -> MarketSegment | None:

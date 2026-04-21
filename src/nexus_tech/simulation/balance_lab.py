@@ -131,6 +131,31 @@ class BalanceMatrixResult:
     cells: tuple[BalanceMatrixCell, ...]
 
 
+@dataclass(frozen=True)
+class BalanceAuditFinding:
+    """One tuning warning surfaced from a balance audit pass."""
+
+    severity: str
+    scenario_id: str
+    difficulty_mode: DifficultyMode
+    summary: str
+    average_score: float
+    average_cash: Decimal
+    shutdowns: int
+    victories: int
+
+
+@dataclass(frozen=True)
+class BalanceAuditResult:
+    """Actionable findings generated from a deterministic balance sweep."""
+
+    campaign_goal_id: CampaignGoalId
+    runs: int
+    turns: int
+    seed_base: int
+    findings: tuple[BalanceAuditFinding, ...]
+
+
 def run_balance_batch(
     *,
     scenario_id: str,
@@ -297,6 +322,82 @@ def run_balance_matrix(
         turns=turns,
         seed_base=seed_base,
         cells=tuple(cells),
+    )
+
+
+def run_balance_audit(
+    *,
+    scenario_ids: list[str],
+    campaign_goal_id: CampaignGoalId,
+    runs: int,
+    turns: int,
+    seed_base: int,
+) -> BalanceAuditResult:
+    """Generate actionable tuning findings across scenarios and difficulties."""
+
+    matrix = run_balance_matrix(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=campaign_goal_id,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    findings: list[BalanceAuditFinding] = []
+    for cell in matrix.cells:
+        if cell.shutdowns >= runs:
+            findings.append(
+                BalanceAuditFinding(
+                    severity="high",
+                    scenario_id=cell.scenario_id,
+                    difficulty_mode=cell.difficulty_mode,
+                    summary="Every audited run shut down before stabilizing.",
+                    average_score=cell.average_score,
+                    average_cash=cell.average_cash,
+                    shutdowns=cell.shutdowns,
+                    victories=cell.victories,
+                )
+            )
+            continue
+        if cell.shutdowns >= max(1, runs // 2):
+            findings.append(
+                BalanceAuditFinding(
+                    severity="medium",
+                    scenario_id=cell.scenario_id,
+                    difficulty_mode=cell.difficulty_mode,
+                    summary="Shutdowns are common enough that the opening may be too punishing.",
+                    average_score=cell.average_score,
+                    average_cash=cell.average_cash,
+                    shutdowns=cell.shutdowns,
+                    victories=cell.victories,
+                )
+            )
+        elif cell.average_cash < BALANCE.finance_pressure_relief_cash_threshold / Decimal("2"):
+            findings.append(
+                BalanceAuditFinding(
+                    severity="low",
+                    scenario_id=cell.scenario_id,
+                    difficulty_mode=cell.difficulty_mode,
+                    summary="Average closing cash is thin and leaves little strategic room.",
+                    average_score=cell.average_score,
+                    average_cash=cell.average_cash,
+                    shutdowns=cell.shutdowns,
+                    victories=cell.victories,
+                )
+            )
+
+    findings.sort(
+        key=lambda finding: (
+            {"high": 0, "medium": 1, "low": 2}[finding.severity],
+            finding.scenario_id,
+            finding.difficulty_mode.value,
+        )
+    )
+    return BalanceAuditResult(
+        campaign_goal_id=campaign_goal_id,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+        findings=tuple(findings),
     )
 
 
@@ -519,6 +620,18 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
             "productize_breakthrough"
             if state.company.cash_on_hand > BALANCE.event_platform_breakthrough_productize_cost * 2
             else "bank_the_gain"
+        )
+    elif event.event_id == "loan_covenant":
+        option_id = (
+            "paydown_now"
+            if state.company.cash_on_hand > BALANCE.event_loan_covenant_paydown_amount * 2
+            else "renegotiate_terms"
+        )
+    elif event.event_id == "down_round_pressure":
+        option_id = (
+            "take_bridge"
+            if state.company.cash_on_hand <= BALANCE.event_down_round_pressure_cash_threshold
+            else "stay_independent"
         )
     else:
         option_id = event.options[0].id

@@ -47,6 +47,8 @@ from nexus_tech.presentation.dashboard import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    BalanceAuditFinding,
+    BalanceAuditResult,
     BalanceBatchResult,
     BalanceComparisonResult,
     BalanceMatrixCell,
@@ -183,11 +185,14 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "list-templates",
         "list-goals",
         "list-rivals",
+        "list-events",
         "simulate-balance",
         "compare-balance",
         "balance-matrix",
+        "balance-audit",
         "list-saves",
         "check-saves",
+        "doctor",
         "rename-save",
         "delete-save",
         "guide",
@@ -379,6 +384,14 @@ def test_list_rivals_command_renders_catalog() -> None:
     assert "price_raider" in result.output
 
 
+def test_list_events_command_renders_registry() -> None:
+    result = runner.invoke(app, ["list-events"])
+
+    assert result.exit_code == 0
+    assert "Event Catalog" in result.output
+    assert "loan_covenant" in result.output
+
+
 def test_simulate_balance_command_renders_batch_summary(monkeypatch: MonkeyPatch) -> None:
     batch = BalanceBatchResult(
         scenario_id="founder_journey",
@@ -506,11 +519,40 @@ def test_balance_matrix_command_renders_grid(monkeypatch: MonkeyPatch) -> None:
     assert "founder" in result.output
 
 
+def test_balance_audit_command_renders_findings(monkeypatch: MonkeyPatch) -> None:
+    audit = BalanceAuditResult(
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=4,
+        seed_base=70,
+        findings=(
+            BalanceAuditFinding(
+                severity="low",
+                scenario_id="founder_journey",
+                difficulty_mode=DifficultyMode.STANDARD,
+                summary="Average closing cash is thin.",
+                average_score=101.0,
+                average_cash=Decimal("1800.00"),
+                shutdowns=0,
+                victories=0,
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_balance_audit", lambda **_: audit)
+
+    result = runner.invoke(app, ["balance-audit", "--scenario", "founder_journey"])
+
+    assert result.exit_code == 0
+    assert "Balance Audit" in result.output
+    assert "Tuning Findings" in result.output
+    assert "low" in result.output
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.7.0" in result.output
+    assert "NEXUS TECH 0.8.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -532,7 +574,7 @@ def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: 
                 integrity_ok=True,
                 foreign_key_ok=True,
                 slot_count=2,
-                schema_version=8,
+                schema_version=9,
                 message="SQLite integrity and foreign keys are healthy.",
             )
 
@@ -545,7 +587,19 @@ def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: 
     assert "Save Health" in result.output
     assert "Integrity: ok" in result.output
     assert "Foreign Keys: ok" in result.output
-    assert "Schema Version: 8" in result.output
+    assert "Schema Version: 9" in result.output
+
+
+def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
+    db_path = tmp_path / "no-save-yet.db"
+
+    result = runner.invoke(app, ["doctor", "--db-path", str(db_path)])
+
+    assert result.exit_code == 0
+    assert "NEXUS TECH Doctor" in result.output
+    assert "Version" in result.output
+    assert "0.8.0" in result.output
+    assert "No save database found yet." in result.output
 
 
 def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -563,8 +617,8 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             updated_at="2026-04-13T01:00:00+00:00",
             victory_achieved=False,
             game_over=False,
-            saved_with_version="0.6.0",
-            schema_version=8,
+            saved_with_version="0.8.0",
+            schema_version=9,
         )
     ]
 

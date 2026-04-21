@@ -58,5 +58,41 @@
     "active_product_count": 2,
     "current_move": "retrench",
     "momentum": 32
+  },
+  {
+    "archetype_id": "channel_aggregator",
+    "title": "Channel Aggregator",
+    "description": "A partner-heavy rival that wins through distribution breadth and persistent mid-market expansion.",
+    "focus_segment": "smb",
+    "strength": 62,
+    "aggression": 61,
+    "pricing_tier": "standard",
+    "active_product_count": 2,
+    "current_move": "discount_push",
+    "momentum": 60
+  },
+  {
+    "archetype_id": "trust_monolith",
+    "title": "Trust Monolith",
+    "description": "A slower enterprise incumbent with deep buyer trust, premium pricing, and broad staying power.",
+    "focus_segment": "enterprise",
+    "strength": 80,
+    "aggression": 44,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "hold",
+    "momentum": 54
+  },
+  {
+    "archetype_id": "vertical_specialist",
+    "title": "Vertical Specialist",
+    "description": "A focused specialist that wins one operational niche through targeted feature depth and credible execution.",
+    "focus_segment": "smb",
+    "strength": 66,
+    "aggression": 52,
+    "pricing_tier": "premium",
+    "active_product_count": 1,
+    "current_move": "feature_sprint",
+    "momentum": 57
   }
 ]

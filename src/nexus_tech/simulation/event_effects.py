@@ -804,6 +804,97 @@ def _apply_platform_breakthrough(state: GameState, event: PendingEvent, option_i
     raise ValueError(f"Unsupported option {option_id} for platform breakthrough.")
 
 
+def _apply_loan_covenant(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "paydown_now":
+        payment = min(
+            state.finance.debt_principal,
+            BALANCE.event_loan_covenant_paydown_amount,
+        )
+        state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - payment)
+        state.finance.debt_principal = quantize_money(state.finance.debt_principal - payment)
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure - BALANCE.event_loan_covenant_paydown_pressure_relief,
+            0,
+            100,
+        )
+        return (
+            f"You paid down the covenant pressure. Cash -{payment}, debt -{payment}, "
+            f"investor pressure -{BALANCE.event_loan_covenant_paydown_pressure_relief}."
+        )
+
+    if option_id == "renegotiate_terms":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_loan_covenant_renegotiate_cash_gain
+        )
+        state.finance.loan_interest_rate = clamp_rate(
+            state.finance.loan_interest_rate
+            + BALANCE.event_loan_covenant_renegotiate_interest_gain
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            + BALANCE.event_loan_covenant_renegotiate_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            "You renegotiated the loan. Cash "
+            f"+{BALANCE.event_loan_covenant_renegotiate_cash_gain}, interest rate "
+            f"+{BALANCE.event_loan_covenant_renegotiate_interest_gain}, investor pressure "
+            f"+{BALANCE.event_loan_covenant_renegotiate_pressure_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for loan covenant.")
+
+
+def _apply_down_round_pressure(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "take_bridge":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_down_round_bridge_cash_gain
+        )
+        state.finance.total_raised = quantize_money(
+            state.finance.total_raised + BALANCE.event_down_round_bridge_cash_gain
+        )
+        state.finance.equity_dilution = clamp_rate(
+            state.finance.equity_dilution + BALANCE.event_down_round_bridge_dilution
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure + BALANCE.event_down_round_bridge_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            "You accepted the bridge round. Cash "
+            f"+{BALANCE.event_down_round_bridge_cash_gain}, dilution "
+            f"+{BALANCE.event_down_round_bridge_dilution}, investor pressure "
+            f"+{BALANCE.event_down_round_bridge_pressure_gain}."
+        )
+
+    if option_id == "stay_independent":
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_down_round_independent_reputation_loss,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(state.finance.investor_pressure - 1, 0, 100)
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.event_down_round_independent_morale_gain,
+                0,
+                100,
+            )
+        return (
+            "You stayed independent. Reputation "
+            f"-{BALANCE.event_down_round_independent_reputation_loss}, team morale "
+            f"+{BALANCE.event_down_round_independent_morale_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for down round pressure.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -845,4 +936,6 @@ EVENT_EFFECT_HANDLERS = {
     "partner_offer": _apply_partner_offer,
     "talent_bidding_war": _apply_talent_bidding_war,
     "platform_breakthrough": _apply_platform_breakthrough,
+    "loan_covenant": _apply_loan_covenant,
+    "down_round_pressure": _apply_down_round_pressure,
 }

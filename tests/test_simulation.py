@@ -35,12 +35,13 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
     run_balance_matrix,
 )
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
-from nexus_tech.simulation.competition import advance_competitors
+from nexus_tech.simulation.competition import advance_competitors, calculate_competitor_pressure
 from nexus_tech.simulation.economy import (
     calculate_total_operating_cost,
     calculate_total_revenue,
@@ -1505,7 +1506,7 @@ def test_late_game_summary_rises_for_concentrated_portfolio() -> None:
         bug_level=29,
         market_fit=64,
         technical_debt=37,
-        user_count=158,
+        user_count=300,
         feature_count=6,
         target_segment=MarketSegment.ENTERPRISE,
         pricing_tier=PricingTier.PREMIUM,
@@ -1518,12 +1519,31 @@ def test_late_game_summary_rises_for_concentrated_portfolio() -> None:
         technical_debt=22,
         target_segment=MarketSegment.SMB,
     )
+    legacy = make_product(
+        "Legacy",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=32,
+        technical_debt=42,
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    ops = make_product(
+        "Ops",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=28,
+        technical_debt=40,
+        target_segment=MarketSegment.SMB,
+    )
 
-    summary = calculate_late_game_summary([flagship, adjacent], current_turn=12)
+    summary = calculate_late_game_summary(
+        [flagship, adjacent, legacy, ops],
+        current_turn=12,
+        headcount=7,
+    )
 
     assert summary.total_risk > 0
     assert summary.concentration_risk > 0
     assert summary.renewal_risk > 0
+    assert summary.org_drag > 0
     assert summary.product_risks
 
 
@@ -1541,7 +1561,7 @@ def test_apply_end_of_turn_late_game_reduces_users_on_risky_product() -> None:
         pricing_tier=PricingTier.PREMIUM,
     )
 
-    summary = apply_end_of_turn_late_game([product], current_turn=12)
+    summary = apply_end_of_turn_late_game([product], current_turn=12, headcount=0)
 
     assert summary.total_risk > 0
     assert product.user_count == 184
@@ -1569,6 +1589,48 @@ def test_new_milestones_unlock_for_debt_free_and_category_moat() -> None:
     assert MilestoneId.CATEGORY_MOAT in unlocked_ids
 
 
+def test_new_milestones_unlock_for_capital_discipline_and_rival_resilience() -> None:
+    state = make_state(
+        make_product("Core", user_count=210),
+        make_product("Expansion", user_count=42, target_segment=MarketSegment.SMB),
+        cash_on_hand=Decimal("12600.00"),
+        finance=FinanceState(
+            debt_principal=Decimal("0.00"),
+            equity_dilution=Decimal("0.0800"),
+        ),
+        competitors=[
+            Competitor(
+                name="Price Rival",
+                focus_segment=MarketSegment.STARTUP,
+                strength=68,
+                aggression=70,
+                pricing_tier=PricingTier.BUDGET,
+            ),
+            Competitor(
+                name="Platform Rival",
+                focus_segment=MarketSegment.ENTERPRISE,
+                strength=72,
+                aggression=55,
+                pricing_tier=PricingTier.PREMIUM,
+            ),
+            Competitor(
+                name="Channel Rival",
+                focus_segment=MarketSegment.SMB,
+                strength=64,
+                aggression=60,
+                pricing_tier=PricingTier.STANDARD,
+            ),
+        ],
+    )
+    state.company.reputation = 64
+
+    unlocked = resolve_new_milestones(state, unlocked_turn=9)
+    unlocked_ids = {entry.milestone_id for entry in unlocked}
+
+    assert MilestoneId.CAPITAL_DISCIPLINE in unlocked_ids
+    assert MilestoneId.RIVAL_RESILIENCE in unlocked_ids
+
+
 def test_new_event_ids_are_registered() -> None:
     registry_ids = {definition.event_id for definition in get_event_registry()}
 
@@ -1576,6 +1638,45 @@ def test_new_event_ids_are_registered() -> None:
     assert "partner_offer" in registry_ids
     assert "talent_bidding_war" in registry_ids
     assert "platform_breakthrough" in registry_ids
+    assert "loan_covenant" in registry_ids
+    assert "down_round_pressure" in registry_ids
+
+
+def test_archetype_competitor_adds_segment_pressure() -> None:
+    product = make_product(
+        "Core",
+        target_segment=MarketSegment.STARTUP,
+        pricing_tier=PricingTier.STANDARD,
+    )
+    plain = Competitor(
+        name="Plain Rival",
+        focus_segment=MarketSegment.STARTUP,
+        strength=30,
+        aggression=30,
+        pricing_tier=PricingTier.STANDARD,
+    )
+    price_raider = plain.model_copy(
+        update={"name": "Price Raider", "archetype_id": "price_raider"}
+    )
+
+    plain_pressure = calculate_competitor_pressure(
+        product,
+        [plain],
+        market_cycle=MarketCycle.STEADY,
+        current_turn=6,
+        roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        roadmap_set_turn=1,
+    )
+    archetype_pressure = calculate_competitor_pressure(
+        product,
+        [price_raider],
+        market_cycle=MarketCycle.STEADY,
+        current_turn=6,
+        roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        roadmap_set_turn=1,
+    )
+
+    assert archetype_pressure > plain_pressure
 
 
 def test_balance_comparison_returns_ranked_scenarios() -> None:
@@ -1590,6 +1691,20 @@ def test_balance_comparison_returns_ranked_scenarios() -> None:
 
     assert len(comparison.comparisons) == 2
     assert comparison.comparisons[0].average_score >= comparison.comparisons[1].average_score
+
+
+def test_balance_audit_returns_actionable_result() -> None:
+    audit = run_balance_audit(
+        scenario_ids=["founder_journey"],
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=2,
+        seed_base=40,
+    )
+
+    assert audit.runs == 1
+    assert audit.turns == 2
+    assert isinstance(audit.findings, tuple)
 
 
 def test_new_milestones_unlock_for_talent_and_platform_credibility() -> None:

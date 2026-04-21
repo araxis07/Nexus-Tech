@@ -691,6 +691,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     late_game_summary = apply_end_of_turn_late_game(
         next_state.products,
         current_turn=resolved_turn,
+        headcount=len(next_state.employees),
     )
     late_game_user_loss = {
         product_risk.product_id: product_risk.user_loss
@@ -933,6 +934,10 @@ def build_turn_narrative(
         return "Operational load is starting to spill into product execution."
     if late_game_summary.startswith("Renewal risk"):
         return "Late-game renewal pressure is starting to tax the portfolio."
+    if late_game_summary.startswith("Maintenance burden"):
+        return "Portfolio upkeep is starting to crowd out forward motion."
+    if late_game_summary.startswith("Company coordination"):
+        return "Team coordination and portfolio drag are now part of every decision."
     if declining_products and any(
         summary.competitor_pressure >= 8 for summary in declining_products
     ):

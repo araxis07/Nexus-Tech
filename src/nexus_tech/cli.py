@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
 from rich.traceback import install as install_rich_traceback
 
 from nexus_tech import __version__
@@ -41,6 +42,7 @@ from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
     render_action_feedback,
+    render_balance_audit,
     render_balance_comparison,
     render_balance_lab,
     render_balance_matrix,
@@ -48,6 +50,7 @@ from nexus_tech.presentation.dashboard import (
     render_competitor_archetype_catalog,
     render_dashboard,
     render_employee_picker,
+    render_event_catalog,
     render_event_result,
     render_game_over,
     render_intro,
@@ -65,6 +68,7 @@ from nexus_tech.presentation.dashboard import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
     run_balance_matrix,
@@ -78,6 +82,7 @@ from nexus_tech.simulation.engine import (
     get_product_choices,
     resolve_turn,
 )
+from nexus_tech.simulation.event_registry import get_event_registry
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.scenarios import (
@@ -353,6 +358,13 @@ def list_rivals_command() -> None:
     render_competitor_archetype_catalog(console, get_available_competitor_archetypes())
 
 
+@app.command("list-events")
+def list_events_command() -> None:
+    """Print the supported dynamic event catalog."""
+
+    render_event_catalog(console, get_event_registry())
+
+
 @app.command("simulate-balance")
 def simulate_balance_command(
     scenario: str = SCENARIO_OPTION,
@@ -431,6 +443,31 @@ def balance_matrix_command(
     render_balance_matrix(console, matrix)
 
 
+@app.command("balance-audit")
+def balance_audit_command(
+    scenario: Optional[list[str]] = COMPARE_SCENARIOS_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(2, "--runs", min=1, help="Number of deterministic runs."),
+    turns: int = typer.Option(10, "--turns", min=1, help="Maximum turns per run."),
+    seed_base: int = typer.Option(
+        100,
+        "--seed-base",
+        help="Base seed. Each matrix cell gets a deterministic seed range from this value.",
+    ),
+) -> None:
+    """Flag rough balance cells across scenarios and supported difficulties."""
+
+    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    audit = run_balance_audit(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    render_balance_audit(console, audit)
+
+
 @app.command("guide")
 def guide_command() -> None:
     """Print a compact quick-start guide."""
@@ -477,6 +514,47 @@ def check_saves_command(
             "\n".join(lines),
             title="Save Health",
             border_style="green" if report.integrity_ok and report.foreign_key_ok else "red",
+        )
+    )
+
+
+@app.command("doctor")
+def doctor_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Print release, content, and save diagnostics for the local install."""
+
+    save_status = "No save database found yet."
+    slot_count = 0
+    schema_version = "-"
+    if db_path.exists():
+        coordinator = SaveLoadCoordinator(db_path)
+        try:
+            health = coordinator.check_save_health()
+        except PersistenceError as error:
+            raise_cli_persistence_error("Doctor Failed", error)
+        save_status = health.message
+        slot_count = health.slot_count
+        schema_version = str(health.schema_version)
+
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Version", __version__)
+    table.add_row("DB Path", str(db_path))
+    table.add_row("DB Exists", "yes" if db_path.exists() else "no")
+    table.add_row("Schema", schema_version)
+    table.add_row("Save Slots", str(slot_count))
+    table.add_row("Scenarios", str(len(get_available_scenarios())))
+    table.add_row("Templates", str(len(get_available_product_templates())))
+    table.add_row("Rivals", str(len(get_available_competitor_archetypes())))
+    table.add_row("Events", str(len(get_event_registry())))
+    table.add_row("Save Status", save_status)
+
+    console.print(
+        Panel(
+            table,
+            title="NEXUS TECH Doctor",
+            border_style="cyan",
+            expand=True,
         )
     )
 

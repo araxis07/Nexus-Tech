@@ -439,6 +439,15 @@ class BalanceConfig:
     late_game_declining_stage_legacy_bonus: int = 2
     late_game_feature_overhang_threshold: int = 4
     late_game_feature_overhang_divisor: int = 3
+    late_game_org_drag_product_threshold: int = 3
+    late_game_org_drag_headcount_threshold: int = 6
+    late_game_org_drag_divisor: int = 2
+    late_game_maintenance_crisis_cost_threshold: Decimal = Decimal("1150.00")
+    late_game_maintenance_crisis_cost_divisor: Decimal = Decimal("260.00")
+    late_game_maintenance_crisis_mature_threshold: int = 2
+    late_game_innovation_gap_mature_threshold: int = 2
+    late_game_innovation_gap_growth_product_cap: int = 0
+    late_game_innovation_gap_debt_threshold: int = 28
     late_game_cost_per_point: Decimal = Decimal("110.00")
     late_game_burnout_divisor: int = 4
     late_game_max_burnout_modifier: int = 3
@@ -485,6 +494,42 @@ class BalanceConfig:
     competitor_focus_pivot_threshold: int = 58
     competitor_focus_pivot_bonus_strength: int = 2
     competitor_focus_pivot_bonus_aggression: int = 2
+    competitor_archetype_pressure_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "price_raider": 1,
+            "platform_bulwark": 2,
+            "feature_blitzer": 1,
+            "niche_defender": 1,
+            "retreating_incumbent": -1,
+            "channel_aggregator": 1,
+            "trust_monolith": 2,
+            "vertical_specialist": 1,
+        }
+    )
+    competitor_archetype_move_bias: dict[str, dict[str, int]] = field(
+        default_factory=lambda: {
+            "price_raider": {"discount_push": 3, "feature_sprint": -1},
+            "platform_bulwark": {"hold": 2, "feature_sprint": 1, "retrench": -1},
+            "feature_blitzer": {"feature_sprint": 3, "hold": -1},
+            "niche_defender": {"hold": 2, "discount_push": -1},
+            "retreating_incumbent": {"retrench": 3, "discount_push": -1},
+            "channel_aggregator": {"discount_push": 1, "feature_sprint": 2},
+            "trust_monolith": {"hold": 3, "retrench": -1},
+            "vertical_specialist": {"feature_sprint": 1, "hold": 1},
+        }
+    )
+    competitor_archetype_pivot_threshold_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "price_raider": -4,
+            "platform_bulwark": 3,
+            "feature_blitzer": -2,
+            "niche_defender": 8,
+            "retreating_incumbent": 6,
+            "channel_aggregator": -3,
+            "trust_monolith": 5,
+            "vertical_specialist": 2,
+        }
+    )
 
     quarter_plan_revenue_growth_by_roadmap: dict[str, Decimal] = field(
         default_factory=lambda: {
@@ -751,6 +796,25 @@ class BalanceConfig:
     event_platform_breakthrough_acquisition_gain: Decimal = Decimal("0.0040")
     event_platform_breakthrough_bug_reduction: int = 2
     event_platform_breakthrough_debt_reduction: int = 4
+    event_loan_covenant_weight: int = 4
+    event_loan_covenant_cooldown: int = 5
+    event_loan_covenant_debt_threshold: Decimal = Decimal("6500.00")
+    event_loan_covenant_cash_threshold: Decimal = Decimal("4200.00")
+    event_loan_covenant_paydown_amount: Decimal = Decimal("1400.00")
+    event_loan_covenant_paydown_pressure_relief: int = 3
+    event_loan_covenant_renegotiate_cash_gain: Decimal = Decimal("300.00")
+    event_loan_covenant_renegotiate_interest_gain: Decimal = Decimal("0.0040")
+    event_loan_covenant_renegotiate_pressure_gain: int = 3
+    event_down_round_pressure_weight: int = 4
+    event_down_round_pressure_cooldown: int = 6
+    event_down_round_pressure_turn_threshold: int = 7
+    event_down_round_pressure_cash_threshold: Decimal = Decimal("4800.00")
+    event_down_round_pressure_investor_threshold: int = 24
+    event_down_round_bridge_cash_gain: Decimal = Decimal("2800.00")
+    event_down_round_bridge_dilution: Decimal = Decimal("0.0500")
+    event_down_round_bridge_pressure_gain: int = 4
+    event_down_round_independent_morale_gain: int = 1
+    event_down_round_independent_reputation_loss: int = 1
 
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4
@@ -768,6 +832,12 @@ class BalanceConfig:
     talent_bench_morale_threshold: int = 70
     platform_credibility_quality_threshold: int = 72
     platform_credibility_debt_threshold: int = 12
+    capital_discipline_cash_threshold: Decimal = Decimal("12000.00")
+    capital_discipline_debt_cap: Decimal = Decimal("1500.00")
+    capital_discipline_dilution_cap: Decimal = Decimal("0.1500")
+    rival_resilience_competitor_threshold: int = 3
+    rival_resilience_user_threshold: int = 200
+    rival_resilience_reputation_threshold: int = 62
     milestone_first_100_users_reputation_gain: int = 2
     milestone_cash_reserve_reputation_gain: int = 1
     milestone_team_growth_reputation_gain: int = 1
@@ -787,6 +857,9 @@ class BalanceConfig:
     milestone_talent_bench_reputation_gain: int = 2
     milestone_talent_bench_morale_gain: int = 2
     milestone_platform_credibility_reputation_gain: int = 2
+    milestone_capital_discipline_reputation_gain: int = 2
+    milestone_capital_discipline_cash_gain: Decimal = Decimal("250.00")
+    milestone_rival_resilience_reputation_gain: int = 3
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

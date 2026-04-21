@@ -151,6 +151,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             is_eligible=_is_platform_breakthrough_eligible,
             build_pending_event=_build_platform_breakthrough_event,
         ),
+        EventDefinition(
+            event_id="loan_covenant",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_loan_covenant_weight,
+            cooldown_turns=BALANCE.event_loan_covenant_cooldown,
+            is_eligible=_is_loan_covenant_eligible,
+            build_pending_event=_build_loan_covenant_event,
+        ),
+        EventDefinition(
+            event_id="down_round_pressure",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_down_round_pressure_weight,
+            cooldown_turns=BALANCE.event_down_round_pressure_cooldown,
+            is_eligible=_is_down_round_pressure_eligible,
+            build_pending_event=_build_down_round_pressure_event,
+        ),
     )
 
 
@@ -863,6 +879,87 @@ def _build_platform_breakthrough_event(
                 id="bank_the_gain",
                 label="Keep the gain internal",
                 description="Use the improvement to quietly reduce bugs and debt instead.",
+            ),
+        ],
+    )
+
+
+def _is_loan_covenant_eligible(state: GameState) -> bool:
+    return (
+        state.finance.debt_principal >= BALANCE.event_loan_covenant_debt_threshold
+        and state.company.cash_on_hand <= BALANCE.event_loan_covenant_cash_threshold
+    )
+
+
+def _build_loan_covenant_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="loan_covenant",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Loan Covenant Pressure",
+        description=(
+            "Your lender wants more discipline around the current debt load. "
+            "You can pay debt down now or renegotiate and accept a worse capital posture."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        options=[
+            EventOption(
+                id="paydown_now",
+                label="Pay debt down now",
+                description="Spend cash to reduce debt and calm covenant pressure.",
+            ),
+            EventOption(
+                id="renegotiate_terms",
+                label="Renegotiate the loan",
+                description="Keep more cash now, but accept higher interest and pressure.",
+            ),
+        ],
+    )
+
+
+def _is_down_round_pressure_eligible(state: GameState) -> bool:
+    return (
+        state.company.current_turn >= BALANCE.event_down_round_pressure_turn_threshold
+        and state.company.cash_on_hand <= BALANCE.event_down_round_pressure_cash_threshold
+        and state.finance.investor_pressure >= BALANCE.event_down_round_pressure_investor_threshold
+        and (
+            count_funding_rounds(state.funding_history, FundingType.ANGEL) > 0
+            or count_funding_rounds(state.funding_history, FundingType.VENTURE) > 0
+        )
+    )
+
+
+def _build_down_round_pressure_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="down_round_pressure",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Down Round Pressure",
+        description=(
+            "Existing investors think the company needs a bridge round. "
+            "You can accept the dilution or stay independent and defend the story."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        options=[
+            EventOption(
+                id="take_bridge",
+                label="Take the bridge round",
+                description="Add cash quickly, but take dilution and more investor pressure.",
+            ),
+            EventOption(
+                id="stay_independent",
+                label="Stay independent",
+                description="Protect the cap table, but accept some narrative damage.",
             ),
         ],
     )

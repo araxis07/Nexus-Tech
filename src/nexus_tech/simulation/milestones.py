@@ -156,6 +156,20 @@ def get_milestone_registry() -> tuple[MilestoneDefinition, ...]:
             is_unlocked=_has_platform_credibility,
             apply_reward=_reward_platform_credibility,
         ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.CAPITAL_DISCIPLINE,
+            title="Capital Discipline",
+            description="The company preserved cash while keeping debt and dilution under control.",
+            is_unlocked=_has_capital_discipline,
+            apply_reward=_reward_capital_discipline,
+        ),
+        MilestoneDefinition(
+            milestone_id=MilestoneId.RIVAL_RESILIENCE,
+            title="Rival Resilience",
+            description="The company held customer traction despite a crowded competitive field.",
+            is_unlocked=_has_rival_resilience,
+            apply_reward=_reward_rival_resilience,
+        ),
     )
 
 
@@ -305,6 +319,30 @@ def _reward_platform_credibility(state: GameState) -> str:
     )
 
 
+def _reward_capital_discipline(state: GameState) -> str:
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand + BALANCE.milestone_capital_discipline_cash_gain
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_capital_discipline_reputation_gain
+    )
+    return (
+        f"Cash +{format_money(BALANCE.milestone_capital_discipline_cash_gain)}, "
+        f"reputation +{BALANCE.milestone_capital_discipline_reputation_gain} "
+        "for disciplined capital management."
+    )
+
+
+def _reward_rival_resilience(state: GameState) -> str:
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.milestone_rival_resilience_reputation_gain
+    )
+    return (
+        f"Reputation +{BALANCE.milestone_rival_resilience_reputation_gain} "
+        "for holding traction under direct rival pressure."
+    )
+
+
 def _get_total_users(state: GameState) -> int:
     return sum(product.user_count for product in state.products if product.is_active)
 
@@ -374,4 +412,20 @@ def _has_platform_credibility(state: GameState) -> bool:
         and product.quality >= BALANCE.platform_credibility_quality_threshold
         and product.technical_debt <= BALANCE.platform_credibility_debt_threshold
         for product in state.products
+    )
+
+
+def _has_capital_discipline(state: GameState) -> bool:
+    return (
+        state.company.cash_on_hand >= BALANCE.capital_discipline_cash_threshold
+        and state.finance.debt_principal <= BALANCE.capital_discipline_debt_cap
+        and state.finance.equity_dilution <= BALANCE.capital_discipline_dilution_cap
+    )
+
+
+def _has_rival_resilience(state: GameState) -> bool:
+    return (
+        len(state.competitors) >= BALANCE.rival_resilience_competitor_threshold
+        and _get_total_users(state) >= BALANCE.rival_resilience_user_threshold
+        and state.company.reputation >= BALANCE.rival_resilience_reputation_threshold
     )

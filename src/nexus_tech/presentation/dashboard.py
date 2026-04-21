@@ -28,12 +28,14 @@ from nexus_tech.domain.models import (
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
 from nexus_tech.simulation.balance_lab import (
+    BalanceAuditResult,
     BalanceBatchResult,
     BalanceComparisonResult,
     BalanceMatrixResult,
 )
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
+from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
@@ -235,6 +237,33 @@ def render_competitor_archetype_catalog(
     )
 
 
+def render_event_catalog(console: Console, event_definitions: tuple[EventDefinition, ...]) -> None:
+    """Render the supported event registry for demo and debugging use."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Event", style="bold")
+    table.add_column("Category")
+    table.add_column("Weight", justify="right")
+    table.add_column("Cooldown", justify="right")
+
+    for definition in event_definitions:
+        table.add_row(
+            definition.event_id,
+            definition.category.value,
+            str(definition.weight),
+            str(definition.cooldown_turns),
+        )
+
+    console.print(
+        Panel(
+            table,
+            title="Event Catalog",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+
+
 def render_save_slot_catalog(
     console: Console,
     save_slots: list[SaveSlotSummary],
@@ -309,7 +338,7 @@ def render_quick_guide(console: Console) -> None:
         "[bold]Useful commands[/bold]",
         (
             "`nexus-tech guide`, `list-scenarios`, `list-templates`, "
-            "`list-rivals`, `list-saves`, `check-saves`"
+            "`list-rivals`, `list-events`, `list-saves`, `check-saves`, `doctor`"
         ),
         "",
         "[bold]Strong first turns[/bold]",
@@ -450,6 +479,53 @@ def render_balance_matrix(console: Console, matrix: BalanceMatrixResult) -> None
             [
                 Panel(overview, title="Balance Matrix", border_style="cyan", expand=True),
                 Panel(table, title="Scenario x Difficulty", border_style="green", expand=True),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
+
+
+def render_balance_audit(console: Console, audit: BalanceAuditResult) -> None:
+    """Render actionable balance warnings from a deterministic audit pass."""
+
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Goal", audit.campaign_goal_id.value)
+    overview.add_row("Runs / Cell", str(audit.runs))
+    overview.add_row("Turns", str(audit.turns))
+    overview.add_row("Seed Base", str(audit.seed_base))
+    overview.add_row("Findings", str(len(audit.findings)))
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Severity")
+    table.add_column("Scenario", style="bold")
+    table.add_column("Difficulty")
+    table.add_column("Issue")
+    table.add_column("Avg Score", justify="right")
+    table.add_column("Avg Cash", justify="right")
+    table.add_column("Shutdowns", justify="right")
+    table.add_column("Victories", justify="right")
+
+    if not audit.findings:
+        table.add_row("-", "-", "-", "No obvious balance risks were flagged.", "-", "-", "-", "-")
+    else:
+        for finding in audit.findings:
+            table.add_row(
+                finding.severity,
+                finding.scenario_id,
+                finding.difficulty_mode.value,
+                finding.summary,
+                f"{finding.average_score:.1f}",
+                format_money(finding.average_cash),
+                str(finding.shutdowns),
+                str(finding.victories),
+            )
+
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Balance Audit", border_style="cyan", expand=True),
+                Panel(table, title="Tuning Findings", border_style="yellow", expand=True),
             ],
             equal=False,
             expand=True,
@@ -1418,6 +1494,7 @@ def _build_late_game_panel(state: GameState) -> Panel:
     late_game = calculate_late_game_summary(
         state.products,
         current_turn=state.company.current_turn,
+        headcount=len(state.employees),
     )
     risk_names = [risk.product_name for risk in late_game.product_risks if risk.user_loss > 0]
     table = Table.grid(padding=(0, 1))
@@ -1425,6 +1502,9 @@ def _build_late_game_panel(state: GameState) -> Panel:
     table.add_row("Concentration", str(late_game.concentration_risk))
     table.add_row("Renewal", str(late_game.renewal_risk))
     table.add_row("Legacy Drag", str(late_game.legacy_drag))
+    table.add_row("Org Drag", str(late_game.org_drag))
+    table.add_row("Maint Crisis", str(late_game.maintenance_crisis))
+    table.add_row("Innovation Gap", str(late_game.innovation_gap))
     table.add_row("Late Cost", format_money(late_game.added_cost))
     table.add_row("Burnout Mod", str(late_game.burnout_modifier))
     table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
@@ -1454,6 +1534,7 @@ def _build_competitor_table(state: GameState) -> Table:
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("#", justify="center", style="bold cyan")
     table.add_column("Competitor", style="bold")
+    table.add_column("Archetype")
     table.add_column("Segment")
     table.add_column("Strength", justify="right")
     table.add_column("Agg", justify="right")
@@ -1466,6 +1547,7 @@ def _build_competitor_table(state: GameState) -> Table:
         table.add_row(
             str(index),
             competitor.name,
+            competitor.archetype_id or "-",
             competitor.focus_segment.value,
             str(competitor.strength),
             str(competitor.aggression),

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0 - 2026-04-21
+
+- Expanded the content catalog with enterprise-data, field-service, and procurement templates plus board-tension, channel-defense, and late-scale drag scenarios
+- Added new competitor archetypes for channel aggregators, trust monoliths, and vertical specialists
+- Deepened rival behavior with archetype-specific move bias, pressure bonuses, and pivot thresholds
+- Added late-game pressure dimensions for org drag, maintenance crisis, and innovation gap
+- Added finance events for loan covenant pressure and down-round pressure
+- Added progression milestones for capital discipline and resilience against direct rival pressure
+- Added `list-events`, `balance-audit`, and `doctor` CLI commands for content discovery, tuning, and local diagnostics
+- Advanced SQLite schema metadata to version `9` and persisted competitor archetype ids
+- Promoted the package version to `0.8.0`
+
 ## 0.7.0 - 2026-04-18
 
 - Added a competitor-archetype catalog so scenarios can seed stronger rival identities without hard-coding every competitor inline

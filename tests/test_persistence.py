@@ -128,6 +128,7 @@ def make_state() -> GameState:
     ]
     competitor = Competitor(
         name="Atlas Cloud",
+        archetype_id="trust_monolith",
         focus_segment=MarketSegment.ENTERPRISE,
         strength=67,
         aggression=61,
@@ -255,8 +256,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "schema_version",
     }.issubset(save_slot_columns)
     assert {"target_segment"}.issubset(product_columns)
-    assert {"current_move", "momentum"}.issubset(competitor_columns)
-    assert user_version >= 8
+    assert {"archetype_id", "current_move", "momentum"}.issubset(competitor_columns)
+    assert user_version >= 9
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -294,7 +295,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 8
+    assert summaries[0].schema_version >= 9
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -307,7 +308,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 8
+    assert report.schema_version >= 9
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

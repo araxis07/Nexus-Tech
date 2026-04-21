@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 9
 
 SCHEMA_STATEMENTS = (
     """
@@ -209,6 +209,7 @@ SCHEMA_STATEMENTS = (
         competitor_id TEXT NOT NULL,
         display_order INTEGER NOT NULL,
         name TEXT NOT NULL,
+        archetype_id TEXT,
         focus_segment TEXT NOT NULL,
         strength INTEGER NOT NULL,
         aggression INTEGER NOT NULL,
@@ -328,6 +329,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
 def _apply_version_6_migration(connection: sqlite3.Connection) -> None:
     """Upgrade older save files with finance and deeper competitor state."""
 
+    _ensure_column(
+        connection,
+        table_name="competitors",
+        column_name="archetype_id",
+        column_definition="TEXT",
+    )
     _ensure_column(
         connection,
         table_name="competitors",

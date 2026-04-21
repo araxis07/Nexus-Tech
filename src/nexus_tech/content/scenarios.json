@@ -1614,5 +1614,280 @@
         "focus_segment": "smb"
       }
     ]
+  },
+  {
+    "scenario_id": "board_tension",
+    "title": "Board Tension",
+    "description": "The company has capital and traction, but the room for sloppy execution is gone and finance pressure is starting to shape every turn.",
+    "company_name": "Northfield Systems",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "6200.00",
+    "reputation": 59,
+    "finance": {
+      "debt_principal": "6800.00",
+      "loan_interest_rate": "0.0360",
+      "equity_dilution": "0.1500",
+      "investor_pressure": 28,
+      "total_raised": "13800.00"
+    },
+    "products": [
+      {
+        "key": "core",
+        "template_id": "billing_hub",
+        "name": "Ledger Pulse",
+        "lifecycle_stage": "growth",
+        "quality": 60,
+        "bug_level": 19,
+        "market_fit": 57,
+        "technical_debt": 28,
+        "user_count": 72,
+        "revenue_per_user": "63.00",
+        "feature_count": 3,
+        "maintenance_cost": "310.00",
+        "acquisition_rate": "0.0340",
+        "churn_rate": "0.0620",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Mina Cole",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "capital_planning",
+        "assigned_product_key": "core",
+        "energy": 76,
+        "morale": 71
+      },
+      {
+        "full_name": "Noah Park",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "reliability",
+        "assigned_product_key": "core",
+        "energy": 77,
+        "morale": 70
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Metric Ledger",
+        "archetype_id": "trust_monolith"
+      }
+    ]
+  },
+  {
+    "scenario_id": "channel_defense",
+    "title": "Channel Defense",
+    "description": "A partner-led product has real expansion momentum, but rival distribution and cross-segment pressure can outpace the team quickly.",
+    "company_name": "Relay Harbor",
+    "company_strategy": "growth",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "11400.00",
+    "reputation": 58,
+    "products": [
+      {
+        "key": "partner",
+        "template_id": "partner_stack",
+        "name": "Relay Channel",
+        "lifecycle_stage": "growth",
+        "quality": 60,
+        "bug_level": 17,
+        "market_fit": 59,
+        "technical_debt": 24,
+        "user_count": 84,
+        "revenue_per_user": "34.00",
+        "feature_count": 4,
+        "maintenance_cost": "255.00",
+        "acquisition_rate": "0.0550",
+        "churn_rate": "0.0700",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "service",
+        "template_id": "field_service_ops",
+        "name": "Relay Field",
+        "lifecycle_stage": "growth",
+        "quality": 57,
+        "bug_level": 16,
+        "market_fit": 53,
+        "technical_debt": 21,
+        "user_count": 46,
+        "revenue_per_user": "48.00",
+        "feature_count": 2,
+        "maintenance_cost": "270.00",
+        "acquisition_rate": "0.0380",
+        "churn_rate": "0.0660",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Ari Stone",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "channel_growth",
+        "assigned_product_key": "partner",
+        "energy": 80,
+        "morale": 76
+      },
+      {
+        "full_name": "Rin Cole",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "partner_enablement",
+        "assigned_product_key": "service",
+        "energy": 79,
+        "morale": 75
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Channel Grid",
+        "archetype_id": "channel_aggregator"
+      },
+      {
+        "name": "Vertical Rail",
+        "archetype_id": "vertical_specialist"
+      }
+    ]
+  },
+  {
+    "scenario_id": "late_scale_drag",
+    "title": "Late-Scale Drag",
+    "description": "The company is already large enough to win, but portfolio drag, maintenance cost, and rival pressure are all waiting to punish weak coordination.",
+    "company_name": "Atlas Meridian",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "portfolio_consolidation",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "16800.00",
+    "reputation": 66,
+    "products": [
+      {
+        "key": "data",
+        "template_id": "enterprise_data_hub",
+        "name": "Atlas Data Core",
+        "lifecycle_stage": "mature",
+        "quality": 71,
+        "bug_level": 18,
+        "market_fit": 68,
+        "technical_debt": 24,
+        "user_count": 118,
+        "revenue_per_user": "102.00",
+        "feature_count": 5,
+        "maintenance_cost": "420.00",
+        "acquisition_rate": "0.0200",
+        "churn_rate": "0.0480",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "procurement",
+        "template_id": "procurement_cloud",
+        "name": "Atlas Procurement",
+        "lifecycle_stage": "mature",
+        "quality": 66,
+        "bug_level": 21,
+        "market_fit": 61,
+        "technical_debt": 30,
+        "user_count": 82,
+        "revenue_per_user": "78.00",
+        "feature_count": 5,
+        "maintenance_cost": "360.00",
+        "acquisition_rate": "0.0240",
+        "churn_rate": "0.0560",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "service",
+        "template_id": "field_service_ops",
+        "name": "Atlas Field",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 20,
+        "market_fit": 55,
+        "technical_debt": 27,
+        "user_count": 64,
+        "revenue_per_user": "50.00",
+        "feature_count": 4,
+        "maintenance_cost": "295.00",
+        "acquisition_rate": "0.0340",
+        "churn_rate": "0.0640",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Talia Ward",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "platform",
+        "assigned_product_key": "data",
+        "energy": 74,
+        "morale": 71
+      },
+      {
+        "full_name": "Owen Bell",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "portfolio_coordination",
+        "assigned_product_key": "data",
+        "energy": 76,
+        "morale": 72
+      },
+      {
+        "full_name": "Lena Park",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "enterprise_ux",
+        "assigned_product_key": "procurement",
+        "energy": 79,
+        "morale": 75
+      },
+      {
+        "full_name": "Marcus Drew",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "field_growth",
+        "assigned_product_key": "service",
+        "energy": 78,
+        "morale": 73
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Atlas Giant",
+        "archetype_id": "trust_monolith"
+      },
+      {
+        "name": "Ops Vertical",
+        "archetype_id": "vertical_specialist",
+        "focus_segment": "smb"
+      },
+      {
+        "name": "Channel Surge",
+        "archetype_id": "channel_aggregator"
+      }
+    ]
   }
 ]

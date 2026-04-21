@@ -144,6 +144,8 @@ class MilestoneId(StrEnum):
     CATEGORY_MOAT = "category_moat"
     TALENT_BENCH = "talent_bench"
     PLATFORM_CREDIBILITY = "platform_credibility"
+    CAPITAL_DISCIPLINE = "capital_discipline"
+    RIVAL_RESILIENCE = "rival_resilience"
 
 
 class FundingType(StrEnum):
@@ -274,6 +276,7 @@ class Competitor(BaseModel):
 
     id: UUID = Field(default_factory=uuid4)
     name: str = Field(min_length=1, max_length=80)
+    archetype_id: Optional[str] = Field(default=None, min_length=1, max_length=40)  # noqa: UP045
     focus_segment: MarketSegment
     strength: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     aggression: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)

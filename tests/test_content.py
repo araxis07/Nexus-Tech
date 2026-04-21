@@ -39,6 +39,9 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "flagship_risk" for scenario in scenarios)
     assert any(scenario.scenario_id == "talent_race" for scenario in scenarios)
     assert any(scenario.scenario_id == "moat_builder" for scenario in scenarios)
+    assert any(scenario.scenario_id == "board_tension" for scenario in scenarios)
+    assert any(scenario.scenario_id == "channel_defense" for scenario in scenarios)
+    assert any(scenario.scenario_id == "late_scale_drag" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -160,15 +163,29 @@ def test_content_pack_two_templates_are_available() -> None:
     assert partner.target_segment.value == "startup"
 
 
+def test_content_pack_three_templates_are_available() -> None:
+    data_hub = get_product_template("enterprise_data_hub")
+    field_ops = get_product_template("field_service_ops")
+    procurement = get_product_template("procurement_cloud")
+
+    assert data_hub.target_segment.value == "enterprise"
+    assert field_ops.target_segment.value == "smb"
+    assert procurement.pricing_tier is PricingTier.PREMIUM
+
+
 def test_competitor_archetype_catalog_is_available() -> None:
     archetypes = get_available_competitor_archetypes()
     archetype_ids = {archetype.archetype_id for archetype in archetypes}
 
     assert {"price_raider", "platform_bulwark", "feature_blitzer"}.issubset(archetype_ids)
+    assert {"channel_aggregator", "trust_monolith", "vertical_specialist"}.issubset(
+        archetype_ids
+    )
 
 
 def test_archetype_backed_scenario_bootstraps_competitors() -> None:
     state = create_new_game(scenario_id="talent_race")
 
     assert any(competitor.name == "Deal Current" for competitor in state.competitors)
+    assert any(competitor.archetype_id == "price_raider" for competitor in state.competitors)
     assert any(competitor.focus_segment.value == "startup" for competitor in state.competitors)
