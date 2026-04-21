@@ -29,6 +29,7 @@ def create_competitor(
     active_product_count: int = 1,
     current_move: CompetitorMove = CompetitorMove.HOLD,
     momentum: int = 50,
+    funding_level: int = 0,
 ) -> Competitor:
     """Create one validated competitor model."""
 
@@ -42,6 +43,7 @@ def create_competitor(
         active_product_count=active_product_count,
         current_move=current_move,
         momentum=momentum,
+        funding_level=funding_level,
     )
 
 
@@ -141,6 +143,7 @@ def calculate_competitor_pressure(
             rival_pressure += BALANCE.competitor_price_match_bonus
         rival_pressure += BALANCE.competitor_move_pressure_bonus[competitor.current_move.value]
         rival_pressure += competitor.momentum // BALANCE.competitor_momentum_divisor
+        rival_pressure += competitor.funding_level
     return clamp_int(
         base_pressure + rival_pressure,
         minimum=0,
@@ -246,6 +249,7 @@ def _apply_competitor_move_side_effects(
         if competitor.archetype_id == "channel_aggregator":
             competitor.strength = clamp_int(competitor.strength + 1)
         _maybe_pivot_focus_segment(competitor, portfolio_products)
+        _maybe_raise_competitor_funding(competitor)
         return
 
     if competitor.current_move is CompetitorMove.FEATURE_SPRINT:
@@ -260,6 +264,7 @@ def _apply_competitor_move_side_effects(
         else:
             competitor.pricing_tier = PricingTier.STANDARD
         _maybe_pivot_focus_segment(competitor, portfolio_products)
+        _maybe_raise_competitor_funding(competitor)
         return
 
     if competitor.current_move is CompetitorMove.RETRENCH:
@@ -270,6 +275,7 @@ def _apply_competitor_move_side_effects(
             competitor.pricing_tier = PricingTier.STANDARD
         if competitor.archetype_id == "retreating_incumbent":
             competitor.strength = clamp_int(competitor.strength - 1)
+        competitor.funding_level = max(0, competitor.funding_level - 1)
         return
 
     if competitor.archetype_id in {"platform_bulwark", "trust_monolith"}:
@@ -280,6 +286,16 @@ def _apply_competitor_move_side_effects(
         competitor.aggression = clamp_int(competitor.aggression - 1)
     if competitor.pricing_tier is PricingTier.BUDGET and competitor.momentum <= 45:
         competitor.pricing_tier = PricingTier.STANDARD
+    _maybe_raise_competitor_funding(competitor)
+
+
+def _maybe_raise_competitor_funding(competitor: Competitor) -> None:
+    """Let strong rivals accumulate capital pressure over time."""
+
+    if competitor.momentum + competitor.aggression + competitor.strength < 190:
+        return
+    competitor.funding_level = min(5, competitor.funding_level + 1)
+    competitor.strength = clamp_int(competitor.strength + 1)
 
 
 def _maybe_pivot_focus_segment(

@@ -10,6 +10,7 @@ from nexus_tech.domain.models import GameState, RoadmapFocus, TurnLedgerEntry
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.campaign import check_campaign_goal_victory, evaluate_campaign_goal
+from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 
 
@@ -23,6 +24,8 @@ class RunScore:
     active_products: int
     mature_products: int
     total_users: int
+    key_accounts: int
+    campaign_grade: str
 
 
 def append_turn_history(
@@ -61,6 +64,10 @@ def calculate_run_score(state: GameState) -> RunScore:
         if product.is_active and product.lifecycle_stage.value == "mature"
     )
     total_users = get_total_users(state)
+    active_key_accounts = sum(
+        1 for account in state.customer_accounts if account.status.value != "churned"
+    )
+    account_revenue = calculate_account_revenue(state.customer_accounts)
     total_score = (
         int((state.company.cash_on_hand / BALANCE.score_cash_divisor).to_integral_value())
         + (total_users // BALANCE.score_users_divisor)
@@ -69,6 +76,8 @@ def calculate_run_score(state: GameState) -> RunScore:
         + (mature_products * BALANCE.score_mature_product_bonus)
         + (active_products * BALANCE.score_active_product_bonus)
         + (len(state.milestone_history) * BALANCE.score_milestone_bonus)
+        + int((account_revenue / BALANCE.key_account_score_value_divisor).to_integral_value())
+        + (state.finance.board_confidence // BALANCE.board_confidence_score_divisor)
         + get_difficulty_profile(state.difficulty_mode).score_modifier
         - int(
             (state.finance.debt_principal / BALANCE.finance_score_debt_divisor)
@@ -82,6 +91,7 @@ def calculate_run_score(state: GameState) -> RunScore:
     )
     if evaluate_campaign_goal(state).completed:
         total_score += BALANCE.score_campaign_goal_bonus[state.campaign_goal_id.value]
+    campaign_grade = _calculate_campaign_grade(total_score)
     if total_score >= 220:
         score_tier = "breakout"
     elif total_score >= 170:
@@ -96,6 +106,7 @@ def calculate_run_score(state: GameState) -> RunScore:
         (state.company.cash_on_hand * BALANCE.valuation_cash_multiplier)
         + (recent_revenue * BALANCE.valuation_revenue_multiplier)
         + (Decimal(total_users) * BALANCE.valuation_user_multiplier)
+        + (account_revenue * BALANCE.key_account_valuation_multiplier)
         - (state.finance.debt_principal * BALANCE.finance_valuation_debt_multiplier)
     )
     estimated_valuation = quantize_money(
@@ -115,6 +126,8 @@ def calculate_run_score(state: GameState) -> RunScore:
         active_products=active_products,
         mature_products=mature_products,
         total_users=total_users,
+        key_accounts=active_key_accounts,
+        campaign_grade=campaign_grade,
     )
 
 
@@ -145,3 +158,15 @@ def get_total_users(state: GameState) -> int:
     """Return total active users across active products."""
 
     return sum(product.user_count for product in state.products if product.is_active)
+
+
+def _calculate_campaign_grade(total_score: int) -> str:
+    if total_score >= 270:
+        return "S"
+    if total_score >= 220:
+        return "A"
+    if total_score >= 170:
+        return "B"
+    if total_score >= 120:
+        return "C"
+    return "D"

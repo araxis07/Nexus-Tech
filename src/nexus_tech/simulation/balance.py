@@ -861,6 +861,42 @@ class BalanceConfig:
     milestone_capital_discipline_cash_gain: Decimal = Decimal("250.00")
     milestone_rival_resilience_reputation_gain: int = 3
 
+    key_account_user_threshold: int = 90
+    key_account_enterprise_user_threshold: int = 18
+    key_account_contract_user_divisor: int = 3
+    key_account_min_contract_value: Decimal = Decimal("280.00")
+    key_account_max_contract_value: Decimal = Decimal("1800.00")
+    key_account_base_satisfaction: int = 58
+    key_account_quality_divisor: int = 8
+    key_account_bug_divisor: int = 10
+    key_account_debt_divisor: int = 15
+    key_account_renewal_interval: int = 4
+    key_account_satisfaction_good_threshold: int = 68
+    key_account_satisfaction_bad_threshold: int = 42
+    key_account_churn_threshold: int = 78
+    key_account_expansion_contract_gain: Decimal = Decimal("140.00")
+    key_account_renewal_churn_user_loss: int = 8
+    key_account_status_at_risk_threshold: int = 55
+    key_account_satisfaction_delta_cap: int = 5
+    key_account_churn_risk_relief: int = 7
+    key_account_churn_risk_gain: int = 9
+    key_account_score_value_divisor: Decimal = Decimal("250.00")
+    key_account_valuation_multiplier: Decimal = Decimal("2.50")
+
+    board_confidence_positive_cashflow_gain: int = 2
+    board_confidence_negative_cashflow_loss: int = 2
+    board_confidence_pressure_divisor: int = 18
+    board_confidence_low_threshold: int = 32
+    board_confidence_high_threshold: int = 72
+    board_confidence_score_divisor: int = 10
+
+    exit_acquisition_score_threshold: int = 170
+    exit_acquisition_value_multiplier: Decimal = Decimal("1.15")
+    exit_ipo_score_threshold: int = 250
+    exit_ipo_value_multiplier: Decimal = Decimal("1.45")
+    exit_independence_cash_threshold: Decimal = Decimal("14000.00")
+    exit_restructure_cash_threshold: Decimal = Decimal("2500.00")
+
     game_over_cash_threshold: Decimal = Decimal("0.00")
 
 

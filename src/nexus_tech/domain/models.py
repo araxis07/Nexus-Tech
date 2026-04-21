@@ -110,6 +110,23 @@ class CompetitorMove(StrEnum):
     RETRENCH = "retrench"
 
 
+class CustomerAccountStatus(StrEnum):
+    """Lifecycle state for a key customer account."""
+
+    ACTIVE = "active"
+    AT_RISK = "at_risk"
+    CHURNED = "churned"
+
+
+class ExitOutcome(StrEnum):
+    """Endgame classification for a completed run."""
+
+    PROFITABLE_INDEPENDENCE = "profitable_independence"
+    STRATEGIC_ACQUISITION = "strategic_acquisition"
+    IPO_READY = "ipo_ready"
+    RESTRUCTURE = "restructure"
+
+
 class EventCategory(StrEnum):
     """Supported event categories for the dynamic event engine."""
 
@@ -189,6 +206,7 @@ class TurnAction(StrEnum):
     UNASSIGN_EMPLOYEE = "unassign_employee"
     REST_TEAM = "rest_team"
     REVIEW_TEAM = "review_team"
+    REVIEW_CUSTOMERS = "review_customers"
     VIEW_REPORT = "view_report"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
@@ -284,6 +302,7 @@ class Competitor(BaseModel):
     active_product_count: int = Field(default=1, ge=1, le=6)
     current_move: CompetitorMove = CompetitorMove.HOLD
     momentum: int = Field(default=50, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    funding_level: int = Field(default=0, ge=0, le=5)
 
 
 class FinanceState(BaseModel):
@@ -303,6 +322,7 @@ class FinanceState(BaseModel):
         le=Decimal("1"),
     )
     investor_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_confidence: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     total_raised: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
@@ -333,6 +353,28 @@ class QuarterPlan(BaseModel):
     @field_validator("revenue_target", "cash_reserve_target", mode="before")
     @classmethod
     def _normalize_plan_money(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+
+class CustomerAccount(BaseModel):
+    """A key account that creates renewal and concentration pressure."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    name: str = Field(min_length=1, max_length=80)
+    product_id: UUID
+    segment: MarketSegment
+    contract_value: Decimal = Field(ge=Decimal("0"))
+    satisfaction: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    renewal_turn: int = Field(ge=1)
+    churn_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    status: CustomerAccountStatus = CustomerAccountStatus.ACTIVE
+
+    @field_validator("contract_value", mode="before")
+    @classmethod
+    def _normalize_contract_value(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
 
 
@@ -459,10 +501,13 @@ class GameState(BaseModel):
     difficulty_mode: DifficultyMode = DifficultyMode.STANDARD
     campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE
     competitors: list[Competitor] = Field(default_factory=list)
+    customer_accounts: list[CustomerAccount] = Field(default_factory=list)
     quarter_plan: QuarterPlan = Field(default_factory=QuarterPlan)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
     victory_achieved: bool = False
     victory_reason: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045
+    exit_outcome: Optional[ExitOutcome] = None  # noqa: UP045
+    exit_summary: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045
     scenario_id: str = Field(
         default=DEFAULT_SCENARIO_ID,
         min_length=1,

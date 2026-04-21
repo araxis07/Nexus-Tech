@@ -13,11 +13,14 @@ from nexus_tech.domain.models import (
     CompanyStrategy,
     Competitor,
     CompetitorMove,
+    CustomerAccount,
+    CustomerAccountStatus,
     DifficultyMode,
     Employee,
     EmployeeRole,
     EventCategory,
     EventHistoryEntry,
+    ExitOutcome,
     FinanceState,
     GameState,
     LifecycleStage,
@@ -35,6 +38,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    format_balance_matrix_csv,
     run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
@@ -42,6 +46,10 @@ from nexus_tech.simulation.balance_lab import (
 )
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors, calculate_competitor_pressure
+from nexus_tech.simulation.customers import (
+    apply_end_of_turn_customers,
+    calculate_account_revenue,
+)
 from nexus_tech.simulation.economy import (
     calculate_total_operating_cost,
     calculate_total_revenue,
@@ -55,6 +63,7 @@ from nexus_tech.simulation.events import (
     select_event_definition,
     select_weighted_definition,
 )
+from nexus_tech.simulation.finance import apply_end_of_turn_finance_drift
 from nexus_tech.simulation.growth import (
     calculate_acquired_users,
     calculate_churned_users,
@@ -179,6 +188,7 @@ def make_state(
     pending_event: PendingEvent | None = None,
     event_history: list[EventHistoryEntry] | None = None,
     milestone_history: list[MilestoneEntry] | None = None,
+    customer_accounts: list[CustomerAccount] | None = None,
 ) -> GameState:
     state = GameState(
         company=Company(
@@ -192,6 +202,7 @@ def make_state(
         employees=employees or [],
         finance=finance or FinanceState(),
         competitors=competitors or [],
+        customer_accounts=customer_accounts or [],
         pending_event=pending_event,
         event_history=event_history or [],
         milestone_history=milestone_history or [],
@@ -236,6 +247,99 @@ def test_multi_product_revenue_aggregates_only_active_products() -> None:
     revenue = calculate_total_revenue(state.products)
 
     assert revenue == Decimal("900.00")
+
+
+def test_key_account_revenue_aggregates_active_accounts_only() -> None:
+    product = make_product("Enterprise Desk", target_segment=MarketSegment.ENTERPRISE)
+    active_account = CustomerAccount(
+        name="Enterprise Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("900.00"),
+        satisfaction=72,
+        expansion_potential=60,
+        renewal_turn=4,
+        churn_risk=12,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    churned_account = active_account.model_copy(
+        update={
+            "name": "Lost Account",
+            "contract_value": Decimal("700.00"),
+            "status": CustomerAccountStatus.CHURNED,
+        }
+    )
+
+    revenue = calculate_account_revenue([active_account, churned_account])
+
+    assert revenue == Decimal("900.00")
+
+
+def test_key_accounts_are_seeded_from_strong_product_traction() -> None:
+    product = make_product(
+        "Enterprise Desk",
+        target_segment=MarketSegment.ENTERPRISE,
+        user_count=30,
+        quality=76,
+        market_fit=72,
+        bug_level=8,
+        technical_debt=10,
+    )
+    accounts: list[CustomerAccount] = []
+
+    summary = apply_end_of_turn_customers(accounts, [product], current_turn=3)
+
+    assert summary.created_accounts == 1
+    assert accounts[0].segment is MarketSegment.ENTERPRISE
+    assert accounts[0].status is CustomerAccountStatus.ACTIVE
+    assert summary.account_revenue > Decimal("0.00")
+
+
+def test_renewal_churns_high_risk_key_account_and_reduces_users() -> None:
+    product = make_product("Risky", user_count=40, quality=28, bug_level=70, technical_debt=80)
+    account = CustomerAccount(
+        name="Risky Renewal",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("500.00"),
+        satisfaction=20,
+        expansion_potential=25,
+        renewal_turn=1,
+        churn_risk=90,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+
+    summary = apply_end_of_turn_customers([account], [product], current_turn=1)
+
+    assert summary.churned_accounts == 1
+    assert account.status is CustomerAccountStatus.CHURNED
+    assert product.user_count == 32
+
+
+def test_resolve_turn_includes_key_account_revenue() -> None:
+    product = make_product(
+        "Account Core",
+        user_count=0,
+        revenue_per_user=Decimal("0.00"),
+        maintenance_cost=Decimal("0.00"),
+    )
+    account = CustomerAccount(
+        name="Anchor Account",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("500.00"),
+        satisfaction=70,
+        expansion_potential=40,
+        renewal_turn=4,
+        churn_risk=10,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account])
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert resolution.customer_summary.account_revenue == Decimal("500.00")
+    assert resolution.total_revenue >= Decimal("500.00")
 
 
 def test_churn_behavior_is_higher_for_bad_product_health() -> None:
@@ -896,6 +1000,8 @@ def test_resolve_turn_sets_victory_when_company_hits_scale_threshold() -> None:
 
     assert resolution.state.victory_achieved is True
     assert resolution.victory_reason is not None
+    assert resolution.state.exit_outcome is not None
+    assert resolution.state.exit_summary
 
 
 def test_three_turn_gameplay_integration_remains_stable() -> None:
@@ -1144,6 +1250,23 @@ def test_retrench_competitor_move_reduces_product_count() -> None:
     assert competitor.pricing_tier is PricingTier.PREMIUM
 
 
+def test_strong_competitor_can_raise_funding_pressure() -> None:
+    competitor = Competitor(
+        name="Funded Rival",
+        focus_segment=MarketSegment.STARTUP,
+        strength=82,
+        aggression=78,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=2,
+        momentum=88,
+        funding_level=0,
+    )
+
+    advance_competitors([competitor], SequenceRandom([1, 0, 0]), market_cycle=MarketCycle.STEADY)
+
+    assert competitor.funding_level > 0
+
+
 def test_balance_batch_is_deterministic_under_fixed_seed_base() -> None:
     batch_a = run_balance_batch(
         scenario_id="founder_journey",
@@ -1165,6 +1288,23 @@ def test_balance_batch_is_deterministic_under_fixed_seed_base() -> None:
     assert batch_a.victories == batch_b.victories
     assert batch_a.average_score == batch_b.average_score
     assert batch_a.results == batch_b.results
+
+
+def test_balance_matrix_csv_export_is_stable() -> None:
+    matrix = run_balance_matrix(
+        scenario_ids=["founder_journey"],
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=2,
+        seed_base=30,
+    )
+
+    csv_output = format_balance_matrix_csv(matrix)
+
+    assert csv_output.startswith(
+        "scenario_id,difficulty,average_score,average_cash,average_users,victories,shutdowns"
+    )
+    assert "founder_journey" in csv_output
 
 
 def test_referral_wave_event_rewards_healthy_product() -> None:
@@ -1275,6 +1415,54 @@ def test_finance_costs_are_included_in_operating_burn() -> None:
     )
 
     assert operating_cost == Decimal("1335.00")
+
+
+def test_board_confidence_moves_with_cash_flow_and_pressure() -> None:
+    company = Company(
+        name="NEXUS TECH",
+        cash_on_hand=Decimal("8000.00"),
+        reputation=55,
+        current_turn=4,
+    )
+    finance = FinanceState(board_confidence=50, investor_pressure=0)
+
+    apply_end_of_turn_finance_drift(
+        finance,
+        company,
+        net_cash_flow=Decimal("200.00"),
+    )
+    after_positive_flow = finance.board_confidence
+    finance.investor_pressure = 20
+    apply_end_of_turn_finance_drift(
+        finance,
+        company,
+        net_cash_flow=Decimal("-300.00"),
+    )
+
+    assert after_positive_flow > 50
+    assert finance.board_confidence < after_positive_flow
+
+
+def test_exit_evaluation_can_classify_independent_outcome() -> None:
+    state = make_state(
+        make_product("Core", user_count=80, market_fit=65),
+        cash_on_hand=Decimal("16000.00"),
+        current_turn=8,
+    )
+
+    resolution = resolve_turn(state, FixedRandom(0))
+    resolution.state.victory_achieved = True
+    resolution.state.exit_outcome = None
+    from nexus_tech.simulation.endgame import apply_exit_outcome
+
+    evaluation = apply_exit_outcome(resolution.state)
+
+    assert evaluation.outcome in {
+        ExitOutcome.PROFITABLE_INDEPENDENCE,
+        ExitOutcome.STRATEGIC_ACQUISITION,
+        ExitOutcome.IPO_READY,
+    }
+    assert resolution.state.exit_summary
 
 
 def test_take_loan_and_repay_debt_change_finance_state() -> None:

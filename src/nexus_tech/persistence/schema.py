@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 9
+CURRENT_SCHEMA_VERSION = 10
 
 SCHEMA_STATEMENTS = (
     """
@@ -23,8 +23,10 @@ SCHEMA_STATEMENTS = (
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
         victory_reason TEXT,
+        exit_outcome TEXT,
+        exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 8,
+        schema_version INTEGER NOT NULL DEFAULT 10,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -154,6 +156,7 @@ SCHEMA_STATEMENTS = (
         loan_interest_rate TEXT NOT NULL,
         equity_dilution TEXT NOT NULL,
         investor_pressure INTEGER NOT NULL,
+        board_confidence INTEGER NOT NULL DEFAULT 55,
         total_raised TEXT NOT NULL,
         last_funding_turn INTEGER
     )
@@ -217,8 +220,30 @@ SCHEMA_STATEMENTS = (
         active_product_count INTEGER NOT NULL,
         current_move TEXT NOT NULL DEFAULT 'hold',
         momentum INTEGER NOT NULL DEFAULT 50,
+        funding_level INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (slot_name, competitor_id),
         UNIQUE (slot_name, display_order)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS customer_accounts (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        account_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        segment TEXT NOT NULL,
+        contract_value TEXT NOT NULL,
+        satisfaction INTEGER NOT NULL,
+        expansion_potential INTEGER NOT NULL,
+        renewal_turn INTEGER NOT NULL,
+        churn_risk INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        PRIMARY KEY (slot_name, account_id),
+        UNIQUE (slot_name, display_order),
+        FOREIGN KEY (slot_name, product_id)
+            REFERENCES products(slot_name, product_id)
     )
     """,
 )
@@ -312,6 +337,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="exit_outcome",
+        column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="exit_summary",
+        column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="saved_with_version",
         column_definition="TEXT NOT NULL DEFAULT 'unknown'",
     )
@@ -320,6 +357,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="save_slots",
         column_name="schema_version",
         column_definition=f"INTEGER NOT NULL DEFAULT {CURRENT_SCHEMA_VERSION}",
+    )
+    _ensure_column(
+        connection,
+        table_name="competitors",
+        column_name="funding_level",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_confidence",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
     )
     if current_version < 6:
         _apply_version_6_migration(connection)
@@ -334,6 +383,18 @@ def _apply_version_6_migration(connection: sqlite3.Connection) -> None:
         table_name="competitors",
         column_name="archetype_id",
         column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="competitors",
+        column_name="funding_level",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_confidence",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
     )
     _ensure_column(
         connection,

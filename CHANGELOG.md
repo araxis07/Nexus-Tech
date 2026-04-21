@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0 - 2026-04-21
+
+- Added key customer accounts with contract revenue, satisfaction, renewal risk, churn, and expansion pressure
+- Added board confidence as a finance signal affected by cash flow, investor pressure, and capital events
+- Added exit outcomes for winning runs, including profitable independence, strategic acquisition, IPO-ready, and restructure paths
+- Deepened competitors with funding levels that increase pressure from strong, high-momentum rivals
+- Added `review_customers` and `export-balance-csv` for clearer demo review and external balance tuning
+- Persisted key accounts, board confidence, competitor funding, and exit summaries through SQLite schema version `10`
+- Promoted the package version to `0.9.0`
+
 ## 0.8.0 - 2026-04-21
 
 - Expanded the content catalog with enterprise-data, field-service, and procurement templates plus board-tension, channel-defense, and late-scale drag scenarios

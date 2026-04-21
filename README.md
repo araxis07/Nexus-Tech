@@ -51,6 +51,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Run each company inside a live market cycle such as `cooling`, `steady`, `expanding`, or `frothy`
 - Track lightweight competitor rosters that apply ongoing pressure by segment, pricing, aggression, and tactical momentum
 - Simulate rival moves such as `hold`, `discount_push`, `feature_sprint`, and `retrench`
+- Track rival funding levels so strong, high-momentum competitors become more dangerous over time
 - Define reusable competitor archetypes such as price raiders, platform bulwarks, and feature blitzers
 - Expand rival archetypes with channel aggregators, trust monoliths, and vertical specialists
 - Let rival moves reshape product count and pricing posture over time
@@ -66,7 +67,16 @@ Each turn represents a business interval. You review the company, choose actions
 - Take local loans to extend runway and pay recurring interest
 - Raise `angel` or `venture` funding when the company has enough traction
 - Track debt, dilution, investor pressure, total capital raised, and funding history
+- Track board confidence as a compact signal of governance trust, cash-flow discipline, and capital pressure
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
+
+### 🤝 Customer Accounts
+
+- Turn strong product traction into named key customer accounts
+- Track account satisfaction, contract value, expansion potential, renewal timing, and churn risk
+- Add recurring account revenue on top of product usage revenue
+- Let weak product health, bugs, and technical debt create visible renewal pressure
+- Review key accounts directly from the in-game `review_customers` action
 
 ### 👥 Employee and Team System
 
@@ -110,13 +120,14 @@ Each turn represents a business interval. You review the company, choose actions
 - Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
 - Work against a quarter plan with explicit revenue, user, cash, and headcount targets
 - Track run score, estimated company value, turn history, and victory conditions in the terminal report
+- Classify successful runs into exit paths such as profitable independence, strategic acquisition, IPO-ready, or restructure
 
 ### 💾 Local Save / Load
 
 - Save and load runs locally with SQLite
 - Resume the latest save slot
 - List, rename, and delete save slots directly from the CLI
-- Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, product targeting, event history, team assignments, and turn history
+- Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
 - Use SQLite schema versioning and additive migrations to keep local save files upgradeable
 - Keep the entire project offline and self-contained
 
@@ -130,6 +141,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Deterministic `compare-balance` scenario rankings for side-by-side tuning across multiple openings
 - Deterministic `balance-matrix` runs to compare the same scenarios across every difficulty profile
 - Deterministic `balance-audit` runs to flag rough scenario/difficulty combinations for tuning
+- Deterministic `export-balance-csv` output for external review of scenario and difficulty balance
 - Report now includes recent events, funding history, and milestone history
 - Add `list-rivals`, `list-events`, `doctor`, and `check-saves` so content, install state, and local persistence health can be reviewed without entering a run
 - Seeded demo support for reproducible simulations
@@ -238,6 +250,12 @@ Run a quick balance audit:
 uv run nexus-tech balance-audit --scenario founder_journey --scenario technical_rebuild --runs 2 --turns 10 --seed-base 100
 ```
 
+Export a balance matrix to CSV:
+
+```bash
+uv run nexus-tech export-balance-csv --output balance.csv --scenario founder_journey --runs 2 --turns 10 --seed-base 100
+```
+
 Load a saved game:
 
 ```bash
@@ -325,6 +343,7 @@ Typical decisions include:
 - which roadmap focus should shape the next few turns
 - how the current market cycle changes the right move
 - whether competitor pressure means you should defend, reposition, or consolidate
+- whether key accounts need product stability before the next renewal cycle
 - when debt is useful fuel versus when it starts to distort the company
 - whether dilution and investor pressure are worth the extra runway
 - when to hire, assign, rest, or remove team members
@@ -363,22 +382,28 @@ uv run ruff format src tests
 
 ## 🗂️ Project Structure
 
-- `src/nexus_tech/domain`  
+- `docs/ARCHITECTURE.md`
+  Short architecture overview and system boundaries.
+
+- `docs/BALANCING.md`
+  Balance workflow, tuning commands, and safe content expansion notes.
+
+- `src/nexus_tech/domain`
   Core validated entities, money helpers, and shared constants.
 
-- `src/nexus_tech/simulation`  
+- `src/nexus_tech/simulation`
   Economy, product progression, growth, team systems, turn resolution, scenario bootstrap, and event logic.
 
-- `src/nexus_tech/content`  
+- `src/nexus_tech/content`
   JSON-backed scenario definitions and product templates.
 
-- `src/nexus_tech/persistence`  
+- `src/nexus_tech/persistence`
   SQLite schema, repositories, and save/load coordination.
 
-- `src/nexus_tech/presentation`  
+- `src/nexus_tech/presentation`
   Rich-based terminal UI rendering.
 
-- `src/nexus_tech/cli.py`  
+- `src/nexus_tech/cli.py`
   Typer commands and interactive terminal session flow.
 
 ## 📌 Project Notes
@@ -387,7 +412,7 @@ uv run ruff format src tests
 - Save data is stored in `nexus-tech.db` by default
 - `--seed` is useful for repeatable demos and deterministic test scenarios
 - `--scenario` selects a starting setup, while `list-scenarios` shows the current catalog
-- Market cycles, quarter plans, competitor rosters, debt, dilution, and funding history are part of the persisted run state
+- Market cycles, quarter plans, competitor rosters, key accounts, debt, dilution, board confidence, and funding history are part of the persisted run state
 - The focus is on correctness, stability, maintainability, and presentation quality
 
 ## 📄 License

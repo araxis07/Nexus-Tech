@@ -584,6 +584,7 @@ def _apply_board_scrutiny(state: GameState, event: PendingEvent, option_id: str)
             0,
             100,
         )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence + 4, 0, 100)
         for employee in state.employees:
             employee.morale = clamp_int(
                 employee.morale - BALANCE.event_board_scrutiny_plan_morale_loss,
@@ -605,6 +606,7 @@ def _apply_board_scrutiny(state: GameState, event: PendingEvent, option_id: str)
             0,
             100,
         )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence - 3, 0, 100)
         for employee in state.employees:
             employee.morale = clamp_int(
                 employee.morale - BALANCE.event_board_scrutiny_growth_morale_loss,
@@ -819,6 +821,7 @@ def _apply_loan_covenant(state: GameState, event: PendingEvent, option_id: str) 
             0,
             100,
         )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence + 2, 0, 100)
         return (
             f"You paid down the covenant pressure. Cash -{payment}, debt -{payment}, "
             f"investor pressure -{BALANCE.event_loan_covenant_paydown_pressure_relief}."
@@ -838,6 +841,7 @@ def _apply_loan_covenant(state: GameState, event: PendingEvent, option_id: str) 
             0,
             100,
         )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence - 2, 0, 100)
         return (
             "You renegotiated the loan. Cash "
             f"+{BALANCE.event_loan_covenant_renegotiate_cash_gain}, interest rate "
@@ -866,6 +870,7 @@ def _apply_down_round_pressure(state: GameState, event: PendingEvent, option_id:
             0,
             100,
         )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence - 4, 0, 100)
         return (
             "You accepted the bridge round. Cash "
             f"+{BALANCE.event_down_round_bridge_cash_gain}, dilution "
@@ -880,6 +885,7 @@ def _apply_down_round_pressure(state: GameState, event: PendingEvent, option_id:
             100,
         )
         state.finance.investor_pressure = clamp_int(state.finance.investor_pressure - 1, 0, 100)
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence + 2, 0, 100)
         for employee in state.employees:
             employee.morale = clamp_int(
                 employee.morale + BALANCE.event_down_round_independent_morale_gain,

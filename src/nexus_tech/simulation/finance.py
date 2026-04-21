@@ -274,6 +274,13 @@ def apply_end_of_turn_finance_drift(
         investor_pressure_delta -= BALANCE.finance_pressure_relief_on_stability
 
     finance.investor_pressure = clamp_int(finance.investor_pressure + investor_pressure_delta)
+    board_delta = (
+        BALANCE.board_confidence_positive_cashflow_gain
+        if net_cash_flow >= ZERO_MONEY
+        else -BALANCE.board_confidence_negative_cashflow_loss
+    )
+    board_delta -= finance.investor_pressure // BALANCE.board_confidence_pressure_divisor
+    finance.board_confidence = clamp_int(finance.board_confidence + board_delta)
 
     return FinanceTurnSummary(
         interest_cost=interest_cost,

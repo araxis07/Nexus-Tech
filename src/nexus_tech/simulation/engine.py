@@ -37,6 +37,7 @@ from nexus_tech.simulation.campaign import (
     evaluate_campaign_goal,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
+from nexus_tech.simulation.customers import CustomerTurnSummary, apply_end_of_turn_customers
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.economy import (
     calculate_product_operating_cost,
@@ -47,6 +48,7 @@ from nexus_tech.simulation.economy import (
     calculate_total_salary_cost,
     is_game_over,
 )
+from nexus_tech.simulation.endgame import apply_exit_outcome
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.finance import (
     FinanceTurnSummary,
@@ -173,6 +175,7 @@ class TurnResolution:
     total_finance_cost: Decimal
     total_operating_cost: Decimal
     net_cash_flow: Decimal
+    customer_summary: CustomerTurnSummary
     reputation_delta: int
     product_summaries: list[ProductTurnSummary]
     team_condition: TeamCondition
@@ -236,6 +239,7 @@ def apply_action(
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
         TurnAction.REVIEW_FINANCE,
+        TurnAction.REVIEW_CUSTOMERS,
         TurnAction.VIEW_REPORT,
     ):
         return ActionOutcome(
@@ -247,6 +251,7 @@ def apply_action(
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
         TurnAction.REVIEW_FINANCE,
+        TurnAction.REVIEW_CUSTOMERS,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
     ):
@@ -256,6 +261,8 @@ def apply_action(
             return ActionOutcome(state=state, message="Team review refreshed.")
         if action is TurnAction.REVIEW_FINANCE:
             return ActionOutcome(state=state, message="Finance review refreshed.")
+        if action is TurnAction.REVIEW_CUSTOMERS:
+            return ActionOutcome(state=state, message="Customer account review refreshed.")
         if action is TurnAction.VIEW_REPORT:
             return ActionOutcome(state=state, message="Run report refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
@@ -682,6 +689,12 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         roadmap_set_turn=next_state.roadmap_set_turn,
     )
     next_state.company.reputation = clamp_int(next_state.company.reputation + reputation_delta)
+    customer_summary = apply_end_of_turn_customers(
+        next_state.customer_accounts,
+        next_state.products,
+        current_turn=resolved_turn,
+    )
+    total_revenue = quantize_money(total_revenue + customer_summary.account_revenue)
 
     operations_summary = apply_end_of_turn_operations(
         next_state,
@@ -778,6 +791,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     campaign_goal_progress = evaluate_campaign_goal(next_state)
     next_state.victory_achieved = victory_reason is not None
     next_state.victory_reason = victory_reason
+    if next_state.victory_achieved:
+        apply_exit_outcome(next_state)
     next_state.company.game_over = is_game_over(next_state.company)
     if not next_state.company.game_over and not next_state.victory_achieved:
         next_state.company.current_turn += 1
@@ -816,6 +831,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         total_finance_cost=total_finance_cost,
         total_operating_cost=total_operating_cost,
         net_cash_flow=net_cash_flow,
+        customer_summary=customer_summary,
         reputation_delta=reputation_delta,
         product_summaries=product_summaries,
         team_condition=team_condition,

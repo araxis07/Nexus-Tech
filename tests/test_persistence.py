@@ -12,12 +12,15 @@ from nexus_tech.domain.models import (
     Company,
     CompanyStrategy,
     Competitor,
+    CustomerAccount,
+    CustomerAccountStatus,
     DifficultyMode,
     Employee,
     EmployeeRole,
     EventCategory,
     EventHistoryEntry,
     EventOption,
+    ExitOutcome,
     FinanceState,
     FundingHistoryEntry,
     FundingType,
@@ -134,12 +137,25 @@ def make_state() -> GameState:
         aggression=61,
         pricing_tier=PricingTier.PREMIUM,
         active_product_count=2,
+        funding_level=2,
+    )
+    customer_account = CustomerAccount(
+        name="Enterprise Anchor: Nexus One",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("850.00"),
+        satisfaction=72,
+        expansion_potential=66,
+        renewal_turn=6,
+        churn_risk=18,
+        status=CustomerAccountStatus.ACTIVE,
     )
     finance = FinanceState(
         debt_principal=Decimal("3200.00"),
         loan_interest_rate=Decimal("0.0350"),
         equity_dilution=Decimal("0.0800"),
         investor_pressure=9,
+        board_confidence=64,
         total_raised=Decimal("7400.00"),
         last_funding_turn=3,
     )
@@ -182,6 +198,7 @@ def make_state() -> GameState:
         employees=[employee],
         finance=finance,
         competitors=[competitor],
+        customer_accounts=[customer_account],
         quarter_plan=quarter_plan,
         difficulty_mode=DifficultyMode.FOUNDER,
         campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
@@ -194,6 +211,10 @@ def make_state() -> GameState:
         market_cycle=MarketCycle.EXPANDING,
         market_cycle_turns_remaining=2,
         turn_history=turn_history,
+        victory_achieved=True,
+        victory_reason="You built a durable software company.",
+        exit_outcome=ExitOutcome.STRATEGIC_ACQUISITION,
+        exit_summary="Strategic Acquisition: A larger platform wants the customer base.",
         scenario_id="vc_sprint",
         scenario_title="VC Sprint",
         action_points_remaining=1,
@@ -227,6 +248,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "event_history",
         "milestone_history",
         "turn_history",
+        "customer_accounts",
     }.issubset(table_names)
 
     with sqlite3.connect(db_path) as connection:
@@ -238,6 +260,9 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         }
         competitor_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(competitors)").fetchall()
+        }
+        finance_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(finance_state)").fetchall()
         }
         user_version = connection.execute("PRAGMA user_version").fetchone()[0]
 
@@ -252,12 +277,17 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "market_cycle_turns_remaining",
         "victory_achieved",
         "victory_reason",
+        "exit_outcome",
+        "exit_summary",
         "saved_with_version",
         "schema_version",
     }.issubset(save_slot_columns)
     assert {"target_segment"}.issubset(product_columns)
-    assert {"archetype_id", "current_move", "momentum"}.issubset(competitor_columns)
-    assert user_version >= 9
+    assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
+        competitor_columns
+    )
+    assert {"board_confidence"}.issubset(finance_columns)
+    assert user_version >= 10
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -295,7 +325,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 9
+    assert summaries[0].schema_version >= 10
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -308,7 +338,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 9
+    assert report.schema_version >= 10
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

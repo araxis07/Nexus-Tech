@@ -401,6 +401,29 @@ def run_balance_audit(
     )
 
 
+def format_balance_matrix_csv(matrix: BalanceMatrixResult) -> str:
+    """Serialize a balance matrix to CSV for external tuning review."""
+
+    lines = [
+        "scenario_id,difficulty,average_score,average_cash,average_users,victories,shutdowns"
+    ]
+    for cell in matrix.cells:
+        lines.append(
+            ",".join(
+                [
+                    cell.scenario_id,
+                    cell.difficulty_mode.value,
+                    f"{cell.average_score:.1f}",
+                    str(cell.average_cash),
+                    f"{cell.average_users:.1f}",
+                    str(cell.victories),
+                    str(cell.shutdowns),
+                ]
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
 @dataclass(frozen=True)
 class PlannedAction:
     action: TurnAction

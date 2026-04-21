@@ -16,6 +16,7 @@ from nexus_tech.domain.models import (
     EventCategory,
     EventHistoryEntry,
     EventOption,
+    ExitOutcome,
     FinanceState,
     GameState,
     MarketCycle,
@@ -27,6 +28,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.persistence.company_repository import CompanyRepository
 from nexus_tech.persistence.competitor_repository import CompetitorRepository
+from nexus_tech.persistence.customer_repository import CustomerAccountRepository
 from nexus_tech.persistence.database import DatabaseManager
 from nexus_tech.persistence.employee_repository import EmployeeRepository
 from nexus_tech.persistence.errors import CorruptSaveError, PersistenceError, SaveNotFoundError
@@ -93,6 +95,7 @@ class SaveLoadCoordinator:
         self.product_repository = ProductRepository()
         self.employee_repository = EmployeeRepository()
         self.competitor_repository = CompetitorRepository()
+        self.customer_repository = CustomerAccountRepository()
         self.finance_repository = FinanceRepository()
         self.quarter_plan_repository = QuarterPlanRepository()
 
@@ -124,6 +127,8 @@ class SaveLoadCoordinator:
                     market_cycle_turns_remaining=state.market_cycle_turns_remaining,
                     victory_achieved=state.victory_achieved,
                     victory_reason=state.victory_reason,
+                    exit_outcome=state.exit_outcome,
+                    exit_summary=state.exit_summary,
                     saved_with_version=__version__,
                     schema_version=CURRENT_SCHEMA_VERSION,
                     timestamp=timestamp,
@@ -132,6 +137,11 @@ class SaveLoadCoordinator:
                 self.product_repository.save_all(connection, slot_name, state.products)
                 self.employee_repository.save_all(connection, slot_name, state.employees)
                 self.competitor_repository.save_all(connection, slot_name, state.competitors)
+                self.customer_repository.save_all(
+                    connection,
+                    slot_name,
+                    state.customer_accounts,
+                )
                 self.finance_repository.save(connection, slot_name, state.finance)
                 self.finance_repository.save_history(connection, slot_name, state.funding_history)
                 self.quarter_plan_repository.save(connection, slot_name, state.quarter_plan)
@@ -166,7 +176,9 @@ class SaveLoadCoordinator:
                         market_cycle,
                         market_cycle_turns_remaining,
                         victory_achieved,
-                        victory_reason
+                        victory_reason,
+                        exit_outcome,
+                        exit_summary
                     FROM save_slots
                     WHERE slot_name = ?
                     """,
@@ -186,6 +198,7 @@ class SaveLoadCoordinator:
 
                     employees = self.employee_repository.load_all(connection, slot_name)
                     competitors = self.competitor_repository.load_all(connection, slot_name)
+                    customer_accounts = self.customer_repository.load_all(connection, slot_name)
                     finance = self.finance_repository.load(connection, slot_name) or FinanceState()
                     funding_history = self.finance_repository.load_history(connection, slot_name)
                     quarter_plan = self.quarter_plan_repository.load(connection, slot_name)
@@ -213,6 +226,7 @@ class SaveLoadCoordinator:
                         employees=employees,
                         finance=finance,
                         competitors=competitors,
+                        customer_accounts=customer_accounts,
                         quarter_plan=quarter_plan,
                         pending_event=pending_event,
                         event_history=event_history,
@@ -225,6 +239,12 @@ class SaveLoadCoordinator:
                         turn_history=turn_history,
                         victory_achieved=bool(slot_row["victory_achieved"]),
                         victory_reason=slot_row["victory_reason"],
+                        exit_outcome=(
+                            ExitOutcome(slot_row["exit_outcome"])
+                            if slot_row["exit_outcome"]
+                            else None
+                        ),
+                        exit_summary=slot_row["exit_summary"],
                         scenario_id=slot_row["scenario_id"],
                         scenario_title=slot_row["scenario_title"],
                         difficulty_mode=DifficultyMode(slot_row["difficulty_mode"]),
@@ -426,6 +446,8 @@ class SaveLoadCoordinator:
         market_cycle_turns_remaining: int,
         victory_achieved: bool,
         victory_reason: str | None,
+        exit_outcome: ExitOutcome | None,
+        exit_summary: str | None,
         saved_with_version: str,
         schema_version: int,
         timestamp: str,
@@ -452,12 +474,14 @@ class SaveLoadCoordinator:
                     market_cycle_turns_remaining,
                     victory_achieved,
                     victory_reason,
+                    exit_outcome,
+                    exit_summary,
                     saved_with_version,
                     schema_version,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
@@ -474,6 +498,8 @@ class SaveLoadCoordinator:
                     market_cycle_turns_remaining,
                     int(victory_achieved),
                     victory_reason,
+                    exit_outcome.value if exit_outcome is not None else None,
+                    exit_summary,
                     saved_with_version,
                     schema_version,
                     timestamp,
@@ -498,6 +524,8 @@ class SaveLoadCoordinator:
                 market_cycle_turns_remaining = ?,
                 victory_achieved = ?,
                 victory_reason = ?,
+                exit_outcome = ?,
+                exit_summary = ?,
                 saved_with_version = ?,
                 schema_version = ?,
                 updated_at = ?
@@ -517,6 +545,8 @@ class SaveLoadCoordinator:
                 market_cycle_turns_remaining,
                 int(victory_achieved),
                 victory_reason,
+                exit_outcome.value if exit_outcome is not None else None,
+                exit_summary,
                 saved_with_version,
                 schema_version,
                 timestamp,

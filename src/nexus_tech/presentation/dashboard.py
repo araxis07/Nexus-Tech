@@ -34,6 +34,8 @@ from nexus_tech.simulation.balance_lab import (
     BalanceMatrixResult,
 )
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
+from nexus_tech.simulation.customers import calculate_account_revenue
+from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import estimate_runway
@@ -561,6 +563,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
             [
                 _build_dashboard_team_panel(state),
                 _build_market_watch_panel(state),
+                _build_customer_accounts_panel(state),
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
                 _build_finance_panel(state),
@@ -599,6 +602,12 @@ def render_team_view(console: Console, state: GameState) -> None:
     )
 
 
+def render_customer_view(console: Console, state: GameState) -> None:
+    """Render the dedicated key-account review panel."""
+
+    console.print(_build_customer_accounts_panel(state, compact=False))
+
+
 def render_report(console: Console, state: GameState) -> None:
     """Render a compact run report with score and turn history."""
 
@@ -633,6 +642,7 @@ def render_report(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_finance_panel(state),
+                _build_customer_accounts_panel(state),
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
                 Panel(
@@ -678,6 +688,19 @@ def render_turn_resolution(console: Console, resolution: TurnResolution) -> None
         console.print(_build_pending_event_panel(resolution.pending_event))
     if resolution.unlocked_milestones:
         console.print(_build_milestone_panel(resolution.unlocked_milestones))
+    if (
+        resolution.customer_summary.created_accounts
+        or resolution.customer_summary.renewed_accounts
+        or resolution.customer_summary.churned_accounts
+        or resolution.customer_summary.at_risk_accounts
+    ):
+        console.print(
+            Panel(
+                resolution.customer_summary.summary,
+                title="Customer Accounts",
+                border_style="green",
+            )
+        )
     console.print(Panel(resolution.narrative, title="Outlook", border_style="green"))
 
 
@@ -688,8 +711,15 @@ def render_victory(console: Console, state: GameState) -> None:
     content = Table.grid(padding=(0, 1))
     content.add_row("Outcome", state.victory_reason or "The company reached durable scale.")
     content.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
+    content.add_row("Grade", run_score.campaign_grade)
     content.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    if state.exit_outcome is not None:
+        exit_evaluation = evaluate_exit_outcome(state, run_score)
+        content.add_row("Exit Path", exit_evaluation.title)
+        content.add_row("Exit Value", format_money(exit_evaluation.offer_value))
+        content.add_row("Exit Summary", state.exit_summary or exit_evaluation.summary)
     content.add_row("Portfolio Users", str(run_score.total_users))
+    content.add_row("Key Accounts", str(run_score.key_accounts))
     content.add_row("Active Products", str(run_score.active_products))
     content.add_row("Mature Products", str(run_score.mature_products))
     content.add_row("Headcount", str(len(state.employees)))
@@ -1120,18 +1150,19 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("20", "unassign_employee", "Pull someone off product work.")
     primary_actions.add_row("21", "rest_team", "Recover energy and morale.")
     primary_actions.add_row("22", "review_team", "Open the detailed team view.")
-    primary_actions.add_row("23", "view_report", "Open the score, plan, and rival report.")
-    primary_actions.add_row("24", "wait", "Hold position for this action.")
-    primary_actions.add_row("25", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("26", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("23", "review_customers", "Open key account renewals.")
+    primary_actions.add_row("24", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("25", "wait", "Hold position for this action.")
+    primary_actions.add_row("26", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("27", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("27", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("28", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("29", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("28", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("29", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("30", "show_guide", "Show a compact how-to-play guide.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -1412,6 +1443,7 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
     table.add_row("Budget", state.quarter_plan.budget_stance.value)
     table.add_row("Market", state.market_cycle.value)
     table.add_row("Run Score", f"{total_score} ({score_tier})")
+    table.add_row("Grade", calculate_run_score(state).campaign_grade)
     table.add_row("Goal State", "complete" if goal_progress.completed else "in progress")
     return Panel(table, title="Run Overview", border_style="magenta", expand=True)
 
@@ -1423,9 +1455,11 @@ def _build_report_score_panel(state: GameState) -> Panel:
     )
     table = Table.grid(padding=(0, 1))
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    table.add_row("Grade", run_score.campaign_grade)
     table.add_row("Active Products", str(run_score.active_products))
     table.add_row("Mature Products", str(run_score.mature_products))
     table.add_row("Portfolio Users", str(run_score.total_users))
+    table.add_row("Key Accounts", str(run_score.key_accounts))
     table.add_row("Headcount", str(len(state.employees)))
     table.add_row("Milestones", str(len(state.milestone_history)))
     table.add_row("Segments", ", ".join(active_segments) if active_segments else "-")
@@ -1490,6 +1524,53 @@ def _build_operations_panel(state: GameState) -> Panel:
     return Panel(table, title="Operations", border_style="yellow", expand=True)
 
 
+def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) -> Panel:
+    active_accounts = [
+        account for account in state.customer_accounts if account.status.value != "churned"
+    ]
+    if not active_accounts:
+        return Panel(
+            "No key accounts yet. Grow product usage and market fit to create renewal pressure.",
+            title="Key Accounts",
+            border_style="green",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Account", style="bold")
+    table.add_column("Segment")
+    table.add_column("Status")
+    table.add_column("Value", justify="right")
+    table.add_column("Sat", justify="right")
+    table.add_column("Risk", justify="right")
+    if not compact:
+        table.add_column("Renewal", justify="right")
+        table.add_column("Expansion", justify="right")
+
+    for account in active_accounts:
+        row = [
+            account.name,
+            account.segment.value,
+            account.status.value,
+            format_money(account.contract_value),
+            str(account.satisfaction),
+            str(account.churn_risk),
+        ]
+        if not compact:
+            row.extend([str(account.renewal_turn), str(account.expansion_potential)])
+        table.add_row(*row)
+
+    content = Group(
+        table,
+        "",
+        (
+            "[dim]Recurring account revenue: "
+            f"{format_money(calculate_account_revenue(state.customer_accounts))}[/dim]"
+        ),
+    )
+    return Panel(content, title="Key Accounts", border_style="green", expand=True)
+
+
 def _build_late_game_panel(state: GameState) -> Panel:
     late_game = calculate_late_game_summary(
         state.products,
@@ -1523,6 +1604,7 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Debt", format_money(state.finance.debt_principal))
     table.add_row("Dilution", format_rate(state.finance.equity_dilution))
     table.add_row("Investor Pressure", str(state.finance.investor_pressure))
+    table.add_row("Board Confidence", str(state.finance.board_confidence))
     table.add_row("Capital Raised", format_money(state.finance.total_raised))
     table.add_row("Funding Entries", str(len(state.funding_history)))
     table.add_row("Turn Interest", format_money(turn_interest))
@@ -1540,6 +1622,7 @@ def _build_competitor_table(state: GameState) -> Table:
     table.add_column("Agg", justify="right")
     table.add_column("Move")
     table.add_column("Mom", justify="right")
+    table.add_column("Funding", justify="right")
     table.add_column("Products", justify="right")
     table.add_column("Price")
 
@@ -1553,6 +1636,7 @@ def _build_competitor_table(state: GameState) -> Table:
             str(competitor.aggression),
             competitor.current_move.value,
             str(competitor.momentum),
+            str(competitor.funding_level),
             str(competitor.active_product_count),
             competitor.pricing_tier.value,
         )

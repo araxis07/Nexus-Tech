@@ -34,9 +34,10 @@ class CompetitorRepository:
                 pricing_tier,
                 active_product_count,
                 current_move,
-                momentum
+                momentum,
+                funding_level
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -52,6 +53,7 @@ class CompetitorRepository:
                     competitor.active_product_count,
                     competitor.current_move.value,
                     competitor.momentum,
+                    competitor.funding_level,
                 )
                 for index, competitor in enumerate(competitors)
             ],
@@ -72,7 +74,8 @@ class CompetitorRepository:
                 pricing_tier,
                 active_product_count,
                 current_move,
-                momentum
+                momentum,
+                funding_level
             FROM competitors
             WHERE slot_name = ?
             ORDER BY display_order ASC
@@ -91,6 +94,7 @@ class CompetitorRepository:
                 active_product_count=row["active_product_count"],
                 current_move=CompetitorMove(row["current_move"] or CompetitorMove.HOLD.value),
                 momentum=row["momentum"] if row["momentum"] is not None else 50,
+                funding_level=row["funding_level"] if row["funding_level"] is not None else 0,
             )
             for row in rows
         ]

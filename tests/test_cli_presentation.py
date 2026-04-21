@@ -18,11 +18,14 @@ from nexus_tech.domain.models import (
     Company,
     CompanyStrategy,
     Competitor,
+    CustomerAccount,
+    CustomerAccountStatus,
     DifficultyMode,
     Employee,
     EmployeeRole,
     EventCategory,
     EventOption,
+    ExitOutcome,
     GameState,
     LifecycleStage,
     MarketCycle,
@@ -142,6 +145,18 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         aggression=59,
         pricing_tier=PricingTier.STANDARD,
         active_product_count=2,
+        funding_level=1,
+    )
+    customer_account = CustomerAccount(
+        name="Startup Anchor: Nexus One",
+        product_id=primary_product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("620.00"),
+        satisfaction=71,
+        expansion_potential=59,
+        renewal_turn=5,
+        churn_risk=14,
+        status=CustomerAccountStatus.ACTIVE,
     )
     quarter_plan = QuarterPlan(
         budget_stance=BudgetStance.BALANCED,
@@ -162,6 +177,7 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         products=[primary_product, secondary_product],
         employees=[employee],
         competitors=[competitor],
+        customer_accounts=[customer_account],
         quarter_plan=quarter_plan,
         pending_event=pending_event,
         roadmap_focus=RoadmapFocus.GROWTH_PUSH,
@@ -190,6 +206,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "compare-balance",
         "balance-matrix",
         "balance-audit",
+        "export-balance-csv",
         "list-saves",
         "check-saves",
         "doctor",
@@ -548,11 +565,44 @@ def test_balance_audit_command_renders_findings(monkeypatch: MonkeyPatch) -> Non
     assert "low" in result.output
 
 
+def test_export_balance_csv_command_writes_matrix_file(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    matrix = BalanceMatrixResult(
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=6,
+        seed_base=50,
+        cells=(
+            BalanceMatrixCell(
+                scenario_id="founder",
+                difficulty_mode=DifficultyMode.STANDARD,
+                average_score=130.0,
+                average_cash=Decimal("9000.00"),
+                average_users=90.0,
+                victories=0,
+                shutdowns=0,
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_balance_matrix", lambda **_: matrix)
+    output_path = tmp_path / "balance.csv"
+
+    result = runner.invoke(app, ["export-balance-csv", "--output", str(output_path)])
+
+    assert result.exit_code == 0
+    assert "Balance Export" in result.output
+    assert output_path.read_text(encoding="utf-8").startswith(
+        "scenario_id,difficulty,average_score"
+    )
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.8.0" in result.output
+    assert "NEXUS TECH 0.9.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -574,7 +624,7 @@ def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: 
                 integrity_ok=True,
                 foreign_key_ok=True,
                 slot_count=2,
-                schema_version=9,
+                schema_version=10,
                 message="SQLite integrity and foreign keys are healthy.",
             )
 
@@ -587,7 +637,7 @@ def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: 
     assert "Save Health" in result.output
     assert "Integrity: ok" in result.output
     assert "Foreign Keys: ok" in result.output
-    assert "Schema Version: 9" in result.output
+    assert "Schema Version: 10" in result.output
 
 
 def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
@@ -598,7 +648,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.8.0" in result.output
+    assert "0.9.0" in result.output
     assert "No save database found yet." in result.output
 
 
@@ -617,8 +667,8 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             updated_at="2026-04-13T01:00:00+00:00",
             victory_achieved=False,
             game_over=False,
-            saved_with_version="0.8.0",
-            schema_version=9,
+            saved_with_version="0.9.0",
+            schema_version=10,
         )
     ]
 
@@ -793,6 +843,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Market Watch" in output
     assert "Late-Game" in output
     assert "Finance" in output
+    assert "Key Accounts" in output
     assert "Strategy" in output
     assert "Price" in output
     assert "Roadmap" in output
@@ -829,6 +880,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Finance" in output
     assert "Competitor Watch" in output
     assert "Estimated Value" in output
+    assert "Key Accounts" in output
 
 
 def test_template_catalog_rendering_contains_catalog_title() -> None:
@@ -868,6 +920,8 @@ def test_victory_rendering_contains_summary_metrics() -> None:
     state = make_demo_state()
     state.victory_achieved = True
     state.victory_reason = "You built a durable software company."
+    state.exit_outcome = ExitOutcome.STRATEGIC_ACQUISITION
+    state.exit_summary = "Strategic Acquisition: A platform wants your customer base."
     console = Console(record=True, width=140)
 
     render_victory(console, state)
@@ -876,3 +930,4 @@ def test_victory_rendering_contains_summary_metrics() -> None:
     assert "Victory" in output
     assert "Run Score" in output
     assert "Estimated Value" in output
+    assert "Exit Path" in output

@@ -23,10 +23,11 @@ class FinanceRepository:
                 loan_interest_rate,
                 equity_dilution,
                 investor_pressure,
+                board_confidence,
                 total_raised,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -34,6 +35,7 @@ class FinanceRepository:
                 str(finance.loan_interest_rate),
                 str(finance.equity_dilution),
                 finance.investor_pressure,
+                finance.board_confidence,
                 str(finance.total_raised),
                 finance.last_funding_turn,
             ),
@@ -49,6 +51,7 @@ class FinanceRepository:
                 loan_interest_rate,
                 equity_dilution,
                 investor_pressure,
+                board_confidence,
                 total_raised,
                 last_funding_turn
             FROM finance_state
@@ -64,6 +67,9 @@ class FinanceRepository:
             loan_interest_rate=Decimal(row["loan_interest_rate"]),
             equity_dilution=Decimal(row["equity_dilution"]),
             investor_pressure=row["investor_pressure"],
+            board_confidence=(
+                row["board_confidence"] if row["board_confidence"] is not None else 55
+            ),
             total_raised=Decimal(row["total_raised"]),
             last_funding_turn=row["last_funding_turn"],
         )

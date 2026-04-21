@@ -48,6 +48,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_matrix,
     render_campaign_goal_catalog,
     render_competitor_archetype_catalog,
+    render_customer_view,
     render_dashboard,
     render_employee_picker,
     render_event_catalog,
@@ -68,6 +69,7 @@ from nexus_tech.presentation.dashboard import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    format_balance_matrix_csv,
     run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
@@ -154,6 +156,7 @@ BALANCE_GOAL_OPTION = typer.Option(
     "--goal",
     help="Campaign goal used during the balance run batch.",
 )
+CSV_OUTPUT_OPTION = typer.Option(..., "--output", help="CSV path to write.")
 
 ACTION_KEYS = {
     "1": TurnAction.CREATE_PRODUCT,
@@ -178,15 +181,16 @@ ACTION_KEYS = {
     "20": TurnAction.UNASSIGN_EMPLOYEE,
     "21": TurnAction.REST_TEAM,
     "22": TurnAction.REVIEW_TEAM,
-    "23": TurnAction.VIEW_REPORT,
-    "24": TurnAction.WAIT,
-    "25": TurnAction.VIEW_STATUS,
-    "26": TurnAction.END_TURN,
+    "23": TurnAction.REVIEW_CUSTOMERS,
+    "24": TurnAction.VIEW_REPORT,
+    "25": TurnAction.WAIT,
+    "26": TurnAction.VIEW_STATUS,
+    "27": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "27": "save_game",
-    "28": "load_game",
-    "29": "show_guide",
+    "28": "save_game",
+    "29": "load_game",
+    "30": "show_guide",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -466,6 +470,39 @@ def balance_audit_command(
         seed_base=seed_base,
     )
     render_balance_audit(console, audit)
+
+
+@app.command("export-balance-csv")
+def export_balance_csv_command(
+    output: Path = CSV_OUTPUT_OPTION,
+    scenario: Optional[list[str]] = COMPARE_SCENARIOS_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(2, "--runs", min=1, help="Number of deterministic runs."),
+    turns: int = typer.Option(10, "--turns", min=1, help="Maximum turns per run."),
+    seed_base: int = typer.Option(
+        100,
+        "--seed-base",
+        help="Base seed. Each matrix cell gets a deterministic seed range from this value.",
+    ),
+) -> None:
+    """Export a scenario-versus-difficulty balance matrix to CSV."""
+
+    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    matrix = run_balance_matrix(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    output.write_text(format_balance_matrix_csv(matrix), encoding="utf-8")
+    console.print(
+        Panel.fit(
+            f"Wrote balance CSV to {output}",
+            title="Balance Export",
+            border_style="green",
+        )
+    )
 
 
 @app.command("guide")
@@ -775,6 +812,10 @@ def run_game_loop(
                     render_report(console, state)
                     continue
 
+                if action is TurnAction.REVIEW_CUSTOMERS:
+                    render_customer_view(console, state)
+                    continue
+
                 if action is TurnAction.VIEW_REPORT:
                     render_report(console, state)
                     continue
@@ -810,6 +851,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.VIEW_STATUS,
         TurnAction.REVIEW_TEAM,
         TurnAction.REVIEW_FINANCE,
+        TurnAction.REVIEW_CUSTOMERS,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,
