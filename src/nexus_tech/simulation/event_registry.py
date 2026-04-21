@@ -185,6 +185,46 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             is_eligible=_is_security_audit_eligible,
             build_pending_event=_build_security_audit_event,
         ),
+        EventDefinition(
+            event_id="enterprise_sales_cycle",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_enterprise_sales_cycle_weight,
+            cooldown_turns=BALANCE.event_enterprise_sales_cycle_cooldown,
+            is_eligible=_is_enterprise_sales_cycle_eligible,
+            build_pending_event=_build_enterprise_sales_cycle_event,
+        ),
+        EventDefinition(
+            event_id="product_launch_window",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_product_launch_window_weight,
+            cooldown_turns=BALANCE.event_product_launch_window_cooldown,
+            is_eligible=_is_product_launch_window_eligible,
+            build_pending_event=_build_product_launch_window_event,
+        ),
+        EventDefinition(
+            event_id="platform_outage",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_platform_outage_weight,
+            cooldown_turns=BALANCE.event_platform_outage_cooldown,
+            is_eligible=_is_platform_outage_eligible,
+            build_pending_event=_build_platform_outage_event,
+        ),
+        EventDefinition(
+            event_id="competitor_acquisition",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_competitor_acquisition_weight,
+            cooldown_turns=BALANCE.event_competitor_acquisition_cooldown,
+            is_eligible=_is_competitor_acquisition_eligible,
+            build_pending_event=_build_competitor_acquisition_event,
+        ),
+        EventDefinition(
+            event_id="regulatory_shift",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_regulatory_shift_weight,
+            cooldown_turns=BALANCE.event_regulatory_shift_cooldown,
+            is_eligible=_is_regulatory_shift_eligible,
+            build_pending_event=_build_regulatory_shift_event,
+        ),
     )
 
 
@@ -788,16 +828,14 @@ def _build_partner_offer_event(
                 id="sign_partner",
                 label="Sign the partner deal",
                 description=(
-                    "Take cash, users, and acquisition lift at the cost "
-                    "of more operating noise."
+                    "Take cash, users, and acquisition lift at the cost of more operating noise."
                 ),
             ),
             EventOption(
                 id="stay_direct",
                 label="Stay direct and focused",
                 description=(
-                    "Skip the channel bump and invest the attention back into "
-                    "product depth."
+                    "Skip the channel bump and invest the attention back into product depth."
                 ),
             ),
         ],
@@ -889,8 +927,7 @@ def _build_platform_breakthrough_event(
                 id="productize_breakthrough",
                 label="Productize the breakthrough",
                 description=(
-                    "Spend cash now to turn the internal gain "
-                    "into product and growth leverage."
+                    "Spend cash now to turn the internal gain into product and growth leverage."
                 ),
             ),
             EventOption(
@@ -1097,6 +1134,268 @@ def _build_security_audit_event(
                 id="defer_audit",
                 label="Defer the audit",
                 description="Save cash now, but increase churn and renewal risk.",
+            ),
+        ],
+    )
+
+
+def _is_enterprise_sales_cycle_eligible(state: GameState) -> bool:
+    return state.company.current_turn >= BALANCE.event_enterprise_sales_turn_threshold and any(
+        product.is_active
+        and product.target_segment is MarketSegment.ENTERPRISE
+        and product.market_fit >= BALANCE.event_enterprise_sales_fit_threshold
+        and product.user_count >= BALANCE.event_enterprise_sales_user_threshold
+        for product in state.products
+    )
+
+
+def _build_enterprise_sales_cycle_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.target_segment is MarketSegment.ENTERPRISE
+            and product.market_fit >= BALANCE.event_enterprise_sales_fit_threshold
+            and product.user_count >= BALANCE.event_enterprise_sales_user_threshold
+        ],
+        rng,
+        score=lambda product: product.market_fit + product.quality + product.user_count,
+    )
+    return PendingEvent(
+        event_id="enterprise_sales_cycle",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Enterprise Sales Cycle",
+        description=(
+            f"A serious enterprise buyer wants a proof-of-concept for {target.name}. "
+            "You can fund the cycle or walk away to protect focus."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_poc",
+                label="Fund the proof-of-concept",
+                description="Spend cash and team energy for users, contract value, and fit.",
+            ),
+            EventOption(
+                id="walk_away",
+                label="Walk away",
+                description="Protect focus and board trust, but skip the growth moment.",
+            ),
+        ],
+    )
+
+
+def _is_product_launch_window_eligible(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.quality >= BALANCE.event_product_launch_quality_threshold
+        and product.market_fit >= BALANCE.event_product_launch_fit_threshold
+        and product.feature_count >= BALANCE.event_product_launch_feature_threshold
+        for product in state.products
+    )
+
+
+def _build_product_launch_window_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.quality >= BALANCE.event_product_launch_quality_threshold
+            and product.market_fit >= BALANCE.event_product_launch_fit_threshold
+            and product.feature_count >= BALANCE.event_product_launch_feature_threshold
+        ],
+        rng,
+        score=lambda product: product.quality + product.market_fit + product.feature_count,
+    )
+    return PendingEvent(
+        event_id="product_launch_window",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Product Launch Window",
+        description=(
+            f"{target.name} has enough readiness for a launch moment. "
+            "You can push a full campaign or soft-launch to protect quality."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="launch_campaign",
+                label="Launch hard",
+                description="Spend cash for demand, but accept a little operational noise.",
+            ),
+            EventOption(
+                id="soft_launch",
+                label="Soft-launch",
+                description="Take a smaller user bump while improving quality signal.",
+            ),
+        ],
+    )
+
+
+def _is_platform_outage_eligible(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and (
+            product.user_count >= BALANCE.event_platform_outage_user_threshold
+            or (
+                product.bug_level >= BALANCE.event_platform_outage_bug_threshold
+                and product.technical_debt >= BALANCE.event_platform_outage_debt_threshold
+            )
+        )
+        for product in state.products
+    )
+
+
+def _build_platform_outage_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and (
+                product.user_count >= BALANCE.event_platform_outage_user_threshold
+                or (
+                    product.bug_level >= BALANCE.event_platform_outage_bug_threshold
+                    and product.technical_debt >= BALANCE.event_platform_outage_debt_threshold
+                )
+            )
+        ],
+        rng,
+        score=lambda product: product.user_count + product.bug_level + product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="platform_outage",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Platform Outage",
+        description=(
+            f"{target.name} suffered reliability trouble. "
+            "You can run a costly response or minimize spend and absorb trust damage."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="all_hands_recovery",
+                label="All-hands recovery",
+                description="Spend cash and energy to reduce bugs and contain reputation loss.",
+            ),
+            EventOption(
+                id="minimize_cost",
+                label="Minimize cost",
+                description="Save cash now, but lose users and worsen trust.",
+            ),
+        ],
+    )
+
+
+def _is_competitor_acquisition_eligible(state: GameState) -> bool:
+    return (
+        state.company.current_turn >= BALANCE.event_competitor_acquisition_turn_threshold
+        and any(product.is_active for product in state.products)
+        and bool(state.competitors)
+        and any(
+            competitor.funding_level >= BALANCE.event_competitor_acquisition_funding_threshold
+            or competitor.momentum >= BALANCE.event_competitor_acquisition_momentum_threshold
+            for competitor in state.competitors
+        )
+    )
+
+
+def _build_competitor_acquisition_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    rival = max(
+        state.competitors,
+        key=lambda competitor: competitor.funding_level + competitor.momentum + competitor.strength,
+    )
+    return PendingEvent(
+        event_id="competitor_acquisition",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Competitor Acquisition",
+        description=(
+            f"{rival.name} was pulled into a larger platform. "
+            "The market is noisier, but their integration risk creates an opening."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        options=[
+            EventOption(
+                id="differentiate_against_stack",
+                label="Differentiate against the stack",
+                description="Spend cash to sharpen product positioning against the new bundle.",
+            ),
+            EventOption(
+                id="seek_distribution_partner",
+                label="Seek a distribution partner",
+                description="Gain users and reputation, but accept more rival capital pressure.",
+            ),
+        ],
+    )
+
+
+def _is_regulatory_shift_eligible(state: GameState) -> bool:
+    return state.company.current_turn >= BALANCE.event_regulatory_shift_turn_threshold and any(
+        product.is_active and product.target_segment is MarketSegment.ENTERPRISE
+        for product in state.products
+    )
+
+
+def _build_regulatory_shift_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active and product.target_segment is MarketSegment.ENTERPRISE
+        ],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="regulatory_shift",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Regulatory Shift",
+        description=(
+            f"New buyer requirements landed around {target.name}. "
+            "You can invest early controls or wait for clarity."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="proactive_controls",
+                label="Invest in controls",
+                description="Spend cash to improve trust, fit, and board confidence.",
+            ),
+            EventOption(
+                id="wait_for_clarity",
+                label="Wait for clarity",
+                description="Avoid immediate spend but increase churn and account risk.",
             ),
         ],
     )

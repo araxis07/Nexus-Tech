@@ -466,9 +466,7 @@ def _apply_referral_wave(state: GameState, event: PendingEvent, option_id: str) 
             0,
             100,
         )
-        product.churn_rate = clamp_rate(
-            product.churn_rate - BALANCE.event_referral_churn_relief
-        )
+        product.churn_rate = clamp_rate(product.churn_rate - BALANCE.event_referral_churn_relief)
         product.lifecycle_stage = infer_lifecycle_stage(product)
         return (
             f"You protected service quality for {product.name}. Users "
@@ -840,12 +838,10 @@ def _apply_loan_covenant(state: GameState, event: PendingEvent, option_id: str) 
             state.company.cash_on_hand + BALANCE.event_loan_covenant_renegotiate_cash_gain
         )
         state.finance.loan_interest_rate = clamp_rate(
-            state.finance.loan_interest_rate
-            + BALANCE.event_loan_covenant_renegotiate_interest_gain
+            state.finance.loan_interest_rate + BALANCE.event_loan_covenant_renegotiate_interest_gain
         )
         state.finance.investor_pressure = clamp_int(
-            state.finance.investor_pressure
-            + BALANCE.event_loan_covenant_renegotiate_pressure_gain,
+            state.finance.investor_pressure + BALANCE.event_loan_covenant_renegotiate_pressure_gain,
             0,
             100,
         )
@@ -1024,6 +1020,273 @@ def _apply_security_audit(state: GameState, event: PendingEvent, option_id: str)
     raise ValueError(f"Unsupported option {option_id} for security audit.")
 
 
+def _apply_enterprise_sales_cycle(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    affected_employees = _get_assigned_employees(state, product.id)
+
+    if option_id == "fund_poc":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_enterprise_poc_cost
+        )
+        product.user_count += BALANCE.event_enterprise_poc_user_gain
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_enterprise_poc_fit_gain,
+            0,
+            100,
+        )
+        product.revenue_per_user = quantize_money(
+            product.revenue_per_user + BALANCE.event_enterprise_poc_revenue_gain
+        )
+        for employee in affected_employees:
+            employee.energy = clamp_int(
+                employee.energy - BALANCE.event_enterprise_poc_energy_loss,
+                0,
+                100,
+            )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You funded the enterprise proof-of-concept for {product.name}. Cash "
+            f"-{BALANCE.event_enterprise_poc_cost}, users "
+            f"+{BALANCE.event_enterprise_poc_user_gain}, revenue per user "
+            f"+{BALANCE.event_enterprise_poc_revenue_gain}."
+        )
+
+    if option_id == "walk_away":
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_enterprise_walkaway_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_enterprise_walkaway_board_gain,
+            0,
+            100,
+        )
+        return (
+            "You walked away from the enterprise cycle and protected focus. Reputation "
+            f"+{BALANCE.event_enterprise_walkaway_reputation_gain}, board confidence "
+            f"+{BALANCE.event_enterprise_walkaway_board_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for enterprise sales cycle.")
+
+
+def _apply_product_launch_window(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "launch_campaign":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_product_launch_campaign_cost
+        )
+        product.user_count += BALANCE.event_product_launch_user_gain
+        product.acquisition_rate = clamp_rate(
+            product.acquisition_rate + BALANCE.event_product_launch_acquisition_gain
+        )
+        product.bug_level = clamp_int(
+            product.bug_level + BALANCE.event_product_launch_bug_increase,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You pushed a launch campaign for {product.name}. Cash "
+            f"-{BALANCE.event_product_launch_campaign_cost}, users "
+            f"+{BALANCE.event_product_launch_user_gain}, bugs "
+            f"+{BALANCE.event_product_launch_bug_increase}."
+        )
+
+    if option_id == "soft_launch":
+        product.user_count += BALANCE.event_product_launch_soft_user_gain
+        product.quality = clamp_int(
+            product.quality + BALANCE.event_product_launch_soft_quality_gain,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You soft-launched {product.name}. Users "
+            f"+{BALANCE.event_product_launch_soft_user_gain}, quality "
+            f"+{BALANCE.event_product_launch_soft_quality_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for product launch window.")
+
+
+def _apply_platform_outage(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    affected_employees = _get_assigned_employees(state, product.id)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "all_hands_recovery":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_platform_outage_response_cost
+        )
+        product.bug_level = clamp_int(
+            product.bug_level - BALANCE.event_platform_outage_bug_reduction,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_platform_outage_reputation_loss,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence + 1, 0, 100)
+        for employee in affected_employees:
+            employee.energy = clamp_int(
+                employee.energy - BALANCE.event_platform_outage_energy_loss,
+                0,
+                100,
+            )
+        for account in accounts:
+            account.churn_risk = clamp_int(account.churn_risk + 2, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You ran an all-hands recovery for {product.name}. Cash "
+            f"-{BALANCE.event_platform_outage_response_cost}, bugs "
+            f"-{BALANCE.event_platform_outage_bug_reduction}, reputation "
+            f"-{BALANCE.event_platform_outage_reputation_loss}."
+        )
+
+    if option_id == "minimize_cost":
+        user_loss = min(product.user_count, BALANCE.event_platform_outage_delay_user_loss)
+        product.user_count = max(0, product.user_count - user_loss)
+        product.bug_level = clamp_int(
+            product.bug_level + BALANCE.event_platform_outage_delay_bug_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_platform_outage_delay_reputation_loss,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.churn_risk = clamp_int(account.churn_risk + 5, 0, 100)
+            if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold:
+                account.status = CustomerAccountStatus.AT_RISK
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You minimized the outage response for {product.name}. Users -{user_loss}, bugs "
+            f"+{BALANCE.event_platform_outage_delay_bug_gain}, reputation "
+            f"-{BALANCE.event_platform_outage_delay_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for platform outage.")
+
+
+def _apply_competitor_acquisition(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+    product = _get_primary_active_product(state)
+
+    if option_id == "differentiate_against_stack":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_competitor_acquisition_differentiate_cost
+        )
+        product.quality = clamp_int(
+            product.quality + BALANCE.event_competitor_acquisition_quality_gain,
+            0,
+            100,
+        )
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_competitor_acquisition_fit_gain,
+            0,
+            100,
+        )
+        for competitor in state.competitors:
+            competitor.aggression = clamp_int(competitor.aggression + 1, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You differentiated {product.name} against the larger rival bundle. Cash "
+            f"-{BALANCE.event_competitor_acquisition_differentiate_cost}, quality "
+            f"+{BALANCE.event_competitor_acquisition_quality_gain}, market fit "
+            f"+{BALANCE.event_competitor_acquisition_fit_gain}."
+        )
+
+    if option_id == "seek_distribution_partner":
+        product.user_count += BALANCE.event_competitor_acquisition_partner_user_gain
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_competitor_acquisition_partner_reputation_gain,
+            0,
+            100,
+        )
+        for competitor in state.competitors:
+            competitor.funding_level = clamp_int(competitor.funding_level + 1, 0, 5)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You found distribution for {product.name}. Users "
+            f"+{BALANCE.event_competitor_acquisition_partner_user_gain}, reputation "
+            f"+{BALANCE.event_competitor_acquisition_partner_reputation_gain}, "
+            "but rival funding pressure rose."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for competitor acquisition.")
+
+
+def _apply_regulatory_shift(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "proactive_controls":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_regulatory_shift_cost
+        )
+        product.technical_debt = clamp_int(
+            product.technical_debt - BALANCE.event_regulatory_shift_debt_reduction,
+            0,
+            100,
+        )
+        product.market_fit = clamp_int(
+            product.market_fit + BALANCE.event_regulatory_shift_fit_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_regulatory_shift_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_regulatory_shift_board_gain,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.churn_risk = clamp_int(account.churn_risk - 4, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You invested in controls for {product.name}. Cash "
+            f"-{BALANCE.event_regulatory_shift_cost}, debt "
+            f"-{BALANCE.event_regulatory_shift_debt_reduction}, reputation "
+            f"+{BALANCE.event_regulatory_shift_reputation_gain}."
+        )
+
+    if option_id == "wait_for_clarity":
+        product.churn_rate = clamp_rate(
+            product.churn_rate + BALANCE.event_regulatory_shift_wait_churn_increase
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_regulatory_shift_wait_reputation_loss,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.event_regulatory_shift_wait_account_risk_gain,
+                0,
+                100,
+            )
+            if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold:
+                account.status = CustomerAccountStatus.AT_RISK
+        return (
+            f"You waited on the regulatory shift for {product.name}. Churn rate "
+            f"+{BALANCE.event_regulatory_shift_wait_churn_increase}, reputation "
+            f"-{BALANCE.event_regulatory_shift_wait_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for regulatory shift.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -1065,6 +1328,19 @@ def _get_best_active_account_for_product(state: GameState, product_id: UUID) -> 
     return max(accounts, key=lambda account: account.satisfaction + account.expansion_potential)
 
 
+def _get_primary_active_product(state: GameState) -> Product:
+    active_products = [product for product in state.products if product.is_active]
+    if not active_products:
+        raise ValueError("This event expected at least one active product.")
+    return max(
+        active_products,
+        key=lambda product: (
+            product.user_count + product.market_fit + product.quality,
+            -product.bug_level,
+        ),
+    )
+
+
 EVENT_EFFECT_HANDLERS = {
     "severe_bug_incident": _apply_severe_bug_incident,
     "favorable_market_trend": _apply_favorable_market_trend,
@@ -1084,4 +1360,9 @@ EVENT_EFFECT_HANDLERS = {
     "down_round_pressure": _apply_down_round_pressure,
     "key_account_expansion": _apply_key_account_expansion,
     "security_audit": _apply_security_audit,
+    "enterprise_sales_cycle": _apply_enterprise_sales_cycle,
+    "product_launch_window": _apply_product_launch_window,
+    "platform_outage": _apply_platform_outage,
+    "competitor_acquisition": _apply_competitor_acquisition,
+    "regulatory_shift": _apply_regulatory_shift,
 }

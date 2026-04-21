@@ -34,8 +34,7 @@ _CAMPAIGN_GOALS = {
         goal_id=CampaignGoalId.PROFIT_MACHINE,
         title="Profit Machine",
         description=(
-            "Build a resilient company that can stack profitable turns without "
-            "fragile financing."
+            "Build a resilient company that can stack profitable turns without fragile financing."
         ),
         success_text=(
             "You turned the company into a profit machine with repeatable cash flow "
@@ -55,8 +54,7 @@ _CAMPAIGN_GOALS = {
         goal_id=CampaignGoalId.CATEGORY_LEADER,
         title="Category Leader",
         description=(
-            "Win on trust and product quality until the company becomes a market "
-            "reference point."
+            "Win on trust and product quality until the company becomes a market reference point."
         ),
         success_text=(
             "You earned category-leader status through product quality, mature offerings, "

@@ -73,8 +73,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         outcome=ExitOutcome.RESTRUCTURE,
         title="Restructure Candidate",
         summary=(
-            "The company has assets, but the run points toward consolidation "
-            "or a painful reset."
+            "The company has assets, but the run points toward consolidation or a painful reset."
         ),
         grade=grade,
         offer_value=restructure_value,

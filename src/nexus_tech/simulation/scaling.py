@@ -51,15 +51,17 @@ def calculate_company_scale_pressure(
 
     active_count = len(active_products)
     feature_load = sum(product.feature_count for product in active_products)
-    late_turn_pressure = max(
-        0,
-        current_turn - BALANCE.scale_late_game_turn_threshold,
-    ) // BALANCE.scale_turn_pressure_divisor
+    late_turn_pressure = (
+        max(
+            0,
+            current_turn - BALANCE.scale_late_game_turn_threshold,
+        )
+        // BALANCE.scale_turn_pressure_divisor
+    )
     coordination_capacity = max(1, headcount * BALANCE.scale_coordination_headcount_factor)
     coordination_drag = max(0, active_count - max(1, headcount))
     coordination_drag += (
-        max(0, feature_load - coordination_capacity)
-        // BALANCE.scale_feature_pressure_divisor
+        max(0, feature_load - coordination_capacity) // BALANCE.scale_feature_pressure_divisor
     )
     coordination_drag += late_turn_pressure
 
@@ -143,6 +145,7 @@ def calculate_product_scale_pressure(
 def is_crowded_pricing_lane(products: list[Product], pricing_tier: PricingTier) -> bool:
     """Return whether the portfolio is concentrated in one pricing posture."""
 
-    return sum(
-        1 for product in products if product.is_active and product.pricing_tier is pricing_tier
-    ) >= 3
+    return (
+        sum(1 for product in products if product.is_active and product.pricing_tier is pricing_tier)
+        >= 3
+    )

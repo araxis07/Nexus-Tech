@@ -80,13 +80,13 @@ def calculate_run_score(state: GameState) -> RunScore:
         + (state.finance.board_confidence // BALANCE.board_confidence_score_divisor)
         + get_difficulty_profile(state.difficulty_mode).score_modifier
         - int(
-            (state.finance.debt_principal / BALANCE.finance_score_debt_divisor)
-            .to_integral_value()
+            (state.finance.debt_principal / BALANCE.finance_score_debt_divisor).to_integral_value()
         )
         - (state.finance.investor_pressure // BALANCE.finance_score_pressure_divisor)
         - int(
-            (state.finance.equity_dilution * Decimal(BALANCE.finance_score_dilution_multiplier))
-            .to_integral_value()
+            (
+                state.finance.equity_dilution * Decimal(BALANCE.finance_score_dilution_multiplier)
+            ).to_integral_value()
         )
     )
     if evaluate_campaign_goal(state).completed:

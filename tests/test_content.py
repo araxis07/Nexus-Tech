@@ -201,12 +201,8 @@ def test_competitor_archetype_catalog_is_available() -> None:
     archetype_ids = {archetype.archetype_id for archetype in archetypes}
 
     assert {"price_raider", "platform_bulwark", "feature_blitzer"}.issubset(archetype_ids)
-    assert {"channel_aggregator", "trust_monolith", "vertical_specialist"}.issubset(
-        archetype_ids
-    )
-    assert {"ai_fast_follower", "governance_giant", "ecosystem_broker"}.issubset(
-        archetype_ids
-    )
+    assert {"channel_aggregator", "trust_monolith", "vertical_specialist"}.issubset(archetype_ids)
+    assert {"ai_fast_follower", "governance_giant", "ecosystem_broker"}.issubset(archetype_ids)
 
 
 def test_competitor_archetype_funding_level_is_available() -> None:

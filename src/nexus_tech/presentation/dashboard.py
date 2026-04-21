@@ -147,9 +147,7 @@ def render_product_template_catalog(
             template.description,
         )
 
-    template_ids = ", ".join(
-        f"{template.template_id} ({template.title})" for template in templates
-    )
+    template_ids = ", ".join(f"{template.template_id} ({template.title})" for template in templates)
     content = Group(
         table,
         "",
@@ -350,6 +348,84 @@ def render_quick_guide(console: Console) -> None:
         ),
     )
     console.print(Panel(content, title="Quick Guide", border_style="blue", expand=True))
+
+
+def render_glossary(console: Console) -> None:
+    """Render stat explanations for players learning the simulation."""
+
+    systems = Table(box=box.SIMPLE_HEAVY, expand=True)
+    systems.add_column("System", style="bold cyan")
+    systems.add_column("What It Means")
+    systems.add_row("Cash", "Company runway. Below zero ends the run.")
+    systems.add_row(
+        "Reputation",
+        "Brand trust. Helps growth, events, funding, and victory quality.",
+    )
+    systems.add_row(
+        "Board Confidence",
+        "Governance trust. Rewards disciplined capital and execution.",
+    )
+    systems.add_row(
+        "Investor Pressure",
+        "Capital-market stress. Raises finance cost and lowers score.",
+    )
+    systems.add_row(
+        "Quality",
+        "Product reliability and perceived value. Helps growth and key accounts.",
+    )
+    systems.add_row(
+        "Bugs",
+        "Visible product defects. Raises churn, incidents, and renewal pressure.",
+    )
+    systems.add_row(
+        "Market Fit",
+        "How well a product matches its segment. Helps acquisition and accounts.",
+    )
+    systems.add_row(
+        "Technical Debt",
+        "Future drag. Raises bugs, costs, churn, and delivery penalties.",
+    )
+    systems.add_row(
+        "Key Accounts",
+        "High-value customers with satisfaction, renewal risk, and expansion upside.",
+    )
+    systems.add_row(
+        "Competitor Funding",
+        "Rival capital pressure. Funded rivals become harder to ignore.",
+    )
+
+    actions = Table(box=box.SIMPLE_HEAVY, expand=True)
+    actions.add_column("Action Family", style="bold cyan")
+    actions.add_column("Use It When")
+    actions.add_row(
+        "Quality / Bugs / Debt",
+        "Retention, renewals, and reputation are starting to weaken.",
+    )
+    actions.add_row("Marketing / Launch", "The product is healthy enough to convert new users.")
+    actions.add_row(
+        "Pricing / Segment",
+        "You need to trade growth speed for revenue or enterprise trust.",
+    )
+    actions.add_row("Hiring / Assignment", "Execution bottlenecks are limiting product outcomes.")
+    actions.add_row(
+        "Finance",
+        "Cash pressure is urgent, but dilution, debt, and board trust matter.",
+    )
+    actions.add_row(
+        "Roadmap / Budget",
+        "The company needs a multi-turn posture rather than one-off actions.",
+    )
+
+    console.print(
+        Columns(
+            [
+                Panel(systems, title="Glossary", border_style="cyan", expand=True),
+                Panel(actions, title="Decision Guide", border_style="blue", expand=True),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
 
 
 def render_balance_lab(console: Console, batch: BalanceBatchResult) -> None:
@@ -924,11 +1000,7 @@ def _build_turn_header_panel(state: GameState) -> Panel:
         roadmap_set_turn=state.roadmap_set_turn,
         current_turn=state.company.current_turn,
     )
-    roadmap_status = (
-        "due now"
-        if roadmap_due
-        else f"{turns_remaining} turns left"
-    )
+    roadmap_status = "due now" if roadmap_due else f"{turns_remaining} turns left"
     body = (
         f"[bold white]Turn {state.company.current_turn}[/bold white]\n"
         f"[cyan]Scenario:[/cyan] {state.scenario_title}\n"
@@ -1163,6 +1235,7 @@ def _build_action_menu_panel() -> Panel:
     utility_actions.add_row("28", "save_game", "Write the current run to SQLite.")
     utility_actions.add_row("29", "load_game", "Resume a saved slot from SQLite.")
     utility_actions.add_row("30", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("31", "show_glossary", "Explain stats and decision families.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -1205,9 +1278,7 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
 
     suggestions: list[str] = []
     if not state.employees:
-        suggestions.append(
-            "Use [bold]17[/bold] to hire the first team member once runway is safe."
-        )
+        suggestions.append("Use [bold]17[/bold] to hire the first team member once runway is safe.")
     elif any(employee.assigned_product_id is None for employee in state.employees):
         suggestions.append(
             "Use [bold]19[/bold] to assign unallocated teammates to the product that matters most."
@@ -1231,8 +1302,7 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
         suggestions.append("Use [bold]29[/bold] any time if you want the compact guide again.")
     if state.company.current_turn >= 2:
         suggestions.append(
-            "Check [bold]23[/bold] after a turn resolves to read the run report "
-            "and rival pressure."
+            "Check [bold]23[/bold] after a turn resolves to read the run report and rival pressure."
         )
 
     body = "\n".join(f"- {line}" for line in suggestions)

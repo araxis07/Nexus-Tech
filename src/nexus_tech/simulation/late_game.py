@@ -102,17 +102,24 @@ def calculate_late_game_summary(
         (product.maintenance_cost for product in active_products),
         Decimal("0.00"),
     )
-    concentration_risk = max(
-        0,
-        lead_share - BALANCE.late_game_concentration_share_threshold,
-    ) // BALANCE.late_game_concentration_divisor
-    org_drag = max(
-        0,
-        len(active_products) - BALANCE.late_game_org_drag_product_threshold,
-    ) + max(
-        0,
-        headcount - BALANCE.late_game_org_drag_headcount_threshold,
-    ) // BALANCE.late_game_org_drag_divisor
+    concentration_risk = (
+        max(
+            0,
+            lead_share - BALANCE.late_game_concentration_share_threshold,
+        )
+        // BALANCE.late_game_concentration_divisor
+    )
+    org_drag = (
+        max(
+            0,
+            len(active_products) - BALANCE.late_game_org_drag_product_threshold,
+        )
+        + max(
+            0,
+            headcount - BALANCE.late_game_org_drag_headcount_threshold,
+        )
+        // BALANCE.late_game_org_drag_divisor
+    )
     maintenance_crisis = max(
         0,
         int(
@@ -148,10 +155,13 @@ def calculate_late_game_summary(
         legacy_drag = 0
 
         if product.lifecycle_stage in {LifecycleStage.MATURE, LifecycleStage.DECLINING}:
-            renewal_risk += max(
-                0,
-                product.user_count - BALANCE.late_game_large_product_user_threshold,
-            ) // BALANCE.late_game_renewal_user_divisor
+            renewal_risk += (
+                max(
+                    0,
+                    product.user_count - BALANCE.late_game_large_product_user_threshold,
+                )
+                // BALANCE.late_game_renewal_user_divisor
+            )
             if product.target_segment.value == "enterprise":
                 renewal_risk += 1
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0 - 2026-04-22
+
+- Added enterprise sales cycle, product launch window, platform outage, competitor acquisition, and regulatory shift events
+- Added a CLI glossary for core stats, system terms, and decision families
+- Added a Markdown `balance-report` export that combines scenario/difficulty matrix results with balance audit findings
+- Added migration coverage for older SQLite schemas with additive columns
+- Added release demo and release checklist documentation
+- Promoted the package version to `0.11.0`
+
 ## 0.10.0 - 2026-04-22
 
 - Added a fourth content pack with AI governance, developer marketplace, customer health, and incident command product templates

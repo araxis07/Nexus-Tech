@@ -178,9 +178,7 @@ def run_balance_batch(
         )
         state = run_autoplay(state, rng, max_turns=turns)
         run_score = calculate_run_score(state)
-        total_users = sum(
-            product.user_count for product in state.products if product.is_active
-        )
+        total_users = sum(product.user_count for product in state.products if product.is_active)
         active_products = sum(1 for product in state.products if product.is_active)
         results.append(
             BalanceRunResult(
@@ -404,9 +402,7 @@ def run_balance_audit(
 def format_balance_matrix_csv(matrix: BalanceMatrixResult) -> str:
     """Serialize a balance matrix to CSV for external tuning review."""
 
-    lines = [
-        "scenario_id,difficulty,average_score,average_cash,average_users,victories,shutdowns"
-    ]
+    lines = ["scenario_id,difficulty,average_score,average_cash,average_users,victories,shutdowns"]
     for cell in matrix.cells:
         lines.append(
             ",".join(
@@ -421,6 +417,73 @@ def format_balance_matrix_csv(matrix: BalanceMatrixResult) -> str:
                 ]
             )
         )
+    return "\n".join(lines) + "\n"
+
+
+def format_balance_report_markdown(
+    matrix: BalanceMatrixResult,
+    audit: BalanceAuditResult,
+) -> str:
+    """Serialize balance matrix and audit findings as a compact Markdown report."""
+
+    lines = [
+        "# NEXUS TECH Balance Report",
+        "",
+        f"- Campaign goal: `{matrix.campaign_goal_id.value}`",
+        f"- Runs per cell: `{matrix.runs}`",
+        f"- Max turns: `{matrix.turns}`",
+        f"- Seed base: `{matrix.seed_base}`",
+        f"- Matrix cells: `{len(matrix.cells)}`",
+        f"- Audit findings: `{len(audit.findings)}`",
+        "",
+        "## Matrix",
+        "",
+        "| Scenario | Difficulty | Avg Score | Avg Cash | Avg Users | Victories | Shutdowns |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for cell in matrix.cells:
+        lines.append(
+            "| "
+            f"{cell.scenario_id} | "
+            f"{cell.difficulty_mode.value} | "
+            f"{cell.average_score:.1f} | "
+            f"{cell.average_cash} | "
+            f"{cell.average_users:.1f} | "
+            f"{cell.victories} | "
+            f"{cell.shutdowns} |"
+        )
+
+    lines.extend(["", "## Audit Findings", ""])
+    if not audit.findings:
+        lines.append("No high-signal balance risks were detected in this run.")
+    else:
+        lines.append(
+            "| Severity | Scenario | Difficulty | Summary | Avg Score | Avg Cash | Shutdowns |"
+        )
+        lines.append("| --- | --- | --- | --- | ---: | ---: | ---: |")
+        for finding in audit.findings:
+            lines.append(
+                "| "
+                f"{finding.severity} | "
+                f"{finding.scenario_id} | "
+                f"{finding.difficulty_mode.value} | "
+                f"{finding.summary} | "
+                f"{finding.average_score:.1f} | "
+                f"{finding.average_cash} | "
+                f"{finding.shutdowns} |"
+            )
+
+    lines.extend(
+        [
+            "",
+            "## Reading The Report",
+            "",
+            "- Builder should be survivable with room for experimentation.",
+            "- Standard should reward disciplined play without requiring perfect choices.",
+            "- Founder should create visible pressure without making most openings impossible.",
+            "- Re-run this report after changing constants, events, or scenario content.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -568,9 +631,7 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
 
     if event.event_id == "severe_bug_incident":
         option_id = (
-            "hotfix"
-            if state.company.cash_on_hand > BALANCE.event_bug_hotfix_cost
-            else "delay"
+            "hotfix" if state.company.cash_on_hand > BALANCE.event_bug_hotfix_cost else "delay"
         )
     elif event.event_id == "favorable_market_trend":
         option_id = (
@@ -668,6 +729,37 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
             if state.company.cash_on_hand > BALANCE.event_security_audit_fund_cost * 2
             else "defer_audit"
         )
+    elif event.event_id == "enterprise_sales_cycle":
+        option_id = (
+            "fund_poc"
+            if state.company.cash_on_hand > BALANCE.event_enterprise_poc_cost * 2
+            else "walk_away"
+        )
+    elif event.event_id == "product_launch_window":
+        option_id = (
+            "launch_campaign"
+            if state.company.cash_on_hand > BALANCE.event_product_launch_campaign_cost * 2
+            else "soft_launch"
+        )
+    elif event.event_id == "platform_outage":
+        option_id = (
+            "all_hands_recovery"
+            if state.company.cash_on_hand > BALANCE.event_platform_outage_response_cost * 2
+            else "minimize_cost"
+        )
+    elif event.event_id == "competitor_acquisition":
+        option_id = (
+            "differentiate_against_stack"
+            if state.company.cash_on_hand
+            > BALANCE.event_competitor_acquisition_differentiate_cost * 2
+            else "seek_distribution_partner"
+        )
+    elif event.event_id == "regulatory_shift":
+        option_id = (
+            "proactive_controls"
+            if state.company.cash_on_hand > BALANCE.event_regulatory_shift_cost * 2
+            else "wait_for_clarity"
+        )
     else:
         option_id = event.options[0].id
 
@@ -704,9 +796,10 @@ def _choose_hire_role(state: GameState) -> EmployeeRole:
         return EmployeeRole.ENGINEER
     if role_counts[EmployeeRole.MARKETER] == 0:
         return EmployeeRole.MARKETER
-    if len([product for product in state.products if product.is_active]) >= 2 and role_counts[
-        EmployeeRole.PRODUCT_MANAGER
-    ] == 0:
+    if (
+        len([product for product in state.products if product.is_active]) >= 2
+        and role_counts[EmployeeRole.PRODUCT_MANAGER] == 0
+    ):
         return EmployeeRole.PRODUCT_MANAGER
     if role_counts[EmployeeRole.DESIGNER] == 0:
         return EmployeeRole.DESIGNER
@@ -723,9 +816,7 @@ def _should_create_product(state: GameState) -> bool:
 
 
 def _choose_next_template_id(state: GameState) -> str:
-    existing_segments = {
-        product.target_segment for product in state.products if product.is_active
-    }
+    existing_segments = {product.target_segment for product in state.products if product.is_active}
     templates = list(get_available_product_templates())
     for preferred_segment in (
         MarketSegment.SMB,

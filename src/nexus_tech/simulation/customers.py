@@ -179,8 +179,7 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
                     * Decimal(
                         max(
                             1,
-                            product.user_count
-                            // BALANCE.key_account_contract_user_divisor,
+                            product.user_count // BALANCE.key_account_contract_user_divisor,
                         )
                     )
                 ),

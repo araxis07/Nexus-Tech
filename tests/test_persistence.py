@@ -290,6 +290,124 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     assert user_version >= 10
 
 
+def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
+    db_path = tmp_path / "old-save.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE save_slots (
+                slot_name TEXT PRIMARY KEY,
+                action_points_remaining INTEGER NOT NULL,
+                rng_seed INTEGER,
+                rng_state TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE companies (
+                slot_name TEXT PRIMARY KEY,
+                company_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                cash_on_hand TEXT NOT NULL,
+                reputation INTEGER NOT NULL,
+                current_turn INTEGER NOT NULL,
+                game_over INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE products (
+                slot_name TEXT NOT NULL,
+                product_id TEXT NOT NULL,
+                display_order INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                lifecycle_stage TEXT NOT NULL,
+                quality INTEGER NOT NULL,
+                bug_level INTEGER NOT NULL,
+                market_fit INTEGER NOT NULL,
+                technical_debt INTEGER NOT NULL,
+                user_count INTEGER NOT NULL,
+                revenue_per_user TEXT NOT NULL,
+                feature_count INTEGER NOT NULL,
+                maintenance_cost TEXT NOT NULL,
+                acquisition_rate TEXT NOT NULL,
+                churn_rate TEXT NOT NULL,
+                is_active INTEGER NOT NULL,
+                PRIMARY KEY (slot_name, product_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE competitors (
+                slot_name TEXT NOT NULL,
+                competitor_id TEXT NOT NULL,
+                display_order INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                focus_segment TEXT NOT NULL,
+                strength INTEGER NOT NULL,
+                aggression INTEGER NOT NULL,
+                pricing_tier TEXT NOT NULL,
+                active_product_count INTEGER NOT NULL,
+                PRIMARY KEY (slot_name, competitor_id)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE finance_state (
+                slot_name TEXT PRIMARY KEY,
+                debt_principal TEXT NOT NULL,
+                loan_interest_rate TEXT NOT NULL,
+                equity_dilution TEXT NOT NULL,
+                investor_pressure INTEGER NOT NULL,
+                total_raised TEXT NOT NULL,
+                last_funding_turn INTEGER
+            )
+            """
+        )
+        connection.execute("PRAGMA user_version = 5")
+
+    DatabaseManager(db_path).initialize()
+
+    with sqlite3.connect(db_path) as connection:
+        save_slot_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(save_slots)").fetchall()
+        }
+        company_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(companies)").fetchall()
+        }
+        product_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(products)").fetchall()
+        }
+        competitor_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(competitors)").fetchall()
+        }
+        finance_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(finance_state)").fetchall()
+        }
+        user_version = connection.execute("PRAGMA user_version").fetchone()[0]
+
+    assert {
+        "scenario_id",
+        "difficulty_mode",
+        "exit_summary",
+        "saved_with_version",
+        "schema_version",
+    }.issubset(save_slot_columns)
+    assert {"strategy"}.issubset(company_columns)
+    assert {"pricing_tier", "target_segment"}.issubset(product_columns)
+    assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
+        competitor_columns
+    )
+    assert {"board_confidence"}.issubset(finance_columns)
+    assert user_version >= 10
+
+
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
     db_path = tmp_path / "round-trip.db"
     coordinator = SaveLoadCoordinator(db_path)

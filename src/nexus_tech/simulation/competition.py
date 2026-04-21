@@ -67,10 +67,13 @@ def advance_competitors(
             -BALANCE.competitor_strength_drift_max,
             BALANCE.competitor_strength_drift_max,
         )
-        aggression_drift = rng.randint(
-            -BALANCE.competitor_aggression_drift_max,
-            BALANCE.competitor_aggression_drift_max,
-        ) + market_profile.competitor_pressure_modifier
+        aggression_drift = (
+            rng.randint(
+                -BALANCE.competitor_aggression_drift_max,
+                BALANCE.competitor_aggression_drift_max,
+            )
+            + market_profile.competitor_pressure_modifier
+        )
         if competitor.current_move is CompetitorMove.DISCOUNT_PUSH:
             aggression_drift += BALANCE.competitor_discount_extra_aggression
             competitor.momentum = clamp_int(
@@ -136,8 +139,7 @@ def calculate_competitor_pressure(
         rival_pressure += competitor.strength // BALANCE.competitor_strength_divisor
         rival_pressure += competitor.aggression // BALANCE.competitor_aggression_divisor
         rival_pressure += (
-            max(0, competitor.active_product_count - 1)
-            * BALANCE.competitor_product_count_bonus
+            max(0, competitor.active_product_count - 1) * BALANCE.competitor_product_count_bonus
         )
         if competitor.pricing_tier is product.pricing_tier:
             rival_pressure += BALANCE.competitor_price_match_bonus
@@ -159,9 +161,7 @@ def summarize_competitor_moves(competitors: list[Competitor]) -> str:
 
     ranked = sorted(
         competitors,
-        key=lambda competitor: (
-            competitor.aggression + competitor.strength + competitor.momentum
-        ),
+        key=lambda competitor: competitor.aggression + competitor.strength + competitor.momentum,
         reverse=True,
     )
     top_rivals = ranked[: BALANCE.competitor_move_summary_limit]

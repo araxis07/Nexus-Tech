@@ -354,9 +354,7 @@ class SaveLoadCoordinator:
             with self.database.connect() as connection:
                 integrity_rows = connection.execute("PRAGMA integrity_check").fetchall()
                 foreign_key_rows = connection.execute("PRAGMA foreign_key_check").fetchall()
-                slot_count = connection.execute(
-                    "SELECT COUNT(*) FROM save_slots"
-                ).fetchone()[0]
+                slot_count = connection.execute("SELECT COUNT(*) FROM save_slots").fetchone()[0]
                 schema_version = connection.execute("PRAGMA user_version").fetchone()[0]
         except sqlite3.DatabaseError as error:
             raise PersistenceError(f"Failed to inspect save health: {error}") from error

@@ -97,12 +97,8 @@ def calculate_operations_summary(
         BALANCE.operations_max_morale_penalty,
         0 if overload == 0 else 1 + (overload // BALANCE.operations_morale_penalty_divisor),
     )
-    reputation_delta = (
-        -1 if overload >= BALANCE.operations_reputation_penalty_threshold else 0
-    )
-    added_cost = quantize_money(
-        Decimal(overload) * BALANCE.operations_overload_cost_per_point
-    )
+    reputation_delta = -1 if overload >= BALANCE.operations_reputation_penalty_threshold else 0
+    added_cost = quantize_money(Decimal(overload) * BALANCE.operations_overload_cost_per_point)
 
     return OperationsSummary(
         total_load=total_load,
@@ -180,8 +176,7 @@ def _calculate_product_operations_risk(
         max(1, product.user_count // BALANCE.operations_user_load_divisor)
         + (product.bug_level // BALANCE.operations_bug_load_divisor)
         + (product.technical_debt // BALANCE.operations_debt_load_divisor)
-        + max(0, product.feature_count - 2)
-        // BALANCE.operations_feature_load_divisor
+        + max(0, product.feature_count - 2) // BALANCE.operations_feature_load_divisor
         + BALANCE.operations_segment_load_bonus[product.target_segment.value]
         + BALANCE.operations_stage_load_bonus[product.lifecycle_stage.value]
     )
@@ -205,11 +200,7 @@ def _calculate_product_operations_risk(
     )
     overload = max(
         0,
-        load
-        + (
-            adjacent_count * BALANCE.operations_same_segment_overlap_penalty
-        )
-        - capacity,
+        load + (adjacent_count * BALANCE.operations_same_segment_overlap_penalty) - capacity,
     )
     return ProductOperationsRisk(
         product_id=product.id,

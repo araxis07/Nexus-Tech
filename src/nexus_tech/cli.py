@@ -54,6 +54,7 @@ from nexus_tech.presentation.dashboard import (
     render_event_catalog,
     render_event_result,
     render_game_over,
+    render_glossary,
     render_intro,
     render_pending_event,
     render_product_picker,
@@ -70,6 +71,7 @@ from nexus_tech.presentation.dashboard import (
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     format_balance_matrix_csv,
+    format_balance_report_markdown,
     run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
@@ -157,6 +159,7 @@ BALANCE_GOAL_OPTION = typer.Option(
     help="Campaign goal used during the balance run batch.",
 )
 CSV_OUTPUT_OPTION = typer.Option(..., "--output", help="CSV path to write.")
+BALANCE_REPORT_OUTPUT_OPTION = typer.Option(..., "--output", help="Markdown path to write.")
 
 ACTION_KEYS = {
     "1": TurnAction.CREATE_PRODUCT,
@@ -191,6 +194,7 @@ UTILITY_ACTION_KEYS = {
     "28": "save_game",
     "29": "load_game",
     "30": "show_guide",
+    "31": "show_glossary",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -505,11 +509,58 @@ def export_balance_csv_command(
     )
 
 
+@app.command("balance-report")
+def balance_report_command(
+    output: Path = BALANCE_REPORT_OUTPUT_OPTION,
+    scenario: Optional[list[str]] = COMPARE_SCENARIOS_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(2, "--runs", min=1, help="Number of deterministic runs."),
+    turns: int = typer.Option(10, "--turns", min=1, help="Maximum turns per run."),
+    seed_base: int = typer.Option(
+        100,
+        "--seed-base",
+        help="Base seed. Each matrix cell gets a deterministic seed range from this value.",
+    ),
+) -> None:
+    """Export a Markdown balance matrix plus audit findings."""
+
+    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    matrix = run_balance_matrix(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    audit = run_balance_audit(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=goal,
+        runs=runs,
+        turns=turns,
+        seed_base=seed_base,
+    )
+    output.write_text(format_balance_report_markdown(matrix, audit), encoding="utf-8")
+    console.print(
+        Panel.fit(
+            f"Wrote balance report to {output}",
+            title="Balance Report",
+            border_style="green",
+        )
+    )
+
+
 @app.command("guide")
 def guide_command() -> None:
     """Print a compact quick-start guide."""
 
     render_quick_guide(console)
+
+
+@app.command("glossary")
+def glossary_command() -> None:
+    """Explain core stats, systems, and decision families."""
+
+    render_glossary(console)
 
 
 @app.command("list-saves")
@@ -1292,6 +1343,10 @@ def handle_utility_action(
 
     if action_name == "show_guide":
         render_quick_guide(console)
+        return state, rng, current_slot_name
+
+    if action_name == "show_glossary":
+        render_glossary(console)
         return state, rng, current_slot_name
 
     raise ValueError(f"Unsupported utility action: {action_name}")

@@ -28,6 +28,12 @@ Export matrix data:
 uv run nexus-tech export-balance-csv --output balance.csv --scenario founder_journey --runs 2 --turns 10
 ```
 
+Export a Markdown balance report:
+
+```bash
+uv run nexus-tech balance-report --output balance-report.md --scenario founder_journey --runs 2 --turns 10
+```
+
 ## What to Watch
 
 - Average score should climb with good decisions but not explode early.

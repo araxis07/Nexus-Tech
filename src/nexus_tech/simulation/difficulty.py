@@ -53,4 +53,3 @@ def get_difficulty_profile(mode: DifficultyMode) -> DifficultyProfile:
     """Return the effective profile for one difficulty mode."""
 
     return _DIFFICULTY_PROFILES[mode]
-

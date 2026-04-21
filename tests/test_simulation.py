@@ -39,6 +39,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     format_balance_matrix_csv,
+    format_balance_report_markdown,
     run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
@@ -563,8 +564,7 @@ def test_set_roadmap_updates_state_and_platform_rebuild_changes_execution_profil
     assert platform_state.roadmap_focus is RoadmapFocus.PLATFORM_REBUILD
     assert platform_cost > baseline_cost
     assert (
-        debt_reduction.state.products[0].technical_debt
-        < platform_state.products[0].technical_debt
+        debt_reduction.state.products[0].technical_debt < platform_state.products[0].technical_debt
     )
 
 
@@ -1307,6 +1307,30 @@ def test_balance_matrix_csv_export_is_stable() -> None:
     assert "founder_journey" in csv_output
 
 
+def test_balance_report_markdown_includes_matrix_and_audit_sections() -> None:
+    matrix = run_balance_matrix(
+        scenario_ids=["founder_journey"],
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=2,
+        seed_base=30,
+    )
+    audit = run_balance_audit(
+        scenario_ids=["founder_journey"],
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=2,
+        seed_base=30,
+    )
+
+    report = format_balance_report_markdown(matrix, audit)
+
+    assert report.startswith("# NEXUS TECH Balance Report")
+    assert "## Matrix" in report
+    assert "## Audit Findings" in report
+    assert "founder_journey" in report
+
+
 def test_referral_wave_event_rewards_healthy_product() -> None:
     product = make_product(
         "Glow",
@@ -1419,6 +1443,166 @@ def test_security_audit_event_protects_enterprise_trust() -> None:
     assert outcome.state.company.reputation > state.company.reputation
     assert outcome.state.finance.board_confidence > state.finance.board_confidence
     assert outcome.history_entry.event_id == "security_audit"
+
+
+def test_enterprise_sales_cycle_can_expand_contract_value() -> None:
+    product = make_product(
+        "Enterprise Desk",
+        target_segment=MarketSegment.ENTERPRISE,
+        market_fit=62,
+        user_count=42,
+        revenue_per_user=Decimal("38.00"),
+    )
+    employee = make_employee(
+        "Enterprise PM",
+        EmployeeRole.PRODUCT_MANAGER,
+        assigned_product_id=product.id,
+        energy=80,
+    )
+    state = make_state(
+        product,
+        employees=[employee],
+        cash_on_hand=Decimal("9000.00"),
+        current_turn=6,
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "enterprise_sales_cycle"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "fund_poc")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].user_count > state.products[0].user_count
+    assert outcome.state.products[0].revenue_per_user > state.products[0].revenue_per_user
+    assert outcome.state.employees[0].energy < state.employees[0].energy
+    assert outcome.history_entry.event_id == "enterprise_sales_cycle"
+
+
+def test_product_launch_window_campaign_increases_demand_and_noise() -> None:
+    product = make_product(
+        "Launch Ready",
+        quality=68,
+        market_fit=62,
+        feature_count=4,
+        bug_level=10,
+        user_count=60,
+    )
+    state = make_state(product, cash_on_hand=Decimal("9000.00"), current_turn=5)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "product_launch_window"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "launch_campaign")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].user_count > state.products[0].user_count
+    assert outcome.state.products[0].acquisition_rate > state.products[0].acquisition_rate
+    assert outcome.state.products[0].bug_level > state.products[0].bug_level
+    assert outcome.history_entry.event_id == "product_launch_window"
+
+
+def test_platform_outage_recovery_reduces_bugs_but_costs_cash_and_energy() -> None:
+    product = make_product(
+        "Scale Core",
+        user_count=140,
+        bug_level=36,
+        technical_debt=34,
+    )
+    employee = make_employee(
+        "Oncall Engineer",
+        EmployeeRole.ENGINEER,
+        assigned_product_id=product.id,
+        energy=82,
+    )
+    state = make_state(
+        product,
+        employees=[employee],
+        cash_on_hand=Decimal("9000.00"),
+        current_turn=7,
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "platform_outage"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "all_hands_recovery")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].bug_level < state.products[0].bug_level
+    assert outcome.state.employees[0].energy < state.employees[0].energy
+    assert outcome.history_entry.event_id == "platform_outage"
+
+
+def test_competitor_acquisition_forces_portfolio_response() -> None:
+    product = make_product("Flagship", quality=66, market_fit=61, user_count=120)
+    competitor = Competitor(
+        name="Bundle Giant",
+        focus_segment=MarketSegment.STARTUP,
+        strength=78,
+        aggression=72,
+        pricing_tier=PricingTier.STANDARD,
+        active_product_count=3,
+        momentum=80,
+        funding_level=2,
+    )
+    state = make_state(
+        product,
+        competitors=[competitor],
+        cash_on_hand=Decimal("9000.00"),
+        current_turn=6,
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "competitor_acquisition"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "differentiate_against_stack")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].quality > state.products[0].quality
+    assert outcome.state.products[0].market_fit > state.products[0].market_fit
+    assert outcome.state.competitors[0].aggression > state.competitors[0].aggression
+    assert outcome.history_entry.event_id == "competitor_acquisition"
+
+
+def test_regulatory_shift_proactive_controls_reduce_debt_and_increase_trust() -> None:
+    product = make_product(
+        "Regulated Core",
+        target_segment=MarketSegment.ENTERPRISE,
+        market_fit=62,
+        technical_debt=42,
+        user_count=70,
+    )
+    state = make_state(product, cash_on_hand=Decimal("9000.00"), current_turn=8)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "regulatory_shift"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "proactive_controls")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].technical_debt < state.products[0].technical_debt
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.history_entry.event_id == "regulatory_shift"
 
 
 def test_profitable_streak_milestone_unlocks_after_three_positive_turns() -> None:
@@ -1896,6 +2080,11 @@ def test_new_event_ids_are_registered() -> None:
     assert "down_round_pressure" in registry_ids
     assert "key_account_expansion" in registry_ids
     assert "security_audit" in registry_ids
+    assert "enterprise_sales_cycle" in registry_ids
+    assert "product_launch_window" in registry_ids
+    assert "platform_outage" in registry_ids
+    assert "competitor_acquisition" in registry_ids
+    assert "regulatory_shift" in registry_ids
 
 
 def test_archetype_competitor_adds_segment_pressure() -> None:
@@ -1911,9 +2100,7 @@ def test_archetype_competitor_adds_segment_pressure() -> None:
         aggression=30,
         pricing_tier=PricingTier.STANDARD,
     )
-    price_raider = plain.model_copy(
-        update={"name": "Price Raider", "archetype_id": "price_raider"}
-    )
+    price_raider = plain.model_copy(update={"name": "Price Raider", "archetype_id": "price_raider"})
 
     plain_pressure = calculate_competitor_pressure(
         product,

@@ -1,0 +1,49 @@
+# NEXUS TECH Release Checklist
+
+Use this checklist before tagging or presenting a release.
+
+## Version And Notes
+
+- Update `pyproject.toml`.
+- Update `src/nexus_tech/__init__.py`.
+- Add a dated entry to `CHANGELOG.md`.
+- Confirm the README lists any new commands, systems, or content.
+
+## Local Verification
+
+```bash
+uv sync --extra dev
+uv run ruff check src tests
+uv run pytest -q
+uv run nexus-tech --version
+uv run nexus-tech doctor
+```
+
+## Demo Verification
+
+```bash
+uv run nexus-tech glossary
+uv run nexus-tech list-scenarios
+uv run nexus-tech list-templates
+uv run nexus-tech list-rivals
+uv run nexus-tech list-events
+uv run nexus-tech simulate-balance --scenario founder_journey --runs 1 --turns 3 --seed-base 7
+uv run nexus-tech balance-report --output /tmp/nexus-balance-report.md --scenario founder_journey --runs 1 --turns 3 --seed-base 7
+```
+
+## Save Verification
+
+```bash
+uv run nexus-tech check-saves
+uv run nexus-tech list-saves
+```
+
+If no save database exists yet, `doctor` should still run cleanly and explain that no save has been created.
+
+## Scope Guardrails
+
+- Keep the game local and offline.
+- Do not add GUI, web, cloud, accounts, telemetry, or multiplayer infrastructure.
+- Keep simulation logic out of Rich rendering and Typer command handlers.
+- Keep SQLite access inside the persistence layer.
+- Keep randomness seedable for deterministic tests and demos.

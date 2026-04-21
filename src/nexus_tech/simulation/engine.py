@@ -369,8 +369,7 @@ def apply_action(
         return ActionOutcome(
             state=next_state,
             message=(
-                f"Budget stance set to {context.budget_stance.value}. "
-                f"{budget_profile.summary}"
+                f"Budget stance set to {context.budget_stance.value}. {budget_profile.summary}"
             ),
         )
 
@@ -960,8 +959,7 @@ def build_turn_narrative(
         return f"Rivals are pressing harder: {competitor_summary}."
     if team_condition.burned_out_count > 0 and scale_pressure_summary.startswith("Coordination"):
         return (
-            "Scale is starting to drag on execution. "
-            "Coordination load now needs active management."
+            "Scale is starting to drag on execution. Coordination load now needs active management."
         )
     if net_cash_flow > ZERO_MONEY and len(expanding_products) >= 2:
         return "The portfolio and team are compounding together."

@@ -42,6 +42,7 @@ from nexus_tech.persistence.save_coordinator import SaveSlotSummary
 from nexus_tech.presentation.dashboard import (
     render_competitor_archetype_catalog,
     render_dashboard,
+    render_glossary,
     render_product_template_catalog,
     render_quick_guide,
     render_report,
@@ -207,12 +208,14 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "balance-matrix",
         "balance-audit",
         "export-balance-csv",
+        "balance-report",
         "list-saves",
         "check-saves",
         "doctor",
         "rename-save",
         "delete-save",
         "guide",
+        "glossary",
     }.issubset(command_names)
     assert "--debug" in option_names
     assert "--version" in option_names
@@ -598,11 +601,50 @@ def test_export_balance_csv_command_writes_matrix_file(
     )
 
 
+def test_balance_report_command_writes_markdown_file(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    matrix = BalanceMatrixResult(
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=6,
+        seed_base=50,
+        cells=(
+            BalanceMatrixCell(
+                scenario_id="founder",
+                difficulty_mode=DifficultyMode.STANDARD,
+                average_score=130.0,
+                average_cash=Decimal("9000.00"),
+                average_users=90.0,
+                victories=0,
+                shutdowns=0,
+            ),
+        ),
+    )
+    audit = BalanceAuditResult(
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=6,
+        seed_base=50,
+        findings=(),
+    )
+    monkeypatch.setattr(cli_module, "run_balance_matrix", lambda **_: matrix)
+    monkeypatch.setattr(cli_module, "run_balance_audit", lambda **_: audit)
+    output_path = tmp_path / "balance.md"
+
+    result = runner.invoke(app, ["balance-report", "--output", str(output_path)])
+
+    assert result.exit_code == 0
+    assert "Balance Report" in result.output
+    assert output_path.read_text(encoding="utf-8").startswith("# NEXUS TECH Balance Report")
+
+
 def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.10.0" in result.output
+    assert "NEXUS TECH 0.11.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -610,6 +652,14 @@ def test_guide_command_renders_quick_start() -> None:
 
     assert result.exit_code == 0
     assert "Quick Guide" in result.output
+
+
+def test_glossary_command_renders_core_stat_help() -> None:
+    result = runner.invoke(app, ["glossary"])
+
+    assert result.exit_code == 0
+    assert "Glossary" in result.output
+    assert "Decision Guide" in result.output
 
 
 def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -648,7 +698,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.10.0" in result.output
+    assert "0.11.0" in result.output
     assert "No save database found yet." in result.output
 
 
@@ -667,7 +717,7 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             updated_at="2026-04-13T01:00:00+00:00",
             victory_achieved=False,
             game_over=False,
-            saved_with_version="0.10.0",
+            saved_with_version="0.11.0",
             schema_version=10,
         )
     ]
@@ -914,6 +964,17 @@ def test_quick_guide_rendering_contains_opening_flow() -> None:
 
     assert "Quick Guide" in output
     assert "Opening flow" in output
+
+
+def test_glossary_rendering_contains_decision_terms() -> None:
+    console = Console(record=True, width=120)
+
+    render_glossary(console)
+    output = console.export_text()
+
+    assert "Glossary" in output
+    assert "Board Confidence" in output
+    assert "Decision Guide" in output
 
 
 def test_victory_rendering_contains_summary_metrics() -> None:

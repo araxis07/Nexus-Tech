@@ -52,9 +52,7 @@ def calculate_investor_pressure_cost(finance: FinanceState) -> Decimal:
     """Operating overhead caused by external capital pressure."""
 
     pressure_units = finance.investor_pressure // BALANCE.finance_pressure_cost_divisor
-    return quantize_money(
-        Decimal(pressure_units) * BALANCE.finance_pressure_operating_cost_unit
-    )
+    return quantize_money(Decimal(pressure_units) * BALANCE.finance_pressure_operating_cost_unit)
 
 
 def calculate_total_finance_cost(finance: FinanceState) -> Decimal:
@@ -139,12 +137,8 @@ def apply_raise_angel(
     ):
         raise ValueError("The company needs better traction before angel funding makes sense.")
 
-    company.cash_on_hand = quantize_money(
-        company.cash_on_hand + BALANCE.finance_angel_raise_amount
-    )
-    finance.total_raised = quantize_money(
-        finance.total_raised + BALANCE.finance_angel_raise_amount
-    )
+    company.cash_on_hand = quantize_money(company.cash_on_hand + BALANCE.finance_angel_raise_amount)
+    finance.total_raised = quantize_money(finance.total_raised + BALANCE.finance_angel_raise_amount)
     finance.equity_dilution = min(
         Decimal("1.0000"),
         finance.equity_dilution + BALANCE.finance_angel_dilution,
@@ -244,9 +238,7 @@ def apply_repay_debt(
         summary="Paid down company debt to reduce future burn.",
     )
     return FinanceActionSummary(
-        message=(
-            f"Repaid {payment} of company debt. Remaining debt is {finance.debt_principal}."
-        ),
+        message=(f"Repaid {payment} of company debt. Remaining debt is {finance.debt_principal}."),
         history_entry=history_entry,
     )
 

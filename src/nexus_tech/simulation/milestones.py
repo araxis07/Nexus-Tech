@@ -349,9 +349,8 @@ def _get_total_users(state: GameState) -> int:
 
 def _has_profitable_streak(state: GameState) -> bool:
     recent_turns = state.turn_history[-BALANCE.profitable_streak_turns :]
-    return (
-        len(recent_turns) == BALANCE.profitable_streak_turns
-        and all(entry.net_cash_flow > 0 for entry in recent_turns)
+    return len(recent_turns) == BALANCE.profitable_streak_turns and all(
+        entry.net_cash_flow > 0 for entry in recent_turns
     )
 
 

@@ -1,5 +1,10 @@
 # 🚀 NEXUS TECH
 
+![CI](https://github.com/araxis07/Nexus-Tech/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.13%2B-blue)
+![Offline First](https://img.shields.io/badge/offline-first-green)
+![Terminal Game](https://img.shields.io/badge/interface-terminal-111827)
+
 **NEXUS TECH** is a terminal-first, single-player business simulation game built entirely in Python.
 
 You start with a small software company, a limited cash reserve, and one early product. From there, your job is to grow the business by making disciplined decisions about product strategy, team management, technical debt, marketing, operating costs, and unexpected business events.
@@ -107,6 +112,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Scale-stage runs can now trigger talent bidding wars and platform breakthroughs with clearer team and product trade-offs
 - Finance-heavy runs can surface loan covenant pressure and down-round trade-offs
 - Customer-heavy and enterprise-heavy runs can surface key-account expansion and security-audit trade-offs
+- Scale-stage runs can now surface enterprise sales cycles, product launch windows, platform outages, competitor acquisitions, and regulatory shifts
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
@@ -145,6 +151,8 @@ Each turn represents a business interval. You review the company, choose actions
 - Deterministic `balance-matrix` runs to compare the same scenarios across every difficulty profile
 - Deterministic `balance-audit` runs to flag rough scenario/difficulty combinations for tuning
 - Deterministic `export-balance-csv` output for external review of scenario and difficulty balance
+- Deterministic `balance-report` output for Markdown tuning reports that combine matrix and audit data
+- Built-in `glossary` command to explain core stats, pressure systems, and decision families
 - Report now includes recent events, funding history, and milestone history
 - Add `list-rivals`, `list-events`, `doctor`, and `check-saves` so content, install state, and local persistence health can be reviewed without entering a run
 - Seeded demo support for reproducible simulations
@@ -259,6 +267,12 @@ Export a balance matrix to CSV:
 uv run nexus-tech export-balance-csv --output balance.csv --scenario founder_journey --runs 2 --turns 10 --seed-base 100
 ```
 
+Export a Markdown balance report:
+
+```bash
+uv run nexus-tech balance-report --output balance-report.md --scenario founder_journey --runs 2 --turns 10 --seed-base 100
+```
+
 Load a saved game:
 
 ```bash
@@ -293,6 +307,12 @@ Show the quick guide:
 
 ```bash
 uv run nexus-tech guide
+```
+
+Show the glossary:
+
+```bash
+uv run nexus-tech glossary
 ```
 
 List save slots:
@@ -390,6 +410,12 @@ uv run ruff format src tests
 
 - `docs/BALANCING.md`
   Balance workflow, tuning commands, and safe content expansion notes.
+
+- `docs/DEMO_SCRIPT.md`
+  Live presentation flow, demo commands, and talking points.
+
+- `docs/RELEASE_CHECKLIST.md`
+  Release verification steps, version checks, and scope guardrails.
 
 - `src/nexus_tech/domain`
   Core validated entities, money helpers, and shared constants.
