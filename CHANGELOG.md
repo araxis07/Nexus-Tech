@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0 - 2026-04-22
+
+- Added a first-run `tutorial` command and in-game tutorial utility for safer onboarding
+- Added `validate-content` to check scenario/template/rival references and event handler coverage
+- Tightened balance audit cash warnings so very short smoke runs do not create noisy findings
+- Improved invalid scenario handling so normal CLI runs fail with a clear panel instead of traceback noise
+- Promoted the package version to `0.12.0`
+
 ## 0.11.0 - 2026-04-22
 
 - Added enterprise sales cycle, product launch window, platform outage, competitor acquisition, and regulatory shift events

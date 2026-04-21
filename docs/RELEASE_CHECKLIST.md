@@ -17,12 +17,14 @@ uv run ruff check src tests
 uv run pytest -q
 uv run nexus-tech --version
 uv run nexus-tech doctor
+uv run nexus-tech validate-content
 ```
 
 ## Demo Verification
 
 ```bash
 uv run nexus-tech glossary
+uv run nexus-tech tutorial
 uv run nexus-tech list-scenarios
 uv run nexus-tech list-templates
 uv run nexus-tech list-rivals

@@ -145,6 +145,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Built-in quick guide flow for onboarding and live demos
+- Built-in first-run tutorial and glossary commands for new players
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
 - Deterministic `compare-balance` scenario rankings for side-by-side tuning across multiple openings
@@ -153,6 +154,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Deterministic `export-balance-csv` output for external review of scenario and difficulty balance
 - Deterministic `balance-report` output for Markdown tuning reports that combine matrix and audit data
 - Built-in `glossary` command to explain core stats, pressure systems, and decision families
+- Built-in `validate-content` command to check catalog references and event handler wiring before release
 - Report now includes recent events, funding history, and milestone history
 - Add `list-rivals`, `list-events`, `doctor`, and `check-saves` so content, install state, and local persistence health can be reviewed without entering a run
 - Seeded demo support for reproducible simulations
@@ -309,10 +311,22 @@ Show the quick guide:
 uv run nexus-tech guide
 ```
 
+Show the first-run tutorial:
+
+```bash
+uv run nexus-tech tutorial
+```
+
 Show the glossary:
 
 ```bash
 uv run nexus-tech glossary
+```
+
+Validate data catalogs and event wiring:
+
+```bash
+uv run nexus-tech validate-content
 ```
 
 List save slots:

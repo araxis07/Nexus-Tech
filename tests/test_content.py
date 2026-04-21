@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     PricingTier,
     TurnAction,
 )
+from nexus_tech.simulation.catalog_validation import validate_content_catalogs
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game
 from nexus_tech.simulation.scenarios import (
     create_product_from_template,
@@ -47,6 +48,17 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "customer_health_firefight" for scenario in scenarios)
     assert any(scenario.scenario_id == "incident_trust_rebuild" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
+
+
+def test_content_catalog_validation_passes_for_packaged_data() -> None:
+    report = validate_content_catalogs()
+
+    assert report.ok is True
+    assert report.scenario_count >= 20
+    assert report.template_count >= 20
+    assert report.rival_count >= 10
+    assert report.event_count >= 20
+    assert report.issues == ()
 
 
 def test_create_new_game_uses_selected_scenario_defaults() -> None:

@@ -341,6 +341,7 @@ def run_balance_audit(
         seed_base=seed_base,
     )
     findings: list[BalanceAuditFinding] = []
+    cash_warning_threshold = calculate_cash_warning_threshold(turns)
     for cell in matrix.cells:
         if cell.shutdowns >= runs:
             findings.append(
@@ -369,7 +370,7 @@ def run_balance_audit(
                     victories=cell.victories,
                 )
             )
-        elif cell.average_cash < BALANCE.finance_pressure_relief_cash_threshold / Decimal("2"):
+        elif cell.average_cash < cash_warning_threshold:
             findings.append(
                 BalanceAuditFinding(
                     severity="low",
@@ -397,6 +398,14 @@ def run_balance_audit(
         seed_base=seed_base,
         findings=tuple(findings),
     )
+
+
+def calculate_cash_warning_threshold(turns: int) -> Decimal:
+    """Return a cash-warning threshold scaled to audit horizon length."""
+
+    scaled_buffer = BALANCE.base_operating_cost * Decimal(max(1, turns // 3))
+    default_buffer = BALANCE.finance_pressure_relief_cash_threshold / Decimal("2")
+    return min(default_buffer, scaled_buffer)
 
 
 def format_balance_matrix_csv(matrix: BalanceMatrixResult) -> str:

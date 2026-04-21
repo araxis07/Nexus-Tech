@@ -28,5 +28,11 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check src tests
 
+      - name: Check formatting
+        run: uv run ruff format --check src tests
+
+      - name: Validate content catalog
+        run: uv run nexus-tech validate-content
+
       - name: Run tests
         run: uv run pytest -q

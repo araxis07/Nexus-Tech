@@ -7,8 +7,10 @@ Use this when presenting the game live from a terminal.
 ```bash
 uv sync --extra dev
 uv run nexus-tech doctor
+uv run nexus-tech validate-content
 uv run nexus-tech list-scenarios
 uv run nexus-tech list-events
+uv run nexus-tech tutorial
 uv run nexus-tech glossary
 ```
 

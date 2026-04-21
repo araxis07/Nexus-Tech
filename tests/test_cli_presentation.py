@@ -41,12 +41,14 @@ from nexus_tech.domain.models import (
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
 from nexus_tech.presentation.dashboard import (
     render_competitor_archetype_catalog,
+    render_content_health,
     render_dashboard,
     render_glossary,
     render_product_template_catalog,
     render_quick_guide,
     render_report,
     render_turn_resolution,
+    render_tutorial,
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
@@ -60,6 +62,7 @@ from nexus_tech.simulation.balance_lab import (
     BalanceRunResult,
     BalanceScenarioComparison,
 )
+from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
 
@@ -209,6 +212,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "balance-audit",
         "export-balance-csv",
         "balance-report",
+        "tutorial",
+        "validate-content",
         "list-saves",
         "check-saves",
         "doctor",
@@ -644,7 +649,7 @@ def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.11.0" in result.output
+    assert "NEXUS TECH 0.12.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -654,12 +659,62 @@ def test_guide_command_renders_quick_start() -> None:
     assert "Quick Guide" in result.output
 
 
+def test_tutorial_command_renders_first_run_path() -> None:
+    result = runner.invoke(app, ["tutorial"])
+
+    assert result.exit_code == 0
+    assert "First Run Tutorial" in result.output
+    assert "new-game" in result.output
+
+
 def test_glossary_command_renders_core_stat_help() -> None:
     result = runner.invoke(app, ["glossary"])
 
     assert result.exit_code == 0
     assert "Glossary" in result.output
     assert "Decision Guide" in result.output
+
+
+def test_validate_content_command_renders_health(monkeypatch: MonkeyPatch) -> None:
+    report = CatalogValidationReport(
+        scenario_count=2,
+        template_count=3,
+        rival_count=1,
+        event_count=4,
+        issues=(),
+    )
+    monkeypatch.setattr(cli_module, "validate_content_catalogs", lambda: report)
+
+    result = runner.invoke(app, ["validate-content"])
+
+    assert result.exit_code == 0
+    assert "Content Health" in result.output
+    assert "All catalog references" in result.output
+
+
+def test_validate_content_command_exits_when_issues_exist(monkeypatch: MonkeyPatch) -> None:
+    report = CatalogValidationReport(
+        scenario_count=2,
+        template_count=3,
+        rival_count=1,
+        event_count=4,
+        issues=("Event 'broken' is registered but has no effect handler.",),
+    )
+    monkeypatch.setattr(cli_module, "validate_content_catalogs", lambda: report)
+
+    result = runner.invoke(app, ["validate-content"])
+
+    assert result.exit_code == 1
+    assert "broken" in result.output
+
+
+def test_invalid_balance_scenario_renders_clean_error() -> None:
+    result = runner.invoke(app, ["simulate-balance", "--scenario", "missing_scenario"])
+
+    assert result.exit_code == 1
+    assert "Invalid Scenario" in result.output
+    assert "missing_scenario" in result.output
+    assert "Traceback" not in result.output
 
 
 def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -698,7 +753,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.11.0" in result.output
+    assert "0.12.0" in result.output
     assert "No save database found yet." in result.output
 
 
@@ -717,7 +772,7 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             updated_at="2026-04-13T01:00:00+00:00",
             victory_achieved=False,
             game_over=False,
-            saved_with_version="0.11.0",
+            saved_with_version="0.12.0",
             schema_version=10,
         )
     ]
@@ -966,6 +1021,17 @@ def test_quick_guide_rendering_contains_opening_flow() -> None:
     assert "Opening flow" in output
 
 
+def test_tutorial_rendering_contains_safe_first_actions() -> None:
+    console = Console(record=True, width=120)
+
+    render_tutorial(console)
+    output = console.export_text()
+
+    assert "First Run Tutorial" in output
+    assert "hire_employee" in output
+    assert "End the turn" in output
+
+
 def test_glossary_rendering_contains_decision_terms() -> None:
     console = Console(record=True, width=120)
 
@@ -975,6 +1041,24 @@ def test_glossary_rendering_contains_decision_terms() -> None:
     assert "Glossary" in output
     assert "Board Confidence" in output
     assert "Decision Guide" in output
+
+
+def test_content_health_rendering_contains_issues_when_present() -> None:
+    console = Console(record=True, width=120)
+    report = CatalogValidationReport(
+        scenario_count=1,
+        template_count=1,
+        rival_count=1,
+        event_count=1,
+        issues=("Broken reference",),
+    )
+
+    render_content_health(console, report)
+    output = console.export_text()
+
+    assert "Content Health" in output
+    assert "failed" in output
+    assert "Broken reference" in output
 
 
 def test_victory_rendering_contains_summary_metrics() -> None:

@@ -38,6 +38,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    calculate_cash_warning_threshold,
     format_balance_matrix_csv,
     format_balance_report_markdown,
     run_balance_audit,
@@ -2148,6 +2149,15 @@ def test_balance_audit_returns_actionable_result() -> None:
     assert audit.runs == 1
     assert audit.turns == 2
     assert isinstance(audit.findings, tuple)
+
+
+def test_cash_warning_threshold_scales_with_audit_horizon() -> None:
+    short_threshold = calculate_cash_warning_threshold(3)
+    long_threshold = calculate_cash_warning_threshold(12)
+
+    assert short_threshold == BALANCE.base_operating_cost
+    assert long_threshold > short_threshold
+    assert long_threshold <= BALANCE.finance_pressure_relief_cash_threshold / Decimal("2")
 
 
 def test_new_milestones_unlock_for_talent_and_platform_credibility() -> None:

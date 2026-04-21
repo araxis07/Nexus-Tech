@@ -34,6 +34,7 @@ from nexus_tech.simulation.balance_lab import (
     BalanceMatrixResult,
 )
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
+from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
@@ -337,8 +338,8 @@ def render_quick_guide(console: Console) -> None:
         "",
         "[bold]Useful commands[/bold]",
         (
-            "`nexus-tech guide`, `list-scenarios`, `list-templates`, "
-            "`list-rivals`, `list-events`, `list-saves`, `check-saves`, `doctor`"
+            "`nexus-tech tutorial`, `guide`, `glossary`, `list-scenarios`, "
+            "`list-events`, `validate-content`, `doctor`"
         ),
         "",
         "[bold]Strong first turns[/bold]",
@@ -348,6 +349,54 @@ def render_quick_guide(console: Console) -> None:
         ),
     )
     console.print(Panel(content, title="Quick Guide", border_style="blue", expand=True))
+
+
+def render_tutorial(console: Console) -> None:
+    """Render a first-run tutorial path without starting an interactive session."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Step", justify="right", style="bold cyan")
+    table.add_column("Player Action", style="bold")
+    table.add_column("Why It Matters")
+    table.add_row(
+        "1",
+        "Run `nexus-tech new-game --scenario founder_journey --seed 7`.",
+        "Starts a repeatable demo with the default founder scenario.",
+    )
+    table.add_row(
+        "2",
+        "Review Company Overview, Product Portfolio, Finance, and Market Watch.",
+        "These panels show runway, product health, pressure, and growth context.",
+    )
+    table.add_row(
+        "3",
+        "Use `hire_employee`, then assign that employee to the flagship product.",
+        "A small team improves execution, but salary burn now matters.",
+    )
+    table.add_row(
+        "4",
+        "Choose either `improve_quality` or `market_product`.",
+        "Quality protects retention; marketing is better once product health is stable.",
+    )
+    table.add_row(
+        "5",
+        "End the turn and read the Turn Summary.",
+        "Revenue, operating cost, churn, growth, events, and team pressure resolve here.",
+    )
+    table.add_row(
+        "6",
+        "Use `view_report`, `review_customers`, and `save_game` after a few turns.",
+        "Reports explain score and risk; saves prove the run can be resumed.",
+    )
+
+    console.print(
+        Panel(
+            table,
+            title="First Run Tutorial",
+            border_style="green",
+            expand=True,
+        )
+    )
 
 
 def render_glossary(console: Console) -> None:
@@ -423,6 +472,42 @@ def render_glossary(console: Console) -> None:
                 Panel(actions, title="Decision Guide", border_style="blue", expand=True),
             ],
             equal=True,
+            expand=True,
+        )
+    )
+
+
+def render_content_health(console: Console, report: CatalogValidationReport) -> None:
+    """Render data catalog and event wiring validation status."""
+
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Status", "ok" if report.ok else "failed")
+    overview.add_row("Scenarios", str(report.scenario_count))
+    overview.add_row("Templates", str(report.template_count))
+    overview.add_row("Rivals", str(report.rival_count))
+    overview.add_row("Events", str(report.event_count))
+    overview.add_row("Issues", str(len(report.issues)))
+
+    issues = Table(box=box.SIMPLE_HEAVY, expand=True)
+    issues.add_column("Issue", style="bold red" if report.issues else "green")
+    if report.issues:
+        for issue in report.issues:
+            issues.add_row(issue)
+    else:
+        issues.add_row("All catalog references and event handlers are wired.")
+
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Content Health", border_style="cyan", expand=True),
+                Panel(
+                    issues,
+                    title="Validation",
+                    border_style="green" if report.ok else "red",
+                    expand=True,
+                ),
+            ],
+            equal=False,
             expand=True,
         )
     )
@@ -1236,6 +1321,7 @@ def _build_action_menu_panel() -> Panel:
     utility_actions.add_row("29", "load_game", "Resume a saved slot from SQLite.")
     utility_actions.add_row("30", "show_guide", "Show a compact how-to-play guide.")
     utility_actions.add_row("31", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("32", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",

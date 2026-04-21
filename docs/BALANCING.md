@@ -34,6 +34,12 @@ Export a Markdown balance report:
 uv run nexus-tech balance-report --output balance-report.md --scenario founder_journey --runs 2 --turns 10
 ```
 
+Validate content references before tuning:
+
+```bash
+uv run nexus-tech validate-content
+```
+
 ## What to Watch
 
 - Average score should climb with good decisions but not explode early.

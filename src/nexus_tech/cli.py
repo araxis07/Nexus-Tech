@@ -48,6 +48,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_matrix,
     render_campaign_goal_catalog,
     render_competitor_archetype_catalog,
+    render_content_health,
     render_customer_view,
     render_dashboard,
     render_employee_picker,
@@ -66,6 +67,7 @@ from nexus_tech.presentation.dashboard import (
     render_scenario_catalog,
     render_team_view,
     render_turn_resolution,
+    render_tutorial,
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
@@ -78,6 +80,7 @@ from nexus_tech.simulation.balance_lab import (
     run_balance_matrix,
 )
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
+from nexus_tech.simulation.catalog_validation import validate_content_catalogs
 from nexus_tech.simulation.engine import (
     ActionContext,
     apply_action,
@@ -195,6 +198,7 @@ UTILITY_ACTION_KEYS = {
     "29": "load_game",
     "30": "show_guide",
     "31": "show_glossary",
+    "32": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -388,6 +392,7 @@ def simulate_balance_command(
 ) -> None:
     """Run a deterministic batch of autoplay simulations for balance checks."""
 
+    validate_scenario_id(scenario)
     batch = run_balance_batch(
         scenario_id=scenario,
         difficulty_mode=difficulty,
@@ -414,7 +419,7 @@ def compare_balance_command(
 ) -> None:
     """Compare multiple scenarios side by side using deterministic autoplay."""
 
-    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    scenario_ids = resolve_scenario_ids(scenario)
     comparison = run_balance_comparison(
         scenario_ids=scenario_ids,
         difficulty_mode=difficulty,
@@ -440,7 +445,7 @@ def balance_matrix_command(
 ) -> None:
     """Compare multiple scenarios across all supported difficulty modes."""
 
-    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    scenario_ids = resolve_scenario_ids(scenario)
     matrix = run_balance_matrix(
         scenario_ids=scenario_ids,
         campaign_goal_id=goal,
@@ -465,7 +470,7 @@ def balance_audit_command(
 ) -> None:
     """Flag rough balance cells across scenarios and supported difficulties."""
 
-    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    scenario_ids = resolve_scenario_ids(scenario)
     audit = run_balance_audit(
         scenario_ids=scenario_ids,
         campaign_goal_id=goal,
@@ -491,7 +496,7 @@ def export_balance_csv_command(
 ) -> None:
     """Export a scenario-versus-difficulty balance matrix to CSV."""
 
-    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    scenario_ids = resolve_scenario_ids(scenario)
     matrix = run_balance_matrix(
         scenario_ids=scenario_ids,
         campaign_goal_id=goal,
@@ -524,7 +529,7 @@ def balance_report_command(
 ) -> None:
     """Export a Markdown balance matrix plus audit findings."""
 
-    scenario_ids = scenario or [entry.scenario_id for entry in get_available_scenarios()]
+    scenario_ids = resolve_scenario_ids(scenario)
     matrix = run_balance_matrix(
         scenario_ids=scenario_ids,
         campaign_goal_id=goal,
@@ -556,11 +561,28 @@ def guide_command() -> None:
     render_quick_guide(console)
 
 
+@app.command("tutorial")
+def tutorial_command() -> None:
+    """Print a first-run tutorial path for demos and new players."""
+
+    render_tutorial(console)
+
+
 @app.command("glossary")
 def glossary_command() -> None:
     """Explain core stats, systems, and decision families."""
 
     render_glossary(console)
+
+
+@app.command("validate-content")
+def validate_content_command() -> None:
+    """Validate content catalogs and event registry wiring."""
+
+    report = validate_content_catalogs()
+    render_content_health(console, report)
+    if not report.ok:
+        raise typer.Exit(code=1) from None
 
 
 @app.command("list-saves")
@@ -774,6 +796,7 @@ def start_new_game(
 ) -> None:
     """Create a brand new run and enter the interactive loop."""
 
+    validate_scenario_id(scenario_id)
     state = create_new_game(
         company_name=company_name,
         product_name=product_name,
@@ -1349,6 +1372,10 @@ def handle_utility_action(
         render_glossary(console)
         return state, rng, current_slot_name
 
+    if action_name == "show_tutorial":
+        render_tutorial(console)
+        return state, rng, current_slot_name
+
     raise ValueError(f"Unsupported utility action: {action_name}")
 
 
@@ -1409,6 +1436,37 @@ def raise_cli_persistence_error(title: str, error: PersistenceError) -> None:
     raise typer.Exit(code=1)
 
 
+def validate_scenario_id(scenario_id: str) -> None:
+    """Exit cleanly when a requested scenario id is unknown."""
+
+    available_ids = {scenario.scenario_id for scenario in get_available_scenarios()}
+    if scenario_id in available_ids:
+        return
+    examples = "\n".join(f"- {scenario_id}" for scenario_id in sorted(available_ids)[:6])
+    console.print(
+        Panel.fit(
+            (
+                f"Unknown scenario '{scenario_id}'.\n"
+                f"Example scenario ids:\n{examples}\n"
+                "Run `nexus-tech list-scenarios` to inspect the full catalog."
+            ),
+            title="Invalid Scenario",
+            border_style="red",
+        )
+    )
+    raise typer.Exit(code=1)
+
+
+def resolve_scenario_ids(scenario_ids: list[str] | None) -> list[str]:
+    """Resolve optional scenario CLI input and validate all ids."""
+
+    if scenario_ids is None:
+        return [entry.scenario_id for entry in get_available_scenarios()]
+    for scenario_id in scenario_ids:
+        validate_scenario_id(scenario_id)
+    return scenario_ids
+
+
 def main() -> None:
     """CLI wrapper used by `python -m` and console scripts."""
 
@@ -1427,7 +1485,7 @@ def main() -> None:
                     border_style="red",
                 )
             )
-        raise typer.Exit(code=1) from error
+        raise typer.Exit(code=1) from None
 
 
 if __name__ == "__main__":
