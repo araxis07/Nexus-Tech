@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0 - 2026-04-22
+
+- Added a fourth content pack with AI governance, developer marketplace, customer health, and incident command product templates
+- Added four higher-scale scenarios focused on AI governance, ecosystem marketplaces, customer health renewals, and security trust rebuilds
+- Added new competitor archetypes for AI fast followers, governance giants, and ecosystem brokers
+- Added key-account expansion and security-audit events to connect new content with customer and trust systems
+- Extended scenario content seeds with board confidence and competitor funding levels
+- Promoted the package version to `0.10.0`
+
 ## 0.9.0 - 2026-04-21
 
 - Added key customer accounts with contract revenue, satisfaction, renewal risk, churn, and expansion pressure

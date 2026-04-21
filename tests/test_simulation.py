@@ -1355,6 +1355,72 @@ def test_compliance_review_event_applies_trust_tradeoff() -> None:
     assert outcome.history_entry.event_id == "compliance_review"
 
 
+def test_key_account_expansion_event_expands_contract() -> None:
+    product = make_product(
+        "Account Desk",
+        target_segment=MarketSegment.ENTERPRISE,
+        user_count=45,
+        quality=74,
+        market_fit=70,
+    )
+    account = CustomerAccount(
+        name="Anchor Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("900.00"),
+        satisfaction=76,
+        expansion_potential=70,
+        renewal_turn=6,
+        churn_risk=12,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        cash_on_hand=Decimal("9000.00"),
+        current_turn=6,
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "key_account_expansion"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "build_success_plan")
+
+    assert outcome.state.customer_accounts[0].contract_value > account.contract_value
+    assert outcome.state.customer_accounts[0].satisfaction > account.satisfaction
+    assert outcome.history_entry.event_id == "key_account_expansion"
+
+
+def test_security_audit_event_protects_enterprise_trust() -> None:
+    product = make_product(
+        "Trust Center",
+        target_segment=MarketSegment.ENTERPRISE,
+        user_count=42,
+        bug_level=22,
+        technical_debt=36,
+    )
+    state = make_state(product, cash_on_hand=Decimal("9000.00"), current_turn=7)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "security_audit"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "fund_audit")
+
+    assert outcome.state.products[0].technical_debt < state.products[0].technical_debt
+    assert outcome.state.products[0].bug_level < state.products[0].bug_level
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.history_entry.event_id == "security_audit"
+
+
 def test_profitable_streak_milestone_unlocks_after_three_positive_turns() -> None:
     state = make_state(make_product("Core"), current_turn=6)
     state.turn_history = [
@@ -1828,6 +1894,8 @@ def test_new_event_ids_are_registered() -> None:
     assert "platform_breakthrough" in registry_ids
     assert "loan_covenant" in registry_ids
     assert "down_round_pressure" in registry_ids
+    assert "key_account_expansion" in registry_ids
+    assert "security_audit" in registry_ids
 
 
 def test_archetype_competitor_adds_segment_pressure() -> None:

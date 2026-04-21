@@ -94,5 +94,44 @@
     "active_product_count": 1,
     "current_move": "feature_sprint",
     "momentum": 57
+  },
+  {
+    "archetype_id": "ai_fast_follower",
+    "title": "AI Fast Follower",
+    "description": "A funded AI-native rival that copies strong product signals quickly and keeps feature pressure high.",
+    "focus_segment": "startup",
+    "strength": 70,
+    "aggression": 68,
+    "pricing_tier": "standard",
+    "active_product_count": 2,
+    "current_move": "feature_sprint",
+    "momentum": 74,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "governance_giant",
+    "title": "Governance Giant",
+    "description": "A compliance-heavy enterprise incumbent with patient capital, buyer trust, and slow but persistent pressure.",
+    "focus_segment": "enterprise",
+    "strength": 82,
+    "aggression": 46,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "hold",
+    "momentum": 56,
+    "funding_level": 3
+  },
+  {
+    "archetype_id": "ecosystem_broker",
+    "title": "Ecosystem Broker",
+    "description": "A distribution-led rival that bundles partner workflows and pulls customers through channel relationships.",
+    "focus_segment": "smb",
+    "strength": 64,
+    "aggression": 66,
+    "pricing_tier": "standard",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 65,
+    "funding_level": 1
   }
 ]

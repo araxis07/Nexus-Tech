@@ -1889,5 +1889,445 @@
         "archetype_id": "channel_aggregator"
       }
     ]
+  },
+  {
+    "scenario_id": "ai_governance_window",
+    "title": "AI Governance Window",
+    "description": "Enterprise buyers are suddenly asking for AI control, auditability, and policy workflows while funded followers race into the same space.",
+    "company_name": "Civic Signal",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "13600.00",
+    "reputation": 61,
+    "finance": {
+      "debt_principal": "0.00",
+      "loan_interest_rate": "0.0000",
+      "equity_dilution": "0.1000",
+      "investor_pressure": 18,
+      "board_confidence": 67,
+      "total_raised": "6200.00"
+    },
+    "products": [
+      {
+        "key": "governance",
+        "template_id": "ai_governance_console",
+        "name": "Civic Guard",
+        "lifecycle_stage": "growth",
+        "quality": 66,
+        "bug_level": 14,
+        "market_fit": 59,
+        "technical_debt": 24,
+        "user_count": 58,
+        "revenue_per_user": "118.00",
+        "feature_count": 3,
+        "maintenance_cost": "410.00",
+        "acquisition_rate": "0.0200",
+        "churn_rate": "0.0480",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "data",
+        "template_id": "enterprise_data_hub",
+        "name": "Civic Data Rail",
+        "lifecycle_stage": "growth",
+        "quality": 61,
+        "bug_level": 18,
+        "market_fit": 55,
+        "technical_debt": 28,
+        "user_count": 42,
+        "revenue_per_user": "94.00",
+        "feature_count": 3,
+        "maintenance_cost": "380.00",
+        "acquisition_rate": "0.0190",
+        "churn_rate": "0.0520",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Mira Chen",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "governance_platform",
+        "assigned_product_key": "governance",
+        "energy": 75,
+        "morale": 76
+      },
+      {
+        "full_name": "Jon Bell",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "enterprise_policy",
+        "assigned_product_key": "governance",
+        "energy": 78,
+        "morale": 74
+      },
+      {
+        "full_name": "Iris Vale",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "trust_workflows",
+        "assigned_product_key": "data",
+        "energy": 80,
+        "morale": 75
+      }
+    ],
+    "competitors": [
+      {
+        "name": "PolicyCloud",
+        "archetype_id": "governance_giant"
+      },
+      {
+        "name": "PromptFleet",
+        "archetype_id": "ai_fast_follower",
+        "focus_segment": "enterprise",
+        "funding_level": 3
+      }
+    ]
+  },
+  {
+    "scenario_id": "ecosystem_flywheel",
+    "title": "Ecosystem Flywheel",
+    "description": "A developer platform is getting partner attention, but the marketplace can either become a moat or turn into coordination debt.",
+    "company_name": "Forge Loop",
+    "company_strategy": "growth",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "growth_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "frothy",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "12400.00",
+    "reputation": 58,
+    "finance": {
+      "debt_principal": "1800.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0800",
+      "investor_pressure": 16,
+      "board_confidence": 60,
+      "total_raised": "4200.00"
+    },
+    "products": [
+      {
+        "key": "marketplace",
+        "template_id": "developer_marketplace",
+        "name": "Forge Exchange",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 20,
+        "market_fit": 61,
+        "technical_debt": 31,
+        "user_count": 122,
+        "revenue_per_user": "29.00",
+        "feature_count": 4,
+        "maintenance_cost": "285.00",
+        "acquisition_rate": "0.0560",
+        "churn_rate": "0.0760",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "api",
+        "template_id": "embedded_api",
+        "name": "Forge API",
+        "lifecycle_stage": "growth",
+        "quality": 63,
+        "bug_level": 16,
+        "market_fit": 57,
+        "technical_debt": 27,
+        "user_count": 88,
+        "revenue_per_user": "44.00",
+        "feature_count": 4,
+        "maintenance_cost": "290.00",
+        "acquisition_rate": "0.0440",
+        "churn_rate": "0.0650",
+        "target_segment": "startup",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "partners",
+        "template_id": "partner_stack",
+        "name": "Forge Partners",
+        "lifecycle_stage": "prototype",
+        "quality": 49,
+        "bug_level": 19,
+        "market_fit": 44,
+        "technical_debt": 25,
+        "user_count": 23,
+        "revenue_per_user": "32.00",
+        "feature_count": 1,
+        "maintenance_cost": "230.00",
+        "acquisition_rate": "0.0500",
+        "churn_rate": "0.0780",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Rae Kim",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "api_ecosystem",
+        "assigned_product_key": "api",
+        "energy": 72,
+        "morale": 73
+      },
+      {
+        "full_name": "Nico Ford",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "developer_relations",
+        "assigned_product_key": "marketplace",
+        "energy": 79,
+        "morale": 78
+      },
+      {
+        "full_name": "Sam Reed",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "partner_ops",
+        "assigned_product_key": "partners",
+        "energy": 77,
+        "morale": 74
+      }
+    ],
+    "competitors": [
+      {
+        "name": "BundleBase",
+        "archetype_id": "ecosystem_broker"
+      },
+      {
+        "name": "AI Extension Lab",
+        "archetype_id": "ai_fast_follower"
+      }
+    ]
+  },
+  {
+    "scenario_id": "customer_health_firefight",
+    "title": "Customer Health Firefight",
+    "description": "Retention software is finally selling, but renewals, support noise, and account risk are forcing every product decision into customer-success trade-offs.",
+    "company_name": "Harbor Health",
+    "company_strategy": "efficiency",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "portfolio_consolidation",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "9800.00",
+    "reputation": 55,
+    "finance": {
+      "debt_principal": "2600.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0000",
+      "investor_pressure": 10,
+      "board_confidence": 58,
+      "total_raised": "0.00"
+    },
+    "products": [
+      {
+        "key": "health",
+        "template_id": "customer_health_engine",
+        "name": "Harbor Health Engine",
+        "lifecycle_stage": "growth",
+        "quality": 62,
+        "bug_level": 21,
+        "market_fit": 60,
+        "technical_debt": 33,
+        "user_count": 104,
+        "revenue_per_user": "61.00",
+        "feature_count": 4,
+        "maintenance_cost": "315.00",
+        "acquisition_rate": "0.0340",
+        "churn_rate": "0.0620",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "renewals",
+        "template_id": "renewal_cloud",
+        "name": "Harbor Renew",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 18,
+        "market_fit": 57,
+        "technical_debt": 28,
+        "user_count": 34,
+        "revenue_per_user": "84.00",
+        "feature_count": 3,
+        "maintenance_cost": "340.00",
+        "acquisition_rate": "0.0240",
+        "churn_rate": "0.0570",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "support",
+        "template_id": "support_ops",
+        "name": "Harbor Support",
+        "lifecycle_stage": "growth",
+        "quality": 54,
+        "bug_level": 27,
+        "market_fit": 51,
+        "technical_debt": 35,
+        "user_count": 86,
+        "revenue_per_user": "42.00",
+        "feature_count": 3,
+        "maintenance_cost": "300.00",
+        "acquisition_rate": "0.0390",
+        "churn_rate": "0.0710",
+        "target_segment": "smb",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Elena Moss",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "customer_success",
+        "assigned_product_key": "health",
+        "energy": 70,
+        "morale": 69
+      },
+      {
+        "full_name": "Drew Lane",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "retention_data",
+        "assigned_product_key": "renewals",
+        "energy": 68,
+        "morale": 70
+      },
+      {
+        "full_name": "Maya Cross",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "service_experience",
+        "assigned_product_key": "support",
+        "energy": 72,
+        "morale": 71
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Success Grid",
+        "archetype_id": "vertical_specialist"
+      },
+      {
+        "name": "Suite Channel",
+        "archetype_id": "ecosystem_broker",
+        "focus_segment": "smb"
+      }
+    ]
+  },
+  {
+    "scenario_id": "incident_trust_rebuild",
+    "title": "Incident Trust Rebuild",
+    "description": "A reliability product has strong enterprise demand, but trust is fragile and every security audit can swing the company narrative.",
+    "company_name": "Signal Harbor",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "11200.00",
+    "reputation": 52,
+    "finance": {
+      "debt_principal": "3600.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0800",
+      "investor_pressure": 20,
+      "board_confidence": 52,
+      "total_raised": "4200.00"
+    },
+    "products": [
+      {
+        "key": "incident",
+        "template_id": "incident_command_center",
+        "name": "Signal Command",
+        "lifecycle_stage": "growth",
+        "quality": 64,
+        "bug_level": 20,
+        "market_fit": 58,
+        "technical_debt": 34,
+        "user_count": 46,
+        "revenue_per_user": "92.00",
+        "feature_count": 3,
+        "maintenance_cost": "365.00",
+        "acquisition_rate": "0.0260",
+        "churn_rate": "0.0550",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "security",
+        "template_id": "security_center",
+        "name": "Signal Trust",
+        "lifecycle_stage": "growth",
+        "quality": 60,
+        "bug_level": 17,
+        "market_fit": 54,
+        "technical_debt": 29,
+        "user_count": 38,
+        "revenue_per_user": "76.00",
+        "feature_count": 3,
+        "maintenance_cost": "330.00",
+        "acquisition_rate": "0.0250",
+        "churn_rate": "0.0530",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Noah Vale",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "incident",
+        "energy": 69,
+        "morale": 70
+      },
+      {
+        "full_name": "Priya West",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "incident_workflows",
+        "assigned_product_key": "incident",
+        "energy": 74,
+        "morale": 72
+      },
+      {
+        "full_name": "Kai Stone",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "trust_marketing",
+        "assigned_product_key": "security",
+        "energy": 76,
+        "morale": 73
+      }
+    ],
+    "competitors": [
+      {
+        "name": "AuditWall",
+        "archetype_id": "governance_giant"
+      },
+      {
+        "name": "Incident AI",
+        "archetype_id": "ai_fast_follower",
+        "focus_segment": "enterprise"
+      }
+    ]
   }
 ]

@@ -246,7 +246,7 @@ def _apply_competitor_move_side_effects(
         if competitor.archetype_id == "price_raider":
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
             competitor.aggression = clamp_int(competitor.aggression + 1)
-        if competitor.archetype_id == "channel_aggregator":
+        if competitor.archetype_id in {"channel_aggregator", "ecosystem_broker"}:
             competitor.strength = clamp_int(competitor.strength + 1)
         _maybe_pivot_focus_segment(competitor, portfolio_products)
         _maybe_raise_competitor_funding(competitor)
@@ -255,7 +255,7 @@ def _apply_competitor_move_side_effects(
     if competitor.current_move is CompetitorMove.FEATURE_SPRINT:
         if competitor.momentum >= BALANCE.competitor_feature_expansion_momentum_threshold:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
-        if competitor.archetype_id == "feature_blitzer":
+        if competitor.archetype_id in {"feature_blitzer", "ai_fast_follower"}:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
         if competitor.archetype_id == "vertical_specialist":
             competitor.strength = clamp_int(competitor.strength + 1)
@@ -278,7 +278,7 @@ def _apply_competitor_move_side_effects(
         competitor.funding_level = max(0, competitor.funding_level - 1)
         return
 
-    if competitor.archetype_id in {"platform_bulwark", "trust_monolith"}:
+    if competitor.archetype_id in {"platform_bulwark", "trust_monolith", "governance_giant"}:
         competitor.pricing_tier = PricingTier.PREMIUM
         competitor.strength = clamp_int(competitor.strength + 1)
     elif competitor.archetype_id == "niche_defender":

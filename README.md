@@ -43,6 +43,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Extend the catalog further with renewal-cloud, customer-portal, and ops-intelligence templates plus channel and concentration-risk scenarios
 - Add a second content-pack pass with billing-hub and partner-stack templates plus talent-race and moat-builder scenarios
 - Add enterprise-data, field-service, and procurement templates plus board-tension, channel-defense, and late-scale drag scenarios
+- Add AI-governance, developer-marketplace, customer-health, and incident-command templates plus higher-scale trust and ecosystem scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
@@ -54,6 +55,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track rival funding levels so strong, high-momentum competitors become more dangerous over time
 - Define reusable competitor archetypes such as price raiders, platform bulwarks, and feature blitzers
 - Expand rival archetypes with channel aggregators, trust monoliths, and vertical specialists
+- Add AI fast followers, governance giants, and ecosystem brokers as new rival archetypes
 - Let rival moves reshape product count and pricing posture over time
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
 - Track an explicit operations layer that converts support backlog and portfolio sprawl into real cost, morale drag, and execution risk
@@ -104,6 +106,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Mature runs can now surface renewal-risk events and channel partner offers with visible product and GTM trade-offs
 - Scale-stage runs can now trigger talent bidding wars and platform breakthroughs with clearer team and product trade-offs
 - Finance-heavy runs can surface loan covenant pressure and down-round trade-offs
+- Customer-heavy and enterprise-heavy runs can surface key-account expansion and security-audit trade-offs
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression

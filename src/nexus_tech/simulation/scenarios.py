@@ -277,6 +277,9 @@ def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor
             ),
             current_move=seed.current_move or archetype.current_move,
             momentum=seed.momentum if seed.momentum is not None else archetype.momentum,
+            funding_level=(
+                seed.funding_level if seed.funding_level is not None else archetype.funding_level
+            ),
         )
 
     return create_competitor(
@@ -289,6 +292,7 @@ def _instantiate_scenario_competitor(seed: ScenarioCompetitorSeed) -> Competitor
         active_product_count=seed.active_product_count or 1,
         current_move=seed.current_move or CompetitorMove.HOLD,
         momentum=seed.momentum or 50,
+        funding_level=seed.funding_level or 0,
     )
 
 
@@ -303,5 +307,6 @@ def _build_scenario_finance(seed: ScenarioFinanceSeed | None) -> FinanceState:
         loan_interest_rate=seed.loan_interest_rate,
         equity_dilution=seed.equity_dilution,
         investor_pressure=seed.investor_pressure,
+        board_confidence=seed.board_confidence,
         total_raised=seed.total_raised,
     )

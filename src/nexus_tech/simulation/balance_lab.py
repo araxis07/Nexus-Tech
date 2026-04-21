@@ -656,6 +656,18 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
             if state.company.cash_on_hand <= BALANCE.event_down_round_pressure_cash_threshold
             else "stay_independent"
         )
+    elif event.event_id == "key_account_expansion":
+        option_id = (
+            "build_success_plan"
+            if state.company.cash_on_hand > BALANCE.event_key_account_success_plan_cost * 2
+            else "ask_for_referral"
+        )
+    elif event.event_id == "security_audit":
+        option_id = (
+            "fund_audit"
+            if state.company.cash_on_hand > BALANCE.event_security_audit_fund_cost * 2
+            else "defer_audit"
+        )
     else:
         option_id = event.options[0].id
 

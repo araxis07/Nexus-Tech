@@ -125,6 +125,7 @@ class ScenarioCompetitorSeed(BaseModel):
     active_product_count: Optional[int] = Field(default=None, ge=1, le=6)  # noqa: UP045
     current_move: Optional[CompetitorMove] = None  # noqa: UP045
     momentum: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
+    funding_level: Optional[int] = Field(default=None, ge=0, le=5)  # noqa: UP045
 
     @model_validator(mode="after")
     def _validate_competitor_source(self) -> ScenarioCompetitorSeed:
@@ -153,6 +154,7 @@ class CompetitorArchetypeDefinition(BaseModel):
     active_product_count: int = Field(default=1, ge=1, le=6)
     current_move: CompetitorMove = CompetitorMove.HOLD
     momentum: int = Field(default=50, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    funding_level: int = Field(default=0, ge=0, le=5)
 
 
 class ScenarioFinanceSeed(BaseModel):
@@ -172,6 +174,7 @@ class ScenarioFinanceSeed(BaseModel):
         le=Decimal("1"),
     )
     investor_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_confidence: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     total_raised: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
 
     @field_validator("debt_principal", "total_raised", mode="before")

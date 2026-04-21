@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from nexus_tech.domain.models import (
+    CustomerAccountStatus,
     Employee,
     EmployeeRole,
     EventCategory,
     EventOption,
     FundingType,
     GameState,
+    MarketSegment,
     PendingEvent,
     Product,
 )
@@ -166,6 +168,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_down_round_pressure_cooldown,
             is_eligible=_is_down_round_pressure_eligible,
             build_pending_event=_build_down_round_pressure_event,
+        ),
+        EventDefinition(
+            event_id="key_account_expansion",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_key_account_expansion_weight,
+            cooldown_turns=BALANCE.event_key_account_expansion_cooldown,
+            is_eligible=_is_key_account_expansion_eligible,
+            build_pending_event=_build_key_account_expansion_event,
+        ),
+        EventDefinition(
+            event_id="security_audit",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_security_audit_weight,
+            cooldown_turns=BALANCE.event_security_audit_cooldown,
+            is_eligible=_is_security_audit_eligible,
+            build_pending_event=_build_security_audit_event,
         ),
     )
 
@@ -963,6 +981,129 @@ def _build_down_round_pressure_event(
             ),
         ],
     )
+
+
+def _is_key_account_expansion_eligible(state: GameState) -> bool:
+    return any(
+        account.status is not CustomerAccountStatus.CHURNED
+        and account.satisfaction >= BALANCE.event_key_account_expansion_satisfaction_threshold
+        and account.expansion_potential >= BALANCE.event_key_account_expansion_potential_threshold
+        and _get_product_by_id(state.products, account.product_id) is not None
+        for account in state.customer_accounts
+    )
+
+
+def _build_key_account_expansion_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    eligible_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+        and account.satisfaction >= BALANCE.event_key_account_expansion_satisfaction_threshold
+        and account.expansion_potential >= BALANCE.event_key_account_expansion_potential_threshold
+        and _get_product_by_id(state.products, account.product_id) is not None
+    ]
+    best_score = max(
+        account.satisfaction + account.expansion_potential for account in eligible_accounts
+    )
+    candidates = [
+        account
+        for account in eligible_accounts
+        if account.satisfaction + account.expansion_potential == best_score
+    ]
+    account = candidates[rng.randint(0, len(candidates) - 1)]
+    product = _get_product_by_id(state.products, account.product_id)
+    if product is None:
+        raise ValueError("Key account expansion expected a product target.")
+
+    return PendingEvent(
+        event_id="key_account_expansion",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Key Account Expansion",
+        description=(
+            f"{account.name} wants more value from {product.name}. "
+            "You can fund a success plan or push for referrals while the account is warm."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=product.id,
+        options=[
+            EventOption(
+                id="build_success_plan",
+                label="Build a success plan",
+                description="Spend cash to expand the contract and protect satisfaction.",
+            ),
+            EventOption(
+                id="ask_for_referral",
+                label="Ask for a referral",
+                description="Turn customer warmth into growth, with some relationship strain.",
+            ),
+        ],
+    )
+
+
+def _is_security_audit_eligible(state: GameState) -> bool:
+    return any(
+        product.is_active
+        and product.target_segment is MarketSegment.ENTERPRISE
+        and (
+            product.user_count >= BALANCE.event_security_audit_user_threshold
+            or product.technical_debt >= BALANCE.event_security_audit_debt_threshold
+        )
+        for product in state.products
+    )
+
+
+def _build_security_audit_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active
+            and product.target_segment is MarketSegment.ENTERPRISE
+            and (
+                product.user_count >= BALANCE.event_security_audit_user_threshold
+                or product.technical_debt >= BALANCE.event_security_audit_debt_threshold
+            )
+        ],
+        rng,
+        score=lambda product: product.user_count + product.technical_debt + product.bug_level,
+    )
+    return PendingEvent(
+        event_id="security_audit",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Security Audit Request",
+        description=(
+            f"Enterprise buyers want stronger security evidence for {target.name}. "
+            "You can fund the audit or defer and absorb trust damage."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_audit",
+                label="Fund the audit",
+                description="Spend cash to lower risk and improve enterprise trust.",
+            ),
+            EventOption(
+                id="defer_audit",
+                label="Defer the audit",
+                description="Save cash now, but increase churn and renewal risk.",
+            ),
+        ],
+    )
+
+
+def _get_product_by_id(products: list[Product], product_id: UUID) -> Product | None:
+    return next((product for product in products if product.id == product_id), None)
 
 
 def _pick_best_product(

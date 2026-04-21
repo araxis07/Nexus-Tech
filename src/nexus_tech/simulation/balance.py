@@ -504,6 +504,9 @@ class BalanceConfig:
             "channel_aggregator": 1,
             "trust_monolith": 2,
             "vertical_specialist": 1,
+            "ai_fast_follower": 1,
+            "governance_giant": 2,
+            "ecosystem_broker": 1,
         }
     )
     competitor_archetype_move_bias: dict[str, dict[str, int]] = field(
@@ -516,6 +519,9 @@ class BalanceConfig:
             "channel_aggregator": {"discount_push": 1, "feature_sprint": 2},
             "trust_monolith": {"hold": 3, "retrench": -1},
             "vertical_specialist": {"feature_sprint": 1, "hold": 1},
+            "ai_fast_follower": {"feature_sprint": 3, "hold": -1},
+            "governance_giant": {"hold": 2, "feature_sprint": 1, "discount_push": -1},
+            "ecosystem_broker": {"discount_push": 1, "feature_sprint": 2},
         }
     )
     competitor_archetype_pivot_threshold_bonus: dict[str, int] = field(
@@ -528,6 +534,9 @@ class BalanceConfig:
             "channel_aggregator": -3,
             "trust_monolith": 5,
             "vertical_specialist": 2,
+            "ai_fast_follower": -2,
+            "governance_giant": 4,
+            "ecosystem_broker": -3,
         }
     )
 
@@ -815,6 +824,28 @@ class BalanceConfig:
     event_down_round_bridge_pressure_gain: int = 4
     event_down_round_independent_morale_gain: int = 1
     event_down_round_independent_reputation_loss: int = 1
+    event_key_account_expansion_weight: int = 4
+    event_key_account_expansion_cooldown: int = 5
+    event_key_account_expansion_satisfaction_threshold: int = 66
+    event_key_account_expansion_potential_threshold: int = 55
+    event_key_account_success_plan_cost: Decimal = Decimal("260.00")
+    event_key_account_success_plan_contract_gain: Decimal = Decimal("180.00")
+    event_key_account_success_plan_satisfaction_gain: int = 6
+    event_key_account_referral_user_gain: int = 9
+    event_key_account_referral_reputation_gain: int = 1
+    event_key_account_referral_satisfaction_loss: int = 3
+    event_security_audit_weight: int = 4
+    event_security_audit_cooldown: int = 5
+    event_security_audit_user_threshold: int = 35
+    event_security_audit_debt_threshold: int = 24
+    event_security_audit_fund_cost: Decimal = Decimal("360.00")
+    event_security_audit_debt_reduction: int = 7
+    event_security_audit_bug_reduction: int = 4
+    event_security_audit_reputation_gain: int = 2
+    event_security_audit_board_gain: int = 3
+    event_security_audit_defer_reputation_loss: int = 2
+    event_security_audit_defer_churn_increase: Decimal = Decimal("0.0050")
+    event_security_audit_defer_account_risk_gain: int = 8
 
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4

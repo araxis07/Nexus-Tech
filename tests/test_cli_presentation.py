@@ -602,7 +602,7 @@ def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.9.0" in result.output
+    assert "NEXUS TECH 0.10.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -648,7 +648,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.9.0" in result.output
+    assert "0.10.0" in result.output
     assert "No save database found yet." in result.output
 
 
@@ -667,7 +667,7 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             updated_at="2026-04-13T01:00:00+00:00",
             victory_achieved=False,
             game_over=False,
-            saved_with_version="0.9.0",
+            saved_with_version="0.10.0",
             schema_version=10,
         )
     ]

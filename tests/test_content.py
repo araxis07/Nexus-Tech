@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from nexus_tech.config import DEFAULT_SCENARIO_ID
-from nexus_tech.content.loader import get_product_template
+from nexus_tech.content.loader import get_competitor_archetype, get_product_template
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
@@ -42,6 +42,10 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "board_tension" for scenario in scenarios)
     assert any(scenario.scenario_id == "channel_defense" for scenario in scenarios)
     assert any(scenario.scenario_id == "late_scale_drag" for scenario in scenarios)
+    assert any(scenario.scenario_id == "ai_governance_window" for scenario in scenarios)
+    assert any(scenario.scenario_id == "ecosystem_flywheel" for scenario in scenarios)
+    assert any(scenario.scenario_id == "customer_health_firefight" for scenario in scenarios)
+    assert any(scenario.scenario_id == "incident_trust_rebuild" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -122,6 +126,13 @@ def test_finance_seed_is_loaded_from_scenario_content() -> None:
     assert state.finance.investor_pressure == 8
 
 
+def test_board_confidence_seed_is_loaded_from_scenario_content() -> None:
+    state = create_new_game(scenario_id="ai_governance_window")
+
+    assert state.finance.board_confidence == 67
+    assert state.finance.equity_dilution == Decimal("0.1000")
+
+
 def test_new_template_catalog_entries_are_available() -> None:
     template = get_product_template("ai_copilot")
 
@@ -173,6 +184,18 @@ def test_content_pack_three_templates_are_available() -> None:
     assert procurement.pricing_tier is PricingTier.PREMIUM
 
 
+def test_content_pack_four_templates_are_available() -> None:
+    governance = get_product_template("ai_governance_console")
+    marketplace = get_product_template("developer_marketplace")
+    health = get_product_template("customer_health_engine")
+    incident = get_product_template("incident_command_center")
+
+    assert governance.target_segment.value == "enterprise"
+    assert marketplace.target_segment.value == "startup"
+    assert health.pricing_tier is PricingTier.PREMIUM
+    assert incident.revenue_per_user == Decimal("88.00")
+
+
 def test_competitor_archetype_catalog_is_available() -> None:
     archetypes = get_available_competitor_archetypes()
     archetype_ids = {archetype.archetype_id for archetype in archetypes}
@@ -181,6 +204,16 @@ def test_competitor_archetype_catalog_is_available() -> None:
     assert {"channel_aggregator", "trust_monolith", "vertical_specialist"}.issubset(
         archetype_ids
     )
+    assert {"ai_fast_follower", "governance_giant", "ecosystem_broker"}.issubset(
+        archetype_ids
+    )
+
+
+def test_competitor_archetype_funding_level_is_available() -> None:
+    archetype = get_competitor_archetype("governance_giant")
+
+    assert archetype.funding_level == 3
+    assert archetype.pricing_tier is PricingTier.PREMIUM
 
 
 def test_archetype_backed_scenario_bootstraps_competitors() -> None:
@@ -189,3 +222,13 @@ def test_archetype_backed_scenario_bootstraps_competitors() -> None:
     assert any(competitor.name == "Deal Current" for competitor in state.competitors)
     assert any(competitor.archetype_id == "price_raider" for competitor in state.competitors)
     assert any(competitor.focus_segment.value == "startup" for competitor in state.competitors)
+
+
+def test_new_content_pack_scenario_bootstraps_funded_rivals() -> None:
+    state = create_new_game(scenario_id="ecosystem_flywheel")
+
+    assert state.scenario_title == "Ecosystem Flywheel"
+    assert len(state.products) == 3
+    assert any(product.name == "Forge Exchange" for product in state.products)
+    assert any(competitor.archetype_id == "ecosystem_broker" for competitor in state.competitors)
+    assert any(competitor.funding_level >= 1 for competitor in state.competitors)

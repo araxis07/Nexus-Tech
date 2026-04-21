@@ -5,7 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from nexus_tech.domain.models import Employee, EventHistoryEntry, GameState, PendingEvent, Product
+from nexus_tech.domain.models import (
+    CustomerAccount,
+    CustomerAccountStatus,
+    Employee,
+    EventHistoryEntry,
+    GameState,
+    PendingEvent,
+    Product,
+)
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.economy import is_game_over
@@ -901,6 +909,121 @@ def _apply_down_round_pressure(state: GameState, event: PendingEvent, option_id:
     raise ValueError(f"Unsupported option {option_id} for down round pressure.")
 
 
+def _apply_key_account_expansion(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    account = _get_best_active_account_for_product(state, product.id)
+
+    if option_id == "build_success_plan":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_key_account_success_plan_cost
+        )
+        account.contract_value = quantize_money(
+            account.contract_value + BALANCE.event_key_account_success_plan_contract_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.event_key_account_success_plan_satisfaction_gain,
+            0,
+            100,
+        )
+        account.expansion_potential = clamp_int(account.expansion_potential - 8, 0, 100)
+        product.market_fit = clamp_int(product.market_fit + 1, 0, 100)
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence + 1, 0, 100)
+        return (
+            f"You expanded {account.name}. Cash "
+            f"-{BALANCE.event_key_account_success_plan_cost}, contract "
+            f"+{BALANCE.event_key_account_success_plan_contract_gain}, satisfaction "
+            f"+{BALANCE.event_key_account_success_plan_satisfaction_gain}."
+        )
+
+    if option_id == "ask_for_referral":
+        product.user_count += BALANCE.event_key_account_referral_user_gain
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_key_account_referral_reputation_gain,
+            0,
+            100,
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction - BALANCE.event_key_account_referral_satisfaction_loss,
+            0,
+            100,
+        )
+        account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"{account.name} referred new demand to {product.name}. Users "
+            f"+{BALANCE.event_key_account_referral_user_gain}, reputation "
+            f"+{BALANCE.event_key_account_referral_reputation_gain}, satisfaction "
+            f"-{BALANCE.event_key_account_referral_satisfaction_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for key account expansion.")
+
+
+def _apply_security_audit(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "fund_audit":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_security_audit_fund_cost
+        )
+        product.technical_debt = clamp_int(
+            product.technical_debt - BALANCE.event_security_audit_debt_reduction,
+            0,
+            100,
+        )
+        product.bug_level = clamp_int(
+            product.bug_level - BALANCE.event_security_audit_bug_reduction,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_security_audit_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_security_audit_board_gain,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.satisfaction = clamp_int(account.satisfaction + 2, 0, 100)
+            account.churn_risk = clamp_int(account.churn_risk - 5, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You funded the security audit for {product.name}. Cash "
+            f"-{BALANCE.event_security_audit_fund_cost}, debt "
+            f"-{BALANCE.event_security_audit_debt_reduction}, reputation "
+            f"+{BALANCE.event_security_audit_reputation_gain}."
+        )
+
+    if option_id == "defer_audit":
+        product.churn_rate = clamp_rate(
+            product.churn_rate + BALANCE.event_security_audit_defer_churn_increase
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_security_audit_defer_reputation_loss,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.event_security_audit_defer_account_risk_gain,
+                0,
+                100,
+            )
+            if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold:
+                account.status = CustomerAccountStatus.AT_RISK
+        return (
+            f"You deferred the security audit for {product.name}. Churn rate "
+            f"+{BALANCE.event_security_audit_defer_churn_increase}, reputation "
+            f"-{BALANCE.event_security_audit_defer_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for security audit.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -927,6 +1050,21 @@ def _get_assigned_employees(state: GameState, product_id: UUID) -> list[Employee
     return [employee for employee in state.employees if employee.assigned_product_id == product_id]
 
 
+def _get_active_accounts_for_product(state: GameState, product_id: UUID) -> list[CustomerAccount]:
+    return [
+        account
+        for account in state.customer_accounts
+        if account.product_id == product_id and account.status is not CustomerAccountStatus.CHURNED
+    ]
+
+
+def _get_best_active_account_for_product(state: GameState, product_id: UUID) -> CustomerAccount:
+    accounts = _get_active_accounts_for_product(state, product_id)
+    if not accounts:
+        raise ValueError("This event expected an active key account.")
+    return max(accounts, key=lambda account: account.satisfaction + account.expansion_potential)
+
+
 EVENT_EFFECT_HANDLERS = {
     "severe_bug_incident": _apply_severe_bug_incident,
     "favorable_market_trend": _apply_favorable_market_trend,
@@ -944,4 +1082,6 @@ EVENT_EFFECT_HANDLERS = {
     "platform_breakthrough": _apply_platform_breakthrough,
     "loan_covenant": _apply_loan_covenant,
     "down_round_pressure": _apply_down_round_pressure,
+    "key_account_expansion": _apply_key_account_expansion,
+    "security_audit": _apply_security_audit,
 }
