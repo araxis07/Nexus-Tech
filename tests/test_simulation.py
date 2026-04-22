@@ -71,6 +71,7 @@ from nexus_tech.simulation.growth import (
     calculate_churned_users,
     calculate_effective_churn_rate_for_context,
 )
+from nexus_tech.simulation.hiring import generate_candidate_pool
 from nexus_tech.simulation.late_game import (
     apply_end_of_turn_late_game,
     calculate_late_game_summary,
@@ -82,6 +83,7 @@ from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_score
+from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scaling import (
     calculate_company_scale_pressure,
     calculate_product_scale_pressure,
@@ -569,6 +571,28 @@ def test_set_roadmap_updates_state_and_platform_rebuild_changes_execution_profil
     )
 
 
+def test_new_roadmap_initiatives_have_distinct_profiles() -> None:
+    trust_profile = get_roadmap_profile(
+        RoadmapFocus.AI_TRUST_PROGRAM,
+        roadmap_set_turn=1,
+        current_turn=1,
+    )
+    community_profile = get_roadmap_profile(
+        RoadmapFocus.COMMUNITY_GROWTH,
+        roadmap_set_turn=1,
+        current_turn=1,
+    )
+    enterprise_profile = get_roadmap_profile(
+        RoadmapFocus.ENTERPRISE_SALES_PUSH,
+        roadmap_set_turn=1,
+        current_turn=1,
+    )
+
+    assert trust_profile.reputation_bonus > 0
+    assert community_profile.acquisition_bonus > trust_profile.acquisition_bonus
+    assert enterprise_profile.market_fit_bonus > community_profile.market_fit_bonus
+
+
 def test_set_budget_stance_action_refreshes_quarter_plan_targets() -> None:
     state = create_new_game("NEXUS TECH", "Nexus One")
     original_plan = state.quarter_plan.model_copy(deep=True)
@@ -809,6 +833,15 @@ def test_hiring_and_firing_change_salary_burden() -> None:
     )
 
     assert calculate_total_salary_cost(fired.state.employees) == Decimal("0.00")
+
+
+def test_candidate_pool_generation_is_seeded_and_role_valid() -> None:
+    first_pool = generate_candidate_pool(RandomSource(seed=77), count=4)
+    second_pool = generate_candidate_pool(RandomSource(seed=77), count=4)
+
+    assert first_pool == second_pool
+    assert len(first_pool) == 4
+    assert all(candidate.role in set(EmployeeRole) for candidate in first_pool)
 
 
 def test_assignment_increases_engineer_effect_on_quality_work() -> None:
@@ -1606,6 +1639,72 @@ def test_regulatory_shift_proactive_controls_reduce_debt_and_increase_trust() ->
     assert outcome.history_entry.event_id == "regulatory_shift"
 
 
+def test_event_chain_followup_becomes_eligible_after_related_history() -> None:
+    product = make_product(
+        "Regulated Core",
+        target_segment=MarketSegment.ENTERPRISE,
+        market_fit=62,
+        technical_debt=36,
+        user_count=58,
+    )
+    history_entry = EventHistoryEntry(
+        event_id="security_audit",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Security Audit",
+        triggered_turn=5,
+        resolved_turn=5,
+        selected_option_id="fund_audit",
+        selected_option_label="Fund audit",
+        result_text="Audit funded.",
+    )
+    state = make_state(product, current_turn=7, event_history=[history_entry])
+
+    eligible_ids = {definition.event_id for definition in get_eligible_event_definitions(state)}
+
+    assert "audit_followup_review" in eligible_ids
+
+
+def test_event_chain_followup_applies_evidence_tradeoff() -> None:
+    product = make_product(
+        "Regulated Core",
+        target_segment=MarketSegment.ENTERPRISE,
+        market_fit=62,
+        technical_debt=36,
+        user_count=58,
+    )
+    account = CustomerAccount(
+        name="Enterprise Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("900.00"),
+        satisfaction=66,
+        expansion_potential=52,
+        renewal_turn=8,
+        churn_risk=22,
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        cash_on_hand=Decimal("9000.00"),
+        current_turn=7,
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "audit_followup_review"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "package_evidence")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.products[0].technical_debt < state.products[0].technical_debt
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.customer_accounts[0].churn_risk < state.customer_accounts[0].churn_risk
+    assert outcome.history_entry.event_id == "audit_followup_review"
+
+
 def test_profitable_streak_milestone_unlocks_after_three_positive_turns() -> None:
     state = make_state(make_product("Core"), current_turn=6)
     state.turn_history = [
@@ -2086,6 +2185,9 @@ def test_new_event_ids_are_registered() -> None:
     assert "platform_outage" in registry_ids
     assert "competitor_acquisition" in registry_ids
     assert "regulatory_shift" in registry_ids
+    assert "audit_followup_review" in registry_ids
+    assert "launch_aftershock" in registry_ids
+    assert "enterprise_procurement_delay" in registry_ids
 
 
 def test_archetype_competitor_adds_segment_pressure() -> None:

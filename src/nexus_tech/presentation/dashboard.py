@@ -21,6 +21,7 @@ from nexus_tech.domain.models import (
     EventHistoryEntry,
     FundingHistoryEntry,
     GameState,
+    MarketSegment,
     MilestoneEntry,
     PendingEvent,
     Product,
@@ -40,6 +41,7 @@ from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import estimate_runway
+from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
 from nexus_tech.simulation.operations import calculate_operations_summary
@@ -51,6 +53,7 @@ from nexus_tech.simulation.roadmap import (
     is_roadmap_due,
 )
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
+from nexus_tech.simulation.segments import MarketSegmentProfile
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
 
 
@@ -98,6 +101,9 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
     table.add_column("Description")
 
     for scenario in scenarios:
+        description = scenario.description
+        if scenario.objective:
+            description = f"{description}\n[dim]Objective: {scenario.objective}[/dim]"
         table.add_row(
             f"{scenario.title}\n[dim]{scenario.scenario_id}[/dim]",
             scenario.company_name,
@@ -106,7 +112,7 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
             scenario.campaign_goal_id.value,
             str(len(scenario.products)),
             str(len(scenario.employees)),
-            scenario.description,
+            description,
         )
 
     scenario_ids = ", ".join(f"{scenario.scenario_id} ({scenario.title})" for scenario in scenarios)
@@ -162,6 +168,80 @@ def render_product_template_catalog(
             expand=True,
         )
     )
+
+
+def render_candidate_pool(
+    console: Console,
+    candidates: tuple[CandidateProfile, ...],
+) -> None:
+    """Render generated hiring candidates."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Candidate", style="bold")
+    table.add_column("Role")
+    table.add_column("Seniority")
+    table.add_column("Specialization")
+    table.add_column("Why They Matter")
+
+    for index, candidate in enumerate(candidates, start=1):
+        table.add_row(
+            str(index),
+            candidate.full_name,
+            candidate.role.value,
+            candidate.seniority.value,
+            candidate.specialization,
+            candidate.pitch,
+        )
+
+    console.print(Panel(table, title="Hiring Candidate Pool", border_style="cyan", expand=True))
+
+
+def render_segment_catalog(
+    console: Console,
+    profiles: tuple[tuple[MarketSegment, MarketSegmentProfile], ...],
+) -> None:
+    """Render customer segment behavior for strategy decisions."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Segment", style="bold", no_wrap=True)
+    table.add_column("Acquisition", justify="right")
+    table.add_column("Churn Mod", justify="right")
+    table.add_column("Support Cost", justify="right")
+    table.add_column("Price Sens.", justify="right")
+    table.add_column("Fit Need", justify="right")
+    table.add_column("Quality Need", justify="right")
+    table.add_column("Competitive Base", justify="right")
+
+    for segment, profile in profiles:
+        table.add_row(
+            segment.value,
+            f"{profile.acquisition_bonus:+d}",
+            format_rate(profile.base_churn_modifier),
+            f"x{profile.support_cost_multiplier}",
+            f"x{profile.price_sensitivity_multiplier}",
+            str(profile.market_fit_threshold),
+            str(profile.quality_threshold),
+            str(profile.competitor_pressure_base),
+        )
+
+    console.print(Panel(table, title="Customer Segment Profiles", border_style="cyan", expand=True))
+
+
+def render_roadmap_catalog(
+    console: Console,
+    profiles: tuple[tuple[str, str], ...],
+) -> None:
+    """Render roadmap/initiative profiles available to the player."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Roadmap Focus", style="bold")
+    table.add_column("Strategic Trade-off")
+
+    for focus, summary in profiles:
+        table.add_row(focus, summary)
+
+    console.print(Panel(table, title="Roadmap Initiatives", border_style="cyan", expand=True))
 
 
 def render_campaign_goal_catalog(

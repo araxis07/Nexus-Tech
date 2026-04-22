@@ -279,6 +279,23 @@ class BalanceConfig:
     roadmap_portfolio_operating_cost_modifier: Decimal = Decimal("-80.00")
     roadmap_portfolio_acquisition_penalty: int = -1
     roadmap_portfolio_competitor_relief: int = 1
+    roadmap_ai_trust_quality_bonus: int = 1
+    roadmap_ai_trust_market_fit_bonus: int = 2
+    roadmap_ai_trust_debt_bonus: int = 3
+    roadmap_ai_trust_reputation_bonus: int = 2
+    roadmap_ai_trust_operating_cost_modifier: Decimal = Decimal("65.00")
+    roadmap_ai_trust_competitor_relief: int = 2
+    roadmap_community_growth_acquisition_bonus: int = 3
+    roadmap_community_growth_market_fit_bonus: int = 1
+    roadmap_community_growth_reputation_bonus: int = 1
+    roadmap_community_growth_feature_risk_modifier: int = 1
+    roadmap_community_growth_operating_cost_modifier: Decimal = Decimal("55.00")
+    roadmap_enterprise_sales_quality_bonus: int = 1
+    roadmap_enterprise_sales_market_fit_bonus: int = 3
+    roadmap_enterprise_sales_acquisition_bonus: int = -1
+    roadmap_enterprise_sales_reputation_bonus: int = 1
+    roadmap_enterprise_sales_operating_cost_modifier: Decimal = Decimal("120.00")
+    roadmap_enterprise_sales_competitor_relief: int = 2
 
     budget_lean_operating_cost_modifier: Decimal = Decimal("-90.00")
     budget_lean_marketing_cost_multiplier: Decimal = Decimal("0.80")
@@ -507,6 +524,9 @@ class BalanceConfig:
             "ai_fast_follower": 1,
             "governance_giant": 2,
             "ecosystem_broker": 1,
+            "open_source_challenger": 1,
+            "regulatory_incumbent": 2,
+            "platform_consolidator": 2,
         }
     )
     competitor_archetype_move_bias: dict[str, dict[str, int]] = field(
@@ -522,6 +542,9 @@ class BalanceConfig:
             "ai_fast_follower": {"feature_sprint": 3, "hold": -1},
             "governance_giant": {"hold": 2, "feature_sprint": 1, "discount_push": -1},
             "ecosystem_broker": {"discount_push": 1, "feature_sprint": 2},
+            "open_source_challenger": {"feature_sprint": 2, "discount_push": 1, "hold": -1},
+            "regulatory_incumbent": {"hold": 3, "retrench": -1},
+            "platform_consolidator": {"discount_push": 2, "feature_sprint": 1},
         }
     )
     competitor_archetype_pivot_threshold_bonus: dict[str, int] = field(
@@ -537,6 +560,9 @@ class BalanceConfig:
             "ai_fast_follower": -2,
             "governance_giant": 4,
             "ecosystem_broker": -3,
+            "open_source_challenger": -2,
+            "regulatory_incumbent": 5,
+            "platform_consolidator": -2,
         }
     )
 
@@ -547,6 +573,9 @@ class BalanceConfig:
             "platform_rebuild": Decimal("1.04"),
             "premium_expansion": Decimal("1.10"),
             "portfolio_consolidation": Decimal("1.05"),
+            "ai_trust_program": Decimal("1.09"),
+            "community_growth": Decimal("1.13"),
+            "enterprise_sales_push": Decimal("1.12"),
         }
     )
     quarter_plan_user_growth_by_budget: dict[str, int] = field(
@@ -902,6 +931,29 @@ class BalanceConfig:
     event_regulatory_shift_wait_reputation_loss: int = 1
     event_regulatory_shift_wait_churn_increase: Decimal = Decimal("0.0040")
     event_regulatory_shift_wait_account_risk_gain: int = 6
+    event_chain_recent_window_turns: int = 4
+    event_audit_followup_weight: int = 3
+    event_audit_followup_cooldown: int = 6
+    event_audit_followup_cost: Decimal = Decimal("260.00")
+    event_audit_followup_debt_reduction: int = 4
+    event_audit_followup_reputation_gain: int = 2
+    event_audit_followup_board_gain: int = 2
+    event_audit_followup_defer_risk_gain: int = 5
+    event_launch_aftershock_weight: int = 3
+    event_launch_aftershock_cooldown: int = 5
+    event_launch_aftershock_stabilize_cost: Decimal = Decimal("240.00")
+    event_launch_aftershock_bug_reduction: int = 3
+    event_launch_aftershock_quality_gain: int = 1
+    event_launch_aftershock_chase_user_gain: int = 8
+    event_launch_aftershock_chase_bug_gain: int = 4
+    event_launch_aftershock_chase_energy_loss: int = 4
+    event_procurement_delay_weight: int = 3
+    event_procurement_delay_cooldown: int = 6
+    event_procurement_delay_proof_cost: Decimal = Decimal("300.00")
+    event_procurement_delay_user_gain: int = 5
+    event_procurement_delay_revenue_gain: Decimal = Decimal("3.00")
+    event_procurement_delay_wait_reputation_loss: int = 1
+    event_procurement_delay_wait_account_risk_gain: int = 5
 
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4

@@ -60,6 +60,32 @@ _ROADMAP_PROFILES = {
         competitor_pressure_relief=BALANCE.roadmap_portfolio_competitor_relief,
         summary="Tighten the portfolio, reduce waste, and protect operating leverage.",
     ),
+    RoadmapFocus.AI_TRUST_PROGRAM: RoadmapProfile(
+        quality_bonus=BALANCE.roadmap_ai_trust_quality_bonus,
+        market_fit_bonus=BALANCE.roadmap_ai_trust_market_fit_bonus,
+        debt_reduction_bonus=BALANCE.roadmap_ai_trust_debt_bonus,
+        reputation_bonus=BALANCE.roadmap_ai_trust_reputation_bonus,
+        operating_cost_modifier=BALANCE.roadmap_ai_trust_operating_cost_modifier,
+        competitor_pressure_relief=BALANCE.roadmap_ai_trust_competitor_relief,
+        summary="Invest in trust, controls, and credible AI governance for regulated buyers.",
+    ),
+    RoadmapFocus.COMMUNITY_GROWTH: RoadmapProfile(
+        market_fit_bonus=BALANCE.roadmap_community_growth_market_fit_bonus,
+        acquisition_bonus=BALANCE.roadmap_community_growth_acquisition_bonus,
+        reputation_bonus=BALANCE.roadmap_community_growth_reputation_bonus,
+        feature_risk_modifier=BALANCE.roadmap_community_growth_feature_risk_modifier,
+        operating_cost_modifier=BALANCE.roadmap_community_growth_operating_cost_modifier,
+        summary="Build community-led distribution while accepting some feature delivery noise.",
+    ),
+    RoadmapFocus.ENTERPRISE_SALES_PUSH: RoadmapProfile(
+        quality_bonus=BALANCE.roadmap_enterprise_sales_quality_bonus,
+        market_fit_bonus=BALANCE.roadmap_enterprise_sales_market_fit_bonus,
+        acquisition_bonus=BALANCE.roadmap_enterprise_sales_acquisition_bonus,
+        reputation_bonus=BALANCE.roadmap_enterprise_sales_reputation_bonus,
+        operating_cost_modifier=BALANCE.roadmap_enterprise_sales_operating_cost_modifier,
+        competitor_pressure_relief=BALANCE.roadmap_enterprise_sales_competitor_relief,
+        summary="Push enterprise sales motions with higher cost and stronger buyer fit.",
+    ),
 }
 
 

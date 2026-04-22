@@ -47,6 +47,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_lab,
     render_balance_matrix,
     render_campaign_goal_catalog,
+    render_candidate_pool,
     render_competitor_archetype_catalog,
     render_content_health,
     render_customer_view,
@@ -63,8 +64,10 @@ from nexus_tech.presentation.dashboard import (
     render_product_template_picker,
     render_quick_guide,
     render_report,
+    render_roadmap_catalog,
     render_save_slot_catalog,
     render_scenario_catalog,
+    render_segment_catalog,
     render_team_view,
     render_turn_resolution,
     render_tutorial,
@@ -91,12 +94,15 @@ from nexus_tech.simulation.engine import (
 )
 from nexus_tech.simulation.event_registry import get_event_registry
 from nexus_tech.simulation.events import resolve_pending_event
+from nexus_tech.simulation.hiring import generate_candidate_pool
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scenarios import (
     get_available_competitor_archetypes,
     get_available_product_templates,
     get_available_scenarios,
 )
+from nexus_tech.simulation.segments import get_market_segment_profile
 
 logger = logging.getLogger(__name__)
 
@@ -375,6 +381,49 @@ def list_events_command() -> None:
     """Print the supported dynamic event catalog."""
 
     render_event_catalog(console, get_event_registry())
+
+
+@app.command("list-candidates")
+def list_candidates_command(
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed used to generate a deterministic hiring pool.",
+    ),
+    count: int = typer.Option(3, "--count", min=1, max=6, help="Number of candidates to show."),
+) -> None:
+    """Print a deterministic sample hiring candidate pool."""
+
+    render_candidate_pool(console, generate_candidate_pool(RandomSource(seed=seed), count=count))
+
+
+@app.command("list-segments")
+def list_segments_command() -> None:
+    """Print customer segment trade-offs used by growth and churn formulas."""
+
+    profiles = tuple((segment, get_market_segment_profile(segment)) for segment in MarketSegment)
+    render_segment_catalog(console, profiles)
+
+
+@app.command("list-roadmaps")
+def list_roadmaps_command() -> None:
+    """Print available quarter-scale roadmap initiatives."""
+
+    profiles = tuple(
+        (
+            focus.value,
+            get_roadmap_profile(focus, roadmap_set_turn=1, current_turn=1).summary,
+        )
+        for focus in RoadmapFocus
+    )
+    render_roadmap_catalog(console, profiles)
+
+
+@app.command("list-initiatives", hidden=True)
+def list_initiatives_alias() -> None:
+    """Backward-compatible alias for roadmap initiative discovery."""
+
+    list_roadmaps_command()
 
 
 @app.command("simulate-balance")
@@ -972,6 +1021,9 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
                 "platform_rebuild",
                 "premium_expansion",
                 "portfolio_consolidation",
+                "ai_trust_program",
+                "community_growth",
+                "enterprise_sales_push",
             ],
             default=state.roadmap_focus.value,
             show_choices=False,
@@ -990,6 +1042,26 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         return ActionContext(budget_stance=BudgetStance(budget_key))
 
     if action is TurnAction.HIRE_EMPLOYEE:
+        candidate_seed = (state.company.current_turn * 101) + (len(state.employees) * 17)
+        candidates = generate_candidate_pool(RandomSource(seed=candidate_seed))
+        render_candidate_pool(console, candidates)
+        candidate_choices = [str(index) for index in range(1, len(candidates) + 1)]
+        selected_candidate = ask_choice_input(
+            "Candidate number or custom",
+            choices=[*candidate_choices, "custom"],
+            default="1",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        if selected_candidate != "custom":
+            candidate = candidates[int(selected_candidate) - 1]
+            return ActionContext(
+                hire_full_name=candidate.full_name,
+                hire_role=candidate.role,
+                hire_seniority=candidate.seniority,
+                hire_specialization=candidate.specialization,
+            )
+
         full_name = ask_text_input("Employee full name")
         role_key = ask_choice_input(
             "Role",

@@ -769,6 +769,24 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
             if state.company.cash_on_hand > BALANCE.event_regulatory_shift_cost * 2
             else "wait_for_clarity"
         )
+    elif event.event_id == "audit_followup_review":
+        option_id = (
+            "package_evidence"
+            if state.company.cash_on_hand > BALANCE.event_audit_followup_cost * 2
+            else "defer_followup"
+        )
+    elif event.event_id == "launch_aftershock":
+        option_id = (
+            "stabilize_experience"
+            if state.company.cash_on_hand > BALANCE.event_launch_aftershock_stabilize_cost * 2
+            else "chase_second_wave"
+        )
+    elif event.event_id == "enterprise_procurement_delay":
+        option_id = (
+            "fund_proof"
+            if state.company.cash_on_hand > BALANCE.event_procurement_delay_proof_cost * 2
+            else "wait_out_process"
+        )
     else:
         option_id = event.options[0].id
 
@@ -855,12 +873,22 @@ def _choose_budget_stance(state: GameState):
 
 def _choose_roadmap_focus(state: GameState) -> RoadmapFocus:
     worst_product = _pick_worst_product(state)
+    if any(
+        product.target_segment is MarketSegment.ENTERPRISE and product.market_fit >= 56
+        for product in state.products
+        if product.is_active
+    ):
+        return RoadmapFocus.ENTERPRISE_SALES_PUSH
     if worst_product.technical_debt >= 40:
         return RoadmapFocus.PLATFORM_REBUILD
+    if any(product.target_segment is MarketSegment.ENTERPRISE for product in state.products):
+        return RoadmapFocus.AI_TRUST_PROGRAM
     if sum(1 for product in state.products if product.is_active) >= 3:
         return RoadmapFocus.PORTFOLIO_CONSOLIDATION
     if state.company.cash_on_hand > BALANCE.cash_reserve_milestone_threshold:
         return RoadmapFocus.GROWTH_PUSH
+    if any(product.target_segment is MarketSegment.INDIE for product in state.products):
+        return RoadmapFocus.COMMUNITY_GROWTH
     return RoadmapFocus.BALANCED_EXECUTION
 
 

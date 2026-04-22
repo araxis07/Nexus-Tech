@@ -225,6 +225,30 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             is_eligible=_is_regulatory_shift_eligible,
             build_pending_event=_build_regulatory_shift_event,
         ),
+        EventDefinition(
+            event_id="audit_followup_review",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_audit_followup_weight,
+            cooldown_turns=BALANCE.event_audit_followup_cooldown,
+            is_eligible=_is_audit_followup_review_eligible,
+            build_pending_event=_build_audit_followup_review_event,
+        ),
+        EventDefinition(
+            event_id="launch_aftershock",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_launch_aftershock_weight,
+            cooldown_turns=BALANCE.event_launch_aftershock_cooldown,
+            is_eligible=_is_launch_aftershock_eligible,
+            build_pending_event=_build_launch_aftershock_event,
+        ),
+        EventDefinition(
+            event_id="enterprise_procurement_delay",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_procurement_delay_weight,
+            cooldown_turns=BALANCE.event_procurement_delay_cooldown,
+            is_eligible=_is_enterprise_procurement_delay_eligible,
+            build_pending_event=_build_enterprise_procurement_delay_event,
+        ),
     )
 
 
@@ -1401,8 +1425,162 @@ def _build_regulatory_shift_event(
     )
 
 
+def _is_audit_followup_review_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"security_audit", "regulatory_shift"},
+        BALANCE.event_chain_recent_window_turns,
+    ) and any(
+        product.is_active and product.target_segment is MarketSegment.ENTERPRISE
+        for product in state.products
+    )
+
+
+def _build_audit_followup_review_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active and product.target_segment is MarketSegment.ENTERPRISE
+        ],
+        rng,
+        score=lambda product: product.market_fit + product.quality - product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="audit_followup_review",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Audit Follow-up Review",
+        description=(
+            f"Enterprise buyers want proof that {target.name} can sustain recent control work. "
+            "You can package evidence now or defer and accept more renewal risk."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="package_evidence",
+                label="Package audit evidence",
+                description="Spend cash for trust, board confidence, and lower technical debt.",
+            ),
+            EventOption(
+                id="defer_followup",
+                label="Defer the follow-up",
+                description="Avoid spend, but key accounts become more nervous.",
+            ),
+        ],
+    )
+
+
+def _is_launch_aftershock_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"product_launch_window", "sudden_press_mention"},
+        BALANCE.event_chain_recent_window_turns,
+    ) and any(product.is_active and product.user_count >= 20 for product in state.products)
+
+
+def _build_launch_aftershock_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active and product.user_count >= 20],
+        rng,
+        score=lambda product: product.user_count + product.market_fit,
+    )
+    return PendingEvent(
+        event_id="launch_aftershock",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Launch Aftershock",
+        description=(
+            f"Attention around {target.name} is still moving. "
+            "You can stabilize the experience or chase a second wave of demand."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="stabilize_experience",
+                label="Stabilize the experience",
+                description="Spend cash to improve quality and reduce bug risk.",
+            ),
+            EventOption(
+                id="chase_second_wave",
+                label="Chase the second wave",
+                description="Gain users quickly, but add bugs and team strain.",
+            ),
+        ],
+    )
+
+
+def _is_enterprise_procurement_delay_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"enterprise_sales_cycle", "key_account_expansion"},
+        BALANCE.event_chain_recent_window_turns,
+    ) and any(
+        product.is_active and product.target_segment is MarketSegment.ENTERPRISE
+        for product in state.products
+    )
+
+
+def _build_enterprise_procurement_delay_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [
+            product
+            for product in state.products
+            if product.is_active and product.target_segment is MarketSegment.ENTERPRISE
+        ],
+        rng,
+        score=lambda product: product.market_fit + product.user_count,
+    )
+    return PendingEvent(
+        event_id="enterprise_procurement_delay",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Enterprise Procurement Delay",
+        description=(
+            f"A large buyer likes {target.name}, but procurement is slowing the deal. "
+            "You can fund proof artifacts or wait out the process."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_proof",
+                label="Fund proof artifacts",
+                description="Spend cash to convert part of the pipeline into users and ARPU.",
+            ),
+            EventOption(
+                id="wait_out_process",
+                label="Wait out the process",
+                description="Protect cash, but reputation and account confidence slip.",
+            ),
+        ],
+    )
+
+
 def _get_product_by_id(products: list[Product], product_id: UUID) -> Product | None:
     return next((product for product in products if product.id == product_id), None)
+
+
+def _has_recent_event(state: GameState, event_ids: set[str], window_turns: int) -> bool:
+    oldest_turn = state.company.current_turn - window_turns
+    return any(
+        entry.event_id in event_ids and entry.resolved_turn >= oldest_turn
+        for entry in state.event_history
+    )
 
 
 def _pick_best_product(

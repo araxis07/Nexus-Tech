@@ -1287,6 +1287,154 @@ def _apply_regulatory_shift(state: GameState, event: PendingEvent, option_id: st
     raise ValueError(f"Unsupported option {option_id} for regulatory shift.")
 
 
+def _apply_audit_followup_review(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "package_evidence":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_audit_followup_cost
+        )
+        product.technical_debt = clamp_int(
+            product.technical_debt - BALANCE.event_audit_followup_debt_reduction,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_audit_followup_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_audit_followup_board_gain,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.churn_risk = clamp_int(account.churn_risk - 3, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You packaged audit evidence for {product.name}. Cash "
+            f"-{BALANCE.event_audit_followup_cost}, debt "
+            f"-{BALANCE.event_audit_followup_debt_reduction}, reputation "
+            f"+{BALANCE.event_audit_followup_reputation_gain}."
+        )
+
+    if option_id == "defer_followup":
+        state.company.reputation = clamp_int(state.company.reputation - 1, 0, 100)
+        for account in accounts:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.event_audit_followup_defer_risk_gain,
+                0,
+                100,
+            )
+            if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold:
+                account.status = CustomerAccountStatus.AT_RISK
+        return (
+            f"You deferred audit follow-up for {product.name}. Reputation -1, account risk "
+            f"+{BALANCE.event_audit_followup_defer_risk_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for audit follow-up review.")
+
+
+def _apply_launch_aftershock(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    affected_employees = _get_assigned_employees(state, product.id)
+
+    if option_id == "stabilize_experience":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_launch_aftershock_stabilize_cost
+        )
+        product.bug_level = clamp_int(
+            product.bug_level - BALANCE.event_launch_aftershock_bug_reduction,
+            0,
+            100,
+        )
+        product.quality = clamp_int(
+            product.quality + BALANCE.event_launch_aftershock_quality_gain,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You stabilized {product.name} after launch. Cash "
+            f"-{BALANCE.event_launch_aftershock_stabilize_cost}, bugs "
+            f"-{BALANCE.event_launch_aftershock_bug_reduction}, quality "
+            f"+{BALANCE.event_launch_aftershock_quality_gain}."
+        )
+
+    if option_id == "chase_second_wave":
+        product.user_count += BALANCE.event_launch_aftershock_chase_user_gain
+        product.bug_level = clamp_int(
+            product.bug_level + BALANCE.event_launch_aftershock_chase_bug_gain,
+            0,
+            100,
+        )
+        for employee in affected_employees:
+            employee.energy = clamp_int(
+                employee.energy - BALANCE.event_launch_aftershock_chase_energy_loss,
+                0,
+                100,
+            )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You chased a second launch wave for {product.name}. Users "
+            f"+{BALANCE.event_launch_aftershock_chase_user_gain}, bugs "
+            f"+{BALANCE.event_launch_aftershock_chase_bug_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for launch aftershock.")
+
+
+def _apply_enterprise_procurement_delay(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "fund_proof":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_procurement_delay_proof_cost
+        )
+        product.user_count += BALANCE.event_procurement_delay_user_gain
+        product.revenue_per_user = quantize_money(
+            product.revenue_per_user + BALANCE.event_procurement_delay_revenue_gain
+        )
+        product.market_fit = clamp_int(product.market_fit + 1, 0, 100)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You funded proof artifacts for {product.name}. Cash "
+            f"-{BALANCE.event_procurement_delay_proof_cost}, users "
+            f"+{BALANCE.event_procurement_delay_user_gain}, revenue per user "
+            f"+{BALANCE.event_procurement_delay_revenue_gain}."
+        )
+
+    if option_id == "wait_out_process":
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_procurement_delay_wait_reputation_loss,
+            0,
+            100,
+        )
+        for account in accounts:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.event_procurement_delay_wait_account_risk_gain,
+                0,
+                100,
+            )
+            if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold:
+                account.status = CustomerAccountStatus.AT_RISK
+        return (
+            f"You waited out procurement for {product.name}. Reputation "
+            f"-{BALANCE.event_procurement_delay_wait_reputation_loss}, account risk "
+            f"+{BALANCE.event_procurement_delay_wait_account_risk_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for enterprise procurement delay.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -1365,4 +1513,7 @@ EVENT_EFFECT_HANDLERS = {
     "platform_outage": _apply_platform_outage,
     "competitor_acquisition": _apply_competitor_acquisition,
     "regulatory_shift": _apply_regulatory_shift,
+    "audit_followup_review": _apply_audit_followup_review,
+    "launch_aftershock": _apply_launch_aftershock,
+    "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
 }

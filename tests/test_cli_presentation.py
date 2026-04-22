@@ -206,6 +206,9 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "list-goals",
         "list-rivals",
         "list-events",
+        "list-candidates",
+        "list-segments",
+        "list-roadmaps",
         "simulate-balance",
         "compare-balance",
         "balance-matrix",
@@ -415,6 +418,30 @@ def test_list_events_command_renders_registry() -> None:
     assert result.exit_code == 0
     assert "Event Catalog" in result.output
     assert "loan_covenant" in result.output
+
+
+def test_list_candidates_command_renders_seeded_candidate_pool() -> None:
+    result = runner.invoke(app, ["list-candidates", "--seed", "12", "--count", "2"])
+
+    assert result.exit_code == 0
+    assert "Hiring Candidate Pool" in result.output
+    assert "Specialization" in result.output
+
+
+def test_list_segments_command_renders_customer_segment_profiles() -> None:
+    result = runner.invoke(app, ["list-segments"])
+
+    assert result.exit_code == 0
+    assert "Customer Segment Profiles" in result.output
+    assert "enterprise" in result.output
+
+
+def test_list_roadmaps_command_renders_initiatives() -> None:
+    result = runner.invoke(app, ["list-roadmaps"])
+
+    assert result.exit_code == 0
+    assert "Roadmap Initiatives" in result.output
+    assert "ai_trust_program" in result.output
 
 
 def test_simulate_balance_command_renders_batch_summary(monkeypatch: MonkeyPatch) -> None:
@@ -649,7 +676,7 @@ def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.12.0" in result.output
+    assert "NEXUS TECH 0.13.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -753,7 +780,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.12.0" in result.output
+    assert "0.13.0" in result.output
     assert "No save database found yet." in result.output
 
 

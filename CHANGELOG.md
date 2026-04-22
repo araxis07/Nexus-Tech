@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0 - 2026-04-23
+
+- Added a fifth content pack with open source, enterprise AI ops, vertical compliance, and community marketplace templates
+- Added four scenario starts for open source commercialization, regulated AI scale, platform ecosystem pressure, and enterprise rescue runs
+- Added new strategic roadmap initiatives for AI trust, community growth, and enterprise sales pushes
+- Added event-chain follow-ups for audit reviews, launch aftershocks, and enterprise procurement delays
+- Added deterministic hiring candidate pools plus `list-candidates`, `list-segments`, and `list-roadmaps` CLI discovery commands
+- Promoted the package version to `0.13.0`
+
 ## 0.12.0 - 2026-04-22
 
 - Added a first-run `tutorial` command and in-game tutorial utility for safer onboarding

@@ -133,5 +133,44 @@
     "current_move": "discount_push",
     "momentum": 65,
     "funding_level": 1
+  },
+  {
+    "archetype_id": "open_source_challenger",
+    "title": "Open Source Challenger",
+    "description": "A community-first rival that wins adoption cheaply and pressures paid conversion through goodwill.",
+    "focus_segment": "indie",
+    "strength": 61,
+    "aggression": 64,
+    "pricing_tier": "budget",
+    "active_product_count": 2,
+    "current_move": "feature_sprint",
+    "momentum": 68,
+    "funding_level": 1
+  },
+  {
+    "archetype_id": "regulatory_incumbent",
+    "title": "Regulatory Incumbent",
+    "description": "A slow but trusted compliance rival with deep buyer references and high switching friction.",
+    "focus_segment": "enterprise",
+    "strength": 78,
+    "aggression": 42,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "hold",
+    "momentum": 53,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "platform_consolidator",
+    "title": "Platform Consolidator",
+    "description": "A funded platform rival that bundles workflow, governance, and distribution into one sales motion.",
+    "focus_segment": "smb",
+    "strength": 74,
+    "aggression": 70,
+    "pricing_tier": "standard",
+    "active_product_count": 4,
+    "current_move": "discount_push",
+    "momentum": 71,
+    "funding_level": 3
   }
 ]

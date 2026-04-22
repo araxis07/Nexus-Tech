@@ -196,6 +196,7 @@ class ScenarioDefinition(BaseModel):
     scenario_id: str = Field(min_length=1, max_length=40)
     title: str = Field(min_length=1, max_length=80)
     description: str = Field(min_length=1, max_length=240)
+    objective: str = Field(default="", max_length=220)
     company_name: str = Field(min_length=1, max_length=80)
     company_strategy: CompanyStrategy = CompanyStrategy.BALANCED
     difficulty_mode: DifficultyMode = DifficultyMode.STANDARD

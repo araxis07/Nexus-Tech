@@ -2329,5 +2329,411 @@
         "focus_segment": "enterprise"
       }
     ]
+  },
+  {
+    "scenario_id": "open_source_commercialization",
+    "title": "Open Source Commercialization",
+    "description": "A beloved open source product has strong adoption, but revenue is thin and community trust can break if monetization feels careless.",
+    "objective": "Convert community adoption into durable revenue without crushing reputation or quality.",
+    "company_name": "Civic Forge",
+    "company_strategy": "growth",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "community_growth",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "7600.00",
+    "reputation": 59,
+    "finance": {
+      "debt_principal": "1200.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0300",
+      "investor_pressure": 10,
+      "board_confidence": 60,
+      "total_raised": "1600.00"
+    },
+    "products": [
+      {
+        "key": "core",
+        "template_id": "open_source_platform",
+        "name": "Forge Core",
+        "lifecycle_stage": "growth",
+        "quality": 61,
+        "bug_level": 18,
+        "market_fit": 62,
+        "technical_debt": 29,
+        "user_count": 120,
+        "revenue_per_user": "12.00",
+        "feature_count": 4,
+        "maintenance_cost": "260.00",
+        "acquisition_rate": "0.0750",
+        "churn_rate": "0.0860",
+        "target_segment": "indie",
+        "pricing_tier": "budget"
+      },
+      {
+        "key": "marketplace",
+        "template_id": "community_marketplace",
+        "name": "Forge Exchange",
+        "lifecycle_stage": "prototype",
+        "quality": 47,
+        "bug_level": 24,
+        "market_fit": 43,
+        "technical_debt": 31,
+        "user_count": 18,
+        "revenue_per_user": "24.00",
+        "feature_count": 1,
+        "maintenance_cost": "295.00",
+        "acquisition_rate": "0.0550",
+        "churn_rate": "0.0800",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Ari Lane",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "developer_tools",
+        "assigned_product_key": "core",
+        "energy": 72,
+        "morale": 78
+      },
+      {
+        "full_name": "Morgan Park",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "community",
+        "assigned_product_key": "marketplace",
+        "energy": 75,
+        "morale": 74
+      }
+    ],
+    "competitors": [
+      {
+        "name": "OpenStacker",
+        "archetype_id": "open_source_challenger"
+      },
+      {
+        "name": "BundleHub",
+        "archetype_id": "platform_consolidator"
+      }
+    ]
+  },
+  {
+    "scenario_id": "regulated_ai_scale",
+    "title": "Regulated AI Scale",
+    "description": "The company has an AI operations product entering regulated enterprise demand where trust, controls, and sales discipline matter.",
+    "objective": "Win enterprise AI buyers while keeping debt, audits, and investor pressure under control.",
+    "company_name": "Argent Systems",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "ai_trust_program",
+    "budget_stance": "aggressive",
+    "market_cycle": "frothy",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "11800.00",
+    "reputation": 55,
+    "finance": {
+      "debt_principal": "2400.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.1200",
+      "investor_pressure": 28,
+      "board_confidence": 58,
+      "total_raised": "7000.00"
+    },
+    "products": [
+      {
+        "key": "aiops",
+        "template_id": "enterprise_ai_ops",
+        "name": "Argent Control",
+        "lifecycle_stage": "growth",
+        "quality": 63,
+        "bug_level": 19,
+        "market_fit": 57,
+        "technical_debt": 33,
+        "user_count": 42,
+        "revenue_per_user": "132.00",
+        "feature_count": 4,
+        "maintenance_cost": "455.00",
+        "acquisition_rate": "0.0180",
+        "churn_rate": "0.0500",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "compliance",
+        "template_id": "vertical_compliance_suite",
+        "name": "Argent Assurance",
+        "lifecycle_stage": "prototype",
+        "quality": 57,
+        "bug_level": 14,
+        "market_fit": 44,
+        "technical_debt": 22,
+        "user_count": 14,
+        "revenue_per_user": "100.00",
+        "feature_count": 2,
+        "maintenance_cost": "375.00",
+        "acquisition_rate": "0.0200",
+        "churn_rate": "0.0440",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Noa Reed",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "enterprise_discovery",
+        "assigned_product_key": "aiops",
+        "energy": 68,
+        "morale": 69
+      },
+      {
+        "full_name": "Harper Chen",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "systems",
+        "assigned_product_key": "aiops",
+        "energy": 66,
+        "morale": 70
+      },
+      {
+        "full_name": "Riley Shaw",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "enterprise_workflows",
+        "assigned_product_key": "compliance",
+        "energy": 73,
+        "morale": 72
+      }
+    ],
+    "competitors": [
+      {
+        "name": "PolicyBase",
+        "archetype_id": "regulatory_incumbent"
+      },
+      {
+        "name": "Apex Cloud",
+        "archetype_id": "platform_consolidator",
+        "focus_segment": "enterprise"
+      }
+    ]
+  },
+  {
+    "scenario_id": "platform_ecosystem_push",
+    "title": "Platform Ecosystem Push",
+    "description": "A product suite is becoming a platform, but marketplace quality, partner incentives, and core reliability are all pulling at once.",
+    "objective": "Scale a multi-product platform without letting debt or competitor bundles overwhelm the portfolio.",
+    "company_name": "Orbit Foundry",
+    "company_strategy": "balanced",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "portfolio_consolidation",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "9800.00",
+    "reputation": 53,
+    "finance": {
+      "debt_principal": "2800.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0700",
+      "investor_pressure": 18,
+      "board_confidence": 57,
+      "total_raised": "3400.00"
+    },
+    "products": [
+      {
+        "key": "platform",
+        "template_id": "developer_platform",
+        "name": "Orbit Platform",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 21,
+        "market_fit": 55,
+        "technical_debt": 34,
+        "user_count": 58,
+        "revenue_per_user": "72.00",
+        "feature_count": 4,
+        "maintenance_cost": "360.00",
+        "acquisition_rate": "0.0300",
+        "churn_rate": "0.0610",
+        "target_segment": "startup",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "marketplace",
+        "template_id": "community_marketplace",
+        "name": "Orbit Exchange",
+        "lifecycle_stage": "prototype",
+        "quality": 45,
+        "bug_level": 25,
+        "market_fit": 49,
+        "technical_debt": 37,
+        "user_count": 26,
+        "revenue_per_user": "26.00",
+        "feature_count": 2,
+        "maintenance_cost": "310.00",
+        "acquisition_rate": "0.0570",
+        "churn_rate": "0.0820",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      },
+      {
+        "key": "partner",
+        "template_id": "partner_stack",
+        "name": "Orbit Channel",
+        "lifecycle_stage": "growth",
+        "quality": 56,
+        "bug_level": 18,
+        "market_fit": 51,
+        "technical_debt": 28,
+        "user_count": 44,
+        "revenue_per_user": "42.00",
+        "feature_count": 3,
+        "maintenance_cost": "285.00",
+        "acquisition_rate": "0.0410",
+        "churn_rate": "0.0640",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Casey Stone",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "platform",
+        "assigned_product_key": "platform",
+        "energy": 71,
+        "morale": 70
+      },
+      {
+        "full_name": "Finley West",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "strategy",
+        "assigned_product_key": "marketplace",
+        "energy": 74,
+        "morale": 72
+      },
+      {
+        "full_name": "Quinn Hayes",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "field_marketing",
+        "assigned_product_key": "partner",
+        "energy": 76,
+        "morale": 73
+      }
+    ],
+    "competitors": [
+      {
+        "name": "StackMerge",
+        "archetype_id": "platform_consolidator"
+      },
+      {
+        "name": "OpenBridge",
+        "archetype_id": "open_source_challenger",
+        "focus_segment": "startup"
+      }
+    ]
+  },
+  {
+    "scenario_id": "enterprise_rescue",
+    "title": "Enterprise Rescue",
+    "description": "A narrow compliance suite has credible enterprise contracts, but churn risk and debt make every quarter a rescue mission.",
+    "objective": "Protect enterprise accounts, stabilize quality, and turn a pressured niche into a profitable core.",
+    "company_name": "Northstar Ledger",
+    "company_strategy": "efficiency",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "enterprise_sales_push",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "6900.00",
+    "reputation": 50,
+    "finance": {
+      "debt_principal": "5200.00",
+      "loan_interest_rate": "0.0350",
+      "equity_dilution": "0.0600",
+      "investor_pressure": 30,
+      "board_confidence": 48,
+      "total_raised": "2600.00"
+    },
+    "products": [
+      {
+        "key": "suite",
+        "template_id": "vertical_compliance_suite",
+        "name": "Northstar Controls",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 25,
+        "market_fit": 56,
+        "technical_debt": 39,
+        "user_count": 36,
+        "revenue_per_user": "104.00",
+        "feature_count": 4,
+        "maintenance_cost": "390.00",
+        "acquisition_rate": "0.0190",
+        "churn_rate": "0.0490",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      },
+      {
+        "key": "analytics",
+        "template_id": "enterprise_data_hub",
+        "name": "Northstar Data",
+        "lifecycle_stage": "mature",
+        "quality": 62,
+        "bug_level": 22,
+        "market_fit": 48,
+        "technical_debt": 42,
+        "user_count": 32,
+        "revenue_per_user": "84.00",
+        "feature_count": 5,
+        "maintenance_cost": "405.00",
+        "acquisition_rate": "0.0180",
+        "churn_rate": "0.0520",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Blair Cross",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "suite",
+        "energy": 61,
+        "morale": 64
+      },
+      {
+        "full_name": "Devon Kline",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "pricing",
+        "assigned_product_key": "analytics",
+        "energy": 67,
+        "morale": 66
+      }
+    ],
+    "competitors": [
+      {
+        "name": "RegulaCore",
+        "archetype_id": "regulatory_incumbent"
+      },
+      {
+        "name": "Trust Suite",
+        "archetype_id": "trust_monolith"
+      }
+    ]
   }
 ]

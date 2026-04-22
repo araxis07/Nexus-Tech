@@ -12,6 +12,7 @@ from nexus_tech.domain.models import (
     EmployeeRole,
     MarketCycle,
     PricingTier,
+    RoadmapFocus,
     TurnAction,
 )
 from nexus_tech.simulation.catalog_validation import validate_content_catalogs
@@ -47,6 +48,10 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "ecosystem_flywheel" for scenario in scenarios)
     assert any(scenario.scenario_id == "customer_health_firefight" for scenario in scenarios)
     assert any(scenario.scenario_id == "incident_trust_rebuild" for scenario in scenarios)
+    assert any(scenario.scenario_id == "open_source_commercialization" for scenario in scenarios)
+    assert any(scenario.scenario_id == "regulated_ai_scale" for scenario in scenarios)
+    assert any(scenario.scenario_id == "platform_ecosystem_push" for scenario in scenarios)
+    assert any(scenario.scenario_id == "enterprise_rescue" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -208,6 +213,27 @@ def test_content_pack_four_templates_are_available() -> None:
     assert incident.revenue_per_user == Decimal("88.00")
 
 
+def test_content_pack_five_templates_and_objective_scenarios_are_available() -> None:
+    open_source = get_product_template("open_source_platform")
+    enterprise_ai = get_product_template("enterprise_ai_ops")
+    compliance = get_product_template("vertical_compliance_suite")
+    marketplace = get_product_template("community_marketplace")
+    scenario = next(
+        scenario
+        for scenario in get_available_scenarios()
+        if scenario.scenario_id == "open_source_commercialization"
+    )
+    state = create_new_game(scenario_id="regulated_ai_scale")
+
+    assert open_source.pricing_tier is PricingTier.BUDGET
+    assert enterprise_ai.revenue_per_user == Decimal("128.00")
+    assert compliance.target_segment.value == "enterprise"
+    assert marketplace.target_segment.value == "startup"
+    assert "community adoption" in scenario.objective
+    assert state.roadmap_focus is RoadmapFocus.AI_TRUST_PROGRAM
+    assert state.scenario_title == "Regulated AI Scale"
+
+
 def test_competitor_archetype_catalog_is_available() -> None:
     archetypes = get_available_competitor_archetypes()
     archetype_ids = {archetype.archetype_id for archetype in archetypes}
@@ -215,6 +241,11 @@ def test_competitor_archetype_catalog_is_available() -> None:
     assert {"price_raider", "platform_bulwark", "feature_blitzer"}.issubset(archetype_ids)
     assert {"channel_aggregator", "trust_monolith", "vertical_specialist"}.issubset(archetype_ids)
     assert {"ai_fast_follower", "governance_giant", "ecosystem_broker"}.issubset(archetype_ids)
+    assert {
+        "open_source_challenger",
+        "regulatory_incumbent",
+        "platform_consolidator",
+    }.issubset(archetype_ids)
 
 
 def test_competitor_archetype_funding_level_is_available() -> None:

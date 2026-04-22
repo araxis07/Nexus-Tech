@@ -74,6 +74,9 @@ class RoadmapFocus(StrEnum):
     PLATFORM_REBUILD = "platform_rebuild"
     PREMIUM_EXPANSION = "premium_expansion"
     PORTFOLIO_CONSOLIDATION = "portfolio_consolidation"
+    AI_TRUST_PROGRAM = "ai_trust_program"
+    COMMUNITY_GROWTH = "community_growth"
+    ENTERPRISE_SALES_PUSH = "enterprise_sales_push"
 
 
 class BudgetStance(StrEnum):

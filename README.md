@@ -49,6 +49,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Add a second content-pack pass with billing-hub and partner-stack templates plus talent-race and moat-builder scenarios
 - Add enterprise-data, field-service, and procurement templates plus board-tension, channel-defense, and late-scale drag scenarios
 - Add AI-governance, developer-marketplace, customer-health, and incident-command templates plus higher-scale trust and ecosystem scenarios
+- Add open-source, enterprise-AI-ops, vertical-compliance, and community-marketplace templates plus objective-driven scale scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Support custom company and primary product overrides on top of scenario defaults
 
@@ -61,6 +62,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Define reusable competitor archetypes such as price raiders, platform bulwarks, and feature blitzers
 - Expand rival archetypes with channel aggregators, trust monoliths, and vertical specialists
 - Add AI fast followers, governance giants, and ecosystem brokers as new rival archetypes
+- Add open source challengers, regulatory incumbents, and platform consolidators as new competitor archetypes
 - Let rival moves reshape product count and pricing posture over time
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
 - Track an explicit operations layer that converts support backlog and portfolio sprawl into real cost, morale drag, and execution risk
@@ -88,6 +90,7 @@ Each turn represents a business interval. You review the company, choose actions
 ### 👥 Employee and Team System
 
 - Hire and fire employees
+- Review deterministic candidate pools before hiring during demos or interactive runs
 - Assign team members to specific products
 - Manage core roles:
   - `engineer`
@@ -113,6 +116,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Finance-heavy runs can surface loan covenant pressure and down-round trade-offs
 - Customer-heavy and enterprise-heavy runs can surface key-account expansion and security-audit trade-offs
 - Scale-stage runs can now surface enterprise sales cycles, product launch windows, platform outages, competitor acquisitions, and regulatory shifts
+- Follow-up event chains can now appear after related audit, launch, and enterprise-sales events
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
@@ -126,6 +130,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Add milestone coverage for building a credible talent bench and a stronger platform foundation
 - Add milestone coverage for capital discipline and resilience against direct rivals
 - Set quarter-scale roadmap focuses such as growth push, platform rebuild, premium expansion, and portfolio consolidation
+- Use higher-scale roadmap initiatives such as AI trust program, community growth, and enterprise sales push
 - Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
 - Work against a quarter plan with explicit revenue, user, cash, and headcount targets
 - Track run score, estimated company value, turn history, and victory conditions in the terminal report
@@ -157,6 +162,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Built-in `validate-content` command to check catalog references and event handler wiring before release
 - Report now includes recent events, funding history, and milestone history
 - Add `list-rivals`, `list-events`, `doctor`, and `check-saves` so content, install state, and local persistence health can be reviewed without entering a run
+- Add `list-candidates`, `list-segments`, and `list-roadmaps` for hiring, customer, and strategy discovery without entering a run
 - Seeded demo support for reproducible simulations
 
 ### 🧪 Quality and Tooling
@@ -213,6 +219,24 @@ List the event registry:
 
 ```bash
 uv run nexus-tech list-events
+```
+
+List generated hiring candidates:
+
+```bash
+uv run nexus-tech list-candidates --seed 7 --count 3
+```
+
+List customer segment trade-offs:
+
+```bash
+uv run nexus-tech list-segments
+```
+
+List roadmap initiatives:
+
+```bash
+uv run nexus-tech list-roadmaps
 ```
 
 List the available campaign goals:
