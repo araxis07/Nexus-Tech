@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 10
+CURRENT_SCHEMA_VERSION = 11
 
 SCHEMA_STATEMENTS = (
     """
@@ -15,6 +15,9 @@ SCHEMA_STATEMENTS = (
         rng_state TEXT,
         scenario_id TEXT NOT NULL DEFAULT 'founder_journey',
         scenario_title TEXT NOT NULL DEFAULT 'Founder Journey',
+        scenario_objective TEXT NOT NULL DEFAULT '',
+        scenario_objective_metric TEXT NOT NULL DEFAULT 'none',
+        scenario_objective_target INTEGER NOT NULL DEFAULT 0,
         difficulty_mode TEXT NOT NULL DEFAULT 'standard',
         campaign_goal_id TEXT NOT NULL DEFAULT 'profit_machine',
         roadmap_focus TEXT NOT NULL DEFAULT 'balanced_execution',
@@ -26,7 +29,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 10,
+        schema_version INTEGER NOT NULL DEFAULT 11,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -83,6 +86,7 @@ SCHEMA_STATEMENTS = (
         morale INTEGER NOT NULL,
         productivity INTEGER NOT NULL,
         specialization TEXT NOT NULL,
+        trait TEXT NOT NULL DEFAULT 'steady_operator',
         assigned_product_id TEXT,
         PRIMARY KEY (slot_name, employee_id),
         UNIQUE (slot_name, display_order),
@@ -100,6 +104,8 @@ SCHEMA_STATEMENTS = (
         description TEXT NOT NULL,
         triggered_turn INTEGER NOT NULL,
         cooldown_turns INTEGER NOT NULL,
+        chain_id TEXT,
+        chain_stage INTEGER NOT NULL DEFAULT 0,
         target_product_id TEXT,
         target_employee_id TEXT,
         FOREIGN KEY (slot_name, target_product_id)
@@ -129,6 +135,8 @@ SCHEMA_STATEMENTS = (
         title TEXT NOT NULL,
         triggered_turn INTEGER NOT NULL,
         resolved_turn INTEGER NOT NULL,
+        chain_id TEXT,
+        chain_stage INTEGER NOT NULL DEFAULT 0,
         selected_option_id TEXT NOT NULL,
         selected_option_label TEXT NOT NULL,
         result_text TEXT NOT NULL,
@@ -246,6 +254,79 @@ SCHEMA_STATEMENTS = (
             REFERENCES products(slot_name, product_id)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS product_releases (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        release_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        release_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        progress INTEGER NOT NULL,
+        required_progress INTEGER NOT NULL,
+        risk INTEGER NOT NULL,
+        scheduled_turn INTEGER NOT NULL,
+        shipped_turn INTEGER,
+        summary TEXT NOT NULL,
+        PRIMARY KEY (slot_name, release_id),
+        UNIQUE (slot_name, display_order),
+        FOREIGN KEY (slot_name, product_id)
+            REFERENCES products(slot_name, product_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS sales_deals (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        deal_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        segment TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        value TEXT NOT NULL,
+        probability INTEGER NOT NULL,
+        created_turn INTEGER NOT NULL,
+        updated_turn INTEGER NOT NULL,
+        PRIMARY KEY (slot_name, deal_id),
+        UNIQUE (slot_name, display_order),
+        FOREIGN KEY (slot_name, product_id)
+            REFERENCES products(slot_name, product_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS roadmap_projects (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        project_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        project_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        target_product_id TEXT,
+        progress INTEGER NOT NULL,
+        required_progress INTEGER NOT NULL,
+        started_turn INTEGER NOT NULL,
+        completed_turn INTEGER,
+        summary TEXT NOT NULL,
+        PRIMARY KEY (slot_name, project_id),
+        UNIQUE (slot_name, display_order),
+        FOREIGN KEY (slot_name, target_product_id)
+            REFERENCES products(slot_name, product_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS competitor_intel (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        entry_index INTEGER NOT NULL,
+        turn INTEGER NOT NULL,
+        competitor_name TEXT NOT NULL,
+        move TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        PRIMARY KEY (slot_name, entry_index)
+    )
+    """,
 )
 
 
@@ -285,6 +366,24 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="save_slots",
         column_name="scenario_title",
         column_definition="TEXT NOT NULL DEFAULT 'Founder Journey'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="scenario_objective",
+        column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="scenario_objective_metric",
+        column_definition="TEXT NOT NULL DEFAULT 'none'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="scenario_objective_target",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
         connection,
@@ -369,6 +468,36 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="finance_state",
         column_name="board_confidence",
         column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="trait",
+        column_definition="TEXT NOT NULL DEFAULT 'steady_operator'",
+    )
+    _ensure_column(
+        connection,
+        table_name="pending_events",
+        column_name="chain_id",
+        column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="pending_events",
+        column_name="chain_stage",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="event_history",
+        column_name="chain_id",
+        column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="event_history",
+        column_name="chain_stage",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     if current_version < 6:
         _apply_version_6_migration(connection)

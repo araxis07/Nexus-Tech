@@ -9,6 +9,7 @@ from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
+    CandidateTrait,
     Company,
     CompanyStrategy,
     Competitor,
@@ -31,7 +32,13 @@ from nexus_tech.domain.models import (
     PendingEvent,
     PricingTier,
     Product,
+    ProductReleaseStatus,
+    ProductReleaseType,
     RoadmapFocus,
+    RoadmapProjectStatus,
+    RoadmapProjectType,
+    SalesDealStage,
+    ScenarioObjectiveMetric,
     Seniority,
     TurnAction,
     TurnLedgerEntry,
@@ -48,6 +55,7 @@ from nexus_tech.simulation.balance_lab import (
 )
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors, calculate_competitor_pressure
+from nexus_tech.simulation.competitor_intel import record_competitor_intel
 from nexus_tech.simulation.customers import (
     apply_end_of_turn_customers,
     calculate_account_revenue,
@@ -77,20 +85,31 @@ from nexus_tech.simulation.late_game import (
     calculate_late_game_summary,
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
+from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.releases import plan_product_release, work_product_release
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.roadmap import get_roadmap_profile
+from nexus_tech.simulation.roadmap_projects import (
+    start_roadmap_project,
+    work_roadmap_project,
+)
+from nexus_tech.simulation.sales import advance_sales_deal, create_sales_deal
 from nexus_tech.simulation.scaling import (
     calculate_company_scale_pressure,
     calculate_product_scale_pressure,
 )
 from nexus_tech.simulation.team import (
+    calculate_base_productivity,
     calculate_effective_productivity,
     calculate_product_team_modifier,
+    calculate_salary,
+    calculate_trait_productivity,
+    calculate_trait_salary,
 )
 
 
@@ -2297,3 +2316,115 @@ def test_balance_matrix_returns_all_difficulty_cells() -> None:
 
     assert len(matrix.cells) == 6
     assert {cell.difficulty_mode for cell in matrix.cells} == set(DifficultyMode)
+
+
+def test_scenario_objective_tracks_closed_sales_deals() -> None:
+    product = make_product("Pipeline", target_segment=MarketSegment.ENTERPRISE, market_fit=74)
+    state = make_state(
+        product,
+        cash_on_hand=Decimal("12000.00"),
+    )
+    state.scenario_objective = "Close one enterprise deal."
+    state.scenario_objective_metric = ScenarioObjectiveMetric.CLOSED_DEALS
+    state.scenario_objective_target = 1
+
+    create_sales_deal(state, product)
+    deal_id = state.sales_deals[0].id
+    advance_sales_deal(state, deal_id)
+    advance_sales_deal(state, deal_id)
+    advance_sales_deal(state, deal_id)
+
+    progress = evaluate_scenario_objective(state)
+
+    assert progress.current_value == 1
+    assert progress.complete
+
+
+def test_release_plan_work_ships_stability_patch() -> None:
+    product = make_product("Stable", quality=55, bug_level=30, technical_debt=36)
+    state = make_state(product, cash_on_hand=Decimal("9000.00"))
+
+    plan_product_release(state, product, ProductReleaseType.STABILITY_PATCH)
+    release_id = state.product_releases[0].id
+    work_product_release(state, release_id)
+    work_product_release(state, release_id)
+
+    release = state.product_releases[0]
+
+    assert release.status is ProductReleaseStatus.SHIPPED
+    assert product.bug_level < 30
+    assert product.technical_debt < 36
+
+
+def test_sales_deal_close_creates_customer_account() -> None:
+    product = make_product(
+        "Enterprise Desk",
+        target_segment=MarketSegment.ENTERPRISE,
+        market_fit=80,
+        quality=78,
+    )
+    state = make_state(product, cash_on_hand=Decimal("12000.00"))
+
+    create_sales_deal(state, product)
+    deal = state.sales_deals[0]
+    advance_sales_deal(state, deal.id)
+    advance_sales_deal(state, deal.id)
+    advance_sales_deal(state, deal.id)
+
+    assert deal.stage is SalesDealStage.CLOSED_WON
+    assert len(state.customer_accounts) == 1
+    assert state.customer_accounts[0].product_id == product.id
+
+
+def test_roadmap_project_completion_improves_target_product() -> None:
+    product = make_product("Debt Box", quality=50, bug_level=30, technical_debt=60)
+    employee = make_employee(
+        "PM",
+        EmployeeRole.PRODUCT_MANAGER,
+        assigned_product_id=product.id,
+    )
+    state = make_state(product, employees=[employee], cash_on_hand=Decimal("10000.00"))
+
+    start_roadmap_project(state, RoadmapProjectType.PLATFORM_REBUILD, product.id)
+    project_id = state.roadmap_projects[0].id
+    work_roadmap_project(state, project_id)
+    work_roadmap_project(state, project_id)
+
+    project = state.roadmap_projects[0]
+
+    assert project.status is RoadmapProjectStatus.COMPLETED
+    assert product.technical_debt < 60
+    assert product.bug_level < 30
+
+
+def test_candidate_trait_changes_salary_and_productivity() -> None:
+    base_salary = calculate_salary(EmployeeRole.ENGINEER, Seniority.SENIOR)
+    base_productivity = calculate_base_productivity(EmployeeRole.ENGINEER, Seniority.SENIOR)
+
+    expert_salary = calculate_trait_salary(base_salary, CandidateTrait.EXPENSIVE_EXPERT)
+    expert_productivity = calculate_trait_productivity(
+        base_productivity,
+        CandidateTrait.EXPENSIVE_EXPERT,
+    )
+
+    assert expert_salary > base_salary
+    assert expert_productivity > base_productivity
+
+
+def test_competitor_intel_records_changed_move() -> None:
+    competitor = Competitor(
+        name="Velocity",
+        focus_segment=MarketSegment.STARTUP,
+        strength=60,
+        aggression=60,
+        pricing_tier=PricingTier.STANDARD,
+        current_move=CompetitorMove.HOLD,
+    )
+    state = make_state(make_product("Core"), competitors=[competitor])
+    previous_competitors = [competitor.model_copy(deep=True)]
+    state.competitors[0].current_move = CompetitorMove.FEATURE_SPRINT
+
+    record_competitor_intel(state, previous_competitors, current_turn=3)
+
+    assert state.competitor_intel
+    assert state.competitor_intel[0].move is CompetitorMove.FEATURE_SPRINT

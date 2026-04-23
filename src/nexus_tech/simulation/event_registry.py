@@ -436,6 +436,8 @@ def _build_press_mention_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="launch_chain",
+        chain_stage=1,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1147,6 +1149,8 @@ def _build_security_audit_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="trust_chain",
+        chain_stage=1,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1200,6 +1204,8 @@ def _build_enterprise_sales_cycle_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="enterprise_sales_chain",
+        chain_stage=1,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1253,6 +1259,8 @@ def _build_product_launch_window_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="launch_chain",
+        chain_stage=1,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1409,6 +1417,8 @@ def _build_regulatory_shift_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="trust_chain",
+        chain_stage=1,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1460,6 +1470,8 @@ def _build_audit_followup_review_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="trust_chain",
+        chain_stage=2,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1504,6 +1516,8 @@ def _build_launch_aftershock_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="launch_chain",
+        chain_stage=2,
         target_product_id=target.id,
         options=[
             EventOption(
@@ -1555,6 +1569,8 @@ def _build_enterprise_procurement_delay_event(
         ),
         triggered_turn=state.company.current_turn,
         cooldown_turns=cooldown_turns,
+        chain_id="enterprise_sales_chain",
+        chain_stage=2,
         target_product_id=target.id,
         options=[
             EventOption(

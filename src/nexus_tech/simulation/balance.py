@@ -252,6 +252,22 @@ class BalanceConfig:
             "product_manager": "delivery",
         }
     )
+    employee_trait_salary_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "steady_operator": Decimal("1.00"),
+            "fast_learner": Decimal("0.94"),
+            "expensive_expert": Decimal("1.28"),
+            "burnout_risk": Decimal("0.90"),
+        }
+    )
+    employee_trait_productivity_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "steady_operator": 0,
+            "fast_learner": 2,
+            "expensive_expert": 8,
+            "burnout_risk": 5,
+        }
+    )
     team_build_bonus_divisor: int = 44
     team_stability_bonus_divisor: int = 48
     team_market_fit_bonus_divisor: int = 52
@@ -527,6 +543,9 @@ class BalanceConfig:
             "open_source_challenger": 1,
             "regulatory_incumbent": 2,
             "platform_consolidator": 2,
+            "enterprise_sales_machine": 2,
+            "data_quality_native": 2,
+            "release_velocity_chaser": 1,
         }
     )
     competitor_archetype_move_bias: dict[str, dict[str, int]] = field(
@@ -545,6 +564,9 @@ class BalanceConfig:
             "open_source_challenger": {"feature_sprint": 2, "discount_push": 1, "hold": -1},
             "regulatory_incumbent": {"hold": 3, "retrench": -1},
             "platform_consolidator": {"discount_push": 2, "feature_sprint": 1},
+            "enterprise_sales_machine": {"hold": 2, "discount_push": 1},
+            "data_quality_native": {"feature_sprint": 2, "hold": 1},
+            "release_velocity_chaser": {"feature_sprint": 3, "hold": -1},
         }
     )
     competitor_archetype_pivot_threshold_bonus: dict[str, int] = field(
@@ -563,6 +585,9 @@ class BalanceConfig:
             "open_source_challenger": -2,
             "regulatory_incumbent": 5,
             "platform_consolidator": -2,
+            "enterprise_sales_machine": 2,
+            "data_quality_native": 3,
+            "release_velocity_chaser": -3,
         }
     )
 
@@ -665,6 +690,34 @@ class BalanceConfig:
     event_trigger_min_turn: int = 2
     event_trigger_chance_percent: int = 42
     event_history_limit: int = 16
+    competitor_intel_limit: int = 12
+
+    release_stability_required_progress: int = 4
+    release_minor_required_progress: int = 6
+    release_major_required_progress: int = 9
+    release_work_base_progress: int = 3
+    release_stability_cash_cost: Decimal = Decimal("180.00")
+    release_minor_cash_cost: Decimal = Decimal("260.00")
+    release_major_cash_cost: Decimal = Decimal("520.00")
+
+    sales_deal_base_value: Decimal = Decimal("950.00")
+    sales_deal_action_cost: Decimal = Decimal("160.00")
+    sales_deal_probability_gain: int = 16
+    sales_deal_close_probability_threshold: int = 62
+    sales_deal_customer_satisfaction: int = 66
+    sales_deal_customer_expansion: int = 54
+    sales_deal_user_gain_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 9,
+            "startup": 7,
+            "smb": 5,
+            "enterprise": 3,
+        }
+    )
+
+    roadmap_project_required_progress: int = 8
+    roadmap_project_work_progress: int = 3
+    roadmap_project_work_cost: Decimal = Decimal("220.00")
 
     event_bug_incident_weight: int = 8
     event_bug_incident_cooldown: int = 4

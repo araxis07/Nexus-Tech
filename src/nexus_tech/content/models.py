@@ -11,6 +11,7 @@ from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
+    CandidateTrait,
     CompanyStrategy,
     CompetitorMove,
     DifficultyMode,
@@ -20,6 +21,7 @@ from nexus_tech.domain.models import (
     MarketSegment,
     PricingTier,
     RoadmapFocus,
+    ScenarioObjectiveMetric,
     Seniority,
 )
 from nexus_tech.domain.money import quantize_money, quantize_rate
@@ -109,6 +111,7 @@ class ScenarioEmployeeSeed(BaseModel):
     energy: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
     morale: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
     productivity: Optional[int] = Field(default=None, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)  # noqa: UP045
+    trait: CandidateTrait = CandidateTrait.STEADY_OPERATOR
 
 
 class ScenarioCompetitorSeed(BaseModel):
@@ -197,6 +200,8 @@ class ScenarioDefinition(BaseModel):
     title: str = Field(min_length=1, max_length=80)
     description: str = Field(min_length=1, max_length=240)
     objective: str = Field(default="", max_length=220)
+    objective_metric: ScenarioObjectiveMetric = ScenarioObjectiveMetric.NONE
+    objective_target: int = Field(default=0, ge=0)
     company_name: str = Field(min_length=1, max_length=80)
     company_strategy: CompanyStrategy = CompanyStrategy.BALANCED
     difficulty_mode: DifficultyMode = DifficultyMode.STANDARD

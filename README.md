@@ -38,6 +38,8 @@ Each turn represents a business interval. You review the company, choose actions
 - Target different customer segments such as `indie`, `startup`, `SMB`, and `enterprise`
 - Adjust pricing tiers to trade off growth, churn, and revenue per user
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
+- Plan and ship product releases such as stability patches, minor releases, and major launches
+- Use multi-action roadmap projects for larger bets like platform rebuilds, enterprise certification, marketplace launches, and sales playbooks
 - Deal with segment-specific trade-offs like support cost, price sensitivity, and competitive pressure
 
 ### 🧩 Data-Driven Content
@@ -50,7 +52,9 @@ Each turn represents a business interval. You review the company, choose actions
 - Add enterprise-data, field-service, and procurement templates plus board-tension, channel-defense, and late-scale drag scenarios
 - Add AI-governance, developer-marketplace, customer-health, and incident-command templates plus higher-scale trust and ecosystem scenarios
 - Add open-source, enterprise-AI-ops, vertical-compliance, and community-marketplace templates plus objective-driven scale scenarios
+- Add sales-enablement AI, data-quality, and release-ops templates plus enterprise pipeline, data trust, and release-crunch scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
+- Track scenario-specific objectives with measurable progress such as closed deals, reputation, or enterprise users
 - Support custom company and primary product overrides on top of scenario defaults
 
 ### 🌐 Market and Competition
@@ -63,7 +67,9 @@ Each turn represents a business interval. You review the company, choose actions
 - Expand rival archetypes with channel aggregators, trust monoliths, and vertical specialists
 - Add AI fast followers, governance giants, and ecosystem brokers as new rival archetypes
 - Add open source challengers, regulatory incumbents, and platform consolidators as new competitor archetypes
+- Add enterprise sales machines, data-quality specialists, and release-velocity rivals as higher-scale pressure archetypes
 - Let rival moves reshape product count and pricing posture over time
+- Capture compact competitor-intel notes when rival posture changes or momentum spikes
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
 - Track an explicit operations layer that converts support backlog and portfolio sprawl into real cost, morale drag, and execution risk
 - Add a dedicated late-game layer for renewal risk, concentration risk, and legacy drag once a run reaches real scale
@@ -82,6 +88,7 @@ Each turn represents a business interval. You review the company, choose actions
 ### 🤝 Customer Accounts
 
 - Turn strong product traction into named key customer accounts
+- Source and advance sales deals through lead, demo, pilot, and closed stages
 - Track account satisfaction, contract value, expansion potential, renewal timing, and churn risk
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
@@ -91,6 +98,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Hire and fire employees
 - Review deterministic candidate pools before hiring during demos or interactive runs
+- Evaluate candidate traits such as steady operator, fast learner, expensive expert, and burnout risk
 - Assign team members to specific products
 - Manage core roles:
   - `engineer`
@@ -117,6 +125,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Customer-heavy and enterprise-heavy runs can surface key-account expansion and security-audit trade-offs
 - Scale-stage runs can now surface enterprise sales cycles, product launch windows, platform outages, competitor acquisitions, and regulatory shifts
 - Follow-up event chains can now appear after related audit, launch, and enterprise-sales events
+- Event chain metadata is now tracked in event history for cleaner future expansion
 - Competitor pressure now also shows up through the simulation layer, not only through isolated events
 
 ### 🏁 Progression
@@ -133,6 +142,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Use higher-scale roadmap initiatives such as AI trust program, community growth, and enterprise sales push
 - Set a budget stance such as `lean`, `balanced`, or `aggressive` and let it shape burn, marketing efficiency, and team fatigue
 - Work against a quarter plan with explicit revenue, user, cash, and headcount targets
+- Work against scenario objectives and larger roadmap projects in addition to campaign goals
 - Track run score, estimated company value, turn history, and victory conditions in the terminal report
 - Classify successful runs into exit paths such as profitable independence, strategic acquisition, IPO-ready, or restructure
 
@@ -142,6 +152,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Resume the latest save slot
 - List, rename, and delete save slots directly from the CLI
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
+- Persist release plans, sales deals, roadmap projects, competitor intel, scenario objectives, and hiring traits
 - Use SQLite schema versioning and additive migrations to keep local save files upgradeable
 - Keep the entire project offline and self-contained
 
@@ -163,6 +174,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Report now includes recent events, funding history, and milestone history
 - Add `list-rivals`, `list-events`, `doctor`, and `check-saves` so content, install state, and local persistence health can be reviewed without entering a run
 - Add `list-candidates`, `list-segments`, and `list-roadmaps` for hiring, customer, and strategy discovery without entering a run
+- Add `list-balance-profiles` plus in-game pipeline review for releases, sales deals, and roadmap projects
 - Seeded demo support for reproducible simulations
 
 ### 🧪 Quality and Tooling

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0 - 2026-04-23
+
+- Added product release planning with stability patches, minor releases, and major launches
+- Added a lightweight sales pipeline with deal stages that can create key customer accounts
+- Added multi-action roadmap projects for platform, enterprise, marketplace, and sales execution bets
+- Added scenario objective tracking, hiring-market traits, competitor-intel notes, and balance profile discovery
+- Expanded content with sales-enablement AI, data-quality, and release-ops templates plus three new objective-driven scenarios
+- Persisted release plans, sales deals, roadmap projects, competitor intel, scenario objectives, event chain metadata, and hiring traits through SQLite schema version `11`
+- Promoted the package version to `0.14.0`
+
 ## 0.13.0 - 2026-04-23
 
 - Added a fifth content pack with open source, enterprise AI ops, vertical compliance, and community marketplace templates

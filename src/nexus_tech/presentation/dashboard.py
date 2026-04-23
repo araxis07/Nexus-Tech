@@ -25,6 +25,9 @@ from nexus_tech.domain.models import (
     MilestoneEntry,
     PendingEvent,
     Product,
+    ProductReleaseStatus,
+    RoadmapProjectStatus,
+    SalesDealStage,
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import SaveSlotSummary
@@ -34,6 +37,7 @@ from nexus_tech.simulation.balance_lab import (
     BalanceComparisonResult,
     BalanceMatrixResult,
 )
+from nexus_tech.simulation.balance_profiles import BalanceProfile
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
@@ -44,6 +48,7 @@ from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
+from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_score
@@ -103,7 +108,12 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
     for scenario in scenarios:
         description = scenario.description
         if scenario.objective:
-            description = f"{description}\n[dim]Objective: {scenario.objective}[/dim]"
+            objective = scenario.objective
+            if scenario.objective_target > 0:
+                objective = (
+                    f"{objective} ({scenario.objective_metric.value} {scenario.objective_target})"
+                )
+            description = f"{description}\n[dim]Objective: {objective}[/dim]"
         table.add_row(
             f"{scenario.title}\n[dim]{scenario.scenario_id}[/dim]",
             scenario.company_name,
@@ -181,7 +191,10 @@ def render_candidate_pool(
     table.add_column("Candidate", style="bold")
     table.add_column("Role")
     table.add_column("Seniority")
+    table.add_column("Trait")
     table.add_column("Specialization")
+    table.add_column("Salary", justify="right")
+    table.add_column("Prod", justify="right")
     table.add_column("Why They Matter")
 
     for index, candidate in enumerate(candidates, start=1):
@@ -190,7 +203,10 @@ def render_candidate_pool(
             candidate.full_name,
             candidate.role.value,
             candidate.seniority.value,
+            candidate.trait.value,
             candidate.specialization,
+            format_money(candidate.salary_expectation),
+            str(candidate.expected_productivity),
             candidate.pitch,
         )
 
@@ -242,6 +258,31 @@ def render_roadmap_catalog(
         table.add_row(focus, summary)
 
     console.print(Panel(table, title="Roadmap Initiatives", border_style="cyan", expand=True))
+
+
+def render_balance_profile_catalog(
+    console: Console,
+    profiles: tuple[BalanceProfile, ...],
+) -> None:
+    """Render recommended deterministic balance-lab profiles."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Profile", style="bold")
+    table.add_column("Difficulty")
+    table.add_column("Runs", justify="right")
+    table.add_column("Turns", justify="right")
+    table.add_column("Use Case")
+
+    for profile in profiles:
+        table.add_row(
+            profile.profile_id.value,
+            profile.difficulty_mode.value,
+            str(profile.runs),
+            str(profile.turns),
+            profile.description,
+        )
+
+    console.print(Panel(table, title="Balance Profiles", border_style="cyan", expand=True))
 
 
 def render_campaign_goal_catalog(
@@ -808,6 +849,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
                 _build_finance_panel(state),
+                _build_pipeline_summary_panel(state),
             ],
             equal=False,
             expand=True,
@@ -849,6 +891,22 @@ def render_customer_view(console: Console, state: GameState) -> None:
     console.print(_build_customer_accounts_panel(state, compact=False))
 
 
+def render_pipeline_view(console: Console, state: GameState) -> None:
+    """Render release, sales, and project execution pipeline."""
+
+    console.print(
+        Columns(
+            [
+                _build_release_pipeline_panel(state),
+                _build_sales_pipeline_panel(state),
+                _build_roadmap_project_panel(state),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
+
+
 def render_report(console: Console, state: GameState) -> None:
     """Render a compact run report with score and turn history."""
 
@@ -874,6 +932,7 @@ def render_report(console: Console, state: GameState) -> None:
                 _build_report_overview_panel(state, run_score.total_score, run_score.score_tier),
                 _build_report_score_panel(state),
                 _build_report_quarter_plan_panel(state),
+                _build_objective_panel(state),
             ],
             equal=True,
             expand=True,
@@ -903,11 +962,13 @@ def render_report(console: Console, state: GameState) -> None:
                 _build_funding_history_panel(state),
                 _build_recent_events_panel(state),
                 _build_milestone_history_panel(state),
+                _build_competitor_intel_panel(state),
             ],
             equal=True,
             expand=True,
         )
     )
+    render_pipeline_view(console, state)
     console.print(history_panel)
 
 
@@ -1190,6 +1251,13 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Scenario", state.scenario_title)
     table.add_row("Difficulty", state.difficulty_mode.value)
     table.add_row("Goal", goal_progress.title)
+    objective_progress = evaluate_scenario_objective(state)
+    if objective_progress.target_value > 0:
+        table.add_row(
+            "Scenario Obj",
+            f"{objective_progress.current_value}/{objective_progress.target_value} "
+            f"({objective_progress.percent}%)",
+        )
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Strategy", state.company.strategy.value)
@@ -1333,6 +1401,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
 
     if not compact:
         table.add_column("Seniority")
+        table.add_column("Trait")
         table.add_column("Spec")
         table.add_column("Salary", justify="right")
 
@@ -1351,6 +1420,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
             row.extend(
                 [
                     employee.seniority.value,
+                    employee.trait.value,
                     employee.specialization,
                     format_money(employee.salary),
                 ]
@@ -1358,6 +1428,149 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
         table.add_row(*row)
 
     return table
+
+
+def _build_objective_panel(state: GameState) -> Panel:
+    progress = evaluate_scenario_objective(state)
+    if not progress.description:
+        body = "No scenario-specific objective is set for this run."
+    else:
+        body = (
+            f"{progress.description}\n"
+            f"[cyan]{progress.metric.value}[/cyan]: "
+            f"{progress.current_value}/{progress.target_value} ({progress.percent}%)"
+        )
+        if progress.complete:
+            body += "\n[green]Objective complete.[/green]"
+    return Panel(body, title="Scenario Objective", border_style="cyan", expand=True)
+
+
+def _build_pipeline_summary_panel(state: GameState) -> Panel:
+    active_releases = sum(
+        1 for release in state.product_releases if release.status is ProductReleaseStatus.PLANNED
+    )
+    active_deals = sum(
+        1
+        for deal in state.sales_deals
+        if deal.stage not in {SalesDealStage.CLOSED_WON, SalesDealStage.CLOSED_LOST}
+    )
+    active_projects = sum(
+        1 for project in state.roadmap_projects if project.status is RoadmapProjectStatus.ACTIVE
+    )
+    content = Table.grid(padding=(0, 1))
+    content.add_row("Releases", str(active_releases))
+    content.add_row("Sales Deals", str(active_deals))
+    content.add_row("Projects", str(active_projects))
+    content.add_row("Intel Notes", str(len(state.competitor_intel)))
+    return Panel(content, title="Execution Pipeline", border_style="cyan", expand=True)
+
+
+def _build_release_pipeline_panel(state: GameState) -> Panel:
+    product_names = {product.id: product.name for product in state.products}
+    releases = [
+        release
+        for release in state.product_releases
+        if release.status is ProductReleaseStatus.PLANNED
+    ]
+    if not releases:
+        return Panel(
+            "No active release plans. Use plan_release to queue one.",
+            title="Release Queue",
+            border_style="blue",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Product", style="bold")
+    table.add_column("Type")
+    table.add_column("Progress", justify="right")
+    table.add_column("Risk", justify="right")
+    for release in releases:
+        table.add_row(
+            product_names.get(release.product_id, "unknown"),
+            release.release_type.value,
+            f"{release.progress}/{release.required_progress}",
+            str(release.risk),
+        )
+    return Panel(table, title="Release Queue", border_style="blue", expand=True)
+
+
+def _build_sales_pipeline_panel(state: GameState) -> Panel:
+    product_names = {product.id: product.name for product in state.products}
+    if not state.sales_deals:
+        return Panel(
+            "No sales deals yet. Use create_sales_deal once a product has a clear segment.",
+            title="Sales Pipeline",
+            border_style="green",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Deal", style="bold")
+    table.add_column("Product")
+    table.add_column("Stage")
+    table.add_column("Value", justify="right")
+    table.add_column("Prob", justify="right")
+    for deal in state.sales_deals[-8:]:
+        table.add_row(
+            deal.name,
+            product_names.get(deal.product_id, "unknown"),
+            deal.stage.value,
+            format_money(deal.value),
+            f"{deal.probability}%",
+        )
+    return Panel(table, title="Sales Pipeline", border_style="green", expand=True)
+
+
+def _build_roadmap_project_panel(state: GameState) -> Panel:
+    product_names = {product.id: product.name for product in state.products}
+    if not state.roadmap_projects:
+        return Panel(
+            "No strategic project is active. Use start_roadmap_project for larger bets.",
+            title="Roadmap Projects",
+            border_style="magenta",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Project", style="bold")
+    table.add_column("Target")
+    table.add_column("Status")
+    table.add_column("Progress", justify="right")
+    table.add_column("Summary")
+    for project in state.roadmap_projects[-6:]:
+        table.add_row(
+            project.project_type.value,
+            product_names.get(project.target_product_id, "company-wide"),
+            project.status.value,
+            f"{project.progress}/{project.required_progress}",
+            project.summary,
+        )
+    return Panel(table, title="Roadmap Projects", border_style="magenta", expand=True)
+
+
+def _build_competitor_intel_panel(state: GameState) -> Panel:
+    if not state.competitor_intel:
+        return Panel(
+            "No competitor intel captured yet.",
+            title="Competitor Intel",
+            border_style="red",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Turn", justify="right")
+    table.add_column("Rival", style="bold")
+    table.add_column("Move")
+    table.add_column("Signal")
+    for entry in state.competitor_intel[-6:]:
+        table.add_row(
+            str(entry.turn),
+            entry.competitor_name,
+            entry.move.value,
+            entry.summary,
+        )
+    return Panel(table, title="Competitor Intel", border_style="red", expand=True)
 
 
 def _build_action_menu_panel() -> Panel:
@@ -1388,20 +1601,27 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("21", "rest_team", "Recover energy and morale.")
     primary_actions.add_row("22", "review_team", "Open the detailed team view.")
     primary_actions.add_row("23", "review_customers", "Open key account renewals.")
-    primary_actions.add_row("24", "view_report", "Open the score, plan, and rival report.")
-    primary_actions.add_row("25", "wait", "Hold position for this action.")
-    primary_actions.add_row("26", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("27", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("24", "plan_release", "Queue a product release plan.")
+    primary_actions.add_row("25", "work_release", "Advance and ship planned releases.")
+    primary_actions.add_row("26", "create_sales_deal", "Source a new sales opportunity.")
+    primary_actions.add_row("27", "advance_sales_deal", "Move a deal through the pipeline.")
+    primary_actions.add_row("28", "start_roadmap_project", "Start a multi-action strategic bet.")
+    primary_actions.add_row("29", "work_roadmap_project", "Advance the active strategic project.")
+    primary_actions.add_row("30", "review_pipeline", "Open release, sales, and project views.")
+    primary_actions.add_row("31", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("32", "wait", "Hold position for this action.")
+    primary_actions.add_row("33", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("34", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("28", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("29", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("30", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("31", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("32", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("35", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("36", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("37", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("38", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("39", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",

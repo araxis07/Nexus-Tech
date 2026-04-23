@@ -2735,5 +2735,216 @@
         "archetype_id": "trust_monolith"
       }
     ]
+  },
+  {
+    "scenario_id": "enterprise_pipeline_race",
+    "title": "Enterprise Pipeline Race",
+    "description": "A sales-led company has strong enterprise intent but needs disciplined pipeline execution before rivals lock the category.",
+    "objective": "Close two enterprise-grade deals before sales burn outruns the company.",
+    "objective_metric": "closed_deals",
+    "objective_target": 2,
+    "company_name": "Atlas Revenue",
+    "company_strategy": "growth",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "enterprise_sales_push",
+    "budget_stance": "aggressive",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "11800.00",
+    "reputation": 56,
+    "products": [
+      {
+        "key": "sales",
+        "template_id": "sales_enablement_ai",
+        "name": "Atlas Signal",
+        "lifecycle_stage": "growth",
+        "quality": 57,
+        "bug_level": 18,
+        "market_fit": 58,
+        "technical_debt": 25,
+        "user_count": 44,
+        "revenue_per_user": "78.00",
+        "feature_count": 3,
+        "maintenance_cost": "330.00",
+        "acquisition_rate": "0.0310",
+        "churn_rate": "0.0610",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Riley Stone",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "enterprise_discovery",
+        "assigned_product_key": "sales",
+        "energy": 74,
+        "morale": 72,
+        "trait": "expensive_expert"
+      },
+      {
+        "full_name": "Kai Morrow",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "field_marketing",
+        "assigned_product_key": "sales",
+        "energy": 77,
+        "morale": 73,
+        "trait": "fast_learner"
+      }
+    ],
+    "competitors": [
+      {
+        "name": "FieldForge",
+        "archetype_id": "enterprise_sales_machine"
+      },
+      {
+        "name": "Velocity CRM",
+        "archetype_id": "release_velocity_chaser"
+      }
+    ]
+  },
+  {
+    "scenario_id": "data_trust_platform",
+    "title": "Data Trust Platform",
+    "description": "A trust-heavy data product has strong buyer pull, but every shortcut shows up in enterprise churn and reputation.",
+    "objective": "Build a credible enterprise user base without letting data quality slip.",
+    "objective_metric": "enterprise_users",
+    "objective_target": 120,
+    "company_name": "Verity Grid",
+    "company_strategy": "quality",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "ai_trust_program",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "10400.00",
+    "reputation": 58,
+    "products": [
+      {
+        "key": "trust",
+        "template_id": "data_quality_guardian",
+        "name": "Verity Guard",
+        "lifecycle_stage": "growth",
+        "quality": 63,
+        "bug_level": 13,
+        "market_fit": 54,
+        "technical_debt": 18,
+        "user_count": 52,
+        "revenue_per_user": "92.00",
+        "feature_count": 2,
+        "maintenance_cost": "360.00",
+        "acquisition_rate": "0.0230",
+        "churn_rate": "0.0440",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Harper Chen",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "trust",
+        "energy": 76,
+        "morale": 74,
+        "trait": "steady_operator"
+      },
+      {
+        "full_name": "Morgan Vale",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "enterprise_workflows",
+        "assigned_product_key": "trust",
+        "energy": 78,
+        "morale": 75,
+        "trait": "fast_learner"
+      }
+    ],
+    "competitors": [
+      {
+        "name": "CleanLake",
+        "archetype_id": "data_quality_native"
+      },
+      {
+        "name": "GovCore",
+        "archetype_id": "governance_giant"
+      }
+    ]
+  },
+  {
+    "scenario_id": "release_crunch",
+    "title": "Release Crunch",
+    "description": "A developer-tools company has active demand, but release quality and delivery discipline now decide whether momentum converts.",
+    "objective": "Raise reputation through controlled releases instead of raw feature churn.",
+    "objective_metric": "reputation",
+    "objective_target": 70,
+    "company_name": "Shipyard Labs",
+    "company_strategy": "balanced",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "9600.00",
+    "reputation": 52,
+    "products": [
+      {
+        "key": "release",
+        "template_id": "release_ops_suite",
+        "name": "Shipyard Flow",
+        "lifecycle_stage": "growth",
+        "quality": 55,
+        "bug_level": 22,
+        "market_fit": 55,
+        "technical_debt": 31,
+        "user_count": 58,
+        "revenue_per_user": "46.00",
+        "feature_count": 4,
+        "maintenance_cost": "305.00",
+        "acquisition_rate": "0.0430",
+        "churn_rate": "0.0680",
+        "target_segment": "startup",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Casey Reed",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "developer_tools",
+        "assigned_product_key": "release",
+        "energy": 69,
+        "morale": 70,
+        "trait": "burnout_risk"
+      },
+      {
+        "full_name": "Eden Shaw",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "delivery",
+        "assigned_product_key": "release",
+        "energy": 75,
+        "morale": 74,
+        "trait": "steady_operator"
+      }
+    ],
+    "competitors": [
+      {
+        "name": "ReleaseRush",
+        "archetype_id": "release_velocity_chaser"
+      },
+      {
+        "name": "OpenForge",
+        "archetype_id": "open_source_challenger",
+        "focus_segment": "startup"
+      }
+    ]
   }
 ]

@@ -69,6 +69,9 @@ def create_game_state_from_scenario(
         market_cycle_turns_remaining=scenario.market_cycle_turns_remaining,
         scenario_id=scenario.scenario_id,
         scenario_title=scenario.title,
+        scenario_objective=scenario.objective,
+        scenario_objective_metric=scenario.objective_metric,
+        scenario_objective_target=scenario.objective_target,
         action_points_remaining=BALANCE.actions_per_turn,
     )
     state.quarter_plan = build_quarter_plan(state, budget_stance=scenario.budget_stance)
@@ -243,6 +246,7 @@ def _instantiate_scenario_employee(
         seniority=seed.seniority,
         specialization=seed.specialization,
         existing_employees=existing_employees,
+        trait=seed.trait,
     )
     if seed.energy is not None:
         employee.energy = seed.energy

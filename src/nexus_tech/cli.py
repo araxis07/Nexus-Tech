@@ -25,6 +25,7 @@ from nexus_tech.content.models import ProductTemplateDefinition
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
+    CandidateTrait,
     CompanyStrategy,
     DifficultyMode,
     Employee,
@@ -34,7 +35,12 @@ from nexus_tech.domain.models import (
     PendingEvent,
     PricingTier,
     Product,
+    ProductReleaseStatus,
+    ProductReleaseType,
     RoadmapFocus,
+    RoadmapProjectStatus,
+    RoadmapProjectType,
+    SalesDealStage,
     Seniority,
     TurnAction,
 )
@@ -46,6 +52,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_comparison,
     render_balance_lab,
     render_balance_matrix,
+    render_balance_profile_catalog,
     render_campaign_goal_catalog,
     render_candidate_pool,
     render_competitor_archetype_catalog,
@@ -59,6 +66,7 @@ from nexus_tech.presentation.dashboard import (
     render_glossary,
     render_intro,
     render_pending_event,
+    render_pipeline_view,
     render_product_picker,
     render_product_template_catalog,
     render_product_template_picker,
@@ -82,6 +90,7 @@ from nexus_tech.simulation.balance_lab import (
     run_balance_comparison,
     run_balance_matrix,
 )
+from nexus_tech.simulation.balance_profiles import list_balance_profiles
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
 from nexus_tech.simulation.catalog_validation import validate_content_catalogs
 from nexus_tech.simulation.engine import (
@@ -194,17 +203,24 @@ ACTION_KEYS = {
     "21": TurnAction.REST_TEAM,
     "22": TurnAction.REVIEW_TEAM,
     "23": TurnAction.REVIEW_CUSTOMERS,
-    "24": TurnAction.VIEW_REPORT,
-    "25": TurnAction.WAIT,
-    "26": TurnAction.VIEW_STATUS,
-    "27": TurnAction.END_TURN,
+    "24": TurnAction.PLAN_RELEASE,
+    "25": TurnAction.WORK_RELEASE,
+    "26": TurnAction.CREATE_SALES_DEAL,
+    "27": TurnAction.ADVANCE_SALES_DEAL,
+    "28": TurnAction.START_ROADMAP_PROJECT,
+    "29": TurnAction.WORK_ROADMAP_PROJECT,
+    "30": TurnAction.REVIEW_PIPELINE,
+    "31": TurnAction.VIEW_REPORT,
+    "32": TurnAction.WAIT,
+    "33": TurnAction.VIEW_STATUS,
+    "34": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "28": "save_game",
-    "29": "load_game",
-    "30": "show_guide",
-    "31": "show_glossary",
-    "32": "show_tutorial",
+    "35": "save_game",
+    "36": "load_game",
+    "37": "show_guide",
+    "38": "show_glossary",
+    "39": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -417,6 +433,13 @@ def list_roadmaps_command() -> None:
         for focus in RoadmapFocus
     )
     render_roadmap_catalog(console, profiles)
+
+
+@app.command("list-balance-profiles")
+def list_balance_profiles_command() -> None:
+    """Print recommended balance-lab presets."""
+
+    render_balance_profile_catalog(console, list_balance_profiles())
 
 
 @app.command("list-initiatives", hidden=True)
@@ -893,7 +916,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="26",
+                    default="33",
                     show_choices=False,
                 )
 
@@ -939,6 +962,10 @@ def run_game_loop(
                     render_customer_view(console, state)
                     continue
 
+                if action is TurnAction.REVIEW_PIPELINE:
+                    render_pipeline_view(console, state)
+                    continue
+
                 if action is TurnAction.VIEW_REPORT:
                     render_report(console, state)
                     continue
@@ -975,6 +1002,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.REVIEW_TEAM,
         TurnAction.REVIEW_FINANCE,
         TurnAction.REVIEW_CUSTOMERS,
+        TurnAction.REVIEW_PIPELINE,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,
@@ -1060,6 +1088,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
                 hire_role=candidate.role,
                 hire_seniority=candidate.seniority,
                 hire_specialization=candidate.specialization,
+                hire_trait=candidate.trait,
             )
 
         full_name = ask_text_input("Employee full name")
@@ -1080,11 +1109,19 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             "Specialization",
             default=default_specialization,
         )
+        trait_key = ask_choice_input(
+            "Trait",
+            choices=["steady_operator", "fast_learner", "expensive_expert", "burnout_risk"],
+            default="steady_operator",
+            show_choices=False,
+            case_sensitive=False,
+        )
         return ActionContext(
             hire_full_name=full_name,
             hire_role=EmployeeRole(role_key),
             hire_seniority=Seniority(seniority_key),
             hire_specialization=specialization,
+            hire_trait=CandidateTrait(trait_key),
         )
 
     if action is TurnAction.FIRE_EMPLOYEE:
@@ -1107,6 +1144,70 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         if product_id is None:
             return None
         return ActionContext(employee_id=employee_id, target_product_id=product_id)
+
+    if action is TurnAction.PLAN_RELEASE:
+        product_id = choose_product_id(state, action)
+        if product_id is None:
+            return None
+        release_type_key = ask_choice_input(
+            "Release type",
+            choices=["stability_patch", "minor_release", "major_launch"],
+            default="minor_release",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(
+            target_product_id=product_id,
+            release_type=ProductReleaseType(release_type_key),
+        )
+
+    if action is TurnAction.WORK_RELEASE:
+        release_id = choose_release_id(state)
+        if release_id is None:
+            return None
+        return ActionContext(release_id=release_id)
+
+    if action is TurnAction.CREATE_SALES_DEAL:
+        product_id = choose_product_id(state, action)
+        if product_id is None:
+            return None
+        return ActionContext(target_product_id=product_id)
+
+    if action is TurnAction.ADVANCE_SALES_DEAL:
+        sales_deal_id = choose_sales_deal_id(state)
+        if sales_deal_id is None:
+            return None
+        return ActionContext(sales_deal_id=sales_deal_id)
+
+    if action is TurnAction.START_ROADMAP_PROJECT:
+        project_type_key = ask_choice_input(
+            "Roadmap project",
+            choices=[
+                "platform_rebuild",
+                "enterprise_certification",
+                "marketplace_launch",
+                "sales_playbook",
+            ],
+            default="platform_rebuild",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        project_type = RoadmapProjectType(project_type_key)
+        product_id = None
+        if project_type is not RoadmapProjectType.SALES_PLAYBOOK:
+            product_id = choose_product_id(state, action)
+            if product_id is None:
+                return None
+        return ActionContext(
+            roadmap_project_type=project_type,
+            target_product_id=product_id,
+        )
+
+    if action is TurnAction.WORK_ROADMAP_PROJECT:
+        roadmap_project_id = choose_roadmap_project_id(state)
+        if roadmap_project_id is None:
+            return None
+        return ActionContext(roadmap_project_id=roadmap_project_id)
 
     if action in PRODUCT_TARGETED_ACTIONS:
         product_id = choose_product_id(state, action)
@@ -1250,6 +1351,138 @@ def choose_employee_id(
     return employee.id
 
 
+def choose_release_id(state: GameState) -> UUID | None:
+    """Prompt the user to select an active release plan."""
+
+    releases = [
+        release
+        for release in state.product_releases
+        if release.status is ProductReleaseStatus.PLANNED
+    ]
+    if not releases:
+        console.print(
+            Panel.fit(
+                "No planned releases are active. Plan a release first.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    product_names = {product.id: product.name for product in state.products}
+    table = Table(box=None, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Product")
+    table.add_column("Type")
+    table.add_column("Progress", justify="right")
+    table.add_column("Risk", justify="right")
+    for index, release in enumerate(releases, start=1):
+        table.add_row(
+            str(index),
+            product_names.get(release.product_id, "unknown"),
+            release.release_type.value,
+            f"{release.progress}/{release.required_progress}",
+            str(release.risk),
+        )
+    console.print(Panel(table, title="Active Releases", border_style="blue", expand=True))
+    choices = {str(index): release for index, release in enumerate(releases, start=1)}
+    selected_key = ask_choice_input(
+        "Select a release",
+        choices=list(choices),
+        default="1",
+        show_choices=False,
+    )
+    return choices[selected_key].id
+
+
+def choose_sales_deal_id(state: GameState) -> UUID | None:
+    """Prompt the user to select an active sales deal."""
+
+    deals = [
+        deal
+        for deal in state.sales_deals
+        if deal.stage not in {SalesDealStage.CLOSED_WON, SalesDealStage.CLOSED_LOST}
+    ]
+    if not deals:
+        console.print(
+            Panel.fit(
+                "No active sales deals are available. Create a sales deal first.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    product_names = {product.id: product.name for product in state.products}
+    table = Table(box=None, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Deal")
+    table.add_column("Product")
+    table.add_column("Stage")
+    table.add_column("Prob", justify="right")
+    for index, deal in enumerate(deals, start=1):
+        table.add_row(
+            str(index),
+            deal.name,
+            product_names.get(deal.product_id, "unknown"),
+            deal.stage.value,
+            f"{deal.probability}%",
+        )
+    console.print(Panel(table, title="Active Sales Deals", border_style="green", expand=True))
+    choices = {str(index): deal for index, deal in enumerate(deals, start=1)}
+    selected_key = ask_choice_input(
+        "Select a sales deal",
+        choices=list(choices),
+        default="1",
+        show_choices=False,
+    )
+    return choices[selected_key].id
+
+
+def choose_roadmap_project_id(state: GameState) -> UUID | None:
+    """Prompt the user to select an active roadmap project."""
+
+    projects = [
+        project
+        for project in state.roadmap_projects
+        if project.status is RoadmapProjectStatus.ACTIVE
+    ]
+    if not projects:
+        console.print(
+            Panel.fit(
+                "No active roadmap project exists. Start one first.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    product_names = {product.id: product.name for product in state.products}
+    table = Table(box=None, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Project")
+    table.add_column("Target")
+    table.add_column("Progress", justify="right")
+    for index, project in enumerate(projects, start=1):
+        table.add_row(
+            str(index),
+            project.project_type.value,
+            product_names.get(project.target_product_id, "company-wide"),
+            f"{project.progress}/{project.required_progress}",
+        )
+    console.print(
+        Panel(table, title="Active Roadmap Projects", border_style="magenta", expand=True)
+    )
+    choices = {str(index): project for index, project in enumerate(projects, start=1)}
+    selected_key = ask_choice_input(
+        "Select a roadmap project",
+        choices=list(choices),
+        default="1",
+        show_choices=False,
+    )
+    return choices[selected_key].id
+
+
 def handle_pending_event(state: GameState) -> GameState:
     """Prompt for an event choice and apply its effect immediately."""
 
@@ -1384,6 +1617,7 @@ def build_employee_selection_summary(
     return (
         f"{employee.full_name}\n"
         f"Role: {employee.role.value} | Seniority: {employee.seniority.value} | "
+        f"Trait: {employee.trait.value} | "
         f"Energy: {employee.energy} | Morale: {employee.morale} | "
         f"Assignment: {assignment_name}"
     )

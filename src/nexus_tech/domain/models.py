@@ -148,6 +148,15 @@ class Seniority(StrEnum):
     SENIOR = "senior"
 
 
+class CandidateTrait(StrEnum):
+    """Hiring-market trait that slightly changes employee economics."""
+
+    STEADY_OPERATOR = "steady_operator"
+    FAST_LEARNER = "fast_learner"
+    EXPENSIVE_EXPERT = "expensive_expert"
+    BURNOUT_RISK = "burnout_risk"
+
+
 class MilestoneId(StrEnum):
     """Supported one-time business milestones."""
 
@@ -184,6 +193,69 @@ class CampaignGoalId(StrEnum):
     CATEGORY_LEADER = "category_leader"
 
 
+class ScenarioObjectiveMetric(StrEnum):
+    """Content-driven scenario objective progress metric."""
+
+    NONE = "none"
+    CASH = "cash"
+    USERS = "users"
+    REPUTATION = "reputation"
+    ACTIVE_PRODUCTS = "active_products"
+    ENTERPRISE_USERS = "enterprise_users"
+    ACTIVE_DEALS = "active_deals"
+    CLOSED_DEALS = "closed_deals"
+
+
+class ProductReleaseType(StrEnum):
+    """Types of product releases the player can plan."""
+
+    STABILITY_PATCH = "stability_patch"
+    MINOR_RELEASE = "minor_release"
+    MAJOR_LAUNCH = "major_launch"
+
+
+class ProductReleaseStatus(StrEnum):
+    """Lifecycle for a product release plan."""
+
+    PLANNED = "planned"
+    SHIPPED = "shipped"
+
+
+class SalesDealStage(StrEnum):
+    """Simplified enterprise sales pipeline stage."""
+
+    LEAD = "lead"
+    DEMO = "demo"
+    PILOT = "pilot"
+    CLOSED_WON = "closed_won"
+    CLOSED_LOST = "closed_lost"
+
+
+class RoadmapProjectType(StrEnum):
+    """Multi-turn strategic projects beyond the active roadmap modifier."""
+
+    PLATFORM_REBUILD = "platform_rebuild"
+    ENTERPRISE_CERTIFICATION = "enterprise_certification"
+    MARKETPLACE_LAUNCH = "marketplace_launch"
+    SALES_PLAYBOOK = "sales_playbook"
+
+
+class RoadmapProjectStatus(StrEnum):
+    """Lifecycle for a roadmap project."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
+class BalanceProfileId(StrEnum):
+    """Named balance presets for tuning and demos."""
+
+    DEMO = "demo"
+    STANDARD = "standard"
+    HARD = "hard"
+    LONG_RUN = "long_run"
+
+
 class TurnAction(StrEnum):
     """Actions the player can take during a turn."""
 
@@ -210,6 +282,13 @@ class TurnAction(StrEnum):
     REST_TEAM = "rest_team"
     REVIEW_TEAM = "review_team"
     REVIEW_CUSTOMERS = "review_customers"
+    PLAN_RELEASE = "plan_release"
+    WORK_RELEASE = "work_release"
+    CREATE_SALES_DEAL = "create_sales_deal"
+    ADVANCE_SALES_DEAL = "advance_sales_deal"
+    START_ROADMAP_PROJECT = "start_roadmap_project"
+    WORK_ROADMAP_PROJECT = "work_roadmap_project"
+    REVIEW_PIPELINE = "review_pipeline"
     VIEW_REPORT = "view_report"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
@@ -282,6 +361,7 @@ class Employee(BaseModel):
     morale: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     productivity: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     specialization: str = Field(min_length=1, max_length=40)
+    trait: CandidateTrait = CandidateTrait.STEADY_OPERATOR
     assigned_product_id: Optional[UUID] = None  # noqa: UP045
 
     @field_validator("salary", mode="before")
@@ -402,6 +482,8 @@ class PendingEvent(BaseModel):
     description: str = Field(min_length=1, max_length=320)
     triggered_turn: int = Field(ge=1)
     cooldown_turns: int = Field(ge=0)
+    chain_id: Optional[str] = Field(default=None, min_length=1, max_length=60)  # noqa: UP045
+    chain_stage: int = Field(default=0, ge=0)
     target_product_id: Optional[UUID] = None  # noqa: UP045
     target_employee_id: Optional[UUID] = None  # noqa: UP045
     options: list[EventOption] = Field(min_length=1, max_length=3)
@@ -417,6 +499,8 @@ class EventHistoryEntry(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     triggered_turn: int = Field(ge=1)
     resolved_turn: int = Field(ge=1)
+    chain_id: Optional[str] = Field(default=None, min_length=1, max_length=60)  # noqa: UP045
+    chain_stage: int = Field(default=0, ge=0)
     selected_option_id: str = Field(min_length=1, max_length=40)
     selected_option_label: str = Field(min_length=1, max_length=80)
     result_text: str = Field(min_length=1, max_length=240)
@@ -484,6 +568,71 @@ class TurnLedgerEntry(BaseModel):
         return quantize_money(value)
 
 
+class ProductReleasePlan(BaseModel):
+    """A planned product release that can be worked over multiple actions."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    product_id: UUID
+    release_type: ProductReleaseType
+    status: ProductReleaseStatus = ProductReleaseStatus.PLANNED
+    progress: int = Field(default=0, ge=0)
+    required_progress: int = Field(default=6, ge=1)
+    risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    scheduled_turn: int = Field(ge=1)
+    shipped_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
+    summary: str = Field(default="", max_length=240)
+
+
+class SalesDeal(BaseModel):
+    """A lightweight enterprise sales opportunity."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    product_id: UUID
+    name: str = Field(min_length=1, max_length=80)
+    segment: MarketSegment = MarketSegment.ENTERPRISE
+    stage: SalesDealStage = SalesDealStage.LEAD
+    value: Decimal = Field(ge=Decimal("0"))
+    probability: int = Field(default=30, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    created_turn: int = Field(ge=1)
+    updated_turn: int = Field(ge=1)
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _normalize_deal_value(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+
+class RoadmapProject(BaseModel):
+    """A multi-action strategic project with completion effects."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    project_type: RoadmapProjectType
+    status: RoadmapProjectStatus = RoadmapProjectStatus.ACTIVE
+    target_product_id: Optional[UUID] = None  # noqa: UP045
+    progress: int = Field(default=0, ge=0)
+    required_progress: int = Field(default=8, ge=1)
+    started_turn: int = Field(ge=1)
+    completed_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
+    summary: str = Field(default="", max_length=240)
+
+
+class CompetitorIntelEntry(BaseModel):
+    """One compact competitor intelligence note."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    turn: int = Field(ge=1)
+    competitor_name: str = Field(min_length=1, max_length=80)
+    move: CompetitorMove
+    summary: str = Field(min_length=1, max_length=240)
+
+
 class GameState(BaseModel):
     """Current in-memory game state."""
 
@@ -505,6 +654,10 @@ class GameState(BaseModel):
     campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE
     competitors: list[Competitor] = Field(default_factory=list)
     customer_accounts: list[CustomerAccount] = Field(default_factory=list)
+    product_releases: list[ProductReleasePlan] = Field(default_factory=list)
+    sales_deals: list[SalesDeal] = Field(default_factory=list)
+    roadmap_projects: list[RoadmapProject] = Field(default_factory=list)
+    competitor_intel: list[CompetitorIntelEntry] = Field(default_factory=list)
     quarter_plan: QuarterPlan = Field(default_factory=QuarterPlan)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
     victory_achieved: bool = False
@@ -521,4 +674,7 @@ class GameState(BaseModel):
         min_length=1,
         max_length=80,
     )
+    scenario_objective: str = Field(default="", max_length=220)
+    scenario_objective_metric: ScenarioObjectiveMetric = ScenarioObjectiveMetric.NONE
+    scenario_objective_target: int = Field(default=0, ge=0)
     action_points_remaining: int = Field(ge=0)

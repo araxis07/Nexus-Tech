@@ -12,6 +12,7 @@ from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
+    CandidateTrait,
     CompanyStrategy,
     Competitor,
     DifficultyMode,
@@ -26,7 +27,9 @@ from nexus_tech.domain.models import (
     PendingEvent,
     PricingTier,
     Product,
+    ProductReleaseType,
     RoadmapFocus,
+    RoadmapProjectType,
     Seniority,
     TurnAction,
 )
@@ -37,6 +40,7 @@ from nexus_tech.simulation.campaign import (
     evaluate_campaign_goal,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
+from nexus_tech.simulation.competitor_intel import record_competitor_intel
 from nexus_tech.simulation.customers import CustomerTurnSummary, apply_end_of_turn_customers
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.economy import (
@@ -79,6 +83,7 @@ from nexus_tech.simulation.product_progression import (
     apply_sunset_product,
 )
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.releases import plan_product_release, work_product_release
 from nexus_tech.simulation.reporting import (
     RunScore,
     append_turn_history,
@@ -90,6 +95,11 @@ from nexus_tech.simulation.roadmap import (
     get_roadmap_profile,
     is_roadmap_due,
 )
+from nexus_tech.simulation.roadmap_projects import (
+    start_roadmap_project,
+    work_roadmap_project,
+)
+from nexus_tech.simulation.sales import advance_sales_deal, age_sales_pipeline, create_sales_deal
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.scenarios import (
     create_game_state_from_scenario,
@@ -126,11 +136,17 @@ class ActionContext:
     hire_role: EmployeeRole | None = None
     hire_seniority: Seniority | None = None
     hire_specialization: str | None = None
+    hire_trait: CandidateTrait | None = None
     strategy: CompanyStrategy | None = None
     pricing_tier: PricingTier | None = None
     target_segment: MarketSegment | None = None
     roadmap_focus: RoadmapFocus | None = None
     budget_stance: BudgetStance | None = None
+    release_type: ProductReleaseType | None = None
+    release_id: UUID | None = None
+    sales_deal_id: UUID | None = None
+    roadmap_project_type: RoadmapProjectType | None = None
+    roadmap_project_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -240,6 +256,7 @@ def apply_action(
         TurnAction.REVIEW_TEAM,
         TurnAction.REVIEW_FINANCE,
         TurnAction.REVIEW_CUSTOMERS,
+        TurnAction.REVIEW_PIPELINE,
         TurnAction.VIEW_REPORT,
     ):
         return ActionOutcome(
@@ -252,6 +269,7 @@ def apply_action(
         TurnAction.REVIEW_TEAM,
         TurnAction.REVIEW_FINANCE,
         TurnAction.REVIEW_CUSTOMERS,
+        TurnAction.REVIEW_PIPELINE,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
     ):
@@ -263,6 +281,8 @@ def apply_action(
             return ActionOutcome(state=state, message="Finance review refreshed.")
         if action is TurnAction.REVIEW_CUSTOMERS:
             return ActionOutcome(state=state, message="Customer account review refreshed.")
+        if action is TurnAction.REVIEW_PIPELINE:
+            return ActionOutcome(state=state, message="Pipeline review refreshed.")
         if action is TurnAction.VIEW_REPORT:
             return ActionOutcome(state=state, message="Run report refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
@@ -318,6 +338,7 @@ def apply_action(
             seniority=context.hire_seniority,
             specialization=context.hire_specialization,
             existing_employees=next_state.employees,
+            trait=context.hire_trait or CandidateTrait.STEADY_OPERATOR,
         )
         next_state.employees.append(employee)
         team_condition = calculate_team_condition(next_state.employees)
@@ -454,6 +475,72 @@ def apply_action(
         summary = apply_rest_team(next_state.employees)
         logger.debug("Rested the team.")
         return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.PLAN_RELEASE:
+        if context.release_type is None:
+            raise ValueError("Planning a release requires choosing a release type.")
+        product = get_target_product(next_state, context.target_product_id)
+        summary = plan_product_release(next_state, product, context.release_type)
+        logger.debug("Planned %s release for %s.", context.release_type.value, product.name)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.WORK_RELEASE:
+        if context.release_id is None:
+            raise ValueError("Working a release requires choosing a release plan.")
+        summary = work_product_release(next_state, context.release_id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Worked release %s.", context.release_id)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.CREATE_SALES_DEAL:
+        product = get_target_product(next_state, context.target_product_id)
+        summary = create_sales_deal(next_state, product)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Created sales deal for %s.", product.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.ADVANCE_SALES_DEAL:
+        if context.sales_deal_id is None:
+            raise ValueError("Advancing sales requires choosing a deal.")
+        summary = advance_sales_deal(next_state, context.sales_deal_id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Advanced sales deal %s.", context.sales_deal_id)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.START_ROADMAP_PROJECT:
+        if context.roadmap_project_type is None:
+            raise ValueError("Starting a roadmap project requires choosing a project type.")
+        summary = start_roadmap_project(
+            next_state,
+            context.roadmap_project_type,
+            context.target_product_id,
+        )
+        logger.debug("Started roadmap project %s.", context.roadmap_project_type.value)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.WORK_ROADMAP_PROJECT:
+        if context.roadmap_project_id is None:
+            raise ValueError("Working a roadmap project requires choosing a project.")
+        summary = work_roadmap_project(next_state, context.roadmap_project_id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Worked roadmap project %s.", context.roadmap_project_id)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
 
     if action is TurnAction.WAIT:
         logger.debug("Applied wait action.")
@@ -754,6 +841,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         + difficulty_profile.burnout_modifier,
     )
 
+    age_sales_pipeline(next_state)
     event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
     next_state = event_outcome.state
     team_condition = calculate_team_condition(next_state.employees)
@@ -761,11 +849,19 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     if unlocked_milestones:
         team_condition = calculate_team_condition(next_state.employees)
 
+    previous_competitors = [
+        competitor.model_copy(deep=True) for competitor in next_state.competitors
+    ]
     advance_competitors(
         next_state.competitors,
         rng,
         market_cycle=next_state.market_cycle,
         portfolio_products=next_state.products,
+    )
+    record_competitor_intel(
+        next_state,
+        previous_competitors,
+        current_turn=resolved_turn,
     )
     (
         next_state.market_cycle,

@@ -70,6 +70,8 @@ def apply_pending_event_choice(
         title=pending_event.title,
         triggered_turn=pending_event.triggered_turn,
         resolved_turn=pending_event.triggered_turn,
+        chain_id=pending_event.chain_id,
+        chain_stage=pending_event.chain_stage,
         selected_option_id=option.id,
         selected_option_label=option.label,
         result_text=result_text,

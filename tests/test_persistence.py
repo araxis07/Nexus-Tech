@@ -12,6 +12,8 @@ from nexus_tech.domain.models import (
     Company,
     CompanyStrategy,
     Competitor,
+    CompetitorIntelEntry,
+    CompetitorMove,
     CustomerAccount,
     CustomerAccountStatus,
     DifficultyMode,
@@ -33,8 +35,17 @@ from nexus_tech.domain.models import (
     PendingEvent,
     PricingTier,
     Product,
+    ProductReleasePlan,
+    ProductReleaseStatus,
+    ProductReleaseType,
     QuarterPlan,
     RoadmapFocus,
+    RoadmapProject,
+    RoadmapProjectStatus,
+    RoadmapProjectType,
+    SalesDeal,
+    SalesDealStage,
+    ScenarioObjectiveMetric,
     Seniority,
     TurnLedgerEntry,
 )
@@ -186,6 +197,41 @@ def make_state() -> GameState:
         cash_reserve_target=Decimal("9000.00"),
         headcount_cap=3,
     )
+    product_release = ProductReleasePlan(
+        product_id=product.id,
+        release_type=ProductReleaseType.MINOR_RELEASE,
+        status=ProductReleaseStatus.PLANNED,
+        progress=2,
+        required_progress=6,
+        risk=34,
+        scheduled_turn=4,
+        summary="Minor release planned.",
+    )
+    sales_deal = SalesDeal(
+        product_id=product.id,
+        name="Enterprise buyer: Nexus One",
+        segment=MarketSegment.ENTERPRISE,
+        stage=SalesDealStage.DEMO,
+        value=Decimal("1300.00"),
+        probability=52,
+        created_turn=4,
+        updated_turn=4,
+    )
+    roadmap_project = RoadmapProject(
+        project_type=RoadmapProjectType.ENTERPRISE_CERTIFICATION,
+        status=RoadmapProjectStatus.ACTIVE,
+        target_product_id=product.id,
+        progress=3,
+        required_progress=8,
+        started_turn=4,
+        summary="Enterprise certification started.",
+    )
+    competitor_intel = CompetitorIntelEntry(
+        turn=4,
+        competitor_name="Atlas Cloud",
+        move=CompetitorMove.FEATURE_SPRINT,
+        summary="Atlas Cloud accelerated a feature sprint.",
+    )
     return GameState(
         company=Company(
             name="NEXUS TECH",
@@ -199,6 +245,10 @@ def make_state() -> GameState:
         finance=finance,
         competitors=[competitor],
         customer_accounts=[customer_account],
+        product_releases=[product_release],
+        sales_deals=[sales_deal],
+        roadmap_projects=[roadmap_project],
+        competitor_intel=[competitor_intel],
         quarter_plan=quarter_plan,
         difficulty_mode=DifficultyMode.FOUNDER,
         campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
@@ -217,6 +267,9 @@ def make_state() -> GameState:
         exit_summary="Strategic Acquisition: A larger platform wants the customer base.",
         scenario_id="vc_sprint",
         scenario_title="VC Sprint",
+        scenario_objective="Close one enterprise deal.",
+        scenario_objective_metric=ScenarioObjectiveMetric.CLOSED_DEALS,
+        scenario_objective_target=1,
         action_points_remaining=1,
     )
 
@@ -249,6 +302,10 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "milestone_history",
         "turn_history",
         "customer_accounts",
+        "product_releases",
+        "sales_deals",
+        "roadmap_projects",
+        "competitor_intel",
     }.issubset(table_names)
 
     with sqlite3.connect(db_path) as connection:
@@ -269,6 +326,9 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     assert {
         "scenario_id",
         "scenario_title",
+        "scenario_objective",
+        "scenario_objective_metric",
+        "scenario_objective_target",
         "difficulty_mode",
         "campaign_goal_id",
         "roadmap_focus",
@@ -287,7 +347,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         competitor_columns
     )
     assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 10
+    assert user_version >= 11
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -405,7 +465,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         competitor_columns
     )
     assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 10
+    assert user_version >= 11
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:

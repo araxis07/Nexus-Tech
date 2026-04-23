@@ -12,6 +12,8 @@ from uuid import UUID
 from nexus_tech import __version__
 from nexus_tech.domain.models import (
     CampaignGoalId,
+    CompetitorIntelEntry,
+    CompetitorMove,
     DifficultyMode,
     EventCategory,
     EventHistoryEntry,
@@ -20,10 +22,20 @@ from nexus_tech.domain.models import (
     FinanceState,
     GameState,
     MarketCycle,
+    MarketSegment,
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
+    ProductReleasePlan,
+    ProductReleaseStatus,
+    ProductReleaseType,
     RoadmapFocus,
+    RoadmapProject,
+    RoadmapProjectStatus,
+    RoadmapProjectType,
+    SalesDeal,
+    SalesDealStage,
+    ScenarioObjectiveMetric,
     TurnLedgerEntry,
 )
 from nexus_tech.persistence.company_repository import CompanyRepository
@@ -119,6 +131,9 @@ class SaveLoadCoordinator:
                     rng_state=rng.export_state(),
                     scenario_id=state.scenario_id,
                     scenario_title=state.scenario_title,
+                    scenario_objective=state.scenario_objective,
+                    scenario_objective_metric=state.scenario_objective_metric,
+                    scenario_objective_target=state.scenario_objective_target,
                     difficulty_mode=state.difficulty_mode,
                     campaign_goal_id=state.campaign_goal_id,
                     roadmap_focus=state.roadmap_focus,
@@ -142,6 +157,10 @@ class SaveLoadCoordinator:
                     slot_name,
                     state.customer_accounts,
                 )
+                self._save_product_releases(connection, slot_name, state.product_releases)
+                self._save_sales_deals(connection, slot_name, state.sales_deals)
+                self._save_roadmap_projects(connection, slot_name, state.roadmap_projects)
+                self._save_competitor_intel(connection, slot_name, state.competitor_intel)
                 self.finance_repository.save(connection, slot_name, state.finance)
                 self.finance_repository.save_history(connection, slot_name, state.funding_history)
                 self.quarter_plan_repository.save(connection, slot_name, state.quarter_plan)
@@ -169,6 +188,9 @@ class SaveLoadCoordinator:
                         rng_state,
                         scenario_id,
                         scenario_title,
+                        scenario_objective,
+                        scenario_objective_metric,
+                        scenario_objective_target,
                         difficulty_mode,
                         campaign_goal_id,
                         roadmap_focus,
@@ -199,6 +221,10 @@ class SaveLoadCoordinator:
                     employees = self.employee_repository.load_all(connection, slot_name)
                     competitors = self.competitor_repository.load_all(connection, slot_name)
                     customer_accounts = self.customer_repository.load_all(connection, slot_name)
+                    product_releases = self._load_product_releases(connection, slot_name)
+                    sales_deals = self._load_sales_deals(connection, slot_name)
+                    roadmap_projects = self._load_roadmap_projects(connection, slot_name)
+                    competitor_intel = self._load_competitor_intel(connection, slot_name)
                     finance = self.finance_repository.load(connection, slot_name) or FinanceState()
                     funding_history = self.finance_repository.load_history(connection, slot_name)
                     quarter_plan = self.quarter_plan_repository.load(connection, slot_name)
@@ -227,6 +253,10 @@ class SaveLoadCoordinator:
                         finance=finance,
                         competitors=competitors,
                         customer_accounts=customer_accounts,
+                        product_releases=product_releases,
+                        sales_deals=sales_deals,
+                        roadmap_projects=roadmap_projects,
+                        competitor_intel=competitor_intel,
                         quarter_plan=quarter_plan,
                         pending_event=pending_event,
                         event_history=event_history,
@@ -247,6 +277,11 @@ class SaveLoadCoordinator:
                         exit_summary=slot_row["exit_summary"],
                         scenario_id=slot_row["scenario_id"],
                         scenario_title=slot_row["scenario_title"],
+                        scenario_objective=slot_row["scenario_objective"],
+                        scenario_objective_metric=ScenarioObjectiveMetric(
+                            slot_row["scenario_objective_metric"]
+                        ),
+                        scenario_objective_target=slot_row["scenario_objective_target"],
                         difficulty_mode=DifficultyMode(slot_row["difficulty_mode"]),
                         campaign_goal_id=CampaignGoalId(slot_row["campaign_goal_id"]),
                         action_points_remaining=slot_row["action_points_remaining"],
@@ -436,6 +471,9 @@ class SaveLoadCoordinator:
         rng_state: str,
         scenario_id: str,
         scenario_title: str,
+        scenario_objective: str,
+        scenario_objective_metric: ScenarioObjectiveMetric,
+        scenario_objective_target: int,
         difficulty_mode: DifficultyMode,
         campaign_goal_id: CampaignGoalId,
         roadmap_focus: RoadmapFocus,
@@ -464,6 +502,9 @@ class SaveLoadCoordinator:
                     rng_state,
                     scenario_id,
                     scenario_title,
+                    scenario_objective,
+                    scenario_objective_metric,
+                    scenario_objective_target,
                     difficulty_mode,
                     campaign_goal_id,
                     roadmap_focus,
@@ -479,7 +520,7 @@ class SaveLoadCoordinator:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     slot_name,
@@ -488,6 +529,9 @@ class SaveLoadCoordinator:
                     rng_state,
                     scenario_id,
                     scenario_title,
+                    scenario_objective,
+                    scenario_objective_metric.value,
+                    scenario_objective_target,
                     difficulty_mode.value,
                     campaign_goal_id.value,
                     roadmap_focus.value,
@@ -514,6 +558,9 @@ class SaveLoadCoordinator:
                 rng_state = ?,
                 scenario_id = ?,
                 scenario_title = ?,
+                scenario_objective = ?,
+                scenario_objective_metric = ?,
+                scenario_objective_target = ?,
                 difficulty_mode = ?,
                 campaign_goal_id = ?,
                 roadmap_focus = ?,
@@ -535,6 +582,9 @@ class SaveLoadCoordinator:
                 rng_state,
                 scenario_id,
                 scenario_title,
+                scenario_objective,
+                scenario_objective_metric.value,
+                scenario_objective_target,
                 difficulty_mode.value,
                 campaign_goal_id.value,
                 roadmap_focus.value,
@@ -558,6 +608,310 @@ class SaveLoadCoordinator:
             (slot_name,),
         ).fetchone()
         return row is not None
+
+    def _save_product_releases(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        product_releases: list[ProductReleasePlan],
+    ) -> None:
+        connection.execute("DELETE FROM product_releases WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO product_releases (
+                slot_name,
+                release_id,
+                display_order,
+                product_id,
+                release_type,
+                status,
+                progress,
+                required_progress,
+                risk,
+                scheduled_turn,
+                shipped_turn,
+                summary
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    str(release.id),
+                    index,
+                    str(release.product_id),
+                    release.release_type.value,
+                    release.status.value,
+                    release.progress,
+                    release.required_progress,
+                    release.risk,
+                    release.scheduled_turn,
+                    release.shipped_turn,
+                    release.summary,
+                )
+                for index, release in enumerate(product_releases)
+            ],
+        )
+
+    def _load_product_releases(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[ProductReleasePlan]:
+        rows = connection.execute(
+            """
+            SELECT
+                release_id,
+                product_id,
+                release_type,
+                status,
+                progress,
+                required_progress,
+                risk,
+                scheduled_turn,
+                shipped_turn,
+                summary
+            FROM product_releases
+            WHERE slot_name = ?
+            ORDER BY display_order ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            ProductReleasePlan(
+                id=UUID(row["release_id"]),
+                product_id=UUID(row["product_id"]),
+                release_type=ProductReleaseType(row["release_type"]),
+                status=ProductReleaseStatus(row["status"]),
+                progress=row["progress"],
+                required_progress=row["required_progress"],
+                risk=row["risk"],
+                scheduled_turn=row["scheduled_turn"],
+                shipped_turn=row["shipped_turn"],
+                summary=row["summary"],
+            )
+            for row in rows
+        ]
+
+    def _save_sales_deals(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        sales_deals: list[SalesDeal],
+    ) -> None:
+        connection.execute("DELETE FROM sales_deals WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO sales_deals (
+                slot_name,
+                deal_id,
+                display_order,
+                product_id,
+                name,
+                segment,
+                stage,
+                value,
+                probability,
+                created_turn,
+                updated_turn
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    str(deal.id),
+                    index,
+                    str(deal.product_id),
+                    deal.name,
+                    deal.segment.value,
+                    deal.stage.value,
+                    str(deal.value),
+                    deal.probability,
+                    deal.created_turn,
+                    deal.updated_turn,
+                )
+                for index, deal in enumerate(sales_deals)
+            ],
+        )
+
+    def _load_sales_deals(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[SalesDeal]:
+        rows = connection.execute(
+            """
+            SELECT
+                deal_id,
+                product_id,
+                name,
+                segment,
+                stage,
+                value,
+                probability,
+                created_turn,
+                updated_turn
+            FROM sales_deals
+            WHERE slot_name = ?
+            ORDER BY display_order ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            SalesDeal(
+                id=UUID(row["deal_id"]),
+                product_id=UUID(row["product_id"]),
+                name=row["name"],
+                segment=MarketSegment(row["segment"]),
+                stage=SalesDealStage(row["stage"]),
+                value=Decimal(row["value"]),
+                probability=row["probability"],
+                created_turn=row["created_turn"],
+                updated_turn=row["updated_turn"],
+            )
+            for row in rows
+        ]
+
+    def _save_roadmap_projects(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        roadmap_projects: list[RoadmapProject],
+    ) -> None:
+        connection.execute("DELETE FROM roadmap_projects WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO roadmap_projects (
+                slot_name,
+                project_id,
+                display_order,
+                project_type,
+                status,
+                target_product_id,
+                progress,
+                required_progress,
+                started_turn,
+                completed_turn,
+                summary
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    str(project.id),
+                    index,
+                    project.project_type.value,
+                    project.status.value,
+                    str(project.target_product_id)
+                    if project.target_product_id is not None
+                    else None,
+                    project.progress,
+                    project.required_progress,
+                    project.started_turn,
+                    project.completed_turn,
+                    project.summary,
+                )
+                for index, project in enumerate(roadmap_projects)
+            ],
+        )
+
+    def _load_roadmap_projects(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[RoadmapProject]:
+        rows = connection.execute(
+            """
+            SELECT
+                project_id,
+                project_type,
+                status,
+                target_product_id,
+                progress,
+                required_progress,
+                started_turn,
+                completed_turn,
+                summary
+            FROM roadmap_projects
+            WHERE slot_name = ?
+            ORDER BY display_order ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            RoadmapProject(
+                id=UUID(row["project_id"]),
+                project_type=RoadmapProjectType(row["project_type"]),
+                status=RoadmapProjectStatus(row["status"]),
+                target_product_id=UUID(row["target_product_id"])
+                if row["target_product_id"] is not None
+                else None,
+                progress=row["progress"],
+                required_progress=row["required_progress"],
+                started_turn=row["started_turn"],
+                completed_turn=row["completed_turn"],
+                summary=row["summary"],
+            )
+            for row in rows
+        ]
+
+    def _save_competitor_intel(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        competitor_intel: list[CompetitorIntelEntry],
+    ) -> None:
+        connection.execute("DELETE FROM competitor_intel WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO competitor_intel (
+                slot_name,
+                entry_index,
+                turn,
+                competitor_name,
+                move,
+                summary
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    index,
+                    entry.turn,
+                    entry.competitor_name,
+                    entry.move.value,
+                    entry.summary,
+                )
+                for index, entry in enumerate(competitor_intel)
+            ],
+        )
+
+    def _load_competitor_intel(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[CompetitorIntelEntry]:
+        rows = connection.execute(
+            """
+            SELECT turn, competitor_name, move, summary
+            FROM competitor_intel
+            WHERE slot_name = ?
+            ORDER BY entry_index ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            CompetitorIntelEntry(
+                turn=row["turn"],
+                competitor_name=row["competitor_name"],
+                move=CompetitorMove(row["move"]),
+                summary=row["summary"],
+            )
+            for row in rows
+        ]
 
     def _save_pending_event(
         self,
@@ -586,10 +940,12 @@ class SaveLoadCoordinator:
                 description,
                 triggered_turn,
                 cooldown_turns,
+                chain_id,
+                chain_stage,
                 target_product_id,
                 target_employee_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -599,6 +955,8 @@ class SaveLoadCoordinator:
                 pending_event.description,
                 pending_event.triggered_turn,
                 pending_event.cooldown_turns,
+                pending_event.chain_id,
+                pending_event.chain_stage,
                 str(pending_event.target_product_id)
                 if pending_event.target_product_id is not None
                 else None,
@@ -647,11 +1005,13 @@ class SaveLoadCoordinator:
                 title,
                 triggered_turn,
                 resolved_turn,
+                chain_id,
+                chain_stage,
                 selected_option_id,
                 selected_option_label,
                 result_text
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -662,6 +1022,8 @@ class SaveLoadCoordinator:
                     entry.title,
                     entry.triggered_turn,
                     entry.resolved_turn,
+                    entry.chain_id,
+                    entry.chain_stage,
                     entry.selected_option_id,
                     entry.selected_option_label,
                     entry.result_text,
@@ -684,6 +1046,8 @@ class SaveLoadCoordinator:
                 description,
                 triggered_turn,
                 cooldown_turns,
+                chain_id,
+                chain_stage,
                 target_product_id,
                 target_employee_id
             FROM pending_events
@@ -713,6 +1077,8 @@ class SaveLoadCoordinator:
             description=row["description"],
             triggered_turn=row["triggered_turn"],
             cooldown_turns=row["cooldown_turns"],
+            chain_id=row["chain_id"],
+            chain_stage=row["chain_stage"],
             target_product_id=UUID(row["target_product_id"])
             if row["target_product_id"] is not None
             else None,
@@ -742,6 +1108,8 @@ class SaveLoadCoordinator:
                 title,
                 triggered_turn,
                 resolved_turn,
+                chain_id,
+                chain_stage,
                 selected_option_id,
                 selected_option_label,
                 result_text
@@ -758,6 +1126,8 @@ class SaveLoadCoordinator:
                 title=row["title"],
                 triggered_turn=row["triggered_turn"],
                 resolved_turn=row["resolved_turn"],
+                chain_id=row["chain_id"],
+                chain_stage=row["chain_stage"],
                 selected_option_id=row["selected_option_id"],
                 selected_option_label=row["selected_option_label"],
                 result_text=row["result_text"],

@@ -7,7 +7,14 @@ from decimal import Decimal
 from uuid import UUID
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import CompanyStrategy, Employee, EmployeeRole, Product, Seniority
+from nexus_tech.domain.models import (
+    CandidateTrait,
+    CompanyStrategy,
+    Employee,
+    EmployeeRole,
+    Product,
+    Seniority,
+)
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.strategy import get_strategy_profile
@@ -58,6 +65,7 @@ def create_employee(
     seniority: Seniority,
     specialization: str | None,
     existing_employees: list[Employee],
+    trait: CandidateTrait = CandidateTrait.STEADY_OPERATOR,
 ) -> Employee:
     """Validate and create a new employee."""
 
@@ -73,8 +81,8 @@ def create_employee(
     if not normalized_specialization:
         normalized_specialization = BALANCE.employee_default_specializations[role.value]
 
-    salary = calculate_salary(role, seniority)
-    productivity = calculate_base_productivity(role, seniority)
+    salary = calculate_trait_salary(calculate_salary(role, seniority), trait)
+    productivity = calculate_trait_productivity(calculate_base_productivity(role, seniority), trait)
     return Employee(
         full_name=normalized_name,
         role=role,
@@ -84,6 +92,7 @@ def create_employee(
         morale=BALANCE.employee_starting_morale,
         productivity=productivity,
         specialization=normalized_specialization,
+        trait=trait,
     )
 
 
@@ -101,6 +110,19 @@ def calculate_base_productivity(role: EmployeeRole, seniority: Seniority) -> int
     base_productivity = BALANCE.employee_role_base_productivity[role.value]
     bonus = BALANCE.employee_seniority_productivity_bonus[seniority.value]
     return clamp_int(base_productivity + bonus, minimum=1)
+
+
+def calculate_trait_salary(base_salary: Decimal, trait: CandidateTrait) -> Decimal:
+    """Adjust salary by hiring-market trait."""
+
+    multiplier = BALANCE.employee_trait_salary_multiplier[trait.value]
+    return quantize_money(base_salary * multiplier)
+
+
+def calculate_trait_productivity(base_productivity: int, trait: CandidateTrait) -> int:
+    """Adjust base productivity by hiring-market trait."""
+
+    return clamp_int(base_productivity + BALANCE.employee_trait_productivity_bonus[trait.value])
 
 
 def calculate_effective_productivity(employee: Employee) -> int:

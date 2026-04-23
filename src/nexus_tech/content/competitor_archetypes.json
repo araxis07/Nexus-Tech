@@ -172,5 +172,44 @@
     "current_move": "discount_push",
     "momentum": 71,
     "funding_level": 3
+  },
+  {
+    "archetype_id": "enterprise_sales_machine",
+    "title": "Enterprise Sales Machine",
+    "description": "A field-sales rival that converts slowly but compounds procurement credibility and buyer references.",
+    "focus_segment": "enterprise",
+    "strength": 79,
+    "aggression": 63,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "hold",
+    "momentum": 64,
+    "funding_level": 3
+  },
+  {
+    "archetype_id": "data_quality_native",
+    "title": "Data Quality Native",
+    "description": "A specialist rival that wins trust-heavy data teams with reliability, audit posture, and deep workflow fit.",
+    "focus_segment": "enterprise",
+    "strength": 73,
+    "aggression": 54,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "feature_sprint",
+    "momentum": 62,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "release_velocity_chaser",
+    "title": "Release Velocity Chaser",
+    "description": "A developer-tools rival that ships constantly and pressures startups with visible release speed.",
+    "focus_segment": "startup",
+    "strength": 67,
+    "aggression": 73,
+    "pricing_tier": "standard",
+    "active_product_count": 2,
+    "current_move": "feature_sprint",
+    "momentum": 72,
+    "funding_level": 2
   }
 ]

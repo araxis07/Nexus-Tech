@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
-from nexus_tech.domain.models import EmployeeRole, Seniority
+from nexus_tech.domain.models import CandidateTrait, EmployeeRole, Seniority
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.team import (
+    calculate_base_productivity,
+    calculate_salary,
+    calculate_trait_productivity,
+    calculate_trait_salary,
+)
 
 
 @dataclass(frozen=True)
@@ -16,6 +23,9 @@ class CandidateProfile:
     role: EmployeeRole
     seniority: Seniority
     specialization: str
+    trait: CandidateTrait
+    salary_expectation: Decimal
+    expected_productivity: int
     pitch: str
 
 
@@ -74,6 +84,13 @@ _PITCHES = {
     ),
 }
 
+_TRAIT_PITCHES = {
+    CandidateTrait.STEADY_OPERATOR: "Steady operator with predictable economics.",
+    CandidateTrait.FAST_LEARNER: "Fast learner with extra output at normal salary pressure.",
+    CandidateTrait.EXPENSIVE_EXPERT: "Expensive expert who raises burn but moves faster.",
+    CandidateTrait.BURNOUT_RISK: "High-output hire with burnout risk if overworked.",
+}
+
 
 def generate_candidate_pool(
     rng: RandomLike,
@@ -95,8 +112,14 @@ def generate_candidate_pool(
 
         role = roles[rng.randint(0, len(roles) - 1)]
         seniority = seniorities[rng.randint(0, len(seniorities) - 1)]
+        trait = tuple(CandidateTrait)[rng.randint(0, len(tuple(CandidateTrait)) - 1)]
         specializations = _ROLE_SPECIALIZATIONS[role]
         pitches = _PITCHES[role]
+        salary_expectation = calculate_trait_salary(calculate_salary(role, seniority), trait)
+        expected_productivity = calculate_trait_productivity(
+            calculate_base_productivity(role, seniority),
+            trait,
+        )
 
         candidates.append(
             CandidateProfile(
@@ -104,7 +127,10 @@ def generate_candidate_pool(
                 role=role,
                 seniority=seniority,
                 specialization=specializations[rng.randint(0, len(specializations) - 1)],
-                pitch=pitches[rng.randint(0, len(pitches) - 1)],
+                trait=trait,
+                salary_expectation=salary_expectation,
+                expected_productivity=expected_productivity,
+                pitch=(f"{pitches[rng.randint(0, len(pitches) - 1)]} {_TRAIT_PITCHES[trait]}"),
             )
         )
 

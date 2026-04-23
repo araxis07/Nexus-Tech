@@ -6,7 +6,7 @@ import sqlite3
 from decimal import Decimal
 from uuid import UUID
 
-from nexus_tech.domain.models import Employee, EmployeeRole, Seniority
+from nexus_tech.domain.models import CandidateTrait, Employee, EmployeeRole, Seniority
 
 
 class EmployeeRepository:
@@ -35,9 +35,10 @@ class EmployeeRepository:
                 morale,
                 productivity,
                 specialization,
+                trait,
                 assigned_product_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -52,6 +53,7 @@ class EmployeeRepository:
                     employee.morale,
                     employee.productivity,
                     employee.specialization,
+                    employee.trait.value,
                     str(employee.assigned_product_id)
                     if employee.assigned_product_id is not None
                     else None,
@@ -75,6 +77,7 @@ class EmployeeRepository:
                 morale,
                 productivity,
                 specialization,
+                trait,
                 assigned_product_id
             FROM employees
             WHERE slot_name = ?
@@ -94,6 +97,7 @@ class EmployeeRepository:
                 morale=row["morale"],
                 productivity=row["productivity"],
                 specialization=row["specialization"],
+                trait=CandidateTrait(row["trait"]),
                 assigned_product_id=UUID(row["assigned_product_id"])
                 if row["assigned_product_id"] is not None
                 else None,

@@ -246,7 +246,11 @@ def _apply_competitor_move_side_effects(
         if competitor.archetype_id == "price_raider":
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
             competitor.aggression = clamp_int(competitor.aggression + 1)
-        if competitor.archetype_id in {"channel_aggregator", "ecosystem_broker"}:
+        if competitor.archetype_id in {
+            "channel_aggregator",
+            "ecosystem_broker",
+            "enterprise_sales_machine",
+        }:
             competitor.strength = clamp_int(competitor.strength + 1)
         _maybe_pivot_focus_segment(competitor, portfolio_products)
         _maybe_raise_competitor_funding(competitor)
@@ -255,9 +259,13 @@ def _apply_competitor_move_side_effects(
     if competitor.current_move is CompetitorMove.FEATURE_SPRINT:
         if competitor.momentum >= BALANCE.competitor_feature_expansion_momentum_threshold:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
-        if competitor.archetype_id in {"feature_blitzer", "ai_fast_follower"}:
+        if competitor.archetype_id in {
+            "feature_blitzer",
+            "ai_fast_follower",
+            "release_velocity_chaser",
+        }:
             competitor.active_product_count = min(6, competitor.active_product_count + 1)
-        if competitor.archetype_id == "vertical_specialist":
+        if competitor.archetype_id in {"vertical_specialist", "data_quality_native"}:
             competitor.strength = clamp_int(competitor.strength + 1)
         if competitor.focus_segment.value == "enterprise":
             competitor.pricing_tier = PricingTier.PREMIUM
@@ -278,7 +286,12 @@ def _apply_competitor_move_side_effects(
         competitor.funding_level = max(0, competitor.funding_level - 1)
         return
 
-    if competitor.archetype_id in {"platform_bulwark", "trust_monolith", "governance_giant"}:
+    if competitor.archetype_id in {
+        "platform_bulwark",
+        "trust_monolith",
+        "governance_giant",
+        "enterprise_sales_machine",
+    }:
         competitor.pricing_tier = PricingTier.PREMIUM
         competitor.strength = clamp_int(competitor.strength + 1)
     elif competitor.archetype_id == "niche_defender":
