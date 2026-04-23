@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     Competitor,
     CompetitorIntelEntry,
     CompetitorMove,
+    ContractBillingModel,
     ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
@@ -88,6 +89,9 @@ def make_state() -> GameState:
         experience_points=24,
         promotion_readiness=48,
         attrition_risk=14,
+        performance_rating=67,
+        tenure_turns=5,
+        underperformance_streak=1,
         assigned_product_id=product.id,
     )
     pending_event = PendingEvent(
@@ -162,10 +166,15 @@ def make_state() -> GameState:
         segment=MarketSegment.ENTERPRISE,
         contract_value=Decimal("850.00"),
         contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=26,
+        usage_units=9,
         discount_rate=Decimal("0.0300"),
         satisfaction=72,
         onboarding_health=74,
         support_load=18,
+        open_tickets=5,
+        sla_breach_risk=13,
         expansion_potential=66,
         renewal_turn=6,
         churn_risk=18,
@@ -222,6 +231,9 @@ def make_state() -> GameState:
         name="Enterprise buyer: Nexus One",
         segment=MarketSegment.ENTERPRISE,
         stage=SalesDealStage.DEMO,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_commitment=30,
+        usage_commitment=12,
         value=Decimal("1300.00"),
         probability=52,
         created_turn=4,
@@ -233,7 +245,12 @@ def make_state() -> GameState:
         target_product_id=product.id,
         progress=3,
         required_progress=8,
+        epic_count=4,
+        epics_completed=1,
         started_turn=4,
+        deadline_turn=7,
+        dependency_project_type=RoadmapProjectType.PLATFORM_REBUILD,
+        delivery_risk=34,
         summary="Enterprise certification started.",
     )
     competitor_intel = CompetitorIntelEntry(
@@ -332,6 +349,18 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         product_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(products)").fetchall()
         }
+        employee_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(employees)").fetchall()
+        }
+        customer_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(customer_accounts)").fetchall()
+        }
+        sales_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(sales_deals)").fetchall()
+        }
+        roadmap_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(roadmap_projects)").fetchall()
+        }
         competitor_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(competitors)").fetchall()
         }
@@ -369,7 +398,27 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         competitor_columns
     )
     assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 12
+    assert {
+        "performance_rating",
+        "tenure_turns",
+        "underperformance_streak",
+    }.issubset(employee_columns)
+    assert {
+        "billing_model",
+        "seat_count",
+        "usage_units",
+        "open_tickets",
+        "sla_breach_risk",
+    }.issubset(customer_columns)
+    assert {"billing_model", "seat_commitment", "usage_commitment"}.issubset(sales_columns)
+    assert {
+        "epic_count",
+        "epics_completed",
+        "deadline_turn",
+        "dependency_project_type",
+        "delivery_risk",
+    }.issubset(roadmap_columns)
+    assert user_version >= 13
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -489,7 +538,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         competitor_columns
     )
     assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 12
+    assert user_version >= 13
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -527,7 +576,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 12
+    assert summaries[0].schema_version >= 13
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -540,7 +589,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 12
+    assert report.schema_version >= 13
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

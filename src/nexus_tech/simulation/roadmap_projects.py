@@ -36,19 +36,41 @@ def start_roadmap_project(
         raise ValueError("Only one roadmap project can be active at a time.")
 
     target_product = _resolve_target_product(state, target_product_id, project_type)
+    dependency = _get_dependency_project_type(project_type)
+    if dependency is not None and not _dependency_is_satisfied(
+        state,
+        dependency,
+        target_product_id=target_product.id if target_product is not None else None,
+    ):
+        raise ValueError(f"{project_type.value} depends on completing {dependency.value} first.")
+
+    required_progress = BALANCE.roadmap_project_required_progress_by_type[project_type.value]
+    epic_count = BALANCE.roadmap_project_epic_count_by_type[project_type.value]
+    deadline_turn = (
+        state.company.current_turn
+        + BALANCE.roadmap_project_deadline_turns_by_type[project_type.value]
+    )
     project = RoadmapProject(
         project_type=project_type,
         target_product_id=target_product.id if target_product is not None else None,
-        required_progress=BALANCE.roadmap_project_required_progress,
+        required_progress=required_progress,
+        epic_count=epic_count,
         started_turn=state.company.current_turn,
-        summary=f"{project_type.value} started.",
+        deadline_turn=deadline_turn,
+        dependency_project_type=dependency,
+        delivery_risk=BALANCE.roadmap_project_delivery_risk_by_type[project_type.value],
+        summary=f"{project_type.value} started with {epic_count} epic(s).",
     )
     state.roadmap_projects.append(project)
     target_text = f" for {target_product.name}" if target_product is not None else ""
+    dependency_text = (
+        f" Dependency satisfied: {dependency.value}." if dependency is not None else ""
+    )
     return RoadmapProjectSummary(
         message=(
             f"Started roadmap project {project_type.value}{target_text}. "
-            f"Progress target {project.required_progress}."
+            f"Progress target {project.required_progress}, deadline turn {project.deadline_turn}."
+            f"{dependency_text}"
         )
     )
 
@@ -73,15 +95,20 @@ def work_roadmap_project(state: GameState, project_id: UUID) -> RoadmapProjectSu
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.roadmap_project_work_cost
     )
-    project.progress = min(
-        project.required_progress,
-        project.progress + _project_progress_gain(state, project),
-    )
+    progress_gain = _project_progress_gain(state, project)
+    if state.company.current_turn > project.deadline_turn:
+        progress_gain = max(1, progress_gain - BALANCE.roadmap_project_late_progress_penalty)
+        project.delivery_risk = clamp_int(
+            project.delivery_risk + BALANCE.roadmap_project_deadline_miss_risk_gain
+        )
+    project.progress = min(project.required_progress, project.progress + progress_gain)
+    project.epics_completed = _calculate_epics_completed(project)
     if project.progress < project.required_progress:
         return RoadmapProjectSummary(
             message=(
                 f"Advanced {project.project_type.value}. "
                 f"Progress {project.progress}/{project.required_progress}, "
+                f"epics {project.epics_completed}/{project.epic_count}, "
                 f"cash -{BALANCE.roadmap_project_work_cost}."
             )
         )
@@ -96,15 +123,19 @@ def work_roadmap_project(state: GameState, project_id: UUID) -> RoadmapProjectSu
 
 
 def _project_progress_gain(state: GameState, project: RoadmapProject) -> int:
-    assigned_bonus = 0
-    if project.target_product_id is not None:
-        assigned_bonus = sum(
-            1
-            for employee in state.employees
-            if employee.assigned_product_id == project.target_product_id
-        )
-    pm_bonus = sum(1 for employee in state.employees if employee.role.value == "product_manager")
-    return BALANCE.roadmap_project_work_progress + assigned_bonus + pm_bonus
+    target_employee_bonus = 0
+    company_bonus = 0
+    for employee in state.employees:
+        if (
+            project.target_product_id is not None
+            and employee.assigned_product_id == project.target_product_id
+        ):
+            target_employee_bonus += 1
+        if employee.role.value == "product_manager":
+            company_bonus += 1
+        if employee.role.value == "engineer":
+            company_bonus += 1
+    return BALANCE.roadmap_project_work_progress + target_employee_bonus + (company_bonus // 2)
 
 
 def _complete_project(state: GameState, project: RoadmapProject) -> None:
@@ -138,6 +169,19 @@ def _complete_project(state: GameState, project: RoadmapProject) -> None:
         state.company.reputation = clamp_int(state.company.reputation + 1, 0, 100)
         project.summary = "Sales execution improved across active pipeline."
 
+    if project.completed_turn is not None and project.completed_turn > project.deadline_turn:
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.roadmap_project_deadline_miss_reputation_penalty,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence - BALANCE.roadmap_project_deadline_miss_board_penalty,
+            0,
+            100,
+        )
+        project.summary += " Delivery slipped and leadership confidence softened."
+
 
 def _resolve_target_product(
     state: GameState,
@@ -158,3 +202,34 @@ def _get_product(state: GameState, product_id: UUID | None) -> Product | None:
     if product is None or not product.is_active:
         raise ValueError("Roadmap project product is not active.")
     return product
+
+
+def _get_dependency_project_type(project_type: RoadmapProjectType) -> RoadmapProjectType | None:
+    dependency_value = BALANCE.roadmap_project_dependency_by_type[project_type.value]
+    if not dependency_value:
+        return None
+    return RoadmapProjectType(dependency_value)
+
+
+def _dependency_is_satisfied(
+    state: GameState,
+    dependency: RoadmapProjectType,
+    *,
+    target_product_id: UUID | None,
+) -> bool:
+    for project in state.roadmap_projects:
+        if project.status is not RoadmapProjectStatus.COMPLETED:
+            continue
+        if project.project_type is not dependency:
+            continue
+        if target_product_id is not None and project.target_product_id != target_product_id:
+            continue
+        return True
+    return False
+
+
+def _calculate_epics_completed(project: RoadmapProject) -> int:
+    return min(
+        project.epic_count,
+        (project.progress * project.epic_count) // max(1, project.required_progress),
+    )

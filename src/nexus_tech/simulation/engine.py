@@ -954,7 +954,12 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.employees,
         net_cash_flow=net_cash_flow,
         burnout_relief=functional_budget_profile.burnout_relief,
+        rng=rng,
     )
+    if progression_summary.resigned_employees:
+        next_state.company.reputation = clamp_int(next_state.company.reputation - 1)
+        next_state.finance.board_confidence = clamp_int(next_state.finance.board_confidence - 1)
+        reputation_delta -= 1
 
     age_sales_pipeline(next_state)
     event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
@@ -1028,6 +1033,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         roadmap_due=roadmap_due,
         promotion_ready_count=progression_summary.promotion_ready_count,
         high_attrition_risk_count=progression_summary.high_attrition_risk_count,
+        underperforming_count=progression_summary.underperforming_count,
+        resigned_employees=progression_summary.resigned_employees,
     )
     logger.debug("Resolved turn %s.", resolved_turn)
 
@@ -1142,6 +1149,8 @@ def build_turn_narrative(
     roadmap_due: bool,
     promotion_ready_count: int,
     high_attrition_risk_count: int,
+    underperforming_count: int,
+    resigned_employees: tuple[str, ...],
 ) -> str:
     """Generate a concise story beat for the turn summary."""
 
@@ -1151,10 +1160,18 @@ def build_turn_narrative(
         return victory_reason
     if campaign_goal_progress.completed:
         return f"Campaign goal complete: {campaign_goal_progress.title}."
+    if resigned_employees:
+        return (
+            "Attrition turned real this turn: "
+            + ", ".join(resigned_employees[:2])
+            + " left the company."
+        )
     if high_attrition_risk_count > 0:
         return "Attrition risk is rising. Team sustainability now needs active attention."
     if promotion_ready_count > 0:
         return "The team is maturing. Some people are ready for broader responsibility."
+    if underperforming_count > 0:
+        return "Some team output is softening. Performance now needs direct management."
     if market_cycle_changed:
         return (
             f"The market shifted to {market_cycle.value}. "

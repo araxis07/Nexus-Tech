@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 12
+CURRENT_SCHEMA_VERSION = 13
 
 SCHEMA_STATEMENTS = (
     """
@@ -95,6 +95,9 @@ SCHEMA_STATEMENTS = (
         experience_points INTEGER NOT NULL DEFAULT 0,
         promotion_readiness INTEGER NOT NULL DEFAULT 0,
         attrition_risk INTEGER NOT NULL DEFAULT 0,
+        performance_rating INTEGER NOT NULL DEFAULT 62,
+        tenure_turns INTEGER NOT NULL DEFAULT 0,
+        underperformance_streak INTEGER NOT NULL DEFAULT 0,
         assigned_product_id TEXT,
         PRIMARY KEY (slot_name, employee_id),
         UNIQUE (slot_name, display_order),
@@ -252,10 +255,15 @@ SCHEMA_STATEMENTS = (
         segment TEXT NOT NULL,
         contract_value TEXT NOT NULL,
         contract_cadence TEXT NOT NULL DEFAULT 'annual',
+        billing_model TEXT NOT NULL DEFAULT 'flat',
+        seat_count INTEGER NOT NULL DEFAULT 0,
+        usage_units INTEGER NOT NULL DEFAULT 0,
         discount_rate TEXT NOT NULL DEFAULT '0.0000',
         satisfaction INTEGER NOT NULL,
         onboarding_health INTEGER NOT NULL DEFAULT 60,
         support_load INTEGER NOT NULL DEFAULT 20,
+        open_tickets INTEGER NOT NULL DEFAULT 0,
+        sla_breach_risk INTEGER NOT NULL DEFAULT 0,
         expansion_potential INTEGER NOT NULL,
         renewal_turn INTEGER NOT NULL,
         churn_risk INTEGER NOT NULL,
@@ -297,6 +305,9 @@ SCHEMA_STATEMENTS = (
         name TEXT NOT NULL,
         segment TEXT NOT NULL,
         stage TEXT NOT NULL,
+        billing_model TEXT NOT NULL DEFAULT 'flat',
+        seat_commitment INTEGER NOT NULL DEFAULT 0,
+        usage_commitment INTEGER NOT NULL DEFAULT 0,
         value TEXT NOT NULL,
         probability INTEGER NOT NULL,
         created_turn INTEGER NOT NULL,
@@ -318,7 +329,12 @@ SCHEMA_STATEMENTS = (
         target_product_id TEXT,
         progress INTEGER NOT NULL,
         required_progress INTEGER NOT NULL,
+        epic_count INTEGER NOT NULL DEFAULT 3,
+        epics_completed INTEGER NOT NULL DEFAULT 0,
         started_turn INTEGER NOT NULL,
+        deadline_turn INTEGER NOT NULL DEFAULT 1,
+        dependency_project_type TEXT,
+        delivery_risk INTEGER NOT NULL DEFAULT 0,
         completed_turn INTEGER,
         summary TEXT NOT NULL,
         PRIMARY KEY (slot_name, project_id),
@@ -537,9 +553,45 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(
         connection,
+        table_name="employees",
+        column_name="performance_rating",
+        column_definition="INTEGER NOT NULL DEFAULT 62",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="tenure_turns",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="underperformance_streak",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
         table_name="customer_accounts",
         column_name="contract_cadence",
         column_definition="TEXT NOT NULL DEFAULT 'annual'",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="billing_model",
+        column_definition="TEXT NOT NULL DEFAULT 'flat'",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="seat_count",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="usage_units",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
         connection,
@@ -558,6 +610,66 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="customer_accounts",
         column_name="support_load",
         column_definition="INTEGER NOT NULL DEFAULT 20",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="open_tickets",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="sla_breach_risk",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="sales_deals",
+        column_name="billing_model",
+        column_definition="TEXT NOT NULL DEFAULT 'flat'",
+    )
+    _ensure_column(
+        connection,
+        table_name="sales_deals",
+        column_name="seat_commitment",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="sales_deals",
+        column_name="usage_commitment",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="roadmap_projects",
+        column_name="epic_count",
+        column_definition="INTEGER NOT NULL DEFAULT 3",
+    )
+    _ensure_column(
+        connection,
+        table_name="roadmap_projects",
+        column_name="epics_completed",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="roadmap_projects",
+        column_name="deadline_turn",
+        column_definition="INTEGER NOT NULL DEFAULT 1",
+    )
+    _ensure_column(
+        connection,
+        table_name="roadmap_projects",
+        column_name="dependency_project_type",
+        column_definition="TEXT",
+    )
+    _ensure_column(
+        connection,
+        table_name="roadmap_projects",
+        column_name="delivery_risk",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
         connection,

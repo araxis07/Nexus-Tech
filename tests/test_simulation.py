@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     CompanyStrategy,
     Competitor,
     CompetitorMove,
+    ContractBillingModel,
     ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
@@ -2455,6 +2456,61 @@ def test_account_revenue_applies_discount_rate() -> None:
     assert calculate_account_revenue([account]) == Decimal("900.00")
 
 
+def test_seat_based_account_revenue_includes_contract_commitment() -> None:
+    product = make_product("Enterprise Desk")
+    account = CustomerAccount(
+        name="Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1000.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=20,
+        discount_rate=Decimal("0.1000"),
+        satisfaction=70,
+        onboarding_health=72,
+        support_load=18,
+        expansion_potential=58,
+        renewal_turn=5,
+        churn_risk=16,
+    )
+
+    assert calculate_account_revenue([account]) == Decimal("1224.00")
+
+
+def test_customer_turn_tracks_support_backlog_and_sla_pressure() -> None:
+    product = make_product("Support Cloud", quality=44, bug_level=36, market_fit=52)
+    account = CustomerAccount(
+        name="Support Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("900.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=18,
+        satisfaction=58,
+        onboarding_health=50,
+        support_load=34,
+        open_tickets=10,
+        sla_breach_risk=54,
+        expansion_potential=62,
+        renewal_turn=6,
+        churn_risk=38,
+    )
+
+    summary = apply_end_of_turn_customers(
+        [account],
+        [product],
+        current_turn=3,
+        customer_success_bonus=0,
+    )
+
+    assert summary.total_open_tickets > 0
+    assert summary.sla_risk_accounts >= 1
+    assert account.open_tickets >= 10
+    assert account.sla_breach_risk >= 48
+
+
 def test_customer_success_action_reduces_risk_and_support_load() -> None:
     product = make_product("Renewal Hub")
     account = CustomerAccount(
@@ -2483,6 +2539,7 @@ def test_customer_success_action_reduces_risk_and_support_load() -> None:
     updated_account = outcome.state.customer_accounts[0]
     assert updated_account.churn_risk < account.churn_risk
     assert updated_account.support_load < account.support_load
+    assert updated_account.open_tickets <= account.open_tickets
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
@@ -2531,6 +2588,7 @@ def test_train_employee_increases_readiness_and_productivity() -> None:
     updated_employee = outcome.state.employees[0]
     assert updated_employee.promotion_readiness > employee.promotion_readiness
     assert updated_employee.productivity > employee.productivity
+    assert updated_employee.performance_rating > employee.performance_rating
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
@@ -2555,6 +2613,67 @@ def test_promote_employee_advances_seniority_and_salary() -> None:
     assert updated_employee.seniority is Seniority.MID
     assert updated_employee.salary > employee.salary
     assert updated_employee.productivity > employee.productivity
+
+
+def test_low_performance_reduces_effective_productivity() -> None:
+    employee = make_employee("Ada", EmployeeRole.ENGINEER, productivity=72)
+    employee.performance_rating = 30
+    weak_productivity = calculate_effective_productivity(employee)
+
+    employee.performance_rating = 78
+    strong_productivity = calculate_effective_productivity(employee)
+
+    assert strong_productivity > weak_productivity
+
+
+def test_extreme_attrition_can_cause_resignation_on_turn_resolution() -> None:
+    product = make_product("Core")
+    employee = make_employee("Ada", EmployeeRole.ENGINEER, assigned_product_id=product.id)
+    employee.attrition_risk = 95
+    employee.morale = 20
+    employee.energy = 20
+    employee.performance_rating = 32
+    employee.underperformance_streak = 3
+    state = make_state(product, employees=[employee], cash_on_hand=Decimal("9000.00"))
+
+    resolution = resolve_turn(state, FixedRandom(1))
+
+    assert len(resolution.state.employees) == 0
+    assert "left the company" in resolution.narrative
+
+
+def test_roadmap_project_dependency_is_enforced() -> None:
+    product = make_product("Enterprise Desk")
+    state = make_state(product, cash_on_hand=Decimal("9000.00"))
+
+    with pytest.raises(ValueError, match="depends on completing platform_rebuild"):
+        start_roadmap_project(
+            state,
+            RoadmapProjectType.ENTERPRISE_CERTIFICATION,
+            product.id,
+        )
+
+
+def test_late_roadmap_project_completion_reduces_board_confidence() -> None:
+    product = make_product("Debt Box", quality=50, bug_level=30, technical_debt=60)
+    employee = make_employee(
+        "PM",
+        EmployeeRole.PRODUCT_MANAGER,
+        assigned_product_id=product.id,
+    )
+    state = make_state(product, employees=[employee], cash_on_hand=Decimal("10000.00"))
+
+    start_roadmap_project(state, RoadmapProjectType.PLATFORM_REBUILD, product.id)
+    project_id = state.roadmap_projects[0].id
+    state.company.current_turn = 8
+    starting_confidence = state.finance.board_confidence
+
+    work_roadmap_project(state, project_id)
+    work_roadmap_project(state, project_id)
+    work_roadmap_project(state, project_id)
+
+    assert state.roadmap_projects[0].status is RoadmapProjectStatus.COMPLETED
+    assert state.finance.board_confidence < starting_confidence
 
 
 def test_functional_budget_affects_customer_risk_drift() -> None:

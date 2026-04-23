@@ -666,6 +666,7 @@ def _is_support_backlog_eligible(state: GameState) -> bool:
         state.products,
         state.employees,
         current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
     )
     return summary.overload >= BALANCE.operations_moderate_overload_threshold and any(
         product.is_active

@@ -274,6 +274,7 @@ class BalanceConfig:
     employee_training_productivity_gain: int = 3
     employee_training_morale_gain: int = 4
     employee_training_attrition_relief: int = 8
+    employee_training_performance_gain: int = 5
     employee_progression_energy_threshold: int = 60
     employee_assigned_experience_gain: int = 6
     employee_unassigned_experience_gain: int = 2
@@ -293,11 +294,27 @@ class BalanceConfig:
     )
     employee_promotion_morale_gain: int = 8
     employee_promotion_attrition_relief: int = 14
+    employee_promotion_performance_gain: int = 6
     employee_attrition_morale_risk_gain: int = 7
     employee_attrition_energy_risk_gain: int = 9
     employee_attrition_negative_cash_flow_risk_gain: int = 4
     employee_attrition_recovery_relief: int = 6
     employee_high_attrition_risk_threshold: int = 65
+    employee_starting_performance_rating: int = 62
+    employee_performance_good_threshold: int = 70
+    employee_performance_low_threshold: int = 42
+    employee_performance_energy_bonus_threshold: int = 68
+    employee_performance_morale_bonus_threshold: int = 68
+    employee_performance_gain: int = 3
+    employee_performance_loss: int = 4
+    employee_performance_recovery_gain: int = 2
+    employee_underperformance_streak_warning: int = 2
+    employee_resignation_attrition_threshold: int = 82
+    employee_resignation_morale_threshold: int = 38
+    employee_resignation_energy_threshold: int = 32
+    employee_resignation_chance_floor: int = 18
+    employee_resignation_attrition_weight_divisor: int = 2
+    employee_resignation_streak_bonus: int = 6
     team_build_bonus_divisor: int = 44
     team_stability_bonus_divisor: int = 48
     team_market_fit_bonus_divisor: int = 52
@@ -472,6 +489,10 @@ class BalanceConfig:
     operations_bug_penalty: int = 2
     operations_quality_penalty: int = 1
     operations_affected_product_limit: int = 2
+    operations_ticket_load_divisor: int = 18
+    operations_sla_risk_load_bonus: int = 2
+    operations_account_ticket_penalty: int = 2
+    operations_account_sla_penalty: int = 4
     operations_segment_load_bonus: dict[str, int] = field(
         default_factory=lambda: {
             "indie": 0,
@@ -736,6 +757,30 @@ class BalanceConfig:
     sales_deal_close_probability_threshold: int = 62
     sales_deal_customer_satisfaction: int = 66
     sales_deal_customer_expansion: int = 54
+    sales_deal_billing_model_by_segment: dict[str, str] = field(
+        default_factory=lambda: {
+            "indie": "flat",
+            "startup": "usage_based",
+            "smb": "seat_based",
+            "enterprise": "seat_based",
+        }
+    )
+    sales_deal_default_seat_commitment_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 0,
+            "startup": 0,
+            "smb": 12,
+            "enterprise": 24,
+        }
+    )
+    sales_deal_default_usage_commitment_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 12,
+            "startup": 32,
+            "smb": 18,
+            "enterprise": 10,
+        }
+    )
     sales_deal_user_gain_by_segment: dict[str, int] = field(
         default_factory=lambda: {
             "indie": 9,
@@ -748,6 +793,50 @@ class BalanceConfig:
     roadmap_project_required_progress: int = 8
     roadmap_project_work_progress: int = 3
     roadmap_project_work_cost: Decimal = Decimal("220.00")
+    roadmap_project_required_progress_by_type: dict[str, int] = field(
+        default_factory=lambda: {
+            "platform_rebuild": 8,
+            "enterprise_certification": 10,
+            "marketplace_launch": 7,
+            "sales_playbook": 6,
+        }
+    )
+    roadmap_project_epic_count_by_type: dict[str, int] = field(
+        default_factory=lambda: {
+            "platform_rebuild": 3,
+            "enterprise_certification": 4,
+            "marketplace_launch": 3,
+            "sales_playbook": 2,
+        }
+    )
+    roadmap_project_deadline_turns_by_type: dict[str, int] = field(
+        default_factory=lambda: {
+            "platform_rebuild": 3,
+            "enterprise_certification": 4,
+            "marketplace_launch": 3,
+            "sales_playbook": 2,
+        }
+    )
+    roadmap_project_delivery_risk_by_type: dict[str, int] = field(
+        default_factory=lambda: {
+            "platform_rebuild": 26,
+            "enterprise_certification": 32,
+            "marketplace_launch": 24,
+            "sales_playbook": 18,
+        }
+    )
+    roadmap_project_dependency_by_type: dict[str, str] = field(
+        default_factory=lambda: {
+            "platform_rebuild": "",
+            "enterprise_certification": "platform_rebuild",
+            "marketplace_launch": "platform_rebuild",
+            "sales_playbook": "",
+        }
+    )
+    roadmap_project_late_progress_penalty: int = 1
+    roadmap_project_deadline_miss_risk_gain: int = 8
+    roadmap_project_deadline_miss_reputation_penalty: int = 1
+    roadmap_project_deadline_miss_board_penalty: int = 2
 
     event_bug_incident_weight: int = 8
     event_bug_incident_cooldown: int = 4
@@ -1110,17 +1199,64 @@ class BalanceConfig:
     key_account_support_load_cap: int = 8
     key_account_onboarding_good_threshold: int = 70
     key_account_onboarding_bad_threshold: int = 45
+    contract_seat_unit_revenue: Decimal = Decimal("18.00")
+    contract_usage_unit_revenue: Decimal = Decimal("4.00")
+    contract_default_billing_model_by_segment: dict[str, str] = field(
+        default_factory=lambda: {
+            "indie": "flat",
+            "startup": "usage_based",
+            "smb": "seat_based",
+            "enterprise": "seat_based",
+        }
+    )
+    contract_default_seat_commitment_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 0,
+            "startup": 0,
+            "smb": 10,
+            "enterprise": 20,
+        }
+    )
+    contract_default_usage_commitment_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 14,
+            "startup": 28,
+            "smb": 12,
+            "enterprise": 8,
+        }
+    )
+    contract_ticket_bug_divisor: int = 10
+    contract_ticket_quality_relief_divisor: int = 22
+    contract_ticket_close_base_relief: int = 2
+    contract_sla_ticket_divisor: int = 8
+    contract_sla_support_divisor: int = 16
+    contract_sla_onboarding_relief_divisor: int = 18
+    contract_sla_risk_threshold: int = 55
+    contract_sla_severe_threshold: int = 75
+    contract_sla_breach_churn_risk_gain: int = 6
+    contract_sla_breach_satisfaction_loss: int = 3
+    contract_seat_expansion_gain: int = 4
+    contract_usage_expansion_gain: int = 8
+    contract_seat_downgrade_loss: int = 3
+    contract_usage_downgrade_loss: int = 6
+    contract_downgrade_satisfaction_threshold: int = 48
+    contract_flat_expansion_contract_gain: Decimal = Decimal("95.00")
+    contract_flat_downgrade_contract_loss: Decimal = Decimal("70.00")
     customer_success_investment_cost: Decimal = Decimal("240.00")
     customer_success_onboarding_gain: int = 8
     customer_success_satisfaction_gain: int = 6
     customer_success_support_relief: int = 5
     customer_success_churn_risk_relief: int = 8
+    customer_success_ticket_relief: int = 4
+    customer_success_sla_relief: int = 8
     retention_play_cost: Decimal = Decimal("180.00")
     retention_discount_rate_increase: Decimal = Decimal("0.0200")
     retention_satisfaction_gain: int = 9
     retention_onboarding_gain: int = 6
     retention_support_relief: int = 6
     retention_churn_risk_relief: int = 14
+    retention_ticket_relief: int = 6
+    retention_sla_relief: int = 10
     key_account_score_value_divisor: Decimal = Decimal("250.00")
     key_account_valuation_multiplier: Decimal = Decimal("2.50")
 

@@ -49,6 +49,10 @@ def invest_in_customer_success(
         account.support_load = clamp_int(
             account.support_load - BALANCE.customer_success_support_relief
         )
+        account.open_tickets = max(0, account.open_tickets - BALANCE.customer_success_ticket_relief)
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.customer_success_sla_relief
+        )
         account.churn_risk = clamp_int(
             account.churn_risk - BALANCE.customer_success_churn_risk_relief
         )
@@ -83,6 +87,8 @@ def run_retention_play(state: GameState, account_id: UUID) -> CustomerSuccessAct
         account.onboarding_health + BALANCE.retention_onboarding_gain
     )
     account.support_load = clamp_int(account.support_load - BALANCE.retention_support_relief)
+    account.open_tickets = max(0, account.open_tickets - BALANCE.retention_ticket_relief)
+    account.sla_breach_risk = clamp_int(account.sla_breach_risk - BALANCE.retention_sla_relief)
     account.churn_risk = clamp_int(account.churn_risk - BALANCE.retention_churn_risk_relief)
     if account.contract_cadence is ContractCadence.MONTHLY and account.discount_rate >= Decimal(
         "0.1000"

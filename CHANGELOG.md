@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0 - 2026-04-23
+
+- Added contract-economy depth with seat-based and usage-based customer billing models plus richer sales commitments
+- Added support-ops depth through account ticket backlog, SLA pressure, and operations-load interaction
+- Added employee performance tracking, underperformance pressure, and real attrition outcomes when burnout is ignored
+- Added roadmap-project depth with epics, deadlines, dependency rules, and delivery-risk consequences
+- Extended dashboards, tables, and SQLite persistence for the new contract, support, people, and roadmap state
+- Promoted the package version to `0.16.0`
+
 ## 0.15.0 - 2026-04-23
 
 - Added customer-success actions for onboarding investment and targeted retention plays

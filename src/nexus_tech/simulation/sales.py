@@ -7,6 +7,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from nexus_tech.domain.models import (
+    ContractBillingModel,
     ContractCadence,
     CustomerAccount,
     GameState,
@@ -17,6 +18,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.contracts import build_contract_shape, get_contract_interval
 from nexus_tech.simulation.support import clamp_int
 
 
@@ -48,8 +50,21 @@ def create_sales_deal(
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.sales_deal_action_cost
     )
+    billing_model = ContractBillingModel(
+        BALANCE.sales_deal_billing_model_by_segment[product.target_segment.value]
+    )
+    seat_commitment = BALANCE.sales_deal_default_seat_commitment_by_segment[
+        product.target_segment.value
+    ]
+    usage_commitment = BALANCE.sales_deal_default_usage_commitment_by_segment[
+        product.target_segment.value
+    ]
     value = quantize_money(
-        BALANCE.sales_deal_base_value + (product.revenue_per_user * 4) + (product.market_fit * 2)
+        BALANCE.sales_deal_base_value
+        + (product.revenue_per_user * 4)
+        + (product.market_fit * 2)
+        + (seat_commitment * 6)
+        + (usage_commitment * 2)
     )
     probability = clamp_int(
         22 + (product.market_fit // 3) + (product.quality // 5) + (marketing_bonus * 4),
@@ -60,6 +75,9 @@ def create_sales_deal(
         product_id=product.id,
         name=f"{product.target_segment.value.title()} buyer: {product.name}",
         segment=product.target_segment,
+        billing_model=billing_model,
+        seat_commitment=seat_commitment,
+        usage_commitment=usage_commitment,
         value=value,
         probability=probability,
         created_turn=state.company.current_turn,
@@ -142,23 +160,37 @@ def _close_won_deal(state: GameState, deal: SalesDeal) -> None:
     product.user_count += BALANCE.sales_deal_user_gain_by_segment[product.target_segment.value]
     product.market_fit = clamp_int(product.market_fit + 1, 0, 100)
     state.company.reputation = clamp_int(state.company.reputation + 1, 0, 100)
+    billing_model, seat_count, usage_units = build_contract_shape(
+        deal.segment,
+        pricing_tier=product.pricing_tier,
+    )
+    if deal.billing_model is not ContractBillingModel.FLAT:
+        billing_model = deal.billing_model
+        seat_count = max(seat_count, deal.seat_commitment)
+        usage_units = max(usage_units, deal.usage_commitment)
+    contract_cadence = (
+        ContractCadence.ANNUAL
+        if deal.segment is MarketSegment.ENTERPRISE
+        else ContractCadence.MONTHLY
+    )
     state.customer_accounts.append(
         CustomerAccount(
             name=deal.name,
             product_id=deal.product_id,
             segment=deal.segment,
             contract_value=deal.value,
-            contract_cadence=(
-                ContractCadence.ANNUAL
-                if deal.segment is MarketSegment.ENTERPRISE
-                else ContractCadence.MONTHLY
-            ),
+            contract_cadence=contract_cadence,
+            billing_model=billing_model,
+            seat_count=seat_count,
+            usage_units=usage_units,
             discount_rate=Decimal("0.0000"),
             satisfaction=BALANCE.sales_deal_customer_satisfaction,
             onboarding_health=BALANCE.sales_deal_customer_satisfaction - 2,
             support_load=24 if deal.segment is MarketSegment.ENTERPRISE else 18,
+            open_tickets=8 if deal.segment is MarketSegment.ENTERPRISE else 4,
+            sla_breach_risk=14 if deal.segment is MarketSegment.ENTERPRISE else 10,
             expansion_potential=BALANCE.sales_deal_customer_expansion,
-            renewal_turn=state.company.current_turn + 4,
+            renewal_turn=state.company.current_turn + get_contract_interval(contract_cadence),
             churn_risk=18 if deal.segment is MarketSegment.ENTERPRISE else 22,
         )
     )

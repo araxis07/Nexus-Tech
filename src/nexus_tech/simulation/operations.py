@@ -7,7 +7,14 @@ from decimal import Decimal
 from uuid import UUID
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import Employee, EmployeeRole, GameState, Product
+from nexus_tech.domain.models import (
+    CustomerAccount,
+    CustomerAccountStatus,
+    Employee,
+    EmployeeRole,
+    GameState,
+    Product,
+)
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.support import clamp_int
@@ -36,6 +43,8 @@ class OperationsSummary:
     team_energy_penalty: int
     team_morale_penalty: int
     reputation_delta: int
+    support_backlog: int
+    sla_risk_accounts: int
     product_risks: tuple[ProductOperationsRisk, ...]
     summary: str
 
@@ -45,10 +54,16 @@ def calculate_operations_summary(
     employees: list[Employee],
     *,
     current_turn: int,
+    customer_accounts: list[CustomerAccount] | None = None,
 ) -> OperationsSummary:
     """Estimate operational pressure from support, complexity, and coordination."""
 
     active_products = [product for product in products if product.is_active]
+    active_accounts = [
+        account
+        for account in (customer_accounts or [])
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
     if not active_products:
         return OperationsSummary(
             total_load=0,
@@ -58,6 +73,8 @@ def calculate_operations_summary(
             team_energy_penalty=0,
             team_morale_penalty=0,
             reputation_delta=0,
+            support_backlog=0,
+            sla_risk_accounts=0,
             product_risks=(),
             summary="No active operations load.",
         )
@@ -76,7 +93,16 @@ def calculate_operations_summary(
         // BALANCE.operations_turn_load_divisor
     )
     company_capacity = _calculate_company_operations_capacity(employees)
-    total_load = portfolio_load + company_overhead
+    support_backlog = sum(account.open_tickets for account in active_accounts)
+    sla_risk_accounts = sum(
+        1
+        for account in active_accounts
+        if account.sla_breach_risk >= BALANCE.contract_sla_risk_threshold
+    )
+    account_load = support_backlog // BALANCE.operations_ticket_load_divisor + (
+        sla_risk_accounts * BALANCE.operations_sla_risk_load_bonus
+    )
+    total_load = portfolio_load + company_overhead + account_load
     total_capacity = portfolio_capacity + company_capacity
     overload = max(0, total_load - total_capacity)
 
@@ -108,6 +134,8 @@ def calculate_operations_summary(
         team_energy_penalty=team_energy_penalty,
         team_morale_penalty=team_morale_penalty,
         reputation_delta=reputation_delta,
+        support_backlog=support_backlog,
+        sla_risk_accounts=sla_risk_accounts,
         product_risks=product_risks,
         summary=summary,
     )
@@ -124,6 +152,7 @@ def apply_end_of_turn_operations(
         state.products,
         state.employees,
         current_turn=current_turn,
+        customer_accounts=state.customer_accounts,
     )
     if summary.overload == 0:
         return summary
@@ -160,6 +189,17 @@ def apply_end_of_turn_operations(
         state.company.reputation = clamp_int(
             state.company.reputation + summary.reputation_delta,
         )
+
+    if summary.overload >= BALANCE.operations_bug_penalty_threshold:
+        for account in state.customer_accounts:
+            if account.status is CustomerAccountStatus.CHURNED:
+                continue
+            if account.product_id not in overloaded_product_ids:
+                continue
+            account.open_tickets += BALANCE.operations_account_ticket_penalty
+            account.sla_breach_risk = clamp_int(
+                account.sla_breach_risk + BALANCE.operations_account_sla_penalty,
+            )
 
     return summary
 

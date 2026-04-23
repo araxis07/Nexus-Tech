@@ -1,4 +1,4 @@
-"""Key-account simulation for customer depth and renewal pressure."""
+"""Key-account simulation for customer depth, support, and contract pressure."""
 
 from __future__ import annotations
 
@@ -16,7 +16,14 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.support import clamp_int, clamp_rate
+from nexus_tech.simulation.contracts import (
+    apply_commercial_renewal,
+    apply_support_drift,
+    build_contract_shape,
+    calculate_account_recurring_revenue,
+    get_contract_interval,
+)
+from nexus_tech.simulation.support import clamp_int
 
 
 @dataclass(frozen=True)
@@ -29,6 +36,8 @@ class CustomerTurnSummary:
     churned_accounts: int
     at_risk_accounts: int
     expansion_revenue: Decimal
+    total_open_tickets: int
+    sla_risk_accounts: int
     summary: str
 
 
@@ -38,7 +47,7 @@ def calculate_account_revenue(accounts: list[CustomerAccount]) -> Decimal:
     return quantize_money(
         sum(
             (
-                quantize_money(account.contract_value * (Decimal("1.0000") - account.discount_rate))
+                calculate_account_recurring_revenue(account)
                 for account in accounts
                 if account.status is not CustomerAccountStatus.CHURNED
             ),
@@ -54,7 +63,7 @@ def apply_end_of_turn_customers(
     current_turn: int,
     customer_success_bonus: int = 0,
 ) -> CustomerTurnSummary:
-    """Update account satisfaction, renewal risk, and account creation."""
+    """Update account satisfaction, support health, and commercial renewals."""
 
     created_accounts = _seed_new_accounts(accounts, products, current_turn=current_turn)
     renewed_accounts = 0
@@ -71,20 +80,19 @@ def apply_end_of_turn_customers(
             churned_accounts += 1
             continue
 
-        support_delta = clamp_int(
-            (product.bug_level // BALANCE.key_account_support_load_bug_divisor)
-            - (product.quality // BALANCE.key_account_support_load_quality_relief_divisor)
-            - customer_success_bonus
-            - BALANCE.key_account_support_load_cs_relief,
-            -BALANCE.key_account_support_load_cap,
-            BALANCE.key_account_support_load_cap,
+        apply_support_drift(
+            account,
+            product,
+            customer_success_bonus=customer_success_bonus,
         )
-        account.support_load = clamp_int(account.support_load + support_delta)
+
         onboarding_delta = 0
         if product.market_fit >= 60 and product.quality >= 60:
             onboarding_delta += 2
         if product.bug_level >= 28:
             onboarding_delta -= 2
+        if account.open_tickets >= 12:
+            onboarding_delta -= 1
         onboarding_delta += customer_success_bonus
         account.onboarding_health = clamp_int(account.onboarding_health + onboarding_delta)
 
@@ -93,23 +101,20 @@ def apply_end_of_turn_customers(
             account,
             customer_success_bonus=customer_success_bonus,
         )
-        account.satisfaction = clamp_int(
-            account.satisfaction + satisfaction_delta,
-            0,
-            100,
-        )
+        account.satisfaction = clamp_int(account.satisfaction + satisfaction_delta)
         if account.satisfaction >= BALANCE.key_account_satisfaction_good_threshold:
             account.churn_risk = clamp_int(
                 account.churn_risk - BALANCE.key_account_churn_risk_relief,
-                0,
-                100,
             )
         if account.satisfaction <= BALANCE.key_account_satisfaction_bad_threshold:
             account.churn_risk = clamp_int(
                 account.churn_risk + BALANCE.key_account_churn_risk_gain,
-                0,
-                100,
             )
+        if account.sla_breach_risk >= BALANCE.contract_sla_risk_threshold:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.contract_sla_breach_churn_risk_gain,
+            )
+
         account.status = (
             CustomerAccountStatus.AT_RISK
             if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold
@@ -119,12 +124,13 @@ def apply_end_of_turn_customers(
         if current_turn < account.renewal_turn:
             continue
 
-        account.renewal_turn = current_turn + _get_renewal_interval(account.contract_cadence)
+        account.renewal_turn = current_turn + get_contract_interval(account.contract_cadence)
         discount_penalty = int(account.discount_rate / BALANCE.key_account_discount_risk_divisor)
         effective_churn_risk = clamp_int(
-            account.churn_risk + discount_penalty - customer_success_bonus,
-            0,
-            100,
+            account.churn_risk
+            + discount_penalty
+            + (account.sla_breach_risk // BALANCE.contract_sla_ticket_divisor)
+            - customer_success_bonus,
         )
         if effective_churn_risk >= BALANCE.key_account_churn_threshold:
             account.status = CustomerAccountStatus.CHURNED
@@ -136,31 +142,32 @@ def apply_end_of_turn_customers(
             continue
 
         renewed_accounts += 1
-        if account.satisfaction >= BALANCE.key_account_satisfaction_good_threshold:
-            expansion = min(
-                BALANCE.key_account_expansion_contract_gain,
-                Decimal(account.expansion_potential) * Decimal("3.00"),
-            )
-            account.contract_value = quantize_money(account.contract_value + expansion)
-            expansion_revenue = quantize_money(expansion_revenue + expansion)
-            account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
-            if (
-                account.contract_cadence is ContractCadence.MONTHLY
-                and account.satisfaction >= 78
-                and account.onboarding_health >= 72
-            ):
-                account.contract_cadence = ContractCadence.ANNUAL
-                account.discount_rate = clamp_rate(account.discount_rate + Decimal("0.0100"))
+        revenue_before = calculate_account_recurring_revenue(account)
+        apply_commercial_renewal(account, customer_success_bonus=customer_success_bonus)
+        revenue_after = calculate_account_recurring_revenue(account)
+        if revenue_after > revenue_before:
+            expansion_revenue = quantize_money(expansion_revenue + (revenue_after - revenue_before))
 
     account_revenue = calculate_account_revenue(accounts)
+    active_accounts = [
+        account for account in accounts if account.status is not CustomerAccountStatus.CHURNED
+    ]
     at_risk_accounts = sum(
-        1 for account in accounts if account.status is CustomerAccountStatus.AT_RISK
+        1 for account in active_accounts if account.status is CustomerAccountStatus.AT_RISK
+    )
+    total_open_tickets = sum(account.open_tickets for account in active_accounts)
+    sla_risk_accounts = sum(
+        1
+        for account in active_accounts
+        if account.sla_breach_risk >= BALANCE.contract_sla_risk_threshold
     )
     summary = _build_customer_summary(
         created_accounts=created_accounts,
         renewed_accounts=renewed_accounts,
         churned_accounts=churned_accounts,
         at_risk_accounts=at_risk_accounts,
+        total_open_tickets=total_open_tickets,
+        sla_risk_accounts=sla_risk_accounts,
     )
     return CustomerTurnSummary(
         account_revenue=account_revenue,
@@ -169,6 +176,8 @@ def apply_end_of_turn_customers(
         churned_accounts=churned_accounts,
         at_risk_accounts=at_risk_accounts,
         expansion_revenue=expansion_revenue,
+        total_open_tickets=total_open_tickets,
+        sla_risk_accounts=sla_risk_accounts,
         summary=summary,
     )
 
@@ -213,10 +222,7 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
                 (
                     product.revenue_per_user
                     * Decimal(
-                        max(
-                            1,
-                            product.user_count // BALANCE.key_account_contract_user_divisor,
-                        )
+                        max(1, product.user_count // BALANCE.key_account_contract_user_divisor)
                     )
                 ),
             ),
@@ -227,13 +233,15 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         + (product.quality // BALANCE.key_account_quality_divisor)
         - (product.bug_level // BALANCE.key_account_bug_divisor)
         - (product.technical_debt // BALANCE.key_account_debt_divisor),
-        0,
-        100,
     )
     contract_cadence = (
         ContractCadence.MONTHLY
         if product.target_segment is MarketSegment.STARTUP
         else ContractCadence.ANNUAL
+    )
+    billing_model, seat_count, usage_units = build_contract_shape(
+        product.target_segment,
+        pricing_tier=product.pricing_tier,
     )
     return CustomerAccount(
         name=f"{product.target_segment.value.title()} Anchor: {product.name}",
@@ -241,12 +249,17 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         segment=product.target_segment,
         contract_value=contract_value,
         contract_cadence=contract_cadence,
+        billing_model=billing_model,
+        seat_count=seat_count,
+        usage_units=usage_units,
         discount_rate=Decimal("0.0000"),
         satisfaction=satisfaction,
-        onboarding_health=clamp_int(satisfaction - 4, 0, 100),
-        support_load=clamp_int(product.bug_level // 2, 0, 100),
-        expansion_potential=clamp_int(product.market_fit + product.feature_count * 2, 0, 100),
-        renewal_turn=current_turn + _get_renewal_interval(contract_cadence),
+        onboarding_health=clamp_int(satisfaction - 4),
+        support_load=clamp_int(product.bug_level // 2),
+        open_tickets=clamp_int(product.bug_level // 5, 0, 1000),
+        sla_breach_risk=clamp_int(max(0, 45 - satisfaction)),
+        expansion_potential=clamp_int(product.market_fit + product.feature_count * 2),
+        renewal_turn=current_turn + get_contract_interval(contract_cadence),
         churn_risk=max(0, 65 - satisfaction),
     )
 
@@ -264,19 +277,17 @@ def _calculate_satisfaction_delta(
         - (product.technical_debt // 30)
         + (account.onboarding_health - 55) // 18
         - (account.support_load // 20)
+        - (account.open_tickets // 12)
+        - (account.sla_breach_risk // 24)
         + customer_success_bonus
     )
+    if account.sla_breach_risk >= BALANCE.contract_sla_risk_threshold:
+        raw_delta -= BALANCE.contract_sla_breach_satisfaction_loss
     return clamp_int(
         raw_delta,
         -BALANCE.key_account_satisfaction_delta_cap,
         BALANCE.key_account_satisfaction_delta_cap,
     )
-
-
-def _get_renewal_interval(contract_cadence: ContractCadence) -> int:
-    if contract_cadence is ContractCadence.MONTHLY:
-        return BALANCE.key_account_monthly_renewal_interval
-    return BALANCE.key_account_renewal_interval
 
 
 def _build_customer_summary(
@@ -285,13 +296,17 @@ def _build_customer_summary(
     renewed_accounts: int,
     churned_accounts: int,
     at_risk_accounts: int,
+    total_open_tickets: int,
+    sla_risk_accounts: int,
 ) -> str:
-    if churned_accounts:
-        return f"{churned_accounts} key account(s) churned under renewal pressure."
-    if renewed_accounts:
-        return f"{renewed_accounts} key account(s) renewed; {at_risk_accounts} remain at risk."
-    if created_accounts:
-        return f"{created_accounts} new key account(s) emerged from stronger product traction."
-    if at_risk_accounts:
-        return f"{at_risk_accounts} key account(s) are at risk and need attention."
-    return "Key accounts remained stable this turn."
+    parts = [
+        f"{created_accounts} new",
+        f"{renewed_accounts} renewed",
+        f"{churned_accounts} churned",
+        f"{at_risk_accounts} at risk",
+    ]
+    if total_open_tickets > 0:
+        parts.append(f"{total_open_tickets} open tickets")
+    if sla_risk_accounts > 0:
+        parts.append(f"{sla_risk_accounts} with SLA pressure")
+    return ", ".join(parts) + "."

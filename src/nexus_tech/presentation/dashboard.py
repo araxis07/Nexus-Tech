@@ -1306,9 +1306,11 @@ def _build_totals_panel(state: GameState) -> Panel:
         state.products,
         state.employees,
         current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
     )
     table.add_row("Ops Load", f"{operations.total_load}/{operations.total_capacity}")
     table.add_row("Ops Cost", format_money(operations.added_cost))
+    table.add_row("Ticket Backlog", str(operations.support_backlog))
     table.add_row("Scale State", scale_pressure.summary)
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
@@ -1319,6 +1321,9 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     average_morale = "-" if team_condition.headcount == 0 else str(team_condition.average_morale)
     promotion_ready = sum(1 for employee in state.employees if employee.promotion_readiness >= 70)
     high_attrition_risk = sum(1 for employee in state.employees if employee.attrition_risk >= 65)
+    underperforming_count = sum(
+        1 for employee in state.employees if employee.performance_rating <= 42
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Headcount", str(team_condition.headcount))
     table.add_row("Assigned", str(team_condition.assigned_headcount))
@@ -1328,6 +1333,7 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table.add_row("Burned Out", str(team_condition.burned_out_count))
     table.add_row("Ready", str(promotion_ready))
     table.add_row("Attrition", str(high_attrition_risk))
+    table.add_row("Underperf", str(underperforming_count))
     return Panel(table, title="Team Summary", border_style="cyan", expand=True)
 
 
@@ -1421,9 +1427,11 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
         table.add_column("Seniority")
         table.add_column("Trait")
         table.add_column("Spec")
+        table.add_column("Perf", justify="right")
         table.add_column("XP", justify="right")
         table.add_column("Ready", justify="right")
         table.add_column("Attr", justify="right")
+        table.add_column("Streak", justify="right")
         table.add_column("Salary", justify="right")
 
     for index, employee in enumerate(state.employees, start=1):
@@ -1443,9 +1451,11 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
                     employee.seniority.value,
                     employee.trait.value,
                     employee.specialization,
+                    str(employee.performance_rating),
                     str(employee.experience_points),
                     str(employee.promotion_readiness),
                     str(employee.attrition_risk),
+                    str(employee.underperformance_streak),
                     format_money(employee.salary),
                 ]
             )
@@ -1533,14 +1543,23 @@ def _build_sales_pipeline_panel(state: GameState) -> Panel:
     table.add_column("Deal", style="bold")
     table.add_column("Product")
     table.add_column("Stage")
+    table.add_column("Model")
     table.add_column("Value", justify="right")
+    table.add_column("Commit", justify="right")
     table.add_column("Prob", justify="right")
     for deal in state.sales_deals[-8:]:
+        commitment = (
+            str(deal.seat_commitment)
+            if deal.billing_model.value == "seat_based"
+            else str(deal.usage_commitment)
+        )
         table.add_row(
             deal.name,
             product_names.get(deal.product_id, "unknown"),
             deal.stage.value,
+            deal.billing_model.value,
             format_money(deal.value),
+            commitment,
             f"{deal.probability}%",
         )
     return Panel(table, title="Sales Pipeline", border_style="green", expand=True)
@@ -1561,6 +1580,10 @@ def _build_roadmap_project_panel(state: GameState) -> Panel:
     table.add_column("Target")
     table.add_column("Status")
     table.add_column("Progress", justify="right")
+    table.add_column("Epics", justify="right")
+    table.add_column("Deadline", justify="right")
+    table.add_column("Risk", justify="right")
+    table.add_column("Depends")
     table.add_column("Summary")
     for project in state.roadmap_projects[-6:]:
         table.add_row(
@@ -1568,6 +1591,12 @@ def _build_roadmap_project_panel(state: GameState) -> Panel:
             product_names.get(project.target_product_id, "company-wide"),
             project.status.value,
             f"{project.progress}/{project.required_progress}",
+            f"{project.epics_completed}/{project.epic_count}",
+            str(project.deadline_turn),
+            str(project.delivery_risk),
+            project.dependency_project_type.value
+            if project.dependency_project_type is not None
+            else "-",
             project.summary,
         )
     return Panel(table, title="Roadmap Projects", border_style="magenta", expand=True)
@@ -1999,6 +2028,7 @@ def _build_operations_panel(state: GameState) -> Panel:
         state.products,
         state.employees,
         current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
     )
     overloaded_products = [
         risk.product_name for risk in operations.product_risks if risk.overload > 0
@@ -2010,6 +2040,8 @@ def _build_operations_panel(state: GameState) -> Panel:
     table.add_row("Ops Cost", format_money(operations.added_cost))
     table.add_row("Energy Drag", str(operations.team_energy_penalty))
     table.add_row("Morale Drag", str(operations.team_morale_penalty))
+    table.add_row("Tickets", str(operations.support_backlog))
+    table.add_row("SLA Risk", str(operations.sla_risk_accounts))
     table.add_row("Hot Spots", ", ".join(overloaded_products[:2]) if overloaded_products else "-")
     table.add_row("State", operations.summary)
     return Panel(table, title="Operations", border_style="yellow", expand=True)
@@ -2038,9 +2070,14 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
         table.add_column("Renewal", justify="right")
         table.add_column("Expansion", justify="right")
         table.add_column("Cadence")
+        table.add_column("Model")
+        table.add_column("Seats", justify="right")
+        table.add_column("Usage", justify="right")
         table.add_column("Disc", justify="right")
         table.add_column("Onboard", justify="right")
         table.add_column("Support", justify="right")
+        table.add_column("Tickets", justify="right")
+        table.add_column("SLA", justify="right")
 
     for account in active_accounts:
         row = [
@@ -2057,9 +2094,14 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
                     str(account.renewal_turn),
                     str(account.expansion_potential),
                     account.contract_cadence.value,
+                    account.billing_model.value,
+                    str(account.seat_count),
+                    str(account.usage_units),
                     format_rate(account.discount_rate),
                     str(account.onboarding_health),
                     str(account.support_load),
+                    str(account.open_tickets),
+                    str(account.sla_breach_risk),
                 ]
             )
         table.add_row(*row)

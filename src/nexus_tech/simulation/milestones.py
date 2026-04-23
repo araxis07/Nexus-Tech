@@ -367,6 +367,7 @@ def _has_operations_machine(state: GameState) -> bool:
         state.products,
         state.employees,
         current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
     )
     return summary.overload <= 1
 

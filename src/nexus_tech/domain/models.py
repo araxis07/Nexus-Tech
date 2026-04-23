@@ -128,6 +128,14 @@ class ContractCadence(StrEnum):
     ANNUAL = "annual"
 
 
+class ContractBillingModel(StrEnum):
+    """Commercial billing model used by enterprise-style customer accounts."""
+
+    FLAT = "flat"
+    SEAT_BASED = "seat_based"
+    USAGE_BASED = "usage_based"
+
+
 class FunctionalBudgetPreset(StrEnum):
     """Named operating-allocation presets for cross-functional spend."""
 
@@ -387,6 +395,9 @@ class Employee(BaseModel):
     experience_points: int = Field(default=0, ge=0)
     promotion_readiness: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     attrition_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    performance_rating: int = Field(default=62, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    tenure_turns: int = Field(default=0, ge=0)
+    underperformance_streak: int = Field(default=0, ge=0)
     assigned_product_id: Optional[UUID] = None  # noqa: UP045
 
     @field_validator("salary", mode="before")
@@ -499,10 +510,15 @@ class CustomerAccount(BaseModel):
     segment: MarketSegment
     contract_value: Decimal = Field(ge=Decimal("0"))
     contract_cadence: ContractCadence = ContractCadence.ANNUAL
+    billing_model: ContractBillingModel = ContractBillingModel.FLAT
+    seat_count: int = Field(default=0, ge=0)
+    usage_units: int = Field(default=0, ge=0)
     discount_rate: Decimal = Field(default=Decimal("0.0000"), ge=Decimal("0"), le=Decimal("1"))
     satisfaction: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     onboarding_health: int = Field(default=60, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     support_load: int = Field(default=20, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    open_tickets: int = Field(default=0, ge=0)
+    sla_breach_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_turn: int = Field(ge=1)
     churn_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
@@ -653,6 +669,9 @@ class SalesDeal(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     segment: MarketSegment = MarketSegment.ENTERPRISE
     stage: SalesDealStage = SalesDealStage.LEAD
+    billing_model: ContractBillingModel = ContractBillingModel.FLAT
+    seat_commitment: int = Field(default=0, ge=0)
+    usage_commitment: int = Field(default=0, ge=0)
     value: Decimal = Field(ge=Decimal("0"))
     probability: int = Field(default=30, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     created_turn: int = Field(ge=1)
@@ -675,7 +694,12 @@ class RoadmapProject(BaseModel):
     target_product_id: Optional[UUID] = None  # noqa: UP045
     progress: int = Field(default=0, ge=0)
     required_progress: int = Field(default=8, ge=1)
+    epic_count: int = Field(default=3, ge=1)
+    epics_completed: int = Field(default=0, ge=0)
     started_turn: int = Field(ge=1)
+    deadline_turn: int = Field(default=1, ge=1)
+    dependency_project_type: Optional[RoadmapProjectType] = None  # noqa: UP045
+    delivery_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     completed_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     summary: str = Field(default="", max_length=240)
 

@@ -575,6 +575,7 @@ def _choose_action(state: GameState) -> PlannedAction:
         state.products,
         state.employees,
         current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
     )
 
     if worst_product.bug_level >= 28 or worst_product.quality <= 42:

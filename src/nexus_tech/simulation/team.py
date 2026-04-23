@@ -93,6 +93,7 @@ def create_employee(
         productivity=productivity,
         specialization=normalized_specialization,
         trait=trait,
+        performance_rating=BALANCE.employee_starting_performance_rating,
     )
 
 
@@ -131,7 +132,14 @@ def calculate_effective_productivity(employee: Employee) -> int:
     energy_factor = Decimal("0.50") + (Decimal(employee.energy) / Decimal("200"))
     morale_factor = Decimal("0.50") + (Decimal(employee.morale) / Decimal("200"))
     attrition_factor = Decimal("1.00") - (Decimal(employee.attrition_risk) / Decimal("300"))
-    effective = Decimal(employee.productivity) * energy_factor * morale_factor * attrition_factor
+    performance_factor = Decimal("0.70") + (Decimal(employee.performance_rating) / Decimal("250"))
+    effective = (
+        Decimal(employee.productivity)
+        * energy_factor
+        * morale_factor
+        * attrition_factor
+        * performance_factor
+    )
     return clamp_int(int(effective.to_integral_value()))
 
 

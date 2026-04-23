@@ -40,6 +40,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
 - Plan and ship product releases such as stability patches, minor releases, and major launches
 - Use multi-action roadmap projects for larger bets like platform rebuilds, enterprise certification, marketplace launches, and sales playbooks
+- Track roadmap project epics, dependencies, deadlines, and delivery risk instead of treating every strategic bet as a flat progress bar
 - Deal with segment-specific trade-offs like support cost, price sensitivity, and competitive pressure
 
 ### 🧩 Data-Driven Content
@@ -91,6 +92,8 @@ Each turn represents a business interval. You review the company, choose actions
 - Source and advance sales deals through lead, demo, pilot, and closed stages
 - Track account satisfaction, contract value, expansion potential, renewal timing, and churn risk
 - Add contract cadence, discounting, onboarding health, and support load to make renewals more believable
+- Support flat, seat-based, and usage-based contract models with different commercial expansion patterns
+- Track open tickets and SLA pressure so support quality can directly affect renewals and retention
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
 - Invest directly in customer success and run targeted retention plays on fragile accounts
@@ -109,6 +112,7 @@ Each turn represents a business interval. You review the company, choose actions
   - `product_manager`
 - Simulate morale, energy, burnout, recovery, and role-based impact on outcomes
 - Train employees, track promotion readiness, promote strong contributors, and monitor attrition risk
+- Track performance rating, underperformance streaks, and real resignation pressure when the company runs too hot
 
 ### 🧭 Functional Budgeting
 

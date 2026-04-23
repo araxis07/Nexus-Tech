@@ -1,4 +1,4 @@
-"""Employee progression, training, and attrition-pressure rules."""
+"""Employee progression, performance, and attrition rules."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import Company, Employee, Seniority
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.support import clamp_int
 
 
@@ -25,6 +26,8 @@ class EmployeeProgressionTurnSummary:
 
     promotion_ready_count: int
     high_attrition_risk_count: int
+    underperforming_count: int
+    resigned_employees: tuple[str, ...]
 
 
 _NEXT_SENIORITY = {
@@ -51,6 +54,10 @@ def train_employee(company: Company, employee: Employee) -> EmployeeProgressionS
     employee.attrition_risk = clamp_int(
         employee.attrition_risk - BALANCE.employee_training_attrition_relief
     )
+    employee.performance_rating = clamp_int(
+        employee.performance_rating + BALANCE.employee_training_performance_gain
+    )
+    employee.underperformance_streak = max(0, employee.underperformance_streak - 1)
     return EmployeeProgressionSummary(
         message=(
             f"Trained {employee.full_name}. Productivity +"
@@ -83,6 +90,10 @@ def promote_employee(employee: Employee) -> EmployeeProgressionSummary:
     employee.attrition_risk = clamp_int(
         employee.attrition_risk - BALANCE.employee_promotion_attrition_relief
     )
+    employee.performance_rating = clamp_int(
+        employee.performance_rating + BALANCE.employee_promotion_performance_gain
+    )
+    employee.underperformance_streak = 0
     return EmployeeProgressionSummary(
         message=(
             f"Promoted {employee.full_name} from {previous_seniority.value} "
@@ -96,13 +107,18 @@ def apply_end_of_turn_employee_progression(
     *,
     net_cash_flow: Decimal,
     burnout_relief: int = 0,
+    rng: RandomLike | None = None,
 ) -> EmployeeProgressionTurnSummary:
-    """Advance progression readiness and update attrition pressure."""
+    """Advance progression readiness, performance, and attrition pressure."""
 
     promotion_ready_count = 0
     high_attrition_risk_count = 0
+    underperforming_count = 0
+    resigned_employees: list[str] = []
+    retained_employees: list[Employee] = []
 
     for employee in employees:
+        employee.tenure_turns += 1
         readiness_gain = (
             BALANCE.employee_assigned_experience_gain
             if employee.assigned_product_id is not None
@@ -113,6 +129,9 @@ def apply_end_of_turn_employee_progression(
             employee.promotion_readiness = clamp_int(
                 employee.promotion_readiness + readiness_gain // 2
             )
+
+        _apply_performance_drift(employee)
+
         if employee.morale <= BALANCE.employee_low_morale_threshold:
             employee.attrition_risk = clamp_int(
                 employee.attrition_risk + BALANCE.employee_attrition_morale_risk_gain
@@ -126,17 +145,72 @@ def apply_end_of_turn_employee_progression(
                 employee.attrition_risk + BALANCE.employee_attrition_negative_cash_flow_risk_gain
             )
         employee.attrition_risk = clamp_int(employee.attrition_risk - burnout_relief)
-        if employee.morale >= 70 and employee.energy >= 65:
+        if (
+            employee.morale >= BALANCE.employee_performance_morale_bonus_threshold
+            and employee.energy >= BALANCE.employee_performance_energy_bonus_threshold
+        ):
             employee.attrition_risk = clamp_int(
                 employee.attrition_risk - BALANCE.employee_attrition_recovery_relief
             )
 
+        if employee.performance_rating <= BALANCE.employee_performance_low_threshold:
+            employee.underperformance_streak += 1
+            underperforming_count += 1
+        else:
+            employee.underperformance_streak = max(0, employee.underperformance_streak - 1)
+
+        if _should_resign(employee, rng):
+            resigned_employees.append(employee.full_name)
+            continue
+
+        retained_employees.append(employee)
         if employee.promotion_readiness >= BALANCE.employee_promotion_readiness_threshold:
             promotion_ready_count += 1
         if employee.attrition_risk >= BALANCE.employee_high_attrition_risk_threshold:
             high_attrition_risk_count += 1
 
+    employees[:] = retained_employees
+
     return EmployeeProgressionTurnSummary(
         promotion_ready_count=promotion_ready_count,
         high_attrition_risk_count=high_attrition_risk_count,
+        underperforming_count=underperforming_count,
+        resigned_employees=tuple(resigned_employees),
     )
+
+
+def _apply_performance_drift(employee: Employee) -> None:
+    performance_delta = 0
+    if (
+        employee.energy >= BALANCE.employee_performance_energy_bonus_threshold
+        and employee.morale >= BALANCE.employee_performance_morale_bonus_threshold
+    ):
+        performance_delta += BALANCE.employee_performance_gain
+    if employee.energy <= BALANCE.employee_burnout_energy_threshold:
+        performance_delta -= BALANCE.employee_performance_loss
+    if employee.morale <= BALANCE.employee_low_morale_threshold:
+        performance_delta -= BALANCE.employee_performance_loss
+    if employee.assigned_product_id is not None and performance_delta >= 0:
+        performance_delta += BALANCE.employee_performance_recovery_gain
+    employee.performance_rating = clamp_int(employee.performance_rating + performance_delta)
+
+
+def _should_resign(employee: Employee, rng: RandomLike | None) -> bool:
+    if employee.attrition_risk < BALANCE.employee_resignation_attrition_threshold:
+        return False
+    if employee.morale > BALANCE.employee_resignation_morale_threshold:
+        return False
+    if employee.energy > BALANCE.employee_resignation_energy_threshold:
+        return False
+
+    resignation_chance = clamp_int(
+        BALANCE.employee_resignation_chance_floor
+        + (employee.attrition_risk - BALANCE.employee_resignation_attrition_threshold)
+        // BALANCE.employee_resignation_attrition_weight_divisor
+        + max(0, employee.underperformance_streak) * BALANCE.employee_resignation_streak_bonus,
+        0,
+        100,
+    )
+    if rng is None:
+        return resignation_chance >= 100
+    return rng.randint(1, 100) <= resignation_chance

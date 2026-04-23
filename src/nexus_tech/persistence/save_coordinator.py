@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     CampaignGoalId,
     CompetitorIntelEntry,
     CompetitorMove,
+    ContractBillingModel,
     DifficultyMode,
     EventCategory,
     EventHistoryEntry,
@@ -753,12 +754,15 @@ class SaveLoadCoordinator:
                 name,
                 segment,
                 stage,
+                billing_model,
+                seat_commitment,
+                usage_commitment,
                 value,
                 probability,
                 created_turn,
                 updated_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -769,6 +773,9 @@ class SaveLoadCoordinator:
                     deal.name,
                     deal.segment.value,
                     deal.stage.value,
+                    deal.billing_model.value,
+                    deal.seat_commitment,
+                    deal.usage_commitment,
                     str(deal.value),
                     deal.probability,
                     deal.created_turn,
@@ -791,6 +798,9 @@ class SaveLoadCoordinator:
                 name,
                 segment,
                 stage,
+                billing_model,
+                seat_commitment,
+                usage_commitment,
                 value,
                 probability,
                 created_turn,
@@ -808,6 +818,9 @@ class SaveLoadCoordinator:
                 name=row["name"],
                 segment=MarketSegment(row["segment"]),
                 stage=SalesDealStage(row["stage"]),
+                billing_model=ContractBillingModel(row["billing_model"] or "flat"),
+                seat_commitment=row["seat_commitment"] or 0,
+                usage_commitment=row["usage_commitment"] or 0,
                 value=Decimal(row["value"]),
                 probability=row["probability"],
                 created_turn=row["created_turn"],
@@ -834,11 +847,16 @@ class SaveLoadCoordinator:
                 target_product_id,
                 progress,
                 required_progress,
+                epic_count,
+                epics_completed,
                 started_turn,
+                deadline_turn,
+                dependency_project_type,
+                delivery_risk,
                 completed_turn,
                 summary
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -852,7 +870,14 @@ class SaveLoadCoordinator:
                     else None,
                     project.progress,
                     project.required_progress,
+                    project.epic_count,
+                    project.epics_completed,
                     project.started_turn,
+                    project.deadline_turn,
+                    project.dependency_project_type.value
+                    if project.dependency_project_type is not None
+                    else None,
+                    project.delivery_risk,
                     project.completed_turn,
                     project.summary,
                 )
@@ -874,7 +899,12 @@ class SaveLoadCoordinator:
                 target_product_id,
                 progress,
                 required_progress,
+                epic_count,
+                epics_completed,
                 started_turn,
+                deadline_turn,
+                dependency_project_type,
+                delivery_risk,
                 completed_turn,
                 summary
             FROM roadmap_projects
@@ -893,7 +923,14 @@ class SaveLoadCoordinator:
                 else None,
                 progress=row["progress"],
                 required_progress=row["required_progress"],
+                epic_count=row["epic_count"] or 3,
+                epics_completed=row["epics_completed"] or 0,
                 started_turn=row["started_turn"],
+                deadline_turn=row["deadline_turn"] or row["started_turn"],
+                dependency_project_type=RoadmapProjectType(row["dependency_project_type"])
+                if row["dependency_project_type"] is not None
+                else None,
+                delivery_risk=row["delivery_risk"] or 0,
                 completed_turn=row["completed_turn"],
                 summary=row["summary"],
             )
