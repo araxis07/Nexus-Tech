@@ -10,6 +10,7 @@ from typer.main import get_command
 from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
+from nexus_tech import __version__
 from nexus_tech.cli import app
 from nexus_tech.content.models import ScenarioDefinition, ScenarioProductSeed
 from nexus_tech.domain.models import (
@@ -711,7 +712,7 @@ def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.15.0" in result.output
+    assert f"NEXUS TECH {__version__}" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -815,7 +816,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.15.0" in result.output
+    assert __version__ in result.output
     assert "No save database found yet." in result.output
 
 
