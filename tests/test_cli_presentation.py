@@ -18,6 +18,7 @@ from nexus_tech.domain.models import (
     Company,
     CompanyStrategy,
     Competitor,
+    ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
     DifficultyMode,
@@ -26,6 +27,8 @@ from nexus_tech.domain.models import (
     EventCategory,
     EventOption,
     ExitOutcome,
+    FunctionalBudget,
+    FunctionalBudgetPreset,
     GameState,
     LifecycleStage,
     MarketCycle,
@@ -109,6 +112,9 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         morale=73,
         productivity=69,
         specialization="platform",
+        experience_points=18,
+        promotion_readiness=44,
+        attrition_risk=12,
         assigned_product_id=primary_product.id,
     )
     pending_event = None
@@ -156,7 +162,11 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         product_id=primary_product.id,
         segment=MarketSegment.STARTUP,
         contract_value=Decimal("620.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        discount_rate=Decimal("0.0200"),
         satisfaction=71,
+        onboarding_health=75,
+        support_load=21,
         expansion_potential=59,
         renewal_turn=5,
         churn_risk=14,
@@ -183,6 +193,13 @@ def make_demo_state(*, include_pending_event: bool = False) -> GameState:
         competitors=[competitor],
         customer_accounts=[customer_account],
         quarter_plan=quarter_plan,
+        functional_budget=FunctionalBudget(
+            preset=FunctionalBudgetPreset.GROWTH_PUSH,
+            engineering_share=24,
+            marketing_share=40,
+            customer_success_share=16,
+            g_and_a_share=20,
+        ),
         pending_event=pending_event,
         roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         roadmap_set_turn=2,
@@ -685,7 +702,7 @@ def test_version_option_prints_installed_version() -> None:
     result = runner.invoke(app, ["--version"])
 
     assert result.exit_code == 0
-    assert "NEXUS TECH 0.14.0" in result.output
+    assert "NEXUS TECH 0.15.0" in result.output
 
 
 def test_guide_command_renders_quick_start() -> None:
@@ -765,7 +782,7 @@ def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: 
                 integrity_ok=True,
                 foreign_key_ok=True,
                 slot_count=2,
-                schema_version=10,
+                schema_version=12,
                 message="SQLite integrity and foreign keys are healthy.",
             )
 
@@ -778,7 +795,7 @@ def test_check_saves_command_renders_health(monkeypatch: MonkeyPatch, tmp_path: 
     assert "Save Health" in result.output
     assert "Integrity: ok" in result.output
     assert "Foreign Keys: ok" in result.output
-    assert "Schema Version: 10" in result.output
+    assert "Schema Version: 12" in result.output
 
 
 def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
@@ -789,7 +806,7 @@ def test_doctor_command_renders_local_diagnostics(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NEXUS TECH Doctor" in result.output
     assert "Version" in result.output
-    assert "0.14.0" in result.output
+    assert "0.15.0" in result.output
     assert "No save database found yet." in result.output
 
 
@@ -809,7 +826,7 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
             victory_achieved=False,
             game_over=False,
             saved_with_version="0.12.0",
-            schema_version=10,
+            schema_version=12,
         )
     ]
 

@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     Competitor,
     CompetitorIntelEntry,
     CompetitorMove,
+    ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
     DifficultyMode,
@@ -24,6 +25,8 @@ from nexus_tech.domain.models import (
     EventOption,
     ExitOutcome,
     FinanceState,
+    FunctionalBudget,
+    FunctionalBudgetPreset,
     FundingHistoryEntry,
     FundingType,
     GameState,
@@ -82,6 +85,9 @@ def make_state() -> GameState:
         morale=71,
         productivity=68,
         specialization="platform",
+        experience_points=24,
+        promotion_readiness=48,
+        attrition_risk=14,
         assigned_product_id=product.id,
     )
     pending_event = PendingEvent(
@@ -155,7 +161,11 @@ def make_state() -> GameState:
         product_id=product.id,
         segment=MarketSegment.ENTERPRISE,
         contract_value=Decimal("850.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        discount_rate=Decimal("0.0300"),
         satisfaction=72,
+        onboarding_health=74,
+        support_load=18,
         expansion_potential=66,
         renewal_turn=6,
         churn_risk=18,
@@ -250,6 +260,13 @@ def make_state() -> GameState:
         roadmap_projects=[roadmap_project],
         competitor_intel=[competitor_intel],
         quarter_plan=quarter_plan,
+        functional_budget=FunctionalBudget(
+            preset=FunctionalBudgetPreset.CUSTOMER_TRUST,
+            engineering_share=25,
+            marketing_share=18,
+            customer_success_share=37,
+            g_and_a_share=20,
+        ),
         difficulty_mode=DifficultyMode.FOUNDER,
         campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
         pending_event=pending_event,
@@ -333,6 +350,11 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "campaign_goal_id",
         "roadmap_focus",
         "roadmap_set_turn",
+        "functional_budget_preset",
+        "budget_engineering_share",
+        "budget_marketing_share",
+        "budget_customer_success_share",
+        "budget_g_and_a_share",
         "market_cycle",
         "market_cycle_turns_remaining",
         "victory_achieved",
@@ -347,7 +369,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         competitor_columns
     )
     assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 11
+    assert user_version >= 12
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -458,6 +480,8 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "exit_summary",
         "saved_with_version",
         "schema_version",
+        "functional_budget_preset",
+        "budget_engineering_share",
     }.issubset(save_slot_columns)
     assert {"strategy"}.issubset(company_columns)
     assert {"pricing_tier", "target_segment"}.issubset(product_columns)
@@ -465,7 +489,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         competitor_columns
     )
     assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 11
+    assert user_version >= 12
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -503,7 +527,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 10
+    assert summaries[0].schema_version >= 12
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -516,7 +540,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 10
+    assert report.schema_version >= 12
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

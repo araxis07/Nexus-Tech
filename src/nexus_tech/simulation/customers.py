@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
+    ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
     LifecycleStage,
@@ -15,7 +16,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.support import clamp_int
+from nexus_tech.simulation.support import clamp_int, clamp_rate
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ def calculate_account_revenue(accounts: list[CustomerAccount]) -> Decimal:
     return quantize_money(
         sum(
             (
-                account.contract_value
+                quantize_money(account.contract_value * (Decimal("1.0000") - account.discount_rate))
                 for account in accounts
                 if account.status is not CustomerAccountStatus.CHURNED
             ),
@@ -51,6 +52,7 @@ def apply_end_of_turn_customers(
     products: list[Product],
     *,
     current_turn: int,
+    customer_success_bonus: int = 0,
 ) -> CustomerTurnSummary:
     """Update account satisfaction, renewal risk, and account creation."""
 
@@ -69,7 +71,28 @@ def apply_end_of_turn_customers(
             churned_accounts += 1
             continue
 
-        satisfaction_delta = _calculate_satisfaction_delta(product)
+        support_delta = clamp_int(
+            (product.bug_level // BALANCE.key_account_support_load_bug_divisor)
+            - (product.quality // BALANCE.key_account_support_load_quality_relief_divisor)
+            - customer_success_bonus
+            - BALANCE.key_account_support_load_cs_relief,
+            -BALANCE.key_account_support_load_cap,
+            BALANCE.key_account_support_load_cap,
+        )
+        account.support_load = clamp_int(account.support_load + support_delta)
+        onboarding_delta = 0
+        if product.market_fit >= 60 and product.quality >= 60:
+            onboarding_delta += 2
+        if product.bug_level >= 28:
+            onboarding_delta -= 2
+        onboarding_delta += customer_success_bonus
+        account.onboarding_health = clamp_int(account.onboarding_health + onboarding_delta)
+
+        satisfaction_delta = _calculate_satisfaction_delta(
+            product,
+            account,
+            customer_success_bonus=customer_success_bonus,
+        )
         account.satisfaction = clamp_int(
             account.satisfaction + satisfaction_delta,
             0,
@@ -96,8 +119,14 @@ def apply_end_of_turn_customers(
         if current_turn < account.renewal_turn:
             continue
 
-        account.renewal_turn = current_turn + BALANCE.key_account_renewal_interval
-        if account.churn_risk >= BALANCE.key_account_churn_threshold:
+        account.renewal_turn = current_turn + _get_renewal_interval(account.contract_cadence)
+        discount_penalty = int(account.discount_rate / BALANCE.key_account_discount_risk_divisor)
+        effective_churn_risk = clamp_int(
+            account.churn_risk + discount_penalty - customer_success_bonus,
+            0,
+            100,
+        )
+        if effective_churn_risk >= BALANCE.key_account_churn_threshold:
             account.status = CustomerAccountStatus.CHURNED
             product.user_count = max(
                 0,
@@ -115,6 +144,13 @@ def apply_end_of_turn_customers(
             account.contract_value = quantize_money(account.contract_value + expansion)
             expansion_revenue = quantize_money(expansion_revenue + expansion)
             account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
+            if (
+                account.contract_cadence is ContractCadence.MONTHLY
+                and account.satisfaction >= 78
+                and account.onboarding_health >= 72
+            ):
+                account.contract_cadence = ContractCadence.ANNUAL
+                account.discount_rate = clamp_rate(account.discount_rate + Decimal("0.0100"))
 
     account_revenue = calculate_account_revenue(accounts)
     at_risk_accounts = sum(
@@ -194,30 +230,53 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         0,
         100,
     )
+    contract_cadence = (
+        ContractCadence.MONTHLY
+        if product.target_segment is MarketSegment.STARTUP
+        else ContractCadence.ANNUAL
+    )
     return CustomerAccount(
         name=f"{product.target_segment.value.title()} Anchor: {product.name}",
         product_id=product.id,
         segment=product.target_segment,
         contract_value=contract_value,
+        contract_cadence=contract_cadence,
+        discount_rate=Decimal("0.0000"),
         satisfaction=satisfaction,
+        onboarding_health=clamp_int(satisfaction - 4, 0, 100),
+        support_load=clamp_int(product.bug_level // 2, 0, 100),
         expansion_potential=clamp_int(product.market_fit + product.feature_count * 2, 0, 100),
-        renewal_turn=current_turn + BALANCE.key_account_renewal_interval,
+        renewal_turn=current_turn + _get_renewal_interval(contract_cadence),
         churn_risk=max(0, 65 - satisfaction),
     )
 
 
-def _calculate_satisfaction_delta(product: Product) -> int:
+def _calculate_satisfaction_delta(
+    product: Product,
+    account: CustomerAccount,
+    *,
+    customer_success_bonus: int,
+) -> int:
     raw_delta = (
         (product.quality - 55) // 12
         + (product.market_fit - 50) // 15
         - (product.bug_level // 22)
         - (product.technical_debt // 30)
+        + (account.onboarding_health - 55) // 18
+        - (account.support_load // 20)
+        + customer_success_bonus
     )
     return clamp_int(
         raw_delta,
         -BALANCE.key_account_satisfaction_delta_cap,
         BALANCE.key_account_satisfaction_delta_cap,
     )
+
+
+def _get_renewal_interval(contract_cadence: ContractCadence) -> int:
+    if contract_cadence is ContractCadence.MONTHLY:
+        return BALANCE.key_account_monthly_renewal_interval
+    return BALANCE.key_account_renewal_interval
 
 
 def _build_customer_summary(

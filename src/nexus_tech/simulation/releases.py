@@ -58,7 +58,12 @@ def plan_product_release(
     )
 
 
-def work_product_release(state: GameState, release_id: UUID) -> ReleaseActionSummary:
+def work_product_release(
+    state: GameState,
+    release_id: UUID,
+    *,
+    engineering_bonus: int = 0,
+) -> ReleaseActionSummary:
     """Advance one planned release and ship it when ready."""
 
     release = next(
@@ -85,7 +90,12 @@ def work_product_release(state: GameState, release_id: UUID) -> ReleaseActionSum
     state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - cost)
     release.progress = min(
         release.required_progress,
-        release.progress + _release_progress_gain(state, product),
+        release.progress
+        + _release_progress_gain(
+            state,
+            product,
+            engineering_bonus=engineering_bonus,
+        ),
     )
     if release.progress < release.required_progress:
         return ReleaseActionSummary(
@@ -129,9 +139,14 @@ def _release_risk(product: Product, release_type: ProductReleaseType) -> int:
     return clamp_int(base, 0, 100)
 
 
-def _release_progress_gain(state: GameState, product: Product) -> int:
+def _release_progress_gain(
+    state: GameState,
+    product: Product,
+    *,
+    engineering_bonus: int = 0,
+) -> int:
     assigned = sum(1 for employee in state.employees if employee.assigned_product_id == product.id)
-    return BALANCE.release_work_base_progress + assigned
+    return BALANCE.release_work_base_progress + assigned + max(0, engineering_bonus)
 
 
 def _ship_release(

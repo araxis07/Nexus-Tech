@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from nexus_tech.domain.models import (
+    ContractCadence,
     CustomerAccount,
     GameState,
     MarketSegment,
@@ -32,7 +34,12 @@ _NEXT_STAGE = {
 }
 
 
-def create_sales_deal(state: GameState, product: Product) -> SalesActionSummary:
+def create_sales_deal(
+    state: GameState,
+    product: Product,
+    *,
+    marketing_bonus: int = 0,
+) -> SalesActionSummary:
     """Create a new sales opportunity for a product."""
 
     if state.company.cash_on_hand < BALANCE.sales_deal_action_cost:
@@ -44,7 +51,11 @@ def create_sales_deal(state: GameState, product: Product) -> SalesActionSummary:
     value = quantize_money(
         BALANCE.sales_deal_base_value + (product.revenue_per_user * 4) + (product.market_fit * 2)
     )
-    probability = clamp_int(22 + (product.market_fit // 3) + (product.quality // 5), 0, 100)
+    probability = clamp_int(
+        22 + (product.market_fit // 3) + (product.quality // 5) + (marketing_bonus * 4),
+        0,
+        100,
+    )
     deal = SalesDeal(
         product_id=product.id,
         name=f"{product.target_segment.value.title()} buyer: {product.name}",
@@ -63,7 +74,12 @@ def create_sales_deal(state: GameState, product: Product) -> SalesActionSummary:
     )
 
 
-def advance_sales_deal(state: GameState, deal_id: UUID) -> SalesActionSummary:
+def advance_sales_deal(
+    state: GameState,
+    deal_id: UUID,
+    *,
+    marketing_bonus: int = 0,
+) -> SalesActionSummary:
     """Advance one sales deal through demo, pilot, and close."""
 
     deal = next(
@@ -84,7 +100,11 @@ def advance_sales_deal(state: GameState, deal_id: UUID) -> SalesActionSummary:
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.sales_deal_action_cost
     )
-    deal.probability = clamp_int(deal.probability + BALANCE.sales_deal_probability_gain, 0, 100)
+    deal.probability = clamp_int(
+        deal.probability + BALANCE.sales_deal_probability_gain + (marketing_bonus * 3),
+        0,
+        100,
+    )
     deal.updated_turn = state.company.current_turn
     deal.stage = _NEXT_STAGE[deal.stage]
     if deal.stage is SalesDealStage.CLOSED_WON:
@@ -128,7 +148,15 @@ def _close_won_deal(state: GameState, deal: SalesDeal) -> None:
             product_id=deal.product_id,
             segment=deal.segment,
             contract_value=deal.value,
+            contract_cadence=(
+                ContractCadence.ANNUAL
+                if deal.segment is MarketSegment.ENTERPRISE
+                else ContractCadence.MONTHLY
+            ),
+            discount_rate=Decimal("0.0000"),
             satisfaction=BALANCE.sales_deal_customer_satisfaction,
+            onboarding_health=BALANCE.sales_deal_customer_satisfaction - 2,
+            support_load=24 if deal.segment is MarketSegment.ENTERPRISE else 18,
             expansion_potential=BALANCE.sales_deal_customer_expansion,
             renewal_turn=state.company.current_turn + 4,
             churn_risk=18 if deal.segment is MarketSegment.ENTERPRISE else 22,

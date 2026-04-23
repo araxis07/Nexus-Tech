@@ -20,6 +20,8 @@ from nexus_tech.domain.models import (
     EventOption,
     ExitOutcome,
     FinanceState,
+    FunctionalBudget,
+    FunctionalBudgetPreset,
     GameState,
     MarketCycle,
     MarketSegment,
@@ -138,6 +140,7 @@ class SaveLoadCoordinator:
                     campaign_goal_id=state.campaign_goal_id,
                     roadmap_focus=state.roadmap_focus,
                     roadmap_set_turn=state.roadmap_set_turn,
+                    functional_budget=state.functional_budget,
                     market_cycle=state.market_cycle,
                     market_cycle_turns_remaining=state.market_cycle_turns_remaining,
                     victory_achieved=state.victory_achieved,
@@ -195,6 +198,11 @@ class SaveLoadCoordinator:
                         campaign_goal_id,
                         roadmap_focus,
                         roadmap_set_turn,
+                        functional_budget_preset,
+                        budget_engineering_share,
+                        budget_marketing_share,
+                        budget_customer_success_share,
+                        budget_g_and_a_share,
                         market_cycle,
                         market_cycle_turns_remaining,
                         victory_achieved,
@@ -284,6 +292,17 @@ class SaveLoadCoordinator:
                         scenario_objective_target=slot_row["scenario_objective_target"],
                         difficulty_mode=DifficultyMode(slot_row["difficulty_mode"]),
                         campaign_goal_id=CampaignGoalId(slot_row["campaign_goal_id"]),
+                        functional_budget=FunctionalBudget(
+                            preset=FunctionalBudgetPreset(
+                                slot_row["functional_budget_preset"] or "balanced"
+                            ),
+                            engineering_share=slot_row["budget_engineering_share"] or 30,
+                            marketing_share=slot_row["budget_marketing_share"] or 25,
+                            customer_success_share=(
+                                slot_row["budget_customer_success_share"] or 25
+                            ),
+                            g_and_a_share=slot_row["budget_g_and_a_share"] or 20,
+                        ),
                         action_points_remaining=slot_row["action_points_remaining"],
                     )
                 except (ValueError, TypeError) as error:
@@ -478,6 +497,7 @@ class SaveLoadCoordinator:
         campaign_goal_id: CampaignGoalId,
         roadmap_focus: RoadmapFocus,
         roadmap_set_turn: int,
+        functional_budget: FunctionalBudget,
         market_cycle: MarketCycle,
         market_cycle_turns_remaining: int,
         victory_achieved: bool,
@@ -509,6 +529,11 @@ class SaveLoadCoordinator:
                     campaign_goal_id,
                     roadmap_focus,
                     roadmap_set_turn,
+                    functional_budget_preset,
+                    budget_engineering_share,
+                    budget_marketing_share,
+                    budget_customer_success_share,
+                    budget_g_and_a_share,
                     market_cycle,
                     market_cycle_turns_remaining,
                     victory_achieved,
@@ -520,7 +545,10 @@ class SaveLoadCoordinator:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
                 """,
                 (
                     slot_name,
@@ -536,6 +564,11 @@ class SaveLoadCoordinator:
                     campaign_goal_id.value,
                     roadmap_focus.value,
                     roadmap_set_turn,
+                    functional_budget.preset.value,
+                    functional_budget.engineering_share,
+                    functional_budget.marketing_share,
+                    functional_budget.customer_success_share,
+                    functional_budget.g_and_a_share,
                     market_cycle.value,
                     market_cycle_turns_remaining,
                     int(victory_achieved),
@@ -565,6 +598,11 @@ class SaveLoadCoordinator:
                 campaign_goal_id = ?,
                 roadmap_focus = ?,
                 roadmap_set_turn = ?,
+                functional_budget_preset = ?,
+                budget_engineering_share = ?,
+                budget_marketing_share = ?,
+                budget_customer_success_share = ?,
+                budget_g_and_a_share = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
                 victory_achieved = ?,
@@ -589,6 +627,11 @@ class SaveLoadCoordinator:
                 campaign_goal_id.value,
                 roadmap_focus.value,
                 roadmap_set_turn,
+                functional_budget.preset.value,
+                functional_budget.engineering_share,
+                functional_budget.marketing_share,
+                functional_budget.customer_success_share,
+                functional_budget.g_and_a_share,
                 market_cycle.value,
                 market_cycle_turns_remaining,
                 int(victory_achieved),

@@ -45,6 +45,7 @@ from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import estimate_runway
+from nexus_tech.simulation.functional_budgeting import get_functional_budget_profile
 from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
@@ -1234,6 +1235,7 @@ def _build_turn_header_panel(state: GameState) -> Panel:
         f"[cyan]Roadmap:[/cyan] {effective_roadmap.value} ({roadmap_status})\n"
         f"[cyan]Market:[/cyan] {state.market_cycle.value} | "
         f"[cyan]Budget:[/cyan] {state.quarter_plan.budget_stance.value}\n"
+        f"[cyan]Org Mix:[/cyan] {state.functional_budget.preset.value}\n"
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
     return Panel.fit(body, title="Turn Control", border_style="blue")
@@ -1245,6 +1247,7 @@ def _build_company_panel(state: GameState) -> Panel:
         roadmap_set_turn=state.roadmap_set_turn,
         current_turn=state.company.current_turn,
     )
+    functional_budget_profile = get_functional_budget_profile(state.functional_budget)
     goal_progress = evaluate_campaign_goal(state)
     table = Table.grid(padding=(0, 1))
     table.add_row("Name", state.company.name)
@@ -1263,6 +1266,17 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Strategy", state.company.strategy.value)
     table.add_row("Roadmap", effective_roadmap.value)
     table.add_row("Budget", state.quarter_plan.budget_stance.value)
+    table.add_row("Org Mix", state.functional_budget.preset.value)
+    table.add_row(
+        "Alloc",
+        (
+            f"E {state.functional_budget.engineering_share}% / "
+            f"M {state.functional_budget.marketing_share}% / "
+            f"CS {state.functional_budget.customer_success_share}% / "
+            f"G&A {state.functional_budget.g_and_a_share}%"
+        ),
+    )
+    table.add_row("Mix State", functional_budget_profile.summary)
     table.add_row("Market", state.market_cycle.value)
     table.add_row("Debt", format_money(state.finance.debt_principal))
     table.add_row("Dilution", format_rate(state.finance.equity_dilution))
@@ -1303,6 +1317,8 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     team_condition = calculate_team_condition(state.employees)
     average_energy = "-" if team_condition.headcount == 0 else str(team_condition.average_energy)
     average_morale = "-" if team_condition.headcount == 0 else str(team_condition.average_morale)
+    promotion_ready = sum(1 for employee in state.employees if employee.promotion_readiness >= 70)
+    high_attrition_risk = sum(1 for employee in state.employees if employee.attrition_risk >= 65)
     table = Table.grid(padding=(0, 1))
     table.add_row("Headcount", str(team_condition.headcount))
     table.add_row("Assigned", str(team_condition.assigned_headcount))
@@ -1310,6 +1326,8 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table.add_row("Avg Energy", average_energy)
     table.add_row("Avg Morale", average_morale)
     table.add_row("Burned Out", str(team_condition.burned_out_count))
+    table.add_row("Ready", str(promotion_ready))
+    table.add_row("Attrition", str(high_attrition_risk))
     return Panel(table, title="Team Summary", border_style="cyan", expand=True)
 
 
@@ -1403,6 +1421,9 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
         table.add_column("Seniority")
         table.add_column("Trait")
         table.add_column("Spec")
+        table.add_column("XP", justify="right")
+        table.add_column("Ready", justify="right")
+        table.add_column("Attr", justify="right")
         table.add_column("Salary", justify="right")
 
     for index, employee in enumerate(state.employees, start=1):
@@ -1422,6 +1443,9 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
                     employee.seniority.value,
                     employee.trait.value,
                     employee.specialization,
+                    str(employee.experience_points),
+                    str(employee.promotion_readiness),
+                    str(employee.attrition_risk),
                     format_money(employee.salary),
                 ]
             )
@@ -1601,27 +1625,36 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("21", "rest_team", "Recover energy and morale.")
     primary_actions.add_row("22", "review_team", "Open the detailed team view.")
     primary_actions.add_row("23", "review_customers", "Open key account renewals.")
-    primary_actions.add_row("24", "plan_release", "Queue a product release plan.")
-    primary_actions.add_row("25", "work_release", "Advance and ship planned releases.")
-    primary_actions.add_row("26", "create_sales_deal", "Source a new sales opportunity.")
-    primary_actions.add_row("27", "advance_sales_deal", "Move a deal through the pipeline.")
-    primary_actions.add_row("28", "start_roadmap_project", "Start a multi-action strategic bet.")
-    primary_actions.add_row("29", "work_roadmap_project", "Advance the active strategic project.")
-    primary_actions.add_row("30", "review_pipeline", "Open release, sales, and project views.")
-    primary_actions.add_row("31", "view_report", "Open the score, plan, and rival report.")
-    primary_actions.add_row("32", "wait", "Hold position for this action.")
-    primary_actions.add_row("33", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("34", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("24", "invest_in_customer_success", "Improve onboarding and retention.")
+    primary_actions.add_row(
+        "25",
+        "run_retention_play",
+        "Save one at-risk account with concessions.",
+    )
+    primary_actions.add_row("26", "train_employee", "Increase readiness and productivity.")
+    primary_actions.add_row("27", "promote_employee", "Level up a ready team member.")
+    primary_actions.add_row("28", "set_functional_budget", "Rebalance engineering, growth, and CS.")
+    primary_actions.add_row("29", "plan_release", "Queue a product release plan.")
+    primary_actions.add_row("30", "work_release", "Advance and ship planned releases.")
+    primary_actions.add_row("31", "create_sales_deal", "Source a new sales opportunity.")
+    primary_actions.add_row("32", "advance_sales_deal", "Move a deal through the pipeline.")
+    primary_actions.add_row("33", "start_roadmap_project", "Start a multi-action strategic bet.")
+    primary_actions.add_row("34", "work_roadmap_project", "Advance the active strategic project.")
+    primary_actions.add_row("35", "review_pipeline", "Open release, sales, and project views.")
+    primary_actions.add_row("36", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("37", "wait", "Hold position for this action.")
+    primary_actions.add_row("38", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("39", "end_turn", "Run the simulation tick.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("35", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("36", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("37", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("38", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("39", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("40", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("41", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("42", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("43", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("44", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -1746,6 +1779,7 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     table.add_row("Strategy", resolution.state.company.strategy.value)
     table.add_row("Difficulty", resolution.state.difficulty_mode.value)
     table.add_row("Budget", resolution.state.quarter_plan.budget_stance.value)
+    table.add_row("Org Mix", resolution.state.functional_budget.preset.value)
     table.add_row("Roadmap", resolution.roadmap_focus.value)
     table.add_row("Market", resolution.market_cycle.value)
     table.add_row("Goal", resolution.campaign_goal_progress.title)
@@ -1897,6 +1931,7 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
     table.add_row("Roadmap", effective_roadmap.value)
     table.add_row("Roadmap State", "due now" if roadmap_due else f"{turns_left} turns left")
     table.add_row("Budget", state.quarter_plan.budget_stance.value)
+    table.add_row("Org Mix", state.functional_budget.preset.value)
     table.add_row("Market", state.market_cycle.value)
     table.add_row("Run Score", f"{total_score} ({score_tier})")
     table.add_row("Grade", calculate_run_score(state).campaign_grade)
@@ -2002,6 +2037,10 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
     if not compact:
         table.add_column("Renewal", justify="right")
         table.add_column("Expansion", justify="right")
+        table.add_column("Cadence")
+        table.add_column("Disc", justify="right")
+        table.add_column("Onboard", justify="right")
+        table.add_column("Support", justify="right")
 
     for account in active_accounts:
         row = [
@@ -2013,7 +2052,16 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
             str(account.churn_risk),
         ]
         if not compact:
-            row.extend([str(account.renewal_turn), str(account.expansion_potential)])
+            row.extend(
+                [
+                    str(account.renewal_turn),
+                    str(account.expansion_potential),
+                    account.contract_cadence.value,
+                    format_rate(account.discount_rate),
+                    str(account.onboarding_health),
+                    str(account.support_load),
+                ]
+            )
         table.add_row(*row)
 
     content = Group(

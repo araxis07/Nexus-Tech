@@ -36,9 +36,12 @@ class EmployeeRepository:
                 productivity,
                 specialization,
                 trait,
+                experience_points,
+                promotion_readiness,
+                attrition_risk,
                 assigned_product_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -54,6 +57,9 @@ class EmployeeRepository:
                     employee.productivity,
                     employee.specialization,
                     employee.trait.value,
+                    employee.experience_points,
+                    employee.promotion_readiness,
+                    employee.attrition_risk,
                     str(employee.assigned_product_id)
                     if employee.assigned_product_id is not None
                     else None,
@@ -78,6 +84,9 @@ class EmployeeRepository:
                 productivity,
                 specialization,
                 trait,
+                experience_points,
+                promotion_readiness,
+                attrition_risk,
                 assigned_product_id
             FROM employees
             WHERE slot_name = ?
@@ -98,6 +107,9 @@ class EmployeeRepository:
                 productivity=row["productivity"],
                 specialization=row["specialization"],
                 trait=CandidateTrait(row["trait"]),
+                experience_points=row["experience_points"] or 0,
+                promotion_readiness=row["promotion_readiness"] or 0,
+                attrition_risk=row["attrition_risk"] or 0,
                 assigned_product_id=UUID(row["assigned_product_id"])
                 if row["assigned_product_id"] is not None
                 else None,

@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     CompanyStrategy,
     Competitor,
     CompetitorMove,
+    ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
     DifficultyMode,
@@ -23,6 +24,8 @@ from nexus_tech.domain.models import (
     EventHistoryEntry,
     ExitOutcome,
     FinanceState,
+    FunctionalBudget,
+    FunctionalBudgetPreset,
     GameState,
     LifecycleStage,
     MarketCycle,
@@ -212,6 +215,7 @@ def make_state(
     event_history: list[EventHistoryEntry] | None = None,
     milestone_history: list[MilestoneEntry] | None = None,
     customer_accounts: list[CustomerAccount] | None = None,
+    functional_budget: FunctionalBudget | None = None,
 ) -> GameState:
     state = GameState(
         company=Company(
@@ -235,6 +239,7 @@ def make_state(
         market_cycle_turns_remaining=market_cycle_turns_remaining,
         difficulty_mode=difficulty_mode,
         campaign_goal_id=campaign_goal_id,
+        functional_budget=functional_budget or FunctionalBudget(),
         action_points_remaining=BALANCE.actions_per_turn,
     )
     state.quarter_plan = build_quarter_plan(state, budget_stance=budget_stance)
@@ -2428,3 +2433,167 @@ def test_competitor_intel_records_changed_move() -> None:
 
     assert state.competitor_intel
     assert state.competitor_intel[0].move is CompetitorMove.FEATURE_SPRINT
+
+
+def test_account_revenue_applies_discount_rate() -> None:
+    product = make_product("Enterprise Desk")
+    account = CustomerAccount(
+        name="Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1000.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        discount_rate=Decimal("0.1000"),
+        satisfaction=70,
+        onboarding_health=72,
+        support_load=18,
+        expansion_potential=58,
+        renewal_turn=5,
+        churn_risk=16,
+    )
+
+    assert calculate_account_revenue([account]) == Decimal("900.00")
+
+
+def test_customer_success_action_reduces_risk_and_support_load() -> None:
+    product = make_product("Renewal Hub")
+    account = CustomerAccount(
+        name="Renewal Anchor",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("700.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        discount_rate=Decimal("0.0000"),
+        satisfaction=55,
+        onboarding_health=52,
+        support_load=38,
+        expansion_potential=50,
+        renewal_turn=3,
+        churn_risk=58,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.INVEST_IN_CUSTOMER_SUCCESS,
+        ActionContext(target_product_id=product.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_account.churn_risk < account.churn_risk
+    assert updated_account.support_load < account.support_load
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_retention_play_adds_discount_and_restores_account_health() -> None:
+    product = make_product("Renewal Hub")
+    account = CustomerAccount(
+        name="Renewal Anchor",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("700.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        discount_rate=Decimal("0.0000"),
+        satisfaction=49,
+        onboarding_health=48,
+        support_load=36,
+        expansion_potential=50,
+        renewal_turn=3,
+        churn_risk=64,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_RETENTION_PLAY,
+        ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_account.discount_rate > account.discount_rate
+    assert updated_account.churn_risk < account.churn_risk
+    assert updated_account.satisfaction > account.satisfaction
+
+
+def test_train_employee_increases_readiness_and_productivity() -> None:
+    product = make_product("Core")
+    employee = make_employee("Ada", EmployeeRole.ENGINEER, assigned_product_id=product.id)
+    state = make_state(product, employees=[employee], cash_on_hand=Decimal("5000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.TRAIN_EMPLOYEE,
+        ActionContext(employee_id=employee.id),
+    )
+
+    updated_employee = outcome.state.employees[0]
+    assert updated_employee.promotion_readiness > employee.promotion_readiness
+    assert updated_employee.productivity > employee.productivity
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_promote_employee_advances_seniority_and_salary() -> None:
+    product = make_product("Core")
+    employee = make_employee(
+        "Ada",
+        EmployeeRole.ENGINEER,
+        seniority=Seniority.JUNIOR,
+        assigned_product_id=product.id,
+    )
+    employee.promotion_readiness = 76
+    state = make_state(product, employees=[employee])
+
+    outcome = apply_action(
+        state,
+        TurnAction.PROMOTE_EMPLOYEE,
+        ActionContext(employee_id=employee.id),
+    )
+
+    updated_employee = outcome.state.employees[0]
+    assert updated_employee.seniority is Seniority.MID
+    assert updated_employee.salary > employee.salary
+    assert updated_employee.productivity > employee.productivity
+
+
+def test_functional_budget_affects_customer_risk_drift() -> None:
+    product = make_product("Trust Cloud", quality=52, bug_level=26, market_fit=56)
+    account = CustomerAccount(
+        name="Trust Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("900.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        discount_rate=Decimal("0.0000"),
+        satisfaction=58,
+        onboarding_health=55,
+        support_load=30,
+        expansion_potential=62,
+        renewal_turn=8,
+        churn_risk=40,
+    )
+    balanced_state = make_state(
+        product.model_copy(deep=True),
+        customer_accounts=[account.model_copy(deep=True)],
+        functional_budget=FunctionalBudget(),
+    )
+    trust_state = make_state(
+        product.model_copy(deep=True),
+        customer_accounts=[account.model_copy(deep=True)],
+        functional_budget=FunctionalBudget(
+            preset=FunctionalBudgetPreset.CUSTOMER_TRUST,
+            engineering_share=25,
+            marketing_share=18,
+            customer_success_share=37,
+            g_and_a_share=20,
+        ),
+    )
+
+    balanced_resolution = resolve_turn(balanced_state, RandomSource(seed=7))
+    trust_resolution = resolve_turn(trust_state, RandomSource(seed=7))
+
+    assert (
+        trust_resolution.state.customer_accounts[0].churn_risk
+        <= balanced_resolution.state.customer_accounts[0].churn_risk
+    )

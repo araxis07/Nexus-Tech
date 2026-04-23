@@ -268,6 +268,36 @@ class BalanceConfig:
             "burnout_risk": 5,
         }
     )
+    employee_training_cost: Decimal = Decimal("180.00")
+    employee_training_experience_gain: int = 12
+    employee_training_readiness_gain: int = 16
+    employee_training_productivity_gain: int = 3
+    employee_training_morale_gain: int = 4
+    employee_training_attrition_relief: int = 8
+    employee_progression_energy_threshold: int = 60
+    employee_assigned_experience_gain: int = 6
+    employee_unassigned_experience_gain: int = 2
+    employee_promotion_readiness_threshold: int = 70
+    employee_promotion_readiness_reset: int = 18
+    employee_promotion_salary_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "mid": Decimal("1.12"),
+            "senior": Decimal("1.18"),
+        }
+    )
+    employee_promotion_productivity_gain: dict[str, int] = field(
+        default_factory=lambda: {
+            "mid": 5,
+            "senior": 7,
+        }
+    )
+    employee_promotion_morale_gain: int = 8
+    employee_promotion_attrition_relief: int = 14
+    employee_attrition_morale_risk_gain: int = 7
+    employee_attrition_energy_risk_gain: int = 9
+    employee_attrition_negative_cash_flow_risk_gain: int = 4
+    employee_attrition_recovery_relief: int = 6
+    employee_high_attrition_risk_threshold: int = 65
     team_build_bonus_divisor: int = 44
     team_stability_bonus_divisor: int = 48
     team_market_fit_bonus_divisor: int = 52
@@ -1063,6 +1093,7 @@ class BalanceConfig:
     key_account_bug_divisor: int = 10
     key_account_debt_divisor: int = 15
     key_account_renewal_interval: int = 4
+    key_account_monthly_renewal_interval: int = 2
     key_account_satisfaction_good_threshold: int = 68
     key_account_satisfaction_bad_threshold: int = 42
     key_account_churn_threshold: int = 78
@@ -1072,6 +1103,24 @@ class BalanceConfig:
     key_account_satisfaction_delta_cap: int = 5
     key_account_churn_risk_relief: int = 7
     key_account_churn_risk_gain: int = 9
+    key_account_discount_risk_divisor: Decimal = Decimal("0.0200")
+    key_account_support_load_bug_divisor: int = 12
+    key_account_support_load_quality_relief_divisor: int = 18
+    key_account_support_load_cs_relief: int = 2
+    key_account_support_load_cap: int = 8
+    key_account_onboarding_good_threshold: int = 70
+    key_account_onboarding_bad_threshold: int = 45
+    customer_success_investment_cost: Decimal = Decimal("240.00")
+    customer_success_onboarding_gain: int = 8
+    customer_success_satisfaction_gain: int = 6
+    customer_success_support_relief: int = 5
+    customer_success_churn_risk_relief: int = 8
+    retention_play_cost: Decimal = Decimal("180.00")
+    retention_discount_rate_increase: Decimal = Decimal("0.0200")
+    retention_satisfaction_gain: int = 9
+    retention_onboarding_gain: int = 6
+    retention_support_relief: int = 6
+    retention_churn_risk_relief: int = 14
     key_account_score_value_divisor: Decimal = Decimal("250.00")
     key_account_valuation_multiplier: Decimal = Decimal("2.50")
 

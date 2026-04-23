@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.0 - 2026-04-23
+
+- Added customer-success actions for onboarding investment and targeted retention plays
+- Added contract-depth fields for cadence, discounting, onboarding health, and support load on customer accounts
+- Added employee progression with training, promotion readiness, promotion actions, and attrition-risk tracking
+- Added functional budget presets to rebalance engineering, marketing, customer success, and G&A priorities
+- Extended terminal dashboards to show org mix, deeper customer account detail, and richer team progression stats
+- Persisted functional budget state plus deeper customer-account and employee progression fields through SQLite schema version `12`
+- Promoted the package version to `0.15.0`
+
 ## 0.14.0 - 2026-04-23
 
 - Added product release planning with stability patches, minor releases, and major launches

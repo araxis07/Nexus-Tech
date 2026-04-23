@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from nexus_tech.config import DEFAULT_SCENARIO_ID, DEFAULT_SCENARIO_TITLE
 from nexus_tech.domain.constants import ATTRIBUTE_MAX, ATTRIBUTE_MIN
@@ -119,6 +119,23 @@ class CustomerAccountStatus(StrEnum):
     ACTIVE = "active"
     AT_RISK = "at_risk"
     CHURNED = "churned"
+
+
+class ContractCadence(StrEnum):
+    """Commercial renewal cadence for a customer account."""
+
+    MONTHLY = "monthly"
+    ANNUAL = "annual"
+
+
+class FunctionalBudgetPreset(StrEnum):
+    """Named operating-allocation presets for cross-functional spend."""
+
+    BALANCED = "balanced"
+    PRODUCT_PUSH = "product_push"
+    GROWTH_PUSH = "growth_push"
+    CUSTOMER_TRUST = "customer_trust"
+    CASH_GUARD = "cash_guard"
 
 
 class ExitOutcome(StrEnum):
@@ -282,6 +299,11 @@ class TurnAction(StrEnum):
     REST_TEAM = "rest_team"
     REVIEW_TEAM = "review_team"
     REVIEW_CUSTOMERS = "review_customers"
+    INVEST_IN_CUSTOMER_SUCCESS = "invest_in_customer_success"
+    RUN_RETENTION_PLAY = "run_retention_play"
+    TRAIN_EMPLOYEE = "train_employee"
+    PROMOTE_EMPLOYEE = "promote_employee"
+    SET_FUNCTIONAL_BUDGET = "set_functional_budget"
     PLAN_RELEASE = "plan_release"
     WORK_RELEASE = "work_release"
     CREATE_SALES_DEAL = "create_sales_deal"
@@ -362,6 +384,9 @@ class Employee(BaseModel):
     productivity: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     specialization: str = Field(min_length=1, max_length=40)
     trait: CandidateTrait = CandidateTrait.STEADY_OPERATOR
+    experience_points: int = Field(default=0, ge=0)
+    promotion_readiness: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    attrition_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     assigned_product_id: Optional[UUID] = None  # noqa: UP045
 
     @field_validator("salary", mode="before")
@@ -439,6 +464,30 @@ class QuarterPlan(BaseModel):
         return quantize_money(value)
 
 
+class FunctionalBudget(BaseModel):
+    """Cross-functional operating allocation used by efficiency systems."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    preset: FunctionalBudgetPreset = FunctionalBudgetPreset.BALANCED
+    engineering_share: int = Field(default=30, ge=0, le=100)
+    marketing_share: int = Field(default=25, ge=0, le=100)
+    customer_success_share: int = Field(default=25, ge=0, le=100)
+    g_and_a_share: int = Field(default=20, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def _validate_total_share(self) -> "FunctionalBudget":
+        total_share = (
+            self.engineering_share
+            + self.marketing_share
+            + self.customer_success_share
+            + self.g_and_a_share
+        )
+        if total_share != 100:
+            raise ValueError("Functional budget shares must total 100.")
+        return self
+
+
 class CustomerAccount(BaseModel):
     """A key account that creates renewal and concentration pressure."""
 
@@ -449,7 +498,11 @@ class CustomerAccount(BaseModel):
     product_id: UUID
     segment: MarketSegment
     contract_value: Decimal = Field(ge=Decimal("0"))
+    contract_cadence: ContractCadence = ContractCadence.ANNUAL
+    discount_rate: Decimal = Field(default=Decimal("0.0000"), ge=Decimal("0"), le=Decimal("1"))
     satisfaction: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    onboarding_health: int = Field(default=60, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    support_load: int = Field(default=20, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_turn: int = Field(ge=1)
     churn_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
@@ -459,6 +512,11 @@ class CustomerAccount(BaseModel):
     @classmethod
     def _normalize_contract_value(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
+
+    @field_validator("discount_rate", mode="before")
+    @classmethod
+    def _normalize_discount_rate(cls, value: Decimal) -> Decimal:
+        return quantize_rate(value)
 
 
 class EventOption(BaseModel):
@@ -659,6 +717,7 @@ class GameState(BaseModel):
     roadmap_projects: list[RoadmapProject] = Field(default_factory=list)
     competitor_intel: list[CompetitorIntelEntry] = Field(default_factory=list)
     quarter_plan: QuarterPlan = Field(default_factory=QuarterPlan)
+    functional_budget: FunctionalBudget = Field(default_factory=FunctionalBudget)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
     victory_achieved: bool = False
     victory_reason: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045

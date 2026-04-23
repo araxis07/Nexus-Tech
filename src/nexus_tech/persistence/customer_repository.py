@@ -6,7 +6,12 @@ import sqlite3
 from decimal import Decimal
 from uuid import UUID
 
-from nexus_tech.domain.models import CustomerAccount, CustomerAccountStatus, MarketSegment
+from nexus_tech.domain.models import (
+    ContractCadence,
+    CustomerAccount,
+    CustomerAccountStatus,
+    MarketSegment,
+)
 
 
 class CustomerAccountRepository:
@@ -31,13 +36,17 @@ class CustomerAccountRepository:
                 product_id,
                 segment,
                 contract_value,
+                contract_cadence,
+                discount_rate,
                 satisfaction,
+                onboarding_health,
+                support_load,
                 expansion_potential,
                 renewal_turn,
                 churn_risk,
                 status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -48,7 +57,11 @@ class CustomerAccountRepository:
                     str(account.product_id),
                     account.segment.value,
                     str(account.contract_value),
+                    account.contract_cadence.value,
+                    str(account.discount_rate),
                     account.satisfaction,
+                    account.onboarding_health,
+                    account.support_load,
                     account.expansion_potential,
                     account.renewal_turn,
                     account.churn_risk,
@@ -69,7 +82,11 @@ class CustomerAccountRepository:
                 product_id,
                 segment,
                 contract_value,
+                contract_cadence,
+                discount_rate,
                 satisfaction,
+                onboarding_health,
+                support_load,
                 expansion_potential,
                 renewal_turn,
                 churn_risk,
@@ -87,7 +104,11 @@ class CustomerAccountRepository:
                 product_id=UUID(row["product_id"]),
                 segment=MarketSegment(row["segment"]),
                 contract_value=Decimal(row["contract_value"]),
+                contract_cadence=ContractCadence(row["contract_cadence"] or "annual"),
+                discount_rate=Decimal(row["discount_rate"] or "0.0000"),
                 satisfaction=row["satisfaction"],
+                onboarding_health=row["onboarding_health"] or 60,
+                support_load=row["support_load"] or 20,
                 expansion_potential=row["expansion_potential"],
                 renewal_turn=row["renewal_turn"],
                 churn_risk=row["churn_risk"],

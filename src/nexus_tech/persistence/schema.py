@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 11
+CURRENT_SCHEMA_VERSION = 12
 
 SCHEMA_STATEMENTS = (
     """
@@ -22,6 +22,11 @@ SCHEMA_STATEMENTS = (
         campaign_goal_id TEXT NOT NULL DEFAULT 'profit_machine',
         roadmap_focus TEXT NOT NULL DEFAULT 'balanced_execution',
         roadmap_set_turn INTEGER NOT NULL DEFAULT 1,
+        functional_budget_preset TEXT NOT NULL DEFAULT 'balanced',
+        budget_engineering_share INTEGER NOT NULL DEFAULT 30,
+        budget_marketing_share INTEGER NOT NULL DEFAULT 25,
+        budget_customer_success_share INTEGER NOT NULL DEFAULT 25,
+        budget_g_and_a_share INTEGER NOT NULL DEFAULT 20,
         market_cycle TEXT NOT NULL DEFAULT 'steady',
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
@@ -29,7 +34,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 11,
+        schema_version INTEGER NOT NULL DEFAULT 12,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -87,6 +92,9 @@ SCHEMA_STATEMENTS = (
         productivity INTEGER NOT NULL,
         specialization TEXT NOT NULL,
         trait TEXT NOT NULL DEFAULT 'steady_operator',
+        experience_points INTEGER NOT NULL DEFAULT 0,
+        promotion_readiness INTEGER NOT NULL DEFAULT 0,
+        attrition_risk INTEGER NOT NULL DEFAULT 0,
         assigned_product_id TEXT,
         PRIMARY KEY (slot_name, employee_id),
         UNIQUE (slot_name, display_order),
@@ -243,7 +251,11 @@ SCHEMA_STATEMENTS = (
         product_id TEXT NOT NULL,
         segment TEXT NOT NULL,
         contract_value TEXT NOT NULL,
+        contract_cadence TEXT NOT NULL DEFAULT 'annual',
+        discount_rate TEXT NOT NULL DEFAULT '0.0000',
         satisfaction INTEGER NOT NULL,
+        onboarding_health INTEGER NOT NULL DEFAULT 60,
+        support_load INTEGER NOT NULL DEFAULT 20,
         expansion_potential INTEGER NOT NULL,
         renewal_turn INTEGER NOT NULL,
         churn_risk INTEGER NOT NULL,
@@ -412,6 +424,36 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="functional_budget_preset",
+        column_definition="TEXT NOT NULL DEFAULT 'balanced'",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="budget_engineering_share",
+        column_definition="INTEGER NOT NULL DEFAULT 30",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="budget_marketing_share",
+        column_definition="INTEGER NOT NULL DEFAULT 25",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="budget_customer_success_share",
+        column_definition="INTEGER NOT NULL DEFAULT 25",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="budget_g_and_a_share",
+        column_definition="INTEGER NOT NULL DEFAULT 20",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="market_cycle",
         column_definition="TEXT NOT NULL DEFAULT 'steady'",
     )
@@ -474,6 +516,48 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="employees",
         column_name="trait",
         column_definition="TEXT NOT NULL DEFAULT 'steady_operator'",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="experience_points",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="promotion_readiness",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="attrition_risk",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="contract_cadence",
+        column_definition="TEXT NOT NULL DEFAULT 'annual'",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="discount_rate",
+        column_definition="TEXT NOT NULL DEFAULT '0.0000'",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="onboarding_health",
+        column_definition="INTEGER NOT NULL DEFAULT 60",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="support_load",
+        column_definition="INTEGER NOT NULL DEFAULT 20",
     )
     _ensure_column(
         connection,

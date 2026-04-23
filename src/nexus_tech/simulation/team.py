@@ -130,7 +130,8 @@ def calculate_effective_productivity(employee: Employee) -> int:
 
     energy_factor = Decimal("0.50") + (Decimal(employee.energy) / Decimal("200"))
     morale_factor = Decimal("0.50") + (Decimal(employee.morale) / Decimal("200"))
-    effective = Decimal(employee.productivity) * energy_factor * morale_factor
+    attrition_factor = Decimal("1.00") - (Decimal(employee.attrition_risk) / Decimal("300"))
+    effective = Decimal(employee.productivity) * energy_factor * morale_factor * attrition_factor
     return clamp_int(int(effective.to_integral_value()))
 
 

@@ -30,6 +30,7 @@ from nexus_tech.domain.models import (
     DifficultyMode,
     Employee,
     EmployeeRole,
+    FunctionalBudgetPreset,
     GameState,
     MarketSegment,
     PendingEvent,
@@ -97,6 +98,7 @@ from nexus_tech.simulation.engine import (
     ActionContext,
     apply_action,
     create_new_game,
+    get_customer_choices,
     get_employee_choices,
     get_product_choices,
     resolve_turn,
@@ -203,24 +205,29 @@ ACTION_KEYS = {
     "21": TurnAction.REST_TEAM,
     "22": TurnAction.REVIEW_TEAM,
     "23": TurnAction.REVIEW_CUSTOMERS,
-    "24": TurnAction.PLAN_RELEASE,
-    "25": TurnAction.WORK_RELEASE,
-    "26": TurnAction.CREATE_SALES_DEAL,
-    "27": TurnAction.ADVANCE_SALES_DEAL,
-    "28": TurnAction.START_ROADMAP_PROJECT,
-    "29": TurnAction.WORK_ROADMAP_PROJECT,
-    "30": TurnAction.REVIEW_PIPELINE,
-    "31": TurnAction.VIEW_REPORT,
-    "32": TurnAction.WAIT,
-    "33": TurnAction.VIEW_STATUS,
-    "34": TurnAction.END_TURN,
+    "24": TurnAction.INVEST_IN_CUSTOMER_SUCCESS,
+    "25": TurnAction.RUN_RETENTION_PLAY,
+    "26": TurnAction.TRAIN_EMPLOYEE,
+    "27": TurnAction.PROMOTE_EMPLOYEE,
+    "28": TurnAction.SET_FUNCTIONAL_BUDGET,
+    "29": TurnAction.PLAN_RELEASE,
+    "30": TurnAction.WORK_RELEASE,
+    "31": TurnAction.CREATE_SALES_DEAL,
+    "32": TurnAction.ADVANCE_SALES_DEAL,
+    "33": TurnAction.START_ROADMAP_PROJECT,
+    "34": TurnAction.WORK_ROADMAP_PROJECT,
+    "35": TurnAction.REVIEW_PIPELINE,
+    "36": TurnAction.VIEW_REPORT,
+    "37": TurnAction.WAIT,
+    "38": TurnAction.VIEW_STATUS,
+    "39": TurnAction.END_TURN,
 }
 UTILITY_ACTION_KEYS = {
-    "35": "save_game",
-    "36": "load_game",
-    "37": "show_guide",
-    "38": "show_glossary",
-    "39": "show_tutorial",
+    "40": "save_game",
+    "41": "load_game",
+    "42": "show_guide",
+    "43": "show_glossary",
+    "44": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -916,7 +923,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="33",
+                    default="38",
                     show_choices=False,
                 )
 
@@ -1069,6 +1076,22 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         )
         return ActionContext(budget_stance=BudgetStance(budget_key))
 
+    if action is TurnAction.SET_FUNCTIONAL_BUDGET:
+        budget_key = ask_choice_input(
+            "Functional budget",
+            choices=[
+                "balanced",
+                "product_push",
+                "growth_push",
+                "customer_trust",
+                "cash_guard",
+            ],
+            default=state.functional_budget.preset.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(functional_budget_preset=FunctionalBudgetPreset(budget_key))
+
     if action is TurnAction.HIRE_EMPLOYEE:
         candidate_seed = (state.company.current_turn * 101) + (len(state.employees) * 17)
         candidates = generate_candidate_pool(RandomSource(seed=candidate_seed))
@@ -1130,6 +1153,12 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             return None
         return ActionContext(employee_id=employee_id)
 
+    if action in {TurnAction.TRAIN_EMPLOYEE, TurnAction.PROMOTE_EMPLOYEE}:
+        employee_id = choose_employee_id(state, action)
+        if employee_id is None:
+            return None
+        return ActionContext(employee_id=employee_id)
+
     if action is TurnAction.UNASSIGN_EMPLOYEE:
         employee_id = choose_employee_id(state, action, assigned_only=True)
         if employee_id is None:
@@ -1144,6 +1173,20 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         if product_id is None:
             return None
         return ActionContext(employee_id=employee_id, target_product_id=product_id)
+
+    if action is TurnAction.INVEST_IN_CUSTOMER_SUCCESS:
+        product_id = choose_product_id(state, action)
+        if product_id is None:
+            return None
+        return ActionContext(target_product_id=product_id)
+
+    if action is TurnAction.RUN_RETENTION_PLAY:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=True)
+        if customer_account_id is None:
+            customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+            if customer_account_id is None:
+                return None
+        return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.PLAN_RELEASE:
         product_id = choose_product_id(state, action)
@@ -1349,6 +1392,51 @@ def choose_employee_id(
         )
     )
     return employee.id
+
+
+def choose_customer_account_id(
+    state: GameState,
+    *,
+    at_risk_only: bool,
+) -> UUID | None:
+    """Prompt the user to select a customer account for retention work."""
+
+    accounts = get_customer_choices(state, at_risk_only=at_risk_only)
+    if not accounts:
+        if at_risk_only:
+            return None
+        console.print(
+            Panel.fit(
+                "No active customer accounts are available for that action.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    table = Table(box=None, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Account", style="bold")
+    table.add_column("Status")
+    table.add_column("Value", justify="right")
+    table.add_column("Risk", justify="right")
+    for index, account in enumerate(accounts, start=1):
+        table.add_row(
+            str(index),
+            account.name,
+            account.status.value,
+            f"${account.contract_value}",
+            str(account.churn_risk),
+        )
+    console.print(Panel(table, title="Customer Accounts", border_style="green", expand=True))
+    choices = {str(index): account for index, account in enumerate(accounts, start=1)}
+    selected_key = ask_choice_input(
+        "Select a customer account",
+        choices=list(choices),
+        default="1",
+        show_choices=False,
+    )
+    return choices[selected_key].id
 
 
 def choose_release_id(state: GameState) -> UUID | None:

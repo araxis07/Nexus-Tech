@@ -90,8 +90,10 @@ Each turn represents a business interval. You review the company, choose actions
 - Turn strong product traction into named key customer accounts
 - Source and advance sales deals through lead, demo, pilot, and closed stages
 - Track account satisfaction, contract value, expansion potential, renewal timing, and churn risk
+- Add contract cadence, discounting, onboarding health, and support load to make renewals more believable
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
+- Invest directly in customer success and run targeted retention plays on fragile accounts
 - Review key accounts directly from the in-game `review_customers` action
 
 ### 👥 Employee and Team System
@@ -106,6 +108,13 @@ Each turn represents a business interval. You review the company, choose actions
   - `marketer`
   - `product_manager`
 - Simulate morale, energy, burnout, recovery, and role-based impact on outcomes
+- Train employees, track promotion readiness, promote strong contributors, and monitor attrition risk
+
+### 🧭 Functional Budgeting
+
+- Set an org-level allocation preset for engineering, marketing, customer success, and G&A
+- Use presets such as `product_push`, `growth_push`, `customer_trust`, and `cash_guard`
+- Let functional-budget choices shape execution speed, sales motion, retention stability, and org resilience
 
 ### 🎲 Dynamic Event Engine
 

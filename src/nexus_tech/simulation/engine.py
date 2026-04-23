@@ -19,6 +19,7 @@ from nexus_tech.domain.models import (
     Employee,
     EmployeeRole,
     EventHistoryEntry,
+    FunctionalBudgetPreset,
     GameState,
     LifecycleStage,
     MarketCycle,
@@ -41,6 +42,11 @@ from nexus_tech.simulation.campaign import (
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
 from nexus_tech.simulation.competitor_intel import record_competitor_intel
+from nexus_tech.simulation.customer_success import (
+    get_customer_account_by_id,
+    invest_in_customer_success,
+    run_retention_play,
+)
 from nexus_tech.simulation.customers import CustomerTurnSummary, apply_end_of_turn_customers
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.economy import (
@@ -52,6 +58,11 @@ from nexus_tech.simulation.economy import (
     calculate_total_salary_cost,
     is_game_over,
 )
+from nexus_tech.simulation.employee_progression import (
+    apply_end_of_turn_employee_progression,
+    promote_employee,
+    train_employee,
+)
 from nexus_tech.simulation.endgame import apply_exit_outcome
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.finance import (
@@ -61,6 +72,10 @@ from nexus_tech.simulation.finance import (
     apply_raise_vc,
     apply_repay_debt,
     apply_take_loan,
+)
+from nexus_tech.simulation.functional_budgeting import (
+    apply_set_functional_budget,
+    get_functional_budget_profile,
 )
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.late_game import LateGameSummary, apply_end_of_turn_late_game
@@ -147,6 +162,8 @@ class ActionContext:
     sales_deal_id: UUID | None = None
     roadmap_project_type: RoadmapProjectType | None = None
     roadmap_project_id: UUID | None = None
+    customer_account_id: UUID | None = None
+    functional_budget_preset: FunctionalBudgetPreset | None = None
 
 
 @dataclass(frozen=True)
@@ -351,6 +368,23 @@ def apply_action(
             ),
         )
 
+    if action is TurnAction.TRAIN_EMPLOYEE:
+        employee = get_employee_by_id(next_state.employees, context.employee_id)
+        summary = train_employee(next_state.company, employee)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Trained employee %s.", employee.full_name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.PROMOTE_EMPLOYEE:
+        employee = get_employee_by_id(next_state.employees, context.employee_id)
+        summary = promote_employee(employee)
+        logger.debug("Promoted employee %s.", employee.full_name)
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.SET_COMPANY_STRATEGY:
         if context.strategy is None:
             raise ValueError("Selecting a company strategy requires a strategy value.")
@@ -391,6 +425,26 @@ def apply_action(
             state=next_state,
             message=(
                 f"Budget stance set to {context.budget_stance.value}. {budget_profile.summary}"
+            ),
+        )
+
+    if action is TurnAction.SET_FUNCTIONAL_BUDGET:
+        if context.functional_budget_preset is None:
+            raise ValueError("Selecting a functional budget requires choosing a preset.")
+
+        budget_profile = apply_set_functional_budget(
+            next_state,
+            context.functional_budget_preset,
+        )
+        logger.debug(
+            "Changed functional budget to %s.",
+            context.functional_budget_preset.value,
+        )
+        return ActionOutcome(
+            state=next_state,
+            message=(
+                f"Functional budget set to {context.functional_budget_preset.value}. "
+                f"{budget_profile.summary}"
             ),
         )
 
@@ -476,6 +530,31 @@ def apply_action(
         logger.debug("Rested the team.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.INVEST_IN_CUSTOMER_SUCCESS:
+        product = get_target_product(next_state, context.target_product_id)
+        summary = invest_in_customer_success(next_state, product.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Invested in customer success for %s.", product.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_RETENTION_PLAY:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_retention_play(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran retention play for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.PLAN_RELEASE:
         if context.release_type is None:
             raise ValueError("Planning a release requires choosing a release type.")
@@ -487,7 +566,12 @@ def apply_action(
     if action is TurnAction.WORK_RELEASE:
         if context.release_id is None:
             raise ValueError("Working a release requires choosing a release plan.")
-        summary = work_product_release(next_state, context.release_id)
+        functional_budget_profile = get_functional_budget_profile(next_state.functional_budget)
+        summary = work_product_release(
+            next_state,
+            context.release_id,
+            engineering_bonus=functional_budget_profile.engineering_bonus,
+        )
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Worked release %s.", context.release_id)
         return ActionOutcome(
@@ -498,7 +582,12 @@ def apply_action(
 
     if action is TurnAction.CREATE_SALES_DEAL:
         product = get_target_product(next_state, context.target_product_id)
-        summary = create_sales_deal(next_state, product)
+        functional_budget_profile = get_functional_budget_profile(next_state.functional_budget)
+        summary = create_sales_deal(
+            next_state,
+            product,
+            marketing_bonus=functional_budget_profile.marketing_bonus,
+        )
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Created sales deal for %s.", product.name)
         return ActionOutcome(
@@ -510,7 +599,12 @@ def apply_action(
     if action is TurnAction.ADVANCE_SALES_DEAL:
         if context.sales_deal_id is None:
             raise ValueError("Advancing sales requires choosing a deal.")
-        summary = advance_sales_deal(next_state, context.sales_deal_id)
+        functional_budget_profile = get_functional_budget_profile(next_state.functional_budget)
+        summary = advance_sales_deal(
+            next_state,
+            context.sales_deal_id,
+            marketing_bonus=functional_budget_profile.marketing_bonus,
+        )
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Advanced sales deal %s.", context.sales_deal_id)
         return ActionOutcome(
@@ -550,7 +644,12 @@ def apply_action(
         )
 
     product = get_target_product(next_state, context.target_product_id)
-    team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
+    functional_budget_profile = get_functional_budget_profile(next_state.functional_budget)
+    team_modifier = _apply_functional_budget_to_team_modifier(
+        calculate_product_team_modifier(next_state.employees, product.id),
+        engineering_bonus=functional_budget_profile.engineering_bonus,
+        marketing_bonus=functional_budget_profile.marketing_bonus,
+    )
     strategy_profile = get_strategy_profile(next_state.company.strategy)
     roadmap_profile = get_roadmap_profile(
         next_state.roadmap_focus,
@@ -667,6 +766,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         current_turn=resolved_turn,
     )
     difficulty_profile = get_difficulty_profile(next_state.difficulty_mode)
+    functional_budget_profile = get_functional_budget_profile(next_state.functional_budget)
     scale_pressure = calculate_company_scale_pressure(
         next_state.products,
         headcount=len(next_state.employees),
@@ -717,7 +817,11 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
             headcount=len(next_state.employees),
             difficulty_mode=next_state.difficulty_mode,
         )
-        team_modifier = calculate_product_team_modifier(next_state.employees, product.id)
+        team_modifier = _apply_functional_budget_to_team_modifier(
+            calculate_product_team_modifier(next_state.employees, product.id),
+            engineering_bonus=functional_budget_profile.engineering_bonus,
+            marketing_bonus=functional_budget_profile.marketing_bonus,
+        )
         growth_result = resolve_growth(
             next_state.company,
             product,
@@ -779,6 +883,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.customer_accounts,
         next_state.products,
         current_turn=resolved_turn,
+        customer_success_bonus=functional_budget_profile.customer_success_bonus,
     )
     total_revenue = quantize_money(total_revenue + customer_summary.account_revenue)
 
@@ -827,6 +932,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.company,
         net_cash_flow=net_cash_flow,
     )
+    next_state.finance.board_confidence = clamp_int(
+        next_state.finance.board_confidence + functional_budget_profile.board_confidence_bonus
+    )
 
     team_condition = apply_end_of_turn_team_drift(
         next_state.employees,
@@ -834,11 +942,18 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         net_cash_flow,
         next_state.company.strategy,
         budget_burnout_modifier=(
-            budget_profile.burnout_modifier + operations_summary.team_energy_penalty
+            budget_profile.burnout_modifier
+            + operations_summary.team_energy_penalty
+            - functional_budget_profile.burnout_relief
         ),
         coordination_burnout_modifier=scale_pressure.coordination_drag
         + late_game_summary.burnout_modifier
         + difficulty_profile.burnout_modifier,
+    )
+    progression_summary = apply_end_of_turn_employee_progression(
+        next_state.employees,
+        net_cash_flow=net_cash_flow,
+        burnout_relief=functional_budget_profile.burnout_relief,
     )
 
     age_sales_pipeline(next_state)
@@ -911,6 +1026,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         late_game_summary=late_game_summary.summary,
         victory_reason=victory_reason,
         roadmap_due=roadmap_due,
+        promotion_ready_count=progression_summary.promotion_ready_count,
+        high_attrition_risk_count=progression_summary.high_attrition_risk_count,
     )
     logger.debug("Resolved turn %s.", resolved_turn)
 
@@ -972,6 +1089,19 @@ def get_employee_choices(
     return list(state.employees)
 
 
+def get_customer_choices(
+    state: GameState,
+    *,
+    at_risk_only: bool = False,
+):
+    """Return customer accounts available for CLI target selection."""
+
+    accounts = [account for account in state.customer_accounts if account.status.value != "churned"]
+    if at_risk_only:
+        return [account for account in accounts if account.status.value == "at_risk"]
+    return accounts
+
+
 def get_target_product(state: GameState, product_id: UUID | None) -> Product:
     """Resolve a target product from the current state."""
 
@@ -1010,6 +1140,8 @@ def build_turn_narrative(
     late_game_summary: str,
     victory_reason: str | None,
     roadmap_due: bool,
+    promotion_ready_count: int,
+    high_attrition_risk_count: int,
 ) -> str:
     """Generate a concise story beat for the turn summary."""
 
@@ -1019,6 +1151,10 @@ def build_turn_narrative(
         return victory_reason
     if campaign_goal_progress.completed:
         return f"Campaign goal complete: {campaign_goal_progress.title}."
+    if high_attrition_risk_count > 0:
+        return "Attrition risk is rising. Team sustainability now needs active attention."
+    if promotion_ready_count > 0:
+        return "The team is maturing. Some people are ready for broader responsibility."
     if market_cycle_changed:
         return (
             f"The market shifted to {market_cycle.value}. "
@@ -1077,3 +1213,22 @@ def build_turn_narrative(
     if late_game_summary != "Late-game pressure is under control.":
         return late_game_summary
     return scale_pressure_summary
+
+
+def _apply_functional_budget_to_team_modifier(
+    team_modifier,
+    *,
+    engineering_bonus: int,
+    marketing_bonus: int,
+):
+    """Apply cross-functional budget priorities to one product team modifier."""
+
+    return replace(
+        team_modifier,
+        build_speed_bonus=team_modifier.build_speed_bonus + engineering_bonus,
+        stability_bonus=team_modifier.stability_bonus + engineering_bonus,
+        debt_reduction_bonus=team_modifier.debt_reduction_bonus + engineering_bonus,
+        market_fit_bonus=team_modifier.market_fit_bonus + max(0, engineering_bonus // 2),
+        acquisition_bonus=team_modifier.acquisition_bonus + marketing_bonus,
+        reputation_bonus=team_modifier.reputation_bonus + max(0, marketing_bonus),
+    )
