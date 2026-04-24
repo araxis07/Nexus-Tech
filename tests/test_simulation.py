@@ -8,6 +8,7 @@ import pytest
 from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
     BoardAsk,
+    BoardResolution,
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
@@ -50,6 +51,7 @@ from nexus_tech.domain.models import (
     SubscriptionPackage,
     SupportInvestmentFocus,
     SupportProgram,
+    SupportTier,
     TurnAction,
     TurnLedgerEntry,
 )
@@ -3340,3 +3342,187 @@ def test_forecast_scenarios_bracket_base_projection() -> None:
     assert conservative.projected_net_cash_flow < base.projected_net_cash_flow
     assert aggressive.projected_net_cash_flow > base.projected_net_cash_flow
     assert conservative.projected_runway_turns <= base.projected_runway_turns
+
+
+def test_appoint_team_lead_sets_flag_and_reduces_succession_blind_spot() -> None:
+    product = make_product("Ops Core")
+    lead_candidate = make_employee(
+        "Rin Lead",
+        EmployeeRole.DESIGNER,
+        assigned_product_id=product.id,
+        leadership_score=72,
+    )
+    state = make_state(product, employees=[lead_candidate])
+
+    outcome = apply_action(
+        state,
+        TurnAction.APPOINT_TEAM_LEAD,
+        context=ActionContext(employee_id=lead_candidate.id),
+    )
+
+    promoted = outcome.state.employees[0]
+    condition = calculate_team_condition(outcome.state.employees)
+    assert promoted.is_team_lead is True
+    assert condition.team_lead_count == 1
+
+
+def test_route_support_escalation_upgrades_support_tier_and_reduces_risk() -> None:
+    product = make_product("Trust Desk", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Escalating Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("980.00"),
+        satisfaction=58,
+        expansion_potential=60,
+        renewal_turn=6,
+        churn_risk=42,
+        open_tickets=9,
+        sla_breach_risk=24,
+        escalation_count=2,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.ROUTE_SUPPORT_ESCALATION,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    routed = outcome.state.customer_accounts[0]
+    assert routed.support_tier is SupportTier.PRIORITY
+    assert routed.open_tickets < account.open_tickets
+    assert routed.churn_risk < account.churn_risk
+
+
+def test_run_add_on_campaign_expands_healthy_accounts() -> None:
+    product = make_product("Bundle Ops", packaging_strategy=PackagingStrategy.MODULAR)
+    account = CustomerAccount(
+        name="Expansion Desk",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("620.00"),
+        satisfaction=76,
+        expansion_potential=64,
+        renewal_turn=6,
+        churn_risk=16,
+        add_on_count=1,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account])
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ADD_ON_CAMPAIGN,
+        context=ActionContext(target_product_id=product.id),
+    )
+
+    expanded = outcome.state.customer_accounts[0]
+    assert expanded.add_on_count > account.add_on_count
+    assert expanded.contract_value > account.contract_value
+    assert outcome.state.products[0].technical_debt > product.technical_debt
+
+
+def test_run_package_migration_aligns_accounts_to_packaging_strategy() -> None:
+    product = make_product(
+        "Migration Suite",
+        packaging_strategy=PackagingStrategy.SUITE,
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Migration Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("920.00"),
+        satisfaction=72,
+        expansion_potential=70,
+        renewal_turn=8,
+        churn_risk=14,
+        subscription_package=SubscriptionPackage.STARTER,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account])
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_PACKAGE_MIGRATION,
+        context=ActionContext(target_product_id=product.id),
+    )
+
+    migrated = outcome.state.customer_accounts[0]
+    assert migrated.subscription_package is SubscriptionPackage.ENTERPRISE_SUITE
+    assert migrated.contract_value > account.contract_value
+
+
+def test_quarterly_board_review_sets_resolution_and_restructuring_pressure() -> None:
+    product = make_product("Board Heat", bug_level=40, technical_debt=44, user_count=120)
+    state = make_state(product, current_turn=4)
+    state.finance.board_pressure = 58
+    state.finance.governance_risk = 52
+    state.finance.board_confidence = 28
+    state.finance.active_board_ask = BoardAsk.PROFITABILITY
+    state.finance.forecast_runway_turns = 4
+    state.support_program.backlog_queue = 28
+
+    summary = apply_end_of_turn_governance(
+        state,
+        resolved_turn=4,
+        total_revenue=Decimal("1400.00"),
+        net_cash_flow=Decimal("-2100.00"),
+        customer_summary=apply_end_of_turn_customers([], [product], current_turn=4),
+        operations_summary=calculate_operations_summary(
+            state.products,
+            state.employees,
+            current_turn=4,
+            customer_accounts=state.customer_accounts,
+            support_backlog_queue=state.support_program.backlog_queue,
+        ),
+    )
+
+    assert summary.board_resolution is BoardResolution.RESTRUCTURE_NOW
+    assert state.finance.quarterly_review_count == 1
+    assert state.finance.restructuring_pressure > 0
+
+
+def test_execute_restructure_plan_cuts_headcount_and_pressure() -> None:
+    product = make_product("Reset Core")
+    employees = [
+        make_employee(
+            "Core PM",
+            EmployeeRole.PRODUCT_MANAGER,
+            seniority=Seniority.SENIOR,
+            assigned_product_id=product.id,
+            leadership_score=84,
+        ),
+        make_employee(
+            "Low Perf Eng",
+            EmployeeRole.ENGINEER,
+            assigned_product_id=None,
+            productivity=48,
+            leadership_score=40,
+        ),
+        make_employee(
+            "Low Perf Design",
+            EmployeeRole.DESIGNER,
+            assigned_product_id=None,
+            productivity=46,
+            leadership_score=42,
+        ),
+        make_employee(
+            "Growth Marketer",
+            EmployeeRole.MARKETER,
+            assigned_product_id=product.id,
+            productivity=64,
+        ),
+    ]
+    state = make_state(product, employees=employees, cash_on_hand=Decimal("5000.00"))
+    state.finance.restructuring_pressure = 14
+    state.finance.board_pressure = 40
+    state.finance.governance_risk = 30
+
+    outcome = apply_action(state, TurnAction.EXECUTE_RESTRUCTURE_PLAN)
+
+    assert len(outcome.state.employees) < len(state.employees)
+    assert outcome.state.finance.restructuring_pressure < 14
+    assert outcome.state.finance.board_pressure < 40

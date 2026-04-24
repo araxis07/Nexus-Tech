@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0 - 2026-04-24
+
+- Added add-on campaign and packaging-migration actions so healthy accounts can deepen monetization outside plain price increases
+- Added support-tier routing with `standard`, `priority`, and `white_glove` post-sale depth plus an escalation action for at-risk accounts
+- Added team-lead promotion, succession-risk tracking, and stronger management-capacity effects on coordination quality
+- Added board resolutions, quarterly review counts, restructuring pressure, and a formal restructure action tied to governance stress
+- Expanded the content catalog again with add-on, support-tier, and turnaround-focused templates, scenarios, and rival archetypes
+- Extended SQLite persistence, dashboard panels, and regression coverage for the new governance, support, and org-structure state
+- Promoted the package version to `0.21.0`
+
 ## 0.20.0 - 2026-04-24
 
 - Added direct price-increase decisions plus healthier packaging-driven account expansion drift for deeper monetization trade-offs

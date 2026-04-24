@@ -34,6 +34,8 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
     if (
         score.total_score >= BALANCE.exit_ipo_score_threshold
         and state.finance.board_confidence >= BALANCE.board_confidence_high_threshold
+        and state.finance.governance_risk <= BALANCE.exit_ipo_governance_risk_cap
+        and state.finance.restructuring_pressure <= BALANCE.exit_max_restructuring_pressure_for_win
     ):
         offer_value = quantize_money(adjusted_value * BALANCE.exit_ipo_value_multiplier)
         return ExitEvaluation(
@@ -55,6 +57,21 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             summary="A larger platform could justify acquiring the portfolio and customer base.",
             grade=grade,
             offer_value=offer_value,
+        )
+
+    if state.finance.restructuring_pressure > BALANCE.exit_max_restructuring_pressure_for_win:
+        restructure_value = quantize_money(
+            max(Decimal("0.00"), adjusted_value - BALANCE.exit_restructure_cash_threshold)
+        )
+        return ExitEvaluation(
+            outcome=ExitOutcome.RESTRUCTURE,
+            title="Board-Led Restructure",
+            summary=(
+                "The company still has assets, but governance pressure now points toward a "
+                "forced reset before durable scale can continue."
+            ),
+            grade=grade,
+            offer_value=restructure_value,
         )
 
     if state.company.cash_on_hand >= BALANCE.exit_independence_cash_threshold:

@@ -55,10 +55,12 @@ class TeamCondition:
     assigned_headcount: int
     managed_headcount: int
     manager_headcount: int
+    team_lead_count: int
     management_capacity: int
     org_drag: int
     overloaded_manager_count: int
     overloaded_report_count: int
+    high_succession_risk_count: int
     total_salary_cost: Decimal
     average_energy: int
     average_morale: int
@@ -73,6 +75,7 @@ class OrgStructureSummary:
     managed_headcount: int
     unmanaged_headcount: int
     manager_headcount: int
+    team_lead_count: int
     management_capacity: int
     org_drag: int
     overloaded_manager_count: int
@@ -203,6 +206,7 @@ def is_eligible_manager(employee: Employee) -> bool:
     return (
         employee.role is EmployeeRole.PRODUCT_MANAGER
         or employee.seniority is Seniority.SENIOR
+        or employee.is_team_lead
         or employee.leadership_score >= 68
     )
 
@@ -215,7 +219,11 @@ def calculate_manager_capacity(employee: Employee) -> int:
     base_capacity = (
         BALANCE.management_product_manager_capacity
         if employee.role is EmployeeRole.PRODUCT_MANAGER
-        else BALANCE.management_senior_capacity
+        else (
+            BALANCE.management_team_lead_capacity
+            if employee.is_team_lead
+            else BALANCE.management_senior_capacity
+        )
     )
     return base_capacity + (employee.leadership_score // BALANCE.management_leadership_divisor)
 
@@ -234,6 +242,7 @@ def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
 
     sanitize_management_links(employees)
     manager_ids = tuple(employee.id for employee in employees if is_eligible_manager(employee))
+    team_lead_count = sum(1 for employee in employees if employee.is_team_lead)
     management_capacity = sum(calculate_manager_capacity(employee) for employee in employees)
     report_counts = _build_manager_report_counts(employees)
     managed_headcount = sum(
@@ -264,6 +273,7 @@ def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
         managed_headcount=managed_headcount,
         unmanaged_headcount=unmanaged_headcount,
         manager_headcount=len(manager_ids),
+        team_lead_count=team_lead_count,
         management_capacity=management_capacity,
         org_drag=max(0, org_drag),
         overloaded_manager_count=overloaded_manager_count,
@@ -329,6 +339,16 @@ def calculate_product_team_modifier(
     )
     coordination_bonus += managed_assigned // BALANCE.management_coordination_bonus_per_managed_pair
     coordination_bonus += same_product_management // BALANCE.management_same_product_bonus_divisor
+    coordination_bonus += sum(
+        BALANCE.management_team_lead_coordination_bonus
+        for employee in assigned_employees
+        if employee.is_team_lead
+    )
+    coordination_bonus += sum(
+        BALANCE.management_team_lead_overload_relief
+        for employee in assigned_employees
+        if employee.is_team_lead and employee.manager_id is not None
+    )
     coordination_bonus -= (
         overloaded_reports // BALANCE.management_overload_coordination_penalty_divisor
     )
@@ -371,10 +391,12 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
             assigned_headcount=0,
             managed_headcount=0,
             manager_headcount=0,
+            team_lead_count=0,
             management_capacity=0,
             org_drag=0,
             overloaded_manager_count=0,
             overloaded_report_count=0,
+            high_succession_risk_count=0,
             total_salary_cost=ZERO_MONEY,
             average_energy=0,
             average_morale=0,
@@ -386,15 +408,22 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
     burned_out_count = sum(
         1 for employee in employees if employee.energy <= BALANCE.employee_burnout_energy_threshold
     )
+    high_succession_risk_count = sum(
+        1
+        for employee in employees
+        if employee.succession_risk >= BALANCE.management_succession_high_risk_threshold
+    )
     return TeamCondition(
         headcount=headcount,
         assigned_headcount=assigned_headcount,
         managed_headcount=org_structure.managed_headcount,
         manager_headcount=org_structure.manager_headcount,
+        team_lead_count=org_structure.team_lead_count,
         management_capacity=org_structure.management_capacity,
         org_drag=org_structure.org_drag,
         overloaded_manager_count=org_structure.overloaded_manager_count,
         overloaded_report_count=org_structure.overloaded_report_count,
+        high_succession_risk_count=high_succession_risk_count,
         total_salary_cost=quantize_money(total_salary_cost),
         average_energy=average_energy,
         average_morale=average_morale,
@@ -430,6 +459,23 @@ def assign_employee(employee: Employee, product_id: UUID) -> TeamActionSummary:
 
     employee.assigned_product_id = product_id
     return TeamActionSummary(message=f"Assigned {employee.full_name} to the selected product.")
+
+
+def appoint_team_lead(employees: list[Employee], employee_id: UUID) -> TeamActionSummary:
+    """Promote one employee into a lightweight team-lead role."""
+
+    employee = get_employee_by_id(employees, employee_id)
+    if employee.is_team_lead:
+        raise ValueError(f"{employee.full_name} is already a team lead.")
+    if employee.assigned_product_id is None:
+        raise ValueError("Team leads must be assigned to an active product first.")
+    if employee.leadership_score < BALANCE.management_team_lead_leadership_threshold:
+        raise ValueError(f"{employee.full_name} does not have enough leadership signal yet.")
+
+    employee.is_team_lead = True
+    employee.morale = clamp_int(employee.morale + 2)
+    employee.performance_rating = clamp_int(employee.performance_rating + 1)
+    return TeamActionSummary(message=f"Appointed {employee.full_name} as a team lead.")
 
 
 def assign_manager(
@@ -603,6 +649,7 @@ def apply_end_of_turn_team_drift(
                 employee.morale - BALANCE.employee_burnout_morale_penalty,
             )
 
+    update_succession_risk(employees)
     return calculate_team_condition(employees)
 
 
@@ -626,6 +673,40 @@ def _build_manager_report_counts(employees: list[Employee]) -> dict[UUID, int]:
             continue
         report_counts[employee.manager_id] = report_counts.get(employee.manager_id, 0) + 1
     return report_counts
+
+
+def update_succession_risk(employees: list[Employee]) -> None:
+    """Refresh succession pressure for managers and team leads."""
+
+    report_counts = _build_manager_report_counts(employees)
+    product_lead_depth: dict[UUID, int] = {}
+    for employee in employees:
+        if employee.assigned_product_id is None:
+            continue
+        if is_eligible_manager(employee):
+            product_lead_depth[employee.assigned_product_id] = (
+                product_lead_depth.get(employee.assigned_product_id, 0) + 1
+            )
+
+    for employee in employees:
+        if not is_eligible_manager(employee):
+            employee.succession_risk = 0
+            continue
+
+        direct_reports = report_counts.get(employee.id, 0)
+        capacity = max(1, calculate_manager_capacity(employee))
+        succession_risk = max(0, direct_reports - capacity)
+        if employee.energy <= BALANCE.management_succession_energy_threshold:
+            succession_risk += 3
+        if employee.morale <= BALANCE.management_succession_morale_threshold:
+            succession_risk += 2
+        if employee.attrition_risk >= BALANCE.management_succession_attrition_threshold:
+            succession_risk += 2
+        if employee.assigned_product_id is not None and (
+            product_lead_depth.get(employee.assigned_product_id, 0) >= 2
+        ):
+            succession_risk -= 2
+        employee.succession_risk = clamp_int(succession_risk)
 
 
 def _pick_best_manager(

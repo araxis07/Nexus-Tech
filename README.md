@@ -93,8 +93,10 @@ Each turn represents a business interval. You review the company, choose actions
 - Track covenant risk and missed board targets so finance pressure is visible before collapse
 - Track burn multiple, board pressure, governance risk, and board directives as the company scales
 - Track an active board ask plus a warning ladder so governance pressure escalates before the company fully breaks
+- Track quarterly board resolutions and restructuring pressure so repeated misses create visible strategic consequences
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
+- Execute a formal restructure plan when governance pressure becomes too high to ignore
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
 
 ### 🤝 Customer Accounts
@@ -106,7 +108,9 @@ Each turn represents a business interval. You review the company, choose actions
 - Support flat, seat-based, and usage-based contract models with different commercial expansion patterns
 - Track per-account plan tier, add-ons, annual prepay posture, and invoice-risk pressure
 - Track subscription package depth, renewal health, failed-payment risk, and dunning pressure on each account
+- Route accounts into `standard`, `priority`, or `white_glove` support tiers as the portfolio matures
 - Let healthy accounts expand between renewals through packaging-driven add-ons, suite upgrades, and contract growth
+- Run explicit add-on campaigns and packaging migrations to rebalance monetization, support burden, and retention posture
 - Track open tickets and SLA pressure so support quality can directly affect renewals and retention
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
@@ -133,6 +137,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Train employees, track promotion readiness, promote strong contributors, and monitor attrition risk
 - Track performance rating, underperformance streaks, and real resignation pressure when the company runs too hot
 - Assign managers, track leadership strength, and absorb org-drag pressure as headcount grows beyond clean management coverage
+- Promote product-facing team leads and track succession risk when too much execution leverage sits on one person
 - Run explicit org reorg actions to rebalance reporting lines and cut overloaded-manager drag
 
 ### 🧭 Functional Budgeting

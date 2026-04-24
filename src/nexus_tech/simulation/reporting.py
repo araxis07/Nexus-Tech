@@ -146,6 +146,7 @@ def check_victory(state: GameState) -> str | None:
         and score.active_products >= 2
         and state.finance.debt_principal <= BALANCE.victory_max_debt_threshold
         and state.finance.investor_pressure <= BALANCE.victory_max_investor_pressure
+        and state.finance.restructuring_pressure <= BALANCE.exit_max_restructuring_pressure_for_win
     ):
         return (
             "You built a durable software company with enough traction, runway, "

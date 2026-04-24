@@ -744,5 +744,43 @@
     "target_segment": "smb",
     "pricing_tier": "standard",
     "packaging_strategy": "modular"
+  },
+  {
+    "template_id": "add_on_revenue_studio",
+    "title": "Add-On Revenue Studio",
+    "description": "A packaging-heavy monetization platform that rewards healthy customers, modular expansion, and steady commercial tuning.",
+    "lifecycle_stage": "prototype",
+    "quality": 48,
+    "bug_level": 15,
+    "market_fit": 34,
+    "technical_debt": 18,
+    "user_count": 0,
+    "revenue_per_user": "62.00",
+    "feature_count": 0,
+    "maintenance_cost": "295.00",
+    "acquisition_rate": "0.0290",
+    "churn_rate": "0.0580",
+    "target_segment": "smb",
+    "pricing_tier": "premium",
+    "packaging_strategy": "modular"
+  },
+  {
+    "template_id": "white_glove_ops",
+    "title": "White Glove Ops",
+    "description": "A premium service-delivery platform built around escalations, executive support posture, and high-touch enterprise retention.",
+    "lifecycle_stage": "prototype",
+    "quality": 52,
+    "bug_level": 12,
+    "market_fit": 31,
+    "technical_debt": 15,
+    "user_count": 0,
+    "revenue_per_user": "92.00",
+    "feature_count": 0,
+    "maintenance_cost": "350.00",
+    "acquisition_rate": "0.0210",
+    "churn_rate": "0.0520",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
   }
 ]

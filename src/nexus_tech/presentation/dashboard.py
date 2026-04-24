@@ -1221,6 +1221,7 @@ def render_employee_picker(
     table.add_column("Role")
     table.add_column("Assignment")
     table.add_column("Manager")
+    table.add_column("Lead")
     table.add_column("Energy", justify="right")
     table.add_column("Morale", justify="right")
     table.add_column("Eff", justify="right")
@@ -1383,10 +1384,12 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table.add_row("Assigned", str(team_condition.assigned_headcount))
     table.add_row("Managed", str(team_condition.managed_headcount))
     table.add_row("Managers", str(team_condition.manager_headcount))
+    table.add_row("Team Leads", str(team_condition.team_lead_count))
     table.add_row("Mgmt Cap", str(team_condition.management_capacity))
     table.add_row("Org Drag", str(team_condition.org_drag))
     table.add_row("Overloaded", str(team_condition.overloaded_manager_count))
     table.add_row("Overload Rpts", str(team_condition.overloaded_report_count))
+    table.add_row("Succession", str(team_condition.high_succession_risk_count))
     table.add_row("Salary Burn", format_money(team_condition.total_salary_cost))
     table.add_row("Avg Energy", average_energy)
     table.add_row("Avg Morale", average_morale)
@@ -1530,6 +1533,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
         table.add_column("Trait")
         table.add_column("Spec")
         table.add_column("Lead", justify="right")
+        table.add_column("Succ", justify="right")
         table.add_column("Perf", justify="right")
         table.add_column("XP", justify="right")
         table.add_column("Ready", justify="right")
@@ -1546,6 +1550,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
             employee.role.value,
             assignment_name,
             employee_names.get(employee.manager_id, "-"),
+            "yes" if employee.is_team_lead else "-",
             str(employee.energy),
             str(employee.morale),
             str(calculate_effective_productivity(employee)),
@@ -1557,6 +1562,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
                     employee.trait.value,
                     employee.specialization,
                     str(employee.leadership_score),
+                    str(employee.succession_risk),
                     str(employee.performance_rating),
                     str(employee.experience_points),
                     str(employee.promotion_readiness),
@@ -1767,7 +1773,7 @@ def _build_action_menu_panel() -> Panel:
         "set_packaging_strategy",
         "Change packaging and monetization depth.",
     )
-    primary_actions.add_row("50", "run_price_increase", "Push a direct price increase.")
+    primary_actions.add_row("55", "run_price_increase", "Push a direct price increase.")
     primary_actions.add_row("8", "set_target_segment", "Retarget a product's customer segment.")
     primary_actions.add_row("9", "sunset_product", "Retire a weak product.")
     primary_actions.add_row("10", "set_company_strategy", "Shift company-wide focus.")
@@ -1789,7 +1795,7 @@ def _build_action_menu_panel() -> Panel:
     )
     primary_actions.add_row("23", "clear_manager", "Remove a reporting line.")
     primary_actions.add_row("24", "rest_team", "Recover energy and morale.")
-    primary_actions.add_row("51", "reorg_team", "Rebuild reporting lines and reduce org drag.")
+    primary_actions.add_row("31", "appoint_team_lead", "Create a squad lead for one product.")
     primary_actions.add_row("25", "review_team", "Open the detailed team view.")
     primary_actions.add_row("26", "review_customers", "Open key account renewals.")
     primary_actions.add_row("27", "invest_in_customer_success", "Improve onboarding and retention.")
@@ -1800,36 +1806,41 @@ def _build_action_menu_panel() -> Panel:
     )
     primary_actions.add_row("29", "train_employee", "Increase readiness and productivity.")
     primary_actions.add_row("30", "promote_employee", "Level up a ready team member.")
-    primary_actions.add_row("31", "set_functional_budget", "Rebalance engineering, growth, and CS.")
-    primary_actions.add_row("32", "upgrade_support_program", "Invest in reusable support leverage.")
-    primary_actions.add_row("33", "plan_release", "Queue a product release plan.")
-    primary_actions.add_row("34", "work_release", "Advance and ship planned releases.")
-    primary_actions.add_row("35", "create_sales_deal", "Source a new sales opportunity.")
-    primary_actions.add_row("36", "advance_sales_deal", "Move a deal through the pipeline.")
-    primary_actions.add_row("37", "start_roadmap_project", "Start a multi-action strategic bet.")
-    primary_actions.add_row("38", "work_roadmap_project", "Advance the active strategic project.")
-    primary_actions.add_row("39", "review_pipeline", "Open release, sales, and project views.")
-    primary_actions.add_row("40", "view_report", "Open the score, plan, and rival report.")
-    primary_actions.add_row("41", "wait", "Hold position for this action.")
-    primary_actions.add_row("42", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("43", "end_turn", "Run the simulation tick.")
-    primary_actions.add_row("44", "source_candidates", "Build a persistent hiring funnel.")
-    primary_actions.add_row("45", "screen_candidate", "Run a light screen before interviews.")
-    primary_actions.add_row("46", "interview_candidate", "Qualify one screened candidate.")
-    primary_actions.add_row("47", "make_hiring_offer", "Convert an interviewed candidate.")
-    primary_actions.add_row("48", "triage_support_backlog", "Spend cash to cut support pressure.")
-    primary_actions.add_row("49", "review_board", "Open the board and governance view.")
-    primary_actions.add_row("52", "execute_board_response", "Answer the active board ask directly.")
+    primary_actions.add_row("32", "route_support_escalation", "Escalate one fragile account.")
+    primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
+    primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
+    primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
+    primary_actions.add_row("36", "set_functional_budget", "Rebalance engineering, growth, and CS.")
+    primary_actions.add_row("37", "upgrade_support_program", "Invest in reusable support leverage.")
+    primary_actions.add_row("38", "plan_release", "Queue a product release plan.")
+    primary_actions.add_row("39", "work_release", "Advance and ship planned releases.")
+    primary_actions.add_row("40", "create_sales_deal", "Source a new sales opportunity.")
+    primary_actions.add_row("41", "advance_sales_deal", "Move a deal through the pipeline.")
+    primary_actions.add_row("42", "start_roadmap_project", "Start a multi-action strategic bet.")
+    primary_actions.add_row("43", "work_roadmap_project", "Advance the active strategic project.")
+    primary_actions.add_row("44", "review_pipeline", "Open release, sales, and project views.")
+    primary_actions.add_row("45", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("46", "wait", "Hold position for this action.")
+    primary_actions.add_row("47", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("48", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("49", "source_candidates", "Build a persistent hiring funnel.")
+    primary_actions.add_row("50", "screen_candidate", "Run a light screen before interviews.")
+    primary_actions.add_row("51", "interview_candidate", "Qualify one screened candidate.")
+    primary_actions.add_row("52", "make_hiring_offer", "Convert an interviewed candidate.")
+    primary_actions.add_row("53", "triage_support_backlog", "Spend cash to cut support pressure.")
+    primary_actions.add_row("54", "review_board", "Open the board and governance view.")
+    primary_actions.add_row("56", "reorg_team", "Rebuild reporting lines and reduce org drag.")
+    primary_actions.add_row("57", "execute_board_response", "Answer the active board ask directly.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("53", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("54", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("55", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("56", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("57", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("58", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("59", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("60", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("61", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("62", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -1893,7 +1904,7 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
         )
 
     if state.company.current_turn == 1:
-        suggestions.append("Use [bold]55[/bold] any time if you want the compact guide again.")
+        suggestions.append("Use [bold]60[/bold] any time if you want the compact guide again.")
     if state.company.current_turn >= 2:
         suggestions.append(
             "Check [bold]40[/bold] after a turn resolves to read the run report and rival pressure."
@@ -2216,6 +2227,7 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
         table.add_column("Renewal", justify="right")
         table.add_column("Expansion", justify="right")
         table.add_column("Plan")
+        table.add_column("Tier")
         table.add_column("Cadence")
         table.add_column("Model")
         table.add_column("Seats", justify="right")
@@ -2249,6 +2261,7 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
                     str(account.renewal_turn),
                     str(account.expansion_potential),
                     account.plan_tier.value,
+                    account.support_tier.value,
                     account.contract_cadence.value,
                     account.billing_model.value,
                     str(account.seat_count),
@@ -2384,9 +2397,12 @@ def _build_governance_panel(state: GameState) -> Panel:
     table.add_row("Board Pressure", str(state.finance.board_pressure))
     table.add_row("Governance Risk", str(state.finance.governance_risk))
     table.add_row("Directive", directive)
+    table.add_row("Resolution", state.finance.board_resolution.value.replace("_", " "))
     table.add_row("Board Ask", state.finance.active_board_ask.value.replace("_", " "))
     table.add_row("Warning", "active" if state.finance.board_warning_active else "clear")
     table.add_row("Warn Level", str(state.finance.board_warning_level))
+    table.add_row("Quarterly Reviews", str(state.finance.quarterly_review_count))
+    table.add_row("Restructure", str(state.finance.restructuring_pressure))
     table.add_row(
         "Last Review",
         str(state.finance.last_board_review_turn)

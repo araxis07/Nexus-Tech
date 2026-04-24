@@ -60,6 +60,20 @@ class PriceIncreaseSummary:
     message: str
 
 
+@dataclass(frozen=True)
+class AddOnCampaignSummary:
+    """Summary of an explicit add-on monetization push."""
+
+    message: str
+
+
+@dataclass(frozen=True)
+class PackagingMigrationSummary:
+    """Summary of an account migration between packages."""
+
+    message: str
+
+
 _PRICING_PROFILES = {
     PricingTier.BUDGET: PricingProfile(
         revenue_multiplier=BALANCE.pricing_budget_revenue_multiplier,
@@ -293,3 +307,104 @@ def apply_run_price_increase(
             f"-{market_fit_penalty} and {adjusted_accounts} account(s) repriced."
         )
     )
+
+
+def apply_run_add_on_campaign(
+    product: Product,
+    customer_accounts: list[CustomerAccount],
+) -> AddOnCampaignSummary:
+    """Push add-on monetization across one product's active account base."""
+
+    if product.packaging_strategy is PackagingStrategy.STREAMLINED:
+        raise ValueError("Streamlined products do not have enough add-on surface for a campaign.")
+
+    converted_accounts = 0
+    for account in customer_accounts:
+        if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
+            continue
+        if account.satisfaction < 60:
+            continue
+        account.add_on_count += BALANCE.add_on_campaign_add_on_gain
+        account.contract_value = quantize_money(
+            account.contract_value + BALANCE.add_on_campaign_contract_gain
+        )
+        account.support_load = clamp_int(
+            account.support_load + BALANCE.add_on_campaign_support_load_gain
+        )
+        account.open_tickets += BALANCE.add_on_campaign_ticket_gain
+        account.expansion_potential = clamp_int(account.expansion_potential - 3)
+        converted_accounts += 1
+
+    if converted_accounts == 0:
+        raise ValueError("No active accounts are healthy enough for an add-on campaign.")
+
+    product.technical_debt = clamp_int(product.technical_debt + BALANCE.add_on_campaign_debt_gain)
+    product.market_fit = clamp_int(product.market_fit + 1)
+    return AddOnCampaignSummary(
+        message=(
+            f"Ran an add-on campaign for {product.name}. "
+            f"{converted_accounts} account(s) expanded and debt +"
+            f"{BALANCE.add_on_campaign_debt_gain}."
+        )
+    )
+
+
+def apply_run_package_migration(
+    product: Product,
+    customer_accounts: list[CustomerAccount],
+) -> PackagingMigrationSummary:
+    """Migrate linked accounts toward the product's current package posture."""
+
+    migrated_accounts = 0
+    upgraded_accounts = 0
+    downgraded_accounts = 0
+    target_package = get_default_subscription_package(product)
+    for account in customer_accounts:
+        if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
+            continue
+        if account.subscription_package is target_package:
+            continue
+        migrated_accounts += 1
+        if _package_rank(target_package) > _package_rank(account.subscription_package):
+            upgraded_accounts += 1
+            account.contract_value = quantize_money(
+                account.contract_value + BALANCE.packaging_migration_upgrade_contract_gain
+            )
+            account.add_on_count += BALANCE.packaging_migration_add_on_gain
+            account.satisfaction = clamp_int(account.satisfaction - 1)
+            account.support_load = clamp_int(account.support_load + 1)
+        else:
+            downgraded_accounts += 1
+            account.contract_value = quantize_money(
+                max(
+                    Decimal("0.00"),
+                    account.contract_value - BALANCE.packaging_migration_downgrade_contract_loss,
+                )
+            )
+            account.open_tickets = max(
+                0,
+                account.open_tickets - BALANCE.packaging_migration_ticket_relief,
+            )
+            account.churn_risk = clamp_int(
+                account.churn_risk - BALANCE.packaging_migration_churn_relief
+            )
+            account.support_load = clamp_int(account.support_load - 2)
+        account.subscription_package = target_package
+
+    if migrated_accounts == 0:
+        raise ValueError("Linked accounts are already aligned with this package posture.")
+
+    return PackagingMigrationSummary(
+        message=(
+            f"Migrated {migrated_accounts} account(s) for {product.name}: "
+            f"{upgraded_accounts} upgraded, {downgraded_accounts} simplified."
+        )
+    )
+
+
+def _package_rank(package: SubscriptionPackage) -> int:
+    if package is SubscriptionPackage.STARTER:
+        return 0
+    if package is SubscriptionPackage.GROWTH:
+        return 1
+    return 2

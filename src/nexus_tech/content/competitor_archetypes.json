@@ -302,5 +302,31 @@
     "current_move": "discount_push",
     "momentum": 67,
     "funding_level": 2
+  },
+  {
+    "archetype_id": "white_glove_operator",
+    "title": "White Glove Operator",
+    "description": "A premium rival that compounds through executive support posture, escalation discipline, and enterprise trust.",
+    "focus_segment": "enterprise",
+    "strength": 80,
+    "aggression": 52,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "hold",
+    "momentum": 65,
+    "funding_level": 3
+  },
+  {
+    "archetype_id": "expansion_playbook_house",
+    "title": "Expansion Playbook House",
+    "description": "A monetization-savvy rival that wins through add-ons, package migrations, and disciplined account expansion plays.",
+    "focus_segment": "smb",
+    "strength": 74,
+    "aggression": 63,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 69,
+    "funding_level": 2
   }
 ]

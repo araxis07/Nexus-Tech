@@ -216,35 +216,40 @@ ACTION_KEYS = {
     "28": TurnAction.RUN_RETENTION_PLAY,
     "29": TurnAction.TRAIN_EMPLOYEE,
     "30": TurnAction.PROMOTE_EMPLOYEE,
-    "31": TurnAction.SET_FUNCTIONAL_BUDGET,
-    "32": TurnAction.UPGRADE_SUPPORT_PROGRAM,
-    "33": TurnAction.PLAN_RELEASE,
-    "34": TurnAction.WORK_RELEASE,
-    "35": TurnAction.CREATE_SALES_DEAL,
-    "36": TurnAction.ADVANCE_SALES_DEAL,
-    "37": TurnAction.START_ROADMAP_PROJECT,
-    "38": TurnAction.WORK_ROADMAP_PROJECT,
-    "39": TurnAction.REVIEW_PIPELINE,
-    "40": TurnAction.VIEW_REPORT,
-    "41": TurnAction.WAIT,
-    "42": TurnAction.VIEW_STATUS,
-    "43": TurnAction.END_TURN,
-    "44": TurnAction.SOURCE_CANDIDATES,
-    "45": TurnAction.SCREEN_CANDIDATE,
-    "46": TurnAction.INTERVIEW_CANDIDATE,
-    "47": TurnAction.MAKE_HIRING_OFFER,
-    "48": TurnAction.TRIAGE_SUPPORT_BACKLOG,
-    "49": TurnAction.REVIEW_BOARD,
-    "50": TurnAction.RUN_PRICE_INCREASE,
-    "51": TurnAction.REORG_TEAM,
-    "52": TurnAction.EXECUTE_BOARD_RESPONSE,
+    "31": TurnAction.APPOINT_TEAM_LEAD,
+    "32": TurnAction.ROUTE_SUPPORT_ESCALATION,
+    "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
+    "34": TurnAction.RUN_PACKAGE_MIGRATION,
+    "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
+    "36": TurnAction.SET_FUNCTIONAL_BUDGET,
+    "37": TurnAction.UPGRADE_SUPPORT_PROGRAM,
+    "38": TurnAction.PLAN_RELEASE,
+    "39": TurnAction.WORK_RELEASE,
+    "40": TurnAction.CREATE_SALES_DEAL,
+    "41": TurnAction.ADVANCE_SALES_DEAL,
+    "42": TurnAction.START_ROADMAP_PROJECT,
+    "43": TurnAction.WORK_ROADMAP_PROJECT,
+    "44": TurnAction.REVIEW_PIPELINE,
+    "45": TurnAction.VIEW_REPORT,
+    "46": TurnAction.WAIT,
+    "47": TurnAction.VIEW_STATUS,
+    "48": TurnAction.END_TURN,
+    "49": TurnAction.SOURCE_CANDIDATES,
+    "50": TurnAction.SCREEN_CANDIDATE,
+    "51": TurnAction.INTERVIEW_CANDIDATE,
+    "52": TurnAction.MAKE_HIRING_OFFER,
+    "53": TurnAction.TRIAGE_SUPPORT_BACKLOG,
+    "54": TurnAction.REVIEW_BOARD,
+    "55": TurnAction.RUN_PRICE_INCREASE,
+    "56": TurnAction.REORG_TEAM,
+    "57": TurnAction.EXECUTE_BOARD_RESPONSE,
 }
 UTILITY_ACTION_KEYS = {
-    "53": "save_game",
-    "54": "load_game",
-    "55": "show_guide",
-    "56": "show_glossary",
-    "57": "show_tutorial",
+    "58": "save_game",
+    "59": "load_game",
+    "60": "show_guide",
+    "61": "show_glossary",
+    "62": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -255,6 +260,8 @@ PRODUCT_TARGETED_ACTIONS = {
     TurnAction.MARKET_PRODUCT,
     TurnAction.ADJUST_PRICING,
     TurnAction.RUN_PRICE_INCREASE,
+    TurnAction.RUN_ADD_ON_CAMPAIGN,
+    TurnAction.RUN_PACKAGE_MIGRATION,
     TurnAction.SET_PACKAGING_STRATEGY,
     TurnAction.SET_TARGET_SEGMENT,
     TurnAction.SUNSET_PRODUCT,
@@ -942,7 +949,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="42",
+                    default="47",
                     show_choices=False,
                 )
 
@@ -1039,6 +1046,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.WAIT,
         TurnAction.REORG_TEAM,
         TurnAction.EXECUTE_BOARD_RESPONSE,
+        TurnAction.EXECUTE_RESTRUCTURE_PLAN,
     ):
         return ActionContext()
 
@@ -1261,6 +1269,12 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             return None
         return ActionContext(employee_id=managed_employee_id)
 
+    if action is TurnAction.APPOINT_TEAM_LEAD:
+        employee_id = choose_employee_id(state, action, assigned_only=True)
+        if employee_id is None:
+            return None
+        return ActionContext(employee_id=employee_id)
+
     if action is TurnAction.INVEST_IN_CUSTOMER_SUCCESS:
         product_id = choose_product_id(state, action)
         if product_id is None:
@@ -1273,6 +1287,12 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             customer_account_id = choose_customer_account_id(state, at_risk_only=False)
             if customer_account_id is None:
                 return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.ROUTE_SUPPORT_ESCALATION:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.PLAN_RELEASE:

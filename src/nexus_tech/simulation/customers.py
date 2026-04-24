@@ -15,6 +15,7 @@ from nexus_tech.domain.models import (
     Product,
     SubscriptionPackage,
     SupportProgram,
+    SupportTier,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -354,6 +355,16 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
             product.target_segment.value
         ]
         + get_packaging_add_on_bonus(product),
+        support_tier=(
+            SupportTier.WHITE_GLOVE
+            if product.packaging_strategy.value == "suite"
+            and product.target_segment is MarketSegment.ENTERPRISE
+            else (
+                SupportTier.PRIORITY
+                if product.target_segment is MarketSegment.ENTERPRISE
+                else SupportTier.STANDARD
+            )
+        ),
         annual_prepay=product.target_segment is MarketSegment.ENTERPRISE,
         discount_rate=Decimal("0.0000"),
         satisfaction=satisfaction,
@@ -422,6 +433,7 @@ def _apply_packaging_expansion_drift(
             and account.subscription_package.value != "enterprise_suite"
         ):
             account.subscription_package = SubscriptionPackage.ENTERPRISE_SUITE
+            account.support_tier = SupportTier.WHITE_GLOVE
         account.add_on_count += BALANCE.packaging_expansion_add_on_gain
     elif product.packaging_strategy.value == "modular":
         account.add_on_count += BALANCE.packaging_expansion_add_on_gain
@@ -429,6 +441,8 @@ def _apply_packaging_expansion_drift(
         account.contract_value = quantize_money(
             account.contract_value + BALANCE.packaging_expansion_contract_gain
         )
+        if account.support_tier is SupportTier.WHITE_GLOVE:
+            account.support_tier = SupportTier.PRIORITY
 
     account.expansion_potential = clamp_int(account.expansion_potential - 4)
     revenue_after = calculate_account_recurring_revenue(account)

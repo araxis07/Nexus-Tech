@@ -8,6 +8,7 @@ from decimal import Decimal
 from nexus_tech.domain.models import (
     BoardAsk,
     BoardDirective,
+    BoardResolution,
     FinanceState,
     FundingHistoryEntry,
     FundingType,
@@ -40,12 +41,15 @@ class FinanceRepository:
                 board_pressure,
                 board_directive,
                 active_board_ask,
+                board_resolution,
                 board_warning_active,
                 board_warning_level,
+                quarterly_review_count,
+                restructuring_pressure,
                 last_board_review_turn,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -64,8 +68,11 @@ class FinanceRepository:
                 finance.board_pressure,
                 finance.board_directive.value,
                 finance.active_board_ask.value,
+                finance.board_resolution.value,
                 int(finance.board_warning_active),
                 finance.board_warning_level,
+                finance.quarterly_review_count,
+                finance.restructuring_pressure,
                 finance.last_board_review_turn,
                 finance.last_funding_turn,
             ),
@@ -92,8 +99,11 @@ class FinanceRepository:
                 board_pressure,
                 board_directive,
                 active_board_ask,
+                board_resolution,
                 board_warning_active,
                 board_warning_level,
+                quarterly_review_count,
+                restructuring_pressure,
                 last_board_review_turn,
                 last_funding_turn
             FROM finance_state
@@ -122,8 +132,11 @@ class FinanceRepository:
             board_pressure=row["board_pressure"] or 0,
             board_directive=BoardDirective(row["board_directive"] or "accelerate_growth"),
             active_board_ask=BoardAsk(row["active_board_ask"] or "profitability"),
+            board_resolution=BoardResolution(row["board_resolution"] or "hold_course"),
             board_warning_active=bool(row["board_warning_active"]),
             board_warning_level=row["board_warning_level"] or 0,
+            quarterly_review_count=row["quarterly_review_count"] or 0,
+            restructuring_pressure=row["restructuring_pressure"] or 0,
             last_board_review_turn=row["last_board_review_turn"],
             last_funding_turn=row["last_funding_turn"],
         )

@@ -43,10 +43,12 @@ class EmployeeRepository:
                 tenure_turns,
                 underperformance_streak,
                 leadership_score,
+                is_team_lead,
+                succession_risk,
                 assigned_product_id,
                 manager_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -69,6 +71,8 @@ class EmployeeRepository:
                     employee.tenure_turns,
                     employee.underperformance_streak,
                     employee.leadership_score,
+                    int(employee.is_team_lead),
+                    employee.succession_risk,
                     str(employee.assigned_product_id)
                     if employee.assigned_product_id is not None
                     else None,
@@ -101,6 +105,8 @@ class EmployeeRepository:
                 tenure_turns,
                 underperformance_streak,
                 leadership_score,
+                is_team_lead,
+                succession_risk,
                 assigned_product_id,
                 manager_id
             FROM employees
@@ -129,6 +135,8 @@ class EmployeeRepository:
                 tenure_turns=row["tenure_turns"] or 0,
                 underperformance_streak=row["underperformance_streak"] or 0,
                 leadership_score=row["leadership_score"] or 55,
+                is_team_lead=bool(row["is_team_lead"]),
+                succession_risk=row["succession_risk"] or 0,
                 assigned_product_id=UUID(row["assigned_product_id"])
                 if row["assigned_product_id"] is not None
                 else None,

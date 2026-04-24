@@ -152,6 +152,14 @@ class SubscriptionPackage(StrEnum):
     ENTERPRISE_SUITE = "enterprise_suite"
 
 
+class SupportTier(StrEnum):
+    """Support tier assigned to one customer account."""
+
+    STANDARD = "standard"
+    PRIORITY = "priority"
+    WHITE_GLOVE = "white_glove"
+
+
 class FunctionalBudgetPreset(StrEnum):
     """Named operating-allocation presets for cross-functional spend."""
 
@@ -324,6 +332,15 @@ class BoardAsk(StrEnum):
     PORTFOLIO_FOCUS = "portfolio_focus"
 
 
+class BoardResolution(StrEnum):
+    """Quarterly board review result used to shape governance pressure."""
+
+    HOLD_COURSE = "hold_course"
+    TARGETED_RESET = "targeted_reset"
+    RESTRUCTURE_NOW = "restructure_now"
+    BACK_GROWTH = "back_growth"
+
+
 class SupportInvestmentFocus(StrEnum):
     """Explicit support-system investment focus."""
 
@@ -342,6 +359,8 @@ class TurnAction(StrEnum):
     MARKET_PRODUCT = "market_product"
     ADJUST_PRICING = "adjust_pricing"
     RUN_PRICE_INCREASE = "run_price_increase"
+    RUN_ADD_ON_CAMPAIGN = "run_add_on_campaign"
+    RUN_PACKAGE_MIGRATION = "run_package_migration"
     SET_PACKAGING_STRATEGY = "set_packaging_strategy"
     SET_TARGET_SEGMENT = "set_target_segment"
     SUNSET_PRODUCT = "sunset_product"
@@ -362,8 +381,10 @@ class TurnAction(StrEnum):
     REVIEW_CUSTOMERS = "review_customers"
     INVEST_IN_CUSTOMER_SUCCESS = "invest_in_customer_success"
     RUN_RETENTION_PLAY = "run_retention_play"
+    ROUTE_SUPPORT_ESCALATION = "route_support_escalation"
     TRAIN_EMPLOYEE = "train_employee"
     PROMOTE_EMPLOYEE = "promote_employee"
+    APPOINT_TEAM_LEAD = "appoint_team_lead"
     SOURCE_CANDIDATES = "source_candidates"
     SCREEN_CANDIDATE = "screen_candidate"
     INTERVIEW_CANDIDATE = "interview_candidate"
@@ -383,6 +404,7 @@ class TurnAction(StrEnum):
     REVIEW_PIPELINE = "review_pipeline"
     REVIEW_BOARD = "review_board"
     EXECUTE_BOARD_RESPONSE = "execute_board_response"
+    EXECUTE_RESTRUCTURE_PLAN = "execute_restructure_plan"
     VIEW_REPORT = "view_report"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
@@ -464,6 +486,8 @@ class Employee(BaseModel):
     tenure_turns: int = Field(default=0, ge=0)
     underperformance_streak: int = Field(default=0, ge=0)
     leadership_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    is_team_lead: bool = False
+    succession_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     assigned_product_id: Optional[UUID] = None  # noqa: UP045
     manager_id: Optional[UUID] = None  # noqa: UP045
 
@@ -519,8 +543,11 @@ class FinanceState(BaseModel):
     board_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_directive: BoardDirective = BoardDirective.ACCELERATE_GROWTH
     active_board_ask: BoardAsk = BoardAsk.PROFITABILITY
+    board_resolution: BoardResolution = BoardResolution.HOLD_COURSE
     board_warning_active: bool = False
     board_warning_level: int = Field(default=0, ge=0, le=3)
+    quarterly_review_count: int = Field(default=0, ge=0)
+    restructuring_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     last_board_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
@@ -611,6 +638,7 @@ class CustomerAccount(BaseModel):
     contract_value: Decimal = Field(ge=Decimal("0"))
     plan_tier: PricingTier = PricingTier.STANDARD
     subscription_package: SubscriptionPackage = SubscriptionPackage.GROWTH
+    support_tier: SupportTier = SupportTier.STANDARD
     contract_cadence: ContractCadence = ContractCadence.ANNUAL
     billing_model: ContractBillingModel = ContractBillingModel.FLAT
     seat_count: int = Field(default=0, ge=0)

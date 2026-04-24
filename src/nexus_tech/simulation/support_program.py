@@ -11,6 +11,7 @@ from nexus_tech.domain.models import (
     GameState,
     SupportInvestmentFocus,
     SupportProgram,
+    SupportTier,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -76,6 +77,10 @@ def apply_end_of_turn_support_program(
         max(0, BALANCE.support_program_segment_ticket_weight[account.segment.value] - 1)
         for account in active_accounts
         if account.open_tickets > 0
+    )
+    weighted_ticket_pressure += sum(
+        BALANCE.support_tier_capacity_cost[account.support_tier.value]
+        for account in active_accounts
     )
     sla_breaches = sum(
         1
@@ -295,6 +300,51 @@ def upgrade_support_program(
     )
 
 
+def route_support_escalation(
+    state: GameState,
+    account_id,
+) -> SupportOpsActionSummary:
+    """Route one account into a higher-touch support response."""
+
+    account = _get_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if account.open_tickets <= 0 and account.sla_breach_risk <= 0 and account.escalation_count <= 0:
+        raise ValueError("That account does not need escalation routing right now.")
+    if state.company.cash_on_hand < BALANCE.support_program_route_escalation_cost:
+        raise ValueError("Not enough cash to route this escalation.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_route_escalation_cost
+    )
+    if account.support_tier is SupportTier.STANDARD:
+        account.support_tier = SupportTier.PRIORITY
+    elif account.support_tier is SupportTier.PRIORITY and account.segment.value == "enterprise":
+        account.support_tier = SupportTier.WHITE_GLOVE
+    account.open_tickets = max(
+        0, account.open_tickets - BALANCE.support_program_route_ticket_relief
+    )
+    account.sla_breach_risk = clamp_int(
+        account.sla_breach_risk - BALANCE.support_program_route_sla_relief
+    )
+    account.failed_payment_risk = clamp_int(
+        account.failed_payment_risk - (BALANCE.support_program_route_sla_relief // 2)
+    )
+    account.support_load = clamp_int(account.support_load - 2)
+    account.churn_risk = clamp_int(account.churn_risk - BALANCE.support_program_route_churn_relief)
+    account.renewal_health = clamp_int(account.renewal_health + 4)
+    account.escalation_count = max(0, account.escalation_count - 1)
+    state.support_program.escalation_queue = max(0, state.support_program.escalation_queue - 1)
+
+    return SupportOpsActionSummary(
+        message=(
+            f"Routed escalation for {account.name}. "
+            f"Tier {account.support_tier.value}, cash -"
+            f"{BALANCE.support_program_route_escalation_cost}."
+        )
+    )
+
+
 def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     """Return the number of accounts with severe support pressure."""
 
@@ -311,19 +361,30 @@ def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
 
 def calculate_support_staff_capacity(state: GameState) -> int:
     support_roles = sum(
-        1
-        for employee in state.employees
-        if employee.role in {EmployeeRole.PRODUCT_MANAGER, EmployeeRole.DESIGNER}
+        BALANCE.support_program_role_capacity[employee.role.value] for employee in state.employees
     )
     engineer_relief = (
-        sum(1 for employee in state.employees if employee.role is EmployeeRole.ENGINEER)
+        sum(
+            1
+            for employee in state.employees
+            if employee.role is EmployeeRole.ENGINEER and employee.assigned_product_id is None
+        )
         // BALANCE.support_program_staff_capacity_engineer_relief_divisor
     )
+    team_lead_bonus = sum(1 for employee in state.employees if employee.is_team_lead)
     budget_capacity = state.functional_budget.customer_success_share // (
         BALANCE.support_program_budget_capacity_divisor
     )
     return (
         (support_roles * BALANCE.support_program_staff_capacity_unit)
         + engineer_relief
+        + team_lead_bonus
         + budget_capacity
     )
+
+
+def _get_account_by_id(accounts: list[CustomerAccount], account_id) -> CustomerAccount:
+    for account in accounts:
+        if account.id == account_id:
+            return account
+    raise ValueError("Selected customer account was not found.")

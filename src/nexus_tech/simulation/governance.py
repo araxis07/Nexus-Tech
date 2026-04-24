@@ -6,13 +6,23 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import BoardAsk, BoardDirective, GameState, LifecycleStage
+from nexus_tech.domain.models import (
+    BoardAsk,
+    BoardDirective,
+    BoardResolution,
+    GameState,
+    LifecycleStage,
+)
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.customers import CustomerTurnSummary
 from nexus_tech.simulation.operations import OperationsSummary
 from nexus_tech.simulation.support import clamp_int, clamp_rate
-from nexus_tech.simulation.team import unassign_employees_from_product
+from nexus_tech.simulation.team import (
+    clear_manager_links,
+    sanitize_management_links,
+    unassign_employees_from_product,
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +39,9 @@ class GovernanceSummary:
     active_board_ask: BoardAsk
     board_ask_met: bool
     board_review_grade: str
+    board_resolution: BoardResolution
+    quarterly_review_count: int
+    restructuring_pressure: int
     summary: str
 
 
@@ -77,6 +90,7 @@ def apply_end_of_turn_governance(
     board_ask_met = _board_ask_met(state, finance.active_board_ask, burn_multiple)
     if board_review_happened:
         finance.last_board_review_turn = resolved_turn
+        finance.quarterly_review_count += 1
         if board_ask_met:
             finance.missed_board_targets = max(
                 0,
@@ -98,6 +112,21 @@ def apply_end_of_turn_governance(
             )
             board_pressure_delta -= BALANCE.board_pressure_relief
             governance_risk_delta -= BALANCE.governance_risk_relief
+        finance.board_resolution = _select_board_resolution(state, burn_multiple, board_ask_met)
+        if finance.board_resolution is BoardResolution.RESTRUCTURE_NOW:
+            finance.restructuring_pressure = clamp_int(
+                finance.restructuring_pressure + BALANCE.board_resolution_restructure_pressure_gain
+            )
+        elif finance.board_resolution is BoardResolution.TARGETED_RESET:
+            finance.restructuring_pressure = clamp_int(
+                finance.restructuring_pressure + BALANCE.board_resolution_reset_pressure_gain
+            )
+        elif finance.board_resolution is BoardResolution.BACK_GROWTH:
+            finance.restructuring_pressure = clamp_int(
+                finance.restructuring_pressure - BALANCE.board_resolution_growth_pressure_relief
+            )
+        else:
+            finance.restructuring_pressure = clamp_int(finance.restructuring_pressure - 1)
 
     finance.board_pressure = clamp_int(finance.board_pressure + board_pressure_delta)
     finance.governance_risk = clamp_int(finance.governance_risk + governance_risk_delta)
@@ -105,6 +134,8 @@ def apply_end_of_turn_governance(
     finance.active_board_ask = _select_board_ask(state, burn_multiple, customer_summary)
     finance.board_warning_level = _calculate_board_warning_level(finance)
     finance.board_warning_active = finance.board_warning_level > 0
+    if finance.board_warning_level >= 2 or finance.missed_board_targets >= 2:
+        finance.restructuring_pressure = clamp_int(finance.restructuring_pressure + 1)
 
     if finance.board_warning_active and finance.board_directive is BoardDirective.STABILIZE_CASH:
         finance.investor_pressure = clamp_int(finance.investor_pressure + 1)
@@ -120,6 +151,9 @@ def apply_end_of_turn_governance(
         active_board_ask=finance.active_board_ask,
         board_ask_met=board_ask_met,
         board_review_grade=_calculate_board_review_grade(finance, burn_multiple, board_ask_met),
+        board_resolution=finance.board_resolution,
+        quarterly_review_count=finance.quarterly_review_count,
+        restructuring_pressure=finance.restructuring_pressure,
         summary=_build_governance_summary(
             board_review_happened=board_review_happened,
             warning_active=finance.board_warning_active,
@@ -127,6 +161,7 @@ def apply_end_of_turn_governance(
             directive=finance.board_directive,
             active_board_ask=finance.active_board_ask,
             board_ask_met=board_ask_met,
+            board_resolution=finance.board_resolution,
         ),
     )
 
@@ -258,6 +293,70 @@ def execute_board_response(state: GameState) -> BoardResponseSummary:
     )
 
 
+def execute_restructure_plan(state: GameState) -> BoardResponseSummary:
+    """Run a board-backed restructuring response that shrinks payroll and pressure."""
+
+    finance = state.finance
+    if finance.restructuring_pressure < BALANCE.board_restructure_min_pressure:
+        raise ValueError("Restructuring pressure is not high enough to justify a formal plan.")
+    if not state.employees:
+        raise ValueError("There is no team to restructure.")
+
+    restructure_candidates = sorted(
+        state.employees,
+        key=lambda employee: (
+            employee.assigned_product_id is not None,
+            employee.is_team_lead,
+            employee.manager_id is not None,
+            employee.performance_rating,
+            -employee.attrition_risk,
+            employee.morale,
+        ),
+    )
+    target_count = 2 if len(state.employees) >= 6 else 1
+    removed = restructure_candidates[:target_count]
+    severance_cost = quantize_money(
+        BALANCE.board_restructure_severance_per_employee * Decimal(len(removed))
+    )
+    if state.company.cash_on_hand < severance_cost:
+        raise ValueError("Not enough cash to cover restructuring severance.")
+
+    remaining = [
+        employee for employee in state.employees if employee.id not in {r.id for r in removed}
+    ]
+    for removed_employee in removed:
+        clear_manager_links(remaining, removed_employee.id)
+    sanitize_management_links(remaining)
+    state.employees = remaining
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - severance_cost)
+    state.company.reputation = clamp_int(
+        state.company.reputation - BALANCE.board_restructure_reputation_loss
+    )
+    finance.restructuring_pressure = clamp_int(
+        finance.restructuring_pressure - BALANCE.board_restructure_pressure_relief
+    )
+    finance.board_pressure = clamp_int(
+        finance.board_pressure - BALANCE.board_restructure_board_pressure_relief
+    )
+    finance.governance_risk = clamp_int(
+        finance.governance_risk - BALANCE.board_restructure_governance_relief
+    )
+    finance.board_resolution = BoardResolution.TARGETED_RESET
+    finance.board_warning_level = _calculate_board_warning_level(finance)
+    finance.board_warning_active = finance.board_warning_level > 0
+
+    for employee in state.employees:
+        employee.morale = clamp_int(employee.morale - BALANCE.board_restructure_morale_loss)
+
+    removed_names = ", ".join(employee.full_name for employee in removed)
+    return BoardResponseSummary(
+        message=(
+            f"Executed a restructure plan. Removed {len(removed)} role(s): {removed_names}. "
+            f"Severance -{severance_cost}."
+        )
+    )
+
+
 def _board_review_failed(state: GameState, burn_multiple: Decimal) -> bool:
     finance = state.finance
     support_program = state.support_program
@@ -377,6 +476,31 @@ def _calculate_board_review_grade(
     return "C"
 
 
+def _select_board_resolution(
+    state: GameState,
+    burn_multiple: Decimal,
+    board_ask_met: bool,
+) -> BoardResolution:
+    finance = state.finance
+    if (
+        finance.board_warning_level >= 2
+        or finance.missed_board_targets >= 2
+        or finance.forecast_runway_turns is not None
+        and finance.forecast_runway_turns < BALANCE.finance_board_runway_target
+        or burn_multiple >= BALANCE.finance_burn_multiple_severe
+    ):
+        return BoardResolution.RESTRUCTURE_NOW
+    if not board_ask_met or finance.board_pressure >= BALANCE.board_pressure_warning_threshold:
+        return BoardResolution.TARGETED_RESET
+    if (
+        board_ask_met
+        and finance.board_confidence >= BALANCE.board_confidence_high_threshold
+        and burn_multiple < BALANCE.finance_burn_multiple_warning
+    ):
+        return BoardResolution.BACK_GROWTH
+    return BoardResolution.HOLD_COURSE
+
+
 def _build_governance_summary(
     *,
     board_review_happened: bool,
@@ -385,20 +509,24 @@ def _build_governance_summary(
     directive: BoardDirective,
     active_board_ask: BoardAsk,
     board_ask_met: bool,
+    board_resolution: BoardResolution,
 ) -> str:
     if warning_active:
         return (
             f"Board warning L{warning_level} active. "
             f"Ask: {active_board_ask.value.replace('_', ' ')}, "
-            f"directive: {directive.value.replace('_', ' ')}."
+            f"directive: {directive.value.replace('_', ' ')}, "
+            f"resolution: {board_resolution.value.replace('_', ' ')}."
         )
     if board_review_happened:
         ask_result = "met" if board_ask_met else "missed"
         return (
             f"Board review completed. Prior ask {ask_result}; "
-            f"new ask: {active_board_ask.value.replace('_', ' ')}."
+            f"new ask: {active_board_ask.value.replace('_', ' ')}; "
+            f"resolution: {board_resolution.value.replace('_', ' ')}."
         )
     return (
         f"Board ask remains {active_board_ask.value.replace('_', ' ')}. "
-        f"Directive: {directive.value.replace('_', ' ')}."
+        f"Directive: {directive.value.replace('_', ' ')}. "
+        f"Resolution: {board_resolution.value.replace('_', ' ')}."
     )

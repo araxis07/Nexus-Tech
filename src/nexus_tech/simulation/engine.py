@@ -83,6 +83,7 @@ from nexus_tech.simulation.governance import (
     GovernanceSummary,
     apply_end_of_turn_governance,
     execute_board_response,
+    execute_restructure_plan,
 )
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.hiring_pipeline import (
@@ -103,6 +104,8 @@ from nexus_tech.simulation.planning import (
 )
 from nexus_tech.simulation.pricing import (
     apply_adjust_pricing,
+    apply_run_add_on_campaign,
+    apply_run_package_migration,
     apply_run_price_increase,
     apply_set_packaging_strategy,
 )
@@ -143,6 +146,7 @@ from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strat
 from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
+    route_support_escalation,
     triage_support_backlog,
     upgrade_support_program,
 )
@@ -150,6 +154,7 @@ from nexus_tech.simulation.team import (
     TeamCondition,
     apply_end_of_turn_team_drift,
     apply_rest_team,
+    appoint_team_lead,
     assign_employee,
     assign_manager,
     calculate_product_team_modifier,
@@ -162,6 +167,7 @@ from nexus_tech.simulation.team import (
     sanitize_management_links,
     unassign_employee,
     unassign_employees_from_product,
+    update_succession_risk,
 )
 
 logger = logging.getLogger(__name__)
@@ -363,6 +369,17 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.EXECUTE_RESTRUCTURE_PLAN:
+        summary = execute_restructure_plan(next_state)
+        update_succession_risk(next_state.employees)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Executed restructure plan.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PRODUCT:
         if context.new_product_name is None:
             raise ValueError("A name is required to create a product.")
@@ -408,6 +425,7 @@ def apply_action(
             trait=context.hire_trait or CandidateTrait.STEADY_OPERATOR,
         )
         next_state.employees.append(employee)
+        update_succession_risk(next_state.employees)
         team_condition = calculate_team_condition(next_state.employees)
         logger.debug("Hired employee %s.", employee.full_name)
         return ActionOutcome(
@@ -586,6 +604,7 @@ def apply_action(
         ]
         clear_manager_links(next_state.employees, employee.id)
         sanitize_management_links(next_state.employees)
+        update_succession_risk(next_state.employees)
         team_condition = calculate_team_condition(next_state.employees)
         logger.debug("Fired employee %s.", employee.full_name)
         return ActionOutcome(
@@ -614,6 +633,7 @@ def apply_action(
             report_id=context.employee_id,
             manager_id=context.manager_id,
         )
+        update_succession_risk(next_state.employees)
         logger.debug(
             "Assigned manager %s to employee %s.",
             context.manager_id,
@@ -625,7 +645,16 @@ def apply_action(
         if context.employee_id is None:
             raise ValueError("Clearing a manager requires choosing an employee.")
         summary = clear_manager_assignment(next_state.employees, report_id=context.employee_id)
+        update_succession_risk(next_state.employees)
         logger.debug("Cleared manager assignment for employee %s.", context.employee_id)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.APPOINT_TEAM_LEAD:
+        if context.employee_id is None:
+            raise ValueError("Appointing a team lead requires choosing an employee.")
+        summary = appoint_team_lead(next_state.employees, context.employee_id)
+        update_succession_risk(next_state.employees)
+        logger.debug("Appointed team lead for employee %s.", context.employee_id)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.UNASSIGN_EMPLOYEE:
@@ -653,6 +682,7 @@ def apply_action(
             if employee.manager_id is not None:
                 employee.energy = clamp_int(employee.energy + BALANCE.management_reorg_energy_gain)
             employee.morale = clamp_int(employee.morale - BALANCE.management_reorg_morale_penalty)
+        update_succession_risk(next_state.employees)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran org reorg.")
         return ActionOutcome(
@@ -680,6 +710,20 @@ def apply_action(
         summary = run_retention_play(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran retention play for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.ROUTE_SUPPORT_ESCALATION:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = route_support_escalation(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Routed support escalation for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -865,6 +909,14 @@ def apply_action(
 
     if action is TurnAction.RUN_PRICE_INCREASE:
         summary = apply_run_price_increase(product, next_state.customer_accounts)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RUN_ADD_ON_CAMPAIGN:
+        summary = apply_run_add_on_campaign(product, next_state.customer_accounts)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RUN_PACKAGE_MIGRATION:
+        summary = apply_run_package_migration(product, next_state.customer_accounts)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.SET_PACKAGING_STRATEGY:
@@ -1146,6 +1198,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         burnout_relief=functional_budget_profile.burnout_relief,
         rng=rng,
     )
+    update_succession_risk(next_state.employees)
     sanitize_management_links(next_state.employees)
     if progression_summary.resigned_employees:
         next_state.company.reputation = clamp_int(next_state.company.reputation - 1)
@@ -1383,6 +1436,8 @@ def build_turn_narrative(
         )
     if governance_summary.board_warning_active:
         return governance_summary.summary
+    if governance_summary.restructuring_pressure >= BALANCE.board_restructure_min_pressure:
+        return "Board pressure is now pointing toward a reset, not just tighter execution."
 
     total_user_delta = sum(summary.net_user_delta for summary in product_summaries)
     declining_products = [summary for summary in product_summaries if summary.net_user_delta < 0]

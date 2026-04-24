@@ -8,6 +8,7 @@ import pytest
 
 from nexus_tech.domain.models import (
     BoardAsk,
+    BoardResolution,
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
@@ -58,6 +59,7 @@ from nexus_tech.domain.models import (
     Seniority,
     SubscriptionPackage,
     SupportProgram,
+    SupportTier,
     TurnLedgerEntry,
 )
 from nexus_tech.persistence.database import DatabaseManager
@@ -101,6 +103,8 @@ def make_state() -> GameState:
         tenure_turns=8,
         underperformance_streak=0,
         leadership_score=82,
+        is_team_lead=True,
+        succession_risk=8,
         assigned_product_id=product.id,
     )
     employee = Employee(
@@ -214,6 +218,7 @@ def make_state() -> GameState:
         renewal_health=70,
         renewal_turn=6,
         churn_risk=18,
+        support_tier=SupportTier.PRIORITY,
         status=CustomerAccountStatus.ACTIVE,
     )
     finance = FinanceState(
@@ -232,8 +237,11 @@ def make_state() -> GameState:
         board_pressure=21,
         board_directive="prove_reliability",
         active_board_ask=BoardAsk.RELIABILITY,
+        board_resolution=BoardResolution.TARGETED_RESET,
         board_warning_active=True,
         board_warning_level=2,
+        quarterly_review_count=2,
+        restructuring_pressure=7,
         last_board_review_turn=4,
         last_funding_turn=3,
     )
@@ -501,8 +509,11 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "board_pressure",
         "board_directive",
         "active_board_ask",
+        "board_resolution",
         "board_warning_active",
         "board_warning_level",
+        "quarterly_review_count",
+        "restructuring_pressure",
         "last_board_review_turn",
     }.issubset(finance_columns)
     assert {
@@ -510,6 +521,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "tenure_turns",
         "underperformance_streak",
         "leadership_score",
+        "is_team_lead",
+        "succession_risk",
         "manager_id",
     }.issubset(employee_columns)
     assert {
@@ -527,6 +540,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "dunning_steps",
         "escalation_count",
         "renewal_health",
+        "support_tier",
     }.issubset(customer_columns)
     assert {
         "plan_tier",
@@ -550,7 +564,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "dependency_project_type",
         "delivery_risk",
     }.issubset(roadmap_columns)
-    assert user_version >= 16
+    assert user_version >= 17
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -687,9 +701,12 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "board_pressure",
         "board_directive",
         "active_board_ask",
+        "board_resolution",
         "board_warning_level",
+        "quarterly_review_count",
+        "restructuring_pressure",
     }.issubset(finance_columns)
-    assert user_version >= 16
+    assert user_version >= 17
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -727,7 +744,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 2
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 16
+    assert summaries[0].schema_version >= 17
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -740,7 +757,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 16
+    assert report.schema_version >= 17
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

@@ -3448,5 +3448,152 @@
         "archetype_id": "tiered_bundle_house"
       }
     ]
+  },
+  {
+    "scenario_id": "expansion_playbook",
+    "title": "Expansion Playbook",
+    "description": "The product is healthy enough to monetize harder, but the wrong packaging move could spike support burden and churn.",
+    "objective": "Expand contract value without collapsing account health.",
+    "objective_metric": "cash",
+    "objective_target": 12000,
+    "company_name": "LiftGrid",
+    "company_strategy": "growth",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "9600.00",
+    "reputation": 56,
+    "products": [
+      {
+        "key": "expansion",
+        "template_id": "add_on_revenue_studio",
+        "name": "LiftGrid",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 17,
+        "market_fit": 58,
+        "technical_debt": 24,
+        "user_count": 74,
+        "revenue_per_user": "64.00",
+        "feature_count": 3,
+        "maintenance_cost": "310.00",
+        "acquisition_rate": "0.0360",
+        "churn_rate": "0.0600",
+        "target_segment": "smb",
+        "pricing_tier": "premium",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Ari Sloan",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "commercial_ops",
+        "assigned_product_key": "expansion",
+        "energy": 76,
+        "morale": 69
+      },
+      {
+        "full_name": "June Patel",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "lifecycle",
+        "assigned_product_key": "expansion",
+        "energy": 78,
+        "morale": 71
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Expansion Playbook House",
+        "archetype_id": "expansion_playbook_house"
+      }
+    ]
+  },
+  {
+    "scenario_id": "white_glove_turnaround",
+    "title": "White Glove Turnaround",
+    "description": "A premium enterprise account base is paying well, but support heat and governance pressure are close to forcing a reset.",
+    "objective": "Stabilize enterprise support before the board forces a restructure.",
+    "objective_metric": "reputation",
+    "objective_target": 72,
+    "company_name": "Reliant Orbit",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "9100.00",
+    "reputation": 52,
+    "products": [
+      {
+        "key": "ops",
+        "template_id": "white_glove_ops",
+        "name": "Reliant Orbit",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 21,
+        "market_fit": 54,
+        "technical_debt": 29,
+        "user_count": 63,
+        "revenue_per_user": "90.00",
+        "feature_count": 3,
+        "maintenance_cost": "338.00",
+        "acquisition_rate": "0.0240",
+        "churn_rate": "0.0580",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium",
+        "packaging_strategy": "suite"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Tess Morgan",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "enterprise_delivery",
+        "assigned_product_key": "ops",
+        "energy": 70,
+        "morale": 63
+      },
+      {
+        "full_name": "Leo Grant",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "reliability",
+        "assigned_product_key": "ops",
+        "energy": 68,
+        "morale": 61
+      },
+      {
+        "full_name": "Mila Hart",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "service_ops",
+        "assigned_product_key": "ops",
+        "energy": 71,
+        "morale": 64
+      }
+    ],
+    "competitors": [
+      {
+        "name": "White Glove Operator",
+        "archetype_id": "white_glove_operator"
+      }
+    ],
+    "finance": {
+      "debt_principal": "3800.00",
+      "loan_interest_rate": "0.0300",
+      "equity_dilution": "0.0700",
+      "investor_pressure": 16,
+      "board_confidence": 43,
+      "total_raised": "8600.00"
+    }
   }
 ]

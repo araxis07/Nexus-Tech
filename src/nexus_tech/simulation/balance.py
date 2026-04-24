@@ -112,6 +112,16 @@ class BalanceConfig:
     price_increase_account_renewal_health_loss: int = 5
     price_increase_account_invoice_risk_gain: int = 4
     price_increase_account_churn_risk_gain: int = 4
+    add_on_campaign_contract_gain: Decimal = Decimal("70.00")
+    add_on_campaign_add_on_gain: int = 1
+    add_on_campaign_support_load_gain: int = 2
+    add_on_campaign_ticket_gain: int = 1
+    add_on_campaign_debt_gain: int = 2
+    packaging_migration_upgrade_contract_gain: Decimal = Decimal("110.00")
+    packaging_migration_downgrade_contract_loss: Decimal = Decimal("85.00")
+    packaging_migration_add_on_gain: int = 1
+    packaging_migration_ticket_relief: int = 2
+    packaging_migration_churn_relief: int = 4
     packaging_revenue_multiplier: dict[str, Decimal] = field(
         default_factory=lambda: {
             "streamlined": Decimal("1.00"),
@@ -425,6 +435,14 @@ class BalanceConfig:
     management_reorg_attrition_relief: int = 8
     management_reorg_energy_gain: int = 4
     management_reorg_morale_penalty: int = 1
+    management_team_lead_capacity: int = 2
+    management_team_lead_leadership_threshold: int = 60
+    management_team_lead_coordination_bonus: int = 1
+    management_team_lead_overload_relief: int = 1
+    management_succession_high_risk_threshold: int = 12
+    management_succession_energy_threshold: int = 45
+    management_succession_morale_threshold: int = 45
+    management_succession_attrition_threshold: int = 55
 
     roadmap_duration_turns: int = 4
     roadmap_growth_acquisition_bonus: int = 2
@@ -1488,6 +1506,16 @@ class BalanceConfig:
     board_response_team_health_attrition_relief: int = 10
     board_response_portfolio_focus_pressure_relief: int = 6
     board_response_portfolio_focus_reputation_loss: int = 1
+    board_resolution_restructure_pressure_gain: int = 6
+    board_resolution_reset_pressure_gain: int = 2
+    board_resolution_growth_pressure_relief: int = 3
+    board_restructure_min_pressure: int = 10
+    board_restructure_severance_per_employee: Decimal = Decimal("140.00")
+    board_restructure_pressure_relief: int = 8
+    board_restructure_governance_relief: int = 5
+    board_restructure_board_pressure_relief: int = 6
+    board_restructure_morale_loss: int = 4
+    board_restructure_reputation_loss: int = 1
     finance_burn_multiple_warning: Decimal = Decimal("1.30")
     finance_burn_multiple_severe: Decimal = Decimal("1.80")
     finance_burn_multiple_pressure_gain: int = 4
@@ -1505,6 +1533,14 @@ class BalanceConfig:
     support_program_escalation_ticket_threshold: int = 14
     support_program_escalation_sla_threshold: int = 62
     support_program_escalation_queue_divisor: int = 2
+    support_program_role_capacity: dict[str, int] = field(
+        default_factory=lambda: {
+            "engineer": 1,
+            "designer": 1,
+            "marketer": 0,
+            "product_manager": 2,
+        }
+    )
     support_program_segment_ticket_weight: dict[str, int] = field(
         default_factory=lambda: {
             "indie": 1,
@@ -1513,12 +1549,37 @@ class BalanceConfig:
             "enterprise": 3,
         }
     )
+    support_tier_ticket_relief: dict[str, int] = field(
+        default_factory=lambda: {
+            "standard": 0,
+            "priority": 1,
+            "white_glove": 2,
+        }
+    )
+    support_tier_sla_relief: dict[str, int] = field(
+        default_factory=lambda: {
+            "standard": 0,
+            "priority": 1,
+            "white_glove": 3,
+        }
+    )
+    support_tier_capacity_cost: dict[str, int] = field(
+        default_factory=lambda: {
+            "standard": 0,
+            "priority": 1,
+            "white_glove": 2,
+        }
+    )
     support_program_backlog_reputation_threshold: int = 24
     support_program_backlog_reputation_loss: int = 1
     support_program_backlog_morale_penalty_threshold: int = 18
     support_program_backlog_morale_penalty: int = 1
     support_program_staffing_gap_reputation_threshold: int = 4
     support_program_staffing_gap_morale_penalty: int = 1
+    support_program_route_escalation_cost: Decimal = Decimal("95.00")
+    support_program_route_ticket_relief: int = 5
+    support_program_route_sla_relief: int = 8
+    support_program_route_churn_relief: int = 6
     support_program_triage_cost: Decimal = Decimal("150.00")
     support_program_triage_backlog_relief: int = 10
     support_program_triage_escalation_relief: int = 3
@@ -1557,6 +1618,8 @@ class BalanceConfig:
     exit_ipo_value_multiplier: Decimal = Decimal("1.45")
     exit_independence_cash_threshold: Decimal = Decimal("14000.00")
     exit_restructure_cash_threshold: Decimal = Decimal("2500.00")
+    exit_max_restructuring_pressure_for_win: int = 18
+    exit_ipo_governance_risk_cap: int = 26
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

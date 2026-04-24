@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 16
+CURRENT_SCHEMA_VERSION = 17
 
 SCHEMA_STATEMENTS = (
     """
@@ -42,7 +42,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 16,
+        schema_version INTEGER NOT NULL DEFAULT 17,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -108,6 +108,8 @@ SCHEMA_STATEMENTS = (
         tenure_turns INTEGER NOT NULL DEFAULT 0,
         underperformance_streak INTEGER NOT NULL DEFAULT 0,
         leadership_score INTEGER NOT NULL DEFAULT 55,
+        is_team_lead INTEGER NOT NULL DEFAULT 0,
+        succession_risk INTEGER NOT NULL DEFAULT 0,
         assigned_product_id TEXT,
         manager_id TEXT,
         PRIMARY KEY (slot_name, employee_id),
@@ -199,8 +201,11 @@ SCHEMA_STATEMENTS = (
         board_pressure INTEGER NOT NULL DEFAULT 0,
         board_directive TEXT NOT NULL DEFAULT 'accelerate_growth',
         active_board_ask TEXT NOT NULL DEFAULT 'profitability',
+        board_resolution TEXT NOT NULL DEFAULT 'hold_course',
         board_warning_active INTEGER NOT NULL DEFAULT 0,
         board_warning_level INTEGER NOT NULL DEFAULT 0,
+        quarterly_review_count INTEGER NOT NULL DEFAULT 0,
+        restructuring_pressure INTEGER NOT NULL DEFAULT 0,
         last_board_review_turn INTEGER,
         last_funding_turn INTEGER
     )
@@ -281,6 +286,7 @@ SCHEMA_STATEMENTS = (
         contract_value TEXT NOT NULL,
         plan_tier TEXT NOT NULL DEFAULT 'standard',
         subscription_package TEXT NOT NULL DEFAULT 'growth',
+        support_tier TEXT NOT NULL DEFAULT 'standard',
         contract_cadence TEXT NOT NULL DEFAULT 'annual',
         billing_model TEXT NOT NULL DEFAULT 'flat',
         seat_count INTEGER NOT NULL DEFAULT 0,
@@ -702,6 +708,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="finance_state",
+        column_name="board_resolution",
+        column_definition="TEXT NOT NULL DEFAULT 'hold_course'",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
         column_name="board_warning_active",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
@@ -709,6 +721,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         connection,
         table_name="finance_state",
         column_name="board_warning_level",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="quarterly_review_count",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="restructuring_pressure",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
@@ -768,6 +792,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="employees",
+        column_name="is_team_lead",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="succession_risk",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
         column_name="manager_id",
         column_definition="TEXT",
     )
@@ -788,6 +824,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="customer_accounts",
         column_name="subscription_package",
         column_definition="TEXT NOT NULL DEFAULT 'growth'",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="support_tier",
+        column_definition="TEXT NOT NULL DEFAULT 'standard'",
     )
     _ensure_column(
         connection,

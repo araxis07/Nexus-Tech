@@ -14,6 +14,7 @@ from nexus_tech.domain.models import (
     MarketSegment,
     PricingTier,
     SubscriptionPackage,
+    SupportTier,
 )
 
 
@@ -41,6 +42,7 @@ class CustomerAccountRepository:
                 contract_value,
                 plan_tier,
                 subscription_package,
+                support_tier,
                 contract_cadence,
                 billing_model,
                 seat_count,
@@ -65,7 +67,7 @@ class CustomerAccountRepository:
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?
+                ?, ?, ?, ?
             )
             """,
             [
@@ -79,6 +81,7 @@ class CustomerAccountRepository:
                     str(account.contract_value),
                     account.plan_tier.value,
                     account.subscription_package.value,
+                    account.support_tier.value,
                     account.contract_cadence.value,
                     account.billing_model.value,
                     account.seat_count,
@@ -118,6 +121,7 @@ class CustomerAccountRepository:
                 contract_value,
                 plan_tier,
                 subscription_package,
+                support_tier,
                 contract_cadence,
                 billing_model,
                 seat_count,
@@ -154,6 +158,7 @@ class CustomerAccountRepository:
                 contract_value=Decimal(row["contract_value"]),
                 plan_tier=PricingTier(row["plan_tier"] or "standard"),
                 subscription_package=SubscriptionPackage(row["subscription_package"] or "growth"),
+                support_tier=SupportTier(row["support_tier"] or "standard"),
                 contract_cadence=ContractCadence(row["contract_cadence"] or "annual"),
                 billing_model=ContractBillingModel(row["billing_model"] or "flat"),
                 seat_count=row["seat_count"] or 0,

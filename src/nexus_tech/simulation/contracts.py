@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     PricingTier,
     Product,
     SubscriptionPackage,
+    SupportTier,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -105,6 +106,8 @@ def apply_support_drift(
     ticket_relief = 0
     if getattr(account, "annual_prepay", False):
         ticket_relief += 1
+    ticket_relief += BALANCE.support_tier_ticket_relief[account.support_tier.value]
+    sla_relief = BALANCE.support_tier_sla_relief[account.support_tier.value]
     support_burden = BALANCE.subscription_package_support_burden[account.subscription_package.value]
 
     support_load_delta = clamp_int(
@@ -138,7 +141,7 @@ def apply_support_drift(
         -BALANCE.key_account_support_load_cap,
         BALANCE.key_account_support_load_cap,
     )
-    account.sla_breach_risk = clamp_int(account.sla_breach_risk + sla_breach_delta)
+    account.sla_breach_risk = clamp_int(account.sla_breach_risk + sla_breach_delta - sla_relief)
 
     return ContractSupportDelta(
         support_load_delta=support_load_delta,
@@ -194,6 +197,11 @@ def apply_commercial_renewal(
         ):
             account.subscription_package = SubscriptionPackage.ENTERPRISE_SUITE
             package_changed = True
+        if (
+            account.support_tier is SupportTier.STANDARD
+            and account.segment is MarketSegment.ENTERPRISE
+        ):
+            account.support_tier = SupportTier.PRIORITY
 
         account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
     elif weak_account:
@@ -223,6 +231,8 @@ def apply_commercial_renewal(
         elif account.subscription_package is SubscriptionPackage.GROWTH:
             account.subscription_package = SubscriptionPackage.STARTER
             package_changed = True
+        if account.support_tier is SupportTier.WHITE_GLOVE:
+            account.support_tier = SupportTier.PRIORITY
 
     if (
         account.contract_cadence is ContractCadence.MONTHLY
