@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.0 - 2026-04-24
+
+- Added subscription depth with plan-tier add-ons, annual prepay behavior, invoice-risk pressure, and richer deal packaging
+- Added a shared support-program layer with knowledge base, automation, backlog queue, and SLA-breach tracking
+- Added a persistent hiring pipeline with sourcing, interviews, offer conversion, and SQLite save/load coverage
+- Added finance forecasting for net cash flow, projected runway, covenant risk, and missed board-target pressure
+- Expanded content again with billing, support-automation, and forecast templates plus new renewal, support, and board-recovery scenarios
+- Added new rival archetypes for support-heavy, revenue-optimized, and lock-in oriented competitors
+- Promoted the package version to `0.17.0`
+
 ## 0.16.0 - 2026-04-23
 
 - Added contract-economy depth with seat-based and usage-based customer billing models plus richer sales commitments

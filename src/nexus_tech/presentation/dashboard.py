@@ -21,6 +21,7 @@ from nexus_tech.domain.models import (
     EventHistoryEntry,
     FundingHistoryEntry,
     GameState,
+    HiringCandidateStage,
     MarketSegment,
     MilestoneEntry,
     PendingEvent,
@@ -60,6 +61,7 @@ from nexus_tech.simulation.roadmap import (
 )
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
+from nexus_tech.simulation.support_program import count_escalating_accounts
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
 
 
@@ -879,6 +881,7 @@ def render_team_view(console: Console, state: GameState) -> None:
             [
                 _build_team_summary_panel(state),
                 _build_team_detail_panel(state),
+                _build_hiring_pipeline_panel(state),
             ],
             equal=False,
             expand=True,
@@ -889,7 +892,16 @@ def render_team_view(console: Console, state: GameState) -> None:
 def render_customer_view(console: Console, state: GameState) -> None:
     """Render the dedicated key-account review panel."""
 
-    console.print(_build_customer_accounts_panel(state, compact=False))
+    console.print(
+        Columns(
+            [
+                _build_customer_accounts_panel(state, compact=False),
+                _build_support_program_panel(state),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
 
 
 def render_pipeline_view(console: Console, state: GameState) -> None:
@@ -901,6 +913,7 @@ def render_pipeline_view(console: Console, state: GameState) -> None:
                 _build_release_pipeline_panel(state),
                 _build_sales_pipeline_panel(state),
                 _build_roadmap_project_panel(state),
+                _build_hiring_pipeline_panel(state),
             ],
             equal=True,
             expand=True,
@@ -1412,6 +1425,39 @@ def _build_team_detail_panel(state: GameState) -> Panel:
     )
 
 
+def _build_hiring_pipeline_panel(state: GameState) -> Panel:
+    active_candidates = [
+        candidate
+        for candidate in state.hiring_candidates
+        if candidate.stage is not HiringCandidateStage.EXPIRED
+    ]
+    if not active_candidates:
+        return Panel(
+            "No active hiring candidates. Use source_candidates to build a deeper hiring funnel.",
+            title="Hiring Pipeline",
+            border_style="cyan",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Candidate", style="bold")
+    table.add_column("Role")
+    table.add_column("Stage")
+    table.add_column("Accept", justify="right")
+    table.add_column("Score", justify="right")
+    table.add_column("Expiry", justify="right")
+    for candidate in active_candidates[-6:]:
+        table.add_row(
+            candidate.full_name,
+            candidate.role.value,
+            candidate.stage.value,
+            f"{candidate.acceptance_chance}%",
+            str(candidate.interview_score),
+            str(candidate.expires_turn),
+        )
+    return Panel(table, title="Hiring Pipeline", border_style="cyan", expand=True)
+
+
 def _build_team_table(state: GameState, *, compact: bool) -> Table:
     product_names = {product.id: product.name for product in state.products}
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
@@ -1491,10 +1537,16 @@ def _build_pipeline_summary_panel(state: GameState) -> Panel:
     active_projects = sum(
         1 for project in state.roadmap_projects if project.status is RoadmapProjectStatus.ACTIVE
     )
+    active_candidates = sum(
+        1
+        for candidate in state.hiring_candidates
+        if candidate.stage in {HiringCandidateStage.SOURCED, HiringCandidateStage.INTERVIEWED}
+    )
     content = Table.grid(padding=(0, 1))
     content.add_row("Releases", str(active_releases))
     content.add_row("Sales Deals", str(active_deals))
     content.add_row("Projects", str(active_projects))
+    content.add_row("Candidates", str(active_candidates))
     content.add_row("Intel Notes", str(len(state.competitor_intel)))
     return Panel(content, title="Execution Pipeline", border_style="cyan", expand=True)
 
@@ -1543,9 +1595,11 @@ def _build_sales_pipeline_panel(state: GameState) -> Panel:
     table.add_column("Deal", style="bold")
     table.add_column("Product")
     table.add_column("Stage")
+    table.add_column("Plan")
     table.add_column("Model")
     table.add_column("Value", justify="right")
     table.add_column("Commit", justify="right")
+    table.add_column("Add-ons", justify="right")
     table.add_column("Prob", justify="right")
     for deal in state.sales_deals[-8:]:
         commitment = (
@@ -1557,9 +1611,11 @@ def _build_sales_pipeline_panel(state: GameState) -> Panel:
             deal.name,
             product_names.get(deal.product_id, "unknown"),
             deal.stage.value,
+            deal.plan_tier.value,
             deal.billing_model.value,
             format_money(deal.value),
             commitment,
+            str(deal.add_on_commitment),
             f"{deal.probability}%",
         )
     return Panel(table, title="Sales Pipeline", border_style="green", expand=True)
@@ -1674,16 +1730,19 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("37", "wait", "Hold position for this action.")
     primary_actions.add_row("38", "view_status", "Refresh the dashboard.")
     primary_actions.add_row("39", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("40", "source_candidates", "Build a persistent hiring funnel.")
+    primary_actions.add_row("41", "interview_candidate", "Qualify one sourced candidate.")
+    primary_actions.add_row("42", "make_hiring_offer", "Convert an interviewed candidate.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("40", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("41", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("42", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("43", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("44", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("43", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("44", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("45", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("46", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("47", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -2069,15 +2128,20 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
     if not compact:
         table.add_column("Renewal", justify="right")
         table.add_column("Expansion", justify="right")
+        table.add_column("Plan")
         table.add_column("Cadence")
         table.add_column("Model")
         table.add_column("Seats", justify="right")
         table.add_column("Usage", justify="right")
+        table.add_column("Add-ons", justify="right")
         table.add_column("Disc", justify="right")
+        table.add_column("Prepay")
         table.add_column("Onboard", justify="right")
         table.add_column("Support", justify="right")
         table.add_column("Tickets", justify="right")
         table.add_column("SLA", justify="right")
+        table.add_column("Invoice", justify="right")
+        table.add_column("Esc", justify="right")
 
     for account in active_accounts:
         row = [
@@ -2093,15 +2157,20 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
                 [
                     str(account.renewal_turn),
                     str(account.expansion_potential),
+                    account.plan_tier.value,
                     account.contract_cadence.value,
                     account.billing_model.value,
                     str(account.seat_count),
                     str(account.usage_units),
+                    str(account.add_on_count),
                     format_rate(account.discount_rate),
+                    "yes" if account.annual_prepay else "no",
                     str(account.onboarding_health),
                     str(account.support_load),
                     str(account.open_tickets),
                     str(account.sla_breach_risk),
+                    str(account.invoice_risk),
+                    str(account.escalation_count),
                 ]
             )
         table.add_row(*row)
@@ -2115,6 +2184,17 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
         ),
     )
     return Panel(content, title="Key Accounts", border_style="green", expand=True)
+
+
+def _build_support_program_panel(state: GameState) -> Panel:
+    escalating_accounts = count_escalating_accounts(state.customer_accounts)
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Knowledge Base", str(state.support_program.knowledge_base_level))
+    table.add_row("Automation", str(state.support_program.automation_level))
+    table.add_row("Backlog Queue", str(state.support_program.backlog_queue))
+    table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))
+    table.add_row("Escalations", str(escalating_accounts))
+    return Panel(table, title="Support Program", border_style="green", expand=True)
 
 
 def _build_late_game_panel(state: GameState) -> Panel:
@@ -2151,10 +2231,19 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Dilution", format_rate(state.finance.equity_dilution))
     table.add_row("Investor Pressure", str(state.finance.investor_pressure))
     table.add_row("Board Confidence", str(state.finance.board_confidence))
+    table.add_row("Covenant Risk", str(state.finance.covenant_risk))
+    table.add_row("Missed Targets", str(state.finance.missed_board_targets))
     table.add_row("Capital Raised", format_money(state.finance.total_raised))
     table.add_row("Funding Entries", str(len(state.funding_history)))
     table.add_row("Turn Interest", format_money(turn_interest))
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
+    table.add_row("Forecast CF", format_money(state.finance.forecast_net_cash_flow))
+    table.add_row(
+        "Forecast Runway",
+        "cashflow+"
+        if state.finance.forecast_runway_turns is None
+        else f"{state.finance.forecast_runway_turns} turns",
+    )
     return Panel(table, title="Finance", border_style="cyan", expand=True)
 
 

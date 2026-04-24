@@ -2946,5 +2946,213 @@
         "focus_segment": "startup"
       }
     ]
+  },
+  {
+    "scenario_id": "contract_renewal_gauntlet",
+    "title": "Contract Renewal Gauntlet",
+    "description": "The company has real customer value but renewal pressure is stacking up across pricing, support, and trust.",
+    "objective": "Stabilize renewals and lift customer satisfaction above the danger zone.",
+    "objective_metric": "reputation",
+    "objective_target": 62,
+    "company_name": "Renewal Forge",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "enterprise_sales_push",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "9100.00",
+    "reputation": 49,
+    "products": [
+      {
+        "key": "renewal",
+        "template_id": "subscription_billing_studio",
+        "name": "Renewal Forge",
+        "lifecycle_stage": "growth",
+        "quality": 60,
+        "bug_level": 24,
+        "market_fit": 58,
+        "technical_debt": 28,
+        "user_count": 66,
+        "revenue_per_user": "86.00",
+        "feature_count": 2,
+        "maintenance_cost": "360.00",
+        "acquisition_rate": "0.0310",
+        "churn_rate": "0.0610",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Elena Brooks",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "pricing",
+        "assigned_product_key": "renewal",
+        "energy": 74,
+        "morale": 66
+      },
+      {
+        "full_name": "Micah Bell",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "field_marketing",
+        "assigned_product_key": "renewal",
+        "energy": 77,
+        "morale": 69
+      }
+    ],
+    "competitors": [
+      {
+        "name": "LockPath Revenue",
+        "archetype_id": "renewal_lockin_vendor"
+      }
+    ],
+    "finance": {
+      "debt_principal": "3400.00",
+      "loan_interest_rate": "0.0300",
+      "equity_dilution": "0.0600",
+      "investor_pressure": 10,
+      "board_confidence": 55,
+      "total_raised": "5400.00"
+    }
+  },
+  {
+    "scenario_id": "support_scaling_crunch",
+    "title": "Support Scaling Crunch",
+    "description": "Demand is real, but ticket flow and onboarding drag are starting to overwhelm delivery discipline.",
+    "objective": "Regain operating control before support pressure starts killing product reputation.",
+    "objective_metric": "users",
+    "objective_target": 140,
+    "company_name": "QueueCraft",
+    "company_strategy": "quality",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "9800.00",
+    "reputation": 53,
+    "products": [
+      {
+        "key": "support",
+        "template_id": "support_automation_hub",
+        "name": "QueueCraft",
+        "lifecycle_stage": "growth",
+        "quality": 56,
+        "bug_level": 26,
+        "market_fit": 61,
+        "technical_debt": 24,
+        "user_count": 82,
+        "revenue_per_user": "46.00",
+        "feature_count": 2,
+        "maintenance_cost": "290.00",
+        "acquisition_rate": "0.0430",
+        "churn_rate": "0.0600",
+        "target_segment": "smb",
+        "pricing_tier": "standard"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Jules Carter",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "service_design",
+        "assigned_product_key": "support",
+        "energy": 76,
+        "morale": 68
+      },
+      {
+        "full_name": "Priya Shah",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "reliability",
+        "assigned_product_key": "support",
+        "energy": 71,
+        "morale": 65
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Support Swarm",
+        "archetype_id": "support_swarm"
+      }
+    ]
+  },
+  {
+    "scenario_id": "forecast_board_reset",
+    "title": "Forecast Board Reset",
+    "description": "Capital still exists, but the board has lost confidence in the company's planning discipline and forward visibility.",
+    "objective": "Restore board confidence and extend forecast runway before another financing shock.",
+    "objective_metric": "cash",
+    "objective_target": 14000,
+    "company_name": "Forward Signal",
+    "company_strategy": "efficiency",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "7600.00",
+    "reputation": 50,
+    "products": [
+      {
+        "key": "forecast",
+        "template_id": "revenue_forecast_cloud",
+        "name": "Forward Signal",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 22,
+        "market_fit": 55,
+        "technical_debt": 31,
+        "user_count": 44,
+        "revenue_per_user": "78.00",
+        "feature_count": 2,
+        "maintenance_cost": "335.00",
+        "acquisition_rate": "0.0290",
+        "churn_rate": "0.0600",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Owen Park",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "platform",
+        "assigned_product_key": "forecast",
+        "energy": 73,
+        "morale": 62
+      },
+      {
+        "full_name": "Tara Lin",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "strategy",
+        "assigned_product_key": "forecast",
+        "energy": 78,
+        "morale": 66
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Forecastly",
+        "archetype_id": "revenue_optimizer"
+      }
+    ],
+    "finance": {
+      "debt_principal": "4600.00",
+      "loan_interest_rate": "0.0320",
+      "equity_dilution": "0.1100",
+      "investor_pressure": 16,
+      "board_confidence": 43,
+      "total_raised": "8800.00"
+    }
   }
 ]

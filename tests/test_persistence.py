@@ -9,6 +9,7 @@ import pytest
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
+    CandidateTrait,
     Company,
     CompanyStrategy,
     Competitor,
@@ -31,6 +32,8 @@ from nexus_tech.domain.models import (
     FundingHistoryEntry,
     FundingType,
     GameState,
+    HiringCandidate,
+    HiringCandidateStage,
     LifecycleStage,
     MarketCycle,
     MarketSegment,
@@ -51,6 +54,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
     ScenarioObjectiveMetric,
     Seniority,
+    SupportProgram,
     TurnLedgerEntry,
 )
 from nexus_tech.persistence.database import DatabaseManager
@@ -165,16 +169,21 @@ def make_state() -> GameState:
         product_id=product.id,
         segment=MarketSegment.ENTERPRISE,
         contract_value=Decimal("850.00"),
+        plan_tier=PricingTier.PREMIUM,
         contract_cadence=ContractCadence.ANNUAL,
         billing_model=ContractBillingModel.SEAT_BASED,
         seat_count=26,
         usage_units=9,
+        add_on_count=2,
+        annual_prepay=True,
         discount_rate=Decimal("0.0300"),
         satisfaction=72,
         onboarding_health=74,
         support_load=18,
         open_tickets=5,
         sla_breach_risk=13,
+        invoice_risk=17,
+        escalation_count=1,
         expansion_potential=66,
         renewal_turn=6,
         churn_risk=18,
@@ -186,7 +195,11 @@ def make_state() -> GameState:
         equity_dilution=Decimal("0.0800"),
         investor_pressure=9,
         board_confidence=64,
+        covenant_risk=11,
+        missed_board_targets=1,
         total_raised=Decimal("7400.00"),
+        forecast_net_cash_flow=Decimal("-420.00"),
+        forecast_runway_turns=18,
         last_funding_turn=3,
     )
     funding_history = [
@@ -231,10 +244,13 @@ def make_state() -> GameState:
         name="Enterprise buyer: Nexus One",
         segment=MarketSegment.ENTERPRISE,
         stage=SalesDealStage.DEMO,
+        plan_tier=PricingTier.PREMIUM,
         billing_model=ContractBillingModel.SEAT_BASED,
         seat_commitment=30,
         usage_commitment=12,
+        add_on_commitment=2,
         value=Decimal("1300.00"),
+        proposed_discount_rate=Decimal("0.0400"),
         probability=52,
         created_turn=4,
         updated_turn=4,
@@ -258,6 +274,20 @@ def make_state() -> GameState:
         competitor_name="Atlas Cloud",
         move=CompetitorMove.FEATURE_SPRINT,
         summary="Atlas Cloud accelerated a feature sprint.",
+    )
+    hiring_candidate = HiringCandidate(
+        full_name="Riley Shaw",
+        role=EmployeeRole.MARKETER,
+        seniority=Seniority.MID,
+        specialization="growth",
+        trait=CandidateTrait.FAST_LEARNER,
+        salary_expectation=Decimal("840.00"),
+        expected_productivity=72,
+        stage=HiringCandidateStage.INTERVIEWED,
+        sourced_turn=3,
+        expires_turn=6,
+        interview_score=64,
+        acceptance_chance=71,
     )
     return GameState(
         company=Company(
@@ -284,12 +314,19 @@ def make_state() -> GameState:
             customer_success_share=37,
             g_and_a_share=20,
         ),
+        support_program=SupportProgram(
+            knowledge_base_level=38,
+            automation_level=29,
+            backlog_queue=7,
+            sla_breaches_last_turn=1,
+        ),
         difficulty_mode=DifficultyMode.FOUNDER,
         campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
         pending_event=pending_event,
         event_history=event_history,
         milestone_history=milestone_history,
         funding_history=funding_history,
+        hiring_candidates=[hiring_candidate],
         roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         roadmap_set_turn=3,
         market_cycle=MarketCycle.EXPANDING,
@@ -340,6 +377,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "sales_deals",
         "roadmap_projects",
         "competitor_intel",
+        "hiring_candidates",
     }.issubset(table_names)
 
     with sqlite3.connect(db_path) as connection:
@@ -384,6 +422,10 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "budget_marketing_share",
         "budget_customer_success_share",
         "budget_g_and_a_share",
+        "support_knowledge_base_level",
+        "support_automation_level",
+        "support_backlog_queue",
+        "support_sla_breaches_last_turn",
         "market_cycle",
         "market_cycle_turns_remaining",
         "victory_achieved",
@@ -397,7 +439,13 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
         competitor_columns
     )
-    assert {"board_confidence"}.issubset(finance_columns)
+    assert {
+        "board_confidence",
+        "covenant_risk",
+        "missed_board_targets",
+        "forecast_net_cash_flow",
+        "forecast_runway_turns",
+    }.issubset(finance_columns)
     assert {
         "performance_rating",
         "tenure_turns",
@@ -407,10 +455,22 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "billing_model",
         "seat_count",
         "usage_units",
+        "plan_tier",
+        "add_on_count",
+        "annual_prepay",
         "open_tickets",
         "sla_breach_risk",
+        "invoice_risk",
+        "escalation_count",
     }.issubset(customer_columns)
-    assert {"billing_model", "seat_commitment", "usage_commitment"}.issubset(sales_columns)
+    assert {
+        "plan_tier",
+        "billing_model",
+        "seat_commitment",
+        "usage_commitment",
+        "add_on_commitment",
+        "proposed_discount_rate",
+    }.issubset(sales_columns)
     assert {
         "epic_count",
         "epics_completed",
@@ -418,7 +478,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "dependency_project_type",
         "delivery_risk",
     }.issubset(roadmap_columns)
-    assert user_version >= 13
+    assert user_version >= 14
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -506,6 +566,12 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
     DatabaseManager(db_path).initialize()
 
     with sqlite3.connect(db_path) as connection:
+        table_names = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
         save_slot_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(save_slots)").fetchall()
         }
@@ -523,6 +589,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         }
         user_version = connection.execute("PRAGMA user_version").fetchone()[0]
 
+    assert "hiring_candidates" in table_names
     assert {
         "scenario_id",
         "difficulty_mode",
@@ -531,14 +598,20 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "schema_version",
         "functional_budget_preset",
         "budget_engineering_share",
+        "support_knowledge_base_level",
     }.issubset(save_slot_columns)
     assert {"strategy"}.issubset(company_columns)
     assert {"pricing_tier", "target_segment"}.issubset(product_columns)
     assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
         competitor_columns
     )
-    assert {"board_confidence"}.issubset(finance_columns)
-    assert user_version >= 13
+    assert {
+        "board_confidence",
+        "covenant_risk",
+        "missed_board_targets",
+        "forecast_net_cash_flow",
+    }.issubset(finance_columns)
+    assert user_version >= 14
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -576,7 +649,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 13
+    assert summaries[0].schema_version >= 14
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:

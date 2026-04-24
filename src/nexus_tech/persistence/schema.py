@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 13
+CURRENT_SCHEMA_VERSION = 14
 
 SCHEMA_STATEMENTS = (
     """
@@ -27,6 +27,10 @@ SCHEMA_STATEMENTS = (
         budget_marketing_share INTEGER NOT NULL DEFAULT 25,
         budget_customer_success_share INTEGER NOT NULL DEFAULT 25,
         budget_g_and_a_share INTEGER NOT NULL DEFAULT 20,
+        support_knowledge_base_level INTEGER NOT NULL DEFAULT 22,
+        support_automation_level INTEGER NOT NULL DEFAULT 16,
+        support_backlog_queue INTEGER NOT NULL DEFAULT 0,
+        support_sla_breaches_last_turn INTEGER NOT NULL DEFAULT 0,
         market_cycle TEXT NOT NULL DEFAULT 'steady',
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
@@ -34,7 +38,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 12,
+        schema_version INTEGER NOT NULL DEFAULT 14,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -176,7 +180,11 @@ SCHEMA_STATEMENTS = (
         equity_dilution TEXT NOT NULL,
         investor_pressure INTEGER NOT NULL,
         board_confidence INTEGER NOT NULL DEFAULT 55,
+        covenant_risk INTEGER NOT NULL DEFAULT 0,
+        missed_board_targets INTEGER NOT NULL DEFAULT 0,
         total_raised TEXT NOT NULL,
+        forecast_net_cash_flow TEXT NOT NULL DEFAULT '0.00',
+        forecast_runway_turns INTEGER,
         last_funding_turn INTEGER
     )
     """,
@@ -254,16 +262,21 @@ SCHEMA_STATEMENTS = (
         product_id TEXT NOT NULL,
         segment TEXT NOT NULL,
         contract_value TEXT NOT NULL,
+        plan_tier TEXT NOT NULL DEFAULT 'standard',
         contract_cadence TEXT NOT NULL DEFAULT 'annual',
         billing_model TEXT NOT NULL DEFAULT 'flat',
         seat_count INTEGER NOT NULL DEFAULT 0,
         usage_units INTEGER NOT NULL DEFAULT 0,
+        add_on_count INTEGER NOT NULL DEFAULT 0,
+        annual_prepay INTEGER NOT NULL DEFAULT 0,
         discount_rate TEXT NOT NULL DEFAULT '0.0000',
         satisfaction INTEGER NOT NULL,
         onboarding_health INTEGER NOT NULL DEFAULT 60,
         support_load INTEGER NOT NULL DEFAULT 20,
         open_tickets INTEGER NOT NULL DEFAULT 0,
         sla_breach_risk INTEGER NOT NULL DEFAULT 0,
+        invoice_risk INTEGER NOT NULL DEFAULT 0,
+        escalation_count INTEGER NOT NULL DEFAULT 0,
         expansion_potential INTEGER NOT NULL,
         renewal_turn INTEGER NOT NULL,
         churn_risk INTEGER NOT NULL,
@@ -305,10 +318,13 @@ SCHEMA_STATEMENTS = (
         name TEXT NOT NULL,
         segment TEXT NOT NULL,
         stage TEXT NOT NULL,
+        plan_tier TEXT NOT NULL DEFAULT 'standard',
         billing_model TEXT NOT NULL DEFAULT 'flat',
         seat_commitment INTEGER NOT NULL DEFAULT 0,
         usage_commitment INTEGER NOT NULL DEFAULT 0,
+        add_on_commitment INTEGER NOT NULL DEFAULT 0,
         value TEXT NOT NULL,
+        proposed_discount_rate TEXT NOT NULL DEFAULT '0.0000',
         probability INTEGER NOT NULL,
         created_turn INTEGER NOT NULL,
         updated_turn INTEGER NOT NULL,
@@ -353,6 +369,28 @@ SCHEMA_STATEMENTS = (
         move TEXT NOT NULL,
         summary TEXT NOT NULL,
         PRIMARY KEY (slot_name, entry_index)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS hiring_candidates (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        candidate_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        full_name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        seniority TEXT NOT NULL,
+        specialization TEXT NOT NULL,
+        trait TEXT NOT NULL DEFAULT 'steady_operator',
+        salary_expectation TEXT NOT NULL,
+        expected_productivity INTEGER NOT NULL,
+        stage TEXT NOT NULL DEFAULT 'sourced',
+        sourced_turn INTEGER NOT NULL,
+        expires_turn INTEGER NOT NULL,
+        interview_score INTEGER NOT NULL DEFAULT 0,
+        acceptance_chance INTEGER NOT NULL DEFAULT 50,
+        PRIMARY KEY (slot_name, candidate_id),
+        UNIQUE (slot_name, display_order)
     )
     """,
 )
@@ -470,6 +508,30 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="support_knowledge_base_level",
+        column_definition="INTEGER NOT NULL DEFAULT 22",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="support_automation_level",
+        column_definition="INTEGER NOT NULL DEFAULT 16",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="support_backlog_queue",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="support_sla_breaches_last_turn",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="market_cycle",
         column_definition="TEXT NOT NULL DEFAULT 'steady'",
     )
@@ -529,6 +591,30 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(
         connection,
+        table_name="finance_state",
+        column_name="covenant_risk",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="missed_board_targets",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="forecast_net_cash_flow",
+        column_definition="TEXT NOT NULL DEFAULT '0.00'",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="forecast_runway_turns",
+        column_definition="INTEGER",
+    )
+    _ensure_column(
+        connection,
         table_name="employees",
         column_name="trait",
         column_definition="TEXT NOT NULL DEFAULT 'steady_operator'",
@@ -578,6 +664,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="customer_accounts",
+        column_name="plan_tier",
+        column_definition="TEXT NOT NULL DEFAULT 'standard'",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
         column_name="billing_model",
         column_definition="TEXT NOT NULL DEFAULT 'flat'",
     )
@@ -591,6 +683,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         connection,
         table_name="customer_accounts",
         column_name="usage_units",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="add_on_count",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="annual_prepay",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
@@ -625,9 +729,27 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(
         connection,
+        table_name="customer_accounts",
+        column_name="invoice_risk",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="escalation_count",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
         table_name="sales_deals",
         column_name="billing_model",
         column_definition="TEXT NOT NULL DEFAULT 'flat'",
+    )
+    _ensure_column(
+        connection,
+        table_name="sales_deals",
+        column_name="plan_tier",
+        column_definition="TEXT NOT NULL DEFAULT 'standard'",
     )
     _ensure_column(
         connection,
@@ -640,6 +762,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="sales_deals",
         column_name="usage_commitment",
         column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="sales_deals",
+        column_name="add_on_commitment",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="sales_deals",
+        column_name="proposed_discount_rate",
+        column_definition="TEXT NOT NULL DEFAULT '0.0000'",
     )
     _ensure_column(
         connection,

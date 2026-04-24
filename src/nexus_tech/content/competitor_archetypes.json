@@ -211,5 +211,44 @@
     "current_move": "feature_sprint",
     "momentum": 72,
     "funding_level": 2
+  },
+  {
+    "archetype_id": "support_swarm",
+    "title": "Support Swarm",
+    "description": "A service-heavy rival that wins with fast response times, procedural discipline, and high-touch retention.",
+    "focus_segment": "smb",
+    "strength": 69,
+    "aggression": 58,
+    "pricing_tier": "standard",
+    "active_product_count": 2,
+    "current_move": "hold",
+    "momentum": 63,
+    "funding_level": 1
+  },
+  {
+    "archetype_id": "revenue_optimizer",
+    "title": "Revenue Optimizer",
+    "description": "A finance-led operator that packages aggressively, expands accounts, and punishes weaker monetization posture.",
+    "focus_segment": "enterprise",
+    "strength": 77,
+    "aggression": 60,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "discount_push",
+    "momentum": 67,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "renewal_lockin_vendor",
+    "title": "Renewal Lock-In Vendor",
+    "description": "A commercial rival that compounds through renewals, buyer lock-in, and deeper account expansion over time.",
+    "focus_segment": "enterprise",
+    "strength": 75,
+    "aggression": 57,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "hold",
+    "momentum": 61,
+    "funding_level": 2
   }
 ]

@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     LifecycleStage,
     MarketSegment,
     Product,
+    SupportProgram,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -24,6 +25,7 @@ from nexus_tech.simulation.contracts import (
     get_contract_interval,
 )
 from nexus_tech.simulation.support import clamp_int
+from nexus_tech.simulation.support_program import calculate_support_program_relief
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,7 @@ def apply_end_of_turn_customers(
     *,
     current_turn: int,
     customer_success_bonus: int = 0,
+    support_program: SupportProgram | None = None,
 ) -> CustomerTurnSummary:
     """Update account satisfaction, support health, and commercial renewals."""
 
@@ -80,11 +83,20 @@ def apply_end_of_turn_customers(
             churned_accounts += 1
             continue
 
+        if support_program is None:
+            support_ticket_relief, support_sla_relief = 0, 0
+        else:
+            support_ticket_relief, support_sla_relief = calculate_support_program_relief(
+                support_program,
+                customer_success_bonus=customer_success_bonus,
+            )
         apply_support_drift(
             account,
             product,
             customer_success_bonus=customer_success_bonus,
         )
+        account.open_tickets = max(0, account.open_tickets - support_ticket_relief)
+        account.sla_breach_risk = clamp_int(account.sla_breach_risk - support_sla_relief)
 
         onboarding_delta = 0
         if product.market_fit >= 60 and product.quality >= 60:
@@ -114,6 +126,32 @@ def apply_end_of_turn_customers(
             account.churn_risk = clamp_int(
                 account.churn_risk + BALANCE.contract_sla_breach_churn_risk_gain,
             )
+        invoice_risk_delta = 0
+        if account.contract_cadence is ContractCadence.MONTHLY:
+            invoice_risk_delta += BALANCE.contract_invoice_risk_monthly_gain
+        invoice_risk_delta += int(
+            account.discount_rate / BALANCE.contract_invoice_risk_discount_gain_divisor
+        )
+        invoice_risk_delta += account.open_tickets // BALANCE.contract_invoice_risk_ticket_divisor
+        invoice_risk_delta -= (
+            account.onboarding_health // BALANCE.contract_invoice_risk_onboarding_relief_divisor
+        )
+        if account.annual_prepay:
+            invoice_risk_delta -= BALANCE.contract_invoice_risk_prepay_relief
+        account.invoice_risk = clamp_int(account.invoice_risk + invoice_risk_delta)
+        if account.invoice_risk >= BALANCE.contract_invoice_risk_threshold:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.contract_invoice_risk_churn_gain,
+            )
+        if account.invoice_risk >= BALANCE.contract_invoice_risk_severe_threshold:
+            account.satisfaction = clamp_int(
+                account.satisfaction - BALANCE.contract_invoice_risk_satisfaction_loss
+            )
+        account.escalation_count = 0
+        if account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold:
+            account.escalation_count += 1
+        if account.sla_breach_risk >= BALANCE.support_program_escalation_sla_threshold:
+            account.escalation_count += 1
 
         account.status = (
             CustomerAccountStatus.AT_RISK
@@ -130,6 +168,7 @@ def apply_end_of_turn_customers(
             account.churn_risk
             + discount_penalty
             + (account.sla_breach_risk // BALANCE.contract_sla_ticket_divisor)
+            + (account.invoice_risk // BALANCE.contract_sla_support_divisor)
             - customer_success_bonus,
         )
         if effective_churn_risk >= BALANCE.key_account_churn_threshold:
@@ -248,16 +287,23 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         product_id=product.id,
         segment=product.target_segment,
         contract_value=contract_value,
+        plan_tier=product.pricing_tier,
         contract_cadence=contract_cadence,
         billing_model=billing_model,
         seat_count=seat_count,
         usage_units=usage_units,
+        add_on_count=BALANCE.contract_default_add_on_commitment_by_segment[
+            product.target_segment.value
+        ],
+        annual_prepay=product.target_segment is MarketSegment.ENTERPRISE,
         discount_rate=Decimal("0.0000"),
         satisfaction=satisfaction,
         onboarding_health=clamp_int(satisfaction - 4),
         support_load=clamp_int(product.bug_level // 2),
         open_tickets=clamp_int(product.bug_level // 5, 0, 1000),
         sla_breach_risk=clamp_int(max(0, 45 - satisfaction)),
+        invoice_risk=18 if product.target_segment is MarketSegment.ENTERPRISE else 26,
+        escalation_count=0,
         expansion_potential=clamp_int(product.market_fit + product.feature_count * 2),
         renewal_turn=current_turn + get_contract_interval(contract_cadence),
         churn_risk=max(0, 65 - satisfaction),
@@ -279,6 +325,7 @@ def _calculate_satisfaction_delta(
         - (account.support_load // 20)
         - (account.open_tickets // 12)
         - (account.sla_breach_risk // 24)
+        - (account.invoice_risk // 30)
         + customer_success_bonus
     )
     if account.sla_breach_risk >= BALANCE.contract_sla_risk_threshold:

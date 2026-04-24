@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import Company, FinanceState, FundingHistoryEntry, FundingType
+from nexus_tech.domain.models import (
+    Company,
+    FinanceState,
+    FundingHistoryEntry,
+    FundingType,
+    TurnLedgerEntry,
+)
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.support import clamp_int
@@ -29,6 +35,10 @@ class FinanceTurnSummary:
     total_finance_cost: Decimal
     investor_pressure_delta: int
     runway_turns: int | None
+    forecast_net_cash_flow: Decimal
+    forecast_runway_turns: int | None
+    covenant_risk: int
+    missed_board_targets: int
 
 
 def count_funding_rounds(
@@ -73,6 +83,23 @@ def estimate_runway(cash_on_hand: Decimal, net_cash_flow: Decimal) -> int | None
     if burn <= ZERO_MONEY:
         return None
     return int(cash_on_hand / burn)
+
+
+def calculate_cash_flow_forecast(
+    turn_history: list[TurnLedgerEntry],
+    *,
+    latest_net_cash_flow: Decimal,
+) -> Decimal:
+    """Forecast near-term cash flow from recent turn history."""
+
+    recent_flows = [
+        entry.net_cash_flow for entry in turn_history[-BALANCE.finance_forecast_history_window :]
+    ]
+    if recent_flows:
+        recent_flows.append(latest_net_cash_flow)
+    else:
+        recent_flows = [latest_net_cash_flow]
+    return quantize_money(sum(recent_flows, ZERO_MONEY) / Decimal(len(recent_flows)))
 
 
 def apply_take_loan(
@@ -248,6 +275,7 @@ def apply_end_of_turn_finance_drift(
     company: Company,
     *,
     net_cash_flow: Decimal,
+    turn_history: list[TurnLedgerEntry] | None = None,
 ) -> FinanceTurnSummary:
     """Apply passive finance pressure changes after the turn resolves."""
 
@@ -266,13 +294,50 @@ def apply_end_of_turn_finance_drift(
         investor_pressure_delta -= BALANCE.finance_pressure_relief_on_stability
 
     finance.investor_pressure = clamp_int(finance.investor_pressure + investor_pressure_delta)
+    forecast_net_cash_flow = calculate_cash_flow_forecast(
+        turn_history or [],
+        latest_net_cash_flow=net_cash_flow,
+    )
+    forecast_runway_turns = estimate_runway(company.cash_on_hand, forecast_net_cash_flow)
+    covenant_delta = 0
+    if finance.debt_principal >= BALANCE.finance_covenant_risk_debt_threshold:
+        covenant_delta += BALANCE.finance_covenant_risk_gain
+    if company.cash_on_hand <= BALANCE.finance_covenant_risk_cash_buffer:
+        covenant_delta += BALANCE.finance_covenant_risk_gain // 2
+    if net_cash_flow < ZERO_MONEY:
+        covenant_delta += BALANCE.finance_covenant_risk_gain // 2
+    if (
+        company.cash_on_hand > BALANCE.finance_covenant_risk_cash_buffer
+        and net_cash_flow >= ZERO_MONEY
+    ):
+        covenant_delta -= BALANCE.finance_covenant_risk_relief
+    finance.covenant_risk = clamp_int(finance.covenant_risk + covenant_delta)
+
+    if (
+        forecast_runway_turns is not None
+        and forecast_runway_turns < BALANCE.finance_board_runway_target
+    ):
+        finance.missed_board_targets += BALANCE.finance_board_target_miss_gain
+    else:
+        finance.missed_board_targets = max(
+            0,
+            finance.missed_board_targets - BALANCE.finance_board_target_relief,
+        )
+
     board_delta = (
         BALANCE.board_confidence_positive_cashflow_gain
         if net_cash_flow >= ZERO_MONEY
         else -BALANCE.board_confidence_negative_cashflow_loss
     )
     board_delta -= finance.investor_pressure // BALANCE.board_confidence_pressure_divisor
+    board_delta -= (
+        finance.covenant_risk // BALANCE.finance_board_covenant_confidence_penalty_divisor
+    )
+    if finance.missed_board_targets > 0:
+        board_delta -= BALANCE.finance_board_miss_confidence_penalty
     finance.board_confidence = clamp_int(finance.board_confidence + board_delta)
+    finance.forecast_net_cash_flow = forecast_net_cash_flow
+    finance.forecast_runway_turns = forecast_runway_turns
 
     return FinanceTurnSummary(
         interest_cost=interest_cost,
@@ -280,4 +345,8 @@ def apply_end_of_turn_finance_drift(
         total_finance_cost=quantize_money(interest_cost + investor_pressure_cost),
         investor_pressure_delta=investor_pressure_delta,
         runway_turns=estimate_runway(company.cash_on_hand, net_cash_flow),
+        forecast_net_cash_flow=forecast_net_cash_flow,
+        forecast_runway_turns=forecast_runway_turns,
+        covenant_risk=finance.covenant_risk,
+        missed_board_targets=finance.missed_board_targets,
     )

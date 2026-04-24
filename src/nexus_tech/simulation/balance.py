@@ -695,6 +695,16 @@ class BalanceConfig:
     finance_pressure_increase_on_high_debt: int = 1
     finance_pressure_relief_on_stability: int = 1
     finance_pressure_relief_cash_threshold: Decimal = Decimal("7000.00")
+    finance_board_runway_target: int = 8
+    finance_forecast_history_window: int = 3
+    finance_covenant_risk_debt_threshold: Decimal = Decimal("5200.00")
+    finance_covenant_risk_cash_buffer: Decimal = Decimal("2600.00")
+    finance_covenant_risk_gain: int = 8
+    finance_covenant_risk_relief: int = 5
+    finance_board_target_miss_gain: int = 1
+    finance_board_target_relief: int = 1
+    finance_board_covenant_confidence_penalty_divisor: int = 16
+    finance_board_miss_confidence_penalty: int = 1
     finance_score_debt_divisor: Decimal = Decimal("600.00")
     finance_score_pressure_divisor: int = 6
     finance_score_dilution_multiplier: int = 80
@@ -757,6 +767,22 @@ class BalanceConfig:
     sales_deal_close_probability_threshold: int = 62
     sales_deal_customer_satisfaction: int = 66
     sales_deal_customer_expansion: int = 54
+    sales_deal_default_add_on_commitment_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 0,
+            "startup": 1,
+            "smb": 2,
+            "enterprise": 3,
+        }
+    )
+    sales_deal_default_discount_rate_by_segment: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "indie": Decimal("0.0000"),
+            "startup": Decimal("0.0200"),
+            "smb": Decimal("0.0300"),
+            "enterprise": Decimal("0.0400"),
+        }
+    )
     sales_deal_billing_model_by_segment: dict[str, str] = field(
         default_factory=lambda: {
             "indie": "flat",
@@ -1199,6 +1225,32 @@ class BalanceConfig:
     key_account_support_load_cap: int = 8
     key_account_onboarding_good_threshold: int = 70
     key_account_onboarding_bad_threshold: int = 45
+    contract_add_on_unit_revenue_by_plan: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "budget": Decimal("18.00"),
+            "standard": Decimal("28.00"),
+            "premium": Decimal("40.00"),
+        }
+    )
+    contract_default_add_on_commitment_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 0,
+            "startup": 1,
+            "smb": 2,
+            "enterprise": 3,
+        }
+    )
+    contract_invoice_risk_monthly_gain: int = 4
+    contract_invoice_risk_discount_gain_divisor: Decimal = Decimal("0.0200")
+    contract_invoice_risk_ticket_divisor: int = 5
+    contract_invoice_risk_prepay_relief: int = 5
+    contract_invoice_risk_onboarding_relief_divisor: int = 18
+    contract_invoice_risk_threshold: int = 58
+    contract_invoice_risk_severe_threshold: int = 78
+    contract_invoice_risk_churn_gain: int = 5
+    contract_invoice_risk_satisfaction_loss: int = 2
+    contract_add_on_expansion_gain: int = 1
+    contract_add_on_downgrade_loss: int = 1
     contract_seat_unit_revenue: Decimal = Decimal("18.00")
     contract_usage_unit_revenue: Decimal = Decimal("4.00")
     contract_default_billing_model_by_segment: dict[str, str] = field(
@@ -1249,6 +1301,8 @@ class BalanceConfig:
     customer_success_churn_risk_relief: int = 8
     customer_success_ticket_relief: int = 4
     customer_success_sla_relief: int = 8
+    customer_success_knowledge_base_gain: int = 5
+    customer_success_automation_gain: int = 3
     retention_play_cost: Decimal = Decimal("180.00")
     retention_discount_rate_increase: Decimal = Decimal("0.0200")
     retention_satisfaction_gain: int = 9
@@ -1266,6 +1320,33 @@ class BalanceConfig:
     board_confidence_low_threshold: int = 32
     board_confidence_high_threshold: int = 72
     board_confidence_score_divisor: int = 10
+
+    support_program_base_capacity: int = 6
+    support_program_knowledge_base_divisor: int = 12
+    support_program_automation_divisor: int = 10
+    support_program_customer_success_capacity_bonus: int = 2
+    support_program_backlog_ticket_divisor: int = 6
+    support_program_queue_relief_divisor: int = 8
+    support_program_escalation_ticket_threshold: int = 14
+    support_program_escalation_sla_threshold: int = 62
+    support_program_backlog_reputation_threshold: int = 24
+    support_program_backlog_reputation_loss: int = 1
+    support_program_backlog_morale_penalty_threshold: int = 18
+    support_program_backlog_morale_penalty: int = 1
+
+    hiring_source_cost: Decimal = Decimal("120.00")
+    hiring_interview_cost: Decimal = Decimal("90.00")
+    hiring_offer_cash_buffer_multiplier: Decimal = Decimal("2.50")
+    hiring_pipeline_candidate_limit: int = 6
+    hiring_pipeline_candidate_ttl: int = 4
+    hiring_acceptance_base: int = 44
+    hiring_acceptance_reputation_divisor: int = 3
+    hiring_acceptance_cash_buffer_divisor: Decimal = Decimal("900.00")
+    hiring_acceptance_interview_divisor: int = 2
+    hiring_acceptance_offer_threshold: int = 68
+    hiring_interview_score_gain: int = 18
+    hiring_interview_score_cap: int = 92
+    hiring_decline_reputation_loss: int = 1
 
     exit_acquisition_score_threshold: int = 170
     exit_acquisition_value_multiplier: Decimal = Decimal("1.15")

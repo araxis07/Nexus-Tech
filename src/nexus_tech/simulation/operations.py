@@ -55,6 +55,7 @@ def calculate_operations_summary(
     *,
     current_turn: int,
     customer_accounts: list[CustomerAccount] | None = None,
+    support_backlog_queue: int = 0,
 ) -> OperationsSummary:
     """Estimate operational pressure from support, complexity, and coordination."""
 
@@ -93,7 +94,9 @@ def calculate_operations_summary(
         // BALANCE.operations_turn_load_divisor
     )
     company_capacity = _calculate_company_operations_capacity(employees)
-    support_backlog = sum(account.open_tickets for account in active_accounts)
+    support_backlog = (
+        sum(account.open_tickets for account in active_accounts) + support_backlog_queue
+    )
     sla_risk_accounts = sum(
         1
         for account in active_accounts
@@ -153,6 +156,7 @@ def apply_end_of_turn_operations(
         state.employees,
         current_turn=current_turn,
         customer_accounts=state.customer_accounts,
+        support_backlog_queue=state.support_program.backlog_queue,
     )
     if summary.overload == 0:
         return summary

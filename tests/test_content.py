@@ -52,6 +52,9 @@ def test_scenario_catalog_exposes_expected_default_entry() -> None:
     assert any(scenario.scenario_id == "regulated_ai_scale" for scenario in scenarios)
     assert any(scenario.scenario_id == "platform_ecosystem_push" for scenario in scenarios)
     assert any(scenario.scenario_id == "enterprise_rescue" for scenario in scenarios)
+    assert any(scenario.scenario_id == "contract_renewal_gauntlet" for scenario in scenarios)
+    assert any(scenario.scenario_id == "support_scaling_crunch" for scenario in scenarios)
+    assert any(scenario.scenario_id == "forecast_board_reset" for scenario in scenarios)
     assert len(scenario_ids) == len(set(scenario_ids))
 
 
@@ -234,6 +237,24 @@ def test_content_pack_five_templates_and_objective_scenarios_are_available() -> 
     assert state.scenario_title == "Regulated AI Scale"
 
 
+def test_content_pack_six_templates_and_forecast_scenarios_are_available() -> None:
+    billing = get_product_template("subscription_billing_studio")
+    support = get_product_template("support_automation_hub")
+    finance = get_product_template("revenue_forecast_cloud")
+    scenario = next(
+        scenario
+        for scenario in get_available_scenarios()
+        if scenario.scenario_id == "forecast_board_reset"
+    )
+    state = create_new_game(scenario_id="support_scaling_crunch")
+
+    assert billing.pricing_tier is PricingTier.PREMIUM
+    assert support.target_segment.value == "smb"
+    assert finance.revenue_per_user == Decimal("76.00")
+    assert "board confidence" in scenario.objective.lower()
+    assert state.scenario_title == "Support Scaling Crunch"
+
+
 def test_competitor_archetype_catalog_is_available() -> None:
     archetypes = get_available_competitor_archetypes()
     archetype_ids = {archetype.archetype_id for archetype in archetypes}
@@ -245,6 +266,9 @@ def test_competitor_archetype_catalog_is_available() -> None:
         "open_source_challenger",
         "regulatory_incumbent",
         "platform_consolidator",
+        "support_swarm",
+        "revenue_optimizer",
+        "renewal_lockin_vendor",
     }.issubset(archetype_ids)
 
 

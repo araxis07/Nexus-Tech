@@ -24,10 +24,14 @@ class FinanceRepository:
                 equity_dilution,
                 investor_pressure,
                 board_confidence,
+                covenant_risk,
+                missed_board_targets,
                 total_raised,
+                forecast_net_cash_flow,
+                forecast_runway_turns,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -36,7 +40,11 @@ class FinanceRepository:
                 str(finance.equity_dilution),
                 finance.investor_pressure,
                 finance.board_confidence,
+                finance.covenant_risk,
+                finance.missed_board_targets,
                 str(finance.total_raised),
+                str(finance.forecast_net_cash_flow),
+                finance.forecast_runway_turns,
                 finance.last_funding_turn,
             ),
         )
@@ -52,7 +60,11 @@ class FinanceRepository:
                 equity_dilution,
                 investor_pressure,
                 board_confidence,
+                covenant_risk,
+                missed_board_targets,
                 total_raised,
+                forecast_net_cash_flow,
+                forecast_runway_turns,
                 last_funding_turn
             FROM finance_state
             WHERE slot_name = ?
@@ -70,7 +82,11 @@ class FinanceRepository:
             board_confidence=(
                 row["board_confidence"] if row["board_confidence"] is not None else 55
             ),
+            covenant_risk=row["covenant_risk"] or 0,
+            missed_board_targets=row["missed_board_targets"] or 0,
             total_raised=Decimal(row["total_raised"]),
+            forecast_net_cash_flow=Decimal(row["forecast_net_cash_flow"] or "0.00"),
+            forecast_runway_turns=row["forecast_runway_turns"],
             last_funding_turn=row["last_funding_turn"],
         )
 

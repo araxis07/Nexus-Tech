@@ -34,8 +34,10 @@ class ContractRenewalDelta:
     contract_value_delta: Decimal
     seat_delta: int
     usage_delta: int
+    add_on_delta: int
     cadence_upgraded: bool
     downgraded: bool
+    annual_prepay_enabled: bool
 
 
 def calculate_account_recurring_revenue(account: CustomerAccount) -> Decimal:
@@ -46,6 +48,10 @@ def calculate_account_recurring_revenue(account: CustomerAccount) -> Decimal:
         recurring_value += Decimal(account.seat_count) * BALANCE.contract_seat_unit_revenue
     elif account.billing_model is ContractBillingModel.USAGE_BASED:
         recurring_value += Decimal(account.usage_units) * BALANCE.contract_usage_unit_revenue
+    recurring_value += (
+        Decimal(account.add_on_count)
+        * BALANCE.contract_add_on_unit_revenue_by_plan[account.plan_tier.value]
+    )
     recurring_value = quantize_money(recurring_value)
     return quantize_money(recurring_value * (Decimal("1.0000") - account.discount_rate))
 
@@ -85,6 +91,10 @@ def apply_support_drift(
 ) -> ContractSupportDelta:
     """Update support load, tickets, and SLA risk for one account."""
 
+    ticket_relief = 0
+    if getattr(account, "annual_prepay", False):
+        ticket_relief += 1
+
     support_load_delta = clamp_int(
         (product.bug_level // BALANCE.key_account_support_load_bug_divisor)
         - (product.quality // BALANCE.key_account_support_load_quality_relief_divisor)
@@ -100,6 +110,7 @@ def apply_support_drift(
         + (account.support_load // BALANCE.key_account_support_load_bug_divisor)
         - (product.quality // BALANCE.contract_ticket_quality_relief_divisor)
         - customer_success_bonus
+        - ticket_relief
         - BALANCE.contract_ticket_close_base_relief,
         -BALANCE.key_account_support_load_cap,
         BALANCE.key_account_support_load_cap,
@@ -133,8 +144,10 @@ def apply_commercial_renewal(
     contract_value_delta = Decimal("0.00")
     seat_delta = 0
     usage_delta = 0
+    add_on_delta = 0
     cadence_upgraded = False
     downgraded = False
+    annual_prepay_enabled = False
 
     healthy_account = (
         account.satisfaction >= BALANCE.key_account_satisfaction_good_threshold
@@ -156,6 +169,8 @@ def apply_commercial_renewal(
         else:
             contract_value_delta = BALANCE.contract_flat_expansion_contract_gain
             account.contract_value = quantize_money(account.contract_value + contract_value_delta)
+        add_on_delta = BALANCE.contract_add_on_expansion_gain
+        account.add_on_count += add_on_delta
 
         account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
     elif weak_account:
@@ -177,6 +192,8 @@ def apply_commercial_renewal(
                 BALANCE.contract_flat_downgrade_contract_loss,
             )
             account.contract_value = quantize_money(account.contract_value + contract_value_delta)
+        add_on_delta = -min(account.add_on_count, BALANCE.contract_add_on_downgrade_loss)
+        account.add_on_count += add_on_delta
 
     if (
         account.contract_cadence is ContractCadence.MONTHLY
@@ -187,13 +204,23 @@ def apply_commercial_renewal(
         account.contract_cadence = ContractCadence.ANNUAL
         account.discount_rate = clamp_rate(account.discount_rate + Decimal("0.0100"))
         cadence_upgraded = True
+    if (
+        account.contract_cadence is ContractCadence.ANNUAL
+        and not account.annual_prepay
+        and account.satisfaction >= BALANCE.key_account_satisfaction_good_threshold
+        and account.invoice_risk < BALANCE.contract_invoice_risk_threshold
+    ):
+        account.annual_prepay = True
+        annual_prepay_enabled = True
 
     return ContractRenewalDelta(
         contract_value_delta=contract_value_delta,
         seat_delta=seat_delta,
         usage_delta=usage_delta,
+        add_on_delta=add_on_delta,
         cadence_upgraded=cadence_upgraded,
         downgraded=downgraded,
+        annual_prepay_enabled=annual_prepay_enabled,
     )
 
 

@@ -54,6 +54,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Add AI-governance, developer-marketplace, customer-health, and incident-command templates plus higher-scale trust and ecosystem scenarios
 - Add open-source, enterprise-AI-ops, vertical-compliance, and community-marketplace templates plus objective-driven scale scenarios
 - Add sales-enablement AI, data-quality, and release-ops templates plus enterprise pipeline, data trust, and release-crunch scenarios
+- Add subscription-billing, support-automation, and revenue-forecast templates plus renewal, support, and board-recovery scenarios
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Track scenario-specific objectives with measurable progress such as closed deals, reputation, or enterprise users
 - Support custom company and primary product overrides on top of scenario defaults
@@ -69,6 +70,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Add AI fast followers, governance giants, and ecosystem brokers as new rival archetypes
 - Add open source challengers, regulatory incumbents, and platform consolidators as new competitor archetypes
 - Add enterprise sales machines, data-quality specialists, and release-velocity rivals as higher-scale pressure archetypes
+- Add support-swarm, revenue-optimizer, and renewal-lock-in rivals for heavier post-sale and monetization pressure
 - Let rival moves reshape product count and pricing posture over time
 - Capture compact competitor-intel notes when rival posture changes or momentum spikes
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
@@ -84,6 +86,8 @@ Each turn represents a business interval. You review the company, choose actions
 - Raise `angel` or `venture` funding when the company has enough traction
 - Track debt, dilution, investor pressure, total capital raised, and funding history
 - Track board confidence as a compact signal of governance trust, cash-flow discipline, and capital pressure
+- Forecast near-term cash flow and runway instead of relying only on last-turn performance
+- Track covenant risk and missed board targets so finance pressure is visible before collapse
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
 
 ### 🤝 Customer Accounts
@@ -93,10 +97,12 @@ Each turn represents a business interval. You review the company, choose actions
 - Track account satisfaction, contract value, expansion potential, renewal timing, and churn risk
 - Add contract cadence, discounting, onboarding health, and support load to make renewals more believable
 - Support flat, seat-based, and usage-based contract models with different commercial expansion patterns
+- Track per-account plan tier, add-ons, annual prepay posture, and invoice-risk pressure
 - Track open tickets and SLA pressure so support quality can directly affect renewals and retention
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
 - Invest directly in customer success and run targeted retention plays on fragile accounts
+- Improve a shared support program with knowledge-base and automation depth that lowers ticket pressure across the portfolio
 - Review key accounts directly from the in-game `review_customers` action
 
 ### 👥 Employee and Team System
@@ -104,6 +110,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Hire and fire employees
 - Review deterministic candidate pools before hiring during demos or interactive runs
 - Evaluate candidate traits such as steady operator, fast learner, expensive expert, and burnout risk
+- Run a persistent hiring pipeline with sourcing, interviewing, and offer conversion instead of only instant hires
 - Assign team members to specific products
 - Manage core roles:
   - `engineer`

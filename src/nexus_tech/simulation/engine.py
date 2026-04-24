@@ -78,6 +78,12 @@ from nexus_tech.simulation.functional_budgeting import (
     get_functional_budget_profile,
 )
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
+from nexus_tech.simulation.hiring_pipeline import (
+    age_hiring_candidates,
+    interview_candidate,
+    make_hiring_offer,
+    source_candidates,
+)
 from nexus_tech.simulation.late_game import LateGameSummary, apply_end_of_turn_late_game
 from nexus_tech.simulation.market import advance_market_cycle
 from nexus_tech.simulation.milestones import resolve_new_milestones
@@ -123,6 +129,7 @@ from nexus_tech.simulation.scenarios import (
 from nexus_tech.simulation.segments import calculate_competitor_pressure
 from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int
+from nexus_tech.simulation.support_program import apply_end_of_turn_support_program
 from nexus_tech.simulation.team import (
     TeamCondition,
     apply_end_of_turn_team_drift,
@@ -164,6 +171,7 @@ class ActionContext:
     roadmap_project_id: UUID | None = None
     customer_account_id: UUID | None = None
     functional_budget_preset: FunctionalBudgetPreset | None = None
+    hiring_candidate_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -383,6 +391,31 @@ def apply_action(
         employee = get_employee_by_id(next_state.employees, context.employee_id)
         summary = promote_employee(employee)
         logger.debug("Promoted employee %s.", employee.full_name)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.SOURCE_CANDIDATES:
+        summary = source_candidates(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Sourced hiring candidates.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.INTERVIEW_CANDIDATE:
+        summary = interview_candidate(next_state, context.hiring_candidate_id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Interviewed hiring candidate %s.", context.hiring_candidate_id)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.MAKE_HIRING_OFFER:
+        summary = make_hiring_offer(next_state, context.hiring_candidate_id)
+        logger.debug("Made offer to hiring candidate %s.", context.hiring_candidate_id)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.SET_COMPANY_STRATEGY:
@@ -884,8 +917,21 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.products,
         current_turn=resolved_turn,
         customer_success_bonus=functional_budget_profile.customer_success_bonus,
+        support_program=next_state.support_program,
     )
     total_revenue = quantize_money(total_revenue + customer_summary.account_revenue)
+    support_summary = apply_end_of_turn_support_program(
+        next_state,
+        customer_success_bonus=functional_budget_profile.customer_success_bonus,
+    )
+    if support_summary.reputation_delta != 0:
+        next_state.company.reputation = clamp_int(
+            next_state.company.reputation + support_summary.reputation_delta
+        )
+        reputation_delta += support_summary.reputation_delta
+    if support_summary.morale_penalty > 0:
+        for employee in next_state.employees:
+            employee.morale = clamp_int(employee.morale - support_summary.morale_penalty)
 
     operations_summary = apply_end_of_turn_operations(
         next_state,
@@ -931,6 +977,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state.finance,
         next_state.company,
         net_cash_flow=net_cash_flow,
+        turn_history=next_state.turn_history,
     )
     next_state.finance.board_confidence = clamp_int(
         next_state.finance.board_confidence + functional_budget_profile.board_confidence_bonus
@@ -962,6 +1009,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         reputation_delta -= 1
 
     age_sales_pipeline(next_state)
+    age_hiring_candidates(next_state)
     event_outcome: EventTurnOutcome = resolve_turn_event(next_state, rng)
     next_state = event_outcome.state
     team_condition = calculate_team_condition(next_state.employees)

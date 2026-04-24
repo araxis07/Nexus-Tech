@@ -28,6 +28,7 @@ from nexus_tech.domain.models import (
     FunctionalBudget,
     FunctionalBudgetPreset,
     GameState,
+    HiringCandidateStage,
     LifecycleStage,
     MarketCycle,
     MarketSegment,
@@ -44,6 +45,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
     ScenarioObjectiveMetric,
     Seniority,
+    SupportProgram,
     TurnAction,
     TurnLedgerEntry,
 )
@@ -60,6 +62,7 @@ from nexus_tech.simulation.balance_lab import (
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.competition import advance_competitors, calculate_competitor_pressure
 from nexus_tech.simulation.competitor_intel import record_competitor_intel
+from nexus_tech.simulation.contracts import calculate_account_recurring_revenue
 from nexus_tech.simulation.customers import (
     apply_end_of_turn_customers,
     calculate_account_revenue,
@@ -84,6 +87,11 @@ from nexus_tech.simulation.growth import (
     calculate_effective_churn_rate_for_context,
 )
 from nexus_tech.simulation.hiring import generate_candidate_pool
+from nexus_tech.simulation.hiring_pipeline import (
+    interview_candidate,
+    make_hiring_offer,
+    source_candidates,
+)
 from nexus_tech.simulation.late_game import (
     apply_end_of_turn_late_game,
     calculate_late_game_summary,
@@ -107,6 +115,7 @@ from nexus_tech.simulation.scaling import (
     calculate_company_scale_pressure,
     calculate_product_scale_pressure,
 )
+from nexus_tech.simulation.support_program import apply_end_of_turn_support_program
 from nexus_tech.simulation.team import (
     calculate_base_productivity,
     calculate_effective_productivity,
@@ -2716,3 +2725,175 @@ def test_functional_budget_affects_customer_risk_drift() -> None:
         trust_resolution.state.customer_accounts[0].churn_risk
         <= balanced_resolution.state.customer_accounts[0].churn_risk
     )
+
+
+def test_account_recurring_revenue_includes_add_ons() -> None:
+    account = CustomerAccount(
+        name="Expansion Anchor",
+        product_id=UUID(int=1),
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1000.00"),
+        plan_tier=PricingTier.PREMIUM,
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.FLAT,
+        add_on_count=2,
+        discount_rate=Decimal("0.1000"),
+        satisfaction=74,
+        expansion_potential=60,
+        renewal_turn=8,
+        churn_risk=12,
+    )
+
+    assert calculate_account_recurring_revenue(account) == Decimal("972.00")
+
+
+def test_explicit_support_program_relief_reduces_account_pressure() -> None:
+    product = make_product("Support Guard", quality=46, bug_level=34, market_fit=54)
+    account = CustomerAccount(
+        name="Support Guard Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("960.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=16,
+        satisfaction=59,
+        onboarding_health=52,
+        support_load=32,
+        open_tickets=14,
+        sla_breach_risk=57,
+        expansion_potential=63,
+        renewal_turn=7,
+        churn_risk=34,
+    )
+
+    baseline_account = account.model_copy(deep=True)
+    support_account = account.model_copy(deep=True)
+    baseline_summary = apply_end_of_turn_customers(
+        [baseline_account],
+        [product],
+        current_turn=4,
+    )
+    support_summary = apply_end_of_turn_customers(
+        [support_account],
+        [product],
+        current_turn=4,
+        support_program=SupportProgram(
+            knowledge_base_level=74,
+            automation_level=68,
+        ),
+    )
+
+    assert support_summary.total_open_tickets < baseline_summary.total_open_tickets
+    assert support_account.sla_breach_risk < baseline_account.sla_breach_risk
+    assert support_account.invoice_risk <= baseline_account.invoice_risk
+
+
+def test_support_program_backlog_creates_queue_pressure() -> None:
+    product = make_product("Ticket Storm", quality=42, bug_level=40, market_fit=50)
+    account = CustomerAccount(
+        name="Storm Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1100.00"),
+        contract_cadence=ContractCadence.ANNUAL,
+        satisfaction=48,
+        onboarding_health=45,
+        support_load=42,
+        open_tickets=28,
+        sla_breach_risk=66,
+        expansion_potential=52,
+        renewal_turn=6,
+        churn_risk=44,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("9000.00"))
+    state.support_program = SupportProgram(
+        knowledge_base_level=6,
+        automation_level=4,
+        backlog_queue=18,
+    )
+
+    summary = apply_end_of_turn_support_program(state)
+
+    assert summary.backlog_queue > 18
+    assert summary.sla_breaches >= 1
+    assert summary.reputation_delta <= 0
+    assert summary.morale_penalty >= 0
+
+
+def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
+    product = make_product("Hiring Hub")
+    state = make_state(product, cash_on_hand=Decimal("15000.00"))
+    state.company.reputation = 72
+
+    source_summary = source_candidates(state, count=1)
+
+    assert "Sourced 1 candidate" in source_summary.message
+    assert len(state.hiring_candidates) == 1
+    candidate = state.hiring_candidates[0]
+    assert candidate.stage is HiringCandidateStage.SOURCED
+
+    interview_summary = interview_candidate(state, candidate.id)
+
+    assert "Interviewed" in interview_summary.message
+    assert candidate.stage is HiringCandidateStage.INTERVIEWED
+
+    candidate.acceptance_chance = 90
+    candidate.interview_score = 84
+    candidate.salary_expectation = Decimal("650.00")
+    offer_summary = make_hiring_offer(state, candidate.id)
+
+    assert "accepted the offer" in offer_summary.message
+    assert len(state.hiring_candidates) == 0
+    assert any(employee.full_name == candidate.full_name for employee in state.employees)
+
+
+def test_finance_forecast_updates_board_and_covenant_pressure() -> None:
+    finance = FinanceState(
+        debt_principal=Decimal("5200.00"),
+        loan_interest_rate=Decimal("0.0300"),
+        investor_pressure=14,
+        board_confidence=64,
+    )
+    company = Company(
+        name="Forecast Labs",
+        cash_on_hand=Decimal("1800.00"),
+        reputation=52,
+    )
+    turn_history = [
+        TurnLedgerEntry(
+            turn=1,
+            total_revenue=Decimal("1100.00"),
+            total_operating_cost=Decimal("1900.00"),
+            net_cash_flow=Decimal("-800.00"),
+            cash_on_hand=Decimal("3000.00"),
+            reputation=50,
+            total_users=38,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+        TurnLedgerEntry(
+            turn=2,
+            total_revenue=Decimal("1180.00"),
+            total_operating_cost=Decimal("1980.00"),
+            net_cash_flow=Decimal("-800.00"),
+            cash_on_hand=Decimal("2200.00"),
+            reputation=51,
+            total_users=40,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+    ]
+
+    summary = apply_end_of_turn_finance_drift(
+        finance,
+        company,
+        net_cash_flow=Decimal("-900.00"),
+        turn_history=turn_history,
+    )
+
+    assert summary.forecast_net_cash_flow == Decimal("-833.33")
+    assert summary.forecast_runway_turns == 2
+    assert finance.covenant_risk > 0
+    assert finance.missed_board_targets > 0
+    assert finance.board_confidence < 64

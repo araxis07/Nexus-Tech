@@ -256,6 +256,15 @@ class SalesDealStage(StrEnum):
     CLOSED_LOST = "closed_lost"
 
 
+class HiringCandidateStage(StrEnum):
+    """Lifecycle stage for a persisted hiring-pipeline candidate."""
+
+    SOURCED = "sourced"
+    INTERVIEWED = "interviewed"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+
+
 class RoadmapProjectType(StrEnum):
     """Multi-turn strategic projects beyond the active roadmap modifier."""
 
@@ -311,6 +320,9 @@ class TurnAction(StrEnum):
     RUN_RETENTION_PLAY = "run_retention_play"
     TRAIN_EMPLOYEE = "train_employee"
     PROMOTE_EMPLOYEE = "promote_employee"
+    SOURCE_CANDIDATES = "source_candidates"
+    INTERVIEW_CANDIDATE = "interview_candidate"
+    MAKE_HIRING_OFFER = "make_hiring_offer"
     SET_FUNCTIONAL_BUDGET = "set_functional_budget"
     PLAN_RELEASE = "plan_release"
     WORK_RELEASE = "work_release"
@@ -442,10 +454,14 @@ class FinanceState(BaseModel):
     )
     investor_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_confidence: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    covenant_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    missed_board_targets: int = Field(default=0, ge=0)
     total_raised: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    forecast_net_cash_flow: Decimal = Field(default=Decimal("0.00"))
+    forecast_runway_turns: Optional[int] = Field(default=None, ge=0)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
-    @field_validator("debt_principal", "total_raised", mode="before")
+    @field_validator("debt_principal", "total_raised", "forecast_net_cash_flow", mode="before")
     @classmethod
     def _normalize_finance_money(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
@@ -499,6 +515,17 @@ class FunctionalBudget(BaseModel):
         return self
 
 
+class SupportProgram(BaseModel):
+    """Shared customer-support tooling and deflection state."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    knowledge_base_level: int = Field(default=22, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    automation_level: int = Field(default=16, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    backlog_queue: int = Field(default=0, ge=0)
+    sla_breaches_last_turn: int = Field(default=0, ge=0)
+
+
 class CustomerAccount(BaseModel):
     """A key account that creates renewal and concentration pressure."""
 
@@ -509,16 +536,21 @@ class CustomerAccount(BaseModel):
     product_id: UUID
     segment: MarketSegment
     contract_value: Decimal = Field(ge=Decimal("0"))
+    plan_tier: PricingTier = PricingTier.STANDARD
     contract_cadence: ContractCadence = ContractCadence.ANNUAL
     billing_model: ContractBillingModel = ContractBillingModel.FLAT
     seat_count: int = Field(default=0, ge=0)
     usage_units: int = Field(default=0, ge=0)
+    add_on_count: int = Field(default=0, ge=0)
+    annual_prepay: bool = False
     discount_rate: Decimal = Field(default=Decimal("0.0000"), ge=Decimal("0"), le=Decimal("1"))
     satisfaction: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     onboarding_health: int = Field(default=60, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     support_load: int = Field(default=20, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     open_tickets: int = Field(default=0, ge=0)
     sla_breach_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    invoice_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    escalation_count: int = Field(default=0, ge=0)
     expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_turn: int = Field(ge=1)
     churn_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
@@ -669,10 +701,17 @@ class SalesDeal(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     segment: MarketSegment = MarketSegment.ENTERPRISE
     stage: SalesDealStage = SalesDealStage.LEAD
+    plan_tier: PricingTier = PricingTier.STANDARD
     billing_model: ContractBillingModel = ContractBillingModel.FLAT
     seat_commitment: int = Field(default=0, ge=0)
     usage_commitment: int = Field(default=0, ge=0)
+    add_on_commitment: int = Field(default=0, ge=0)
     value: Decimal = Field(ge=Decimal("0"))
+    proposed_discount_rate: Decimal = Field(
+        default=Decimal("0.0000"),
+        ge=Decimal("0"),
+        le=Decimal("1"),
+    )
     probability: int = Field(default=30, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     created_turn: int = Field(ge=1)
     updated_turn: int = Field(ge=1)
@@ -680,6 +719,36 @@ class SalesDeal(BaseModel):
     @field_validator("value", mode="before")
     @classmethod
     def _normalize_deal_value(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+    @field_validator("proposed_discount_rate", mode="before")
+    @classmethod
+    def _normalize_deal_discount(cls, value: Decimal) -> Decimal:
+        return quantize_rate(value)
+
+
+class HiringCandidate(BaseModel):
+    """A persisted candidate moving through the hiring pipeline."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    full_name: str = Field(min_length=1, max_length=80)
+    role: EmployeeRole
+    seniority: Seniority
+    specialization: str = Field(min_length=1, max_length=40)
+    trait: CandidateTrait = CandidateTrait.STEADY_OPERATOR
+    salary_expectation: Decimal = Field(ge=Decimal("0"))
+    expected_productivity: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    stage: HiringCandidateStage = HiringCandidateStage.SOURCED
+    sourced_turn: int = Field(ge=1)
+    expires_turn: int = Field(ge=1)
+    interview_score: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    acceptance_chance: int = Field(default=50, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+
+    @field_validator("salary_expectation", mode="before")
+    @classmethod
+    def _normalize_candidate_salary(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
 
 
@@ -724,6 +793,7 @@ class GameState(BaseModel):
     products: list[Product] = Field(min_length=1)
     employees: list[Employee] = Field(default_factory=list)
     finance: FinanceState = Field(default_factory=FinanceState)
+    support_program: SupportProgram = Field(default_factory=SupportProgram)
     pending_event: Optional[PendingEvent] = None  # noqa: UP045
     event_history: list[EventHistoryEntry] = Field(default_factory=list)
     milestone_history: list[MilestoneEntry] = Field(default_factory=list)
@@ -736,6 +806,7 @@ class GameState(BaseModel):
     campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE
     competitors: list[Competitor] = Field(default_factory=list)
     customer_accounts: list[CustomerAccount] = Field(default_factory=list)
+    hiring_candidates: list[HiringCandidate] = Field(default_factory=list)
     product_releases: list[ProductReleasePlan] = Field(default_factory=list)
     sales_deals: list[SalesDeal] = Field(default_factory=list)
     roadmap_projects: list[RoadmapProject] = Field(default_factory=list)

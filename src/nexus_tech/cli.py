@@ -32,6 +32,7 @@ from nexus_tech.domain.models import (
     EmployeeRole,
     FunctionalBudgetPreset,
     GameState,
+    HiringCandidateStage,
     MarketSegment,
     PendingEvent,
     PricingTier,
@@ -221,13 +222,16 @@ ACTION_KEYS = {
     "37": TurnAction.WAIT,
     "38": TurnAction.VIEW_STATUS,
     "39": TurnAction.END_TURN,
+    "40": TurnAction.SOURCE_CANDIDATES,
+    "41": TurnAction.INTERVIEW_CANDIDATE,
+    "42": TurnAction.MAKE_HIRING_OFFER,
 }
 UTILITY_ACTION_KEYS = {
-    "40": "save_game",
-    "41": "load_game",
-    "42": "show_guide",
-    "43": "show_glossary",
-    "44": "show_tutorial",
+    "43": "save_game",
+    "44": "load_game",
+    "45": "show_guide",
+    "46": "show_glossary",
+    "47": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -1159,6 +1163,29 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             return None
         return ActionContext(employee_id=employee_id)
 
+    if action is TurnAction.SOURCE_CANDIDATES:
+        return ActionContext()
+
+    if action is TurnAction.INTERVIEW_CANDIDATE:
+        candidate_id = choose_hiring_candidate_id(
+            state,
+            stage=HiringCandidateStage.SOURCED,
+            action_label=action.value,
+        )
+        if candidate_id is None:
+            return None
+        return ActionContext(hiring_candidate_id=candidate_id)
+
+    if action is TurnAction.MAKE_HIRING_OFFER:
+        candidate_id = choose_hiring_candidate_id(
+            state,
+            stage=HiringCandidateStage.INTERVIEWED,
+            action_label=action.value,
+        )
+        if candidate_id is None:
+            return None
+        return ActionContext(hiring_candidate_id=candidate_id)
+
     if action is TurnAction.UNASSIGN_EMPLOYEE:
         employee_id = choose_employee_id(state, action, assigned_only=True)
         if employee_id is None:
@@ -1392,6 +1419,54 @@ def choose_employee_id(
         )
     )
     return employee.id
+
+
+def choose_hiring_candidate_id(
+    state: GameState,
+    *,
+    stage: HiringCandidateStage,
+    action_label: str,
+) -> UUID | None:
+    """Prompt the user to select a hiring candidate for pipeline work."""
+
+    candidates = [candidate for candidate in state.hiring_candidates if candidate.stage is stage]
+    if not candidates:
+        console.print(
+            Panel.fit(
+                f"No candidates are in the '{stage.value}' stage right now.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    table = Table(box=None, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Candidate", style="bold")
+    table.add_column("Role")
+    table.add_column("Seniority")
+    table.add_column("Stage")
+    table.add_column("Accept", justify="right")
+    table.add_column("Salary", justify="right")
+    for index, candidate in enumerate(candidates, start=1):
+        table.add_row(
+            str(index),
+            candidate.full_name,
+            candidate.role.value,
+            candidate.seniority.value,
+            candidate.stage.value,
+            f"{candidate.acceptance_chance}%",
+            str(candidate.salary_expectation),
+        )
+    console.print(Panel(table, title="Hiring Pipeline", border_style="cyan", expand=True))
+    choices = {str(index): candidate for index, candidate in enumerate(candidates, start=1)}
+    selected_key = ask_choice_input(
+        f"Select a candidate for {action_label.replace('_', ' ')}",
+        choices=list(choices),
+        default="1",
+        show_choices=False,
+    )
+    return choices[selected_key].id
 
 
 def choose_customer_account_id(

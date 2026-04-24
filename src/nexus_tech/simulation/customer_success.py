@@ -15,6 +15,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.domain.money import format_rate, quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.support import clamp_int, clamp_rate
+from nexus_tech.simulation.support_program import improve_support_program
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,11 @@ def invest_in_customer_success(
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.customer_success_investment_cost
     )
+    improve_support_program(
+        state.support_program,
+        knowledge_base_gain=BALANCE.customer_success_knowledge_base_gain,
+        automation_gain=BALANCE.customer_success_automation_gain,
+    )
     for account in matching_accounts:
         account.onboarding_health = clamp_int(
             account.onboarding_health + BALANCE.customer_success_onboarding_gain
@@ -62,7 +68,9 @@ def invest_in_customer_success(
     return CustomerSuccessActionSummary(
         message=(
             f"Invested in customer success for {len(matching_accounts)} account(s). "
-            f"Cash -{BALANCE.customer_success_investment_cost}."
+            f"Cash -{BALANCE.customer_success_investment_cost}. "
+            f"Knowledge base {state.support_program.knowledge_base_level}, "
+            f"automation {state.support_program.automation_level}."
         )
     )
 
@@ -89,6 +97,8 @@ def run_retention_play(state: GameState, account_id: UUID) -> CustomerSuccessAct
     account.support_load = clamp_int(account.support_load - BALANCE.retention_support_relief)
     account.open_tickets = max(0, account.open_tickets - BALANCE.retention_ticket_relief)
     account.sla_breach_risk = clamp_int(account.sla_breach_risk - BALANCE.retention_sla_relief)
+    account.invoice_risk = clamp_int(account.invoice_risk - BALANCE.retention_sla_relief)
+    account.escalation_count = max(0, account.escalation_count - 1)
     account.churn_risk = clamp_int(account.churn_risk - BALANCE.retention_churn_risk_relief)
     if account.contract_cadence is ContractCadence.MONTHLY and account.discount_rate >= Decimal(
         "0.1000"

@@ -24,11 +24,14 @@ from nexus_tech.domain.models import (
     FunctionalBudget,
     FunctionalBudgetPreset,
     GameState,
+    HiringCandidate,
+    HiringCandidateStage,
     MarketCycle,
     MarketSegment,
     MilestoneEntry,
     MilestoneId,
     PendingEvent,
+    PricingTier,
     ProductReleasePlan,
     ProductReleaseStatus,
     ProductReleaseType,
@@ -39,6 +42,7 @@ from nexus_tech.domain.models import (
     SalesDeal,
     SalesDealStage,
     ScenarioObjectiveMetric,
+    SupportProgram,
     TurnLedgerEntry,
 )
 from nexus_tech.persistence.company_repository import CompanyRepository
@@ -142,6 +146,7 @@ class SaveLoadCoordinator:
                     roadmap_focus=state.roadmap_focus,
                     roadmap_set_turn=state.roadmap_set_turn,
                     functional_budget=state.functional_budget,
+                    support_program=state.support_program,
                     market_cycle=state.market_cycle,
                     market_cycle_turns_remaining=state.market_cycle_turns_remaining,
                     victory_achieved=state.victory_achieved,
@@ -163,6 +168,7 @@ class SaveLoadCoordinator:
                 )
                 self._save_product_releases(connection, slot_name, state.product_releases)
                 self._save_sales_deals(connection, slot_name, state.sales_deals)
+                self._save_hiring_candidates(connection, slot_name, state.hiring_candidates)
                 self._save_roadmap_projects(connection, slot_name, state.roadmap_projects)
                 self._save_competitor_intel(connection, slot_name, state.competitor_intel)
                 self.finance_repository.save(connection, slot_name, state.finance)
@@ -204,6 +210,10 @@ class SaveLoadCoordinator:
                         budget_marketing_share,
                         budget_customer_success_share,
                         budget_g_and_a_share,
+                        support_knowledge_base_level,
+                        support_automation_level,
+                        support_backlog_queue,
+                        support_sla_breaches_last_turn,
                         market_cycle,
                         market_cycle_turns_remaining,
                         victory_achieved,
@@ -232,6 +242,7 @@ class SaveLoadCoordinator:
                     customer_accounts = self.customer_repository.load_all(connection, slot_name)
                     product_releases = self._load_product_releases(connection, slot_name)
                     sales_deals = self._load_sales_deals(connection, slot_name)
+                    hiring_candidates = self._load_hiring_candidates(connection, slot_name)
                     roadmap_projects = self._load_roadmap_projects(connection, slot_name)
                     competitor_intel = self._load_competitor_intel(connection, slot_name)
                     finance = self.finance_repository.load(connection, slot_name) or FinanceState()
@@ -264,6 +275,7 @@ class SaveLoadCoordinator:
                         customer_accounts=customer_accounts,
                         product_releases=product_releases,
                         sales_deals=sales_deals,
+                        hiring_candidates=hiring_candidates,
                         roadmap_projects=roadmap_projects,
                         competitor_intel=competitor_intel,
                         quarter_plan=quarter_plan,
@@ -303,6 +315,14 @@ class SaveLoadCoordinator:
                                 slot_row["budget_customer_success_share"] or 25
                             ),
                             g_and_a_share=slot_row["budget_g_and_a_share"] or 20,
+                        ),
+                        support_program=SupportProgram(
+                            knowledge_base_level=slot_row["support_knowledge_base_level"] or 22,
+                            automation_level=slot_row["support_automation_level"] or 16,
+                            backlog_queue=slot_row["support_backlog_queue"] or 0,
+                            sla_breaches_last_turn=(
+                                slot_row["support_sla_breaches_last_turn"] or 0
+                            ),
                         ),
                         action_points_remaining=slot_row["action_points_remaining"],
                     )
@@ -499,6 +519,7 @@ class SaveLoadCoordinator:
         roadmap_focus: RoadmapFocus,
         roadmap_set_turn: int,
         functional_budget: FunctionalBudget,
+        support_program: SupportProgram,
         market_cycle: MarketCycle,
         market_cycle_turns_remaining: int,
         victory_achieved: bool,
@@ -535,6 +556,10 @@ class SaveLoadCoordinator:
                     budget_marketing_share,
                     budget_customer_success_share,
                     budget_g_and_a_share,
+                    support_knowledge_base_level,
+                    support_automation_level,
+                    support_backlog_queue,
+                    support_sla_breaches_last_turn,
                     market_cycle,
                     market_cycle_turns_remaining,
                     victory_achieved,
@@ -548,7 +573,8 @@ class SaveLoadCoordinator:
                 )
                 VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?
                 )
                 """,
                 (
@@ -570,6 +596,10 @@ class SaveLoadCoordinator:
                     functional_budget.marketing_share,
                     functional_budget.customer_success_share,
                     functional_budget.g_and_a_share,
+                    support_program.knowledge_base_level,
+                    support_program.automation_level,
+                    support_program.backlog_queue,
+                    support_program.sla_breaches_last_turn,
                     market_cycle.value,
                     market_cycle_turns_remaining,
                     int(victory_achieved),
@@ -604,6 +634,10 @@ class SaveLoadCoordinator:
                 budget_marketing_share = ?,
                 budget_customer_success_share = ?,
                 budget_g_and_a_share = ?,
+                support_knowledge_base_level = ?,
+                support_automation_level = ?,
+                support_backlog_queue = ?,
+                support_sla_breaches_last_turn = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
                 victory_achieved = ?,
@@ -633,6 +667,10 @@ class SaveLoadCoordinator:
                 functional_budget.marketing_share,
                 functional_budget.customer_success_share,
                 functional_budget.g_and_a_share,
+                support_program.knowledge_base_level,
+                support_program.automation_level,
+                support_program.backlog_queue,
+                support_program.sla_breaches_last_turn,
                 market_cycle.value,
                 market_cycle_turns_remaining,
                 int(victory_achieved),
@@ -754,15 +792,18 @@ class SaveLoadCoordinator:
                 name,
                 segment,
                 stage,
+                plan_tier,
                 billing_model,
                 seat_commitment,
                 usage_commitment,
+                add_on_commitment,
                 value,
+                proposed_discount_rate,
                 probability,
                 created_turn,
                 updated_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -773,10 +814,13 @@ class SaveLoadCoordinator:
                     deal.name,
                     deal.segment.value,
                     deal.stage.value,
+                    deal.plan_tier.value,
                     deal.billing_model.value,
                     deal.seat_commitment,
                     deal.usage_commitment,
+                    deal.add_on_commitment,
                     str(deal.value),
+                    str(deal.proposed_discount_rate),
                     deal.probability,
                     deal.created_turn,
                     deal.updated_turn,
@@ -798,10 +842,13 @@ class SaveLoadCoordinator:
                 name,
                 segment,
                 stage,
+                plan_tier,
                 billing_model,
                 seat_commitment,
                 usage_commitment,
+                add_on_commitment,
                 value,
+                proposed_discount_rate,
                 probability,
                 created_turn,
                 updated_turn
@@ -818,13 +865,112 @@ class SaveLoadCoordinator:
                 name=row["name"],
                 segment=MarketSegment(row["segment"]),
                 stage=SalesDealStage(row["stage"]),
+                plan_tier=PricingTier(row["plan_tier"] or "standard"),
                 billing_model=ContractBillingModel(row["billing_model"] or "flat"),
                 seat_commitment=row["seat_commitment"] or 0,
                 usage_commitment=row["usage_commitment"] or 0,
+                add_on_commitment=row["add_on_commitment"] or 0,
                 value=Decimal(row["value"]),
+                proposed_discount_rate=Decimal(row["proposed_discount_rate"] or "0.0000"),
                 probability=row["probability"],
                 created_turn=row["created_turn"],
                 updated_turn=row["updated_turn"],
+            )
+            for row in rows
+        ]
+
+    def _save_hiring_candidates(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        hiring_candidates: list[HiringCandidate],
+    ) -> None:
+        connection.execute("DELETE FROM hiring_candidates WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO hiring_candidates (
+                slot_name,
+                candidate_id,
+                display_order,
+                full_name,
+                role,
+                seniority,
+                specialization,
+                trait,
+                salary_expectation,
+                expected_productivity,
+                stage,
+                sourced_turn,
+                expires_turn,
+                interview_score,
+                acceptance_chance
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    str(candidate.id),
+                    index,
+                    candidate.full_name,
+                    candidate.role.value,
+                    candidate.seniority.value,
+                    candidate.specialization,
+                    candidate.trait.value,
+                    str(candidate.salary_expectation),
+                    candidate.expected_productivity,
+                    candidate.stage.value,
+                    candidate.sourced_turn,
+                    candidate.expires_turn,
+                    candidate.interview_score,
+                    candidate.acceptance_chance,
+                )
+                for index, candidate in enumerate(hiring_candidates)
+            ],
+        )
+
+    def _load_hiring_candidates(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[HiringCandidate]:
+        rows = connection.execute(
+            """
+            SELECT
+                candidate_id,
+                full_name,
+                role,
+                seniority,
+                specialization,
+                trait,
+                salary_expectation,
+                expected_productivity,
+                stage,
+                sourced_turn,
+                expires_turn,
+                interview_score,
+                acceptance_chance
+            FROM hiring_candidates
+            WHERE slot_name = ?
+            ORDER BY display_order ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            HiringCandidate(
+                id=UUID(row["candidate_id"]),
+                full_name=row["full_name"],
+                role=row["role"],
+                seniority=row["seniority"],
+                specialization=row["specialization"],
+                trait=row["trait"],
+                salary_expectation=Decimal(row["salary_expectation"]),
+                expected_productivity=row["expected_productivity"],
+                stage=HiringCandidateStage(row["stage"] or "sourced"),
+                sourced_turn=row["sourced_turn"],
+                expires_turn=row["expires_turn"],
+                interview_score=row["interview_score"] or 0,
+                acceptance_chance=row["acceptance_chance"] or 50,
             )
             for row in rows
         ]
