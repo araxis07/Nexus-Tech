@@ -37,6 +37,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track quality, bugs, market fit, technical debt, users, acquisition, and churn
 - Target different customer segments such as `indie`, `startup`, `SMB`, and `enterprise`
 - Adjust pricing tiers to trade off growth, churn, and revenue per user
+- Run explicit price-increase plays when you want to trade customer comfort for stronger monetization
 - Shift each product between `streamlined`, `modular`, and `suite` packaging to rebalance monetization, acquisition, and support complexity
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
 - Plan and ship product releases such as stability patches, minor releases, and major launches
@@ -92,6 +93,8 @@ Each turn represents a business interval. You review the company, choose actions
 - Track covenant risk and missed board targets so finance pressure is visible before collapse
 - Track burn multiple, board pressure, governance risk, and board directives as the company scales
 - Track an active board ask plus a warning ladder so governance pressure escalates before the company fully breaks
+- Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
+- Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
 
 ### 🤝 Customer Accounts
@@ -103,6 +106,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Support flat, seat-based, and usage-based contract models with different commercial expansion patterns
 - Track per-account plan tier, add-ons, annual prepay posture, and invoice-risk pressure
 - Track subscription package depth, renewal health, failed-payment risk, and dunning pressure on each account
+- Let healthy accounts expand between renewals through packaging-driven add-ons, suite upgrades, and contract growth
 - Track open tickets and SLA pressure so support quality can directly affect renewals and retention
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
@@ -129,6 +133,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Train employees, track promotion readiness, promote strong contributors, and monitor attrition risk
 - Track performance rating, underperformance streaks, and real resignation pressure when the company runs too hot
 - Assign managers, track leadership strength, and absorb org-drag pressure as headcount grows beyond clean management coverage
+- Run explicit org reorg actions to rebalance reporting lines and cut overloaded-manager drag
 
 ### 🧭 Functional Budgeting
 
@@ -190,6 +195,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
+- Finance and support panels now surface forecast scenarios, staffing capacity, and staffing gaps for faster live decision-making
 - Built-in quick guide flow for onboarding and live demos
 - Built-in first-run tutorial and glossary commands for new players
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history

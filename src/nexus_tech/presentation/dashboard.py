@@ -45,7 +45,10 @@ from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
-from nexus_tech.simulation.finance import estimate_runway
+from nexus_tech.simulation.finance import (
+    calculate_cash_flow_forecast_scenarios,
+    estimate_runway,
+)
 from nexus_tech.simulation.functional_budgeting import get_functional_budget_profile
 from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
@@ -61,7 +64,10 @@ from nexus_tech.simulation.roadmap import (
 )
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
-from nexus_tech.simulation.support_program import count_escalating_accounts
+from nexus_tech.simulation.support_program import (
+    calculate_support_staff_capacity,
+    count_escalating_accounts,
+)
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
 
 
@@ -1379,6 +1385,8 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table.add_row("Managers", str(team_condition.manager_headcount))
     table.add_row("Mgmt Cap", str(team_condition.management_capacity))
     table.add_row("Org Drag", str(team_condition.org_drag))
+    table.add_row("Overloaded", str(team_condition.overloaded_manager_count))
+    table.add_row("Overload Rpts", str(team_condition.overloaded_report_count))
     table.add_row("Salary Burn", format_money(team_condition.total_salary_cost))
     table.add_row("Avg Energy", average_energy)
     table.add_row("Avg Morale", average_morale)
@@ -1759,6 +1767,7 @@ def _build_action_menu_panel() -> Panel:
         "set_packaging_strategy",
         "Change packaging and monetization depth.",
     )
+    primary_actions.add_row("50", "run_price_increase", "Push a direct price increase.")
     primary_actions.add_row("8", "set_target_segment", "Retarget a product's customer segment.")
     primary_actions.add_row("9", "sunset_product", "Retire a weak product.")
     primary_actions.add_row("10", "set_company_strategy", "Shift company-wide focus.")
@@ -1780,6 +1789,7 @@ def _build_action_menu_panel() -> Panel:
     )
     primary_actions.add_row("23", "clear_manager", "Remove a reporting line.")
     primary_actions.add_row("24", "rest_team", "Recover energy and morale.")
+    primary_actions.add_row("51", "reorg_team", "Rebuild reporting lines and reduce org drag.")
     primary_actions.add_row("25", "review_team", "Open the detailed team view.")
     primary_actions.add_row("26", "review_customers", "Open key account renewals.")
     primary_actions.add_row("27", "invest_in_customer_success", "Improve onboarding and retention.")
@@ -1809,16 +1819,17 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("47", "make_hiring_offer", "Convert an interviewed candidate.")
     primary_actions.add_row("48", "triage_support_backlog", "Spend cash to cut support pressure.")
     primary_actions.add_row("49", "review_board", "Open the board and governance view.")
+    primary_actions.add_row("52", "execute_board_response", "Answer the active board ask directly.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("50", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("51", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("52", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("53", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("54", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("53", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("54", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("55", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("56", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("57", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -1882,7 +1893,7 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
         )
 
     if state.company.current_turn == 1:
-        suggestions.append("Use [bold]52[/bold] any time if you want the compact guide again.")
+        suggestions.append("Use [bold]55[/bold] any time if you want the compact guide again.")
     if state.company.current_turn >= 2:
         suggestions.append(
             "Check [bold]40[/bold] after a turn resolves to read the run report and rival pressure."
@@ -2272,10 +2283,19 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
 
 def _build_support_program_panel(state: GameState) -> Panel:
     escalating_accounts = count_escalating_accounts(state.customer_accounts)
+    staffing_capacity = calculate_support_staff_capacity(state)
+    staffing_gap = max(
+        0,
+        escalating_accounts
+        + sum(1 for account in state.customer_accounts if account.segment.value == "enterprise")
+        - max(1, staffing_capacity // 3),
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Knowledge Base", str(state.support_program.knowledge_base_level))
     table.add_row("Automation", str(state.support_program.automation_level))
     table.add_row("SLA Target", str(state.support_program.sla_target))
+    table.add_row("Staff Cap", str(staffing_capacity))
+    table.add_row("Staff Gap", str(staffing_gap))
     table.add_row("Backlog Queue", str(state.support_program.backlog_queue))
     table.add_row("Esc Queue", str(state.support_program.escalation_queue))
     table.add_row("Resolved", str(state.support_program.resolved_last_turn))
@@ -2309,6 +2329,13 @@ def _build_late_game_panel(state: GameState) -> Panel:
 
 def _build_finance_panel(state: GameState) -> Panel:
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
+    base_forecast, conservative_forecast, aggressive_forecast = (
+        calculate_cash_flow_forecast_scenarios(
+            state.company.cash_on_hand,
+            state.turn_history,
+            latest_net_cash_flow=_latest_net_cash_flow(state),
+        )
+    )
     turn_interest = (
         state.finance.debt_principal * state.finance.loan_interest_rate
         if state.finance.debt_principal > Decimal("0")
@@ -2326,12 +2353,26 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Turn Interest", format_money(turn_interest))
     table.add_row("Burn Multiple", f"{state.finance.burn_multiple:.2f}x")
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
-    table.add_row("Forecast CF", format_money(state.finance.forecast_net_cash_flow))
+    table.add_row("Base Forecast", format_money(base_forecast.projected_net_cash_flow))
     table.add_row(
-        "Forecast Runway",
+        "Base Runway",
         "cashflow+"
-        if state.finance.forecast_runway_turns is None
-        else f"{state.finance.forecast_runway_turns} turns",
+        if base_forecast.projected_runway_turns is None
+        else f"{base_forecast.projected_runway_turns} turns",
+    )
+    table.add_row("Conservative", format_money(conservative_forecast.projected_net_cash_flow))
+    table.add_row(
+        "Consv Runway",
+        "cashflow+"
+        if conservative_forecast.projected_runway_turns is None
+        else f"{conservative_forecast.projected_runway_turns} turns",
+    )
+    table.add_row("Aggressive", format_money(aggressive_forecast.projected_net_cash_flow))
+    table.add_row(
+        "Aggr Runway",
+        "cashflow+"
+        if aggressive_forecast.projected_runway_turns is None
+        else f"{aggressive_forecast.projected_runway_turns} turns",
     )
     return Panel(table, title="Finance", border_style="cyan", expand=True)
 

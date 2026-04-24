@@ -41,6 +41,15 @@ class FinanceTurnSummary:
     missed_board_targets: int
 
 
+@dataclass(frozen=True)
+class ForecastScenarioSnapshot:
+    """One bounded cash-flow forecast scenario."""
+
+    label: str
+    projected_net_cash_flow: Decimal
+    projected_runway_turns: int | None
+
+
 def count_funding_rounds(
     funding_history: list[FundingHistoryEntry],
     funding_type: FundingType,
@@ -100,6 +109,53 @@ def calculate_cash_flow_forecast(
     else:
         recent_flows = [latest_net_cash_flow]
     return quantize_money(sum(recent_flows, ZERO_MONEY) / Decimal(len(recent_flows)))
+
+
+def calculate_cash_flow_forecast_scenarios(
+    cash_on_hand: Decimal,
+    turn_history: list[TurnLedgerEntry],
+    *,
+    latest_net_cash_flow: Decimal,
+) -> tuple[ForecastScenarioSnapshot, ForecastScenarioSnapshot, ForecastScenarioSnapshot]:
+    """Return base, conservative, and aggressive forecast snapshots."""
+
+    base_forecast = calculate_cash_flow_forecast(
+        turn_history,
+        latest_net_cash_flow=latest_net_cash_flow,
+    )
+    conservative_forecast = _adjust_forecast(
+        base_forecast,
+        drag=BALANCE.finance_forecast_conservative_drag,
+    )
+    aggressive_forecast = _adjust_forecast(
+        base_forecast,
+        drag=-BALANCE.finance_forecast_aggressive_relief,
+    )
+    return (
+        ForecastScenarioSnapshot(
+            label="Base",
+            projected_net_cash_flow=base_forecast,
+            projected_runway_turns=estimate_runway(cash_on_hand, base_forecast),
+        ),
+        ForecastScenarioSnapshot(
+            label="Conservative",
+            projected_net_cash_flow=conservative_forecast,
+            projected_runway_turns=estimate_runway(cash_on_hand, conservative_forecast),
+        ),
+        ForecastScenarioSnapshot(
+            label="Aggressive",
+            projected_net_cash_flow=aggressive_forecast,
+            projected_runway_turns=estimate_runway(cash_on_hand, aggressive_forecast),
+        ),
+    )
+
+
+def _adjust_forecast(net_cash_flow: Decimal, *, drag: Decimal) -> Decimal:
+    if net_cash_flow == ZERO_MONEY:
+        return ZERO_MONEY
+    if net_cash_flow < ZERO_MONEY:
+        return quantize_money(net_cash_flow * (Decimal("1.0000") + drag))
+    return quantize_money(net_cash_flow * (Decimal("1.0000") - drag))
 
 
 def apply_take_loan(

@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     LifecycleStage,
     MarketSegment,
     Product,
+    SubscriptionPackage,
     SupportProgram,
 )
 from nexus_tech.domain.money import quantize_money
@@ -126,6 +127,14 @@ def apply_end_of_turn_customers(
             customer_success_bonus=customer_success_bonus,
         )
         account.satisfaction = clamp_int(account.satisfaction + satisfaction_delta)
+        expansion_revenue = quantize_money(
+            expansion_revenue
+            + _apply_packaging_expansion_drift(
+                account,
+                product,
+                current_turn=current_turn,
+            )
+        )
         if account.satisfaction >= BALANCE.key_account_satisfaction_good_threshold:
             account.churn_risk = clamp_int(
                 account.churn_risk - BALANCE.key_account_churn_risk_relief,
@@ -389,6 +398,43 @@ def _calculate_satisfaction_delta(
         -BALANCE.key_account_satisfaction_delta_cap,
         BALANCE.key_account_satisfaction_delta_cap,
     )
+
+
+def _apply_packaging_expansion_drift(
+    account: CustomerAccount,
+    product: Product,
+    *,
+    current_turn: int,
+) -> Decimal:
+    if current_turn % BALANCE.packaging_expansion_interval != 0:
+        return ZERO_MONEY
+    if (
+        account.satisfaction < BALANCE.packaging_expansion_satisfaction_threshold
+        or account.onboarding_health < BALANCE.packaging_expansion_onboarding_threshold
+        or account.open_tickets > BALANCE.packaging_expansion_ticket_threshold
+    ):
+        return ZERO_MONEY
+
+    revenue_before = calculate_account_recurring_revenue(account)
+    if product.packaging_strategy.value == "suite":
+        if (
+            account.segment is MarketSegment.ENTERPRISE
+            and account.subscription_package.value != "enterprise_suite"
+        ):
+            account.subscription_package = SubscriptionPackage.ENTERPRISE_SUITE
+        account.add_on_count += BALANCE.packaging_expansion_add_on_gain
+    elif product.packaging_strategy.value == "modular":
+        account.add_on_count += BALANCE.packaging_expansion_add_on_gain
+    else:
+        account.contract_value = quantize_money(
+            account.contract_value + BALANCE.packaging_expansion_contract_gain
+        )
+
+    account.expansion_potential = clamp_int(account.expansion_potential - 4)
+    revenue_after = calculate_account_recurring_revenue(account)
+    if revenue_after <= revenue_before:
+        return ZERO_MONEY
+    return revenue_after - revenue_before
 
 
 def _build_customer_summary(

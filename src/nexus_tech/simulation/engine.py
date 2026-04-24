@@ -82,6 +82,7 @@ from nexus_tech.simulation.functional_budgeting import (
 from nexus_tech.simulation.governance import (
     GovernanceSummary,
     apply_end_of_turn_governance,
+    execute_board_response,
 )
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.hiring_pipeline import (
@@ -100,7 +101,11 @@ from nexus_tech.simulation.planning import (
     get_budget_profile,
     is_quarter_plan_due,
 )
-from nexus_tech.simulation.pricing import apply_adjust_pricing, apply_set_packaging_strategy
+from nexus_tech.simulation.pricing import (
+    apply_adjust_pricing,
+    apply_run_price_increase,
+    apply_set_packaging_strategy,
+)
 from nexus_tech.simulation.product_progression import (
     ProductDrift,
     apply_add_feature,
@@ -153,6 +158,7 @@ from nexus_tech.simulation.team import (
     clear_manager_links,
     create_employee,
     get_employee_by_id,
+    run_org_reorg,
     sanitize_management_links,
     unassign_employee,
     unassign_employees_from_product,
@@ -343,6 +349,19 @@ def apply_action(
 
     next_state = state.model_copy(deep=True)
     next_state.action_points_remaining -= 1
+
+    if action is TurnAction.EXECUTE_BOARD_RESPONSE:
+        summary = execute_board_response(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug(
+            "Executed board response for ask %s.",
+            next_state.finance.active_board_ask.value,
+        )
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
 
     if action is TurnAction.CREATE_PRODUCT:
         if context.new_product_name is None:
@@ -620,6 +639,28 @@ def apply_action(
         logger.debug("Rested the team.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.REORG_TEAM:
+        if next_state.company.cash_on_hand < BALANCE.management_reorg_cost:
+            raise ValueError("Not enough cash to run an org reorg this turn.")
+        summary = run_org_reorg(next_state.employees)
+        next_state.company.cash_on_hand = quantize_money(
+            next_state.company.cash_on_hand - BALANCE.management_reorg_cost
+        )
+        for employee in next_state.employees:
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk - BALANCE.management_reorg_attrition_relief
+            )
+            if employee.manager_id is not None:
+                employee.energy = clamp_int(employee.energy + BALANCE.management_reorg_energy_gain)
+            employee.morale = clamp_int(employee.morale - BALANCE.management_reorg_morale_penalty)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran org reorg.")
+        return ActionOutcome(
+            state=next_state,
+            message=f"{summary.message} Cash -{BALANCE.management_reorg_cost}.",
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.INVEST_IN_CUSTOMER_SUCCESS:
         product = get_target_product(next_state, context.target_product_id)
         summary = invest_in_customer_success(next_state, product.id)
@@ -820,6 +861,10 @@ def apply_action(
             raise ValueError("Adjusting pricing requires selecting a pricing tier.")
 
         summary = apply_adjust_pricing(product, context.pricing_tier)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RUN_PRICE_INCREASE:
+        summary = apply_run_price_increase(product, next_state.customer_accounts)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.SET_PACKAGING_STRATEGY:

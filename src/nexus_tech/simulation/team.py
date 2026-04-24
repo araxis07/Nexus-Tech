@@ -57,6 +57,8 @@ class TeamCondition:
     manager_headcount: int
     management_capacity: int
     org_drag: int
+    overloaded_manager_count: int
+    overloaded_report_count: int
     total_salary_cost: Decimal
     average_energy: int
     average_morale: int
@@ -73,6 +75,20 @@ class OrgStructureSummary:
     manager_headcount: int
     management_capacity: int
     org_drag: int
+    overloaded_manager_count: int
+    overloaded_report_count: int
+
+
+@dataclass(frozen=True)
+class OrgReorgSummary:
+    """Summary of a team reorg action."""
+
+    reassigned_reports: int
+    unmanaged_before: int
+    unmanaged_after: int
+    overloaded_reports_before: int
+    overloaded_reports_after: int
+    message: str
 
 
 def create_employee(
@@ -219,14 +235,30 @@ def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
     sanitize_management_links(employees)
     manager_ids = tuple(employee.id for employee in employees if is_eligible_manager(employee))
     management_capacity = sum(calculate_manager_capacity(employee) for employee in employees)
+    report_counts = _build_manager_report_counts(employees)
     managed_headcount = sum(
         1
         for employee in employees
         if employee.manager_id is not None and employee.manager_id in manager_ids
     )
     unmanaged_headcount = max(0, len(employees) - len(manager_ids) - managed_headcount)
+    overloaded_reports = sum(
+        max(0, report_counts.get(employee.id, 0) - calculate_manager_capacity(employee))
+        for employee in employees
+        if employee.id in manager_ids
+    )
+    overloaded_manager_count = sum(
+        1
+        for employee in employees
+        if employee.id in manager_ids
+        and report_counts.get(employee.id, 0) > calculate_manager_capacity(employee)
+    )
     capacity_gap = max(0, unmanaged_headcount - BALANCE.management_org_drag_threshold)
-    org_drag = capacity_gap + max(0, len(employees) - len(manager_ids) - management_capacity)
+    org_drag = (
+        capacity_gap
+        + max(0, len(employees) - len(manager_ids) - management_capacity)
+        + overloaded_reports
+    )
     return OrgStructureSummary(
         manager_ids=manager_ids,
         managed_headcount=managed_headcount,
@@ -234,6 +266,8 @@ def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
         manager_headcount=len(manager_ids),
         management_capacity=management_capacity,
         org_drag=max(0, org_drag),
+        overloaded_manager_count=overloaded_manager_count,
+        overloaded_report_count=max(0, overloaded_reports),
     )
 
 
@@ -278,7 +312,27 @@ def calculate_product_team_modifier(
         for employee in assigned_employees
         if employee.manager_id is not None and employee.manager_id in org_structure.manager_ids
     )
+    same_product_management = sum(
+        1
+        for employee in assigned_employees
+        if employee.manager_id is not None
+        and any(
+            manager.id == employee.manager_id and manager.assigned_product_id == product_id
+            for manager in employees
+        )
+    )
+    manager_report_counts = _build_manager_report_counts(employees)
+    overloaded_reports = sum(
+        max(0, manager_report_counts.get(manager.id, 0) - calculate_manager_capacity(manager))
+        for manager in employees
+        if manager.assigned_product_id == product_id and is_eligible_manager(manager)
+    )
     coordination_bonus += managed_assigned // BALANCE.management_coordination_bonus_per_managed_pair
+    coordination_bonus += same_product_management // BALANCE.management_same_product_bonus_divisor
+    coordination_bonus -= (
+        overloaded_reports // BALANCE.management_overload_coordination_penalty_divisor
+    )
+    coordination_bonus = max(0, coordination_bonus)
 
     return ProductTeamModifier(
         assigned_headcount=len(assigned_employees),
@@ -319,6 +373,8 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
             manager_headcount=0,
             management_capacity=0,
             org_drag=0,
+            overloaded_manager_count=0,
+            overloaded_report_count=0,
             total_salary_cost=ZERO_MONEY,
             average_energy=0,
             average_morale=0,
@@ -337,6 +393,8 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
         manager_headcount=org_structure.manager_headcount,
         management_capacity=org_structure.management_capacity,
         org_drag=org_structure.org_drag,
+        overloaded_manager_count=org_structure.overloaded_manager_count,
+        overloaded_report_count=org_structure.overloaded_report_count,
         total_salary_cost=quantize_money(total_salary_cost),
         average_energy=average_energy,
         average_morale=average_morale,
@@ -417,6 +475,53 @@ def clear_manager_links(employees: list[Employee], manager_id: UUID) -> int:
             employee.manager_id = None
             cleared += 1
     return cleared
+
+
+def run_org_reorg(employees: list[Employee]) -> OrgReorgSummary:
+    """Rebuild reporting lines to reduce unmanaged work and overloaded managers."""
+
+    sanitize_management_links(employees)
+    managers = [employee for employee in employees if is_eligible_manager(employee)]
+    reports = [employee for employee in employees if employee.id not in {m.id for m in managers}]
+    if len(employees) < 2 or not reports:
+        raise ValueError("The team is too small to justify a formal reorg.")
+    if not managers:
+        raise ValueError("No eligible managers are available for a reorg.")
+
+    before = calculate_org_structure(employees)
+    for report in reports:
+        report.manager_id = None
+
+    manager_loads = {manager.id: 0 for manager in managers}
+    reassigned_reports = 0
+    for report in sorted(
+        reports,
+        key=lambda employee: (
+            employee.assigned_product_id is None,
+            employee.role.value,
+            -employee.productivity,
+        ),
+    ):
+        manager = _pick_best_manager(report, managers, manager_loads)
+        if manager is None:
+            continue
+        report.manager_id = manager.id
+        manager_loads[manager.id] += 1
+        reassigned_reports += 1
+
+    after = calculate_org_structure(employees)
+    return OrgReorgSummary(
+        reassigned_reports=reassigned_reports,
+        unmanaged_before=before.unmanaged_headcount,
+        unmanaged_after=after.unmanaged_headcount,
+        overloaded_reports_before=before.overloaded_report_count,
+        overloaded_reports_after=after.overloaded_report_count,
+        message=(
+            f"Rebuilt reporting lines for {reassigned_reports} teammate(s). "
+            f"Unmanaged {before.unmanaged_headcount}->{after.unmanaged_headcount}, "
+            f"overloaded reports {before.overloaded_report_count}->{after.overloaded_report_count}."
+        ),
+    )
 
 
 def unassign_employee(employee: Employee) -> TeamActionSummary:
@@ -512,3 +617,29 @@ def get_employee_by_id(employees: list[Employee], employee_id: UUID | None) -> E
             return employee
 
     raise ValueError("Selected employee was not found.")
+
+
+def _build_manager_report_counts(employees: list[Employee]) -> dict[UUID, int]:
+    report_counts: dict[UUID, int] = {}
+    for employee in employees:
+        if employee.manager_id is None:
+            continue
+        report_counts[employee.manager_id] = report_counts.get(employee.manager_id, 0) + 1
+    return report_counts
+
+
+def _pick_best_manager(
+    report: Employee,
+    managers: list[Employee],
+    manager_loads: dict[UUID, int],
+) -> Employee | None:
+    ranked_managers = sorted(
+        managers,
+        key=lambda manager: (
+            report.assigned_product_id != manager.assigned_product_id,
+            manager_loads[manager.id] >= calculate_manager_capacity(manager),
+            manager_loads[manager.id],
+            -manager.leadership_score,
+        ),
+    )
+    return ranked_managers[0] if ranked_managers else None

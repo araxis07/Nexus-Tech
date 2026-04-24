@@ -235,13 +235,16 @@ ACTION_KEYS = {
     "47": TurnAction.MAKE_HIRING_OFFER,
     "48": TurnAction.TRIAGE_SUPPORT_BACKLOG,
     "49": TurnAction.REVIEW_BOARD,
+    "50": TurnAction.RUN_PRICE_INCREASE,
+    "51": TurnAction.REORG_TEAM,
+    "52": TurnAction.EXECUTE_BOARD_RESPONSE,
 }
 UTILITY_ACTION_KEYS = {
-    "50": "save_game",
-    "51": "load_game",
-    "52": "show_guide",
-    "53": "show_glossary",
-    "54": "show_tutorial",
+    "53": "save_game",
+    "54": "load_game",
+    "55": "show_guide",
+    "56": "show_glossary",
+    "57": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -251,6 +254,7 @@ PRODUCT_TARGETED_ACTIONS = {
     TurnAction.REDUCE_TECHNICAL_DEBT,
     TurnAction.MARKET_PRODUCT,
     TurnAction.ADJUST_PRICING,
+    TurnAction.RUN_PRICE_INCREASE,
     TurnAction.SET_PACKAGING_STRATEGY,
     TurnAction.SET_TARGET_SEGMENT,
     TurnAction.SUNSET_PRODUCT,
@@ -1033,6 +1037,8 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,
+        TurnAction.REORG_TEAM,
+        TurnAction.EXECUTE_BOARD_RESPONSE,
     ):
         return ActionContext()
 

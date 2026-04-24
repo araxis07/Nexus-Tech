@@ -706,5 +706,43 @@
     "target_segment": "startup",
     "pricing_tier": "standard",
     "packaging_strategy": "streamlined"
+  },
+  {
+    "template_id": "board_command_cloud",
+    "title": "Board Command Cloud",
+    "description": "A finance-and-governance product that rewards disciplined execution, stronger pricing posture, and clean reporting.",
+    "lifecycle_stage": "prototype",
+    "quality": 51,
+    "bug_level": 12,
+    "market_fit": 34,
+    "technical_debt": 15,
+    "user_count": 0,
+    "revenue_per_user": "84.00",
+    "feature_count": 0,
+    "maintenance_cost": "320.00",
+    "acquisition_rate": "0.0250",
+    "churn_rate": "0.0560",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "org_chart_hq",
+    "title": "Org Chart HQ",
+    "description": "An execution-management platform built around team structure, manager leverage, and operating clarity at scale.",
+    "lifecycle_stage": "prototype",
+    "quality": 47,
+    "bug_level": 15,
+    "market_fit": 35,
+    "technical_debt": 17,
+    "user_count": 0,
+    "revenue_per_user": "56.00",
+    "feature_count": 0,
+    "maintenance_cost": "275.00",
+    "acquisition_rate": "0.0320",
+    "churn_rate": "0.0600",
+    "target_segment": "smb",
+    "pricing_tier": "standard",
+    "packaging_strategy": "modular"
   }
 ]

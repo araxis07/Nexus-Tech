@@ -47,6 +47,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
     ScenarioObjectiveMetric,
     Seniority,
+    SubscriptionPackage,
     SupportInvestmentFocus,
     SupportProgram,
     TurnAction,
@@ -83,7 +84,10 @@ from nexus_tech.simulation.events import (
     select_event_definition,
     select_weighted_definition,
 )
-from nexus_tech.simulation.finance import apply_end_of_turn_finance_drift
+from nexus_tech.simulation.finance import (
+    apply_end_of_turn_finance_drift,
+    calculate_cash_flow_forecast_scenarios,
+)
 from nexus_tech.simulation.governance import apply_end_of_turn_governance
 from nexus_tech.simulation.growth import (
     calculate_acquired_users,
@@ -3162,3 +3166,177 @@ def test_governance_tracks_board_ask_and_warning_level() -> None:
     assert state.finance.active_board_ask is BoardAsk.PROFITABILITY
     assert summary.board_warning_level >= 1
     assert state.finance.board_warning_active is True
+
+
+def test_run_price_increase_lifts_product_and_account_revenue() -> None:
+    product = make_product(
+        "Monetize Me",
+        quality=72,
+        revenue_per_user=Decimal("50.00"),
+        pricing_tier=PricingTier.PREMIUM,
+        packaging_strategy=PackagingStrategy.SUITE,
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1200.00"),
+        plan_tier=PricingTier.PREMIUM,
+        subscription_package=SubscriptionPackage.GROWTH,
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=24,
+        usage_units=0,
+        add_on_count=2,
+        annual_prepay=True,
+        discount_rate=Decimal("0.0200"),
+        satisfaction=78,
+        onboarding_health=74,
+        support_load=16,
+        open_tickets=3,
+        sla_breach_risk=10,
+        invoice_risk=12,
+        failed_payment_risk=8,
+        expansion_potential=68,
+        renewal_health=73,
+        renewal_turn=6,
+        churn_risk=16,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account])
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_PRICE_INCREASE,
+        context=ActionContext(target_product_id=product.id),
+    )
+
+    assert outcome.state.products[0].revenue_per_user > product.revenue_per_user
+    assert outcome.state.customer_accounts[0].contract_value > account.contract_value
+    assert outcome.state.customer_accounts[0].satisfaction < account.satisfaction
+
+
+def test_suite_packaging_creates_expansion_drift_before_renewal() -> None:
+    product = make_product(
+        "Suite Engine",
+        target_segment=MarketSegment.ENTERPRISE,
+        packaging_strategy=PackagingStrategy.SUITE,
+    )
+    account = CustomerAccount(
+        name="Expansion Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("950.00"),
+        plan_tier=PricingTier.PREMIUM,
+        subscription_package=SubscriptionPackage.GROWTH,
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=18,
+        usage_units=0,
+        add_on_count=1,
+        annual_prepay=True,
+        discount_rate=Decimal("0.0000"),
+        satisfaction=82,
+        onboarding_health=78,
+        support_load=12,
+        open_tickets=2,
+        sla_breach_risk=8,
+        invoice_risk=8,
+        failed_payment_risk=4,
+        expansion_potential=72,
+        renewal_health=76,
+        renewal_turn=10,
+        churn_risk=10,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+
+    summary = apply_end_of_turn_customers(
+        [account],
+        [product],
+        current_turn=3,
+        support_program=SupportProgram(),
+    )
+
+    assert account.subscription_package is SubscriptionPackage.ENTERPRISE_SUITE
+    assert account.add_on_count > 1
+    assert summary.expansion_revenue > Decimal("0.00")
+
+
+def test_reorg_team_reduces_management_gaps() -> None:
+    product = make_product("Org Atlas")
+    manager = make_employee(
+        "Morgan Lead",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=product.id,
+        leadership_score=84,
+    )
+    engineer = make_employee("Ada Builder", EmployeeRole.ENGINEER, assigned_product_id=product.id)
+    designer = make_employee("Rin Design", EmployeeRole.DESIGNER, assigned_product_id=product.id)
+    marketer = make_employee("Jae Growth", EmployeeRole.MARKETER, assigned_product_id=product.id)
+    state = make_state(product, employees=[manager, engineer, designer, marketer])
+
+    before = calculate_team_condition(state.employees)
+    outcome = apply_action(state, TurnAction.REORG_TEAM)
+    after = calculate_team_condition(outcome.state.employees)
+
+    assert after.managed_headcount > before.managed_headcount
+    assert after.org_drag <= before.org_drag
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_execute_board_response_reliability_resets_pressure() -> None:
+    product = make_product("Trust Layer", bug_level=28, technical_debt=34)
+    state = make_state(product)
+    state.finance.board_pressure = 42
+    state.finance.governance_risk = 31
+    state.finance.board_warning_active = True
+    state.finance.board_warning_level = 2
+    state.finance.active_board_ask = BoardAsk.RELIABILITY
+    state.support_program.backlog_queue = 20
+    state.support_program.escalation_queue = 6
+
+    outcome = apply_action(state, TurnAction.EXECUTE_BOARD_RESPONSE)
+
+    assert outcome.state.support_program.backlog_queue < 20
+    assert outcome.state.support_program.escalation_queue < 6
+    assert outcome.state.finance.board_pressure < 42
+    assert outcome.state.finance.governance_risk < 31
+
+
+def test_forecast_scenarios_bracket_base_projection() -> None:
+    turn_history = [
+        TurnLedgerEntry(
+            turn=1,
+            total_revenue=Decimal("900.00"),
+            total_operating_cost=Decimal("1600.00"),
+            net_cash_flow=Decimal("-700.00"),
+            cash_on_hand=Decimal("6000.00"),
+            reputation=50,
+            total_users=40,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+        TurnLedgerEntry(
+            turn=2,
+            total_revenue=Decimal("920.00"),
+            total_operating_cost=Decimal("1720.00"),
+            net_cash_flow=Decimal("-800.00"),
+            cash_on_hand=Decimal("5200.00"),
+            reputation=49,
+            total_users=42,
+            headcount=2,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        ),
+    ]
+
+    base, conservative, aggressive = calculate_cash_flow_forecast_scenarios(
+        Decimal("4800.00"),
+        turn_history,
+        latest_net_cash_flow=Decimal("-900.00"),
+    )
+
+    assert conservative.projected_net_cash_flow < base.projected_net_cash_flow
+    assert aggressive.projected_net_cash_flow > base.projected_net_cash_flow
+    assert conservative.projected_runway_turns <= base.projected_runway_turns

@@ -3301,5 +3301,152 @@
         "archetype_id": "service_reliability_house"
       }
     ]
+  },
+  {
+    "scenario_id": "board_intervention_cycle",
+    "title": "Board Intervention Cycle",
+    "description": "The company still has revenue, but governance patience is gone and every weak quarter now triggers direct intervention.",
+    "objective": "Recover board trust and extend runway before the company is forced into a harsher restructuring.",
+    "objective_metric": "cash",
+    "objective_target": 18000,
+    "company_name": "Boardline Systems",
+    "company_strategy": "efficiency",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "portfolio_consolidation",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "7100.00",
+    "reputation": 48,
+    "products": [
+      {
+        "key": "board",
+        "template_id": "board_command_cloud",
+        "name": "Boardline",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 23,
+        "market_fit": 54,
+        "technical_debt": 30,
+        "user_count": 39,
+        "revenue_per_user": "86.00",
+        "feature_count": 2,
+        "maintenance_cost": "336.00",
+        "acquisition_rate": "0.0270",
+        "churn_rate": "0.0600",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium",
+        "packaging_strategy": "suite"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Leah Park",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "finance_ops",
+        "assigned_product_key": "board",
+        "energy": 74,
+        "morale": 64
+      },
+      {
+        "full_name": "Mason Reed",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "platform",
+        "assigned_product_key": "board",
+        "energy": 72,
+        "morale": 62
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Boardroom Operator",
+        "archetype_id": "boardroom_operator"
+      }
+    ],
+    "finance": {
+      "debt_principal": "4200.00",
+      "loan_interest_rate": "0.0310",
+      "equity_dilution": "0.0900",
+      "investor_pressure": 18,
+      "board_confidence": 40,
+      "total_raised": "9200.00"
+    }
+  },
+  {
+    "scenario_id": "org_reorg_crunch",
+    "title": "Org Reorg Crunch",
+    "description": "The product set is growing faster than management coverage, and delivery is starting to fracture under org drag.",
+    "objective": "Stabilize org structure and protect reputation before execution debt becomes permanent.",
+    "objective_metric": "reputation",
+    "objective_target": 70,
+    "company_name": "SpanForge",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "8800.00",
+    "reputation": 51,
+    "products": [
+      {
+        "key": "org",
+        "template_id": "org_chart_hq",
+        "name": "SpanForge",
+        "lifecycle_stage": "growth",
+        "quality": 56,
+        "bug_level": 20,
+        "market_fit": 57,
+        "technical_debt": 26,
+        "user_count": 68,
+        "revenue_per_user": "58.00",
+        "feature_count": 3,
+        "maintenance_cost": "298.00",
+        "acquisition_rate": "0.0380",
+        "churn_rate": "0.0620",
+        "target_segment": "smb",
+        "pricing_tier": "standard",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Rae Kim",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "delivery",
+        "assigned_product_key": "org",
+        "energy": 77,
+        "morale": 68
+      },
+      {
+        "full_name": "Ben Ito",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "workflow",
+        "assigned_product_key": "org",
+        "energy": 72,
+        "morale": 64
+      },
+      {
+        "full_name": "Nina Cole",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "ops_ux",
+        "assigned_product_key": "org",
+        "energy": 73,
+        "morale": 65
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Tiered Bundle House",
+        "archetype_id": "tiered_bundle_house"
+      }
+    ]
   }
 ]

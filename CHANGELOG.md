@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.20.0 - 2026-04-24
+
+- Added direct price-increase decisions plus healthier packaging-driven account expansion drift for deeper monetization trade-offs
+- Added org-structure v2 with reorg actions, overloaded-manager pressure, and stronger coordination penalties when span-of-control slips
+- Added board-response actions tied to the current board ask so governance pressure can be answered directly instead of only observed
+- Added finance forecast scenarios for base, conservative, and aggressive runway review in the terminal finance panel
+- Deepened support-ops pressure with weighted segment demand, staffing-gap penalties, and better visibility into support capacity
+- Expanded the content catalog again with governance, pricing, and org-scale templates plus new board-intervention and org-reorg scenarios
+- Promoted the package version to `0.20.0`
+
 ## 0.19.0 - 2026-04-24
 
 - Added pricing and packaging depth with `streamlined`, `modular`, and `suite` packaging strategies that change monetization, acquisition, churn, and support cost posture

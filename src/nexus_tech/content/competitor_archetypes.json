@@ -276,5 +276,31 @@
     "current_move": "hold",
     "momentum": 59,
     "funding_level": 2
+  },
+  {
+    "archetype_id": "boardroom_operator",
+    "title": "Boardroom Operator",
+    "description": "A finance-savvy rival that wins with cleaner reporting, steadier economics, and calm governance optics.",
+    "focus_segment": "enterprise",
+    "strength": 76,
+    "aggression": 54,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "hold",
+    "momentum": 63,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "tiered_bundle_house",
+    "title": "Tiered Bundle House",
+    "description": "A packaging-heavy rival that uses clean bundles, modular upsells, and disciplined operations to compound mid-market share.",
+    "focus_segment": "smb",
+    "strength": 71,
+    "aggression": 60,
+    "pricing_tier": "standard",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 67,
+    "funding_level": 2
   }
 ]

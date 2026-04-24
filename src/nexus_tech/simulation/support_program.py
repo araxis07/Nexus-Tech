@@ -29,6 +29,8 @@ class SupportProgramSummary:
     sla_breaches: int
     resolved_tickets: int
     deflection_score: int
+    weighted_ticket_pressure: int
+    staffing_gap: int
     reputation_delta: int
     morale_penalty: int
     summary: str
@@ -70,6 +72,11 @@ def apply_end_of_turn_support_program(
         if account.status is not CustomerAccountStatus.CHURNED
     ]
     total_open_tickets = sum(account.open_tickets for account in active_accounts)
+    weighted_ticket_pressure = total_open_tickets + sum(
+        max(0, BALANCE.support_program_segment_ticket_weight[account.segment.value] - 1)
+        for account in active_accounts
+        if account.open_tickets > 0
+    )
     sla_breaches = sum(
         1
         for account in active_accounts
@@ -87,9 +94,9 @@ def apply_end_of_turn_support_program(
     effective_capacity = (
         BALANCE.support_program_base_capacity
         + ticket_relief
-        + _calculate_support_staff_capacity(state)
+        + calculate_support_staff_capacity(state)
     )
-    incoming_ticket_pressure = total_open_tickets + state.support_program.backlog_queue
+    incoming_ticket_pressure = weighted_ticket_pressure + state.support_program.backlog_queue
     resolved_tickets = min(incoming_ticket_pressure, effective_capacity)
     deflected_tickets = min(total_open_tickets, ticket_relief + resolved_tickets)
     queue_increase = max(0, incoming_ticket_pressure - resolved_tickets)
@@ -101,10 +108,18 @@ def apply_end_of_turn_support_program(
         queue_increase - queue_relief,
     )
     severe_accounts = count_escalating_accounts(active_accounts)
+    enterprise_pressure = sum(
+        1 for account in active_accounts if account.segment.value == "enterprise"
+    )
+    staffing_gap = max(
+        0,
+        severe_accounts + enterprise_pressure - max(1, effective_capacity // 3),
+    )
     state.support_program.escalation_queue = max(
         0,
         state.support_program.escalation_queue
         + severe_accounts
+        + staffing_gap
         - (resolved_tickets // BALANCE.support_program_escalation_queue_divisor),
     )
     state.support_program.resolved_last_turn = resolved_tickets
@@ -119,16 +134,22 @@ def apply_end_of_turn_support_program(
         >= BALANCE.support_program_triage_escalation_relief * 2
     ):
         reputation_delta = -BALANCE.support_program_backlog_reputation_loss
+    if staffing_gap >= BALANCE.support_program_staffing_gap_reputation_threshold:
+        reputation_delta -= 1
     if (
         state.support_program.backlog_queue
         >= BALANCE.support_program_backlog_morale_penalty_threshold
     ):
         morale_penalty = BALANCE.support_program_backlog_morale_penalty
+    if staffing_gap > 0:
+        morale_penalty += BALANCE.support_program_staffing_gap_morale_penalty
 
     if not active_accounts:
         summary = "Support tooling is idle."
     elif state.support_program.backlog_queue == 0:
         summary = "Support tooling is keeping ticket flow under control."
+    elif staffing_gap > 0:
+        summary = "Support demand is outrunning staffed capacity and enterprise pressure is rising."
     else:
         summary = "Support backlog is creating visible delivery and customer pressure."
 
@@ -141,6 +162,8 @@ def apply_end_of_turn_support_program(
         sla_breaches=sla_breaches,
         resolved_tickets=resolved_tickets,
         deflection_score=deflection_score,
+        weighted_ticket_pressure=weighted_ticket_pressure,
+        staffing_gap=staffing_gap,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
         summary=summary,
@@ -286,7 +309,7 @@ def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     )
 
 
-def _calculate_support_staff_capacity(state: GameState) -> int:
+def calculate_support_staff_capacity(state: GameState) -> int:
     support_roles = sum(
         1
         for employee in state.employees

@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
-from nexus_tech.domain.models import BoardAsk, BoardDirective, GameState
+from nexus_tech.domain.models import BoardAsk, BoardDirective, GameState, LifecycleStage
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.customers import CustomerTurnSummary
 from nexus_tech.simulation.operations import OperationsSummary
-from nexus_tech.simulation.support import clamp_int
+from nexus_tech.simulation.support import clamp_int, clamp_rate
+from nexus_tech.simulation.team import unassign_employees_from_product
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,15 @@ class GovernanceSummary:
     board_directive: BoardDirective
     active_board_ask: BoardAsk
     board_ask_met: bool
+    board_review_grade: str
     summary: str
+
+
+@dataclass(frozen=True)
+class BoardResponseSummary:
+    """Summary of an explicit board-response action."""
+
+    message: str
 
 
 def calculate_burn_multiple(total_revenue: Decimal, net_cash_flow: Decimal) -> Decimal:
@@ -110,6 +119,7 @@ def apply_end_of_turn_governance(
         board_directive=finance.board_directive,
         active_board_ask=finance.active_board_ask,
         board_ask_met=board_ask_met,
+        board_review_grade=_calculate_board_review_grade(finance, burn_multiple, board_ask_met),
         summary=_build_governance_summary(
             board_review_happened=board_review_happened,
             warning_active=finance.board_warning_active,
@@ -118,6 +128,133 @@ def apply_end_of_turn_governance(
             active_board_ask=finance.active_board_ask,
             board_ask_met=board_ask_met,
         ),
+    )
+
+
+def execute_board_response(state: GameState) -> BoardResponseSummary:
+    """Take a direct response aligned with the current board ask."""
+
+    finance = state.finance
+    if (
+        finance.board_pressure < BALANCE.board_response_min_pressure_threshold
+        and not finance.board_warning_active
+        and finance.missed_board_targets == 0
+    ):
+        raise ValueError("Board pressure is not high enough to justify a formal response.")
+
+    ask = finance.active_board_ask
+    message_suffix = ""
+    if ask is BoardAsk.PROFITABILITY:
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.board_response_profitability_cash_gain
+        )
+        for product in state.products:
+            if not product.is_active:
+                continue
+            product.acquisition_rate = clamp_rate(
+                product.acquisition_rate - BALANCE.board_response_profitability_growth_penalty
+            )
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.board_response_profitability_morale_loss
+            )
+        finance.board_pressure = clamp_int(
+            finance.board_pressure - BALANCE.board_response_profitability_pressure_relief
+        )
+        message_suffix = (
+            f"Cash +{BALANCE.board_response_profitability_cash_gain} and growth pace cooled."
+        )
+    elif ask is BoardAsk.RELIABILITY:
+        if state.company.cash_on_hand < BALANCE.board_response_reliability_cost:
+            raise ValueError("Not enough cash to execute the reliability reset.")
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.board_response_reliability_cost
+        )
+        state.support_program.backlog_queue = max(
+            0,
+            state.support_program.backlog_queue - BALANCE.board_response_reliability_backlog_relief,
+        )
+        state.support_program.escalation_queue = max(
+            0,
+            state.support_program.escalation_queue
+            - BALANCE.board_response_reliability_escalation_relief,
+        )
+        riskiest_product = max(
+            (product for product in state.products if product.is_active),
+            key=lambda product: (product.bug_level, product.technical_debt),
+            default=None,
+        )
+        if riskiest_product is not None:
+            riskiest_product.bug_level = clamp_int(
+                riskiest_product.bug_level - BALANCE.board_response_reliability_bug_relief
+            )
+        finance.board_pressure = clamp_int(
+            finance.board_pressure - BALANCE.board_response_profitability_pressure_relief
+        )
+        message_suffix = (
+            f"Cash -{BALANCE.board_response_reliability_cost}; "
+            "support queues and product risk eased."
+        )
+    elif ask is BoardAsk.TEAM_HEALTH:
+        if state.company.cash_on_hand < BALANCE.board_response_team_health_cost:
+            raise ValueError("Not enough cash to execute the team-health reset.")
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.board_response_team_health_cost
+        )
+        for employee in state.employees:
+            employee.energy = clamp_int(
+                employee.energy + BALANCE.board_response_team_health_energy_gain
+            )
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.board_response_team_health_morale_gain
+            )
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk - BALANCE.board_response_team_health_attrition_relief
+            )
+        finance.board_pressure = clamp_int(
+            finance.board_pressure - BALANCE.board_response_profitability_pressure_relief
+        )
+        message_suffix = (
+            f"Cash -{BALANCE.board_response_team_health_cost}; team energy and morale recovered."
+        )
+    else:
+        active_products = [product for product in state.products if product.is_active]
+        if not active_products:
+            raise ValueError("No active products remain for a portfolio-focus response.")
+        weakest_product = min(
+            active_products,
+            key=lambda product: (product.user_count, product.market_fit, product.quality),
+        )
+        unassigned_count = 0
+        if len(active_products) >= 2:
+            weakest_product.is_active = False
+            weakest_product.lifecycle_stage = LifecycleStage.SUNSET
+            unassigned_count = unassign_employees_from_product(state.employees, weakest_product.id)
+            state.company.reputation = clamp_int(
+                state.company.reputation - BALANCE.board_response_portfolio_focus_reputation_loss
+            )
+            message_suffix = (
+                f"Trimmed {weakest_product.name} and unassigned {unassigned_count} teammate(s)."
+            )
+        else:
+            weakest_product.technical_debt = clamp_int(weakest_product.technical_debt - 6)
+            weakest_product.market_fit = clamp_int(weakest_product.market_fit + 1)
+            message_suffix = f"Focused the portfolio around {weakest_product.name}."
+        finance.board_pressure = clamp_int(
+            finance.board_pressure - BALANCE.board_response_portfolio_focus_pressure_relief
+        )
+
+    finance.governance_risk = clamp_int(
+        finance.governance_risk - BALANCE.board_response_governance_relief
+    )
+    finance.board_confidence = clamp_int(
+        finance.board_confidence + BALANCE.board_response_confidence_gain
+    )
+    finance.missed_board_targets = max(0, finance.missed_board_targets - 1)
+    finance.board_warning_level = _calculate_board_warning_level(finance)
+    finance.board_warning_active = finance.board_warning_level > 0
+    return BoardResponseSummary(
+        message=(f"Executed a board response for {ask.value.replace('_', ' ')}. {message_suffix}")
     )
 
 
@@ -224,6 +361,20 @@ def _calculate_board_warning_level(finance) -> int:
     ):
         return 1
     return 0
+
+
+def _calculate_board_review_grade(
+    finance,
+    burn_multiple: Decimal,
+    board_ask_met: bool,
+) -> str:
+    if finance.board_confidence >= BALANCE.board_confidence_high_threshold and board_ask_met:
+        return "A"
+    if burn_multiple < BALANCE.finance_burn_multiple_warning and board_ask_met:
+        return "B"
+    if finance.board_warning_active or finance.missed_board_targets > 0:
+        return "D"
+    return "C"
 
 
 def _build_governance_summary(

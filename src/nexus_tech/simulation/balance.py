@@ -79,6 +79,39 @@ class BalanceConfig:
     pricing_premium_quality_threshold: int = 62
     pricing_premium_market_fit_bonus: int = 1
     pricing_premium_market_fit_penalty: int = 2
+    price_increase_base_multiplier: Decimal = Decimal("1.08")
+    price_increase_premium_bonus: Decimal = Decimal("0.02")
+    price_increase_budget_penalty: Decimal = Decimal("-0.01")
+    price_increase_suite_bonus: Decimal = Decimal("0.02")
+    price_increase_market_fit_penalty_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 4,
+            "startup": 3,
+            "smb": 2,
+            "enterprise": 1,
+        }
+    )
+    price_increase_packaging_relief: dict[str, int] = field(
+        default_factory=lambda: {
+            "streamlined": 0,
+            "modular": 1,
+            "suite": 2,
+        }
+    )
+    price_increase_quality_relief_divisor: int = 24
+    price_increase_churn_rate_gain: Decimal = Decimal("0.0040")
+    price_increase_account_value_multiplier: Decimal = Decimal("1.05")
+    price_increase_account_satisfaction_loss_by_segment: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 5,
+            "startup": 4,
+            "smb": 3,
+            "enterprise": 2,
+        }
+    )
+    price_increase_account_renewal_health_loss: int = 5
+    price_increase_account_invoice_risk_gain: int = 4
+    price_increase_account_churn_risk_gain: int = 4
     packaging_revenue_multiplier: dict[str, Decimal] = field(
         default_factory=lambda: {
             "streamlined": Decimal("1.00"),
@@ -128,6 +161,12 @@ class BalanceConfig:
             "suite": {"indie": -2, "startup": -1, "smb": 1, "enterprise": 2},
         }
     )
+    packaging_expansion_interval: int = 3
+    packaging_expansion_satisfaction_threshold: int = 74
+    packaging_expansion_onboarding_threshold: int = 68
+    packaging_expansion_ticket_threshold: int = 6
+    packaging_expansion_add_on_gain: int = 1
+    packaging_expansion_contract_gain: Decimal = Decimal("90.00")
 
     segment_base_acquisition_bonus: dict[str, int] = field(
         default_factory=lambda: {
@@ -376,10 +415,16 @@ class BalanceConfig:
     management_senior_capacity: int = 3
     management_leadership_divisor: int = 25
     management_coordination_bonus_per_managed_pair: int = 1
+    management_same_product_bonus_divisor: int = 2
+    management_overload_coordination_penalty_divisor: int = 2
     management_unmanaged_energy_penalty: int = 1
     management_unmanaged_morale_penalty: int = 1
     management_attrition_relief: int = 5
     management_org_drag_threshold: int = 2
+    management_reorg_cost: Decimal = Decimal("160.00")
+    management_reorg_attrition_relief: int = 8
+    management_reorg_energy_gain: int = 4
+    management_reorg_morale_penalty: int = 1
 
     roadmap_duration_turns: int = 4
     roadmap_growth_acquisition_bonus: int = 2
@@ -754,6 +799,8 @@ class BalanceConfig:
     finance_pressure_relief_cash_threshold: Decimal = Decimal("7000.00")
     finance_board_runway_target: int = 8
     finance_forecast_history_window: int = 3
+    finance_forecast_conservative_drag: Decimal = Decimal("0.18")
+    finance_forecast_aggressive_relief: Decimal = Decimal("0.15")
     finance_covenant_risk_debt_threshold: Decimal = Decimal("5200.00")
     finance_covenant_risk_cash_buffer: Decimal = Decimal("2600.00")
     finance_covenant_risk_gain: int = 8
@@ -1424,6 +1471,23 @@ class BalanceConfig:
     board_warning_level_one_confidence_threshold: int = 38
     board_ask_miss_penalty: int = 1
     board_ask_hit_relief: int = 1
+    board_response_min_pressure_threshold: int = 28
+    board_response_confidence_gain: int = 2
+    board_response_governance_relief: int = 3
+    board_response_profitability_cash_gain: Decimal = Decimal("180.00")
+    board_response_profitability_growth_penalty: Decimal = Decimal("0.0040")
+    board_response_profitability_morale_loss: int = 1
+    board_response_profitability_pressure_relief: int = 5
+    board_response_reliability_cost: Decimal = Decimal("220.00")
+    board_response_reliability_backlog_relief: int = 8
+    board_response_reliability_escalation_relief: int = 3
+    board_response_reliability_bug_relief: int = 3
+    board_response_team_health_cost: Decimal = Decimal("180.00")
+    board_response_team_health_energy_gain: int = 8
+    board_response_team_health_morale_gain: int = 6
+    board_response_team_health_attrition_relief: int = 10
+    board_response_portfolio_focus_pressure_relief: int = 6
+    board_response_portfolio_focus_reputation_loss: int = 1
     finance_burn_multiple_warning: Decimal = Decimal("1.30")
     finance_burn_multiple_severe: Decimal = Decimal("1.80")
     finance_burn_multiple_pressure_gain: int = 4
@@ -1441,10 +1505,20 @@ class BalanceConfig:
     support_program_escalation_ticket_threshold: int = 14
     support_program_escalation_sla_threshold: int = 62
     support_program_escalation_queue_divisor: int = 2
+    support_program_segment_ticket_weight: dict[str, int] = field(
+        default_factory=lambda: {
+            "indie": 1,
+            "startup": 1,
+            "smb": 2,
+            "enterprise": 3,
+        }
+    )
     support_program_backlog_reputation_threshold: int = 24
     support_program_backlog_reputation_loss: int = 1
     support_program_backlog_morale_penalty_threshold: int = 18
     support_program_backlog_morale_penalty: int = 1
+    support_program_staffing_gap_reputation_threshold: int = 4
+    support_program_staffing_gap_morale_penalty: int = 1
     support_program_triage_cost: Decimal = Decimal("150.00")
     support_program_triage_backlog_relief: int = 10
     support_program_triage_escalation_relief: int = 3

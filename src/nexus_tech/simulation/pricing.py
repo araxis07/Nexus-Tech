@@ -5,7 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from nexus_tech.domain.models import PackagingStrategy, PricingTier, Product, SubscriptionPackage
+from nexus_tech.domain.models import (
+    CustomerAccount,
+    CustomerAccountStatus,
+    PackagingStrategy,
+    PricingTier,
+    Product,
+    SubscriptionPackage,
+)
 from nexus_tech.domain.money import format_money, quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.support import clamp_int, clamp_rate
@@ -42,6 +49,13 @@ class PackagingProfile:
 @dataclass(frozen=True)
 class PackagingActionSummary:
     """Summary of changing a product packaging strategy."""
+
+    message: str
+
+
+@dataclass(frozen=True)
+class PriceIncreaseSummary:
+    """Summary of an explicit price increase decision."""
 
     message: str
 
@@ -219,5 +233,63 @@ def apply_set_packaging_strategy(
             f"{product.name} shifted to {packaging_strategy.value} packaging. "
             f"Effective revenue per user is now {format_money(effective_rpu)}, "
             f"market fit {fit_delta:+d}, add-on depth {add_on_bonus:+d}."
+        )
+    )
+
+
+def apply_run_price_increase(
+    product: Product,
+    customer_accounts: list[CustomerAccount],
+) -> PriceIncreaseSummary:
+    """Raise product monetization and let account tension absorb part of the shock."""
+
+    multiplier = BALANCE.price_increase_base_multiplier
+    if product.pricing_tier is PricingTier.PREMIUM:
+        multiplier += BALANCE.price_increase_premium_bonus
+    elif product.pricing_tier is PricingTier.BUDGET:
+        multiplier += BALANCE.price_increase_budget_penalty
+    if product.packaging_strategy is PackagingStrategy.SUITE:
+        multiplier += BALANCE.price_increase_suite_bonus
+
+    product.revenue_per_user = quantize_money(product.revenue_per_user * multiplier)
+    market_fit_penalty = max(
+        1,
+        BALANCE.price_increase_market_fit_penalty_by_segment[product.target_segment.value]
+        - (product.quality // BALANCE.price_increase_quality_relief_divisor)
+        - BALANCE.price_increase_packaging_relief[product.packaging_strategy.value],
+    )
+    product.market_fit = clamp_int(product.market_fit - market_fit_penalty)
+    product.churn_rate = clamp_rate(product.churn_rate + BALANCE.price_increase_churn_rate_gain)
+
+    adjusted_accounts = 0
+    for account in customer_accounts:
+        if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
+            continue
+        adjusted_accounts += 1
+        account.contract_value = quantize_money(
+            account.contract_value * BALANCE.price_increase_account_value_multiplier
+        )
+        satisfaction_loss = max(
+            1,
+            BALANCE.price_increase_account_satisfaction_loss_by_segment[account.segment.value]
+            - (1 if account.annual_prepay else 0)
+            - (1 if product.packaging_strategy is PackagingStrategy.SUITE else 0),
+        )
+        account.satisfaction = clamp_int(account.satisfaction - satisfaction_loss)
+        account.renewal_health = clamp_int(
+            account.renewal_health - BALANCE.price_increase_account_renewal_health_loss
+        )
+        account.invoice_risk = clamp_int(
+            account.invoice_risk + BALANCE.price_increase_account_invoice_risk_gain
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk + BALANCE.price_increase_account_churn_risk_gain
+        )
+
+    return PriceIncreaseSummary(
+        message=(
+            f"Raised pricing on {product.name}. Base ARPU is now "
+            f"{format_money(product.revenue_per_user)} with market fit "
+            f"-{market_fit_penalty} and {adjusted_accounts} account(s) repriced."
         )
     )
