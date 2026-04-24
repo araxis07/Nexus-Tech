@@ -22,8 +22,11 @@ from nexus_tech.simulation.contracts import (
     apply_support_drift,
     build_contract_shape,
     calculate_account_recurring_revenue,
-    default_subscription_package,
     get_contract_interval,
+)
+from nexus_tech.simulation.pricing import (
+    get_default_subscription_package,
+    get_packaging_add_on_bonus,
 )
 from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.support_program import calculate_support_program_relief
@@ -333,14 +336,15 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         segment=product.target_segment,
         contract_value=contract_value,
         plan_tier=product.pricing_tier,
-        subscription_package=default_subscription_package(product.target_segment),
+        subscription_package=get_default_subscription_package(product),
         contract_cadence=contract_cadence,
         billing_model=billing_model,
         seat_count=seat_count,
         usage_units=usage_units,
         add_on_count=BALANCE.contract_default_add_on_commitment_by_segment[
             product.target_segment.value
-        ],
+        ]
+        + get_packaging_add_on_bonus(product),
         annual_prepay=product.target_segment is MarketSegment.ENTERPRISE,
         discount_rate=Decimal("0.0000"),
         satisfaction=satisfaction,

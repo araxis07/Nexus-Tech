@@ -37,6 +37,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track quality, bugs, market fit, technical debt, users, acquisition, and churn
 - Target different customer segments such as `indie`, `startup`, `SMB`, and `enterprise`
 - Adjust pricing tiers to trade off growth, churn, and revenue per user
+- Shift each product between `streamlined`, `modular`, and `suite` packaging to rebalance monetization, acquisition, and support complexity
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
 - Plan and ship product releases such as stability patches, minor releases, and major launches
 - Use multi-action roadmap projects for larger bets like platform rebuilds, enterprise certification, marketplace launches, and sales playbooks
@@ -71,6 +72,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Add open source challengers, regulatory incumbents, and platform consolidators as new competitor archetypes
 - Add enterprise sales machines, data-quality specialists, and release-velocity rivals as higher-scale pressure archetypes
 - Add support-swarm, revenue-optimizer, and renewal-lock-in rivals for heavier post-sale and monetization pressure
+- Add bundle-empires and service-reliability rivals to pressure packaging posture and operational discipline
 - Let rival moves reshape product count and pricing posture over time
 - Capture compact competitor-intel notes when rival posture changes or momentum spikes
 - Push into late-game scale pressure through market saturation, product cannibalization, coordination drag, and maintenance sprawl
@@ -89,6 +91,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Forecast near-term cash flow and runway instead of relying only on last-turn performance
 - Track covenant risk and missed board targets so finance pressure is visible before collapse
 - Track burn multiple, board pressure, governance risk, and board directives as the company scales
+- Track an active board ask plus a warning ladder so governance pressure escalates before the company fully breaks
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
 
 ### 🤝 Customer Accounts
@@ -105,6 +108,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Let weak product health, bugs, and technical debt create visible renewal pressure
 - Invest directly in customer success and run targeted retention plays on fragile accounts
 - Improve a shared support program with knowledge-base and automation depth that lowers ticket pressure across the portfolio
+- Upgrade support operations directly through knowledge-base, automation, and SLA investments instead of relying only on passive drift
 - Run explicit support triage actions that cut backlog, escalation pressure, and payment-risk spillover
 - Review key accounts directly from the in-game `review_customers` action
 
@@ -124,6 +128,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Simulate morale, energy, burnout, recovery, and role-based impact on outcomes
 - Train employees, track promotion readiness, promote strong contributors, and monitor attrition risk
 - Track performance rating, underperformance streaks, and real resignation pressure when the company runs too hot
+- Assign managers, track leadership strength, and absorb org-drag pressure as headcount grows beyond clean management coverage
 
 ### 🧭 Functional Budgeting
 

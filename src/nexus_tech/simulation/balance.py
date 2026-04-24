@@ -79,6 +79,55 @@ class BalanceConfig:
     pricing_premium_quality_threshold: int = 62
     pricing_premium_market_fit_bonus: int = 1
     pricing_premium_market_fit_penalty: int = 2
+    packaging_revenue_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "streamlined": Decimal("1.00"),
+            "modular": Decimal("1.05"),
+            "suite": Decimal("1.12"),
+        }
+    )
+    packaging_acquisition_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "streamlined": 0,
+            "modular": 0,
+            "suite": -1,
+        }
+    )
+    packaging_churn_modifier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "streamlined": Decimal("0.0000"),
+            "modular": Decimal("0.0010"),
+            "suite": Decimal("-0.0040"),
+        }
+    )
+    packaging_support_cost_multiplier: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "streamlined": Decimal("1.00"),
+            "modular": Decimal("1.00"),
+            "suite": Decimal("1.10"),
+        }
+    )
+    packaging_add_on_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "streamlined": 0,
+            "modular": 2,
+            "suite": 3,
+        }
+    )
+    packaging_enterprise_probability_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "streamlined": 0,
+            "modular": 1,
+            "suite": 3,
+        }
+    )
+    packaging_market_fit_shift_by_segment: dict[str, dict[str, int]] = field(
+        default_factory=lambda: {
+            "streamlined": {"indie": 2, "startup": 1, "smb": 0, "enterprise": -2},
+            "modular": {"indie": 0, "startup": 1, "smb": 1, "enterprise": 1},
+            "suite": {"indie": -2, "startup": -1, "smb": 1, "enterprise": 2},
+        }
+    )
 
     segment_base_acquisition_bonus: dict[str, int] = field(
         default_factory=lambda: {
@@ -323,6 +372,14 @@ class BalanceConfig:
     team_debt_bonus_divisor: int = 38
     team_coordination_bonus_divisor: int = 36
     team_burnout_protection_divisor: int = 55
+    management_product_manager_capacity: int = 4
+    management_senior_capacity: int = 3
+    management_leadership_divisor: int = 25
+    management_coordination_bonus_per_managed_pair: int = 1
+    management_unmanaged_energy_penalty: int = 1
+    management_unmanaged_morale_penalty: int = 1
+    management_attrition_relief: int = 5
+    management_org_drag_threshold: int = 2
 
     roadmap_duration_turns: int = 4
     roadmap_growth_acquisition_bonus: int = 2
@@ -1359,6 +1416,14 @@ class BalanceConfig:
     governance_risk_warning_threshold: int = 44
     governance_risk_relief: int = 3
     board_pressure_relief: int = 4
+    board_warning_level_two_pressure_threshold: int = 62
+    board_warning_level_three_pressure_threshold: int = 78
+    board_warning_level_two_risk_threshold: int = 58
+    board_warning_level_three_risk_threshold: int = 74
+    board_warning_level_two_confidence_threshold: int = 24
+    board_warning_level_one_confidence_threshold: int = 38
+    board_ask_miss_penalty: int = 1
+    board_ask_hit_relief: int = 1
     finance_burn_multiple_warning: Decimal = Decimal("1.30")
     finance_burn_multiple_severe: Decimal = Decimal("1.80")
     finance_burn_multiple_pressure_gain: int = 4
@@ -1385,6 +1450,12 @@ class BalanceConfig:
     support_program_triage_escalation_relief: int = 3
     support_program_triage_ticket_relief: int = 4
     support_program_triage_sla_relief: int = 6
+    support_program_upgrade_cost: Decimal = Decimal("170.00")
+    support_program_upgrade_knowledge_gain: int = 10
+    support_program_upgrade_automation_gain: int = 10
+    support_program_upgrade_sla_gain: int = 8
+    support_program_upgrade_backlog_relief: int = 4
+    support_program_upgrade_escalation_relief: int = 1
 
     hiring_source_cost: Decimal = Decimal("120.00")
     hiring_screen_cost: Decimal = Decimal("55.00")

@@ -148,6 +148,7 @@ def render_product_template_catalog(
     table.add_column("Stage")
     table.add_column("Segment")
     table.add_column("Price")
+    table.add_column("Pack")
     table.add_column("Q", justify="right")
     table.add_column("B", justify="right")
     table.add_column("Fit", justify="right")
@@ -160,6 +161,7 @@ def render_product_template_catalog(
             template.lifecycle_stage.value,
             template.target_segment.value,
             template.pricing_tier.value,
+            template.packaging_strategy.value,
             str(template.quality),
             str(template.bug_level),
             str(template.market_fit),
@@ -1212,16 +1214,19 @@ def render_employee_picker(
     table.add_column("Employee", style="bold")
     table.add_column("Role")
     table.add_column("Assignment")
+    table.add_column("Manager")
     table.add_column("Energy", justify="right")
     table.add_column("Morale", justify="right")
     table.add_column("Eff", justify="right")
 
+    employee_names = {employee.id: employee.full_name for employee in employees}
     for index, employee in enumerate(employees, start=1):
         table.add_row(
             str(index),
             employee.full_name,
             employee.role.value,
             product_names.get(employee.assigned_product_id, "unassigned"),
+            employee_names.get(employee.manager_id, "-"),
             str(employee.energy),
             str(employee.morale),
             str(calculate_effective_productivity(employee)),
@@ -1370,6 +1375,10 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table = Table.grid(padding=(0, 1))
     table.add_row("Headcount", str(team_condition.headcount))
     table.add_row("Assigned", str(team_condition.assigned_headcount))
+    table.add_row("Managed", str(team_condition.managed_headcount))
+    table.add_row("Managers", str(team_condition.manager_headcount))
+    table.add_row("Mgmt Cap", str(team_condition.management_capacity))
+    table.add_row("Org Drag", str(team_condition.org_drag))
     table.add_row("Salary Burn", format_money(team_condition.total_salary_cost))
     table.add_row("Avg Energy", average_energy)
     table.add_row("Avg Morale", average_morale)
@@ -1396,6 +1405,7 @@ def _build_portfolio_table(state: GameState) -> Table:
     table.add_column("Debt", justify="right")
     table.add_column("Maint", justify="right")
     table.add_column("Price")
+    table.add_column("Pack")
     table.add_column("Aq", justify="right")
     table.add_column("Ch", justify="right")
 
@@ -1414,6 +1424,7 @@ def _build_portfolio_table(state: GameState) -> Table:
             str(product.technical_debt),
             format_money(product.maintenance_cost),
             product.pricing_tier.value,
+            product.packaging_strategy.value,
             format_rate(product.acquisition_rate),
             format_rate(product.churn_rate),
         )
@@ -1424,7 +1435,7 @@ def _build_portfolio_table(state: GameState) -> Table:
 def _build_dashboard_team_panel(state: GameState) -> Panel:
     if not state.employees:
         return Panel(
-            "No employees hired yet. Use [bold]17[/bold] to start building the team.",
+            "No employees hired yet. Use [bold]18[/bold] to start building the team.",
             title="Team Table",
             border_style="cyan",
             expand=True,
@@ -1501,6 +1512,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
     table.add_column("Employee", style="bold")
     table.add_column("Role")
     table.add_column("Assignment")
+    table.add_column("Manager")
     table.add_column("Energy", justify="right")
     table.add_column("Morale", justify="right")
     table.add_column("Eff", justify="right")
@@ -1509,6 +1521,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
         table.add_column("Seniority")
         table.add_column("Trait")
         table.add_column("Spec")
+        table.add_column("Lead", justify="right")
         table.add_column("Perf", justify="right")
         table.add_column("XP", justify="right")
         table.add_column("Ready", justify="right")
@@ -1516,6 +1529,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
         table.add_column("Streak", justify="right")
         table.add_column("Salary", justify="right")
 
+    employee_names = {employee.id: employee.full_name for employee in state.employees}
     for index, employee in enumerate(state.employees, start=1):
         assignment_name = product_names.get(employee.assigned_product_id, "unassigned")
         row = [
@@ -1523,6 +1537,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
             employee.full_name,
             employee.role.value,
             assignment_name,
+            employee_names.get(employee.manager_id, "-"),
             str(employee.energy),
             str(employee.morale),
             str(calculate_effective_productivity(employee)),
@@ -1533,6 +1548,7 @@ def _build_team_table(state: GameState, *, compact: bool) -> Table:
                     employee.seniority.value,
                     employee.trait.value,
                     employee.specialization,
+                    str(employee.leadership_score),
                     str(employee.performance_rating),
                     str(employee.experience_points),
                     str(employee.promotion_readiness),
@@ -1738,59 +1754,71 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("4", "reduce_technical_debt", "Stabilise future delivery.")
     primary_actions.add_row("5", "market_product", "Spend cash for acquisition.")
     primary_actions.add_row("6", "adjust_pricing", "Change pricing and growth trade-offs.")
-    primary_actions.add_row("7", "set_target_segment", "Retarget a product's customer segment.")
-    primary_actions.add_row("8", "sunset_product", "Retire a weak product.")
-    primary_actions.add_row("9", "set_company_strategy", "Shift company-wide focus.")
-    primary_actions.add_row("10", "set_roadmap", "Pick the quarter's execution plan.")
-    primary_actions.add_row("11", "set_budget_stance", "Change the quarter's spend posture.")
-    primary_actions.add_row("12", "take_loan", "Trade future burn for runway.")
-    primary_actions.add_row("13", "raise_angel", "Take smaller capital with dilution.")
-    primary_actions.add_row("14", "raise_vc", "Raise a larger round once traction is real.")
-    primary_actions.add_row("15", "repay_debt", "Reduce interest and capital pressure.")
-    primary_actions.add_row("16", "review_finance", "Open the capital and runway view.")
-    primary_actions.add_row("17", "hire_employee", "Add capability and salary burn.")
-    primary_actions.add_row("18", "fire_employee", "Remove salary burden.")
-    primary_actions.add_row("19", "assign_employee", "Put someone on a product.")
-    primary_actions.add_row("20", "unassign_employee", "Pull someone off product work.")
-    primary_actions.add_row("21", "rest_team", "Recover energy and morale.")
-    primary_actions.add_row("22", "review_team", "Open the detailed team view.")
-    primary_actions.add_row("23", "review_customers", "Open key account renewals.")
-    primary_actions.add_row("24", "invest_in_customer_success", "Improve onboarding and retention.")
     primary_actions.add_row(
-        "25",
+        "7",
+        "set_packaging_strategy",
+        "Change packaging and monetization depth.",
+    )
+    primary_actions.add_row("8", "set_target_segment", "Retarget a product's customer segment.")
+    primary_actions.add_row("9", "sunset_product", "Retire a weak product.")
+    primary_actions.add_row("10", "set_company_strategy", "Shift company-wide focus.")
+    primary_actions.add_row("11", "set_roadmap", "Pick the quarter's execution plan.")
+    primary_actions.add_row("12", "set_budget_stance", "Change the quarter's spend posture.")
+    primary_actions.add_row("13", "take_loan", "Trade future burn for runway.")
+    primary_actions.add_row("14", "raise_angel", "Take smaller capital with dilution.")
+    primary_actions.add_row("15", "raise_vc", "Raise a larger round once traction is real.")
+    primary_actions.add_row("16", "repay_debt", "Reduce interest and capital pressure.")
+    primary_actions.add_row("17", "review_finance", "Open the capital and runway view.")
+    primary_actions.add_row("18", "hire_employee", "Add capability and salary burn.")
+    primary_actions.add_row("19", "fire_employee", "Remove salary burden.")
+    primary_actions.add_row("20", "assign_employee", "Put someone on a product.")
+    primary_actions.add_row("21", "unassign_employee", "Pull someone off product work.")
+    primary_actions.add_row(
+        "22",
+        "assign_manager",
+        "Create reporting structure and reduce org drag.",
+    )
+    primary_actions.add_row("23", "clear_manager", "Remove a reporting line.")
+    primary_actions.add_row("24", "rest_team", "Recover energy and morale.")
+    primary_actions.add_row("25", "review_team", "Open the detailed team view.")
+    primary_actions.add_row("26", "review_customers", "Open key account renewals.")
+    primary_actions.add_row("27", "invest_in_customer_success", "Improve onboarding and retention.")
+    primary_actions.add_row(
+        "28",
         "run_retention_play",
         "Save one at-risk account with concessions.",
     )
-    primary_actions.add_row("26", "train_employee", "Increase readiness and productivity.")
-    primary_actions.add_row("27", "promote_employee", "Level up a ready team member.")
-    primary_actions.add_row("28", "set_functional_budget", "Rebalance engineering, growth, and CS.")
-    primary_actions.add_row("29", "plan_release", "Queue a product release plan.")
-    primary_actions.add_row("30", "work_release", "Advance and ship planned releases.")
-    primary_actions.add_row("31", "create_sales_deal", "Source a new sales opportunity.")
-    primary_actions.add_row("32", "advance_sales_deal", "Move a deal through the pipeline.")
-    primary_actions.add_row("33", "start_roadmap_project", "Start a multi-action strategic bet.")
-    primary_actions.add_row("34", "work_roadmap_project", "Advance the active strategic project.")
-    primary_actions.add_row("35", "review_pipeline", "Open release, sales, and project views.")
-    primary_actions.add_row("36", "view_report", "Open the score, plan, and rival report.")
-    primary_actions.add_row("37", "wait", "Hold position for this action.")
-    primary_actions.add_row("38", "view_status", "Refresh the dashboard.")
-    primary_actions.add_row("39", "end_turn", "Run the simulation tick.")
-    primary_actions.add_row("40", "source_candidates", "Build a persistent hiring funnel.")
-    primary_actions.add_row("41", "screen_candidate", "Run a light screen before interviews.")
-    primary_actions.add_row("42", "interview_candidate", "Qualify one screened candidate.")
-    primary_actions.add_row("43", "make_hiring_offer", "Convert an interviewed candidate.")
-    primary_actions.add_row("44", "triage_support_backlog", "Spend cash to cut support pressure.")
-    primary_actions.add_row("45", "review_board", "Open the board and governance view.")
+    primary_actions.add_row("29", "train_employee", "Increase readiness and productivity.")
+    primary_actions.add_row("30", "promote_employee", "Level up a ready team member.")
+    primary_actions.add_row("31", "set_functional_budget", "Rebalance engineering, growth, and CS.")
+    primary_actions.add_row("32", "upgrade_support_program", "Invest in reusable support leverage.")
+    primary_actions.add_row("33", "plan_release", "Queue a product release plan.")
+    primary_actions.add_row("34", "work_release", "Advance and ship planned releases.")
+    primary_actions.add_row("35", "create_sales_deal", "Source a new sales opportunity.")
+    primary_actions.add_row("36", "advance_sales_deal", "Move a deal through the pipeline.")
+    primary_actions.add_row("37", "start_roadmap_project", "Start a multi-action strategic bet.")
+    primary_actions.add_row("38", "work_roadmap_project", "Advance the active strategic project.")
+    primary_actions.add_row("39", "review_pipeline", "Open release, sales, and project views.")
+    primary_actions.add_row("40", "view_report", "Open the score, plan, and rival report.")
+    primary_actions.add_row("41", "wait", "Hold position for this action.")
+    primary_actions.add_row("42", "view_status", "Refresh the dashboard.")
+    primary_actions.add_row("43", "end_turn", "Run the simulation tick.")
+    primary_actions.add_row("44", "source_candidates", "Build a persistent hiring funnel.")
+    primary_actions.add_row("45", "screen_candidate", "Run a light screen before interviews.")
+    primary_actions.add_row("46", "interview_candidate", "Qualify one screened candidate.")
+    primary_actions.add_row("47", "make_hiring_offer", "Convert an interviewed candidate.")
+    primary_actions.add_row("48", "triage_support_backlog", "Spend cash to cut support pressure.")
+    primary_actions.add_row("49", "review_board", "Open the board and governance view.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("46", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("47", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("48", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("49", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("50", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("50", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("51", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("52", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("53", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("54", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -1833,10 +1861,10 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
 
     suggestions: list[str] = []
     if not state.employees:
-        suggestions.append("Use [bold]17[/bold] to hire the first team member once runway is safe.")
+        suggestions.append("Use [bold]18[/bold] to hire the first team member once runway is safe.")
     elif any(employee.assigned_product_id is None for employee in state.employees):
         suggestions.append(
-            "Use [bold]19[/bold] to assign unallocated teammates to the product that matters most."
+            "Use [bold]20[/bold] to assign unallocated teammates to the product that matters most."
         )
     else:
         suggestions.append(
@@ -1854,10 +1882,10 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
         )
 
     if state.company.current_turn == 1:
-        suggestions.append("Use [bold]29[/bold] any time if you want the compact guide again.")
+        suggestions.append("Use [bold]52[/bold] any time if you want the compact guide again.")
     if state.company.current_turn >= 2:
         suggestions.append(
-            "Check [bold]23[/bold] after a turn resolves to read the run report and rival pressure."
+            "Check [bold]40[/bold] after a turn resolves to read the run report and rival pressure."
         )
 
     body = "\n".join(f"- {line}" for line in suggestions)
@@ -2315,7 +2343,9 @@ def _build_governance_panel(state: GameState) -> Panel:
     table.add_row("Board Pressure", str(state.finance.board_pressure))
     table.add_row("Governance Risk", str(state.finance.governance_risk))
     table.add_row("Directive", directive)
+    table.add_row("Board Ask", state.finance.active_board_ask.value.replace("_", " "))
     table.add_row("Warning", "active" if state.finance.board_warning_active else "clear")
+    table.add_row("Warn Level", str(state.finance.board_warning_level))
     table.add_row(
         "Last Review",
         str(state.finance.last_board_review_turn)

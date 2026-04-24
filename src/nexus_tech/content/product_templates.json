@@ -609,7 +609,8 @@
     "acquisition_rate": "0.0240",
     "churn_rate": "0.0550",
     "target_segment": "enterprise",
-    "pricing_tier": "premium"
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
   },
   {
     "template_id": "support_automation_hub",
@@ -627,7 +628,8 @@
     "acquisition_rate": "0.0360",
     "churn_rate": "0.0620",
     "target_segment": "smb",
-    "pricing_tier": "standard"
+    "pricing_tier": "standard",
+    "packaging_strategy": "modular"
   },
   {
     "template_id": "revenue_forecast_cloud",
@@ -645,6 +647,64 @@
     "acquisition_rate": "0.0260",
     "churn_rate": "0.0580",
     "target_segment": "enterprise",
-    "pricing_tier": "premium"
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "packaging_command_center",
+    "title": "Packaging Command Center",
+    "description": "A revenue-ops control product built around bundle strategy, expansion value, and heavier commercial expectations.",
+    "lifecycle_stage": "prototype",
+    "quality": 50,
+    "bug_level": 13,
+    "market_fit": 35,
+    "technical_debt": 18,
+    "user_count": 0,
+    "revenue_per_user": "86.00",
+    "feature_count": 0,
+    "maintenance_cost": "335.00",
+    "acquisition_rate": "0.0250",
+    "churn_rate": "0.0540",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "service_sla_grid",
+    "title": "Service SLA Grid",
+    "description": "A support-operations platform that trades simplicity for service depth, response guarantees, and retention leverage.",
+    "lifecycle_stage": "prototype",
+    "quality": 49,
+    "bug_level": 14,
+    "market_fit": 38,
+    "technical_debt": 17,
+    "user_count": 0,
+    "revenue_per_user": "48.00",
+    "feature_count": 0,
+    "maintenance_cost": "270.00",
+    "acquisition_rate": "0.0340",
+    "churn_rate": "0.0600",
+    "target_segment": "smb",
+    "pricing_tier": "standard",
+    "packaging_strategy": "modular"
+  },
+  {
+    "template_id": "org_ops_console",
+    "title": "Org Ops Console",
+    "description": "An internal operating system for scaling teams that rewards disciplined execution, management clarity, and steady delivery.",
+    "lifecycle_stage": "prototype",
+    "quality": 48,
+    "bug_level": 14,
+    "market_fit": 33,
+    "technical_debt": 16,
+    "user_count": 0,
+    "revenue_per_user": "58.00",
+    "feature_count": 0,
+    "maintenance_cost": "280.00",
+    "acquisition_rate": "0.0300",
+    "churn_rate": "0.0590",
+    "target_segment": "startup",
+    "pricing_tier": "standard",
+    "packaging_strategy": "streamlined"
   }
 ]

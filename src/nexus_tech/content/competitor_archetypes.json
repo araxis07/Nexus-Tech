@@ -250,5 +250,31 @@
     "current_move": "hold",
     "momentum": 61,
     "funding_level": 2
+  },
+  {
+    "archetype_id": "bundle_empire",
+    "title": "Bundle Empire",
+    "description": "A packaging-savvy rival that wins through larger suites, aggressive expansion paths, and cleaner board-level monetization narratives.",
+    "focus_segment": "enterprise",
+    "strength": 78,
+    "aggression": 62,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 66,
+    "funding_level": 3
+  },
+  {
+    "archetype_id": "service_reliability_house",
+    "title": "Service Reliability House",
+    "description": "A disciplined operational rival that compounds through SLA credibility, steady releases, and calmer post-sale execution.",
+    "focus_segment": "smb",
+    "strength": 72,
+    "aggression": 51,
+    "pricing_tier": "standard",
+    "active_product_count": 2,
+    "current_move": "hold",
+    "momentum": 59,
+    "funding_level": 2
   }
 ]

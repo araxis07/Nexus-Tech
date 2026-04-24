@@ -6,7 +6,13 @@ import sqlite3
 from decimal import Decimal
 from uuid import UUID
 
-from nexus_tech.domain.models import LifecycleStage, MarketSegment, PricingTier, Product
+from nexus_tech.domain.models import (
+    LifecycleStage,
+    MarketSegment,
+    PackagingStrategy,
+    PricingTier,
+    Product,
+)
 
 
 class ProductRepository:
@@ -40,10 +46,11 @@ class ProductRepository:
                 acquisition_rate,
                 churn_rate,
                 pricing_tier,
+                packaging_strategy,
                 target_segment,
                 is_active
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -63,6 +70,7 @@ class ProductRepository:
                     str(product.acquisition_rate),
                     str(product.churn_rate),
                     product.pricing_tier.value,
+                    product.packaging_strategy.value,
                     product.target_segment.value,
                     int(product.is_active),
                 )
@@ -90,6 +98,7 @@ class ProductRepository:
                 acquisition_rate,
                 churn_rate,
                 pricing_tier,
+                packaging_strategy,
                 target_segment,
                 is_active
             FROM products
@@ -115,6 +124,9 @@ class ProductRepository:
                 acquisition_rate=Decimal(row["acquisition_rate"]),
                 churn_rate=Decimal(row["churn_rate"]),
                 pricing_tier=PricingTier(row["pricing_tier"] or PricingTier.STANDARD.value),
+                packaging_strategy=PackagingStrategy(
+                    row["packaging_strategy"] or PackagingStrategy.STREAMLINED.value
+                ),
                 target_segment=MarketSegment(row["target_segment"] or MarketSegment.STARTUP.value),
                 is_active=bool(row["is_active"]),
             )

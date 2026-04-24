@@ -8,6 +8,7 @@ from nexus_tech.domain.models import (
     Company,
     LifecycleStage,
     MarketSegment,
+    PackagingStrategy,
     PricingTier,
     Product,
 )
@@ -54,6 +55,7 @@ def create_product(
     acquisition_rate: Decimal = BALANCE.new_product_acquisition_rate,
     churn_rate: Decimal = BALANCE.new_product_churn_rate,
     pricing_tier: PricingTier = PricingTier.STANDARD,
+    packaging_strategy: PackagingStrategy = PackagingStrategy.STREAMLINED,
     target_segment: MarketSegment = MarketSegment.STARTUP,
     is_active: bool = True,
 ) -> Product:
@@ -81,6 +83,7 @@ def create_product(
         acquisition_rate=acquisition_rate,
         churn_rate=churn_rate,
         pricing_tier=pricing_tier,
+        packaging_strategy=packaging_strategy,
         target_segment=target_segment,
         is_active=is_active,
     )

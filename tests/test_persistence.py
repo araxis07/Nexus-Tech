@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from nexus_tech.domain.models import (
+    BoardAsk,
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
@@ -39,6 +40,7 @@ from nexus_tech.domain.models import (
     MarketSegment,
     MilestoneEntry,
     MilestoneId,
+    PackagingStrategy,
     PendingEvent,
     PricingTier,
     Product,
@@ -79,8 +81,27 @@ def make_state() -> GameState:
         acquisition_rate=Decimal("0.0720"),
         churn_rate=Decimal("0.0480"),
         pricing_tier=PricingTier.PREMIUM,
+        packaging_strategy=PackagingStrategy.SUITE,
         target_segment=MarketSegment.ENTERPRISE,
         is_active=True,
+    )
+    manager = Employee(
+        full_name="Jules Park",
+        role=EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        salary=Decimal("980.00"),
+        energy=76,
+        morale=74,
+        productivity=66,
+        specialization="delivery",
+        experience_points=48,
+        promotion_readiness=63,
+        attrition_risk=9,
+        performance_rating=71,
+        tenure_turns=8,
+        underperformance_streak=0,
+        leadership_score=82,
+        assigned_product_id=product.id,
     )
     employee = Employee(
         full_name="Ada Wong",
@@ -97,7 +118,9 @@ def make_state() -> GameState:
         performance_rating=67,
         tenure_turns=5,
         underperformance_streak=1,
+        leadership_score=58,
         assigned_product_id=product.id,
+        manager_id=manager.id,
     )
     pending_event = PendingEvent(
         event_id="competitor_pressure",
@@ -151,7 +174,7 @@ def make_state() -> GameState:
             cash_on_hand=Decimal("7630.50"),
             reputation=57,
             total_users=42,
-            headcount=1,
+            headcount=2,
             roadmap_focus=RoadmapFocus.GROWTH_PUSH,
         )
     ]
@@ -208,7 +231,9 @@ def make_state() -> GameState:
         governance_risk=16,
         board_pressure=21,
         board_directive="prove_reliability",
+        active_board_ask=BoardAsk.RELIABILITY,
         board_warning_active=True,
+        board_warning_level=2,
         last_board_review_turn=4,
         last_funding_turn=3,
     )
@@ -313,7 +338,7 @@ def make_state() -> GameState:
             current_turn=4,
         ),
         products=[product],
-        employees=[employee],
+        employees=[manager, employee],
         finance=finance,
         competitors=[competitor],
         customer_accounts=[customer_account],
@@ -461,7 +486,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "saved_with_version",
         "schema_version",
     }.issubset(save_slot_columns)
-    assert {"target_segment"}.issubset(product_columns)
+    assert {"target_segment", "packaging_strategy"}.issubset(product_columns)
     assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
         competitor_columns
     )
@@ -475,13 +500,17 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "governance_risk",
         "board_pressure",
         "board_directive",
+        "active_board_ask",
         "board_warning_active",
+        "board_warning_level",
         "last_board_review_turn",
     }.issubset(finance_columns)
     assert {
         "performance_rating",
         "tenure_turns",
         "underperformance_streak",
+        "leadership_score",
+        "manager_id",
     }.issubset(employee_columns)
     assert {
         "billing_model",
@@ -521,7 +550,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "dependency_project_type",
         "delivery_risk",
     }.issubset(roadmap_columns)
-    assert user_version >= 15
+    assert user_version >= 16
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -645,7 +674,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "support_sla_target",
     }.issubset(save_slot_columns)
     assert {"strategy"}.issubset(company_columns)
-    assert {"pricing_tier", "target_segment"}.issubset(product_columns)
+    assert {"pricing_tier", "target_segment", "packaging_strategy"}.issubset(product_columns)
     assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
         competitor_columns
     )
@@ -657,8 +686,10 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "burn_multiple",
         "board_pressure",
         "board_directive",
+        "active_board_ask",
+        "board_warning_level",
     }.issubset(finance_columns)
-    assert user_version >= 15
+    assert user_version >= 16
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -694,9 +725,9 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].slot_name == "slot-b"
     assert summaries[0].company_name == "Atlas Systems"
     assert summaries[0].active_products == 1
-    assert summaries[0].headcount == 1
+    assert summaries[0].headcount == 2
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 15
+    assert summaries[0].schema_version >= 16
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -709,7 +740,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 15
+    assert report.schema_version >= 16
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

@@ -19,6 +19,7 @@ from nexus_tech.domain.models import (
     LifecycleStage,
     MarketCycle,
     MarketSegment,
+    PackagingStrategy,
     PricingTier,
     RoadmapFocus,
     ScenarioObjectiveMetric,
@@ -47,6 +48,7 @@ class ProductTemplateDefinition(BaseModel):
     acquisition_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     churn_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     pricing_tier: PricingTier = PricingTier.STANDARD
+    packaging_strategy: PackagingStrategy = PackagingStrategy.STREAMLINED
     target_segment: MarketSegment = MarketSegment.STARTUP
 
     @field_validator("revenue_per_user", "maintenance_cost", mode="before")
@@ -80,6 +82,7 @@ class ScenarioProductSeed(BaseModel):
     acquisition_rate: Optional[Decimal] = None  # noqa: UP045
     churn_rate: Optional[Decimal] = None  # noqa: UP045
     pricing_tier: Optional[PricingTier] = None  # noqa: UP045
+    packaging_strategy: Optional[PackagingStrategy] = None  # noqa: UP045
     target_segment: Optional[MarketSegment] = None  # noqa: UP045
     is_active: bool = True
 

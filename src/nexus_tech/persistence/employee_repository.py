@@ -42,9 +42,11 @@ class EmployeeRepository:
                 performance_rating,
                 tenure_turns,
                 underperformance_streak,
-                assigned_product_id
+                leadership_score,
+                assigned_product_id,
+                manager_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -66,9 +68,11 @@ class EmployeeRepository:
                     employee.performance_rating,
                     employee.tenure_turns,
                     employee.underperformance_streak,
+                    employee.leadership_score,
                     str(employee.assigned_product_id)
                     if employee.assigned_product_id is not None
                     else None,
+                    str(employee.manager_id) if employee.manager_id is not None else None,
                 )
                 for index, employee in enumerate(employees)
             ],
@@ -96,7 +100,9 @@ class EmployeeRepository:
                 performance_rating,
                 tenure_turns,
                 underperformance_streak,
-                assigned_product_id
+                leadership_score,
+                assigned_product_id,
+                manager_id
             FROM employees
             WHERE slot_name = ?
             ORDER BY display_order ASC
@@ -122,9 +128,11 @@ class EmployeeRepository:
                 performance_rating=row["performance_rating"] or 62,
                 tenure_turns=row["tenure_turns"] or 0,
                 underperformance_streak=row["underperformance_streak"] or 0,
+                leadership_score=row["leadership_score"] or 55,
                 assigned_product_id=UUID(row["assigned_product_id"])
                 if row["assigned_product_id"] is not None
                 else None,
+                manager_id=UUID(row["manager_id"]) if row["manager_id"] is not None else None,
             )
             for row in rows
         ]

@@ -199,6 +199,7 @@ def _instantiate_template_product(
         acquisition_rate=template.acquisition_rate,
         churn_rate=template.churn_rate,
         pricing_tier=template.pricing_tier,
+        packaging_strategy=template.packaging_strategy,
         target_segment=template.target_segment,
     )
     if seed is None:
@@ -228,6 +229,8 @@ def _instantiate_template_product(
         product.churn_rate = seed.churn_rate
     if seed.pricing_tier is not None:
         product.pricing_tier = seed.pricing_tier
+    if seed.packaging_strategy is not None:
+        product.packaging_strategy = seed.packaging_strategy
     if seed.target_segment is not None:
         product.target_segment = seed.target_segment
     product.is_active = seed.is_active

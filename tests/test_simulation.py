@@ -7,6 +7,7 @@ import pytest
 
 from nexus_tech.config import DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME
 from nexus_tech.domain.models import (
+    BoardAsk,
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
@@ -34,6 +35,7 @@ from nexus_tech.domain.models import (
     MarketSegment,
     MilestoneEntry,
     MilestoneId,
+    PackagingStrategy,
     PendingEvent,
     PricingTier,
     Product,
@@ -45,6 +47,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
     ScenarioObjectiveMetric,
     Seniority,
+    SupportInvestmentFocus,
     SupportProgram,
     TurnAction,
     TurnLedgerEntry,
@@ -126,6 +129,7 @@ from nexus_tech.simulation.team import (
     calculate_effective_productivity,
     calculate_product_team_modifier,
     calculate_salary,
+    calculate_team_condition,
     calculate_trait_productivity,
     calculate_trait_salary,
 )
@@ -165,6 +169,7 @@ def make_product(
     acquisition_rate: Decimal = Decimal("0.0600"),
     churn_rate: Decimal = Decimal("0.0500"),
     pricing_tier: PricingTier = PricingTier.STANDARD,
+    packaging_strategy: PackagingStrategy = PackagingStrategy.STREAMLINED,
     target_segment: MarketSegment = MarketSegment.STARTUP,
     is_active: bool = True,
 ) -> Product:
@@ -182,6 +187,7 @@ def make_product(
         acquisition_rate=acquisition_rate,
         churn_rate=churn_rate,
         pricing_tier=pricing_tier,
+        packaging_strategy=packaging_strategy,
         target_segment=target_segment,
         is_active=is_active,
     )
@@ -197,7 +203,9 @@ def make_employee(
     morale: int = 76,
     productivity: int | None = None,
     specialization: str = "generalist",
+    leadership_score: int = 55,
     assigned_product_id: UUID | None = None,
+    manager_id: UUID | None = None,
 ) -> Employee:
     return Employee(
         full_name=full_name,
@@ -208,7 +216,9 @@ def make_employee(
         morale=morale,
         productivity=productivity or 64,
         specialization=specialization,
+        leadership_score=leadership_score,
         assigned_product_id=assigned_product_id,
+        manager_id=manager_id,
     )
 
 
@@ -3040,3 +3050,115 @@ def test_finance_forecast_updates_board_and_covenant_pressure() -> None:
     assert finance.covenant_risk > 0
     assert finance.missed_board_targets > 0
     assert finance.board_confidence < 64
+
+
+def test_set_packaging_strategy_changes_product_economics() -> None:
+    product = make_product("Atlas", revenue_per_user=Decimal("30.00"))
+    state = make_state(product)
+
+    baseline_rpu = calculate_effective_revenue_per_user(product)
+    outcome = apply_action(
+        state,
+        TurnAction.SET_PACKAGING_STRATEGY,
+        context=ActionContext(
+            target_product_id=product.id,
+            packaging_strategy=PackagingStrategy.MODULAR,
+        ),
+    )
+
+    updated_product = outcome.state.products[0]
+    assert updated_product.packaging_strategy is PackagingStrategy.MODULAR
+    assert calculate_effective_revenue_per_user(updated_product) > baseline_rpu
+
+
+def test_upgrade_support_program_spends_cash_and_improves_focus_metric() -> None:
+    state = make_state(make_product("Support Atlas"), cash_on_hand=Decimal("4000.00"))
+    starting_cash = state.company.cash_on_hand
+    starting_automation = state.support_program.automation_level
+
+    outcome = apply_action(
+        state,
+        TurnAction.UPGRADE_SUPPORT_PROGRAM,
+        context=ActionContext(support_investment_focus=SupportInvestmentFocus.AUTOMATION),
+    )
+
+    assert outcome.state.company.cash_on_hand < starting_cash
+    assert outcome.state.support_program.automation_level > starting_automation
+
+
+def test_assign_manager_increases_managed_coverage_and_coordination() -> None:
+    product = make_product("Managed Platform")
+    manager = make_employee(
+        "Morgan Lead",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=product.id,
+        leadership_score=82,
+    )
+    engineer = make_employee(
+        "Ada Builder",
+        EmployeeRole.ENGINEER,
+        assigned_product_id=product.id,
+    )
+    designer = make_employee(
+        "Rin Design",
+        EmployeeRole.DESIGNER,
+        assigned_product_id=product.id,
+    )
+    state = make_state(product, employees=[manager, engineer, designer])
+
+    baseline_modifier = calculate_product_team_modifier(state.employees, product.id)
+    baseline_condition = calculate_team_condition(state.employees)
+
+    first_assignment = apply_action(
+        state,
+        TurnAction.ASSIGN_MANAGER,
+        context=ActionContext(employee_id=engineer.id, manager_id=manager.id),
+    )
+    second_assignment = apply_action(
+        first_assignment.state,
+        TurnAction.ASSIGN_MANAGER,
+        context=ActionContext(employee_id=designer.id, manager_id=manager.id),
+    )
+
+    updated_modifier = calculate_product_team_modifier(
+        second_assignment.state.employees,
+        product.id,
+    )
+    updated_condition = calculate_team_condition(second_assignment.state.employees)
+
+    assert updated_condition.managed_headcount > baseline_condition.managed_headcount
+    assert updated_modifier.coordination_bonus > baseline_modifier.coordination_bonus
+
+
+def test_governance_tracks_board_ask_and_warning_level() -> None:
+    product = make_product("Governance Atlas", bug_level=26, technical_debt=34)
+    state = make_state(product)
+    state.finance.forecast_runway_turns = 4
+    state.finance.board_confidence = 30
+    state.support_program.backlog_queue = 30
+    state.support_program.escalation_queue = 8
+    customer_summary = apply_end_of_turn_customers(
+        state.customer_accounts,
+        [product],
+        current_turn=4,
+    )
+    operations_summary = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
+    )
+
+    summary = apply_end_of_turn_governance(
+        state,
+        resolved_turn=4,
+        total_revenue=Decimal("900.00"),
+        net_cash_flow=Decimal("-1100.00"),
+        customer_summary=customer_summary,
+        operations_summary=operations_summary,
+    )
+
+    assert state.finance.active_board_ask is BoardAsk.PROFITABILITY
+    assert summary.board_warning_level >= 1
+    assert state.finance.board_warning_active is True

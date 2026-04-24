@@ -9,6 +9,7 @@ from nexus_tech.domain.models import (
     CustomerAccountStatus,
     EmployeeRole,
     GameState,
+    SupportInvestmentFocus,
     SupportProgram,
 )
 from nexus_tech.domain.money import quantize_money
@@ -219,6 +220,54 @@ def triage_support_backlog(state: GameState) -> SupportOpsActionSummary:
             f"Cash -{BALANCE.support_program_triage_cost}, "
             f"backlog {state.support_program.backlog_queue}, "
             f"escalations {state.support_program.escalation_queue}."
+        )
+    )
+
+
+def upgrade_support_program(
+    state: GameState,
+    focus: SupportInvestmentFocus,
+) -> SupportOpsActionSummary:
+    """Spend cash on reusable support leverage instead of one-off triage."""
+
+    if state.company.cash_on_hand < BALANCE.support_program_upgrade_cost:
+        raise ValueError("Not enough cash to upgrade the support program this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_upgrade_cost
+    )
+    if focus is SupportInvestmentFocus.KNOWLEDGE_BASE:
+        improve_support_program(
+            state.support_program,
+            knowledge_base_gain=BALANCE.support_program_upgrade_knowledge_gain,
+            automation_gain=0,
+        )
+    elif focus is SupportInvestmentFocus.AUTOMATION:
+        improve_support_program(
+            state.support_program,
+            knowledge_base_gain=0,
+            automation_gain=BALANCE.support_program_upgrade_automation_gain,
+        )
+    else:
+        state.support_program.sla_target = clamp_int(
+            state.support_program.sla_target + BALANCE.support_program_upgrade_sla_gain
+        )
+
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - BALANCE.support_program_upgrade_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue - BALANCE.support_program_upgrade_escalation_relief,
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Upgraded support via {focus.value}. "
+            f"Cash -{BALANCE.support_program_upgrade_cost}, "
+            f"KB {state.support_program.knowledge_base_level}, "
+            f"automation {state.support_program.automation_level}, "
+            f"SLA target {state.support_program.sla_target}."
         )
     )
 

@@ -19,7 +19,10 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.finance import calculate_total_finance_cost
 from nexus_tech.simulation.planning import get_budget_profile
-from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
+from nexus_tech.simulation.pricing import (
+    calculate_effective_revenue_per_user,
+    get_packaging_support_cost_multiplier,
+)
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scaling import calculate_product_scale_pressure
 from nexus_tech.simulation.segments import resolve_segment_dynamics
@@ -62,6 +65,7 @@ def calculate_product_operating_cost(
         Decimal(product.user_count)
         * BALANCE.per_user_support_cost
         * segment_dynamics.support_cost_multiplier
+        * get_packaging_support_cost_multiplier(product)
     )
     debt_cost = Decimal(product.technical_debt) * BALANCE.per_debt_operating_cost
     scale_pressure = calculate_product_scale_pressure(

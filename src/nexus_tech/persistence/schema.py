@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 15
+CURRENT_SCHEMA_VERSION = 16
 
 SCHEMA_STATEMENTS = (
     """
@@ -42,7 +42,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 15,
+        schema_version INTEGER NOT NULL DEFAULT 16,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -79,6 +79,7 @@ SCHEMA_STATEMENTS = (
         acquisition_rate TEXT NOT NULL,
         churn_rate TEXT NOT NULL,
         pricing_tier TEXT NOT NULL DEFAULT 'standard',
+        packaging_strategy TEXT NOT NULL DEFAULT 'streamlined',
         target_segment TEXT NOT NULL DEFAULT 'startup',
         is_active INTEGER NOT NULL,
         PRIMARY KEY (slot_name, product_id),
@@ -106,11 +107,15 @@ SCHEMA_STATEMENTS = (
         performance_rating INTEGER NOT NULL DEFAULT 62,
         tenure_turns INTEGER NOT NULL DEFAULT 0,
         underperformance_streak INTEGER NOT NULL DEFAULT 0,
+        leadership_score INTEGER NOT NULL DEFAULT 55,
         assigned_product_id TEXT,
+        manager_id TEXT,
         PRIMARY KEY (slot_name, employee_id),
         UNIQUE (slot_name, display_order),
         FOREIGN KEY (slot_name, assigned_product_id)
-            REFERENCES products(slot_name, product_id)
+            REFERENCES products(slot_name, product_id),
+        FOREIGN KEY (slot_name, manager_id)
+            REFERENCES employees(slot_name, employee_id)
     )
     """,
     """
@@ -193,7 +198,9 @@ SCHEMA_STATEMENTS = (
         governance_risk INTEGER NOT NULL DEFAULT 0,
         board_pressure INTEGER NOT NULL DEFAULT 0,
         board_directive TEXT NOT NULL DEFAULT 'accelerate_growth',
+        active_board_ask TEXT NOT NULL DEFAULT 'profitability',
         board_warning_active INTEGER NOT NULL DEFAULT 0,
+        board_warning_level INTEGER NOT NULL DEFAULT 0,
         last_board_review_turn INTEGER,
         last_funding_turn INTEGER
     )
@@ -442,6 +449,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(
         connection,
+        table_name="products",
+        column_name="packaging_strategy",
+        column_definition="TEXT NOT NULL DEFAULT 'streamlined'",
+    )
+    _ensure_column(
+        connection,
         table_name="save_slots",
         column_name="scenario_id",
         column_definition="TEXT NOT NULL DEFAULT 'founder_journey'",
@@ -683,7 +696,19 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="finance_state",
+        column_name="active_board_ask",
+        column_definition="TEXT NOT NULL DEFAULT 'profitability'",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
         column_name="board_warning_active",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_warning_level",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
@@ -733,6 +758,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="employees",
         column_name="underperformance_streak",
         column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="leadership_score",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="employees",
+        column_name="manager_id",
+        column_definition="TEXT",
     )
     _ensure_column(
         connection,

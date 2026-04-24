@@ -57,6 +57,14 @@ class PricingTier(StrEnum):
     PREMIUM = "premium"
 
 
+class PackagingStrategy(StrEnum):
+    """Product packaging posture used by monetization and account depth systems."""
+
+    STREAMLINED = "streamlined"
+    MODULAR = "modular"
+    SUITE = "suite"
+
+
 class MarketSegment(StrEnum):
     """Primary customer segment targeted by a product."""
 
@@ -307,6 +315,23 @@ class BoardDirective(StrEnum):
     ACCELERATE_GROWTH = "accelerate_growth"
 
 
+class BoardAsk(StrEnum):
+    """Current board-level operating ask tracked across review cycles."""
+
+    PROFITABILITY = "profitability"
+    RELIABILITY = "reliability"
+    TEAM_HEALTH = "team_health"
+    PORTFOLIO_FOCUS = "portfolio_focus"
+
+
+class SupportInvestmentFocus(StrEnum):
+    """Explicit support-system investment focus."""
+
+    KNOWLEDGE_BASE = "knowledge_base"
+    AUTOMATION = "automation"
+    SLA_PROGRAM = "sla_program"
+
+
 class TurnAction(StrEnum):
     """Actions the player can take during a turn."""
 
@@ -316,6 +341,7 @@ class TurnAction(StrEnum):
     REDUCE_TECHNICAL_DEBT = "reduce_technical_debt"
     MARKET_PRODUCT = "market_product"
     ADJUST_PRICING = "adjust_pricing"
+    SET_PACKAGING_STRATEGY = "set_packaging_strategy"
     SET_TARGET_SEGMENT = "set_target_segment"
     SUNSET_PRODUCT = "sunset_product"
     SET_COMPANY_STRATEGY = "set_company_strategy"
@@ -342,7 +368,10 @@ class TurnAction(StrEnum):
     INTERVIEW_CANDIDATE = "interview_candidate"
     MAKE_HIRING_OFFER = "make_hiring_offer"
     TRIAGE_SUPPORT_BACKLOG = "triage_support_backlog"
+    UPGRADE_SUPPORT_PROGRAM = "upgrade_support_program"
     SET_FUNCTIONAL_BUDGET = "set_functional_budget"
+    ASSIGN_MANAGER = "assign_manager"
+    CLEAR_MANAGER = "clear_manager"
     PLAN_RELEASE = "plan_release"
     WORK_RELEASE = "work_release"
     CREATE_SALES_DEAL = "create_sales_deal"
@@ -395,6 +424,7 @@ class Product(BaseModel):
     acquisition_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     churn_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     pricing_tier: PricingTier = PricingTier.STANDARD
+    packaging_strategy: PackagingStrategy = PackagingStrategy.STREAMLINED
     target_segment: MarketSegment = MarketSegment.STARTUP
     is_active: bool = True
 
@@ -430,7 +460,9 @@ class Employee(BaseModel):
     performance_rating: int = Field(default=62, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     tenure_turns: int = Field(default=0, ge=0)
     underperformance_streak: int = Field(default=0, ge=0)
+    leadership_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     assigned_product_id: Optional[UUID] = None  # noqa: UP045
+    manager_id: Optional[UUID] = None  # noqa: UP045
 
     @field_validator("salary", mode="before")
     @classmethod
@@ -483,7 +515,9 @@ class FinanceState(BaseModel):
     governance_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_directive: BoardDirective = BoardDirective.ACCELERATE_GROWTH
+    active_board_ask: BoardAsk = BoardAsk.PROFITABILITY
     board_warning_active: bool = False
+    board_warning_level: int = Field(default=0, ge=0, le=3)
     last_board_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 

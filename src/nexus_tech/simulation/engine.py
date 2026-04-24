@@ -25,6 +25,7 @@ from nexus_tech.domain.models import (
     MarketCycle,
     MarketSegment,
     MilestoneEntry,
+    PackagingStrategy,
     PendingEvent,
     PricingTier,
     Product,
@@ -32,6 +33,7 @@ from nexus_tech.domain.models import (
     RoadmapFocus,
     RoadmapProjectType,
     Seniority,
+    SupportInvestmentFocus,
     TurnAction,
 )
 from nexus_tech.domain.money import format_money, quantize_money
@@ -98,7 +100,7 @@ from nexus_tech.simulation.planning import (
     get_budget_profile,
     is_quarter_plan_due,
 )
-from nexus_tech.simulation.pricing import apply_adjust_pricing
+from nexus_tech.simulation.pricing import apply_adjust_pricing, apply_set_packaging_strategy
 from nexus_tech.simulation.product_progression import (
     ProductDrift,
     apply_add_feature,
@@ -137,16 +139,21 @@ from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
     triage_support_backlog,
+    upgrade_support_program,
 )
 from nexus_tech.simulation.team import (
     TeamCondition,
     apply_end_of_turn_team_drift,
     apply_rest_team,
     assign_employee,
+    assign_manager,
     calculate_product_team_modifier,
     calculate_team_condition,
+    clear_manager_assignment,
+    clear_manager_links,
     create_employee,
     get_employee_by_id,
+    sanitize_management_links,
     unassign_employee,
     unassign_employees_from_product,
 )
@@ -169,7 +176,9 @@ class ActionContext:
     hire_trait: CandidateTrait | None = None
     strategy: CompanyStrategy | None = None
     pricing_tier: PricingTier | None = None
+    packaging_strategy: PackagingStrategy | None = None
     target_segment: MarketSegment | None = None
+    support_investment_focus: SupportInvestmentFocus | None = None
     roadmap_focus: RoadmapFocus | None = None
     budget_stance: BudgetStance | None = None
     release_type: ProductReleaseType | None = None
@@ -180,6 +189,7 @@ class ActionContext:
     customer_account_id: UUID | None = None
     functional_budget_preset: FunctionalBudgetPreset | None = None
     hiring_candidate_id: UUID | None = None
+    manager_id: UUID | None = None
 
 
 @dataclass(frozen=True)
@@ -555,6 +565,8 @@ def apply_action(
         next_state.employees = [
             team_member for team_member in next_state.employees if team_member.id != employee.id
         ]
+        clear_manager_links(next_state.employees, employee.id)
+        sanitize_management_links(next_state.employees)
         team_condition = calculate_team_condition(next_state.employees)
         logger.debug("Fired employee %s.", employee.full_name)
         return ActionOutcome(
@@ -574,6 +586,28 @@ def apply_action(
             state=next_state,
             message=f"{summary.message} {employee.full_name} -> {product.name}.",
         )
+
+    if action is TurnAction.ASSIGN_MANAGER:
+        if context.employee_id is None or context.manager_id is None:
+            raise ValueError("Assigning a manager requires choosing a report and a manager.")
+        summary = assign_manager(
+            next_state.employees,
+            report_id=context.employee_id,
+            manager_id=context.manager_id,
+        )
+        logger.debug(
+            "Assigned manager %s to employee %s.",
+            context.manager_id,
+            context.employee_id,
+        )
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.CLEAR_MANAGER:
+        if context.employee_id is None:
+            raise ValueError("Clearing a manager requires choosing an employee.")
+        summary = clear_manager_assignment(next_state.employees, report_id=context.employee_id)
+        logger.debug("Cleared manager assignment for employee %s.", context.employee_id)
+        return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.UNASSIGN_EMPLOYEE:
         employee = get_employee_by_id(next_state.employees, context.employee_id)
@@ -615,6 +649,21 @@ def apply_action(
         summary = triage_support_backlog(next_state)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Triaged support backlog.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.UPGRADE_SUPPORT_PROGRAM:
+        if context.support_investment_focus is None:
+            raise ValueError("Upgrading support requires choosing an investment focus.")
+        summary = upgrade_support_program(next_state, context.support_investment_focus)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug(
+            "Upgraded support program with focus %s.",
+            context.support_investment_focus.value,
+        )
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -773,6 +822,13 @@ def apply_action(
         summary = apply_adjust_pricing(product, context.pricing_tier)
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_PACKAGING_STRATEGY:
+        if context.packaging_strategy is None:
+            raise ValueError("Selecting packaging requires choosing a packaging strategy.")
+
+        summary = apply_set_packaging_strategy(product, context.packaging_strategy)
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.SET_TARGET_SEGMENT:
         if context.target_segment is None:
             raise ValueError("Selecting a segment requires choosing a target segment.")
@@ -813,6 +869,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
 
     resolved_turn = state.company.current_turn
     next_state = state.model_copy(deep=True)
+    sanitize_management_links(next_state.employees)
     product_summaries: list[ProductTurnSummary] = []
     unlocked_milestones: list[MilestoneEntry] = []
     company_strategy_profile = get_strategy_profile(next_state.company.strategy)
@@ -1044,6 +1101,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         burnout_relief=functional_budget_profile.burnout_relief,
         rng=rng,
     )
+    sanitize_management_links(next_state.employees)
     if progression_summary.resigned_employees:
         next_state.company.reputation = clamp_int(next_state.company.reputation - 1)
         next_state.finance.board_confidence = clamp_int(next_state.finance.board_confidence - 1)

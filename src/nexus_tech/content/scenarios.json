@@ -3154,5 +3154,152 @@
       "board_confidence": 43,
       "total_raised": "8800.00"
     }
+  },
+  {
+    "scenario_id": "packaging_reset",
+    "title": "Packaging Reset",
+    "description": "Your core product has demand, but monetization is sloppy and the board wants a cleaner commercial story fast.",
+    "objective": "Stabilize packaging and grow cash before the board pushes for harder intervention.",
+    "objective_metric": "cash",
+    "objective_target": 16000,
+    "company_name": "Bundle Foundry",
+    "company_strategy": "efficiency",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "8400.00",
+    "reputation": 52,
+    "products": [
+      {
+        "key": "bundle",
+        "template_id": "packaging_command_center",
+        "name": "BundleIQ",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 18,
+        "market_fit": 57,
+        "technical_debt": 23,
+        "user_count": 48,
+        "revenue_per_user": "84.00",
+        "feature_count": 2,
+        "maintenance_cost": "348.00",
+        "acquisition_rate": "0.0280",
+        "churn_rate": "0.0580",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium",
+        "packaging_strategy": "suite"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Elena Voss",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "monetization",
+        "assigned_product_key": "bundle",
+        "energy": 75,
+        "morale": 68
+      },
+      {
+        "full_name": "Marcus Lee",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "commercial_ops",
+        "assigned_product_key": "bundle",
+        "energy": 80,
+        "morale": 70
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Bundle Empire",
+        "archetype_id": "bundle_empire"
+      }
+    ],
+    "finance": {
+      "debt_principal": "2800.00",
+      "loan_interest_rate": "0.0240",
+      "equity_dilution": "0.0500",
+      "investor_pressure": 12,
+      "board_confidence": 46,
+      "total_raised": "5400.00"
+    }
+  },
+  {
+    "scenario_id": "service_recovery",
+    "title": "Service Recovery",
+    "description": "A support-heavy product has real traction, but SLA misses and queue pressure are eroding trust across the customer base.",
+    "objective": "Recover reputation and operational discipline before service failures turn into churn.",
+    "objective_metric": "reputation",
+    "objective_target": 72,
+    "company_name": "Response Grid",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "7900.00",
+    "reputation": 47,
+    "products": [
+      {
+        "key": "service",
+        "template_id": "service_sla_grid",
+        "name": "Response Grid",
+        "lifecycle_stage": "growth",
+        "quality": 57,
+        "bug_level": 24,
+        "market_fit": 58,
+        "technical_debt": 29,
+        "user_count": 74,
+        "revenue_per_user": "50.00",
+        "feature_count": 2,
+        "maintenance_cost": "296.00",
+        "acquisition_rate": "0.0390",
+        "churn_rate": "0.0640",
+        "target_segment": "smb",
+        "pricing_tier": "standard",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Priya Nair",
+        "role": "designer",
+        "seniority": "mid",
+        "specialization": "service_design",
+        "assigned_product_key": "service",
+        "energy": 77,
+        "morale": 66
+      },
+      {
+        "full_name": "Daniel Cho",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "service",
+        "energy": 72,
+        "morale": 64
+      },
+      {
+        "full_name": "Sofia Hart",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "operations",
+        "assigned_product_key": "service",
+        "energy": 79,
+        "morale": 69
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Service Reliability House",
+        "archetype_id": "service_reliability_house"
+      }
+    ]
   }
 ]

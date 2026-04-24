@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.0 - 2026-04-24
+
+- Added pricing and packaging depth with `streamlined`, `modular`, and `suite` packaging strategies that change monetization, acquisition, churn, and support cost posture
+- Added org-structure depth with manager assignment, management capacity, org-drag pressure, and leadership tracking on employees
+- Added support-program upgrade actions so the player can invest directly in knowledge base quality, automation depth, and SLA discipline
+- Expanded governance with rotating board asks, warning levels, and stronger confidence penalties when the company misses operating expectations
+- Extended SQLite persistence, CLI menus, dashboards, and regression coverage for packaging, management, support-program, and governance state
+- Expanded the content catalog with packaging-first, support-SLA, and org-ops templates plus new turnaround scenarios and rival archetypes
+- Promoted the package version to `0.19.0`
+
 ## 0.18.0 - 2026-04-24
 
 - Added subscription-governed contract depth with package upgrades, renewal-health tracking, failed-payment risk, and dunning pressure

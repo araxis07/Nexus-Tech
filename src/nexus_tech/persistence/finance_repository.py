@@ -5,7 +5,13 @@ from __future__ import annotations
 import sqlite3
 from decimal import Decimal
 
-from nexus_tech.domain.models import BoardDirective, FinanceState, FundingHistoryEntry, FundingType
+from nexus_tech.domain.models import (
+    BoardAsk,
+    BoardDirective,
+    FinanceState,
+    FundingHistoryEntry,
+    FundingType,
+)
 
 
 class FinanceRepository:
@@ -33,11 +39,13 @@ class FinanceRepository:
                 governance_risk,
                 board_pressure,
                 board_directive,
+                active_board_ask,
                 board_warning_active,
+                board_warning_level,
                 last_board_review_turn,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -55,7 +63,9 @@ class FinanceRepository:
                 finance.governance_risk,
                 finance.board_pressure,
                 finance.board_directive.value,
+                finance.active_board_ask.value,
                 int(finance.board_warning_active),
+                finance.board_warning_level,
                 finance.last_board_review_turn,
                 finance.last_funding_turn,
             ),
@@ -81,7 +91,9 @@ class FinanceRepository:
                 governance_risk,
                 board_pressure,
                 board_directive,
+                active_board_ask,
                 board_warning_active,
+                board_warning_level,
                 last_board_review_turn,
                 last_funding_turn
             FROM finance_state
@@ -109,7 +121,9 @@ class FinanceRepository:
             governance_risk=row["governance_risk"] or 0,
             board_pressure=row["board_pressure"] or 0,
             board_directive=BoardDirective(row["board_directive"] or "accelerate_growth"),
+            active_board_ask=BoardAsk(row["active_board_ask"] or "profitability"),
             board_warning_active=bool(row["board_warning_active"]),
+            board_warning_level=row["board_warning_level"] or 0,
             last_board_review_turn=row["last_board_review_turn"],
             last_funding_turn=row["last_funding_turn"],
         )

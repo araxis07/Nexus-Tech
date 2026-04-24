@@ -53,10 +53,26 @@ class TeamCondition:
 
     headcount: int
     assigned_headcount: int
+    managed_headcount: int
+    manager_headcount: int
+    management_capacity: int
+    org_drag: int
     total_salary_cost: Decimal
     average_energy: int
     average_morale: int
     burned_out_count: int
+
+
+@dataclass(frozen=True)
+class OrgStructureSummary:
+    """Management coverage and organization drag across the current roster."""
+
+    manager_ids: tuple[UUID, ...]
+    managed_headcount: int
+    unmanaged_headcount: int
+    manager_headcount: int
+    management_capacity: int
+    org_drag: int
 
 
 def create_employee(
@@ -93,6 +109,7 @@ def create_employee(
         productivity=productivity,
         specialization=normalized_specialization,
         trait=trait,
+        leadership_score=_calculate_leadership_score(role, seniority, trait),
         performance_rating=BALANCE.employee_starting_performance_rating,
     )
 
@@ -143,6 +160,83 @@ def calculate_effective_productivity(employee: Employee) -> int:
     return clamp_int(int(effective.to_integral_value()))
 
 
+def _calculate_leadership_score(
+    role: EmployeeRole,
+    seniority: Seniority,
+    trait: CandidateTrait,
+) -> int:
+    leadership_score = 42
+    if role is EmployeeRole.PRODUCT_MANAGER:
+        leadership_score += 18
+    if seniority is Seniority.MID:
+        leadership_score += 6
+    elif seniority is Seniority.SENIOR:
+        leadership_score += 14
+    if trait is CandidateTrait.FAST_LEARNER:
+        leadership_score += 4
+    elif trait is CandidateTrait.EXPENSIVE_EXPERT:
+        leadership_score += 6
+    elif trait is CandidateTrait.BURNOUT_RISK:
+        leadership_score -= 4
+    return clamp_int(leadership_score)
+
+
+def is_eligible_manager(employee: Employee) -> bool:
+    """Return whether an employee can manage others."""
+
+    return (
+        employee.role is EmployeeRole.PRODUCT_MANAGER
+        or employee.seniority is Seniority.SENIOR
+        or employee.leadership_score >= 68
+    )
+
+
+def calculate_manager_capacity(employee: Employee) -> int:
+    """Return how many direct reports one employee can support."""
+
+    if not is_eligible_manager(employee):
+        return 0
+    base_capacity = (
+        BALANCE.management_product_manager_capacity
+        if employee.role is EmployeeRole.PRODUCT_MANAGER
+        else BALANCE.management_senior_capacity
+    )
+    return base_capacity + (employee.leadership_score // BALANCE.management_leadership_divisor)
+
+
+def sanitize_management_links(employees: list[Employee]) -> None:
+    """Clear broken manager references after roster changes."""
+
+    employee_ids = {employee.id for employee in employees}
+    for employee in employees:
+        if employee.manager_id == employee.id or employee.manager_id not in employee_ids:
+            employee.manager_id = None
+
+
+def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
+    """Summarise manager coverage and org drag for the current roster."""
+
+    sanitize_management_links(employees)
+    manager_ids = tuple(employee.id for employee in employees if is_eligible_manager(employee))
+    management_capacity = sum(calculate_manager_capacity(employee) for employee in employees)
+    managed_headcount = sum(
+        1
+        for employee in employees
+        if employee.manager_id is not None and employee.manager_id in manager_ids
+    )
+    unmanaged_headcount = max(0, len(employees) - len(manager_ids) - managed_headcount)
+    capacity_gap = max(0, unmanaged_headcount - BALANCE.management_org_drag_threshold)
+    org_drag = capacity_gap + max(0, len(employees) - len(manager_ids) - management_capacity)
+    return OrgStructureSummary(
+        manager_ids=manager_ids,
+        managed_headcount=managed_headcount,
+        unmanaged_headcount=unmanaged_headcount,
+        manager_headcount=len(manager_ids),
+        management_capacity=management_capacity,
+        org_drag=max(0, org_drag),
+    )
+
+
 def calculate_product_team_modifier(
     employees: list[Employee],
     product_id: UUID,
@@ -152,6 +246,7 @@ def calculate_product_team_modifier(
     assigned_employees = [
         employee for employee in employees if employee.assigned_product_id == product_id
     ]
+    org_structure = calculate_org_structure(employees)
     engineer_power = sum(
         calculate_effective_productivity(employee)
         for employee in assigned_employees
@@ -178,6 +273,12 @@ def calculate_product_team_modifier(
         if len(assigned_employees) >= 2
         else product_manager_power // (BALANCE.team_coordination_bonus_divisor + 12)
     )
+    managed_assigned = sum(
+        1
+        for employee in assigned_employees
+        if employee.manager_id is not None and employee.manager_id in org_structure.manager_ids
+    )
+    coordination_bonus += managed_assigned // BALANCE.management_coordination_bonus_per_managed_pair
 
     return ProductTeamModifier(
         assigned_headcount=len(assigned_employees),
@@ -203,6 +304,7 @@ def calculate_product_team_modifier(
 def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
     """Compute headcount, salary burden, and average team condition."""
 
+    org_structure = calculate_org_structure(employees)
     headcount = len(employees)
     assigned_headcount = sum(
         1 for employee in employees if employee.assigned_product_id is not None
@@ -213,6 +315,10 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
         return TeamCondition(
             headcount=0,
             assigned_headcount=0,
+            managed_headcount=0,
+            manager_headcount=0,
+            management_capacity=0,
+            org_drag=0,
             total_salary_cost=ZERO_MONEY,
             average_energy=0,
             average_morale=0,
@@ -227,6 +333,10 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
     return TeamCondition(
         headcount=headcount,
         assigned_headcount=assigned_headcount,
+        managed_headcount=org_structure.managed_headcount,
+        manager_headcount=org_structure.manager_headcount,
+        management_capacity=org_structure.management_capacity,
+        org_drag=org_structure.org_drag,
         total_salary_cost=quantize_money(total_salary_cost),
         average_energy=average_energy,
         average_morale=average_morale,
@@ -264,6 +374,51 @@ def assign_employee(employee: Employee, product_id: UUID) -> TeamActionSummary:
     return TeamActionSummary(message=f"Assigned {employee.full_name} to the selected product.")
 
 
+def assign_manager(
+    employees: list[Employee],
+    *,
+    report_id: UUID,
+    manager_id: UUID,
+) -> TeamActionSummary:
+    """Assign one employee to a manager."""
+
+    sanitize_management_links(employees)
+    report = get_employee_by_id(employees, report_id)
+    manager = get_employee_by_id(employees, manager_id)
+    if report.id == manager.id:
+        raise ValueError("An employee cannot manage themselves.")
+    if not is_eligible_manager(manager):
+        raise ValueError(f"{manager.full_name} is not eligible to manage other employees.")
+
+    report.manager_id = manager.id
+    return TeamActionSummary(message=f"{manager.full_name} now manages {report.full_name}.")
+
+
+def clear_manager_assignment(
+    employees: list[Employee],
+    *,
+    report_id: UUID,
+) -> TeamActionSummary:
+    """Remove one employee from their manager."""
+
+    report = get_employee_by_id(employees, report_id)
+    if report.manager_id is None:
+        raise ValueError(f"{report.full_name} does not have a manager assigned.")
+    report.manager_id = None
+    return TeamActionSummary(message=f"Removed manager assignment for {report.full_name}.")
+
+
+def clear_manager_links(employees: list[Employee], manager_id: UUID) -> int:
+    """Remove manager references that point at one deleted employee."""
+
+    cleared = 0
+    for employee in employees:
+        if employee.manager_id == manager_id:
+            employee.manager_id = None
+            cleared += 1
+    return cleared
+
+
 def unassign_employee(employee: Employee) -> TeamActionSummary:
     """Remove an employee from product work."""
 
@@ -293,6 +448,7 @@ def apply_end_of_turn_team_drift(
 ) -> TeamCondition:
     """Apply burnout and recovery after the turn resolves."""
 
+    org_structure = calculate_org_structure(employees)
     product_map = {product.id: product for product in products}
     strategy_profile = get_strategy_profile(company_strategy)
 
@@ -329,6 +485,10 @@ def apply_end_of_turn_team_drift(
         morale_loss = BALANCE.employee_assigned_morale_loss
         if net_cash_flow < ZERO_MONEY:
             morale_loss += BALANCE.employee_negative_cash_flow_morale_penalty
+        if employee.manager_id is None:
+            energy_loss += BALANCE.management_unmanaged_energy_penalty
+            morale_loss += BALANCE.management_unmanaged_morale_penalty
+        energy_loss += org_structure.org_drag
 
         employee.energy = clamp_int(employee.energy - energy_loss)
         employee.morale = clamp_int(employee.morale - morale_loss)

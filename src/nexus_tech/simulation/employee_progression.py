@@ -11,6 +11,7 @@ from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.support import clamp_int
+from nexus_tech.simulation.team import sanitize_management_links
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,10 @@ def apply_end_of_turn_employee_progression(
             employee.attrition_risk = clamp_int(
                 employee.attrition_risk - BALANCE.employee_attrition_recovery_relief
             )
+        if employee.manager_id is not None:
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk - BALANCE.management_attrition_relief
+            )
 
         if employee.performance_rating <= BALANCE.employee_performance_low_threshold:
             employee.underperformance_streak += 1
@@ -170,6 +175,7 @@ def apply_end_of_turn_employee_progression(
             high_attrition_risk_count += 1
 
     employees[:] = retained_employees
+    sanitize_management_links(employees)
 
     return EmployeeProgressionTurnSummary(
         promotion_ready_count=promotion_ready_count,

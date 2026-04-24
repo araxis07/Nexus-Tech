@@ -34,6 +34,7 @@ from nexus_tech.domain.models import (
     GameState,
     HiringCandidateStage,
     MarketSegment,
+    PackagingStrategy,
     PendingEvent,
     PricingTier,
     Product,
@@ -44,6 +45,7 @@ from nexus_tech.domain.models import (
     RoadmapProjectType,
     SalesDealStage,
     Seniority,
+    SupportInvestmentFocus,
     TurnAction,
 )
 from nexus_tech.persistence.errors import PersistenceError
@@ -190,52 +192,56 @@ ACTION_KEYS = {
     "4": TurnAction.REDUCE_TECHNICAL_DEBT,
     "5": TurnAction.MARKET_PRODUCT,
     "6": TurnAction.ADJUST_PRICING,
-    "7": TurnAction.SET_TARGET_SEGMENT,
-    "8": TurnAction.SUNSET_PRODUCT,
-    "9": TurnAction.SET_COMPANY_STRATEGY,
-    "10": TurnAction.SET_ROADMAP,
-    "11": TurnAction.SET_BUDGET_STANCE,
-    "12": TurnAction.TAKE_LOAN,
-    "13": TurnAction.RAISE_ANGEL,
-    "14": TurnAction.RAISE_VC,
-    "15": TurnAction.REPAY_DEBT,
-    "16": TurnAction.REVIEW_FINANCE,
-    "17": TurnAction.HIRE_EMPLOYEE,
-    "18": TurnAction.FIRE_EMPLOYEE,
-    "19": TurnAction.ASSIGN_EMPLOYEE,
-    "20": TurnAction.UNASSIGN_EMPLOYEE,
-    "21": TurnAction.REST_TEAM,
-    "22": TurnAction.REVIEW_TEAM,
-    "23": TurnAction.REVIEW_CUSTOMERS,
-    "24": TurnAction.INVEST_IN_CUSTOMER_SUCCESS,
-    "25": TurnAction.RUN_RETENTION_PLAY,
-    "26": TurnAction.TRAIN_EMPLOYEE,
-    "27": TurnAction.PROMOTE_EMPLOYEE,
-    "28": TurnAction.SET_FUNCTIONAL_BUDGET,
-    "29": TurnAction.PLAN_RELEASE,
-    "30": TurnAction.WORK_RELEASE,
-    "31": TurnAction.CREATE_SALES_DEAL,
-    "32": TurnAction.ADVANCE_SALES_DEAL,
-    "33": TurnAction.START_ROADMAP_PROJECT,
-    "34": TurnAction.WORK_ROADMAP_PROJECT,
-    "35": TurnAction.REVIEW_PIPELINE,
-    "36": TurnAction.VIEW_REPORT,
-    "37": TurnAction.WAIT,
-    "38": TurnAction.VIEW_STATUS,
-    "39": TurnAction.END_TURN,
-    "40": TurnAction.SOURCE_CANDIDATES,
-    "41": TurnAction.SCREEN_CANDIDATE,
-    "42": TurnAction.INTERVIEW_CANDIDATE,
-    "43": TurnAction.MAKE_HIRING_OFFER,
-    "44": TurnAction.TRIAGE_SUPPORT_BACKLOG,
-    "45": TurnAction.REVIEW_BOARD,
+    "7": TurnAction.SET_PACKAGING_STRATEGY,
+    "8": TurnAction.SET_TARGET_SEGMENT,
+    "9": TurnAction.SUNSET_PRODUCT,
+    "10": TurnAction.SET_COMPANY_STRATEGY,
+    "11": TurnAction.SET_ROADMAP,
+    "12": TurnAction.SET_BUDGET_STANCE,
+    "13": TurnAction.TAKE_LOAN,
+    "14": TurnAction.RAISE_ANGEL,
+    "15": TurnAction.RAISE_VC,
+    "16": TurnAction.REPAY_DEBT,
+    "17": TurnAction.REVIEW_FINANCE,
+    "18": TurnAction.HIRE_EMPLOYEE,
+    "19": TurnAction.FIRE_EMPLOYEE,
+    "20": TurnAction.ASSIGN_EMPLOYEE,
+    "21": TurnAction.UNASSIGN_EMPLOYEE,
+    "22": TurnAction.ASSIGN_MANAGER,
+    "23": TurnAction.CLEAR_MANAGER,
+    "24": TurnAction.REST_TEAM,
+    "25": TurnAction.REVIEW_TEAM,
+    "26": TurnAction.REVIEW_CUSTOMERS,
+    "27": TurnAction.INVEST_IN_CUSTOMER_SUCCESS,
+    "28": TurnAction.RUN_RETENTION_PLAY,
+    "29": TurnAction.TRAIN_EMPLOYEE,
+    "30": TurnAction.PROMOTE_EMPLOYEE,
+    "31": TurnAction.SET_FUNCTIONAL_BUDGET,
+    "32": TurnAction.UPGRADE_SUPPORT_PROGRAM,
+    "33": TurnAction.PLAN_RELEASE,
+    "34": TurnAction.WORK_RELEASE,
+    "35": TurnAction.CREATE_SALES_DEAL,
+    "36": TurnAction.ADVANCE_SALES_DEAL,
+    "37": TurnAction.START_ROADMAP_PROJECT,
+    "38": TurnAction.WORK_ROADMAP_PROJECT,
+    "39": TurnAction.REVIEW_PIPELINE,
+    "40": TurnAction.VIEW_REPORT,
+    "41": TurnAction.WAIT,
+    "42": TurnAction.VIEW_STATUS,
+    "43": TurnAction.END_TURN,
+    "44": TurnAction.SOURCE_CANDIDATES,
+    "45": TurnAction.SCREEN_CANDIDATE,
+    "46": TurnAction.INTERVIEW_CANDIDATE,
+    "47": TurnAction.MAKE_HIRING_OFFER,
+    "48": TurnAction.TRIAGE_SUPPORT_BACKLOG,
+    "49": TurnAction.REVIEW_BOARD,
 }
 UTILITY_ACTION_KEYS = {
-    "46": "save_game",
-    "47": "load_game",
-    "48": "show_guide",
-    "49": "show_glossary",
-    "50": "show_tutorial",
+    "50": "save_game",
+    "51": "load_game",
+    "52": "show_guide",
+    "53": "show_glossary",
+    "54": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -245,6 +251,7 @@ PRODUCT_TARGETED_ACTIONS = {
     TurnAction.REDUCE_TECHNICAL_DEBT,
     TurnAction.MARKET_PRODUCT,
     TurnAction.ADJUST_PRICING,
+    TurnAction.SET_PACKAGING_STRATEGY,
     TurnAction.SET_TARGET_SEGMENT,
     TurnAction.SUNSET_PRODUCT,
 }
@@ -931,7 +938,7 @@ def run_game_loop(
                 choice = ask_choice_input(
                     "Choose an action",
                     choices=ALL_MENU_KEYS,
-                    default="38",
+                    default="42",
                     show_choices=False,
                 )
 
@@ -1208,6 +1215,16 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     if action is TurnAction.TRIAGE_SUPPORT_BACKLOG:
         return ActionContext()
 
+    if action is TurnAction.UPGRADE_SUPPORT_PROGRAM:
+        focus_key = ask_choice_input(
+            "Support investment focus",
+            choices=["knowledge_base", "automation", "sla_program"],
+            default="knowledge_base",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(support_investment_focus=SupportInvestmentFocus(focus_key))
+
     if action is TurnAction.UNASSIGN_EMPLOYEE:
         employee_id = choose_employee_id(state, action, assigned_only=True)
         if employee_id is None:
@@ -1222,6 +1239,21 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         if product_id is None:
             return None
         return ActionContext(employee_id=employee_id, target_product_id=product_id)
+
+    if action is TurnAction.ASSIGN_MANAGER:
+        employee_id = choose_employee_id(state, action)
+        if employee_id is None:
+            return None
+        manager_id = choose_manager_id(state, exclude_employee_id=employee_id)
+        if manager_id is None:
+            return None
+        return ActionContext(employee_id=employee_id, manager_id=manager_id)
+
+    if action is TurnAction.CLEAR_MANAGER:
+        managed_employee_id = choose_employee_id(state, action, manager_assigned_only=True)
+        if managed_employee_id is None:
+            return None
+        return ActionContext(employee_id=managed_employee_id)
 
     if action is TurnAction.INVEST_IN_CUSTOMER_SUCCESS:
         product_id = choose_product_id(state, action)
@@ -1317,6 +1349,19 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
                 target_product_id=product_id,
                 pricing_tier=PricingTier(pricing_key),
             )
+        if action is TurnAction.SET_PACKAGING_STRATEGY:
+            product = next(product for product in state.products if product.id == product_id)
+            packaging_key = ask_choice_input(
+                "Packaging strategy",
+                choices=["streamlined", "modular", "suite"],
+                default=product.packaging_strategy.value,
+                show_choices=False,
+                case_sensitive=False,
+            )
+            return ActionContext(
+                target_product_id=product_id,
+                packaging_strategy=PackagingStrategy(packaging_key),
+            )
         if action is TurnAction.SET_TARGET_SEGMENT:
             product = next(product for product in state.products if product.id == product_id)
             segment_key = ask_choice_input(
@@ -1408,10 +1453,13 @@ def choose_employee_id(
     state: GameState,
     action: TurnAction,
     assigned_only: bool | None = None,
+    manager_assigned_only: bool = False,
 ) -> UUID | None:
     """Prompt the user to select an employee for an action."""
 
     employees = get_employee_choices(state, assigned_only=assigned_only)
+    if manager_assigned_only:
+        employees = [employee for employee in employees if employee.manager_id is not None]
     if not employees:
         console.print(
             Panel.fit(
@@ -1435,12 +1483,65 @@ def choose_employee_id(
     logger.debug("Selected employee %s for action %s.", employee.full_name, action.value)
     console.print(
         Panel.fit(
-            build_employee_selection_summary(employee, state.products),
+            build_employee_selection_summary(employee, state.products, state.employees),
             title="Target Selected",
             border_style="blue",
         )
     )
     return employee.id
+
+
+def choose_manager_id(
+    state: GameState,
+    *,
+    exclude_employee_id: UUID,
+) -> UUID | None:
+    """Prompt the user to select an eligible manager."""
+
+    eligible_managers = [
+        employee
+        for employee in state.employees
+        if employee.id != exclude_employee_id
+        and (
+            employee.role is EmployeeRole.PRODUCT_MANAGER
+            or employee.seniority is Seniority.SENIOR
+            or employee.leadership_score >= 68
+        )
+    ]
+    if not eligible_managers:
+        console.print(
+            Panel.fit(
+                "No eligible managers are available yet. Promote someone or hire leadership depth.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    employee_choices = {
+        str(index): employee for index, employee in enumerate(eligible_managers, start=1)
+    }
+    render_employee_picker(
+        console,
+        eligible_managers,
+        state.products,
+        action_label="assign_manager",
+    )
+    selected_key = ask_choice_input(
+        "Select a manager",
+        choices=list(employee_choices),
+        default="1",
+        show_choices=False,
+    )
+    manager = employee_choices[selected_key]
+    console.print(
+        Panel.fit(
+            build_employee_selection_summary(manager, state.products, state.employees),
+            title="Manager Selected",
+            border_style="blue",
+        )
+    )
+    return manager.id
 
 
 def choose_hiring_candidate_id(
@@ -1778,7 +1879,8 @@ def build_product_selection_summary(product: Product) -> str:
         f"Stage: {product.lifecycle_stage.value} | Users: {product.user_count} | "
         f"Quality: {product.quality} | Bugs: {product.bug_level} | "
         f"Fit: {product.market_fit} | Debt: {product.technical_debt} | "
-        f"Segment: {product.target_segment.value} | Pricing: {product.pricing_tier.value}"
+        f"Segment: {product.target_segment.value} | Pricing: {product.pricing_tier.value} | "
+        f"Packaging: {product.packaging_strategy.value}"
     )
 
 
@@ -1791,24 +1893,31 @@ def build_product_template_summary(template: ProductTemplateDefinition) -> str:
         f"Stage: {template.lifecycle_stage.value} | Quality: {template.quality} | "
         f"Bugs: {template.bug_level} | Fit: {template.market_fit} | "
         f"Debt: {template.technical_debt} | Segment: {template.target_segment.value} | "
-        f"Pricing: {template.pricing_tier.value}"
+        f"Pricing: {template.pricing_tier.value} | Packaging: {template.packaging_strategy.value}"
     )
 
 
 def build_employee_selection_summary(
     employee: Employee,
     products: list[Product],
+    employees: list[Employee],
 ) -> str:
     """Show concise employee stats before an action."""
 
     product_names = {product.id: product.name for product in products}
     assignment_name = product_names.get(employee.assigned_product_id, "unassigned")
+    manager_name = next(
+        (teammate.full_name for teammate in employees if teammate.id == employee.manager_id),
+        None,
+    )
     return (
         f"{employee.full_name}\n"
         f"Role: {employee.role.value} | Seniority: {employee.seniority.value} | "
         f"Trait: {employee.trait.value} | "
         f"Energy: {employee.energy} | Morale: {employee.morale} | "
-        f"Assignment: {assignment_name}"
+        f"Assignment: {assignment_name} | "
+        f"Leadership: {employee.leadership_score} | "
+        f"Manager: {manager_name or 'none'}"
     )
 
 

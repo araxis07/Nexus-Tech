@@ -20,8 +20,12 @@ from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.contracts import (
     build_contract_shape,
-    default_subscription_package,
     get_contract_interval,
+)
+from nexus_tech.simulation.pricing import (
+    get_default_subscription_package,
+    get_packaging_add_on_bonus,
+    get_packaging_enterprise_probability_bonus,
 )
 from nexus_tech.simulation.support import clamp_int
 
@@ -65,7 +69,7 @@ def create_sales_deal(
     ]
     add_on_commitment = BALANCE.sales_deal_default_add_on_commitment_by_segment[
         product.target_segment.value
-    ]
+    ] + get_packaging_add_on_bonus(product)
     proposed_discount_rate = BALANCE.sales_deal_default_discount_rate_by_segment[
         product.target_segment.value
     ]
@@ -78,7 +82,11 @@ def create_sales_deal(
         + (Decimal(add_on_commitment) * Decimal("35.00"))
     )
     probability = clamp_int(
-        22 + (product.market_fit // 3) + (product.quality // 5) + (marketing_bonus * 4),
+        22
+        + (product.market_fit // 3)
+        + (product.quality // 5)
+        + (marketing_bonus * 4)
+        + get_packaging_enterprise_probability_bonus(product),
         0,
         100,
     )
@@ -87,7 +95,7 @@ def create_sales_deal(
         name=f"{product.target_segment.value.title()} buyer: {product.name}",
         segment=product.target_segment,
         plan_tier=product.pricing_tier,
-        subscription_package=default_subscription_package(product.target_segment),
+        subscription_package=get_default_subscription_package(product),
         billing_model=billing_model,
         seat_commitment=seat_commitment,
         usage_commitment=usage_commitment,
