@@ -88,6 +88,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track board confidence as a compact signal of governance trust, cash-flow discipline, and capital pressure
 - Forecast near-term cash flow and runway instead of relying only on last-turn performance
 - Track covenant risk and missed board targets so finance pressure is visible before collapse
+- Track burn multiple, board pressure, governance risk, and board directives as the company scales
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
 
 ### 🤝 Customer Accounts
@@ -98,11 +99,13 @@ Each turn represents a business interval. You review the company, choose actions
 - Add contract cadence, discounting, onboarding health, and support load to make renewals more believable
 - Support flat, seat-based, and usage-based contract models with different commercial expansion patterns
 - Track per-account plan tier, add-ons, annual prepay posture, and invoice-risk pressure
+- Track subscription package depth, renewal health, failed-payment risk, and dunning pressure on each account
 - Track open tickets and SLA pressure so support quality can directly affect renewals and retention
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
 - Invest directly in customer success and run targeted retention plays on fragile accounts
 - Improve a shared support program with knowledge-base and automation depth that lowers ticket pressure across the portfolio
+- Run explicit support triage actions that cut backlog, escalation pressure, and payment-risk spillover
 - Review key accounts directly from the in-game `review_customers` action
 
 ### 👥 Employee and Team System
@@ -111,6 +114,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Review deterministic candidate pools before hiring during demos or interactive runs
 - Evaluate candidate traits such as steady operator, fast learner, expensive expert, and burnout risk
 - Run a persistent hiring pipeline with sourcing, interviewing, and offer conversion instead of only instant hires
+- Screen candidates before interviews and negotiate offers under salary-market pressure instead of using a flat one-step funnel
 - Assign team members to specific products
 - Manage core roles:
   - `engineer`
@@ -180,6 +184,7 @@ Each turn represents a business interval. You review the company, choose actions
 
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
+- Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
 - Built-in quick guide flow for onboarding and live demos
 - Built-in first-run tutorial and glossary commands for new players
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history

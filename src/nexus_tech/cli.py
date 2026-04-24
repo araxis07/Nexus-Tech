@@ -55,6 +55,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_lab,
     render_balance_matrix,
     render_balance_profile_catalog,
+    render_board_view,
     render_campaign_goal_catalog,
     render_candidate_pool,
     render_competitor_archetype_catalog,
@@ -223,15 +224,18 @@ ACTION_KEYS = {
     "38": TurnAction.VIEW_STATUS,
     "39": TurnAction.END_TURN,
     "40": TurnAction.SOURCE_CANDIDATES,
-    "41": TurnAction.INTERVIEW_CANDIDATE,
-    "42": TurnAction.MAKE_HIRING_OFFER,
+    "41": TurnAction.SCREEN_CANDIDATE,
+    "42": TurnAction.INTERVIEW_CANDIDATE,
+    "43": TurnAction.MAKE_HIRING_OFFER,
+    "44": TurnAction.TRIAGE_SUPPORT_BACKLOG,
+    "45": TurnAction.REVIEW_BOARD,
 }
 UTILITY_ACTION_KEYS = {
-    "43": "save_game",
-    "44": "load_game",
-    "45": "show_guide",
-    "46": "show_glossary",
-    "47": "show_tutorial",
+    "46": "save_game",
+    "47": "load_game",
+    "48": "show_guide",
+    "49": "show_glossary",
+    "50": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -977,6 +981,10 @@ def run_game_loop(
                     render_pipeline_view(console, state)
                     continue
 
+                if action is TurnAction.REVIEW_BOARD:
+                    render_board_view(console, state)
+                    continue
+
                 if action is TurnAction.VIEW_REPORT:
                     render_report(console, state)
                     continue
@@ -1014,6 +1022,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.REVIEW_FINANCE,
         TurnAction.REVIEW_CUSTOMERS,
         TurnAction.REVIEW_PIPELINE,
+        TurnAction.REVIEW_BOARD,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,
@@ -1166,10 +1175,20 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     if action is TurnAction.SOURCE_CANDIDATES:
         return ActionContext()
 
-    if action is TurnAction.INTERVIEW_CANDIDATE:
+    if action is TurnAction.SCREEN_CANDIDATE:
         candidate_id = choose_hiring_candidate_id(
             state,
             stage=HiringCandidateStage.SOURCED,
+            action_label=action.value,
+        )
+        if candidate_id is None:
+            return None
+        return ActionContext(hiring_candidate_id=candidate_id)
+
+    if action is TurnAction.INTERVIEW_CANDIDATE:
+        candidate_id = choose_hiring_candidate_id(
+            state,
+            stage=HiringCandidateStage.SCREENED,
             action_label=action.value,
         )
         if candidate_id is None:
@@ -1185,6 +1204,9 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         if candidate_id is None:
             return None
         return ActionContext(hiring_candidate_id=candidate_id)
+
+    if action is TurnAction.TRIAGE_SUPPORT_BACKLOG:
+        return ActionContext()
 
     if action is TurnAction.UNASSIGN_EMPLOYEE:
         employee_id = choose_employee_id(state, action, assigned_only=True)
@@ -1447,6 +1469,8 @@ def choose_hiring_candidate_id(
     table.add_column("Seniority")
     table.add_column("Stage")
     table.add_column("Accept", justify="right")
+    table.add_column("Salary+", justify="right")
+    table.add_column("Offer By", justify="right")
     table.add_column("Salary", justify="right")
     for index, candidate in enumerate(candidates, start=1):
         table.add_row(
@@ -1456,6 +1480,8 @@ def choose_hiring_candidate_id(
             candidate.seniority.value,
             candidate.stage.value,
             f"{candidate.acceptance_chance}%",
+            str(candidate.market_salary_pressure),
+            str(candidate.offer_deadline_turn),
             str(candidate.salary_expectation),
         )
     console.print(Panel(table, title="Hiring Pipeline", border_style="cyan", expand=True))

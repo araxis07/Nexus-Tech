@@ -42,6 +42,7 @@ from nexus_tech.domain.models import (
     SalesDeal,
     SalesDealStage,
     ScenarioObjectiveMetric,
+    SubscriptionPackage,
     SupportProgram,
     TurnLedgerEntry,
 )
@@ -212,7 +213,11 @@ class SaveLoadCoordinator:
                         budget_g_and_a_share,
                         support_knowledge_base_level,
                         support_automation_level,
+                        support_sla_target,
                         support_backlog_queue,
+                        support_escalation_queue,
+                        support_resolved_last_turn,
+                        support_deflection_score,
                         support_sla_breaches_last_turn,
                         market_cycle,
                         market_cycle_turns_remaining,
@@ -319,7 +324,11 @@ class SaveLoadCoordinator:
                         support_program=SupportProgram(
                             knowledge_base_level=slot_row["support_knowledge_base_level"] or 22,
                             automation_level=slot_row["support_automation_level"] or 16,
+                            sla_target=slot_row["support_sla_target"] or 58,
                             backlog_queue=slot_row["support_backlog_queue"] or 0,
+                            escalation_queue=slot_row["support_escalation_queue"] or 0,
+                            resolved_last_turn=slot_row["support_resolved_last_turn"] or 0,
+                            deflection_score=slot_row["support_deflection_score"] or 0,
                             sla_breaches_last_turn=(
                                 slot_row["support_sla_breaches_last_turn"] or 0
                             ),
@@ -558,7 +567,11 @@ class SaveLoadCoordinator:
                     budget_g_and_a_share,
                     support_knowledge_base_level,
                     support_automation_level,
+                    support_sla_target,
                     support_backlog_queue,
+                    support_escalation_queue,
+                    support_resolved_last_turn,
+                    support_deflection_score,
                     support_sla_breaches_last_turn,
                     market_cycle,
                     market_cycle_turns_remaining,
@@ -572,9 +585,8 @@ class SaveLoadCoordinator:
                     updated_at
                 )
                 VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -598,7 +610,11 @@ class SaveLoadCoordinator:
                     functional_budget.g_and_a_share,
                     support_program.knowledge_base_level,
                     support_program.automation_level,
+                    support_program.sla_target,
                     support_program.backlog_queue,
+                    support_program.escalation_queue,
+                    support_program.resolved_last_turn,
+                    support_program.deflection_score,
                     support_program.sla_breaches_last_turn,
                     market_cycle.value,
                     market_cycle_turns_remaining,
@@ -636,7 +652,11 @@ class SaveLoadCoordinator:
                 budget_g_and_a_share = ?,
                 support_knowledge_base_level = ?,
                 support_automation_level = ?,
+                support_sla_target = ?,
                 support_backlog_queue = ?,
+                support_escalation_queue = ?,
+                support_resolved_last_turn = ?,
+                support_deflection_score = ?,
                 support_sla_breaches_last_turn = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
@@ -669,7 +689,11 @@ class SaveLoadCoordinator:
                 functional_budget.g_and_a_share,
                 support_program.knowledge_base_level,
                 support_program.automation_level,
+                support_program.sla_target,
                 support_program.backlog_queue,
+                support_program.escalation_queue,
+                support_program.resolved_last_turn,
+                support_program.deflection_score,
                 support_program.sla_breaches_last_turn,
                 market_cycle.value,
                 market_cycle_turns_remaining,
@@ -793,17 +817,19 @@ class SaveLoadCoordinator:
                 segment,
                 stage,
                 plan_tier,
+                subscription_package,
                 billing_model,
                 seat_commitment,
                 usage_commitment,
                 add_on_commitment,
+                annual_prepay_offer,
                 value,
                 proposed_discount_rate,
                 probability,
                 created_turn,
                 updated_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -815,10 +841,12 @@ class SaveLoadCoordinator:
                     deal.segment.value,
                     deal.stage.value,
                     deal.plan_tier.value,
+                    deal.subscription_package.value,
                     deal.billing_model.value,
                     deal.seat_commitment,
                     deal.usage_commitment,
                     deal.add_on_commitment,
+                    int(deal.annual_prepay_offer),
                     str(deal.value),
                     str(deal.proposed_discount_rate),
                     deal.probability,
@@ -843,10 +871,12 @@ class SaveLoadCoordinator:
                 segment,
                 stage,
                 plan_tier,
+                subscription_package,
                 billing_model,
                 seat_commitment,
                 usage_commitment,
                 add_on_commitment,
+                annual_prepay_offer,
                 value,
                 proposed_discount_rate,
                 probability,
@@ -866,10 +896,12 @@ class SaveLoadCoordinator:
                 segment=MarketSegment(row["segment"]),
                 stage=SalesDealStage(row["stage"]),
                 plan_tier=PricingTier(row["plan_tier"] or "standard"),
+                subscription_package=SubscriptionPackage(row["subscription_package"] or "growth"),
                 billing_model=ContractBillingModel(row["billing_model"] or "flat"),
                 seat_commitment=row["seat_commitment"] or 0,
                 usage_commitment=row["usage_commitment"] or 0,
                 add_on_commitment=row["add_on_commitment"] or 0,
+                annual_prepay_offer=bool(row["annual_prepay_offer"]),
                 value=Decimal(row["value"]),
                 proposed_discount_rate=Decimal(row["proposed_discount_rate"] or "0.0000"),
                 probability=row["probability"],
@@ -902,10 +934,13 @@ class SaveLoadCoordinator:
                 stage,
                 sourced_turn,
                 expires_turn,
+                offer_deadline_turn,
                 interview_score,
-                acceptance_chance
+                acceptance_chance,
+                market_salary_pressure,
+                negotiation_rounds
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -922,8 +957,11 @@ class SaveLoadCoordinator:
                     candidate.stage.value,
                     candidate.sourced_turn,
                     candidate.expires_turn,
+                    candidate.offer_deadline_turn,
                     candidate.interview_score,
                     candidate.acceptance_chance,
+                    candidate.market_salary_pressure,
+                    candidate.negotiation_rounds,
                 )
                 for index, candidate in enumerate(hiring_candidates)
             ],
@@ -948,8 +986,11 @@ class SaveLoadCoordinator:
                 stage,
                 sourced_turn,
                 expires_turn,
+                offer_deadline_turn,
                 interview_score,
-                acceptance_chance
+                acceptance_chance,
+                market_salary_pressure,
+                negotiation_rounds
             FROM hiring_candidates
             WHERE slot_name = ?
             ORDER BY display_order ASC
@@ -969,8 +1010,11 @@ class SaveLoadCoordinator:
                 stage=HiringCandidateStage(row["stage"] or "sourced"),
                 sourced_turn=row["sourced_turn"],
                 expires_turn=row["expires_turn"],
+                offer_deadline_turn=row["offer_deadline_turn"] or row["expires_turn"],
                 interview_score=row["interview_score"] or 0,
                 acceptance_chance=row["acceptance_chance"] or 50,
+                market_salary_pressure=row["market_salary_pressure"] or 0,
+                negotiation_rounds=row["negotiation_rounds"] or 0,
             )
             for row in rows
         ]

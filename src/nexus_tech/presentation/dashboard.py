@@ -852,6 +852,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
                 _build_finance_panel(state),
+                _build_governance_panel(state),
                 _build_pipeline_summary_panel(state),
             ],
             equal=False,
@@ -897,6 +898,23 @@ def render_customer_view(console: Console, state: GameState) -> None:
             [
                 _build_customer_accounts_panel(state, compact=False),
                 _build_support_program_panel(state),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
+
+
+def render_board_view(console: Console, state: GameState) -> None:
+    """Render the dedicated board and governance review panel."""
+
+    console.print(
+        Columns(
+            [
+                _build_finance_panel(state),
+                _build_governance_panel(state),
+                _build_objective_panel(state),
+                _build_late_game_panel(state),
             ],
             equal=False,
             expand=True,
@@ -956,6 +974,7 @@ def render_report(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_finance_panel(state),
+                _build_governance_panel(state),
                 _build_customer_accounts_panel(state),
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
@@ -1002,6 +1021,17 @@ def render_turn_resolution(console: Console, resolution: TurnResolution) -> None
         console.print(_build_event_result_panel(resolution.event_history_entry))
     if resolution.pending_event is not None:
         console.print(_build_pending_event_panel(resolution.pending_event))
+    if (
+        resolution.governance_summary.board_review_happened
+        or resolution.governance_summary.board_warning_active
+    ):
+        console.print(
+            Panel(
+                resolution.governance_summary.summary,
+                title="Board / Governance",
+                border_style="magenta",
+            )
+        )
     if resolution.unlocked_milestones:
         console.print(_build_milestone_panel(resolution.unlocked_milestones))
     if (
@@ -1445,6 +1475,9 @@ def _build_hiring_pipeline_panel(state: GameState) -> Panel:
     table.add_column("Stage")
     table.add_column("Accept", justify="right")
     table.add_column("Score", justify="right")
+    table.add_column("Salary+", justify="right")
+    table.add_column("Rounds", justify="right")
+    table.add_column("Offer By", justify="right")
     table.add_column("Expiry", justify="right")
     for candidate in active_candidates[-6:]:
         table.add_row(
@@ -1453,6 +1486,9 @@ def _build_hiring_pipeline_panel(state: GameState) -> Panel:
             candidate.stage.value,
             f"{candidate.acceptance_chance}%",
             str(candidate.interview_score),
+            str(candidate.market_salary_pressure),
+            str(candidate.negotiation_rounds),
+            str(candidate.offer_deadline_turn),
             str(candidate.expires_turn),
         )
     return Panel(table, title="Hiring Pipeline", border_style="cyan", expand=True)
@@ -1540,7 +1576,12 @@ def _build_pipeline_summary_panel(state: GameState) -> Panel:
     active_candidates = sum(
         1
         for candidate in state.hiring_candidates
-        if candidate.stage in {HiringCandidateStage.SOURCED, HiringCandidateStage.INTERVIEWED}
+        if candidate.stage
+        in {
+            HiringCandidateStage.SOURCED,
+            HiringCandidateStage.SCREENED,
+            HiringCandidateStage.INTERVIEWED,
+        }
     )
     content = Table.grid(padding=(0, 1))
     content.add_row("Releases", str(active_releases))
@@ -1596,10 +1637,12 @@ def _build_sales_pipeline_panel(state: GameState) -> Panel:
     table.add_column("Product")
     table.add_column("Stage")
     table.add_column("Plan")
+    table.add_column("Package")
     table.add_column("Model")
     table.add_column("Value", justify="right")
     table.add_column("Commit", justify="right")
     table.add_column("Add-ons", justify="right")
+    table.add_column("Prepay")
     table.add_column("Prob", justify="right")
     for deal in state.sales_deals[-8:]:
         commitment = (
@@ -1612,10 +1655,12 @@ def _build_sales_pipeline_panel(state: GameState) -> Panel:
             product_names.get(deal.product_id, "unknown"),
             deal.stage.value,
             deal.plan_tier.value,
+            deal.subscription_package.value,
             deal.billing_model.value,
             format_money(deal.value),
             commitment,
             str(deal.add_on_commitment),
+            "yes" if deal.annual_prepay_offer else "no",
             f"{deal.probability}%",
         )
     return Panel(table, title="Sales Pipeline", border_style="green", expand=True)
@@ -1731,18 +1776,21 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("38", "view_status", "Refresh the dashboard.")
     primary_actions.add_row("39", "end_turn", "Run the simulation tick.")
     primary_actions.add_row("40", "source_candidates", "Build a persistent hiring funnel.")
-    primary_actions.add_row("41", "interview_candidate", "Qualify one sourced candidate.")
-    primary_actions.add_row("42", "make_hiring_offer", "Convert an interviewed candidate.")
+    primary_actions.add_row("41", "screen_candidate", "Run a light screen before interviews.")
+    primary_actions.add_row("42", "interview_candidate", "Qualify one screened candidate.")
+    primary_actions.add_row("43", "make_hiring_offer", "Convert an interviewed candidate.")
+    primary_actions.add_row("44", "triage_support_backlog", "Spend cash to cut support pressure.")
+    primary_actions.add_row("45", "review_board", "Open the board and governance view.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("43", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("44", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("45", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("46", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("47", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("46", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("47", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("48", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("49", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("50", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -2141,6 +2189,10 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
         table.add_column("Tickets", justify="right")
         table.add_column("SLA", justify="right")
         table.add_column("Invoice", justify="right")
+        table.add_column("Pay Risk", justify="right")
+        table.add_column("Renewal", justify="right")
+        table.add_column("Package")
+        table.add_column("Dunning", justify="right")
         table.add_column("Esc", justify="right")
 
     for account in active_accounts:
@@ -2170,6 +2222,10 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
                     str(account.open_tickets),
                     str(account.sla_breach_risk),
                     str(account.invoice_risk),
+                    str(account.failed_payment_risk),
+                    str(account.renewal_health),
+                    account.subscription_package.value,
+                    str(account.dunning_steps),
                     str(account.escalation_count),
                 ]
             )
@@ -2191,7 +2247,11 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table = Table.grid(padding=(0, 1))
     table.add_row("Knowledge Base", str(state.support_program.knowledge_base_level))
     table.add_row("Automation", str(state.support_program.automation_level))
+    table.add_row("SLA Target", str(state.support_program.sla_target))
     table.add_row("Backlog Queue", str(state.support_program.backlog_queue))
+    table.add_row("Esc Queue", str(state.support_program.escalation_queue))
+    table.add_row("Resolved", str(state.support_program.resolved_last_turn))
+    table.add_row("Deflection", str(state.support_program.deflection_score))
     table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))
     table.add_row("Escalations", str(escalating_accounts))
     return Panel(table, title="Support Program", border_style="green", expand=True)
@@ -2236,6 +2296,7 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Capital Raised", format_money(state.finance.total_raised))
     table.add_row("Funding Entries", str(len(state.funding_history)))
     table.add_row("Turn Interest", format_money(turn_interest))
+    table.add_row("Burn Multiple", f"{state.finance.burn_multiple:.2f}x")
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     table.add_row("Forecast CF", format_money(state.finance.forecast_net_cash_flow))
     table.add_row(
@@ -2245,6 +2306,25 @@ def _build_finance_panel(state: GameState) -> Panel:
         else f"{state.finance.forecast_runway_turns} turns",
     )
     return Panel(table, title="Finance", border_style="cyan", expand=True)
+
+
+def _build_governance_panel(state: GameState) -> Panel:
+    directive = state.finance.board_directive.value.replace("_", " ")
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Board Confidence", str(state.finance.board_confidence))
+    table.add_row("Board Pressure", str(state.finance.board_pressure))
+    table.add_row("Governance Risk", str(state.finance.governance_risk))
+    table.add_row("Directive", directive)
+    table.add_row("Warning", "active" if state.finance.board_warning_active else "clear")
+    table.add_row(
+        "Last Review",
+        str(state.finance.last_board_review_turn)
+        if state.finance.last_board_review_turn is not None
+        else "-",
+    )
+    table.add_row("Covenant Risk", str(state.finance.covenant_risk))
+    table.add_row("Missed Targets", str(state.finance.missed_board_targets))
+    return Panel(table, title="Board / Governance", border_style="magenta", expand=True)
 
 
 def _build_competitor_table(state: GameState) -> Table:

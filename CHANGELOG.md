@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.0 - 2026-04-24
+
+- Added subscription-governed contract depth with package upgrades, renewal-health tracking, failed-payment risk, and dunning pressure
+- Added support-ops interventions with backlog triage, escalation-queue tracking, SLA targets, and support deflection reporting
+- Added hiring-pipeline screening plus offer negotiation, salary pressure, and deadline pressure before candidates expire
+- Added a board and governance layer with burn multiple, board pressure, governance risk, directives, and a dedicated review panel
+- Extended SQLite persistence, CLI actions, turn summaries, and dashboard panels for the new contract, support, hiring, and governance state
+- Promoted the package version to `0.18.0`
+
 ## 0.17.0 - 2026-04-24
 
 - Added subscription depth with plan-tier add-ons, annual prepay behavior, invoice-risk pressure, and richer deal packaging

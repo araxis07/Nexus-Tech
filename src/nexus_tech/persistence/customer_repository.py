@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     CustomerAccountStatus,
     MarketSegment,
     PricingTier,
+    SubscriptionPackage,
 )
 
 
@@ -39,6 +40,7 @@ class CustomerAccountRepository:
                 segment,
                 contract_value,
                 plan_tier,
+                subscription_package,
                 contract_cadence,
                 billing_model,
                 seat_count,
@@ -52,13 +54,19 @@ class CustomerAccountRepository:
                 open_tickets,
                 sla_breach_risk,
                 invoice_risk,
+                failed_payment_risk,
+                dunning_steps,
                 escalation_count,
                 expansion_potential,
+                renewal_health,
                 renewal_turn,
                 churn_risk,
                 status
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?
+            )
             """,
             [
                 (
@@ -70,6 +78,7 @@ class CustomerAccountRepository:
                     account.segment.value,
                     str(account.contract_value),
                     account.plan_tier.value,
+                    account.subscription_package.value,
                     account.contract_cadence.value,
                     account.billing_model.value,
                     account.seat_count,
@@ -83,8 +92,11 @@ class CustomerAccountRepository:
                     account.open_tickets,
                     account.sla_breach_risk,
                     account.invoice_risk,
+                    account.failed_payment_risk,
+                    account.dunning_steps,
                     account.escalation_count,
                     account.expansion_potential,
+                    account.renewal_health,
                     account.renewal_turn,
                     account.churn_risk,
                     account.status.value,
@@ -105,6 +117,7 @@ class CustomerAccountRepository:
                 segment,
                 contract_value,
                 plan_tier,
+                subscription_package,
                 contract_cadence,
                 billing_model,
                 seat_count,
@@ -118,8 +131,11 @@ class CustomerAccountRepository:
                 open_tickets,
                 sla_breach_risk,
                 invoice_risk,
+                failed_payment_risk,
+                dunning_steps,
                 escalation_count,
                 expansion_potential,
+                renewal_health,
                 renewal_turn,
                 churn_risk,
                 status
@@ -137,6 +153,7 @@ class CustomerAccountRepository:
                 segment=MarketSegment(row["segment"]),
                 contract_value=Decimal(row["contract_value"]),
                 plan_tier=PricingTier(row["plan_tier"] or "standard"),
+                subscription_package=SubscriptionPackage(row["subscription_package"] or "growth"),
                 contract_cadence=ContractCadence(row["contract_cadence"] or "annual"),
                 billing_model=ContractBillingModel(row["billing_model"] or "flat"),
                 seat_count=row["seat_count"] or 0,
@@ -150,8 +167,11 @@ class CustomerAccountRepository:
                 open_tickets=row["open_tickets"] or 0,
                 sla_breach_risk=row["sla_breach_risk"] or 0,
                 invoice_risk=row["invoice_risk"] or 0,
+                failed_payment_risk=row["failed_payment_risk"] or 0,
+                dunning_steps=row["dunning_steps"] or 0,
                 escalation_count=row["escalation_count"] or 0,
                 expansion_potential=row["expansion_potential"],
+                renewal_health=row["renewal_health"] or 60,
                 renewal_turn=row["renewal_turn"],
                 churn_risk=row["churn_risk"],
                 status=CustomerAccountStatus(row["status"]),

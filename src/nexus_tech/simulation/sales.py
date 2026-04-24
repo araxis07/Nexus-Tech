@@ -18,7 +18,11 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.contracts import build_contract_shape, get_contract_interval
+from nexus_tech.simulation.contracts import (
+    build_contract_shape,
+    default_subscription_package,
+    get_contract_interval,
+)
 from nexus_tech.simulation.support import clamp_int
 
 
@@ -83,10 +87,12 @@ def create_sales_deal(
         name=f"{product.target_segment.value.title()} buyer: {product.name}",
         segment=product.target_segment,
         plan_tier=product.pricing_tier,
+        subscription_package=default_subscription_package(product.target_segment),
         billing_model=billing_model,
         seat_commitment=seat_commitment,
         usage_commitment=usage_commitment,
         add_on_commitment=add_on_commitment,
+        annual_prepay_offer=product.target_segment is MarketSegment.ENTERPRISE,
         value=value,
         proposed_discount_rate=proposed_discount_rate,
         probability=probability,
@@ -190,12 +196,13 @@ def _close_won_deal(state: GameState, deal: SalesDeal) -> None:
             segment=deal.segment,
             contract_value=deal.value,
             plan_tier=deal.plan_tier,
+            subscription_package=deal.subscription_package,
             contract_cadence=contract_cadence,
             billing_model=billing_model,
             seat_count=seat_count,
             usage_units=usage_units,
             add_on_count=deal.add_on_commitment,
-            annual_prepay=deal.segment is MarketSegment.ENTERPRISE,
+            annual_prepay=deal.annual_prepay_offer,
             discount_rate=deal.proposed_discount_rate,
             satisfaction=BALANCE.sales_deal_customer_satisfaction,
             onboarding_health=BALANCE.sales_deal_customer_satisfaction - 2,
@@ -203,8 +210,11 @@ def _close_won_deal(state: GameState, deal: SalesDeal) -> None:
             open_tickets=8 if deal.segment is MarketSegment.ENTERPRISE else 4,
             sla_breach_risk=14 if deal.segment is MarketSegment.ENTERPRISE else 10,
             invoice_risk=16 if deal.segment is MarketSegment.ENTERPRISE else 22,
+            failed_payment_risk=4 if contract_cadence is ContractCadence.MONTHLY else 0,
+            dunning_steps=0,
             escalation_count=0,
             expansion_potential=BALANCE.sales_deal_customer_expansion,
+            renewal_health=BALANCE.sales_deal_customer_satisfaction - 4,
             renewal_turn=state.company.current_turn + get_contract_interval(contract_cadence),
             churn_risk=18 if deal.segment is MarketSegment.ENTERPRISE else 22,
         )

@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from nexus_tech.domain.models import (
     CustomerAccount,
     CustomerAccountStatus,
+    EmployeeRole,
     GameState,
     SupportProgram,
 )
+from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.support import clamp_int
 
@@ -22,10 +24,20 @@ class SupportProgramSummary:
     effective_capacity: int
     deflected_tickets: int
     backlog_queue: int
+    escalation_queue: int
     sla_breaches: int
+    resolved_tickets: int
+    deflection_score: int
     reputation_delta: int
     morale_penalty: int
     summary: str
+
+
+@dataclass(frozen=True)
+class SupportOpsActionSummary:
+    """Summary of an explicit support-ops intervention."""
+
+    message: str
 
 
 def calculate_support_program_relief(
@@ -60,27 +72,51 @@ def apply_end_of_turn_support_program(
     sla_breaches = sum(
         1
         for account in active_accounts
-        if account.sla_breach_risk >= BALANCE.support_program_escalation_sla_threshold
+        if account.sla_breach_risk >= state.support_program.sla_target
     )
     ticket_relief, _ = calculate_support_program_relief(
         state.support_program,
         customer_success_bonus=customer_success_bonus,
     )
-    effective_capacity = BALANCE.support_program_base_capacity + ticket_relief
-    deflected_tickets = min(total_open_tickets, effective_capacity)
-    queue_increase = max(0, total_open_tickets - deflected_tickets)
+    deflection_score = clamp_int(
+        ticket_relief
+        + state.support_program.knowledge_base_level // 2
+        + state.support_program.automation_level // 2
+    )
+    effective_capacity = (
+        BALANCE.support_program_base_capacity
+        + ticket_relief
+        + _calculate_support_staff_capacity(state)
+    )
+    incoming_ticket_pressure = total_open_tickets + state.support_program.backlog_queue
+    resolved_tickets = min(incoming_ticket_pressure, effective_capacity)
+    deflected_tickets = min(total_open_tickets, ticket_relief + resolved_tickets)
+    queue_increase = max(0, incoming_ticket_pressure - resolved_tickets)
     queue_relief = (
         state.support_program.automation_level // BALANCE.support_program_queue_relief_divisor
     )
     state.support_program.backlog_queue = max(
         0,
-        state.support_program.backlog_queue + queue_increase - queue_relief,
+        queue_increase - queue_relief,
     )
+    severe_accounts = count_escalating_accounts(active_accounts)
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        + severe_accounts
+        - (resolved_tickets // BALANCE.support_program_escalation_queue_divisor),
+    )
+    state.support_program.resolved_last_turn = resolved_tickets
+    state.support_program.deflection_score = deflection_score
     state.support_program.sla_breaches_last_turn = sla_breaches
 
     reputation_delta = 0
     morale_penalty = 0
-    if state.support_program.backlog_queue >= BALANCE.support_program_backlog_reputation_threshold:
+    if (
+        state.support_program.backlog_queue >= BALANCE.support_program_backlog_reputation_threshold
+        or state.support_program.escalation_queue
+        >= BALANCE.support_program_triage_escalation_relief * 2
+    ):
         reputation_delta = -BALANCE.support_program_backlog_reputation_loss
     if (
         state.support_program.backlog_queue
@@ -100,7 +136,10 @@ def apply_end_of_turn_support_program(
         effective_capacity=effective_capacity,
         deflected_tickets=deflected_tickets,
         backlog_queue=state.support_program.backlog_queue,
+        escalation_queue=state.support_program.escalation_queue,
         sla_breaches=sla_breaches,
+        resolved_tickets=resolved_tickets,
+        deflection_score=deflection_score,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
         summary=summary,
@@ -121,6 +160,69 @@ def improve_support_program(
     support_program.automation_level = clamp_int(support_program.automation_level + automation_gain)
 
 
+def triage_support_backlog(state: GameState) -> SupportOpsActionSummary:
+    """Spend cash and attention to manually reduce support pressure."""
+
+    if (
+        state.support_program.backlog_queue <= 0
+        and state.support_program.escalation_queue <= 0
+        and not any(account.open_tickets > 0 for account in state.customer_accounts)
+    ):
+        raise ValueError("Support pressure is already under control.")
+    if state.company.cash_on_hand < BALANCE.support_program_triage_cost:
+        raise ValueError("Not enough cash to run a support triage sprint this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_triage_cost
+    )
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - BALANCE.support_program_triage_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue - BALANCE.support_program_triage_escalation_relief,
+    )
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                account.escalation_count,
+                account.open_tickets,
+                account.sla_breach_risk,
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    improved_accounts = 0
+    for account in accounts[:3]:
+        if account.open_tickets <= 0 and account.sla_breach_risk <= 0:
+            continue
+        account.open_tickets = max(
+            0,
+            account.open_tickets - BALANCE.support_program_triage_ticket_relief,
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.support_program_triage_sla_relief
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk - (BALANCE.support_program_triage_sla_relief // 2)
+        )
+        account.escalation_count = max(0, account.escalation_count - 1)
+        improved_accounts += 1
+
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a support triage sprint for {improved_accounts} account(s). "
+            f"Cash -{BALANCE.support_program_triage_cost}, "
+            f"backlog {state.support_program.backlog_queue}, "
+            f"escalations {state.support_program.escalation_queue}."
+        )
+    )
+
+
 def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     """Return the number of accounts with severe support pressure."""
 
@@ -132,4 +234,24 @@ def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
             account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
             or account.sla_breach_risk >= BALANCE.support_program_escalation_sla_threshold
         )
+    )
+
+
+def _calculate_support_staff_capacity(state: GameState) -> int:
+    support_roles = sum(
+        1
+        for employee in state.employees
+        if employee.role in {EmployeeRole.PRODUCT_MANAGER, EmployeeRole.DESIGNER}
+    )
+    engineer_relief = (
+        sum(1 for employee in state.employees if employee.role is EmployeeRole.ENGINEER)
+        // BALANCE.support_program_staff_capacity_engineer_relief_divisor
+    )
+    budget_capacity = state.functional_budget.customer_success_share // (
+        BALANCE.support_program_budget_capacity_divisor
+    )
+    return (
+        (support_roles * BALANCE.support_program_staff_capacity_unit)
+        + engineer_relief
+        + budget_capacity
     )

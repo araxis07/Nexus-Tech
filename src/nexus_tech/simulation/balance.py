@@ -1232,6 +1232,28 @@ class BalanceConfig:
             "premium": Decimal("40.00"),
         }
     )
+    subscription_default_package_by_segment: dict[str, str] = field(
+        default_factory=lambda: {
+            "indie": "starter",
+            "startup": "starter",
+            "smb": "growth",
+            "enterprise": "enterprise_suite",
+        }
+    )
+    subscription_package_recurring_bonus: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "starter": Decimal("0.00"),
+            "growth": Decimal("55.00"),
+            "enterprise_suite": Decimal("140.00"),
+        }
+    )
+    subscription_package_support_burden: dict[str, int] = field(
+        default_factory=lambda: {
+            "starter": 0,
+            "growth": 2,
+            "enterprise_suite": 4,
+        }
+    )
     contract_default_add_on_commitment_by_segment: dict[str, int] = field(
         default_factory=lambda: {
             "indie": 0,
@@ -1249,6 +1271,15 @@ class BalanceConfig:
     contract_invoice_risk_severe_threshold: int = 78
     contract_invoice_risk_churn_gain: int = 5
     contract_invoice_risk_satisfaction_loss: int = 2
+    contract_failed_payment_monthly_gain: int = 4
+    contract_failed_payment_invoice_divisor: int = 18
+    contract_failed_payment_discount_divisor: Decimal = Decimal("0.0300")
+    contract_failed_payment_health_relief_divisor: int = 16
+    contract_failed_payment_prepay_relief: int = 6
+    contract_failed_payment_threshold: int = 60
+    contract_failed_payment_dunning_limit: int = 3
+    contract_failed_payment_dunning_satisfaction_loss: int = 3
+    contract_failed_payment_churn_gain: int = 6
     contract_add_on_expansion_gain: int = 1
     contract_add_on_downgrade_loss: int = 1
     contract_seat_unit_revenue: Decimal = Decimal("18.00")
@@ -1320,21 +1351,43 @@ class BalanceConfig:
     board_confidence_low_threshold: int = 32
     board_confidence_high_threshold: int = 72
     board_confidence_score_divisor: int = 10
+    board_review_interval: int = 4
+    board_review_pressure_gain: int = 5
+    board_review_confidence_gain: int = 3
+    board_review_confidence_loss: int = 4
+    board_pressure_warning_threshold: int = 48
+    governance_risk_warning_threshold: int = 44
+    governance_risk_relief: int = 3
+    board_pressure_relief: int = 4
+    finance_burn_multiple_warning: Decimal = Decimal("1.30")
+    finance_burn_multiple_severe: Decimal = Decimal("1.80")
+    finance_burn_multiple_pressure_gain: int = 4
+    finance_governance_pressure_gain: int = 3
 
     support_program_base_capacity: int = 6
     support_program_knowledge_base_divisor: int = 12
     support_program_automation_divisor: int = 10
     support_program_customer_success_capacity_bonus: int = 2
+    support_program_staff_capacity_unit: int = 2
+    support_program_staff_capacity_engineer_relief_divisor: int = 2
+    support_program_budget_capacity_divisor: int = 10
     support_program_backlog_ticket_divisor: int = 6
     support_program_queue_relief_divisor: int = 8
     support_program_escalation_ticket_threshold: int = 14
     support_program_escalation_sla_threshold: int = 62
+    support_program_escalation_queue_divisor: int = 2
     support_program_backlog_reputation_threshold: int = 24
     support_program_backlog_reputation_loss: int = 1
     support_program_backlog_morale_penalty_threshold: int = 18
     support_program_backlog_morale_penalty: int = 1
+    support_program_triage_cost: Decimal = Decimal("150.00")
+    support_program_triage_backlog_relief: int = 10
+    support_program_triage_escalation_relief: int = 3
+    support_program_triage_ticket_relief: int = 4
+    support_program_triage_sla_relief: int = 6
 
     hiring_source_cost: Decimal = Decimal("120.00")
+    hiring_screen_cost: Decimal = Decimal("55.00")
     hiring_interview_cost: Decimal = Decimal("90.00")
     hiring_offer_cash_buffer_multiplier: Decimal = Decimal("2.50")
     hiring_pipeline_candidate_limit: int = 6
@@ -1344,9 +1397,14 @@ class BalanceConfig:
     hiring_acceptance_cash_buffer_divisor: Decimal = Decimal("900.00")
     hiring_acceptance_interview_divisor: int = 2
     hiring_acceptance_offer_threshold: int = 68
+    hiring_acceptance_negotiate_threshold: int = 60
+    hiring_screen_score_gain: int = 8
+    hiring_screen_acceptance_gain: int = 6
     hiring_interview_score_gain: int = 18
     hiring_interview_score_cap: int = 92
     hiring_decline_reputation_loss: int = 1
+    hiring_salary_pressure_gain: int = 4
+    hiring_negotiation_salary_step: Decimal = Decimal("45.00")
 
     exit_acquisition_score_threshold: int = 170
     exit_acquisition_value_multiplier: Decimal = Decimal("1.15")

@@ -59,9 +59,13 @@ def invest_in_customer_success(
         account.sla_breach_risk = clamp_int(
             account.sla_breach_risk - BALANCE.customer_success_sla_relief
         )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk - (BALANCE.customer_success_sla_relief // 2)
+        )
         account.churn_risk = clamp_int(
             account.churn_risk - BALANCE.customer_success_churn_risk_relief
         )
+        account.renewal_health = clamp_int(account.renewal_health + 6)
         if account.status is CustomerAccountStatus.AT_RISK and account.churn_risk < 40:
             account.status = CustomerAccountStatus.ACTIVE
 
@@ -98,8 +102,13 @@ def run_retention_play(state: GameState, account_id: UUID) -> CustomerSuccessAct
     account.open_tickets = max(0, account.open_tickets - BALANCE.retention_ticket_relief)
     account.sla_breach_risk = clamp_int(account.sla_breach_risk - BALANCE.retention_sla_relief)
     account.invoice_risk = clamp_int(account.invoice_risk - BALANCE.retention_sla_relief)
+    account.failed_payment_risk = clamp_int(
+        account.failed_payment_risk - BALANCE.retention_sla_relief
+    )
+    account.dunning_steps = max(0, account.dunning_steps - 1)
     account.escalation_count = max(0, account.escalation_count - 1)
     account.churn_risk = clamp_int(account.churn_risk - BALANCE.retention_churn_risk_relief)
+    account.renewal_health = clamp_int(account.renewal_health + 10)
     if account.contract_cadence is ContractCadence.MONTHLY and account.discount_rate >= Decimal(
         "0.1000"
     ):

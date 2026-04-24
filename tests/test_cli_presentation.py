@@ -1011,6 +1011,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Market Watch" in output
     assert "Late-Game" in output
     assert "Finance" in output
+    assert "Board / Governance" in output
     assert "Key Accounts" in output
     assert "Strategy" in output
     assert "Price" in output

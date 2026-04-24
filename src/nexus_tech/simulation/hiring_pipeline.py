@@ -72,8 +72,8 @@ def interview_candidate(state: GameState, candidate_id: UUID) -> HiringPipelineS
     """Advance one sourced candidate through an interview step."""
 
     candidate = get_hiring_candidate_by_id(state, candidate_id)
-    if candidate.stage is not HiringCandidateStage.SOURCED:
-        raise ValueError("Only sourced candidates can be interviewed.")
+    if candidate.stage is not HiringCandidateStage.SCREENED:
+        raise ValueError("Only screened candidates can be interviewed.")
     if state.company.cash_on_hand < BALANCE.hiring_interview_cost:
         raise ValueError("Not enough cash to run an interview this turn.")
 
@@ -98,6 +98,48 @@ def interview_candidate(state: GameState, candidate_id: UUID) -> HiringPipelineS
         message=(
             f"Interviewed {candidate.full_name}. Acceptance now {candidate.acceptance_chance}% "
             f"and cash -{BALANCE.hiring_interview_cost}."
+        )
+    )
+
+
+def screen_candidate(state: GameState, candidate_id: UUID) -> HiringPipelineSummary:
+    """Run a lighter screening pass before investing in a full interview."""
+
+    candidate = get_hiring_candidate_by_id(state, candidate_id)
+    if candidate.stage is not HiringCandidateStage.SOURCED:
+        raise ValueError("Only sourced candidates can be screened.")
+    if state.company.cash_on_hand < BALANCE.hiring_screen_cost:
+        raise ValueError("Not enough cash to screen a candidate this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.hiring_screen_cost
+    )
+    candidate.stage = HiringCandidateStage.SCREENED
+    candidate.interview_score = clamp_int(
+        candidate.interview_score
+        + BALANCE.hiring_screen_score_gain
+        + (state.company.reputation // 20),
+        0,
+        BALANCE.hiring_interview_score_cap,
+    )
+    candidate.acceptance_chance = clamp_int(
+        candidate.acceptance_chance
+        + BALANCE.hiring_screen_acceptance_gain
+        + max(0, (state.company.reputation - 50) // 15)
+        - (candidate.market_salary_pressure // 8),
+    )
+    candidate.market_salary_pressure = clamp_int(
+        candidate.market_salary_pressure + BALANCE.hiring_salary_pressure_gain
+    )
+    candidate.offer_deadline_turn = max(
+        candidate.offer_deadline_turn,
+        state.company.current_turn + (BALANCE.hiring_pipeline_candidate_ttl - 1),
+    )
+    return HiringPipelineSummary(
+        message=(
+            f"Screened {candidate.full_name}. "
+            f"Acceptance now {candidate.acceptance_chance}% and cash "
+            f"-{BALANCE.hiring_screen_cost}."
         )
     )
 
@@ -150,6 +192,29 @@ def make_hiring_offer(state: GameState, candidate_id: UUID) -> HiringPipelineSum
             )
         )
 
+    if acceptance_score >= BALANCE.hiring_acceptance_negotiate_threshold:
+        candidate.negotiation_rounds += 1
+        candidate.salary_expectation = quantize_money(
+            candidate.salary_expectation + BALANCE.hiring_negotiation_salary_step
+        )
+        candidate.market_salary_pressure = clamp_int(
+            candidate.market_salary_pressure + BALANCE.hiring_salary_pressure_gain
+        )
+        candidate.acceptance_chance = clamp_int(
+            candidate.acceptance_chance + BALANCE.hiring_screen_acceptance_gain
+        )
+        candidate.offer_deadline_turn = max(
+            state.company.current_turn + 1,
+            candidate.offer_deadline_turn,
+        )
+        return HiringPipelineSummary(
+            message=(
+                f"{candidate.full_name} wants a stronger package. "
+                f"Salary expectation rises to {format_money(candidate.salary_expectation)} "
+                "and the candidate stays live for one more turn."
+            )
+        )
+
     candidate.stage = HiringCandidateStage.DECLINED
     candidate.expires_turn = state.company.current_turn + 1
     state.company.reputation = clamp_int(
@@ -175,7 +240,10 @@ def age_hiring_candidates(state: GameState) -> None:
             retained_candidates.append(candidate)
             continue
 
-        if state.company.current_turn > candidate.expires_turn:
+        if (
+            state.company.current_turn > candidate.expires_turn
+            or state.company.current_turn > candidate.offer_deadline_turn
+        ):
             candidate.stage = HiringCandidateStage.EXPIRED
             candidate.expires_turn = state.company.current_turn + 1
             retained_candidates.append(candidate)
@@ -183,7 +251,16 @@ def age_hiring_candidates(state: GameState) -> None:
 
         stale_pressure = max(0, state.company.current_turn - candidate.sourced_turn - 1)
         if stale_pressure > 0:
-            candidate.acceptance_chance = clamp_int(candidate.acceptance_chance - stale_pressure)
+            candidate.market_salary_pressure = clamp_int(
+                candidate.market_salary_pressure + stale_pressure
+            )
+            candidate.salary_expectation = quantize_money(
+                candidate.salary_expectation
+                + (BALANCE.hiring_negotiation_salary_step * stale_pressure)
+            )
+            candidate.acceptance_chance = clamp_int(
+                candidate.acceptance_chance - stale_pressure - (candidate.negotiation_rounds * 2)
+            )
         retained_candidates.append(candidate)
 
     state.hiring_candidates = retained_candidates[-BALANCE.hiring_pipeline_candidate_limit :]
@@ -220,7 +297,15 @@ def _candidate_from_profile(profile: CandidateProfile, state: GameState) -> Hiri
         stage=HiringCandidateStage.SOURCED,
         sourced_turn=state.company.current_turn,
         expires_turn=state.company.current_turn + BALANCE.hiring_pipeline_candidate_ttl,
+        offer_deadline_turn=(
+            state.company.current_turn + (BALANCE.hiring_pipeline_candidate_ttl - 1)
+        ),
         acceptance_chance=acceptance_base,
+        market_salary_pressure=clamp_int(
+            (8 if profile.seniority is not None and profile.seniority.value == "senior" else 4)
+            + (6 if profile.trait is CandidateTrait.EXPENSIVE_EXPERT else 0)
+            + (2 if profile.role.value == "engineer" else 0)
+        ),
     )
 
 

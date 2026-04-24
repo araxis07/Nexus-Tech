@@ -54,6 +54,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
     ScenarioObjectiveMetric,
     Seniority,
+    SubscriptionPackage,
     SupportProgram,
     TurnLedgerEntry,
 )
@@ -183,8 +184,11 @@ def make_state() -> GameState:
         open_tickets=5,
         sla_breach_risk=13,
         invoice_risk=17,
+        failed_payment_risk=12,
+        dunning_steps=1,
         escalation_count=1,
         expansion_potential=66,
+        renewal_health=70,
         renewal_turn=6,
         churn_risk=18,
         status=CustomerAccountStatus.ACTIVE,
@@ -200,6 +204,12 @@ def make_state() -> GameState:
         total_raised=Decimal("7400.00"),
         forecast_net_cash_flow=Decimal("-420.00"),
         forecast_runway_turns=18,
+        burn_multiple=Decimal("0.54"),
+        governance_risk=16,
+        board_pressure=21,
+        board_directive="prove_reliability",
+        board_warning_active=True,
+        last_board_review_turn=4,
         last_funding_turn=3,
     )
     funding_history = [
@@ -245,10 +255,12 @@ def make_state() -> GameState:
         segment=MarketSegment.ENTERPRISE,
         stage=SalesDealStage.DEMO,
         plan_tier=PricingTier.PREMIUM,
+        subscription_package=SubscriptionPackage.ENTERPRISE_SUITE,
         billing_model=ContractBillingModel.SEAT_BASED,
         seat_commitment=30,
         usage_commitment=12,
         add_on_commitment=2,
+        annual_prepay_offer=True,
         value=Decimal("1300.00"),
         proposed_discount_rate=Decimal("0.0400"),
         probability=52,
@@ -286,8 +298,11 @@ def make_state() -> GameState:
         stage=HiringCandidateStage.INTERVIEWED,
         sourced_turn=3,
         expires_turn=6,
+        offer_deadline_turn=5,
         interview_score=64,
         acceptance_chance=71,
+        market_salary_pressure=12,
+        negotiation_rounds=1,
     )
     return GameState(
         company=Company(
@@ -317,7 +332,11 @@ def make_state() -> GameState:
         support_program=SupportProgram(
             knowledge_base_level=38,
             automation_level=29,
+            sla_target=56,
             backlog_queue=7,
+            escalation_queue=3,
+            resolved_last_turn=8,
+            deflection_score=41,
             sla_breaches_last_turn=1,
         ),
         difficulty_mode=DifficultyMode.FOUNDER,
@@ -396,6 +415,9 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         sales_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(sales_deals)").fetchall()
         }
+        hiring_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(hiring_candidates)").fetchall()
+        }
         roadmap_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(roadmap_projects)").fetchall()
         }
@@ -424,7 +446,11 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "budget_g_and_a_share",
         "support_knowledge_base_level",
         "support_automation_level",
+        "support_sla_target",
         "support_backlog_queue",
+        "support_escalation_queue",
+        "support_resolved_last_turn",
+        "support_deflection_score",
         "support_sla_breaches_last_turn",
         "market_cycle",
         "market_cycle_turns_remaining",
@@ -445,6 +471,12 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "missed_board_targets",
         "forecast_net_cash_flow",
         "forecast_runway_turns",
+        "burn_multiple",
+        "governance_risk",
+        "board_pressure",
+        "board_directive",
+        "board_warning_active",
+        "last_board_review_turn",
     }.issubset(finance_columns)
     assert {
         "performance_rating",
@@ -456,21 +488,32 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "seat_count",
         "usage_units",
         "plan_tier",
+        "subscription_package",
         "add_on_count",
         "annual_prepay",
         "open_tickets",
         "sla_breach_risk",
         "invoice_risk",
+        "failed_payment_risk",
+        "dunning_steps",
         "escalation_count",
+        "renewal_health",
     }.issubset(customer_columns)
     assert {
         "plan_tier",
+        "subscription_package",
         "billing_model",
         "seat_commitment",
         "usage_commitment",
         "add_on_commitment",
+        "annual_prepay_offer",
         "proposed_discount_rate",
     }.issubset(sales_columns)
+    assert {
+        "offer_deadline_turn",
+        "market_salary_pressure",
+        "negotiation_rounds",
+    }.issubset(hiring_columns)
     assert {
         "epic_count",
         "epics_completed",
@@ -478,7 +521,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "dependency_project_type",
         "delivery_risk",
     }.issubset(roadmap_columns)
-    assert user_version >= 14
+    assert user_version >= 15
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -599,6 +642,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "functional_budget_preset",
         "budget_engineering_share",
         "support_knowledge_base_level",
+        "support_sla_target",
     }.issubset(save_slot_columns)
     assert {"strategy"}.issubset(company_columns)
     assert {"pricing_tier", "target_segment"}.issubset(product_columns)
@@ -610,8 +654,11 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "covenant_risk",
         "missed_board_targets",
         "forecast_net_cash_flow",
+        "burn_multiple",
+        "board_pressure",
+        "board_directive",
     }.issubset(finance_columns)
-    assert user_version >= 14
+    assert user_version >= 15
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -649,7 +696,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 1
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 14
+    assert summaries[0].schema_version >= 15
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -662,7 +709,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 13
+    assert report.schema_version >= 15
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

@@ -81,6 +81,7 @@ from nexus_tech.simulation.events import (
     select_weighted_definition,
 )
 from nexus_tech.simulation.finance import apply_end_of_turn_finance_drift
+from nexus_tech.simulation.governance import apply_end_of_turn_governance
 from nexus_tech.simulation.growth import (
     calculate_acquired_users,
     calculate_churned_users,
@@ -90,6 +91,7 @@ from nexus_tech.simulation.hiring import generate_candidate_pool
 from nexus_tech.simulation.hiring_pipeline import (
     interview_candidate,
     make_hiring_offer,
+    screen_candidate,
     source_candidates,
 )
 from nexus_tech.simulation.late_game import (
@@ -115,7 +117,10 @@ from nexus_tech.simulation.scaling import (
     calculate_company_scale_pressure,
     calculate_product_scale_pressure,
 )
-from nexus_tech.simulation.support_program import apply_end_of_turn_support_program
+from nexus_tech.simulation.support_program import (
+    apply_end_of_turn_support_program,
+    triage_support_backlog,
+)
 from nexus_tech.simulation.team import (
     calculate_base_productivity,
     calculate_effective_productivity,
@@ -310,7 +315,7 @@ def test_key_account_revenue_aggregates_active_accounts_only() -> None:
 
     revenue = calculate_account_revenue([active_account, churned_account])
 
-    assert revenue == Decimal("900.00")
+    assert revenue == Decimal("955.00")
 
 
 def test_key_accounts_are_seeded_from_strong_product_traction() -> None:
@@ -376,7 +381,7 @@ def test_resolve_turn_includes_key_account_revenue() -> None:
 
     resolution = resolve_turn(state, FixedRandom(0))
 
-    assert resolution.customer_summary.account_revenue == Decimal("500.00")
+    assert resolution.customer_summary.account_revenue == Decimal("555.00")
     assert resolution.total_revenue >= Decimal("500.00")
 
 
@@ -2462,7 +2467,7 @@ def test_account_revenue_applies_discount_rate() -> None:
         churn_risk=16,
     )
 
-    assert calculate_account_revenue([account]) == Decimal("900.00")
+    assert calculate_account_revenue([account]) == Decimal("949.50")
 
 
 def test_seat_based_account_revenue_includes_contract_commitment() -> None:
@@ -2484,7 +2489,7 @@ def test_seat_based_account_revenue_includes_contract_commitment() -> None:
         churn_risk=16,
     )
 
-    assert calculate_account_revenue([account]) == Decimal("1224.00")
+    assert calculate_account_revenue([account]) == Decimal("1273.50")
 
 
 def test_customer_turn_tracks_support_backlog_and_sla_pressure() -> None:
@@ -2744,7 +2749,7 @@ def test_account_recurring_revenue_includes_add_ons() -> None:
         churn_risk=12,
     )
 
-    assert calculate_account_recurring_revenue(account) == Decimal("972.00")
+    assert calculate_account_recurring_revenue(account) == Decimal("1021.50")
 
 
 def test_explicit_support_program_relief_reduces_account_pressure() -> None:
@@ -2833,6 +2838,14 @@ def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     candidate = state.hiring_candidates[0]
     assert candidate.stage is HiringCandidateStage.SOURCED
 
+    with pytest.raises(ValueError, match="screened"):
+        interview_candidate(state, candidate.id)
+
+    screen_summary = screen_candidate(state, candidate.id)
+
+    assert "Screened" in screen_summary.message
+    assert candidate.stage is HiringCandidateStage.SCREENED
+
     interview_summary = interview_candidate(state, candidate.id)
 
     assert "Interviewed" in interview_summary.message
@@ -2846,6 +2859,136 @@ def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     assert "accepted the offer" in offer_summary.message
     assert len(state.hiring_candidates) == 0
     assert any(employee.full_name == candidate.full_name for employee in state.employees)
+
+
+def test_hiring_offer_negotiation_can_raise_salary_before_acceptance() -> None:
+    product = make_product("Negotiation Hub")
+    state = make_state(product, cash_on_hand=Decimal("15000.00"))
+    state.company.reputation = 58
+    source_candidates(state, count=1)
+    candidate = state.hiring_candidates[0]
+    screen_candidate(state, candidate.id)
+    interview_candidate(state, candidate.id)
+
+    candidate.acceptance_chance = 45
+    candidate.interview_score = 6
+    candidate.salary_expectation = Decimal("900.00")
+    negotiation_summary = make_hiring_offer(state, candidate.id)
+
+    assert "stronger package" in negotiation_summary.message
+    assert candidate.negotiation_rounds == 1
+    assert candidate.salary_expectation == Decimal("945.00")
+    assert candidate.stage is HiringCandidateStage.INTERVIEWED
+
+    candidate.acceptance_chance = 88
+    candidate.interview_score = 80
+    accepted_summary = make_hiring_offer(state, candidate.id)
+
+    assert "accepted the offer" in accepted_summary.message
+    assert not state.hiring_candidates
+
+
+def test_support_triage_reduces_backlog_and_account_pressure() -> None:
+    product = make_product("Service Desk")
+    account = CustomerAccount(
+        name="Queue Heavy",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1300.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        satisfaction=46,
+        onboarding_health=44,
+        support_load=40,
+        open_tickets=24,
+        sla_breach_risk=74,
+        invoice_risk=48,
+        failed_payment_risk=55,
+        escalation_count=2,
+        expansion_potential=48,
+        renewal_health=40,
+        renewal_turn=4,
+        churn_risk=52,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+    state.support_program = SupportProgram(
+        knowledge_base_level=20,
+        automation_level=14,
+        backlog_queue=20,
+        escalation_queue=6,
+    )
+
+    summary = triage_support_backlog(state)
+
+    assert "support triage sprint" in summary.message
+    assert state.support_program.backlog_queue < 20
+    assert state.support_program.escalation_queue < 6
+    assert account.open_tickets < 24
+    assert account.sla_breach_risk < 74
+    assert account.failed_payment_risk < 55
+
+
+def test_failed_payment_dunning_can_force_customer_churn() -> None:
+    product = make_product("Billing Core", user_count=30)
+    account = CustomerAccount(
+        name="Dunning Risk",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("480.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        billing_model=ContractBillingModel.FLAT,
+        satisfaction=42,
+        onboarding_health=28,
+        support_load=26,
+        invoice_risk=90,
+        failed_payment_risk=58,
+        dunning_steps=2,
+        expansion_potential=35,
+        renewal_health=12,
+        renewal_turn=3,
+        churn_risk=60,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+
+    summary = apply_end_of_turn_customers([account], [product], current_turn=3)
+
+    assert summary.churned_accounts == 1
+    assert account.status is CustomerAccountStatus.CHURNED
+    assert product.user_count < 30
+
+
+def test_governance_layer_raises_warning_when_cash_and_support_are_weak() -> None:
+    product = make_product("Governance Core")
+    state = make_state(product, cash_on_hand=Decimal("2200.00"), current_turn=4)
+    state.finance.board_confidence = 35
+    state.finance.forecast_runway_turns = 2
+    state.finance.missed_board_targets = 1
+    state.support_program.backlog_queue = 16
+    state.support_program.escalation_queue = 6
+
+    customer_summary = apply_end_of_turn_customers(
+        state.customer_accounts,
+        [product],
+        current_turn=4,
+    )
+    operations_summary = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
+    )
+    summary = apply_end_of_turn_governance(
+        state,
+        resolved_turn=4,
+        total_revenue=Decimal("1200.00"),
+        net_cash_flow=Decimal("-950.00"),
+        customer_summary=customer_summary,
+        operations_summary=operations_summary,
+    )
+
+    assert summary.board_review_happened is True
+    assert summary.board_warning_active is True
+    assert state.finance.board_pressure > 0
+    assert state.finance.board_directive.value == "stabilize_cash"
 
 
 def test_finance_forecast_updates_board_and_covenant_pressure() -> None:

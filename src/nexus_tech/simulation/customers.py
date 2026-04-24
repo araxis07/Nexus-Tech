@@ -22,6 +22,7 @@ from nexus_tech.simulation.contracts import (
     apply_support_drift,
     build_contract_shape,
     calculate_account_recurring_revenue,
+    default_subscription_package,
     get_contract_interval,
 )
 from nexus_tech.simulation.support import clamp_int
@@ -107,6 +108,14 @@ def apply_end_of_turn_customers(
             onboarding_delta -= 1
         onboarding_delta += customer_success_bonus
         account.onboarding_health = clamp_int(account.onboarding_health + onboarding_delta)
+        account.renewal_health = clamp_int(
+            48
+            + ((account.satisfaction - 50) // 2)
+            + ((account.onboarding_health - 50) // 3)
+            - (account.open_tickets // 10)
+            - (account.sla_breach_risk // 18)
+            - BALANCE.subscription_package_support_burden[account.subscription_package.value]
+        )
 
         satisfaction_delta = _calculate_satisfaction_delta(
             product,
@@ -147,11 +156,47 @@ def apply_end_of_turn_customers(
             account.satisfaction = clamp_int(
                 account.satisfaction - BALANCE.contract_invoice_risk_satisfaction_loss
             )
+        failed_payment_delta = 0
+        if account.contract_cadence is ContractCadence.MONTHLY:
+            failed_payment_delta += BALANCE.contract_failed_payment_monthly_gain
+        failed_payment_delta += (
+            account.invoice_risk // BALANCE.contract_failed_payment_invoice_divisor
+        )
+        failed_payment_delta += int(
+            account.discount_rate / BALANCE.contract_failed_payment_discount_divisor
+        )
+        failed_payment_delta -= (
+            account.renewal_health // BALANCE.contract_failed_payment_health_relief_divisor
+        )
+        if account.annual_prepay:
+            failed_payment_delta -= BALANCE.contract_failed_payment_prepay_relief
+        account.failed_payment_risk = clamp_int(account.failed_payment_risk + failed_payment_delta)
+        if account.failed_payment_risk >= BALANCE.contract_failed_payment_threshold:
+            account.dunning_steps += 1
+            account.satisfaction = clamp_int(
+                account.satisfaction - BALANCE.contract_failed_payment_dunning_satisfaction_loss
+            )
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.contract_failed_payment_churn_gain
+            )
+        elif account.dunning_steps > 0 and account.failed_payment_risk < 30:
+            account.dunning_steps -= 1
         account.escalation_count = 0
         if account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold:
             account.escalation_count += 1
         if account.sla_breach_risk >= BALANCE.support_program_escalation_sla_threshold:
             account.escalation_count += 1
+        if account.failed_payment_risk >= BALANCE.contract_failed_payment_threshold:
+            account.escalation_count += 1
+
+        if account.dunning_steps >= BALANCE.contract_failed_payment_dunning_limit:
+            account.status = CustomerAccountStatus.CHURNED
+            product.user_count = max(
+                0,
+                product.user_count - BALANCE.key_account_renewal_churn_user_loss,
+            )
+            churned_accounts += 1
+            continue
 
         account.status = (
             CustomerAccountStatus.AT_RISK
@@ -288,6 +333,7 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         segment=product.target_segment,
         contract_value=contract_value,
         plan_tier=product.pricing_tier,
+        subscription_package=default_subscription_package(product.target_segment),
         contract_cadence=contract_cadence,
         billing_model=billing_model,
         seat_count=seat_count,
@@ -303,8 +349,11 @@ def _create_account_from_product(product: Product, *, current_turn: int) -> Cust
         open_tickets=clamp_int(product.bug_level // 5, 0, 1000),
         sla_breach_risk=clamp_int(max(0, 45 - satisfaction)),
         invoice_risk=18 if product.target_segment is MarketSegment.ENTERPRISE else 26,
+        failed_payment_risk=8 if contract_cadence is ContractCadence.MONTHLY else 0,
+        dunning_steps=0,
         escalation_count=0,
         expansion_potential=clamp_int(product.market_fit + product.feature_count * 2),
+        renewal_health=clamp_int(satisfaction - 2),
         renewal_turn=current_turn + get_contract_interval(contract_cadence),
         churn_risk=max(0, 65 - satisfaction),
     )
@@ -326,6 +375,7 @@ def _calculate_satisfaction_delta(
         - (account.open_tickets // 12)
         - (account.sla_breach_risk // 24)
         - (account.invoice_risk // 30)
+        - (account.failed_payment_risk // 32)
         + customer_success_bonus
     )
     if account.sla_breach_risk >= BALANCE.contract_sla_risk_threshold:

@@ -136,6 +136,14 @@ class ContractBillingModel(StrEnum):
     USAGE_BASED = "usage_based"
 
 
+class SubscriptionPackage(StrEnum):
+    """Commercial package that shapes account monetization depth."""
+
+    STARTER = "starter"
+    GROWTH = "growth"
+    ENTERPRISE_SUITE = "enterprise_suite"
+
+
 class FunctionalBudgetPreset(StrEnum):
     """Named operating-allocation presets for cross-functional spend."""
 
@@ -260,6 +268,7 @@ class HiringCandidateStage(StrEnum):
     """Lifecycle stage for a persisted hiring-pipeline candidate."""
 
     SOURCED = "sourced"
+    SCREENED = "screened"
     INTERVIEWED = "interviewed"
     DECLINED = "declined"
     EXPIRED = "expired"
@@ -288,6 +297,14 @@ class BalanceProfileId(StrEnum):
     STANDARD = "standard"
     HARD = "hard"
     LONG_RUN = "long_run"
+
+
+class BoardDirective(StrEnum):
+    """Current board ask used to communicate governance pressure."""
+
+    STABILIZE_CASH = "stabilize_cash"
+    PROVE_RELIABILITY = "prove_reliability"
+    ACCELERATE_GROWTH = "accelerate_growth"
 
 
 class TurnAction(StrEnum):
@@ -321,8 +338,10 @@ class TurnAction(StrEnum):
     TRAIN_EMPLOYEE = "train_employee"
     PROMOTE_EMPLOYEE = "promote_employee"
     SOURCE_CANDIDATES = "source_candidates"
+    SCREEN_CANDIDATE = "screen_candidate"
     INTERVIEW_CANDIDATE = "interview_candidate"
     MAKE_HIRING_OFFER = "make_hiring_offer"
+    TRIAGE_SUPPORT_BACKLOG = "triage_support_backlog"
     SET_FUNCTIONAL_BUDGET = "set_functional_budget"
     PLAN_RELEASE = "plan_release"
     WORK_RELEASE = "work_release"
@@ -331,6 +350,7 @@ class TurnAction(StrEnum):
     START_ROADMAP_PROJECT = "start_roadmap_project"
     WORK_ROADMAP_PROJECT = "work_roadmap_project"
     REVIEW_PIPELINE = "review_pipeline"
+    REVIEW_BOARD = "review_board"
     VIEW_REPORT = "view_report"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
@@ -459,9 +479,21 @@ class FinanceState(BaseModel):
     total_raised: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
     forecast_net_cash_flow: Decimal = Field(default=Decimal("0.00"))
     forecast_runway_turns: Optional[int] = Field(default=None, ge=0)  # noqa: UP045
+    burn_multiple: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    governance_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_directive: BoardDirective = BoardDirective.ACCELERATE_GROWTH
+    board_warning_active: bool = False
+    last_board_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
-    @field_validator("debt_principal", "total_raised", "forecast_net_cash_flow", mode="before")
+    @field_validator(
+        "debt_principal",
+        "total_raised",
+        "forecast_net_cash_flow",
+        "burn_multiple",
+        mode="before",
+    )
     @classmethod
     def _normalize_finance_money(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
@@ -522,7 +554,11 @@ class SupportProgram(BaseModel):
 
     knowledge_base_level: int = Field(default=22, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     automation_level: int = Field(default=16, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    sla_target: int = Field(default=58, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     backlog_queue: int = Field(default=0, ge=0)
+    escalation_queue: int = Field(default=0, ge=0)
+    resolved_last_turn: int = Field(default=0, ge=0)
+    deflection_score: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     sla_breaches_last_turn: int = Field(default=0, ge=0)
 
 
@@ -537,6 +573,7 @@ class CustomerAccount(BaseModel):
     segment: MarketSegment
     contract_value: Decimal = Field(ge=Decimal("0"))
     plan_tier: PricingTier = PricingTier.STANDARD
+    subscription_package: SubscriptionPackage = SubscriptionPackage.GROWTH
     contract_cadence: ContractCadence = ContractCadence.ANNUAL
     billing_model: ContractBillingModel = ContractBillingModel.FLAT
     seat_count: int = Field(default=0, ge=0)
@@ -550,8 +587,11 @@ class CustomerAccount(BaseModel):
     open_tickets: int = Field(default=0, ge=0)
     sla_breach_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     invoice_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    failed_payment_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    dunning_steps: int = Field(default=0, ge=0)
     escalation_count: int = Field(default=0, ge=0)
     expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    renewal_health: int = Field(default=60, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_turn: int = Field(ge=1)
     churn_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     status: CustomerAccountStatus = CustomerAccountStatus.ACTIVE
@@ -702,10 +742,12 @@ class SalesDeal(BaseModel):
     segment: MarketSegment = MarketSegment.ENTERPRISE
     stage: SalesDealStage = SalesDealStage.LEAD
     plan_tier: PricingTier = PricingTier.STANDARD
+    subscription_package: SubscriptionPackage = SubscriptionPackage.GROWTH
     billing_model: ContractBillingModel = ContractBillingModel.FLAT
     seat_commitment: int = Field(default=0, ge=0)
     usage_commitment: int = Field(default=0, ge=0)
     add_on_commitment: int = Field(default=0, ge=0)
+    annual_prepay_offer: bool = False
     value: Decimal = Field(ge=Decimal("0"))
     proposed_discount_rate: Decimal = Field(
         default=Decimal("0.0000"),
@@ -743,8 +785,11 @@ class HiringCandidate(BaseModel):
     stage: HiringCandidateStage = HiringCandidateStage.SOURCED
     sourced_turn: int = Field(ge=1)
     expires_turn: int = Field(ge=1)
+    offer_deadline_turn: int = Field(default=1, ge=1)
     interview_score: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     acceptance_chance: int = Field(default=50, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    market_salary_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    negotiation_rounds: int = Field(default=0, ge=0)
 
     @field_validator("salary_expectation", mode="before")
     @classmethod

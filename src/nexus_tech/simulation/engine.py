@@ -77,11 +77,16 @@ from nexus_tech.simulation.functional_budgeting import (
     apply_set_functional_budget,
     get_functional_budget_profile,
 )
+from nexus_tech.simulation.governance import (
+    GovernanceSummary,
+    apply_end_of_turn_governance,
+)
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.hiring_pipeline import (
     age_hiring_candidates,
     interview_candidate,
     make_hiring_offer,
+    screen_candidate,
     source_candidates,
 )
 from nexus_tech.simulation.late_game import LateGameSummary, apply_end_of_turn_late_game
@@ -129,7 +134,10 @@ from nexus_tech.simulation.scenarios import (
 from nexus_tech.simulation.segments import calculate_competitor_pressure
 from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int
-from nexus_tech.simulation.support_program import apply_end_of_turn_support_program
+from nexus_tech.simulation.support_program import (
+    apply_end_of_turn_support_program,
+    triage_support_backlog,
+)
 from nexus_tech.simulation.team import (
     TeamCondition,
     apply_end_of_turn_team_drift,
@@ -221,6 +229,7 @@ class TurnResolution:
     product_summaries: list[ProductTurnSummary]
     team_condition: TeamCondition
     finance_summary: FinanceTurnSummary
+    governance_summary: GovernanceSummary
     pending_event: PendingEvent | None
     event_history_entry: EventHistoryEntry | None
     unlocked_milestones: list[MilestoneEntry]
@@ -282,6 +291,7 @@ def apply_action(
         TurnAction.REVIEW_FINANCE,
         TurnAction.REVIEW_CUSTOMERS,
         TurnAction.REVIEW_PIPELINE,
+        TurnAction.REVIEW_BOARD,
         TurnAction.VIEW_REPORT,
     ):
         return ActionOutcome(
@@ -295,6 +305,7 @@ def apply_action(
         TurnAction.REVIEW_FINANCE,
         TurnAction.REVIEW_CUSTOMERS,
         TurnAction.REVIEW_PIPELINE,
+        TurnAction.REVIEW_BOARD,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
     ):
@@ -308,6 +319,8 @@ def apply_action(
             return ActionOutcome(state=state, message="Customer account review refreshed.")
         if action is TurnAction.REVIEW_PIPELINE:
             return ActionOutcome(state=state, message="Pipeline review refreshed.")
+        if action is TurnAction.REVIEW_BOARD:
+            return ActionOutcome(state=state, message="Board and governance review refreshed.")
         if action is TurnAction.VIEW_REPORT:
             return ActionOutcome(state=state, message="Run report refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
@@ -397,6 +410,16 @@ def apply_action(
         summary = source_candidates(next_state)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Sourced hiring candidates.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.SCREEN_CANDIDATE:
+        summary = screen_candidate(next_state, context.hiring_candidate_id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Screened hiring candidate %s.", context.hiring_candidate_id)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -582,6 +605,16 @@ def apply_action(
         summary = run_retention_play(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran retention play for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.TRIAGE_SUPPORT_BACKLOG:
+        summary = triage_support_backlog(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Triaged support backlog.")
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -982,6 +1015,14 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     next_state.finance.board_confidence = clamp_int(
         next_state.finance.board_confidence + functional_budget_profile.board_confidence_bonus
     )
+    governance_summary = apply_end_of_turn_governance(
+        next_state,
+        resolved_turn=resolved_turn,
+        total_revenue=total_revenue,
+        net_cash_flow=net_cash_flow,
+        customer_summary=customer_summary,
+        operations_summary=operations_summary,
+    )
 
     team_condition = apply_end_of_turn_team_drift(
         next_state.employees,
@@ -1068,6 +1109,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         product_summaries=product_summaries,
         team_condition=team_condition,
         finance_summary=finance_summary,
+        governance_summary=governance_summary,
         competitors=next_state.competitors,
         game_over=next_state.company.game_over,
         quarter_plan_due=quarter_plan_due,
@@ -1103,6 +1145,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         product_summaries=product_summaries,
         team_condition=team_condition,
         finance_summary=finance_summary,
+        governance_summary=governance_summary,
         pending_event=event_outcome.pending_event,
         event_history_entry=event_outcome.history_entry,
         unlocked_milestones=unlocked_milestones,
@@ -1184,6 +1227,7 @@ def build_turn_narrative(
     product_summaries: list[ProductTurnSummary],
     team_condition: TeamCondition,
     finance_summary: FinanceTurnSummary,
+    governance_summary: GovernanceSummary,
     competitors: list[Competitor],
     game_over: bool,
     quarter_plan_due: bool,
@@ -1234,6 +1278,8 @@ def build_turn_narrative(
             f"{format_money(finance_summary.total_finance_cost)} "
             "and investors will expect cleaner execution."
         )
+    if governance_summary.board_warning_active:
+        return governance_summary.summary
 
     total_user_delta = sum(summary.net_user_delta for summary in product_summaries)
     declining_products = [summary for summary in product_summaries if summary.net_user_delta < 0]

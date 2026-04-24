@@ -12,6 +12,7 @@ from nexus_tech.domain.models import (
     MarketSegment,
     PricingTier,
     Product,
+    SubscriptionPackage,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -35,6 +36,7 @@ class ContractRenewalDelta:
     seat_delta: int
     usage_delta: int
     add_on_delta: int
+    package_changed: bool
     cadence_upgraded: bool
     downgraded: bool
     annual_prepay_enabled: bool
@@ -52,6 +54,9 @@ def calculate_account_recurring_revenue(account: CustomerAccount) -> Decimal:
         Decimal(account.add_on_count)
         * BALANCE.contract_add_on_unit_revenue_by_plan[account.plan_tier.value]
     )
+    recurring_value += BALANCE.subscription_package_recurring_bonus[
+        account.subscription_package.value
+    ]
     recurring_value = quantize_money(recurring_value)
     return quantize_money(recurring_value * (Decimal("1.0000") - account.discount_rate))
 
@@ -83,6 +88,12 @@ def build_contract_shape(
     return billing_model, seat_count, usage_units
 
 
+def default_subscription_package(segment: MarketSegment) -> SubscriptionPackage:
+    """Return the default subscription package for a segment."""
+
+    return SubscriptionPackage(BALANCE.subscription_default_package_by_segment[segment.value])
+
+
 def apply_support_drift(
     account: CustomerAccount,
     product: Product,
@@ -94,9 +105,11 @@ def apply_support_drift(
     ticket_relief = 0
     if getattr(account, "annual_prepay", False):
         ticket_relief += 1
+    support_burden = BALANCE.subscription_package_support_burden[account.subscription_package.value]
 
     support_load_delta = clamp_int(
         (product.bug_level // BALANCE.key_account_support_load_bug_divisor)
+        + support_burden
         - (product.quality // BALANCE.key_account_support_load_quality_relief_divisor)
         - customer_success_bonus
         - BALANCE.key_account_support_load_cs_relief,
@@ -145,6 +158,7 @@ def apply_commercial_renewal(
     seat_delta = 0
     usage_delta = 0
     add_on_delta = 0
+    package_changed = False
     cadence_upgraded = False
     downgraded = False
     annual_prepay_enabled = False
@@ -171,6 +185,15 @@ def apply_commercial_renewal(
             account.contract_value = quantize_money(account.contract_value + contract_value_delta)
         add_on_delta = BALANCE.contract_add_on_expansion_gain
         account.add_on_count += add_on_delta
+        if account.subscription_package is SubscriptionPackage.STARTER:
+            account.subscription_package = SubscriptionPackage.GROWTH
+            package_changed = True
+        elif (
+            account.subscription_package is SubscriptionPackage.GROWTH
+            and account.segment is MarketSegment.ENTERPRISE
+        ):
+            account.subscription_package = SubscriptionPackage.ENTERPRISE_SUITE
+            package_changed = True
 
         account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
     elif weak_account:
@@ -194,6 +217,12 @@ def apply_commercial_renewal(
             account.contract_value = quantize_money(account.contract_value + contract_value_delta)
         add_on_delta = -min(account.add_on_count, BALANCE.contract_add_on_downgrade_loss)
         account.add_on_count += add_on_delta
+        if account.subscription_package is SubscriptionPackage.ENTERPRISE_SUITE:
+            account.subscription_package = SubscriptionPackage.GROWTH
+            package_changed = True
+        elif account.subscription_package is SubscriptionPackage.GROWTH:
+            account.subscription_package = SubscriptionPackage.STARTER
+            package_changed = True
 
     if (
         account.contract_cadence is ContractCadence.MONTHLY
@@ -218,6 +247,7 @@ def apply_commercial_renewal(
         seat_delta=seat_delta,
         usage_delta=usage_delta,
         add_on_delta=add_on_delta,
+        package_changed=package_changed,
         cadence_upgraded=cadence_upgraded,
         downgraded=downgraded,
         annual_prepay_enabled=annual_prepay_enabled,

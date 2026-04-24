@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from decimal import Decimal
 
-from nexus_tech.domain.models import FinanceState, FundingHistoryEntry, FundingType
+from nexus_tech.domain.models import BoardDirective, FinanceState, FundingHistoryEntry, FundingType
 
 
 class FinanceRepository:
@@ -29,9 +29,15 @@ class FinanceRepository:
                 total_raised,
                 forecast_net_cash_flow,
                 forecast_runway_turns,
+                burn_multiple,
+                governance_risk,
+                board_pressure,
+                board_directive,
+                board_warning_active,
+                last_board_review_turn,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -45,6 +51,12 @@ class FinanceRepository:
                 str(finance.total_raised),
                 str(finance.forecast_net_cash_flow),
                 finance.forecast_runway_turns,
+                str(finance.burn_multiple),
+                finance.governance_risk,
+                finance.board_pressure,
+                finance.board_directive.value,
+                int(finance.board_warning_active),
+                finance.last_board_review_turn,
                 finance.last_funding_turn,
             ),
         )
@@ -65,6 +77,12 @@ class FinanceRepository:
                 total_raised,
                 forecast_net_cash_flow,
                 forecast_runway_turns,
+                burn_multiple,
+                governance_risk,
+                board_pressure,
+                board_directive,
+                board_warning_active,
+                last_board_review_turn,
                 last_funding_turn
             FROM finance_state
             WHERE slot_name = ?
@@ -87,6 +105,12 @@ class FinanceRepository:
             total_raised=Decimal(row["total_raised"]),
             forecast_net_cash_flow=Decimal(row["forecast_net_cash_flow"] or "0.00"),
             forecast_runway_turns=row["forecast_runway_turns"],
+            burn_multiple=Decimal(row["burn_multiple"] or "0.00"),
+            governance_risk=row["governance_risk"] or 0,
+            board_pressure=row["board_pressure"] or 0,
+            board_directive=BoardDirective(row["board_directive"] or "accelerate_growth"),
+            board_warning_active=bool(row["board_warning_active"]),
+            last_board_review_turn=row["last_board_review_turn"],
             last_funding_turn=row["last_funding_turn"],
         )
 
