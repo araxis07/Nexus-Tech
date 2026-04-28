@@ -361,6 +361,8 @@ class TurnAction(StrEnum):
     RUN_PRICE_INCREASE = "run_price_increase"
     RUN_ADD_ON_CAMPAIGN = "run_add_on_campaign"
     RUN_PACKAGE_MIGRATION = "run_package_migration"
+    EXPAND_PACKAGE_CATALOG = "expand_package_catalog"
+    EXPAND_ADD_ON_CATALOG = "expand_add_on_catalog"
     SET_PACKAGING_STRATEGY = "set_packaging_strategy"
     SET_TARGET_SEGMENT = "set_target_segment"
     SUNSET_PRODUCT = "sunset_product"
@@ -381,6 +383,8 @@ class TurnAction(StrEnum):
     REVIEW_CUSTOMERS = "review_customers"
     INVEST_IN_CUSTOMER_SUCCESS = "invest_in_customer_success"
     RUN_RETENTION_PLAY = "run_retention_play"
+    MAKE_RENEWAL_OFFER = "make_renewal_offer"
+    RUN_WIN_BACK_PLAY = "run_win_back_play"
     ROUTE_SUPPORT_ESCALATION = "route_support_escalation"
     TRAIN_EMPLOYEE = "train_employee"
     PROMOTE_EMPLOYEE = "promote_employee"
@@ -390,6 +394,7 @@ class TurnAction(StrEnum):
     INTERVIEW_CANDIDATE = "interview_candidate"
     MAKE_HIRING_OFFER = "make_hiring_offer"
     TRIAGE_SUPPORT_BACKLOG = "triage_support_backlog"
+    INVEST_IN_SUPPORT_STAFFING = "invest_in_support_staffing"
     UPGRADE_SUPPORT_PROGRAM = "upgrade_support_program"
     SET_FUNCTIONAL_BUDGET = "set_functional_budget"
     ASSIGN_MANAGER = "assign_manager"
@@ -404,6 +409,7 @@ class TurnAction(StrEnum):
     REVIEW_PIPELINE = "review_pipeline"
     REVIEW_BOARD = "review_board"
     EXECUTE_BOARD_RESPONSE = "execute_board_response"
+    START_BOARD_RECOVERY_PLAN = "start_board_recovery_plan"
     EXECUTE_RESTRUCTURE_PLAN = "execute_restructure_plan"
     VIEW_REPORT = "view_report"
     WAIT = "wait"
@@ -450,6 +456,8 @@ class Product(BaseModel):
     churn_rate: Decimal = Field(ge=Decimal("0"), le=Decimal("1"))
     pricing_tier: PricingTier = PricingTier.STANDARD
     packaging_strategy: PackagingStrategy = PackagingStrategy.STREAMLINED
+    package_catalog_depth: int = Field(default=0, ge=0, le=10)
+    add_on_catalog_depth: int = Field(default=0, ge=0, le=10)
     target_segment: MarketSegment = MarketSegment.STARTUP
     is_active: bool = True
 
@@ -544,10 +552,13 @@ class FinanceState(BaseModel):
     board_directive: BoardDirective = BoardDirective.ACCELERATE_GROWTH
     active_board_ask: BoardAsk = BoardAsk.PROFITABILITY
     board_resolution: BoardResolution = BoardResolution.HOLD_COURSE
+    board_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_warning_active: bool = False
     board_warning_level: int = Field(default=0, ge=0, le=3)
     quarterly_review_count: int = Field(default=0, ge=0)
     restructuring_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_recovery_focus: BoardAsk = BoardAsk.PROFITABILITY
+    board_recovery_turns_remaining: int = Field(default=0, ge=0)
     last_board_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
@@ -621,9 +632,16 @@ class SupportProgram(BaseModel):
     sla_target: int = Field(default=58, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     backlog_queue: int = Field(default=0, ge=0)
     escalation_queue: int = Field(default=0, ge=0)
+    staffing_level: int = Field(default=0, ge=0, le=20)
     resolved_last_turn: int = Field(default=0, ge=0)
     deflection_score: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     sla_breaches_last_turn: int = Field(default=0, ge=0)
+    service_cost_last_turn: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+
+    @field_validator("service_cost_last_turn", mode="before")
+    @classmethod
+    def _normalize_service_cost(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
 
 
 class CustomerAccount(BaseModel):
@@ -655,6 +673,8 @@ class CustomerAccount(BaseModel):
     failed_payment_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     dunning_steps: int = Field(default=0, ge=0)
     escalation_count: int = Field(default=0, ge=0)
+    renewal_offer_active: bool = False
+    win_back_attempts: int = Field(default=0, ge=0)
     expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_health: int = Field(default=60, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_turn: int = Field(ge=1)

@@ -227,6 +227,7 @@ def apply_end_of_turn_customers(
             + discount_penalty
             + (account.sla_breach_risk // BALANCE.contract_sla_ticket_divisor)
             + (account.invoice_risk // BALANCE.contract_sla_support_divisor)
+            - (BALANCE.renewal_offer_risk_relief if account.renewal_offer_active else 0)
             - customer_success_bonus,
         )
         if effective_churn_risk >= BALANCE.key_account_churn_threshold:
@@ -235,12 +236,14 @@ def apply_end_of_turn_customers(
                 0,
                 product.user_count - BALANCE.key_account_renewal_churn_user_loss,
             )
+            account.renewal_offer_active = False
             churned_accounts += 1
             continue
 
         renewed_accounts += 1
         revenue_before = calculate_account_recurring_revenue(account)
         apply_commercial_renewal(account, customer_success_bonus=customer_success_bonus)
+        account.renewal_offer_active = False
         revenue_after = calculate_account_recurring_revenue(account)
         if revenue_after > revenue_before:
             expansion_revenue = quantize_money(expansion_revenue + (revenue_after - revenue_before))

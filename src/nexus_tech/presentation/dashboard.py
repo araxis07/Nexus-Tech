@@ -31,7 +31,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
 )
 from nexus_tech.domain.money import format_money, format_rate
-from nexus_tech.persistence.save_coordinator import SaveSlotSummary
+from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
 from nexus_tech.simulation.balance_lab import (
     BalanceAuditResult,
     BalanceBatchResult,
@@ -457,6 +457,51 @@ def render_save_slot_catalog(
         f"[dim]Available slots: {slot_names}[/dim]",
     )
     console.print(Panel(content, title="Save Slots", border_style="green", expand=True))
+
+
+def render_run_archive_catalog(
+    console: Console,
+    archives: list[RunArchiveSummary],
+) -> None:
+    """Render archived completed runs with compact end-state metadata."""
+
+    if not archives:
+        console.print(
+            Panel(
+                "No completed runs have been archived yet.",
+                title="Run Archives",
+                border_style="green",
+                expand=True,
+            )
+        )
+        return
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Archive", style="bold")
+    table.add_column("Company")
+    table.add_column("Scenario")
+    table.add_column("Turn", justify="right")
+    table.add_column("Outcome")
+    table.add_column("Score", justify="right")
+    table.add_column("Cash", justify="right")
+    table.add_column("Rep", justify="right")
+    table.add_column("Saved")
+
+    for archive in archives:
+        status = "victory" if archive.victory_achieved else "shutdown" if archive.game_over else "-"
+        table.add_row(
+            archive.slot_name,
+            archive.company_name,
+            archive.scenario_title,
+            str(archive.completed_turn),
+            f"{archive.exit_outcome} / {status}",
+            str(archive.total_score),
+            format_money(archive.final_cash),
+            str(archive.final_reputation),
+            archive.archived_at,
+        )
+
+    console.print(Panel(table, title="Run Archives", border_style="green", expand=True))
 
 
 def render_quick_guide(console: Console) -> None:
@@ -1417,6 +1462,8 @@ def _build_portfolio_table(state: GameState) -> Table:
     table.add_column("Maint", justify="right")
     table.add_column("Price")
     table.add_column("Pack")
+    table.add_column("Cat", justify="right")
+    table.add_column("Add", justify="right")
     table.add_column("Aq", justify="right")
     table.add_column("Ch", justify="right")
 
@@ -1436,6 +1483,8 @@ def _build_portfolio_table(state: GameState) -> Table:
             format_money(product.maintenance_cost),
             product.pricing_tier.value,
             product.packaging_strategy.value,
+            str(product.package_catalog_depth),
+            str(product.add_on_catalog_depth),
             format_rate(product.acquisition_rate),
             format_rate(product.churn_rate),
         )
@@ -1829,18 +1878,37 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("52", "make_hiring_offer", "Convert an interviewed candidate.")
     primary_actions.add_row("53", "triage_support_backlog", "Spend cash to cut support pressure.")
     primary_actions.add_row("54", "review_board", "Open the board and governance view.")
+    primary_actions.add_row("55", "run_price_increase", "Raise price on one product.")
     primary_actions.add_row("56", "reorg_team", "Rebuild reporting lines and reduce org drag.")
     primary_actions.add_row("57", "execute_board_response", "Answer the active board ask directly.")
+    primary_actions.add_row(
+        "58",
+        "start_board_recovery_plan",
+        "Commit to a short board recovery plan.",
+    )
+    primary_actions.add_row("59", "invest_in_support_staffing", "Add durable support headcount.")
+    primary_actions.add_row(
+        "60",
+        "expand_package_catalog",
+        "Deepen package structure on one product.",
+    )
+    primary_actions.add_row("61", "expand_add_on_catalog", "Create more monetizable add-ons.")
+    primary_actions.add_row(
+        "62",
+        "make_renewal_offer",
+        "Proactively stabilize one account renewal.",
+    )
+    primary_actions.add_row("63", "run_win_back_play", "Try to recover one churned account.")
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("58", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("59", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("60", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("61", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("62", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("64", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("65", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("66", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("67", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("68", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -2307,6 +2375,7 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Knowledge Base", str(state.support_program.knowledge_base_level))
     table.add_row("Automation", str(state.support_program.automation_level))
     table.add_row("SLA Target", str(state.support_program.sla_target))
+    table.add_row("Staffing", str(state.support_program.staffing_level))
     table.add_row("Staff Cap", str(staffing_capacity))
     table.add_row("Staff Gap", str(staffing_gap))
     table.add_row("Backlog Queue", str(state.support_program.backlog_queue))
@@ -2314,6 +2383,7 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Resolved", str(state.support_program.resolved_last_turn))
     table.add_row("Deflection", str(state.support_program.deflection_score))
     table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))
+    table.add_row("Service Cost", format_money(state.support_program.service_cost_last_turn))
     table.add_row("Escalations", str(escalating_accounts))
     return Panel(table, title="Support Program", border_style="green", expand=True)
 
@@ -2394,11 +2464,14 @@ def _build_governance_panel(state: GameState) -> Panel:
     directive = state.finance.board_directive.value.replace("_", " ")
     table = Table.grid(padding=(0, 1))
     table.add_row("Board Confidence", str(state.finance.board_confidence))
+    table.add_row("Board Score", str(state.finance.board_score))
     table.add_row("Board Pressure", str(state.finance.board_pressure))
     table.add_row("Governance Risk", str(state.finance.governance_risk))
     table.add_row("Directive", directive)
     table.add_row("Resolution", state.finance.board_resolution.value.replace("_", " "))
     table.add_row("Board Ask", state.finance.active_board_ask.value.replace("_", " "))
+    table.add_row("Recovery Focus", state.finance.board_recovery_focus.value.replace("_", " "))
+    table.add_row("Recovery Turns", str(state.finance.board_recovery_turns_remaining))
     table.add_row("Warning", "active" if state.finance.board_warning_active else "clear")
     table.add_row("Warn Level", str(state.finance.board_warning_level))
     table.add_row("Quarterly Reviews", str(state.finance.quarterly_review_count))

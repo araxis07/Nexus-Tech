@@ -117,6 +117,16 @@ class BalanceConfig:
     add_on_campaign_support_load_gain: int = 2
     add_on_campaign_ticket_gain: int = 1
     add_on_campaign_debt_gain: int = 2
+    package_catalog_expand_cost: Decimal = Decimal("140.00")
+    package_catalog_expand_depth_gain: int = 1
+    package_catalog_expand_market_fit_gain: int = 2
+    add_on_catalog_expand_cost: Decimal = Decimal("125.00")
+    add_on_catalog_expand_depth_gain: int = 1
+    add_on_catalog_expand_debt_gain: int = 2
+    packaging_catalog_contract_gain_per_depth: Decimal = Decimal("30.00")
+    add_on_catalog_contract_gain_per_depth: Decimal = Decimal("22.00")
+    packaging_catalog_revenue_multiplier_step: Decimal = Decimal("0.0200")
+    add_on_catalog_revenue_multiplier_step: Decimal = Decimal("0.0100")
     packaging_migration_upgrade_contract_gain: Decimal = Decimal("110.00")
     packaging_migration_downgrade_contract_loss: Decimal = Decimal("85.00")
     packaging_migration_add_on_gain: int = 1
@@ -1489,6 +1499,16 @@ class BalanceConfig:
     board_warning_level_one_confidence_threshold: int = 38
     board_ask_miss_penalty: int = 1
     board_ask_hit_relief: int = 1
+    board_score_profitability_target: int = 62
+    board_score_reliability_target: int = 62
+    board_score_team_health_target: int = 62
+    board_score_portfolio_focus_target: int = 58
+    board_recovery_plan_cost: Decimal = Decimal("220.00")
+    board_recovery_turns: int = 3
+    board_recovery_pressure_relief: int = 4
+    board_recovery_governance_relief: int = 3
+    board_recovery_confidence_gain: int = 2
+    board_recovery_miss_penalty: int = 2
     board_response_min_pressure_threshold: int = 28
     board_response_confidence_gain: int = 2
     board_response_governance_relief: int = 3
@@ -1533,6 +1553,12 @@ class BalanceConfig:
     support_program_escalation_ticket_threshold: int = 14
     support_program_escalation_sla_threshold: int = 62
     support_program_escalation_queue_divisor: int = 2
+    support_program_staffing_investment_cost: Decimal = Decimal("190.00")
+    support_program_staffing_level_gain: int = 2
+    support_program_staffing_capacity_unit: int = 3
+    support_program_service_cost_per_ticket: Decimal = Decimal("7.00")
+    support_program_service_cost_per_escalation: Decimal = Decimal("22.00")
+    support_program_service_cost_per_staffing_level: Decimal = Decimal("28.00")
     support_program_role_capacity: dict[str, int] = field(
         default_factory=lambda: {
             "engineer": 1,
@@ -1591,6 +1617,20 @@ class BalanceConfig:
     support_program_upgrade_sla_gain: int = 8
     support_program_upgrade_backlog_relief: int = 4
     support_program_upgrade_escalation_relief: int = 1
+    renewal_offer_cost: Decimal = Decimal("110.00")
+    renewal_offer_discount_increase: Decimal = Decimal("0.0100")
+    renewal_offer_health_gain: int = 8
+    renewal_offer_satisfaction_gain: int = 4
+    renewal_offer_risk_relief: int = 7
+    renewal_offer_turn_window: int = 2
+    win_back_play_cost: Decimal = Decimal("150.00")
+    win_back_contract_multiplier: Decimal = Decimal("0.80")
+    win_back_satisfaction_reset: int = 58
+    win_back_onboarding_reset: int = 56
+    win_back_support_load_reset: int = 18
+    win_back_churn_risk_reset: int = 28
+    win_back_renewal_health_reset: int = 54
+    win_back_open_ticket_relief: int = 4
 
     hiring_source_cost: Decimal = Decimal("120.00")
     hiring_screen_cost: Decimal = Decimal("55.00")

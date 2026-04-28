@@ -78,6 +78,7 @@ from nexus_tech.presentation.dashboard import (
     render_quick_guide,
     render_report,
     render_roadmap_catalog,
+    render_run_archive_catalog,
     render_save_slot_catalog,
     render_scenario_catalog,
     render_segment_catalog,
@@ -243,13 +244,19 @@ ACTION_KEYS = {
     "55": TurnAction.RUN_PRICE_INCREASE,
     "56": TurnAction.REORG_TEAM,
     "57": TurnAction.EXECUTE_BOARD_RESPONSE,
+    "58": TurnAction.START_BOARD_RECOVERY_PLAN,
+    "59": TurnAction.INVEST_IN_SUPPORT_STAFFING,
+    "60": TurnAction.EXPAND_PACKAGE_CATALOG,
+    "61": TurnAction.EXPAND_ADD_ON_CATALOG,
+    "62": TurnAction.MAKE_RENEWAL_OFFER,
+    "63": TurnAction.RUN_WIN_BACK_PLAY,
 }
 UTILITY_ACTION_KEYS = {
-    "58": "save_game",
-    "59": "load_game",
-    "60": "show_guide",
-    "61": "show_glossary",
-    "62": "show_tutorial",
+    "64": "save_game",
+    "65": "load_game",
+    "66": "show_guide",
+    "67": "show_glossary",
+    "68": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -260,6 +267,8 @@ PRODUCT_TARGETED_ACTIONS = {
     TurnAction.MARKET_PRODUCT,
     TurnAction.ADJUST_PRICING,
     TurnAction.RUN_PRICE_INCREASE,
+    TurnAction.EXPAND_PACKAGE_CATALOG,
+    TurnAction.EXPAND_ADD_ON_CATALOG,
     TurnAction.RUN_ADD_ON_CAMPAIGN,
     TurnAction.RUN_PACKAGE_MIGRATION,
     TurnAction.SET_PACKAGING_STRATEGY,
@@ -704,6 +713,20 @@ def list_saves_command(
     render_save_slot_catalog(console, save_slots)
 
 
+@app.command("list-archives")
+def list_archives_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """List archived completed runs from the local SQLite database."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        archives = coordinator.list_run_archives()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Archive List Failed", error)
+    render_run_archive_catalog(console, archives)
+
+
 @app.command("check-saves")
 def check_saves_command(
     db_path: Path = DB_PATH_OPTION,
@@ -741,11 +764,13 @@ def doctor_command(
 
     save_status = "No save database found yet."
     slot_count = 0
+    archive_count = 0
     schema_version = "-"
     if db_path.exists():
         coordinator = SaveLoadCoordinator(db_path)
         try:
             health = coordinator.check_save_health()
+            archive_count = len(coordinator.list_run_archives())
         except PersistenceError as error:
             raise_cli_persistence_error("Doctor Failed", error)
         save_status = health.message
@@ -758,6 +783,7 @@ def doctor_command(
     table.add_row("DB Exists", "yes" if db_path.exists() else "no")
     table.add_row("Schema", schema_version)
     table.add_row("Save Slots", str(slot_count))
+    table.add_row("Run Archives", str(archive_count))
     table.add_row("Scenarios", str(len(get_available_scenarios())))
     table.add_row("Templates", str(len(get_available_product_templates())))
     table.add_row("Rivals", str(len(get_available_competitor_archetypes())))
@@ -1047,6 +1073,8 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.REORG_TEAM,
         TurnAction.EXECUTE_BOARD_RESPONSE,
         TurnAction.EXECUTE_RESTRUCTURE_PLAN,
+        TurnAction.START_BOARD_RECOVERY_PLAN,
+        TurnAction.INVEST_IN_SUPPORT_STAFFING,
     ):
         return ActionContext()
 
@@ -1287,6 +1315,22 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             customer_account_id = choose_customer_account_id(state, at_risk_only=False)
             if customer_account_id is None:
                 return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.MAKE_RENEWAL_OFFER:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_WIN_BACK_PLAY:
+        customer_account_id = choose_customer_account_id(
+            state,
+            at_risk_only=False,
+            churned_only=True,
+        )
+        if customer_account_id is None:
+            return None
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.ROUTE_SUPPORT_ESCALATION:
@@ -1626,12 +1670,17 @@ def choose_customer_account_id(
     state: GameState,
     *,
     at_risk_only: bool,
+    churned_only: bool = False,
 ) -> UUID | None:
     """Prompt the user to select a customer account for retention work."""
 
-    accounts = get_customer_choices(state, at_risk_only=at_risk_only)
+    accounts = get_customer_choices(
+        state,
+        at_risk_only=at_risk_only,
+        churned_only=churned_only,
+    )
     if not accounts:
-        if at_risk_only:
+        if at_risk_only or churned_only:
             return None
         console.print(
             Panel.fit(
@@ -1906,7 +1955,8 @@ def build_product_selection_summary(product: Product) -> str:
         f"Quality: {product.quality} | Bugs: {product.bug_level} | "
         f"Fit: {product.market_fit} | Debt: {product.technical_debt} | "
         f"Segment: {product.target_segment.value} | Pricing: {product.pricing_tier.value} | "
-        f"Packaging: {product.packaging_strategy.value}"
+        f"Packaging: {product.packaging_strategy.value} | "
+        f"PackCat: {product.package_catalog_depth} | AddOns: {product.add_on_catalog_depth}"
     )
 
 

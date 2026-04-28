@@ -47,10 +47,12 @@ class ProductRepository:
                 churn_rate,
                 pricing_tier,
                 packaging_strategy,
+                package_catalog_depth,
+                add_on_catalog_depth,
                 target_segment,
                 is_active
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -71,6 +73,8 @@ class ProductRepository:
                     str(product.churn_rate),
                     product.pricing_tier.value,
                     product.packaging_strategy.value,
+                    product.package_catalog_depth,
+                    product.add_on_catalog_depth,
                     product.target_segment.value,
                     int(product.is_active),
                 )
@@ -99,6 +103,8 @@ class ProductRepository:
                 churn_rate,
                 pricing_tier,
                 packaging_strategy,
+                package_catalog_depth,
+                add_on_catalog_depth,
                 target_segment,
                 is_active
             FROM products
@@ -127,6 +133,8 @@ class ProductRepository:
                 packaging_strategy=PackagingStrategy(
                     row["packaging_strategy"] or PackagingStrategy.STREAMLINED.value
                 ),
+                package_catalog_depth=row["package_catalog_depth"] or 0,
+                add_on_catalog_depth=row["add_on_catalog_depth"] or 0,
                 target_segment=MarketSegment(row["target_segment"] or MarketSegment.STARTUP.value),
                 is_active=bool(row["is_active"]),
             )

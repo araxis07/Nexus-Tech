@@ -171,10 +171,17 @@ def apply_commercial_renewal(
         and account.onboarding_health >= BALANCE.key_account_onboarding_good_threshold
         and account.sla_breach_risk < BALANCE.contract_sla_risk_threshold
     )
+    if account.renewal_offer_active:
+        healthy_account = healthy_account or (
+            account.renewal_health >= BALANCE.key_account_onboarding_good_threshold
+            and account.churn_risk < BALANCE.key_account_churn_threshold
+        )
     weak_account = (
         account.satisfaction <= BALANCE.contract_downgrade_satisfaction_threshold
         or account.sla_breach_risk >= BALANCE.contract_sla_severe_threshold
     )
+    if account.renewal_offer_active:
+        weak_account = False
 
     if healthy_account:
         if account.billing_model is ContractBillingModel.SEAT_BASED:
@@ -202,6 +209,8 @@ def apply_commercial_renewal(
             and account.segment is MarketSegment.ENTERPRISE
         ):
             account.support_tier = SupportTier.PRIORITY
+        if account.renewal_offer_active:
+            account.renewal_health = clamp_int(account.renewal_health + 4)
 
         account.expansion_potential = clamp_int(account.expansion_potential - 4, 0, 100)
     elif weak_account:

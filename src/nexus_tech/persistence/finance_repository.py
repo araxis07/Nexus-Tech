@@ -42,14 +42,17 @@ class FinanceRepository:
                 board_directive,
                 active_board_ask,
                 board_resolution,
+                board_score,
                 board_warning_active,
                 board_warning_level,
                 quarterly_review_count,
                 restructuring_pressure,
+                board_recovery_focus,
+                board_recovery_turns_remaining,
                 last_board_review_turn,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 slot_name,
@@ -69,10 +72,13 @@ class FinanceRepository:
                 finance.board_directive.value,
                 finance.active_board_ask.value,
                 finance.board_resolution.value,
+                finance.board_score,
                 int(finance.board_warning_active),
                 finance.board_warning_level,
                 finance.quarterly_review_count,
                 finance.restructuring_pressure,
+                finance.board_recovery_focus.value,
+                finance.board_recovery_turns_remaining,
                 finance.last_board_review_turn,
                 finance.last_funding_turn,
             ),
@@ -100,10 +106,13 @@ class FinanceRepository:
                 board_directive,
                 active_board_ask,
                 board_resolution,
+                board_score,
                 board_warning_active,
                 board_warning_level,
                 quarterly_review_count,
                 restructuring_pressure,
+                board_recovery_focus,
+                board_recovery_turns_remaining,
                 last_board_review_turn,
                 last_funding_turn
             FROM finance_state
@@ -133,10 +142,13 @@ class FinanceRepository:
             board_directive=BoardDirective(row["board_directive"] or "accelerate_growth"),
             active_board_ask=BoardAsk(row["active_board_ask"] or "profitability"),
             board_resolution=BoardResolution(row["board_resolution"] or "hold_course"),
+            board_score=row["board_score"] or 55,
             board_warning_active=bool(row["board_warning_active"]),
             board_warning_level=row["board_warning_level"] or 0,
             quarterly_review_count=row["quarterly_review_count"] or 0,
             restructuring_pressure=row["restructuring_pressure"] or 0,
+            board_recovery_focus=BoardAsk(row["board_recovery_focus"] or "profitability"),
+            board_recovery_turns_remaining=row["board_recovery_turns_remaining"] or 0,
             last_board_review_turn=row["last_board_review_turn"],
             last_funding_turn=row["last_funding_turn"],
         )

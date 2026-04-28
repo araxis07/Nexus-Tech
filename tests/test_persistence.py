@@ -84,6 +84,8 @@ def make_state() -> GameState:
         churn_rate=Decimal("0.0480"),
         pricing_tier=PricingTier.PREMIUM,
         packaging_strategy=PackagingStrategy.SUITE,
+        package_catalog_depth=2,
+        add_on_catalog_depth=3,
         target_segment=MarketSegment.ENTERPRISE,
         is_active=True,
     )
@@ -214,6 +216,8 @@ def make_state() -> GameState:
         failed_payment_risk=12,
         dunning_steps=1,
         escalation_count=1,
+        renewal_offer_active=True,
+        win_back_attempts=1,
         expansion_potential=66,
         renewal_health=70,
         renewal_turn=6,
@@ -238,10 +242,13 @@ def make_state() -> GameState:
         board_directive="prove_reliability",
         active_board_ask=BoardAsk.RELIABILITY,
         board_resolution=BoardResolution.TARGETED_RESET,
+        board_score=63,
         board_warning_active=True,
         board_warning_level=2,
         quarterly_review_count=2,
         restructuring_pressure=7,
+        board_recovery_focus=BoardAsk.RELIABILITY,
+        board_recovery_turns_remaining=2,
         last_board_review_turn=4,
         last_funding_turn=3,
     )
@@ -368,9 +375,11 @@ def make_state() -> GameState:
             sla_target=56,
             backlog_queue=7,
             escalation_queue=3,
+            staffing_level=4,
             resolved_last_turn=8,
             deflection_score=41,
             sla_breaches_last_turn=1,
+            service_cost_last_turn=Decimal("164.00"),
         ),
         difficulty_mode=DifficultyMode.FOUNDER,
         campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
@@ -430,6 +439,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "roadmap_projects",
         "competitor_intel",
         "hiring_candidates",
+        "run_archives",
     }.issubset(table_names)
 
     with sqlite3.connect(db_path) as connection:
@@ -482,9 +492,11 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "support_sla_target",
         "support_backlog_queue",
         "support_escalation_queue",
+        "support_staffing_level",
         "support_resolved_last_turn",
         "support_deflection_score",
         "support_sla_breaches_last_turn",
+        "support_service_cost_last_turn",
         "market_cycle",
         "market_cycle_turns_remaining",
         "victory_achieved",
@@ -494,7 +506,12 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "saved_with_version",
         "schema_version",
     }.issubset(save_slot_columns)
-    assert {"target_segment", "packaging_strategy"}.issubset(product_columns)
+    assert {
+        "target_segment",
+        "packaging_strategy",
+        "package_catalog_depth",
+        "add_on_catalog_depth",
+    }.issubset(product_columns)
     assert {"archetype_id", "current_move", "momentum", "funding_level"}.issubset(
         competitor_columns
     )
@@ -510,10 +527,13 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "board_directive",
         "active_board_ask",
         "board_resolution",
+        "board_score",
         "board_warning_active",
         "board_warning_level",
         "quarterly_review_count",
         "restructuring_pressure",
+        "board_recovery_focus",
+        "board_recovery_turns_remaining",
         "last_board_review_turn",
     }.issubset(finance_columns)
     assert {
@@ -564,7 +584,11 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "dependency_project_type",
         "delivery_risk",
     }.issubset(roadmap_columns)
-    assert user_version >= 17
+    assert {
+        "renewal_offer_active",
+        "win_back_attempts",
+    }.issubset(customer_columns)
+    assert user_version >= 18
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -744,7 +768,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 2
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 17
+    assert summaries[0].schema_version >= 18
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -757,7 +781,21 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 17
+    assert report.schema_version >= 18
+
+
+def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
+    db_path = tmp_path / "archives.db"
+    coordinator = SaveLoadCoordinator(db_path)
+
+    coordinator.save_game("active", make_state(), RandomSource(seed=29))
+
+    archives = coordinator.list_run_archives()
+
+    assert len(archives) == 1
+    assert archives[0].slot_name == "active"
+    assert archives[0].victory_achieved is True
+    assert archives[0].total_score > 0
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

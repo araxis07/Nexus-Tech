@@ -59,6 +59,8 @@ class CustomerAccountRepository:
                 failed_payment_risk,
                 dunning_steps,
                 escalation_count,
+                renewal_offer_active,
+                win_back_attempts,
                 expansion_potential,
                 renewal_health,
                 renewal_turn,
@@ -67,7 +69,7 @@ class CustomerAccountRepository:
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
             """,
             [
@@ -98,6 +100,8 @@ class CustomerAccountRepository:
                     account.failed_payment_risk,
                     account.dunning_steps,
                     account.escalation_count,
+                    int(account.renewal_offer_active),
+                    account.win_back_attempts,
                     account.expansion_potential,
                     account.renewal_health,
                     account.renewal_turn,
@@ -138,6 +142,8 @@ class CustomerAccountRepository:
                 failed_payment_risk,
                 dunning_steps,
                 escalation_count,
+                renewal_offer_active,
+                win_back_attempts,
                 expansion_potential,
                 renewal_health,
                 renewal_turn,
@@ -175,6 +181,8 @@ class CustomerAccountRepository:
                 failed_payment_risk=row["failed_payment_risk"] or 0,
                 dunning_steps=row["dunning_steps"] or 0,
                 escalation_count=row["escalation_count"] or 0,
+                renewal_offer_active=bool(row["renewal_offer_active"]),
+                win_back_attempts=row["win_back_attempts"] or 0,
                 expansion_potential=row["expansion_potential"],
                 renewal_health=row["renewal_health"] or 60,
                 renewal_turn=row["renewal_turn"],

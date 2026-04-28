@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.models import (
+    Company,
     CustomerAccount,
     CustomerAccountStatus,
     PackagingStrategy,
@@ -74,6 +75,13 @@ class PackagingMigrationSummary:
     message: str
 
 
+@dataclass(frozen=True)
+class CatalogExpansionSummary:
+    """Summary of expanding monetization surface on one product."""
+
+    message: str
+
+
 _PRICING_PROFILES = {
     PricingTier.BUDGET: PricingProfile(
         revenue_multiplier=BALANCE.pricing_budget_revenue_multiplier,
@@ -137,10 +145,19 @@ def calculate_effective_revenue_per_user(product: Product) -> Decimal:
 
     pricing_profile = get_pricing_profile(product.pricing_tier)
     packaging_profile = get_packaging_profile(product.packaging_strategy)
+    catalog_multiplier = quantize_rate(
+        Decimal("1.0000")
+        + (
+            Decimal(product.package_catalog_depth)
+            * BALANCE.packaging_catalog_revenue_multiplier_step
+        )
+        + (Decimal(product.add_on_catalog_depth) * BALANCE.add_on_catalog_revenue_multiplier_step)
+    )
     return quantize_money(
         product.revenue_per_user
         * pricing_profile.revenue_multiplier
         * packaging_profile.revenue_multiplier
+        * catalog_multiplier
     )
 
 
@@ -169,13 +186,17 @@ def get_packaging_support_cost_multiplier(product: Product) -> Decimal:
 def get_packaging_add_on_bonus(product: Product) -> int:
     """Return add-on depth created by the chosen packaging strategy."""
 
-    return get_packaging_profile(product.packaging_strategy).add_on_bonus
+    return get_packaging_profile(product.packaging_strategy).add_on_bonus + (
+        product.add_on_catalog_depth
+    )
 
 
 def get_packaging_enterprise_probability_bonus(product: Product) -> int:
     """Return enterprise pipeline lift implied by the packaging strategy."""
 
-    return get_packaging_profile(product.packaging_strategy).enterprise_probability_bonus
+    return get_packaging_profile(product.packaging_strategy).enterprise_probability_bonus + (
+        product.package_catalog_depth
+    )
 
 
 def get_default_subscription_package(product: Product) -> SubscriptionPackage:
@@ -319,15 +340,17 @@ def apply_run_add_on_campaign(
         raise ValueError("Streamlined products do not have enough add-on surface for a campaign.")
 
     converted_accounts = 0
+    contract_gain = quantize_money(
+        BALANCE.add_on_campaign_contract_gain
+        + (Decimal(product.add_on_catalog_depth) * BALANCE.add_on_catalog_contract_gain_per_depth)
+    )
     for account in customer_accounts:
         if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
             continue
         if account.satisfaction < 60:
             continue
         account.add_on_count += BALANCE.add_on_campaign_add_on_gain
-        account.contract_value = quantize_money(
-            account.contract_value + BALANCE.add_on_campaign_contract_gain
-        )
+        account.contract_value = quantize_money(account.contract_value + contract_gain)
         account.support_load = clamp_int(
             account.support_load + BALANCE.add_on_campaign_support_load_gain
         )
@@ -338,7 +361,11 @@ def apply_run_add_on_campaign(
     if converted_accounts == 0:
         raise ValueError("No active accounts are healthy enough for an add-on campaign.")
 
-    product.technical_debt = clamp_int(product.technical_debt + BALANCE.add_on_campaign_debt_gain)
+    product.technical_debt = clamp_int(
+        product.technical_debt
+        + BALANCE.add_on_campaign_debt_gain
+        + max(0, product.add_on_catalog_depth - 1)
+    )
     product.market_fit = clamp_int(product.market_fit + 1)
     return AddOnCampaignSummary(
         message=(
@@ -359,6 +386,13 @@ def apply_run_package_migration(
     upgraded_accounts = 0
     downgraded_accounts = 0
     target_package = get_default_subscription_package(product)
+    upgrade_gain = quantize_money(
+        BALANCE.packaging_migration_upgrade_contract_gain
+        + (
+            Decimal(product.package_catalog_depth)
+            * BALANCE.packaging_catalog_contract_gain_per_depth
+        )
+    )
     for account in customer_accounts:
         if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
             continue
@@ -367,9 +401,7 @@ def apply_run_package_migration(
         migrated_accounts += 1
         if _package_rank(target_package) > _package_rank(account.subscription_package):
             upgraded_accounts += 1
-            account.contract_value = quantize_money(
-                account.contract_value + BALANCE.packaging_migration_upgrade_contract_gain
-            )
+            account.contract_value = quantize_money(account.contract_value + upgrade_gain)
             account.add_on_count += BALANCE.packaging_migration_add_on_gain
             account.satisfaction = clamp_int(account.satisfaction - 1)
             account.support_load = clamp_int(account.support_load + 1)
@@ -398,6 +430,58 @@ def apply_run_package_migration(
         message=(
             f"Migrated {migrated_accounts} account(s) for {product.name}: "
             f"{upgraded_accounts} upgraded, {downgraded_accounts} simplified."
+        )
+    )
+
+
+def apply_expand_package_catalog(
+    company: Company,
+    product: Product,
+) -> CatalogExpansionSummary:
+    """Spend cash to improve package depth and enterprise-ready packaging."""
+
+    if product.package_catalog_depth >= 10:
+        raise ValueError(f"{product.name} already has a deep package catalog.")
+    if company.cash_on_hand < BALANCE.package_catalog_expand_cost:
+        raise ValueError("Not enough cash to expand the package catalog.")
+
+    company.cash_on_hand = quantize_money(
+        company.cash_on_hand - BALANCE.package_catalog_expand_cost
+    )
+    product.package_catalog_depth += BALANCE.package_catalog_expand_depth_gain
+    product.market_fit = clamp_int(
+        product.market_fit + BALANCE.package_catalog_expand_market_fit_gain
+    )
+    return CatalogExpansionSummary(
+        message=(
+            f"Expanded package catalog for {product.name}. "
+            f"Depth {product.package_catalog_depth}, cash -"
+            f"{BALANCE.package_catalog_expand_cost}."
+        )
+    )
+
+
+def apply_expand_add_on_catalog(
+    company: Company,
+    product: Product,
+) -> CatalogExpansionSummary:
+    """Spend cash to deepen add-on surface for one product."""
+
+    if product.add_on_catalog_depth >= 10:
+        raise ValueError(f"{product.name} already has a deep add-on catalog.")
+    if company.cash_on_hand < BALANCE.add_on_catalog_expand_cost:
+        raise ValueError("Not enough cash to expand the add-on catalog.")
+
+    company.cash_on_hand = quantize_money(company.cash_on_hand - BALANCE.add_on_catalog_expand_cost)
+    product.add_on_catalog_depth += BALANCE.add_on_catalog_expand_depth_gain
+    product.technical_debt = clamp_int(
+        product.technical_debt + BALANCE.add_on_catalog_expand_debt_gain
+    )
+    return CatalogExpansionSummary(
+        message=(
+            f"Expanded add-on catalog for {product.name}. "
+            f"Depth {product.add_on_catalog_depth}, cash -"
+            f"{BALANCE.add_on_catalog_expand_cost}."
         )
     )
 

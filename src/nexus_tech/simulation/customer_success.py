@@ -12,7 +12,7 @@ from nexus_tech.domain.models import (
     CustomerAccountStatus,
     GameState,
 )
-from nexus_tech.domain.money import format_rate, quantize_money
+from nexus_tech.domain.money import format_money, format_rate, quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 from nexus_tech.simulation.support_program import improve_support_program
@@ -121,6 +121,81 @@ def run_retention_play(state: GameState, account_id: UUID) -> CustomerSuccessAct
             f"Retention play launched for {account.name}. "
             f"Discount now {format_rate(account.discount_rate)}, "
             f"cash -{BALANCE.retention_play_cost}."
+        )
+    )
+
+
+def make_renewal_offer(state: GameState, account_id: UUID) -> CustomerSuccessActionSummary:
+    """Proactively offer renewal concessions before the next contract decision."""
+
+    account = get_customer_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if account.renewal_offer_active:
+        raise ValueError("A renewal offer is already active for that account.")
+    if state.company.cash_on_hand < BALANCE.renewal_offer_cost:
+        raise ValueError("Not enough cash to make a renewal offer this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.renewal_offer_cost
+    )
+    account.discount_rate = clamp_rate(
+        account.discount_rate + BALANCE.renewal_offer_discount_increase
+    )
+    account.renewal_offer_active = True
+    account.renewal_health = clamp_int(account.renewal_health + BALANCE.renewal_offer_health_gain)
+    account.satisfaction = clamp_int(account.satisfaction + BALANCE.renewal_offer_satisfaction_gain)
+    account.failed_payment_risk = clamp_int(
+        account.failed_payment_risk - BALANCE.renewal_offer_risk_relief
+    )
+    if account.renewal_turn > state.company.current_turn + BALANCE.renewal_offer_turn_window:
+        account.renewal_turn = state.company.current_turn + BALANCE.renewal_offer_turn_window
+    if account.status is CustomerAccountStatus.AT_RISK and account.renewal_health >= 60:
+        account.status = CustomerAccountStatus.ACTIVE
+
+    return CustomerSuccessActionSummary(
+        message=(
+            f"Made a renewal offer to {account.name}. "
+            f"Discount now {format_rate(account.discount_rate)}, "
+            f"renewal turn {account.renewal_turn}, "
+            f"cash -{BALANCE.renewal_offer_cost}."
+        )
+    )
+
+
+def run_win_back_play(state: GameState, account_id: UUID) -> CustomerSuccessActionSummary:
+    """Attempt to recover a churned account with a higher-touch commercial save."""
+
+    account = get_customer_account_by_id(state.customer_accounts, account_id)
+    if account.status is not CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has not churned and does not need a win-back play.")
+    if state.company.cash_on_hand < BALANCE.win_back_play_cost:
+        raise ValueError("Not enough cash to run a win-back play this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.win_back_play_cost
+    )
+    account.status = CustomerAccountStatus.ACTIVE
+    account.win_back_attempts += 1
+    account.contract_value = quantize_money(
+        account.contract_value * BALANCE.win_back_contract_multiplier
+    )
+    account.satisfaction = clamp_int(BALANCE.win_back_satisfaction_reset)
+    account.onboarding_health = clamp_int(BALANCE.win_back_onboarding_reset)
+    account.support_load = clamp_int(BALANCE.win_back_support_load_reset)
+    account.churn_risk = clamp_int(BALANCE.win_back_churn_risk_reset)
+    account.renewal_health = clamp_int(BALANCE.win_back_renewal_health_reset)
+    account.failed_payment_risk = clamp_int(account.failed_payment_risk - 10)
+    account.open_tickets = max(0, account.open_tickets - BALANCE.win_back_open_ticket_relief)
+    account.dunning_steps = 0
+    account.escalation_count = max(0, account.escalation_count - 1)
+    account.renewal_offer_active = False
+    account.renewal_turn = state.company.current_turn + 1
+
+    return CustomerSuccessActionSummary(
+        message=(
+            f"Won back {account.name} at {format_money(account.contract_value)} ARR-equivalent. "
+            f"Cash -{BALANCE.win_back_play_cost}."
         )
     )
 

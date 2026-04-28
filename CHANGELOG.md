@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.0 - 2026-04-28
+
+- Added board-recovery plans with recovery focus, board score tracking, and multi-turn governance stabilization pressure
+- Added support-staffing investment plus explicit per-turn support service cost so post-sale scale creates clearer cash drag
+- Added package-catalog and add-on-catalog expansion actions that deepen monetization without replacing existing pricing plays
+- Added renewal-offer and win-back actions so fragile and churned accounts can re-enter the commercial loop
+- Added completed-run archives in SQLite plus a `list-archives` CLI command for lightweight meta progression and run history review
+- Extended dashboards, save/load coverage, and regression tests for the new governance, support, pricing, customer, and archive state
+- Promoted the package version to `0.22.0`
+
 ## 0.21.0 - 2026-04-24
 
 - Added add-on campaign and packaging-migration actions so healthy accounts can deepen monetization outside plain price increases

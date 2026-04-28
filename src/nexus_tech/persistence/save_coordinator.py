@@ -105,6 +105,24 @@ class SaveHealthReport:
     message: str
 
 
+@dataclass(frozen=True)
+class RunArchiveSummary:
+    """Compact history row for completed runs."""
+
+    archive_key: str
+    slot_name: str
+    company_name: str
+    scenario_title: str
+    completed_turn: int
+    victory_achieved: bool
+    game_over: bool
+    exit_outcome: str
+    total_score: int
+    final_cash: Decimal
+    final_reputation: int
+    archived_at: str
+
+
 class SaveLoadCoordinator:
     """Coordinate repositories and schema initialization for save/load."""
 
@@ -179,6 +197,7 @@ class SaveLoadCoordinator:
                 self._save_event_history(connection, slot_name, state.event_history)
                 self._save_milestone_history(connection, slot_name, state.milestone_history)
                 self._save_turn_history(connection, slot_name, state.turn_history)
+                self._archive_completed_run(connection, slot_name, state, timestamp)
         except sqlite3.DatabaseError as error:
             raise PersistenceError(f"Failed to save game: {error}") from error
 
@@ -216,9 +235,11 @@ class SaveLoadCoordinator:
                         support_sla_target,
                         support_backlog_queue,
                         support_escalation_queue,
+                        support_staffing_level,
                         support_resolved_last_turn,
                         support_deflection_score,
                         support_sla_breaches_last_turn,
+                        support_service_cost_last_turn,
                         market_cycle,
                         market_cycle_turns_remaining,
                         victory_achieved,
@@ -327,10 +348,14 @@ class SaveLoadCoordinator:
                             sla_target=slot_row["support_sla_target"] or 58,
                             backlog_queue=slot_row["support_backlog_queue"] or 0,
                             escalation_queue=slot_row["support_escalation_queue"] or 0,
+                            staffing_level=slot_row["support_staffing_level"] or 0,
                             resolved_last_turn=slot_row["support_resolved_last_turn"] or 0,
                             deflection_score=slot_row["support_deflection_score"] or 0,
                             sla_breaches_last_turn=(
                                 slot_row["support_sla_breaches_last_turn"] or 0
+                            ),
+                            service_cost_last_turn=Decimal(
+                                slot_row["support_service_cost_last_turn"] or "0.00"
                             ),
                         ),
                         action_points_remaining=slot_row["action_points_remaining"],
@@ -423,6 +448,55 @@ class SaveLoadCoordinator:
                 game_over=bool(row["game_over"]) if row["game_over"] is not None else False,
                 saved_with_version=row["saved_with_version"] or "unknown",
                 schema_version=row["schema_version"] or 0,
+            )
+            for row in rows
+        ]
+
+    def list_run_archives(self) -> list[RunArchiveSummary]:
+        """Return archived completed runs ordered by most recent archive time."""
+
+        if not self.database.exists():
+            return []
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT
+                        archive_key,
+                        slot_name,
+                        company_name,
+                        scenario_title,
+                        completed_turn,
+                        victory_achieved,
+                        game_over,
+                        exit_outcome,
+                        total_score,
+                        final_cash,
+                        final_reputation,
+                        archived_at
+                    FROM run_archives
+                    ORDER BY archived_at DESC
+                    """
+                ).fetchall()
+        except sqlite3.DatabaseError as error:
+            raise PersistenceError(f"Failed to inspect run archives: {error}") from error
+
+        return [
+            RunArchiveSummary(
+                archive_key=row["archive_key"],
+                slot_name=row["slot_name"],
+                company_name=row["company_name"],
+                scenario_title=row["scenario_title"] or "Unknown scenario",
+                completed_turn=row["completed_turn"] or 0,
+                victory_achieved=bool(row["victory_achieved"]),
+                game_over=bool(row["game_over"]),
+                exit_outcome=row["exit_outcome"] or "none",
+                total_score=row["total_score"] or 0,
+                final_cash=Decimal(row["final_cash"] or "0.00"),
+                final_reputation=row["final_reputation"] or 0,
+                archived_at=row["archived_at"],
             )
             for row in rows
         ]
@@ -570,9 +644,11 @@ class SaveLoadCoordinator:
                     support_sla_target,
                     support_backlog_queue,
                     support_escalation_queue,
+                    support_staffing_level,
                     support_resolved_last_turn,
                     support_deflection_score,
                     support_sla_breaches_last_turn,
+                    support_service_cost_last_turn,
                     market_cycle,
                     market_cycle_turns_remaining,
                     victory_achieved,
@@ -586,7 +662,7 @@ class SaveLoadCoordinator:
                 )
                 VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -613,9 +689,11 @@ class SaveLoadCoordinator:
                     support_program.sla_target,
                     support_program.backlog_queue,
                     support_program.escalation_queue,
+                    support_program.staffing_level,
                     support_program.resolved_last_turn,
                     support_program.deflection_score,
                     support_program.sla_breaches_last_turn,
+                    str(support_program.service_cost_last_turn),
                     market_cycle.value,
                     market_cycle_turns_remaining,
                     int(victory_achieved),
@@ -655,9 +733,11 @@ class SaveLoadCoordinator:
                 support_sla_target = ?,
                 support_backlog_queue = ?,
                 support_escalation_queue = ?,
+                support_staffing_level = ?,
                 support_resolved_last_turn = ?,
                 support_deflection_score = ?,
                 support_sla_breaches_last_turn = ?,
+                support_service_cost_last_turn = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
                 victory_achieved = ?,
@@ -692,9 +772,11 @@ class SaveLoadCoordinator:
                 support_program.sla_target,
                 support_program.backlog_queue,
                 support_program.escalation_queue,
+                support_program.staffing_level,
                 support_program.resolved_last_turn,
                 support_program.deflection_score,
                 support_program.sla_breaches_last_turn,
+                str(support_program.service_cost_last_turn),
                 market_cycle.value,
                 market_cycle_turns_remaining,
                 int(victory_achieved),
@@ -705,6 +787,61 @@ class SaveLoadCoordinator:
                 schema_version,
                 timestamp,
                 slot_name,
+            ),
+        )
+
+    def _archive_completed_run(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        state: GameState,
+        timestamp: str,
+    ) -> None:
+        if not state.victory_achieved and not state.company.game_over:
+            return
+
+        archive_key = (
+            f"{slot_name}:{state.company.current_turn}:"
+            f"{state.exit_outcome.value if state.exit_outcome is not None else 'none'}"
+        )
+        from nexus_tech.simulation.reporting import calculate_run_score
+
+        total_score = calculate_run_score(state).total_score
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO run_archives (
+                archive_key,
+                slot_name,
+                company_name,
+                scenario_id,
+                scenario_title,
+                completed_turn,
+                victory_achieved,
+                game_over,
+                exit_outcome,
+                exit_summary,
+                total_score,
+                final_cash,
+                final_reputation,
+                archived_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                archive_key,
+                slot_name,
+                state.company.name,
+                state.scenario_id,
+                state.scenario_title,
+                state.company.current_turn,
+                int(state.victory_achieved),
+                int(state.company.game_over),
+                state.exit_outcome.value if state.exit_outcome is not None else "none",
+                state.exit_summary,
+                total_score,
+                str(state.company.cash_on_hand),
+                state.company.reputation,
+                timestamp,
             ),
         )
 

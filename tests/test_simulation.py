@@ -128,6 +128,7 @@ from nexus_tech.simulation.scaling import (
 )
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
+    calculate_support_staff_capacity,
     triage_support_backlog,
 )
 from nexus_tech.simulation.team import (
@@ -176,6 +177,8 @@ def make_product(
     churn_rate: Decimal = Decimal("0.0500"),
     pricing_tier: PricingTier = PricingTier.STANDARD,
     packaging_strategy: PackagingStrategy = PackagingStrategy.STREAMLINED,
+    package_catalog_depth: int = 0,
+    add_on_catalog_depth: int = 0,
     target_segment: MarketSegment = MarketSegment.STARTUP,
     is_active: bool = True,
 ) -> Product:
@@ -194,6 +197,8 @@ def make_product(
         churn_rate=churn_rate,
         pricing_tier=pricing_tier,
         packaging_strategy=packaging_strategy,
+        package_catalog_depth=package_catalog_depth,
+        add_on_catalog_depth=add_on_catalog_depth,
         target_segment=target_segment,
         is_active=is_active,
     )
@@ -3526,3 +3531,122 @@ def test_execute_restructure_plan_cuts_headcount_and_pressure() -> None:
     assert len(outcome.state.employees) < len(state.employees)
     assert outcome.state.finance.restructuring_pressure < 14
     assert outcome.state.finance.board_pressure < 40
+
+
+def test_expand_catalog_actions_increase_depth_and_consume_cash() -> None:
+    product = make_product(
+        "Catalog Core",
+        packaging_strategy=PackagingStrategy.MODULAR,
+        package_catalog_depth=1,
+        add_on_catalog_depth=1,
+    )
+    state = make_state(product, cash_on_hand=Decimal("4000.00"))
+
+    packaged = apply_action(
+        state,
+        TurnAction.EXPAND_PACKAGE_CATALOG,
+        context=ActionContext(target_product_id=product.id),
+    )
+    add_ons = apply_action(
+        packaged.state,
+        TurnAction.EXPAND_ADD_ON_CATALOG,
+        context=ActionContext(target_product_id=product.id),
+    )
+
+    assert packaged.state.products[0].package_catalog_depth == 2
+    assert add_ons.state.products[0].add_on_catalog_depth == 2
+    assert add_ons.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_make_renewal_offer_flags_account_and_pulls_renewal_forward() -> None:
+    product = make_product("Renewal Desk")
+    account = CustomerAccount(
+        name="Renewal Anchor",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("640.00"),
+        satisfaction=68,
+        expansion_potential=58,
+        renewal_turn=8,
+        churn_risk=22,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], current_turn=4)
+
+    outcome = apply_action(
+        state,
+        TurnAction.MAKE_RENEWAL_OFFER,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    renewed = outcome.state.customer_accounts[0]
+    assert renewed.renewal_offer_active is True
+    assert renewed.renewal_turn <= 6
+    assert renewed.discount_rate > account.discount_rate
+
+
+def test_run_win_back_play_restores_churned_account() -> None:
+    product = make_product("Winback Core")
+    account = CustomerAccount(
+        name="Lost Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("780.00"),
+        satisfaction=22,
+        expansion_potential=44,
+        renewal_turn=4,
+        churn_risk=92,
+        open_tickets=6,
+        status=CustomerAccountStatus.CHURNED,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_WIN_BACK_PLAY,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    restored = outcome.state.customer_accounts[0]
+    assert restored.status is CustomerAccountStatus.ACTIVE
+    assert restored.win_back_attempts == 1
+    assert restored.renewal_turn == state.company.current_turn + 1
+
+
+def test_support_staffing_investment_increases_capacity_and_turn_service_cost() -> None:
+    product = make_product("Support Load")
+    account = CustomerAccount(
+        name="Support Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("900.00"),
+        satisfaction=70,
+        expansion_potential=62,
+        renewal_turn=5,
+        churn_risk=18,
+        open_tickets=10,
+        sla_breach_risk=44,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+    base_capacity = calculate_support_staff_capacity(state)
+
+    invested = apply_action(state, TurnAction.INVEST_IN_SUPPORT_STAFFING)
+    resolution = resolve_turn(invested.state, FixedRandom(0))
+
+    assert calculate_support_staff_capacity(invested.state) > base_capacity
+    assert resolution.state.support_program.service_cost_last_turn > Decimal("0.00")
+
+
+def test_start_board_recovery_plan_sets_focus_and_duration() -> None:
+    product = make_product("Board Core")
+    state = make_state(product, cash_on_hand=Decimal("5000.00"))
+    state.finance.board_pressure = 42
+    state.finance.governance_risk = 38
+    state.finance.active_board_ask = BoardAsk.RELIABILITY
+
+    outcome = apply_action(state, TurnAction.START_BOARD_RECOVERY_PLAN)
+
+    assert outcome.state.finance.board_recovery_focus is BoardAsk.RELIABILITY
+    assert outcome.state.finance.board_recovery_turns_remaining == BALANCE.board_recovery_turns
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand

@@ -47,7 +47,9 @@ from nexus_tech.simulation.competitor_intel import record_competitor_intel
 from nexus_tech.simulation.customer_success import (
     get_customer_account_by_id,
     invest_in_customer_success,
+    make_renewal_offer,
     run_retention_play,
+    run_win_back_play,
 )
 from nexus_tech.simulation.customers import CustomerTurnSummary, apply_end_of_turn_customers
 from nexus_tech.simulation.difficulty import get_difficulty_profile
@@ -84,6 +86,7 @@ from nexus_tech.simulation.governance import (
     apply_end_of_turn_governance,
     execute_board_response,
     execute_restructure_plan,
+    start_board_recovery_plan,
 )
 from nexus_tech.simulation.growth import calculate_company_reputation_delta, resolve_growth
 from nexus_tech.simulation.hiring_pipeline import (
@@ -104,6 +107,8 @@ from nexus_tech.simulation.planning import (
 )
 from nexus_tech.simulation.pricing import (
     apply_adjust_pricing,
+    apply_expand_add_on_catalog,
+    apply_expand_package_catalog,
     apply_run_add_on_campaign,
     apply_run_package_migration,
     apply_run_price_increase,
@@ -146,6 +151,7 @@ from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strat
 from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
+    invest_in_support_staffing,
     route_support_escalation,
     triage_support_backlog,
     upgrade_support_program,
@@ -363,6 +369,16 @@ def apply_action(
             "Executed board response for ask %s.",
             next_state.finance.active_board_ask.value,
         )
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.START_BOARD_RECOVERY_PLAN:
+        summary = start_board_recovery_plan(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Started board recovery plan.")
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -716,6 +732,34 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.MAKE_RENEWAL_OFFER:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = make_renewal_offer(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Made renewal offer for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_WIN_BACK_PLAY:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_win_back_play(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran win-back play for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.ROUTE_SUPPORT_ESCALATION:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -749,6 +793,16 @@ def apply_action(
             "Upgraded support program with focus %s.",
             context.support_investment_focus.value,
         )
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.INVEST_IN_SUPPORT_STAFFING:
+        summary = invest_in_support_staffing(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Expanded support staffing.")
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -910,6 +964,24 @@ def apply_action(
     if action is TurnAction.RUN_PRICE_INCREASE:
         summary = apply_run_price_increase(product, next_state.customer_accounts)
         return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.EXPAND_PACKAGE_CATALOG:
+        summary = apply_expand_package_catalog(next_state.company, product)
+        next_state.company.game_over = is_game_over(next_state.company)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.EXPAND_ADD_ON_CATALOG:
+        summary = apply_expand_add_on_catalog(next_state.company, product)
+        next_state.company.game_over = is_game_over(next_state.company)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
 
     if action is TurnAction.RUN_ADD_ON_CAMPAIGN:
         summary = apply_run_add_on_campaign(product, next_state.customer_accounts)
@@ -1124,7 +1196,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         next_state,
         current_turn=resolved_turn,
     )
-    total_operations_cost = operations_summary.added_cost
+    total_operations_cost = quantize_money(
+        operations_summary.added_cost + support_summary.service_cost
+    )
     late_game_summary = apply_end_of_turn_late_game(
         next_state.products,
         current_turn=resolved_turn,
@@ -1347,9 +1421,12 @@ def get_customer_choices(
     state: GameState,
     *,
     at_risk_only: bool = False,
+    churned_only: bool = False,
 ):
     """Return customer accounts available for CLI target selection."""
 
+    if churned_only:
+        return [account for account in state.customer_accounts if account.status.value == "churned"]
     accounts = [account for account in state.customer_accounts if account.status.value != "churned"]
     if at_risk_only:
         return [account for account in accounts if account.status.value == "at_risk"]

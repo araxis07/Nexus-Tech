@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from nexus_tech.domain.models import (
     CustomerAccount,
@@ -32,6 +33,7 @@ class SupportProgramSummary:
     deflection_score: int
     weighted_ticket_pressure: int
     staffing_gap: int
+    service_cost: Decimal
     reputation_delta: int
     morale_penalty: int
     summary: str
@@ -130,6 +132,18 @@ def apply_end_of_turn_support_program(
     state.support_program.resolved_last_turn = resolved_tickets
     state.support_program.deflection_score = deflection_score
     state.support_program.sla_breaches_last_turn = sla_breaches
+    service_cost = quantize_money(
+        (Decimal(total_open_tickets) * BALANCE.support_program_service_cost_per_ticket)
+        + (
+            Decimal(state.support_program.escalation_queue)
+            * BALANCE.support_program_service_cost_per_escalation
+        )
+        + (
+            Decimal(state.support_program.staffing_level)
+            * BALANCE.support_program_service_cost_per_staffing_level
+        )
+    )
+    state.support_program.service_cost_last_turn = service_cost
 
     reputation_delta = 0
     morale_penalty = 0
@@ -169,6 +183,7 @@ def apply_end_of_turn_support_program(
         deflection_score=deflection_score,
         weighted_ticket_pressure=weighted_ticket_pressure,
         staffing_gap=staffing_gap,
+        service_cost=service_cost,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
         summary=summary,
@@ -300,6 +315,37 @@ def upgrade_support_program(
     )
 
 
+def invest_in_support_staffing(state: GameState) -> SupportOpsActionSummary:
+    """Spend cash on more durable support staffing capacity."""
+
+    if state.company.cash_on_hand < BALANCE.support_program_staffing_investment_cost:
+        raise ValueError("Not enough cash to expand support staffing this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_staffing_investment_cost
+    )
+    state.support_program.staffing_level = clamp_int(
+        state.support_program.staffing_level + BALANCE.support_program_staffing_level_gain,
+        0,
+        20,
+    )
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - BALANCE.support_program_upgrade_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue - BALANCE.support_program_upgrade_escalation_relief,
+    )
+    return SupportOpsActionSummary(
+        message=(
+            "Expanded support staffing. "
+            f"Cash -{BALANCE.support_program_staffing_investment_cost}, "
+            f"staffing level {state.support_program.staffing_level}."
+        )
+    )
+
+
 def route_support_escalation(
     state: GameState,
     account_id,
@@ -377,6 +423,7 @@ def calculate_support_staff_capacity(state: GameState) -> int:
     )
     return (
         (support_roles * BALANCE.support_program_staff_capacity_unit)
+        + (state.support_program.staffing_level * BALANCE.support_program_staffing_capacity_unit)
         + engineer_relief
         + team_lead_bonus
         + budget_capacity

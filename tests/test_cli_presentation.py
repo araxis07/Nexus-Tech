@@ -43,7 +43,7 @@ from nexus_tech.domain.models import (
     Seniority,
     TurnLedgerEntry,
 )
-from nexus_tech.persistence.save_coordinator import SaveSlotSummary
+from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
 from nexus_tech.presentation.dashboard import (
     render_competitor_archetype_catalog,
     render_content_health,
@@ -856,6 +856,45 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
     assert captured["db_path"] == db_path
     assert "Save Slots" in result.output
     assert "active" in result.output
+
+
+def test_list_archives_command_renders_archive_catalog(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+    archives = [
+        RunArchiveSummary(
+            archive_key="active:8:strategic_acquisition",
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_title="Founder Journey",
+            completed_turn=8,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="strategic_acquisition",
+            total_score=188,
+            final_cash=Decimal("12400.00"),
+            final_reputation=64,
+            archived_at="2026-04-28T01:00:00+00:00",
+        )
+    ]
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            captured["db_path"] = db_path
+
+        def list_run_archives(self) -> list[RunArchiveSummary]:
+            return archives
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+
+    db_path = tmp_path / "archives.db"
+    result = runner.invoke(app, ["list-archives", "--db-path", str(db_path)])
+
+    assert result.exit_code == 0
+    assert captured["db_path"] == db_path
+    assert "Run Archives" in result.output
 
 
 def test_rename_save_command_calls_coordinator(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

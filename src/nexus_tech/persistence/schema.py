@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 17
+CURRENT_SCHEMA_VERSION = 18
 
 SCHEMA_STATEMENTS = (
     """
@@ -32,9 +32,11 @@ SCHEMA_STATEMENTS = (
         support_sla_target INTEGER NOT NULL DEFAULT 58,
         support_backlog_queue INTEGER NOT NULL DEFAULT 0,
         support_escalation_queue INTEGER NOT NULL DEFAULT 0,
+        support_staffing_level INTEGER NOT NULL DEFAULT 0,
         support_resolved_last_turn INTEGER NOT NULL DEFAULT 0,
         support_deflection_score INTEGER NOT NULL DEFAULT 0,
         support_sla_breaches_last_turn INTEGER NOT NULL DEFAULT 0,
+        support_service_cost_last_turn TEXT NOT NULL DEFAULT '0.00',
         market_cycle TEXT NOT NULL DEFAULT 'steady',
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
@@ -42,9 +44,27 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 17,
+        schema_version INTEGER NOT NULL DEFAULT 18,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS run_archives (
+        archive_key TEXT PRIMARY KEY,
+        slot_name TEXT NOT NULL,
+        company_name TEXT NOT NULL,
+        scenario_id TEXT NOT NULL,
+        scenario_title TEXT NOT NULL,
+        completed_turn INTEGER NOT NULL,
+        victory_achieved INTEGER NOT NULL DEFAULT 0,
+        game_over INTEGER NOT NULL DEFAULT 0,
+        exit_outcome TEXT,
+        exit_summary TEXT,
+        total_score INTEGER NOT NULL,
+        final_cash TEXT NOT NULL,
+        final_reputation INTEGER NOT NULL,
+        archived_at TEXT NOT NULL
     )
     """,
     """
@@ -80,6 +100,8 @@ SCHEMA_STATEMENTS = (
         churn_rate TEXT NOT NULL,
         pricing_tier TEXT NOT NULL DEFAULT 'standard',
         packaging_strategy TEXT NOT NULL DEFAULT 'streamlined',
+        package_catalog_depth INTEGER NOT NULL DEFAULT 0,
+        add_on_catalog_depth INTEGER NOT NULL DEFAULT 0,
         target_segment TEXT NOT NULL DEFAULT 'startup',
         is_active INTEGER NOT NULL,
         PRIMARY KEY (slot_name, product_id),
@@ -202,10 +224,13 @@ SCHEMA_STATEMENTS = (
         board_directive TEXT NOT NULL DEFAULT 'accelerate_growth',
         active_board_ask TEXT NOT NULL DEFAULT 'profitability',
         board_resolution TEXT NOT NULL DEFAULT 'hold_course',
+        board_score INTEGER NOT NULL DEFAULT 55,
         board_warning_active INTEGER NOT NULL DEFAULT 0,
         board_warning_level INTEGER NOT NULL DEFAULT 0,
         quarterly_review_count INTEGER NOT NULL DEFAULT 0,
         restructuring_pressure INTEGER NOT NULL DEFAULT 0,
+        board_recovery_focus TEXT NOT NULL DEFAULT 'profitability',
+        board_recovery_turns_remaining INTEGER NOT NULL DEFAULT 0,
         last_board_review_turn INTEGER,
         last_funding_turn INTEGER
     )
@@ -303,6 +328,8 @@ SCHEMA_STATEMENTS = (
         failed_payment_risk INTEGER NOT NULL DEFAULT 0,
         dunning_steps INTEGER NOT NULL DEFAULT 0,
         escalation_count INTEGER NOT NULL DEFAULT 0,
+        renewal_offer_active INTEGER NOT NULL DEFAULT 0,
+        win_back_attempts INTEGER NOT NULL DEFAULT 0,
         expansion_potential INTEGER NOT NULL,
         renewal_health INTEGER NOT NULL DEFAULT 60,
         renewal_turn INTEGER NOT NULL,
@@ -461,6 +488,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     _ensure_column(
         connection,
+        table_name="products",
+        column_name="package_catalog_depth",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="products",
+        column_name="add_on_catalog_depth",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
         table_name="save_slots",
         column_name="scenario_id",
         column_definition="TEXT NOT NULL DEFAULT 'founder_journey'",
@@ -576,6 +615,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="support_staffing_level",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="support_resolved_last_turn",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
@@ -590,6 +635,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="save_slots",
         column_name="support_sla_breaches_last_turn",
         column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="support_service_cost_last_turn",
+        column_definition="TEXT NOT NULL DEFAULT '0.00'",
     )
     _ensure_column(
         connection,
@@ -714,6 +765,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="finance_state",
+        column_name="board_score",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
         column_name="board_warning_active",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
@@ -733,6 +790,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         connection,
         table_name="finance_state",
         column_name="restructuring_pressure",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_recovery_focus",
+        column_definition="TEXT NOT NULL DEFAULT 'profitability'",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_recovery_turns_remaining",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
@@ -913,6 +982,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         connection,
         table_name="customer_accounts",
         column_name="escalation_count",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="renewal_offer_active",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="customer_accounts",
+        column_name="win_back_attempts",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
