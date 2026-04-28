@@ -43,6 +43,7 @@ from nexus_tech.domain.models import (
     SalesDealStage,
     ScenarioObjectiveMetric,
     SubscriptionPackage,
+    SupportLaneFocus,
     SupportProgram,
     TurnLedgerEntry,
 )
@@ -118,6 +119,9 @@ class RunArchiveSummary:
     game_over: bool
     exit_outcome: str
     total_score: int
+    score_tier: str
+    campaign_grade: str
+    estimated_valuation: Decimal
     final_cash: Decimal
     final_reputation: int
     archived_at: str
@@ -233,12 +237,14 @@ class SaveLoadCoordinator:
                         support_knowledge_base_level,
                         support_automation_level,
                         support_sla_target,
+                        support_lane_focus,
                         support_backlog_queue,
                         support_escalation_queue,
                         support_staffing_level,
                         support_resolved_last_turn,
                         support_deflection_score,
                         support_sla_breaches_last_turn,
+                        support_queue_age_pressure,
                         support_service_cost_last_turn,
                         market_cycle,
                         market_cycle_turns_remaining,
@@ -346,6 +352,9 @@ class SaveLoadCoordinator:
                             knowledge_base_level=slot_row["support_knowledge_base_level"] or 22,
                             automation_level=slot_row["support_automation_level"] or 16,
                             sla_target=slot_row["support_sla_target"] or 58,
+                            lane_focus=SupportLaneFocus(
+                                slot_row["support_lane_focus"] or "balanced"
+                            ),
                             backlog_queue=slot_row["support_backlog_queue"] or 0,
                             escalation_queue=slot_row["support_escalation_queue"] or 0,
                             staffing_level=slot_row["support_staffing_level"] or 0,
@@ -354,6 +363,7 @@ class SaveLoadCoordinator:
                             sla_breaches_last_turn=(
                                 slot_row["support_sla_breaches_last_turn"] or 0
                             ),
+                            queue_age_pressure=slot_row["support_queue_age_pressure"] or 0,
                             service_cost_last_turn=Decimal(
                                 slot_row["support_service_cost_last_turn"] or "0.00"
                             ),
@@ -473,6 +483,9 @@ class SaveLoadCoordinator:
                         game_over,
                         exit_outcome,
                         total_score,
+                        score_tier,
+                        campaign_grade,
+                        estimated_valuation,
                         final_cash,
                         final_reputation,
                         archived_at
@@ -494,6 +507,9 @@ class SaveLoadCoordinator:
                 game_over=bool(row["game_over"]),
                 exit_outcome=row["exit_outcome"] or "none",
                 total_score=row["total_score"] or 0,
+                score_tier=row["score_tier"] or "fragile",
+                campaign_grade=row["campaign_grade"] or "D",
+                estimated_valuation=Decimal(row["estimated_valuation"] or "0.00"),
                 final_cash=Decimal(row["final_cash"] or "0.00"),
                 final_reputation=row["final_reputation"] or 0,
                 archived_at=row["archived_at"],
@@ -642,12 +658,14 @@ class SaveLoadCoordinator:
                     support_knowledge_base_level,
                     support_automation_level,
                     support_sla_target,
+                    support_lane_focus,
                     support_backlog_queue,
                     support_escalation_queue,
                     support_staffing_level,
                     support_resolved_last_turn,
                     support_deflection_score,
                     support_sla_breaches_last_turn,
+                    support_queue_age_pressure,
                     support_service_cost_last_turn,
                     market_cycle,
                     market_cycle_turns_remaining,
@@ -662,7 +680,7 @@ class SaveLoadCoordinator:
                 )
                 VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -687,12 +705,14 @@ class SaveLoadCoordinator:
                     support_program.knowledge_base_level,
                     support_program.automation_level,
                     support_program.sla_target,
+                    support_program.lane_focus.value,
                     support_program.backlog_queue,
                     support_program.escalation_queue,
                     support_program.staffing_level,
                     support_program.resolved_last_turn,
                     support_program.deflection_score,
                     support_program.sla_breaches_last_turn,
+                    support_program.queue_age_pressure,
                     str(support_program.service_cost_last_turn),
                     market_cycle.value,
                     market_cycle_turns_remaining,
@@ -731,12 +751,14 @@ class SaveLoadCoordinator:
                 support_knowledge_base_level = ?,
                 support_automation_level = ?,
                 support_sla_target = ?,
+                support_lane_focus = ?,
                 support_backlog_queue = ?,
                 support_escalation_queue = ?,
                 support_staffing_level = ?,
                 support_resolved_last_turn = ?,
                 support_deflection_score = ?,
                 support_sla_breaches_last_turn = ?,
+                support_queue_age_pressure = ?,
                 support_service_cost_last_turn = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
@@ -770,12 +792,14 @@ class SaveLoadCoordinator:
                 support_program.knowledge_base_level,
                 support_program.automation_level,
                 support_program.sla_target,
+                support_program.lane_focus.value,
                 support_program.backlog_queue,
                 support_program.escalation_queue,
                 support_program.staffing_level,
                 support_program.resolved_last_turn,
                 support_program.deflection_score,
                 support_program.sla_breaches_last_turn,
+                support_program.queue_age_pressure,
                 str(support_program.service_cost_last_turn),
                 market_cycle.value,
                 market_cycle_turns_remaining,
@@ -806,7 +830,7 @@ class SaveLoadCoordinator:
         )
         from nexus_tech.simulation.reporting import calculate_run_score
 
-        total_score = calculate_run_score(state).total_score
+        run_score = calculate_run_score(state)
         connection.execute(
             """
             INSERT OR REPLACE INTO run_archives (
@@ -821,11 +845,14 @@ class SaveLoadCoordinator:
                 exit_outcome,
                 exit_summary,
                 total_score,
+                score_tier,
+                campaign_grade,
+                estimated_valuation,
                 final_cash,
                 final_reputation,
                 archived_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 archive_key,
@@ -838,7 +865,10 @@ class SaveLoadCoordinator:
                 int(state.company.game_over),
                 state.exit_outcome.value if state.exit_outcome is not None else "none",
                 state.exit_summary,
-                total_score,
+                run_score.total_score,
+                run_score.score_tier,
+                run_score.campaign_grade,
+                str(run_score.estimated_valuation),
                 str(state.company.cash_on_hand),
                 state.company.reputation,
                 timestamp,

@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     CustomerAccountStatus,
     MarketSegment,
     PricingTier,
+    RenewalOfferType,
     SubscriptionPackage,
     SupportTier,
 )
@@ -59,7 +60,9 @@ class CustomerAccountRepository:
                 failed_payment_risk,
                 dunning_steps,
                 escalation_count,
+                ticket_queue_age,
                 renewal_offer_active,
+                renewal_offer_type,
                 win_back_attempts,
                 expansion_potential,
                 renewal_health,
@@ -69,7 +72,7 @@ class CustomerAccountRepository:
             )
             VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?
             )
             """,
             [
@@ -100,7 +103,11 @@ class CustomerAccountRepository:
                     account.failed_payment_risk,
                     account.dunning_steps,
                     account.escalation_count,
+                    account.ticket_queue_age,
                     int(account.renewal_offer_active),
+                    account.renewal_offer_type.value
+                    if account.renewal_offer_type is not None
+                    else None,
                     account.win_back_attempts,
                     account.expansion_potential,
                     account.renewal_health,
@@ -142,7 +149,9 @@ class CustomerAccountRepository:
                 failed_payment_risk,
                 dunning_steps,
                 escalation_count,
+                ticket_queue_age,
                 renewal_offer_active,
+                renewal_offer_type,
                 win_back_attempts,
                 expansion_potential,
                 renewal_health,
@@ -181,7 +190,13 @@ class CustomerAccountRepository:
                 failed_payment_risk=row["failed_payment_risk"] or 0,
                 dunning_steps=row["dunning_steps"] or 0,
                 escalation_count=row["escalation_count"] or 0,
+                ticket_queue_age=row["ticket_queue_age"] or 0,
                 renewal_offer_active=bool(row["renewal_offer_active"]),
+                renewal_offer_type=(
+                    RenewalOfferType(row["renewal_offer_type"])
+                    if row["renewal_offer_type"]
+                    else None
+                ),
                 win_back_attempts=row["win_back_attempts"] or 0,
                 expansion_potential=row["expansion_potential"],
                 renewal_health=row["renewal_health"] or 60,

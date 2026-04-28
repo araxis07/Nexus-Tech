@@ -42,6 +42,7 @@ from nexus_tech.domain.models import (
     Product,
     ProductReleaseStatus,
     ProductReleaseType,
+    RenewalOfferType,
     RoadmapFocus,
     RoadmapProjectStatus,
     RoadmapProjectType,
@@ -50,6 +51,7 @@ from nexus_tech.domain.models import (
     Seniority,
     SubscriptionPackage,
     SupportInvestmentFocus,
+    SupportLaneFocus,
     SupportProgram,
     SupportTier,
     TurnAction,
@@ -2843,8 +2845,37 @@ def test_support_program_backlog_creates_queue_pressure() -> None:
 
     assert summary.backlog_queue > 18
     assert summary.sla_breaches >= 1
+    assert summary.queue_age_pressure > 0
     assert summary.reputation_delta <= 0
     assert summary.morale_penalty >= 0
+
+
+def test_set_support_lane_focus_updates_program_bias() -> None:
+    product = make_product("White Glove")
+    account = CustomerAccount(
+        name="Enterprise Queue",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=61,
+        expansion_potential=58,
+        renewal_turn=6,
+        churn_risk=24,
+        open_tickets=10,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account])
+    state.support_program.backlog_queue = 5
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_SUPPORT_LANE_FOCUS,
+        context=ActionContext(support_lane_focus=SupportLaneFocus.ENTERPRISE),
+    )
+
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert outcome.state.support_program.backlog_queue == 4
 
 
 def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
@@ -3142,6 +3173,48 @@ def test_assign_manager_increases_managed_coverage_and_coordination() -> None:
     assert updated_modifier.coordination_bonus > baseline_modifier.coordination_bonus
 
 
+def test_assign_manager_rejects_reporting_cycles() -> None:
+    product = make_product("Hierarchy Core")
+    leader = make_employee(
+        "Morgan Lead",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=product.id,
+        leadership_score=84,
+    )
+    squad_lead = make_employee(
+        "Rin Squad",
+        EmployeeRole.DESIGNER,
+        assigned_product_id=product.id,
+        leadership_score=74,
+    )
+    builder = make_employee(
+        "Ada Builder",
+        EmployeeRole.ENGINEER,
+        assigned_product_id=product.id,
+    )
+    state = make_state(product, employees=[leader, squad_lead, builder])
+    state.action_points_remaining = 4
+
+    managed = apply_action(
+        state,
+        TurnAction.ASSIGN_MANAGER,
+        context=ActionContext(employee_id=squad_lead.id, manager_id=leader.id),
+    )
+    managed = apply_action(
+        managed.state,
+        TurnAction.ASSIGN_MANAGER,
+        context=ActionContext(employee_id=builder.id, manager_id=squad_lead.id),
+    )
+
+    with pytest.raises(ValueError, match="cycle"):
+        apply_action(
+            managed.state,
+            TurnAction.ASSIGN_MANAGER,
+            context=ActionContext(employee_id=leader.id, manager_id=squad_lead.id),
+        )
+
+
 def test_governance_tracks_board_ask_and_warning_level() -> None:
     product = make_product("Governance Atlas", bug_level=26, technical_debt=34)
     state = make_state(product)
@@ -3291,6 +3364,38 @@ def test_reorg_team_reduces_management_gaps() -> None:
     assert after.managed_headcount > before.managed_headcount
     assert after.org_drag <= before.org_drag
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_team_condition_tracks_layers_and_span_risk() -> None:
+    product = make_product("Scale Org")
+    leader = make_employee(
+        "Core PM",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=product.id,
+        leadership_score=86,
+    )
+    team_lead = make_employee(
+        "Lead Eng",
+        EmployeeRole.ENGINEER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=product.id,
+        leadership_score=72,
+    )
+    reports = [
+        make_employee(f"Builder {index}", EmployeeRole.ENGINEER, assigned_product_id=product.id)
+        for index in range(1, 6)
+    ]
+    state = make_state(product, employees=[leader, team_lead, *reports])
+    team_lead.manager_id = leader.id
+    for report in reports:
+        report.manager_id = team_lead.id
+
+    condition = calculate_team_condition(state.employees)
+
+    assert condition.management_layers >= 2
+    assert condition.max_span >= 5
+    assert condition.span_risk > 0
 
 
 def test_execute_board_response_reliability_resets_pressure() -> None:
@@ -3486,8 +3591,40 @@ def test_quarterly_board_review_sets_resolution_and_restructuring_pressure() -> 
     )
 
     assert summary.board_resolution is BoardResolution.RESTRUCTURE_NOW
+    assert summary.board_resolution_due is True
+    assert summary.board_resolution_window == BALANCE.board_resolution_window_turns
     assert state.finance.quarterly_review_count == 1
     assert state.finance.restructuring_pressure > 0
+
+
+def test_board_resolution_due_expires_into_more_pressure() -> None:
+    product = make_product("Board Clock")
+    state = make_state(product, current_turn=5)
+    state.finance.board_resolution_due = True
+    state.finance.board_resolution_window = 1
+    starting_pressure = state.finance.board_pressure
+    starting_risk = state.finance.governance_risk
+    starting_confidence = state.finance.board_confidence
+
+    apply_end_of_turn_governance(
+        state,
+        resolved_turn=5,
+        total_revenue=Decimal("1100.00"),
+        net_cash_flow=Decimal("-900.00"),
+        customer_summary=apply_end_of_turn_customers([], [product], current_turn=5),
+        operations_summary=calculate_operations_summary(
+            state.products,
+            state.employees,
+            current_turn=5,
+            customer_accounts=state.customer_accounts,
+        ),
+    )
+
+    assert state.finance.board_pressure > starting_pressure
+    assert state.finance.governance_risk > starting_risk
+    assert state.finance.board_confidence < starting_confidence
+    assert state.finance.board_resolution_due is True
+    assert state.finance.board_resolution_window == BALANCE.board_resolution_window_turns
 
 
 def test_execute_restructure_plan_cuts_headcount_and_pressure() -> None:
@@ -3581,8 +3718,73 @@ def test_make_renewal_offer_flags_account_and_pulls_renewal_forward() -> None:
 
     renewed = outcome.state.customer_accounts[0]
     assert renewed.renewal_offer_active is True
+    assert renewed.renewal_offer_type is RenewalOfferType.LIGHT_DISCOUNT
     assert renewed.renewal_turn <= 6
     assert renewed.discount_rate > account.discount_rate
+
+
+def test_make_renewal_offer_bundle_upgrade_expands_package_depth() -> None:
+    product = make_product("Bundle Renewal")
+    account = CustomerAccount(
+        name="Bundle Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("740.00"),
+        subscription_package=SubscriptionPackage.STARTER,
+        add_on_count=0,
+        satisfaction=70,
+        expansion_potential=60,
+        renewal_turn=7,
+        churn_risk=18,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], current_turn=4)
+
+    outcome = apply_action(
+        state,
+        TurnAction.MAKE_RENEWAL_OFFER,
+        context=ActionContext(
+            customer_account_id=account.id,
+            renewal_offer_type=RenewalOfferType.BUNDLE_UPGRADE,
+        ),
+    )
+
+    renewed = outcome.state.customer_accounts[0]
+    assert renewed.renewal_offer_type is RenewalOfferType.BUNDLE_UPGRADE
+    assert renewed.subscription_package is SubscriptionPackage.GROWTH
+    assert renewed.add_on_count == 1
+
+
+def test_make_renewal_offer_term_extension_locks_longer_contract() -> None:
+    product = make_product("Term Renewal")
+    account = CustomerAccount(
+        name="Term Anchor",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("580.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        annual_prepay=False,
+        satisfaction=66,
+        expansion_potential=54,
+        renewal_turn=8,
+        churn_risk=28,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], current_turn=4)
+
+    outcome = apply_action(
+        state,
+        TurnAction.MAKE_RENEWAL_OFFER,
+        context=ActionContext(
+            customer_account_id=account.id,
+            renewal_offer_type=RenewalOfferType.TERM_EXTENSION,
+        ),
+    )
+
+    renewed = outcome.state.customer_accounts[0]
+    assert renewed.renewal_offer_type is RenewalOfferType.TERM_EXTENSION
+    assert renewed.contract_cadence is ContractCadence.ANNUAL
+    assert renewed.annual_prepay is True
 
 
 def test_run_win_back_play_restores_churned_account() -> None:
@@ -3650,3 +3852,18 @@ def test_start_board_recovery_plan_sets_focus_and_duration() -> None:
     assert outcome.state.finance.board_recovery_focus is BoardAsk.RELIABILITY
     assert outcome.state.finance.board_recovery_turns_remaining == BALANCE.board_recovery_turns
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_board_actions_clear_resolution_deadline() -> None:
+    product = make_product("Board Relief")
+    state = make_state(product, cash_on_hand=Decimal("7000.00"))
+    state.finance.board_pressure = 44
+    state.finance.governance_risk = 35
+    state.finance.active_board_ask = BoardAsk.TEAM_HEALTH
+    state.finance.board_resolution_due = True
+    state.finance.board_resolution_window = 2
+
+    outcome = apply_action(state, TurnAction.START_BOARD_RECOVERY_PLAN)
+
+    assert outcome.state.finance.board_resolution_due is False
+    assert outcome.state.finance.board_resolution_window == 0

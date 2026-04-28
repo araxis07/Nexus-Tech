@@ -11,6 +11,8 @@ from nexus_tech.domain.models import (
     CustomerAccount,
     CustomerAccountStatus,
     GameState,
+    RenewalOfferType,
+    SubscriptionPackage,
 )
 from nexus_tech.domain.money import format_money, format_rate, quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -125,7 +127,12 @@ def run_retention_play(state: GameState, account_id: UUID) -> CustomerSuccessAct
     )
 
 
-def make_renewal_offer(state: GameState, account_id: UUID) -> CustomerSuccessActionSummary:
+def make_renewal_offer(
+    state: GameState,
+    account_id: UUID,
+    *,
+    offer_type: RenewalOfferType = RenewalOfferType.LIGHT_DISCOUNT,
+) -> CustomerSuccessActionSummary:
     """Proactively offer renewal concessions before the next contract decision."""
 
     account = get_customer_account_by_id(state.customer_accounts, account_id)
@@ -139,15 +146,38 @@ def make_renewal_offer(state: GameState, account_id: UUID) -> CustomerSuccessAct
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.renewal_offer_cost
     )
-    account.discount_rate = clamp_rate(
-        account.discount_rate + BALANCE.renewal_offer_discount_increase
-    )
     account.renewal_offer_active = True
+    account.renewal_offer_type = offer_type
     account.renewal_health = clamp_int(account.renewal_health + BALANCE.renewal_offer_health_gain)
     account.satisfaction = clamp_int(account.satisfaction + BALANCE.renewal_offer_satisfaction_gain)
     account.failed_payment_risk = clamp_int(
         account.failed_payment_risk - BALANCE.renewal_offer_risk_relief
     )
+    offer_summary = "light discount"
+    if offer_type is RenewalOfferType.LIGHT_DISCOUNT:
+        account.discount_rate = clamp_rate(
+            account.discount_rate
+            + BALANCE.renewal_offer_discount_increase
+            + BALANCE.renewal_offer_light_discount_extra
+        )
+    elif offer_type is RenewalOfferType.BUNDLE_UPGRADE:
+        account.add_on_count += BALANCE.renewal_offer_bundle_add_on_gain
+        account.subscription_package = _upgrade_subscription_package(account.subscription_package)
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.renewal_offer_bundle_health_gain
+        )
+        offer_summary = "bundle upgrade"
+    else:
+        if account.contract_cadence is ContractCadence.MONTHLY:
+            account.contract_cadence = ContractCadence.ANNUAL
+        account.annual_prepay = True
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk - BALANCE.renewal_offer_term_extension_risk_relief
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.renewal_offer_term_extension_health_gain
+        )
+        offer_summary = "term extension"
     if account.renewal_turn > state.company.current_turn + BALANCE.renewal_offer_turn_window:
         account.renewal_turn = state.company.current_turn + BALANCE.renewal_offer_turn_window
     if account.status is CustomerAccountStatus.AT_RISK and account.renewal_health >= 60:
@@ -155,7 +185,7 @@ def make_renewal_offer(state: GameState, account_id: UUID) -> CustomerSuccessAct
 
     return CustomerSuccessActionSummary(
         message=(
-            f"Made a renewal offer to {account.name}. "
+            f"Made a {offer_summary} renewal offer to {account.name}. "
             f"Discount now {format_rate(account.discount_rate)}, "
             f"renewal turn {account.renewal_turn}, "
             f"cash -{BALANCE.renewal_offer_cost}."
@@ -190,6 +220,7 @@ def run_win_back_play(state: GameState, account_id: UUID) -> CustomerSuccessActi
     account.dunning_steps = 0
     account.escalation_count = max(0, account.escalation_count - 1)
     account.renewal_offer_active = False
+    account.renewal_offer_type = None
     account.renewal_turn = state.company.current_turn + 1
 
     return CustomerSuccessActionSummary(
@@ -223,3 +254,9 @@ def _get_product_accounts(
         for account in accounts
         if account.product_id == product_id and account.status is not CustomerAccountStatus.CHURNED
     ]
+
+
+def _upgrade_subscription_package(package: SubscriptionPackage) -> SubscriptionPackage:
+    if package is SubscriptionPackage.STARTER:
+        return SubscriptionPackage.GROWTH
+    return SubscriptionPackage.ENTERPRISE_SUITE

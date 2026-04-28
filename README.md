@@ -96,6 +96,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track an active board ask plus a warning ladder so governance pressure escalates before the company fully breaks
 - Track a rolling board score and launch multi-turn board recovery plans when trust starts slipping
 - Track quarterly board resolutions and restructuring pressure so repeated misses create visible strategic consequences
+- Track formal board-response deadlines so ignored resolutions can re-intensify governance pressure a few turns later
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
 - Execute a formal restructure plan when governance pressure becomes too high to ignore
@@ -114,12 +115,14 @@ Each turn represents a business interval. You review the company, choose actions
 - Let healthy accounts expand between renewals through packaging-driven add-ons, suite upgrades, and contract growth
 - Run explicit add-on campaigns and packaging migrations to rebalance monetization, support burden, and retention posture
 - Make proactive renewal offers and run win-back plays so churned accounts can still become commercial recovery opportunities
+- Choose renewal-offer types such as `light_discount`, `bundle_upgrade`, and `term_extension` so commercial saves carry clearer trade-offs
 - Track open tickets and SLA pressure so support quality can directly affect renewals and retention
 - Add recurring account revenue on top of product usage revenue
 - Let weak product health, bugs, and technical debt create visible renewal pressure
 - Invest directly in customer success and run targeted retention plays on fragile accounts
 - Improve a shared support program with knowledge-base and automation depth that lowers ticket pressure across the portfolio
 - Upgrade support operations directly through knowledge-base, automation, and SLA investments instead of relying only on passive drift
+- Aim support operations at `balanced`, `onboarding`, or `enterprise` lanes to change which queues get relief first
 - Invest in dedicated support staffing and pay visible service cost every turn as the installed base becomes heavier to serve
 - Run explicit support triage actions that cut backlog, escalation pressure, and payment-risk spillover
 - Review key accounts directly from the in-game `review_customers` action
@@ -141,6 +144,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Train employees, track promotion readiness, promote strong contributors, and monitor attrition risk
 - Track performance rating, underperformance streaks, and real resignation pressure when the company runs too hot
 - Assign managers, track leadership strength, and absorb org-drag pressure as headcount grows beyond clean management coverage
+- Track management layers and span-of-control risk so larger orgs create visible coordination drag instead of scaling cleanly forever
 - Promote product-facing team leads and track succession risk when too much execution leverage sits on one person
 - Run explicit org reorg actions to rebalance reporting lines and cut overloaded-manager drag
 
@@ -195,6 +199,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Resume the latest save slot
 - List, rename, and delete save slots directly from the CLI
 - Archive completed runs and inspect them later through `list-archives`
+- Archive run score tier, campaign grade, and estimated valuation so completed runs are easier to compare later
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
 - Persist release plans, sales deals, roadmap projects, competitor intel, scenario objectives, and hiring traits
 - Use SQLite schema versioning and additive migrations to keep local save files upgradeable

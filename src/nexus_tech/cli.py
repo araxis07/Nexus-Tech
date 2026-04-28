@@ -40,12 +40,14 @@ from nexus_tech.domain.models import (
     Product,
     ProductReleaseStatus,
     ProductReleaseType,
+    RenewalOfferType,
     RoadmapFocus,
     RoadmapProjectStatus,
     RoadmapProjectType,
     SalesDealStage,
     Seniority,
     SupportInvestmentFocus,
+    SupportLaneFocus,
     TurnAction,
 )
 from nexus_tech.persistence.errors import PersistenceError
@@ -250,13 +252,14 @@ ACTION_KEYS = {
     "61": TurnAction.EXPAND_ADD_ON_CATALOG,
     "62": TurnAction.MAKE_RENEWAL_OFFER,
     "63": TurnAction.RUN_WIN_BACK_PLAY,
+    "64": TurnAction.SET_SUPPORT_LANE_FOCUS,
 }
 UTILITY_ACTION_KEYS = {
-    "64": "save_game",
-    "65": "load_game",
-    "66": "show_guide",
-    "67": "show_glossary",
-    "68": "show_tutorial",
+    "65": "save_game",
+    "66": "load_game",
+    "67": "show_guide",
+    "68": "show_glossary",
+    "69": "show_tutorial",
 }
 ALL_MENU_KEYS = list(ACTION_KEYS) + list(UTILITY_ACTION_KEYS)
 
@@ -1257,6 +1260,16 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     if action is TurnAction.TRIAGE_SUPPORT_BACKLOG:
         return ActionContext()
 
+    if action is TurnAction.SET_SUPPORT_LANE_FOCUS:
+        focus_key = ask_choice_input(
+            "Support lane focus",
+            choices=["balanced", "onboarding", "enterprise"],
+            default=state.support_program.lane_focus.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(support_lane_focus=SupportLaneFocus(focus_key))
+
     if action is TurnAction.UPGRADE_SUPPORT_PROGRAM:
         focus_key = ask_choice_input(
             "Support investment focus",
@@ -1321,7 +1334,17 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None
-        return ActionContext(customer_account_id=customer_account_id)
+        offer_type_key = ask_choice_input(
+            "Renewal offer type",
+            choices=["light_discount", "bundle_upgrade", "term_extension"],
+            default="light_discount",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(
+            customer_account_id=customer_account_id,
+            renewal_offer_type=RenewalOfferType(offer_type_key),
+        )
 
     if action is TurnAction.RUN_WIN_BACK_PLAY:
         customer_account_id = choose_customer_account_id(

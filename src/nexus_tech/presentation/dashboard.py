@@ -483,6 +483,9 @@ def render_run_archive_catalog(
     table.add_column("Turn", justify="right")
     table.add_column("Outcome")
     table.add_column("Score", justify="right")
+    table.add_column("Tier")
+    table.add_column("Grade")
+    table.add_column("Value", justify="right")
     table.add_column("Cash", justify="right")
     table.add_column("Rep", justify="right")
     table.add_column("Saved")
@@ -496,6 +499,9 @@ def render_run_archive_catalog(
             str(archive.completed_turn),
             f"{archive.exit_outcome} / {status}",
             str(archive.total_score),
+            archive.score_tier,
+            archive.campaign_grade,
+            format_money(archive.estimated_valuation),
             format_money(archive.final_cash),
             str(archive.final_reputation),
             archive.archived_at,
@@ -1431,6 +1437,9 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table.add_row("Managers", str(team_condition.manager_headcount))
     table.add_row("Team Leads", str(team_condition.team_lead_count))
     table.add_row("Mgmt Cap", str(team_condition.management_capacity))
+    table.add_row("Mgmt Layers", str(team_condition.management_layers))
+    table.add_row("Max Span", str(team_condition.max_span))
+    table.add_row("Span Risk", str(team_condition.span_risk))
     table.add_row("Org Drag", str(team_condition.org_drag))
     table.add_row("Overloaded", str(team_condition.overloaded_manager_count))
     table.add_row("Overload Rpts", str(team_condition.overloaded_report_count))
@@ -1899,16 +1908,21 @@ def _build_action_menu_panel() -> Panel:
         "Proactively stabilize one account renewal.",
     )
     primary_actions.add_row("63", "run_win_back_play", "Try to recover one churned account.")
+    primary_actions.add_row(
+        "64",
+        "set_support_lane_focus",
+        "Bias support toward onboarding, enterprise, or balance.",
+    )
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
     utility_actions.add_column("Utility", style="bold")
     utility_actions.add_column("Purpose")
-    utility_actions.add_row("64", "save_game", "Write the current run to SQLite.")
-    utility_actions.add_row("65", "load_game", "Resume a saved slot from SQLite.")
-    utility_actions.add_row("66", "show_guide", "Show a compact how-to-play guide.")
-    utility_actions.add_row("67", "show_glossary", "Explain stats and decision families.")
-    utility_actions.add_row("68", "show_tutorial", "Show a safe first-run action path.")
+    utility_actions.add_row("65", "save_game", "Write the current run to SQLite.")
+    utility_actions.add_row("66", "load_game", "Resume a saved slot from SQLite.")
+    utility_actions.add_row("67", "show_guide", "Show a compact how-to-play guide.")
+    utility_actions.add_row("68", "show_glossary", "Explain stats and decision families.")
+    utility_actions.add_row("69", "show_tutorial", "Show a safe first-run action path.")
 
     content = Group(
         "[bold]Turn Actions[/bold]",
@@ -2313,6 +2327,8 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
         table.add_column("Package")
         table.add_column("Dunning", justify="right")
         table.add_column("Esc", justify="right")
+        table.add_column("Queue Age", justify="right")
+        table.add_column("Offer")
 
     for account in active_accounts:
         row = [
@@ -2347,6 +2363,12 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
                     account.subscription_package.value,
                     str(account.dunning_steps),
                     str(account.escalation_count),
+                    str(account.ticket_queue_age),
+                    (
+                        account.renewal_offer_type.value
+                        if account.renewal_offer_type is not None
+                        else "-"
+                    ),
                 ]
             )
         table.add_row(*row)
@@ -2375,11 +2397,13 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Knowledge Base", str(state.support_program.knowledge_base_level))
     table.add_row("Automation", str(state.support_program.automation_level))
     table.add_row("SLA Target", str(state.support_program.sla_target))
+    table.add_row("Lane Focus", state.support_program.lane_focus.value)
     table.add_row("Staffing", str(state.support_program.staffing_level))
     table.add_row("Staff Cap", str(staffing_capacity))
     table.add_row("Staff Gap", str(staffing_gap))
     table.add_row("Backlog Queue", str(state.support_program.backlog_queue))
     table.add_row("Esc Queue", str(state.support_program.escalation_queue))
+    table.add_row("Queue Age", str(state.support_program.queue_age_pressure))
     table.add_row("Resolved", str(state.support_program.resolved_last_turn))
     table.add_row("Deflection", str(state.support_program.deflection_score))
     table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))
@@ -2469,6 +2493,8 @@ def _build_governance_panel(state: GameState) -> Panel:
     table.add_row("Governance Risk", str(state.finance.governance_risk))
     table.add_row("Directive", directive)
     table.add_row("Resolution", state.finance.board_resolution.value.replace("_", " "))
+    table.add_row("Resolution Due", "yes" if state.finance.board_resolution_due else "no")
+    table.add_row("Resolution Window", str(state.finance.board_resolution_window))
     table.add_row("Board Ask", state.finance.active_board_ask.value.replace("_", " "))
     table.add_row("Recovery Focus", state.finance.board_recovery_focus.value.replace("_", " "))
     table.add_row("Recovery Turns", str(state.finance.board_recovery_turns_remaining))

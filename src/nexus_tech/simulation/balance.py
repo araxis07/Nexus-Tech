@@ -453,6 +453,9 @@ class BalanceConfig:
     management_succession_energy_threshold: int = 45
     management_succession_morale_threshold: int = 45
     management_succession_attrition_threshold: int = 55
+    management_layer_drag_threshold: int = 2
+    management_layer_drag_per_layer: int = 2
+    management_span_soft_cap: int = 4
 
     roadmap_duration_turns: int = 4
     roadmap_growth_acquisition_bonus: int = 2
@@ -1509,6 +1512,10 @@ class BalanceConfig:
     board_recovery_governance_relief: int = 3
     board_recovery_confidence_gain: int = 2
     board_recovery_miss_penalty: int = 2
+    board_resolution_window_turns: int = 2
+    board_resolution_expiry_pressure_gain: int = 4
+    board_resolution_expiry_risk_gain: int = 3
+    board_resolution_expiry_confidence_loss: int = 2
     board_response_min_pressure_threshold: int = 28
     board_response_confidence_gain: int = 2
     board_response_governance_relief: int = 3
@@ -1559,6 +1566,13 @@ class BalanceConfig:
     support_program_service_cost_per_ticket: Decimal = Decimal("7.00")
     support_program_service_cost_per_escalation: Decimal = Decimal("22.00")
     support_program_service_cost_per_staffing_level: Decimal = Decimal("28.00")
+    support_program_service_cost_per_queue_age: Decimal = Decimal("5.00")
+    support_program_focus_ticket_relief_divisor: int = 2
+    support_program_focus_onboarding_bonus: int = 2
+    support_program_focus_enterprise_bonus: int = 2
+    support_program_queue_age_threshold: int = 3
+    support_program_queue_age_satisfaction_loss: int = 2
+    support_program_queue_age_churn_gain: int = 4
     support_program_role_capacity: dict[str, int] = field(
         default_factory=lambda: {
             "engineer": 1,
@@ -1623,6 +1637,11 @@ class BalanceConfig:
     renewal_offer_satisfaction_gain: int = 4
     renewal_offer_risk_relief: int = 7
     renewal_offer_turn_window: int = 2
+    renewal_offer_light_discount_extra: Decimal = Decimal("0.0100")
+    renewal_offer_bundle_add_on_gain: int = 1
+    renewal_offer_bundle_health_gain: int = 5
+    renewal_offer_term_extension_risk_relief: int = 10
+    renewal_offer_term_extension_health_gain: int = 7
     win_back_play_cost: Decimal = Decimal("150.00")
     win_back_contract_multiplier: Decimal = Decimal("0.80")
     win_back_satisfaction_reset: int = 58

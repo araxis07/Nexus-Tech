@@ -30,10 +30,12 @@ from nexus_tech.domain.models import (
     PricingTier,
     Product,
     ProductReleaseType,
+    RenewalOfferType,
     RoadmapFocus,
     RoadmapProjectType,
     Seniority,
     SupportInvestmentFocus,
+    SupportLaneFocus,
     TurnAction,
 )
 from nexus_tech.domain.money import format_money, quantize_money
@@ -153,6 +155,7 @@ from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
     invest_in_support_staffing,
     route_support_escalation,
+    set_support_lane_focus,
     triage_support_backlog,
     upgrade_support_program,
 )
@@ -208,6 +211,8 @@ class ActionContext:
     functional_budget_preset: FunctionalBudgetPreset | None = None
     hiring_candidate_id: UUID | None = None
     manager_id: UUID | None = None
+    support_lane_focus: SupportLaneFocus | None = None
+    renewal_offer_type: RenewalOfferType | None = None
 
 
 @dataclass(frozen=True)
@@ -737,7 +742,11 @@ def apply_action(
             next_state.customer_accounts,
             context.customer_account_id,
         )
-        summary = make_renewal_offer(next_state, account.id)
+        summary = make_renewal_offer(
+            next_state,
+            account.id,
+            offer_type=context.renewal_offer_type or RenewalOfferType.LIGHT_DISCOUNT,
+        )
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Made renewal offer for %s.", account.name)
         return ActionOutcome(
@@ -773,6 +782,13 @@ def apply_action(
             message=summary.message,
             turn_should_end=next_state.company.game_over,
         )
+
+    if action is TurnAction.SET_SUPPORT_LANE_FOCUS:
+        if context.support_lane_focus is None:
+            raise ValueError("A support lane focus must be selected.")
+        summary = set_support_lane_focus(next_state, context.support_lane_focus)
+        logger.debug("Set support lane focus to %s.", context.support_lane_focus.value)
+        return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.TRIAGE_SUPPORT_BACKLOG:
         summary = triage_support_backlog(next_state)

@@ -349,6 +349,22 @@ class SupportInvestmentFocus(StrEnum):
     SLA_PROGRAM = "sla_program"
 
 
+class SupportLaneFocus(StrEnum):
+    """Company-wide support lane emphasis."""
+
+    BALANCED = "balanced"
+    ONBOARDING = "onboarding"
+    ENTERPRISE = "enterprise"
+
+
+class RenewalOfferType(StrEnum):
+    """Type of proactive renewal offer sent to one account."""
+
+    LIGHT_DISCOUNT = "light_discount"
+    BUNDLE_UPGRADE = "bundle_upgrade"
+    TERM_EXTENSION = "term_extension"
+
+
 class TurnAction(StrEnum):
     """Actions the player can take during a turn."""
 
@@ -395,6 +411,7 @@ class TurnAction(StrEnum):
     MAKE_HIRING_OFFER = "make_hiring_offer"
     TRIAGE_SUPPORT_BACKLOG = "triage_support_backlog"
     INVEST_IN_SUPPORT_STAFFING = "invest_in_support_staffing"
+    SET_SUPPORT_LANE_FOCUS = "set_support_lane_focus"
     UPGRADE_SUPPORT_PROGRAM = "upgrade_support_program"
     SET_FUNCTIONAL_BUDGET = "set_functional_budget"
     ASSIGN_MANAGER = "assign_manager"
@@ -559,6 +576,8 @@ class FinanceState(BaseModel):
     restructuring_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_recovery_focus: BoardAsk = BoardAsk.PROFITABILITY
     board_recovery_turns_remaining: int = Field(default=0, ge=0)
+    board_resolution_due: bool = False
+    board_resolution_window: int = Field(default=0, ge=0)
     last_board_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
@@ -630,12 +649,14 @@ class SupportProgram(BaseModel):
     knowledge_base_level: int = Field(default=22, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     automation_level: int = Field(default=16, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     sla_target: int = Field(default=58, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    lane_focus: SupportLaneFocus = SupportLaneFocus.BALANCED
     backlog_queue: int = Field(default=0, ge=0)
     escalation_queue: int = Field(default=0, ge=0)
     staffing_level: int = Field(default=0, ge=0, le=20)
     resolved_last_turn: int = Field(default=0, ge=0)
     deflection_score: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     sla_breaches_last_turn: int = Field(default=0, ge=0)
+    queue_age_pressure: int = Field(default=0, ge=0)
     service_cost_last_turn: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
 
     @field_validator("service_cost_last_turn", mode="before")
@@ -673,7 +694,9 @@ class CustomerAccount(BaseModel):
     failed_payment_risk: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     dunning_steps: int = Field(default=0, ge=0)
     escalation_count: int = Field(default=0, ge=0)
+    ticket_queue_age: int = Field(default=0, ge=0)
     renewal_offer_active: bool = False
+    renewal_offer_type: Optional[RenewalOfferType] = None  # noqa: UP045
     win_back_attempts: int = Field(default=0, ge=0)
     expansion_potential: int = Field(ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     renewal_health: int = Field(default=60, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)

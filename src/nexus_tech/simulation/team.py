@@ -57,6 +57,9 @@ class TeamCondition:
     manager_headcount: int
     team_lead_count: int
     management_capacity: int
+    management_layers: int
+    max_span: int
+    span_risk: int
     org_drag: int
     overloaded_manager_count: int
     overloaded_report_count: int
@@ -77,6 +80,9 @@ class OrgStructureSummary:
     manager_headcount: int
     team_lead_count: int
     management_capacity: int
+    management_layers: int
+    max_span: int
+    span_risk: int
     org_drag: int
     overloaded_manager_count: int
     overloaded_report_count: int
@@ -262,11 +268,20 @@ def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
         if employee.id in manager_ids
         and report_counts.get(employee.id, 0) > calculate_manager_capacity(employee)
     )
+    management_layers = _calculate_management_layers(employees)
+    max_span = max(report_counts.values(), default=0)
+    span_risk = max(0, max_span - BALANCE.management_span_soft_cap)
     capacity_gap = max(0, unmanaged_headcount - BALANCE.management_org_drag_threshold)
     org_drag = (
         capacity_gap
         + max(0, len(employees) - len(manager_ids) - management_capacity)
         + overloaded_reports
+        + max(
+            0,
+            management_layers - BALANCE.management_layer_drag_threshold,
+        )
+        * BALANCE.management_layer_drag_per_layer
+        + span_risk
     )
     return OrgStructureSummary(
         manager_ids=manager_ids,
@@ -275,6 +290,9 @@ def calculate_org_structure(employees: list[Employee]) -> OrgStructureSummary:
         manager_headcount=len(manager_ids),
         team_lead_count=team_lead_count,
         management_capacity=management_capacity,
+        management_layers=management_layers,
+        max_span=max_span,
+        span_risk=span_risk,
         org_drag=max(0, org_drag),
         overloaded_manager_count=overloaded_manager_count,
         overloaded_report_count=max(0, overloaded_reports),
@@ -393,6 +411,9 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
             manager_headcount=0,
             team_lead_count=0,
             management_capacity=0,
+            management_layers=0,
+            max_span=0,
+            span_risk=0,
             org_drag=0,
             overloaded_manager_count=0,
             overloaded_report_count=0,
@@ -420,6 +441,9 @@ def calculate_team_condition(employees: list[Employee]) -> TeamCondition:
         manager_headcount=org_structure.manager_headcount,
         team_lead_count=org_structure.team_lead_count,
         management_capacity=org_structure.management_capacity,
+        management_layers=org_structure.management_layers,
+        max_span=org_structure.max_span,
+        span_risk=org_structure.span_risk,
         org_drag=org_structure.org_drag,
         overloaded_manager_count=org_structure.overloaded_manager_count,
         overloaded_report_count=org_structure.overloaded_report_count,
@@ -493,6 +517,8 @@ def assign_manager(
         raise ValueError("An employee cannot manage themselves.")
     if not is_eligible_manager(manager):
         raise ValueError(f"{manager.full_name} is not eligible to manage other employees.")
+    if _creates_manager_cycle(employees, report_id=report.id, manager_id=manager.id):
+        raise ValueError("That reporting line would create a management cycle.")
 
     report.manager_id = manager.id
     return TeamActionSummary(message=f"{manager.full_name} now manages {report.full_name}.")
@@ -673,6 +699,44 @@ def _build_manager_report_counts(employees: list[Employee]) -> dict[UUID, int]:
             continue
         report_counts[employee.manager_id] = report_counts.get(employee.manager_id, 0) + 1
     return report_counts
+
+
+def _calculate_management_layers(employees: list[Employee]) -> int:
+    employee_map = {employee.id: employee for employee in employees}
+    max_depth = 0
+    for employee in employees:
+        depth = 0
+        visited: set[UUID] = {employee.id}
+        current_manager_id = employee.manager_id
+        while current_manager_id is not None and current_manager_id in employee_map:
+            if current_manager_id in visited:
+                depth += 1
+                break
+            visited.add(current_manager_id)
+            depth += 1
+            current_manager_id = employee_map[current_manager_id].manager_id
+        max_depth = max(max_depth, depth)
+    return max_depth
+
+
+def _creates_manager_cycle(
+    employees: list[Employee],
+    *,
+    report_id: UUID,
+    manager_id: UUID,
+) -> bool:
+    employee_map = {employee.id: employee for employee in employees}
+    visited: set[UUID] = {report_id}
+    current_manager_id = manager_id
+    while current_manager_id is not None:
+        if current_manager_id in visited:
+            return True
+        visited.add(current_manager_id)
+        current_manager = employee_map.get(current_manager_id)
+        if current_manager is None:
+            return False
+        current_manager_id = current_manager.manager_id
+    return False
 
 
 def update_succession_risk(employees: list[Employee]) -> None:

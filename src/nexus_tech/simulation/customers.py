@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     LifecycleStage,
     MarketSegment,
     Product,
+    RenewalOfferType,
     SubscriptionPackage,
     SupportProgram,
     SupportTier,
@@ -222,12 +223,17 @@ def apply_end_of_turn_customers(
 
         account.renewal_turn = current_turn + get_contract_interval(account.contract_cadence)
         discount_penalty = int(account.discount_rate / BALANCE.key_account_discount_risk_divisor)
+        renewal_offer_relief = 0
+        if account.renewal_offer_active:
+            renewal_offer_relief += BALANCE.renewal_offer_risk_relief
+            if account.renewal_offer_type is RenewalOfferType.TERM_EXTENSION:
+                renewal_offer_relief += BALANCE.renewal_offer_term_extension_risk_relief // 2
         effective_churn_risk = clamp_int(
             account.churn_risk
             + discount_penalty
             + (account.sla_breach_risk // BALANCE.contract_sla_ticket_divisor)
             + (account.invoice_risk // BALANCE.contract_sla_support_divisor)
-            - (BALANCE.renewal_offer_risk_relief if account.renewal_offer_active else 0)
+            - renewal_offer_relief
             - customer_success_bonus,
         )
         if effective_churn_risk >= BALANCE.key_account_churn_threshold:
@@ -237,6 +243,7 @@ def apply_end_of_turn_customers(
                 product.user_count - BALANCE.key_account_renewal_churn_user_loss,
             )
             account.renewal_offer_active = False
+            account.renewal_offer_type = None
             churned_accounts += 1
             continue
 
@@ -244,6 +251,7 @@ def apply_end_of_turn_customers(
         revenue_before = calculate_account_recurring_revenue(account)
         apply_commercial_renewal(account, customer_success_bonus=customer_success_bonus)
         account.renewal_offer_active = False
+        account.renewal_offer_type = None
         revenue_after = calculate_account_recurring_revenue(account)
         if revenue_after > revenue_before:
             expansion_revenue = quantize_money(expansion_revenue + (revenue_after - revenue_before))

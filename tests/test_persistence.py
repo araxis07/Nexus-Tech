@@ -49,6 +49,7 @@ from nexus_tech.domain.models import (
     ProductReleaseStatus,
     ProductReleaseType,
     QuarterPlan,
+    RenewalOfferType,
     RoadmapFocus,
     RoadmapProject,
     RoadmapProjectStatus,
@@ -58,6 +59,7 @@ from nexus_tech.domain.models import (
     ScenarioObjectiveMetric,
     Seniority,
     SubscriptionPackage,
+    SupportLaneFocus,
     SupportProgram,
     SupportTier,
     TurnLedgerEntry,
@@ -216,7 +218,9 @@ def make_state() -> GameState:
         failed_payment_risk=12,
         dunning_steps=1,
         escalation_count=1,
+        ticket_queue_age=3,
         renewal_offer_active=True,
+        renewal_offer_type=RenewalOfferType.TERM_EXTENSION,
         win_back_attempts=1,
         expansion_potential=66,
         renewal_health=70,
@@ -249,6 +253,8 @@ def make_state() -> GameState:
         restructuring_pressure=7,
         board_recovery_focus=BoardAsk.RELIABILITY,
         board_recovery_turns_remaining=2,
+        board_resolution_due=True,
+        board_resolution_window=2,
         last_board_review_turn=4,
         last_funding_turn=3,
     )
@@ -373,12 +379,14 @@ def make_state() -> GameState:
             knowledge_base_level=38,
             automation_level=29,
             sla_target=56,
+            lane_focus=SupportLaneFocus.ENTERPRISE,
             backlog_queue=7,
             escalation_queue=3,
             staffing_level=4,
             resolved_last_turn=8,
             deflection_score=41,
             sla_breaches_last_turn=1,
+            queue_age_pressure=5,
             service_cost_last_turn=Decimal("164.00"),
         ),
         difficulty_mode=DifficultyMode.FOUNDER,
@@ -490,12 +498,14 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "support_knowledge_base_level",
         "support_automation_level",
         "support_sla_target",
+        "support_lane_focus",
         "support_backlog_queue",
         "support_escalation_queue",
         "support_staffing_level",
         "support_resolved_last_turn",
         "support_deflection_score",
         "support_sla_breaches_last_turn",
+        "support_queue_age_pressure",
         "support_service_cost_last_turn",
         "market_cycle",
         "market_cycle_turns_remaining",
@@ -534,6 +544,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "restructuring_pressure",
         "board_recovery_focus",
         "board_recovery_turns_remaining",
+        "board_resolution_due",
+        "board_resolution_window",
         "last_board_review_turn",
     }.issubset(finance_columns)
     assert {
@@ -559,6 +571,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "failed_payment_risk",
         "dunning_steps",
         "escalation_count",
+        "ticket_queue_age",
         "renewal_health",
         "support_tier",
     }.issubset(customer_columns)
@@ -586,9 +599,10 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     }.issubset(roadmap_columns)
     assert {
         "renewal_offer_active",
+        "renewal_offer_type",
         "win_back_attempts",
     }.issubset(customer_columns)
-    assert user_version >= 18
+    assert user_version >= 19
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -710,6 +724,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "budget_engineering_share",
         "support_knowledge_base_level",
         "support_sla_target",
+        "support_lane_focus",
     }.issubset(save_slot_columns)
     assert {"strategy"}.issubset(company_columns)
     assert {"pricing_tier", "target_segment", "packaging_strategy"}.issubset(product_columns)
@@ -729,8 +744,10 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "board_warning_level",
         "quarterly_review_count",
         "restructuring_pressure",
+        "board_resolution_due",
+        "board_resolution_window",
     }.issubset(finance_columns)
-    assert user_version >= 17
+    assert user_version >= 19
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -781,7 +798,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 18
+    assert report.schema_version >= 19
 
 
 def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
@@ -796,6 +813,9 @@ def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
     assert archives[0].slot_name == "active"
     assert archives[0].victory_achieved is True
     assert archives[0].total_score > 0
+    assert archives[0].score_tier
+    assert archives[0].campaign_grade
+    assert archives[0].estimated_valuation > Decimal("0.00")
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

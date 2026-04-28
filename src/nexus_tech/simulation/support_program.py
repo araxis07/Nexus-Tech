@@ -11,6 +11,7 @@ from nexus_tech.domain.models import (
     EmployeeRole,
     GameState,
     SupportInvestmentFocus,
+    SupportLaneFocus,
     SupportProgram,
     SupportTier,
 )
@@ -33,6 +34,7 @@ class SupportProgramSummary:
     deflection_score: int
     weighted_ticket_pressure: int
     staffing_gap: int
+    queue_age_pressure: int
     service_cost: Decimal
     reputation_delta: int
     morale_penalty: int
@@ -74,12 +76,25 @@ def apply_end_of_turn_support_program(
         for account in state.customer_accounts
         if account.status is not CustomerAccountStatus.CHURNED
     ]
+    queue_age_pressure = 0
+    for account in active_accounts:
+        if account.open_tickets > 0 or account.sla_breach_risk > 0:
+            account.ticket_queue_age += 1
+            if (
+                account.segment.value == "enterprise"
+                or account.support_tier is SupportTier.WHITE_GLOVE
+            ):
+                account.ticket_queue_age += 1
+        else:
+            account.ticket_queue_age = max(0, account.ticket_queue_age - 1)
+        queue_age_pressure += max(0, account.ticket_queue_age - 1)
     total_open_tickets = sum(account.open_tickets for account in active_accounts)
     weighted_ticket_pressure = total_open_tickets + sum(
         max(0, BALANCE.support_program_segment_ticket_weight[account.segment.value] - 1)
         for account in active_accounts
         if account.open_tickets > 0
     )
+    weighted_ticket_pressure += queue_age_pressure
     weighted_ticket_pressure += sum(
         BALANCE.support_tier_capacity_cost[account.support_tier.value]
         for account in active_accounts
@@ -97,6 +112,7 @@ def apply_end_of_turn_support_program(
         ticket_relief
         + state.support_program.knowledge_base_level // 2
         + state.support_program.automation_level // 2
+        + _calculate_support_focus_bonus(active_accounts, state.support_program.lane_focus)
     )
     effective_capacity = (
         BALANCE.support_program_base_capacity
@@ -132,6 +148,7 @@ def apply_end_of_turn_support_program(
     state.support_program.resolved_last_turn = resolved_tickets
     state.support_program.deflection_score = deflection_score
     state.support_program.sla_breaches_last_turn = sla_breaches
+    state.support_program.queue_age_pressure = queue_age_pressure
     service_cost = quantize_money(
         (Decimal(total_open_tickets) * BALANCE.support_program_service_cost_per_ticket)
         + (
@@ -142,6 +159,7 @@ def apply_end_of_turn_support_program(
             Decimal(state.support_program.staffing_level)
             * BALANCE.support_program_service_cost_per_staffing_level
         )
+        + (Decimal(queue_age_pressure) * BALANCE.support_program_service_cost_per_queue_age)
     )
     state.support_program.service_cost_last_turn = service_cost
 
@@ -155,6 +173,15 @@ def apply_end_of_turn_support_program(
         reputation_delta = -BALANCE.support_program_backlog_reputation_loss
     if staffing_gap >= BALANCE.support_program_staffing_gap_reputation_threshold:
         reputation_delta -= 1
+    if queue_age_pressure >= BALANCE.support_program_queue_age_threshold:
+        for account in active_accounts:
+            if account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold:
+                account.satisfaction = clamp_int(
+                    account.satisfaction - BALANCE.support_program_queue_age_satisfaction_loss
+                )
+                account.churn_risk = clamp_int(
+                    account.churn_risk + BALANCE.support_program_queue_age_churn_gain
+                )
     if (
         state.support_program.backlog_queue
         >= BALANCE.support_program_backlog_morale_penalty_threshold
@@ -183,6 +210,7 @@ def apply_end_of_turn_support_program(
         deflection_score=deflection_score,
         weighted_ticket_pressure=weighted_ticket_pressure,
         staffing_gap=staffing_gap,
+        queue_age_pressure=queue_age_pressure,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
@@ -346,6 +374,24 @@ def invest_in_support_staffing(state: GameState) -> SupportOpsActionSummary:
     )
 
 
+def set_support_lane_focus(
+    state: GameState,
+    focus: SupportLaneFocus,
+) -> SupportOpsActionSummary:
+    """Change the company-wide support lane emphasis."""
+
+    if state.support_program.lane_focus is focus:
+        raise ValueError(f"Support is already focused on {focus.value}.")
+    state.support_program.lane_focus = focus
+    state.support_program.backlog_queue = max(0, state.support_program.backlog_queue - 1)
+    return SupportOpsActionSummary(
+        message=(
+            f"Support lane focus shifted to {focus.value}. "
+            f"Backlog now {state.support_program.backlog_queue}."
+        )
+    )
+
+
 def route_support_escalation(
     state: GameState,
     account_id,
@@ -380,6 +426,7 @@ def route_support_escalation(
     account.churn_risk = clamp_int(account.churn_risk - BALANCE.support_program_route_churn_relief)
     account.renewal_health = clamp_int(account.renewal_health + 4)
     account.escalation_count = max(0, account.escalation_count - 1)
+    account.ticket_queue_age = max(0, account.ticket_queue_age - 2)
     state.support_program.escalation_queue = max(0, state.support_program.escalation_queue - 1)
 
     return SupportOpsActionSummary(
@@ -424,10 +471,43 @@ def calculate_support_staff_capacity(state: GameState) -> int:
     return (
         (support_roles * BALANCE.support_program_staff_capacity_unit)
         + (state.support_program.staffing_level * BALANCE.support_program_staffing_capacity_unit)
+        + _focus_capacity_bonus(state)
         + engineer_relief
         + team_lead_bonus
         + budget_capacity
     )
+
+
+def _focus_capacity_bonus(state: GameState) -> int:
+    focus = state.support_program.lane_focus
+    if focus is SupportLaneFocus.BALANCED:
+        return 0
+    targeted_accounts = 0
+    for account in state.customer_accounts:
+        if account.status is CustomerAccountStatus.CHURNED or account.open_tickets <= 0:
+            continue
+        if (focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise") or (
+            focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise"
+        ):
+            targeted_accounts += 1
+    return targeted_accounts // BALANCE.support_program_focus_ticket_relief_divisor
+
+
+def _calculate_support_focus_bonus(
+    accounts: list[CustomerAccount],
+    focus: SupportLaneFocus,
+) -> int:
+    if focus is SupportLaneFocus.BALANCED:
+        return 0
+    focus_bonus = 0
+    for account in accounts:
+        if account.open_tickets <= 0:
+            continue
+        if focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise":
+            focus_bonus += BALANCE.support_program_focus_enterprise_bonus
+        elif focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise":
+            focus_bonus += BALANCE.support_program_focus_onboarding_bonus
+    return focus_bonus
 
 
 def _get_account_by_id(accounts: list[CustomerAccount], account_id) -> CustomerAccount:

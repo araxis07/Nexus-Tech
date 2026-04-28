@@ -49,10 +49,14 @@ class FinanceRepository:
                 restructuring_pressure,
                 board_recovery_focus,
                 board_recovery_turns_remaining,
+                board_resolution_due,
+                board_resolution_window,
                 last_board_review_turn,
                 last_funding_turn
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
             (
                 slot_name,
@@ -79,6 +83,8 @@ class FinanceRepository:
                 finance.restructuring_pressure,
                 finance.board_recovery_focus.value,
                 finance.board_recovery_turns_remaining,
+                int(finance.board_resolution_due),
+                finance.board_resolution_window,
                 finance.last_board_review_turn,
                 finance.last_funding_turn,
             ),
@@ -113,6 +119,8 @@ class FinanceRepository:
                 restructuring_pressure,
                 board_recovery_focus,
                 board_recovery_turns_remaining,
+                board_resolution_due,
+                board_resolution_window,
                 last_board_review_turn,
                 last_funding_turn
             FROM finance_state
@@ -149,6 +157,8 @@ class FinanceRepository:
             restructuring_pressure=row["restructuring_pressure"] or 0,
             board_recovery_focus=BoardAsk(row["board_recovery_focus"] or "profitability"),
             board_recovery_turns_remaining=row["board_recovery_turns_remaining"] or 0,
+            board_resolution_due=bool(row["board_resolution_due"]),
+            board_resolution_window=row["board_resolution_window"] or 0,
             last_board_review_turn=row["last_board_review_turn"],
             last_funding_turn=row["last_funding_turn"],
         )

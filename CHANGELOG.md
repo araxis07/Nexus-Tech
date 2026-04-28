@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.23.0 - 2026-04-28
+
+- Added support-lane focus with `balanced`, `onboarding`, and `enterprise` routing so support capacity can be aimed at the current customer mix
+- Added typed renewal offers with `light_discount`, `bundle_upgrade`, and `term_extension` outcomes instead of treating every renewal save as the same play
+- Added governance follow-through with formal board-resolution deadlines that raise pressure again when the company ignores the board response window
+- Added deeper org-structure tracking through management layers, span risk, and cycle-safe reporting assignments
+- Extended SQLite persistence and run archives with the new support, governance, customer, and score metadata
+- Extended dashboards, CLI prompts, and regression coverage for support lanes, renewal types, board deadlines, and archive summaries
+- Promoted the package version to `0.23.0`
+
 ## 0.22.0 - 2026-04-28
 
 - Added board-recovery plans with recovery focus, board score tracking, and multi-turn governance stabilization pressure
