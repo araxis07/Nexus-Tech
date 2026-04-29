@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
+    CapitalPlan,
     Company,
     FinanceState,
     FundingHistoryEntry,
@@ -15,6 +16,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.support import clamp_int
 
 
@@ -330,6 +332,7 @@ def apply_end_of_turn_finance_drift(
     finance: FinanceState,
     company: Company,
     *,
+    capital_plan: CapitalPlan | None = None,
     net_cash_flow: Decimal,
     turn_history: list[TurnLedgerEntry] | None = None,
 ) -> FinanceTurnSummary:
@@ -355,6 +358,20 @@ def apply_end_of_turn_finance_drift(
         latest_net_cash_flow=net_cash_flow,
     )
     forecast_runway_turns = estimate_runway(company.cash_on_hand, forecast_net_cash_flow)
+    capital_drift = (
+        evaluate_capital_plan(
+            company,
+            finance,
+            capital_plan,
+            latest_net_cash_flow=net_cash_flow,
+        )
+        if capital_plan is not None
+        else None
+    )
+    if capital_drift is not None:
+        finance.investor_pressure = clamp_int(
+            finance.investor_pressure + capital_drift.investor_pressure_delta
+        )
     covenant_delta = 0
     if finance.debt_principal >= BALANCE.finance_covenant_risk_debt_threshold:
         covenant_delta += BALANCE.finance_covenant_risk_gain
@@ -367,12 +384,14 @@ def apply_end_of_turn_finance_drift(
         and net_cash_flow >= ZERO_MONEY
     ):
         covenant_delta -= BALANCE.finance_covenant_risk_relief
+    if capital_drift is not None:
+        covenant_delta += capital_drift.covenant_risk_delta
     finance.covenant_risk = clamp_int(finance.covenant_risk + covenant_delta)
 
-    if (
-        forecast_runway_turns is not None
-        and forecast_runway_turns < BALANCE.finance_board_runway_target
-    ):
+    runway_target = BALANCE.finance_board_runway_target
+    if capital_drift is not None:
+        runway_target += capital_drift.runway_target_modifier
+    if forecast_runway_turns is not None and forecast_runway_turns < runway_target:
         finance.missed_board_targets += BALANCE.finance_board_target_miss_gain
     else:
         finance.missed_board_targets = max(
@@ -391,6 +410,8 @@ def apply_end_of_turn_finance_drift(
     )
     if finance.missed_board_targets > 0:
         board_delta -= BALANCE.finance_board_miss_confidence_penalty
+    if capital_drift is not None:
+        board_delta += capital_drift.board_confidence_delta
     finance.board_confidence = clamp_int(finance.board_confidence + board_delta)
     finance.forecast_net_cash_flow = forecast_net_cash_flow
     finance.forecast_runway_turns = forecast_runway_turns

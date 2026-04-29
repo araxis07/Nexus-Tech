@@ -54,6 +54,7 @@ from nexus_tech.simulation.governance import get_governance_tradeoff_focus
 from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
+from nexus_tech.simulation.meta_progression import MetaProgressionSummary
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
@@ -919,7 +920,9 @@ def render_dashboard(console: Console, state: GameState) -> None:
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
                 _build_finance_panel(state),
+                _build_capital_plan_panel(state),
                 _build_governance_panel(state),
+                _build_partnership_panel(state),
                 _build_pipeline_summary_panel(state),
             ],
             equal=False,
@@ -979,9 +982,26 @@ def render_board_view(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_finance_panel(state),
+                _build_capital_plan_panel(state),
                 _build_governance_panel(state),
                 _build_objective_panel(state),
                 _build_late_game_panel(state),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
+
+
+def render_partnership_view(console: Console, state: GameState) -> None:
+    """Render the dedicated partnership and capital allocation view."""
+
+    console.print(
+        Columns(
+            [
+                _build_partnership_panel(state, compact=False),
+                _build_capital_plan_panel(state),
+                _build_finance_panel(state),
             ],
             equal=False,
             expand=True,
@@ -1041,7 +1061,9 @@ def render_report(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_finance_panel(state),
+                _build_capital_plan_panel(state),
                 _build_governance_panel(state),
+                _build_partnership_panel(state),
                 _build_customer_accounts_panel(state),
                 _build_support_program_panel(state),
                 _build_operations_panel(state),
@@ -1069,8 +1091,40 @@ def render_report(console: Console, state: GameState) -> None:
             expand=True,
         )
     )
-    render_pipeline_view(console, state)
     console.print(history_panel)
+    render_pipeline_view(console, state)
+
+
+def render_meta_progression(console: Console, summary: MetaProgressionSummary) -> None:
+    """Render archive-derived campaign progression."""
+
+    overview = Table(box=None, expand=True)
+    overview.add_column("Metric", style="bold")
+    overview.add_column("Value")
+    overview.add_row("Runs", str(summary.total_runs))
+    overview.add_row("Victories", str(summary.victories))
+    overview.add_row("Best Score", str(summary.best_score))
+    overview.add_row("Best Grade", summary.best_grade)
+    overview.add_row("Avg Offer", format_money(summary.average_offer_value))
+    overview.add_row("Campaign Tier", summary.campaign_tier)
+    overview.add_row(
+        "Outcomes",
+        ", ".join(summary.unique_outcomes) if summary.unique_outcomes else "-",
+    )
+    overview.add_row(
+        "Unlocks",
+        ", ".join(summary.unlocked_achievements),
+    )
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Meta Progression", border_style="cyan", expand=True),
+                Panel(summary.next_goal, title="Next Goal", border_style="green", expand=True),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
 
 
 def render_turn_resolution(console: Console, resolution: TurnResolution) -> None:
@@ -1937,6 +1991,22 @@ def _build_action_menu_panel() -> Panel:
         "set_support_lane_focus",
         "Bias support toward onboarding, enterprise, billing, or balance.",
     )
+    primary_actions.add_row(
+        "70",
+        "create_partnership",
+        "Open one reseller, integration, or marketplace channel.",
+    )
+    primary_actions.add_row(
+        "71",
+        "invest_in_partner_enablement",
+        "Improve partner quality, readiness, and conflict posture.",
+    )
+    primary_actions.add_row("72", "review_partnerships", "Open the channel and capital view.")
+    primary_actions.add_row(
+        "73",
+        "set_capital_plan",
+        "Change reserve posture and preferred capital source.",
+    )
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
@@ -2542,6 +2612,79 @@ def _build_finance_panel(state: GameState) -> Panel:
         else f"{aggressive_forecast.projected_runway_turns} turns",
     )
     return Panel(table, title="Finance", border_style="cyan", expand=True)
+
+
+def _build_capital_plan_panel(state: GameState) -> Panel:
+    latest_net_cash_flow = _latest_net_cash_flow(state)
+    reserve_gap = state.company.cash_on_hand - state.capital_plan.reserve_target
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Mode", state.capital_plan.mode.value)
+    table.add_row("Source Bias", state.capital_plan.source_preference.value)
+    table.add_row("Horizon", f"{state.capital_plan.planning_horizon_turns} turns")
+    table.add_row("Reserve Target", format_money(state.capital_plan.reserve_target))
+    table.add_row("Reserve Gap", format_signed_money(reserve_gap))
+    table.add_row(
+        "Allocation",
+        (
+            f"P {state.capital_plan.product_investment_share}% / "
+            f"GTM {state.capital_plan.go_to_market_share}% / "
+            f"Reserve {state.capital_plan.reserve_share}%"
+        ),
+    )
+    table.add_row("Latest Cashflow", format_signed_money(latest_net_cash_flow))
+    return Panel(table, title="Capital Plan", border_style="bright_cyan", expand=True)
+
+
+def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel:
+    if not state.partnerships:
+        return Panel(
+            "No partnerships yet. Use create_partnership to open channel distribution.",
+            title="Partnerships",
+            border_style="magenta",
+            expand=True,
+        )
+
+    product_names = {product.id: product.name for product in state.products}
+    if compact:
+        active_count = sum(1 for deal in state.partnerships if deal.status.value == "active")
+        strained_count = sum(1 for deal in state.partnerships if deal.status.value == "strained")
+        sourced_revenue = sum(
+            (deal.sourced_revenue for deal in state.partnerships),
+            Decimal("0.00"),
+        )
+        sourced_users = sum(deal.sourced_users for deal in state.partnerships)
+        channels = sorted({deal.channel.value for deal in state.partnerships})
+        table = Table.grid(padding=(0, 1))
+        table.add_row("Count", str(len(state.partnerships)))
+        table.add_row("Channels", ", ".join(channels))
+        table.add_row("Active / Strained", f"{active_count} / {strained_count}")
+        table.add_row("Sourced Users", str(sourced_users))
+        table.add_row("Sourced Revenue", format_money(sourced_revenue))
+        return Panel(table, title="Partnerships", border_style="magenta", expand=True)
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Partner", style="bold")
+    table.add_column("Product")
+    table.add_column("Channel")
+    table.add_column("Status")
+    table.add_column("Enable", justify="right")
+    table.add_column("Risk", justify="right")
+    table.add_column("Conflict", justify="right")
+    table.add_column("Rev Share", justify="right")
+    table.add_column("Sourced Rev", justify="right")
+    for partnership in state.partnerships:
+        table.add_row(
+            partnership.name,
+            product_names.get(partnership.product_id, "unknown"),
+            partnership.channel.value,
+            partnership.status.value,
+            str(partnership.enablement_level),
+            str(partnership.risk),
+            str(partnership.conflict_pressure),
+            format_rate(partnership.rev_share_rate),
+            format_money(partnership.sourced_revenue),
+        )
+    return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 
 
 def _build_governance_panel(state: GameState) -> Panel:

@@ -19,6 +19,7 @@ from nexus_tech.domain.models import (
     Product,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.endgame import calculate_endgame_readiness
 from nexus_tech.simulation.finance import count_funding_rounds
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.randomness import RandomLike
@@ -138,6 +139,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_partner_offer_event,
         ),
         EventDefinition(
+            event_id="channel_conflict",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_channel_conflict_weight,
+            cooldown_turns=BALANCE.event_channel_conflict_cooldown,
+            is_eligible=_is_channel_conflict_eligible,
+            build_pending_event=_build_channel_conflict_event,
+        ),
+        EventDefinition(
             event_id="talent_bidding_war",
             category=EventCategory.EMPLOYEE_ISSUE,
             weight=BALANCE.event_talent_bidding_war_weight,
@@ -168,6 +177,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_down_round_pressure_cooldown,
             is_eligible=_is_down_round_pressure_eligible,
             build_pending_event=_build_down_round_pressure_event,
+        ),
+        EventDefinition(
+            event_id="bridge_round",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_bridge_round_weight,
+            cooldown_turns=BALANCE.event_bridge_round_cooldown,
+            is_eligible=_is_bridge_round_eligible,
+            build_pending_event=_build_bridge_round_event,
         ),
         EventDefinition(
             event_id="key_account_expansion",
@@ -240,6 +257,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_launch_aftershock_cooldown,
             is_eligible=_is_launch_aftershock_eligible,
             build_pending_event=_build_launch_aftershock_event,
+        ),
+        EventDefinition(
+            event_id="exit_interest",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_exit_interest_weight,
+            cooldown_turns=BALANCE.event_exit_interest_cooldown,
+            is_eligible=_is_exit_interest_eligible,
+            build_pending_event=_build_exit_interest_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -869,6 +894,53 @@ def _build_partner_offer_event(
     )
 
 
+def _is_channel_conflict_eligible(state: GameState) -> bool:
+    return any(
+        partnership.status.value != "paused"
+        and partnership.conflict_pressure >= BALANCE.event_channel_conflict_conflict_threshold
+        for partnership in state.partnerships
+    )
+
+
+def _build_channel_conflict_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = max(
+        (partnership for partnership in state.partnerships if partnership.status.value != "paused"),
+        key=lambda partnership: partnership.conflict_pressure + partnership.risk,
+    )
+    product = _get_product_by_id(state.products, target.product_id)
+    product_name = product.name if product is not None else "the flagship product"
+    del rng
+    return PendingEvent(
+        event_id="channel_conflict",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Channel Conflict",
+        description=(
+            f"The {target.channel.value} channel around {product_name} is colliding with direct "
+            "sales. You can protect direct control or lean into the partner and accept more "
+            "governance noise."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.product_id,
+        options=[
+            EventOption(
+                id="protect_direct",
+                label="Protect direct sales",
+                description="Reduce conflict now, but slow the channel for a turn.",
+            ),
+            EventOption(
+                id="lean_partner",
+                label="Lean into the partner",
+                description="Take faster channel demand, but increase board pressure.",
+            ),
+        ],
+    )
+
+
 def _is_talent_bidding_war_eligible(state: GameState) -> bool:
     return (
         state.company.current_turn >= BALANCE.event_talent_bidding_war_turn_threshold
@@ -1042,6 +1114,48 @@ def _build_down_round_pressure_event(
                 id="stay_independent",
                 label="Stay independent",
                 description="Protect the cap table, but accept some narrative damage.",
+            ),
+        ],
+    )
+
+
+def _is_bridge_round_eligible(state: GameState) -> bool:
+    return (
+        state.company.current_turn >= BALANCE.event_bridge_round_turn_threshold
+        and state.company.cash_on_hand <= BALANCE.event_bridge_round_cash_threshold
+        and (
+            state.capital_plan.source_preference.value != "bootstrap"
+            or state.finance.investor_pressure >= 18
+        )
+    )
+
+
+def _build_bridge_round_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="bridge_round",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Bridge Capital Window",
+        description=(
+            "A small bridge investor is willing to move fast. You can take the cash to protect "
+            "runway or cut burn and preserve more control."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        options=[
+            EventOption(
+                id="take_bridge",
+                label="Take the bridge",
+                description="Add cash now, but accept more dilution and investor pressure.",
+            ),
+            EventOption(
+                id="cut_burn",
+                label="Cut burn instead",
+                description="Preserve control, but ask the team for a harder operating reset.",
             ),
         ],
     )
@@ -1530,6 +1644,56 @@ def _build_launch_aftershock_event(
                 id="chase_second_wave",
                 label="Chase the second wave",
                 description="Gain users quickly, but add bugs and team strain.",
+            ),
+        ],
+    )
+
+
+def _is_exit_interest_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    return (
+        state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
+        and max(
+            readiness.ipo_readiness_score,
+            readiness.acquisition_interest_score,
+            readiness.independence_score,
+        )
+        >= BALANCE.event_exit_interest_readiness_threshold
+    )
+
+
+def _build_exit_interest_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="exit_interest",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Inbound Exit Interest",
+        description=(
+            f"A larger platform has started asking questions about {target.name}. "
+            "You can explore the signal for credibility and cash or stay independent and keep "
+            "the team focused."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="explore_interest",
+                label="Explore the interest",
+                description="Take the signal seriously and accept some new board pressure.",
+            ),
+            EventOption(
+                id="stay_independent",
+                label="Stay independent",
+                description="Protect focus and reinforce the independent story.",
             ),
         ],
     )

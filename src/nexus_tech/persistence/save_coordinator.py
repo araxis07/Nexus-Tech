@@ -12,6 +12,9 @@ from uuid import UUID
 from nexus_tech import __version__
 from nexus_tech.domain.models import (
     CampaignGoalId,
+    CapitalPlan,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     CompetitorIntelEntry,
     CompetitorMove,
     ContractBillingModel,
@@ -30,6 +33,9 @@ from nexus_tech.domain.models import (
     MarketSegment,
     MilestoneEntry,
     MilestoneId,
+    PartnerChannel,
+    PartnershipDeal,
+    PartnershipStatus,
     PendingEvent,
     PricingTier,
     ProductReleasePlan,
@@ -199,6 +205,8 @@ class SaveLoadCoordinator:
                 self._save_hiring_candidates(connection, slot_name, state.hiring_candidates)
                 self._save_roadmap_projects(connection, slot_name, state.roadmap_projects)
                 self._save_competitor_intel(connection, slot_name, state.competitor_intel)
+                self._save_partnerships(connection, slot_name, state.partnerships)
+                self._save_capital_plan(connection, slot_name, state.capital_plan)
                 self.finance_repository.save(connection, slot_name, state.finance)
                 self.finance_repository.save_history(connection, slot_name, state.funding_history)
                 self.quarter_plan_repository.save(connection, slot_name, state.quarter_plan)
@@ -285,6 +293,8 @@ class SaveLoadCoordinator:
                     hiring_candidates = self._load_hiring_candidates(connection, slot_name)
                     roadmap_projects = self._load_roadmap_projects(connection, slot_name)
                     competitor_intel = self._load_competitor_intel(connection, slot_name)
+                    partnerships = self._load_partnerships(connection, slot_name)
+                    capital_plan = self._load_capital_plan(connection, slot_name)
                     finance = self.finance_repository.load(connection, slot_name) or FinanceState()
                     funding_history = self.finance_repository.load_history(connection, slot_name)
                     quarter_plan = self.quarter_plan_repository.load(connection, slot_name)
@@ -318,6 +328,7 @@ class SaveLoadCoordinator:
                         hiring_candidates=hiring_candidates,
                         roadmap_projects=roadmap_projects,
                         competitor_intel=competitor_intel,
+                        partnerships=partnerships,
                         quarter_plan=quarter_plan,
                         pending_event=pending_event,
                         event_history=event_history,
@@ -345,6 +356,7 @@ class SaveLoadCoordinator:
                         scenario_objective_target=slot_row["scenario_objective_target"],
                         difficulty_mode=DifficultyMode(slot_row["difficulty_mode"]),
                         campaign_goal_id=CampaignGoalId(slot_row["campaign_goal_id"]),
+                        capital_plan=capital_plan,
                         functional_budget=FunctionalBudget(
                             preset=FunctionalBudgetPreset(
                                 slot_row["functional_budget_preset"] or "balanced"
@@ -1392,6 +1404,174 @@ class SaveLoadCoordinator:
             )
             for row in rows
         ]
+
+    def _save_partnerships(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        partnerships: list[PartnershipDeal],
+    ) -> None:
+        connection.execute("DELETE FROM partnerships WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO partnerships (
+                slot_name,
+                partnership_id,
+                display_order,
+                name,
+                product_id,
+                channel,
+                status,
+                quality,
+                risk,
+                enablement_level,
+                rev_share_rate,
+                sourced_revenue,
+                sourced_users,
+                conflict_pressure,
+                started_turn,
+                last_review_turn,
+                summary
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    str(partnership.id),
+                    index,
+                    partnership.name,
+                    str(partnership.product_id),
+                    partnership.channel.value,
+                    partnership.status.value,
+                    partnership.quality,
+                    partnership.risk,
+                    partnership.enablement_level,
+                    str(partnership.rev_share_rate),
+                    str(partnership.sourced_revenue),
+                    partnership.sourced_users,
+                    partnership.conflict_pressure,
+                    partnership.started_turn,
+                    partnership.last_review_turn,
+                    partnership.summary,
+                )
+                for index, partnership in enumerate(partnerships)
+            ],
+        )
+
+    def _load_partnerships(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[PartnershipDeal]:
+        rows = connection.execute(
+            """
+            SELECT
+                partnership_id,
+                name,
+                product_id,
+                channel,
+                status,
+                quality,
+                risk,
+                enablement_level,
+                rev_share_rate,
+                sourced_revenue,
+                sourced_users,
+                conflict_pressure,
+                started_turn,
+                last_review_turn,
+                summary
+            FROM partnerships
+            WHERE slot_name = ?
+            ORDER BY display_order ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            PartnershipDeal(
+                id=UUID(row["partnership_id"]),
+                name=row["name"],
+                product_id=UUID(row["product_id"]),
+                channel=PartnerChannel(row["channel"]),
+                status=PartnershipStatus(row["status"]),
+                quality=row["quality"],
+                risk=row["risk"],
+                enablement_level=row["enablement_level"],
+                rev_share_rate=row["rev_share_rate"],
+                sourced_revenue=row["sourced_revenue"],
+                sourced_users=row["sourced_users"],
+                conflict_pressure=row["conflict_pressure"],
+                started_turn=row["started_turn"],
+                last_review_turn=row["last_review_turn"],
+                summary=row["summary"],
+            )
+            for row in rows
+        ]
+
+    def _save_capital_plan(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        capital_plan: CapitalPlan,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO capital_plan (
+                slot_name,
+                mode,
+                source_preference,
+                planning_horizon_turns,
+                reserve_target,
+                product_investment_share,
+                go_to_market_share,
+                reserve_share
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                slot_name,
+                capital_plan.mode.value,
+                capital_plan.source_preference.value,
+                capital_plan.planning_horizon_turns,
+                str(capital_plan.reserve_target),
+                capital_plan.product_investment_share,
+                capital_plan.go_to_market_share,
+                capital_plan.reserve_share,
+            ),
+        )
+
+    def _load_capital_plan(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> CapitalPlan:
+        row = connection.execute(
+            """
+            SELECT
+                mode,
+                source_preference,
+                planning_horizon_turns,
+                reserve_target,
+                product_investment_share,
+                go_to_market_share,
+                reserve_share
+            FROM capital_plan
+            WHERE slot_name = ?
+            """,
+            (slot_name,),
+        ).fetchone()
+        if row is None:
+            return CapitalPlan()
+        return CapitalPlan(
+            mode=CapitalPlanMode(row["mode"]),
+            source_preference=CapitalSourcePreference(row["source_preference"]),
+            planning_horizon_turns=row["planning_horizon_turns"],
+            reserve_target=row["reserve_target"],
+            product_investment_share=row["product_investment_share"],
+            go_to_market_share=row["go_to_market_share"],
+            reserve_share=row["reserve_share"],
+        )
 
     def _save_pending_event(
         self,

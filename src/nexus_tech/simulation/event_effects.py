@@ -11,6 +11,7 @@ from nexus_tech.domain.models import (
     Employee,
     EventHistoryEntry,
     GameState,
+    PartnerChannel,
     PendingEvent,
     Product,
 )
@@ -19,6 +20,7 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.economy import is_game_over
 from nexus_tech.simulation.event_registry import get_designer_or_marketer_support
 from nexus_tech.simulation.finance import apply_raise_angel
+from nexus_tech.simulation.partnerships import create_partnership
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 
@@ -684,6 +686,11 @@ def _apply_partner_offer(state: GameState, event: PendingEvent, option_id: str) 
     product = _get_target_product(state, event)
 
     if option_id == "sign_partner":
+        if not any(
+            partnership.product_id == product.id and partnership.channel is PartnerChannel.RESELLER
+            for partnership in state.partnerships
+        ):
+            create_partnership(state, product.id, PartnerChannel.RESELLER)
         state.company.cash_on_hand = quantize_money(
             state.company.cash_on_hand + BALANCE.event_partner_offer_cash_gain
         )
@@ -905,6 +912,56 @@ def _apply_down_round_pressure(state: GameState, event: PendingEvent, option_id:
         )
 
     raise ValueError(f"Unsupported option {option_id} for down round pressure.")
+
+
+def _apply_bridge_round(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "take_bridge":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_bridge_round_take_cash_gain
+        )
+        state.finance.total_raised = quantize_money(
+            state.finance.total_raised + BALANCE.event_bridge_round_take_cash_gain
+        )
+        state.finance.equity_dilution = clamp_rate(
+            state.finance.equity_dilution + BALANCE.event_bridge_round_take_dilution_gain
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure + BALANCE.event_bridge_round_take_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence - 2, 0, 100)
+        return (
+            f"You took bridge capital. Cash +{BALANCE.event_bridge_round_take_cash_gain}, "
+            f"dilution +{BALANCE.event_bridge_round_take_dilution_gain}, investor pressure "
+            f"+{BALANCE.event_bridge_round_take_pressure_gain}."
+        )
+
+    if option_id == "cut_burn":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_bridge_round_cut_burn_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_bridge_round_cut_burn_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(state.finance.investor_pressure - 1, 0, 100)
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.event_bridge_round_cut_burn_morale_loss,
+                0,
+                100,
+            )
+        return (
+            f"You cut burn instead of raising. Cash -{BALANCE.event_bridge_round_cut_burn_cost}, "
+            f"board confidence +{BALANCE.event_bridge_round_cut_burn_confidence_gain}, morale "
+            f"-{BALANCE.event_bridge_round_cut_burn_morale_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for bridge round.")
 
 
 def _apply_key_account_expansion(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -1437,6 +1494,96 @@ def _apply_enterprise_procurement_delay(
     raise ValueError(f"Unsupported option {option_id} for enterprise procurement delay.")
 
 
+def _apply_channel_conflict(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_conflicted_partnership(state, product.id)
+
+    if option_id == "protect_direct":
+        user_loss = min(product.user_count, BALANCE.event_channel_conflict_direct_user_loss)
+        product.user_count = max(0, product.user_count - user_loss)
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure - BALANCE.event_channel_conflict_direct_relief,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(partnership.risk - 4, 0, 100)
+        return (
+            f"You protected direct sales for {product.name}. Users -{user_loss}, conflict "
+            f"-{BALANCE.event_channel_conflict_direct_relief}."
+        )
+
+    if option_id == "lean_partner":
+        product.user_count += BALANCE.event_channel_conflict_partner_user_gain
+        partnership.sourced_users += BALANCE.event_channel_conflict_partner_user_gain
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure + BALANCE.event_channel_conflict_partner_conflict_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_channel_conflict_partner_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            f"You leaned into the partner for {product.name}. Users "
+            f"+{BALANCE.event_channel_conflict_partner_user_gain}, board pressure "
+            f"+{BALANCE.event_channel_conflict_partner_pressure_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for channel conflict.")
+
+
+def _apply_exit_interest(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "explore_interest":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_exit_interest_cash_gain
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_exit_interest_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_exit_interest_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_exit_interest_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            f"You explored exit interest around {product.name}. Cash "
+            f"+{BALANCE.event_exit_interest_cash_gain}, reputation "
+            f"+{BALANCE.event_exit_interest_reputation_gain}."
+        )
+
+    if option_id == "stay_independent":
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_exit_interest_independence_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_exit_interest_independence_pressure_relief,
+            0,
+            100,
+        )
+        return (
+            f"You stayed independent around {product.name}. Board confidence "
+            f"+{BALANCE.event_exit_interest_independence_confidence_gain}, investor pressure "
+            f"-{BALANCE.event_exit_interest_independence_pressure_relief}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for exit interest.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -1469,6 +1616,20 @@ def _get_active_accounts_for_product(state: GameState, product_id: UUID) -> list
         for account in state.customer_accounts
         if account.product_id == product_id and account.status is not CustomerAccountStatus.CHURNED
     ]
+
+
+def _get_most_conflicted_partnership(state: GameState, product_id: UUID):
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.product_id == product_id and partnership.status.value != "paused"
+    ]
+    if not partnerships:
+        raise ValueError("This event expected an active partnership.")
+    return max(
+        partnerships,
+        key=lambda partnership: partnership.conflict_pressure + partnership.risk,
+    )
 
 
 def _get_best_active_account_for_product(state: GameState, product_id: UUID) -> CustomerAccount:
@@ -1504,10 +1665,12 @@ EVENT_EFFECT_HANDLERS = {
     "board_scrutiny": _apply_board_scrutiny,
     "renewal_risk": _apply_renewal_risk,
     "partner_offer": _apply_partner_offer,
+    "channel_conflict": _apply_channel_conflict,
     "talent_bidding_war": _apply_talent_bidding_war,
     "platform_breakthrough": _apply_platform_breakthrough,
     "loan_covenant": _apply_loan_covenant,
     "down_round_pressure": _apply_down_round_pressure,
+    "bridge_round": _apply_bridge_round,
     "key_account_expansion": _apply_key_account_expansion,
     "security_audit": _apply_security_audit,
     "enterprise_sales_cycle": _apply_enterprise_sales_cycle,
@@ -1517,5 +1680,6 @@ EVENT_EFFECT_HANDLERS = {
     "regulatory_shift": _apply_regulatory_shift,
     "audit_followup_review": _apply_audit_followup_review,
     "launch_aftershock": _apply_launch_aftershock,
+    "exit_interest": _apply_exit_interest,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
 }

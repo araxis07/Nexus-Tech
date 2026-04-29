@@ -13,6 +13,8 @@ from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     CompanyStrategy,
     Competitor,
     DifficultyMode,
@@ -26,6 +28,7 @@ from nexus_tech.domain.models import (
     MarketSegment,
     MilestoneEntry,
     PackagingStrategy,
+    PartnerChannel,
     PendingEvent,
     PricingTier,
     Product,
@@ -44,6 +47,7 @@ from nexus_tech.simulation.campaign import (
     CampaignGoalProgress,
     evaluate_campaign_goal,
 )
+from nexus_tech.simulation.capital_planning import apply_set_capital_plan
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
 from nexus_tech.simulation.competitor_intel import record_competitor_intel
 from nexus_tech.simulation.customer_success import (
@@ -102,6 +106,12 @@ from nexus_tech.simulation.late_game import LateGameSummary, apply_end_of_turn_l
 from nexus_tech.simulation.market import advance_market_cycle
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.operations import OperationsSummary, apply_end_of_turn_operations
+from nexus_tech.simulation.partnerships import (
+    apply_end_of_turn_partnerships,
+    create_partnership,
+    get_partnership_by_id,
+    invest_in_partner_enablement,
+)
 from nexus_tech.simulation.planning import (
     build_quarter_plan,
     get_budget_profile,
@@ -213,6 +223,10 @@ class ActionContext:
     manager_id: UUID | None = None
     support_lane_focus: SupportLaneFocus | None = None
     renewal_offer_type: RenewalOfferType | None = None
+    partner_channel: PartnerChannel | None = None
+    partnership_id: UUID | None = None
+    capital_plan_mode: CapitalPlanMode | None = None
+    capital_source_preference: CapitalSourcePreference | None = None
 
 
 @dataclass(frozen=True)
@@ -325,6 +339,7 @@ def apply_action(
         TurnAction.REVIEW_CUSTOMERS,
         TurnAction.REVIEW_PIPELINE,
         TurnAction.REVIEW_BOARD,
+        TurnAction.REVIEW_PARTNERSHIPS,
         TurnAction.VIEW_REPORT,
     ):
         return ActionOutcome(
@@ -354,6 +369,8 @@ def apply_action(
             return ActionOutcome(state=state, message="Pipeline review refreshed.")
         if action is TurnAction.REVIEW_BOARD:
             return ActionOutcome(state=state, message="Board and governance review refreshed.")
+        if action is TurnAction.REVIEW_PARTNERSHIPS:
+            return ActionOutcome(state=state, message="Partnership and capital review refreshed.")
         if action is TurnAction.VIEW_REPORT:
             return ActionOutcome(state=state, message="Run report refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
@@ -572,6 +589,21 @@ def apply_action(
             ),
         )
 
+    if action is TurnAction.SET_CAPITAL_PLAN:
+        if context.capital_plan_mode is None or context.capital_source_preference is None:
+            raise ValueError("Selecting a capital plan requires a mode and capital source.")
+        summary = apply_set_capital_plan(
+            next_state,
+            context.capital_plan_mode,
+            context.capital_source_preference,
+        )
+        logger.debug(
+            "Changed capital plan to %s / %s.",
+            context.capital_plan_mode.value,
+            context.capital_source_preference.value,
+        )
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.TAKE_LOAN:
         summary = apply_take_loan(
             next_state.company,
@@ -777,6 +809,39 @@ def apply_action(
         summary = route_support_escalation(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Routed support escalation for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.CREATE_PARTNERSHIP:
+        if context.target_product_id is None or context.partner_channel is None:
+            raise ValueError("Creating a partnership requires selecting a product and channel.")
+        summary = create_partnership(
+            next_state,
+            context.target_product_id,
+            context.partner_channel,
+        )
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug(
+            "Created %s partnership for product %s.",
+            context.partner_channel.value,
+            context.target_product_id,
+        )
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.INVEST_IN_PARTNER_ENABLEMENT:
+        if context.partnership_id is None:
+            raise ValueError("Investing in partner enablement requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = invest_in_partner_enablement(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Invested in partner enablement for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -1203,6 +1268,13 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         support_program=next_state.support_program,
     )
     total_revenue = quantize_money(total_revenue + customer_summary.account_revenue)
+    partnership_summary = apply_end_of_turn_partnerships(next_state)
+    total_revenue = quantize_money(total_revenue + partnership_summary.sourced_revenue)
+    if partnership_summary.reputation_delta != 0:
+        next_state.company.reputation = clamp_int(
+            next_state.company.reputation + partnership_summary.reputation_delta
+        )
+        reputation_delta += partnership_summary.reputation_delta
     support_summary = apply_end_of_turn_support_program(
         next_state,
         customer_success_bonus=functional_budget_profile.customer_success_bonus,
@@ -1221,7 +1293,9 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         current_turn=resolved_turn,
     )
     total_operations_cost = quantize_money(
-        operations_summary.added_cost + support_summary.service_cost
+        operations_summary.added_cost
+        + support_summary.service_cost
+        + partnership_summary.service_cost
     )
     late_game_summary = apply_end_of_turn_late_game(
         next_state.products,
@@ -1261,6 +1335,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     finance_summary = apply_end_of_turn_finance_drift(
         next_state.finance,
         next_state.company,
+        capital_plan=next_state.capital_plan,
         net_cash_flow=net_cash_flow,
         turn_history=next_state.turn_history,
     )
@@ -1372,6 +1447,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         campaign_goal_progress=campaign_goal_progress,
         scale_pressure_summary=scale_pressure.summary,
         operations_summary=operations_summary.summary,
+        partnership_summary=partnership_summary.summary,
         late_game_summary=late_game_summary.summary,
         victory_reason=victory_reason,
         roadmap_due=roadmap_due,
@@ -1457,6 +1533,22 @@ def get_customer_choices(
     return accounts
 
 
+def get_partnership_choices(
+    state: GameState,
+    *,
+    actionable_only: bool = False,
+):
+    """Return partnerships available for CLI target selection."""
+
+    if actionable_only:
+        return [
+            partnership
+            for partnership in state.partnerships
+            if partnership.status.value != "paused"
+        ]
+    return list(state.partnerships)
+
+
 def get_target_product(state: GameState, product_id: UUID | None) -> Product:
     """Resolve a target product from the current state."""
 
@@ -1493,6 +1585,7 @@ def build_turn_narrative(
     campaign_goal_progress: CampaignGoalProgress,
     scale_pressure_summary: str,
     operations_summary: str,
+    partnership_summary: str,
     late_game_summary: str,
     victory_reason: str | None,
     roadmap_due: bool,
@@ -1539,6 +1632,8 @@ def build_turn_narrative(
         return governance_summary.summary
     if governance_summary.restructuring_pressure >= BALANCE.board_restructure_min_pressure:
         return "Board pressure is now pointing toward a reset, not just tighter execution."
+    if partnership_summary != "No active partner contribution this turn.":
+        return partnership_summary
 
     total_user_delta = sum(summary.net_user_delta for summary in product_summaries)
     declining_products = [summary for summary in product_summaries if summary.net_user_delta < 0]

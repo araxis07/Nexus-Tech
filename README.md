@@ -40,6 +40,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Run explicit price-increase plays when you want to trade customer comfort for stronger monetization
 - Shift each product between `streamlined`, `modular`, and `suite` packaging to rebalance monetization, acquisition, and support complexity
 - Expand package catalogs and add-on catalogs over time so monetization depth can scale beyond the base packaging posture
+- Open reseller, integration, and marketplace partnerships that add sourced growth, revenue-share trade-offs, support load, and direct-channel conflict
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
 - Plan and ship product releases such as stability patches, minor releases, and major launches
 - Use multi-action roadmap projects for larger bets like platform rebuilds, enterprise certification, marketplace launches, and sales playbooks
@@ -100,6 +101,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track formal board-response deadlines so ignored resolutions can re-intensify governance pressure a few turns later
 - Let repeated board misses escalate into an explicit governance crisis so late-game pressure compounds when the company ignores follow-through
 - Force governance trade-offs when a board resolution stays open so the company has to bias toward profitability, reliability, team recovery, or portfolio focus
+- Set a capital plan with explicit reserve posture and preferred capital source so runway expectations can differ between conserve, balanced, and expand modes
 - Track explicit endgame readiness across IPO, acquisition, and profitable independence so late-game strategy is easier to read before the run ends
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
@@ -177,6 +179,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Mature runs can now surface renewal-risk events and channel partner offers with visible product and GTM trade-offs
 - Scale-stage runs can now trigger talent bidding wars and platform breakthroughs with clearer team and product trade-offs
 - Finance-heavy runs can surface loan covenant pressure and down-round trade-offs
+- Scale-stage runs can now surface channel-conflict, bridge-capital, and inbound exit-interest decisions tied to the new partnership and endgame systems
 - Customer-heavy and enterprise-heavy runs can surface key-account expansion and security-audit trade-offs
 - Scale-stage runs can now surface enterprise sales cycles, product launch windows, platform outages, competitor acquisitions, and regulatory shifts
 - Follow-up event chains can now appear after related audit, launch, and enterprise-sales events
@@ -200,6 +203,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Work against scenario objectives and larger roadmap projects in addition to campaign goals
 - Track run score, estimated company value, turn history, and victory conditions in the terminal report
 - Classify successful runs into exit paths such as profitable independence, strategic acquisition, IPO-ready, or restructure
+- Summarize completed-run history into archive-driven meta progression with campaign tiers and unlock-style achievement tracking
 
 ### 💾 Local Save / Load
 
@@ -207,10 +211,12 @@ Each turn represents a business interval. You review the company, choose actions
 - Resume the latest save slot
 - List, rename, and delete save slots directly from the CLI
 - Archive completed runs and inspect them later through `list-archives`
+- Derive campaign-level progression from archived runs through `show-progression`
 - Archive run score tier, campaign grade, and estimated valuation so completed runs are easier to compare later
 - Archive compact run badges such as capital discipline, board trust, and enterprise execution so meta history is easier to scan quickly
 - Archive strategic outlook and modeled offer value so completed runs can be compared by likely business outcome as well as score
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
+- Persist partnerships and capital-plan posture so channel strategy and reserve discipline survive save/load boundaries
 - Persist release plans, sales deals, roadmap projects, competitor intel, scenario objectives, and hiring traits
 - Use SQLite schema versioning and additive migrations to keep local save files upgradeable
 - Keep the entire project offline and self-contained

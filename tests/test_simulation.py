@@ -12,6 +12,9 @@ from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
+    CapitalPlan,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     Company,
     CompanyStrategy,
     Competitor,
@@ -37,6 +40,9 @@ from nexus_tech.domain.models import (
     MilestoneEntry,
     MilestoneId,
     PackagingStrategy,
+    PartnerChannel,
+    PartnershipDeal,
+    PartnershipStatus,
     PendingEvent,
     PricingTier,
     Product,
@@ -57,6 +63,7 @@ from nexus_tech.domain.models import (
     TurnAction,
     TurnLedgerEntry,
 )
+from nexus_tech.persistence.save_coordinator import RunArchiveSummary
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     calculate_cash_warning_threshold,
@@ -113,9 +120,11 @@ from nexus_tech.simulation.late_game import (
     apply_end_of_turn_late_game,
     calculate_late_game_summary,
 )
+from nexus_tech.simulation.meta_progression import summarize_meta_progression
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
+from nexus_tech.simulation.partnerships import apply_end_of_turn_partnerships
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.pricing import (
     calculate_effective_revenue_per_user,
@@ -248,6 +257,8 @@ def make_state(
     employees: list[Employee] | None = None,
     competitors: list[Competitor] | None = None,
     finance: FinanceState | None = None,
+    partnerships: list[PartnershipDeal] | None = None,
+    capital_plan: CapitalPlan | None = None,
     cash_on_hand: Decimal = Decimal("6000.00"),
     strategy: CompanyStrategy = CompanyStrategy.BALANCED,
     roadmap_focus: RoadmapFocus = RoadmapFocus.BALANCED_EXECUTION,
@@ -285,6 +296,8 @@ def make_state(
         market_cycle_turns_remaining=market_cycle_turns_remaining,
         difficulty_mode=difficulty_mode,
         campaign_goal_id=campaign_goal_id,
+        partnerships=partnerships or [],
+        capital_plan=capital_plan or CapitalPlan(),
         functional_budget=functional_budget or FunctionalBudget(),
         action_points_remaining=BALANCE.actions_per_turn,
     )
@@ -4306,3 +4319,183 @@ def test_endgame_readiness_surfaces_acquisition_and_ipo_scores() -> None:
         "strategic_acquisition",
         "profitable_independence",
     }
+
+
+def test_bridge_round_event_applies_cash_and_dilution() -> None:
+    product = make_product("Bridge Core")
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.VENTURE,
+    )
+    state = make_state(
+        product,
+        capital_plan=capital_plan,
+        cash_on_hand=Decimal("1800.00"),
+        current_turn=9,
+    )
+    state.finance.investor_pressure = 20
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "bridge_round"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "take_bridge")
+
+    assert outcome.state.company.cash_on_hand > state.company.cash_on_hand
+    assert outcome.state.finance.equity_dilution > state.finance.equity_dilution
+    assert outcome.history_entry.event_id == "bridge_round"
+
+
+def test_exit_interest_event_rewards_strong_company_signal() -> None:
+    product = make_product(
+        "Exit Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=220,
+        quality=74,
+        market_fit=72,
+    )
+    state = make_state(product, cash_on_hand=Decimal("22000.00"), current_turn=12)
+    state.company.reputation = 76
+    state.finance.board_confidence = 80
+    state.finance.board_score = 78
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "exit_interest"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "explore_interest")
+
+    assert outcome.state.company.cash_on_hand > state.company.cash_on_hand
+    assert outcome.state.company.reputation >= state.company.reputation
+    assert outcome.history_entry.event_id == "exit_interest"
+
+
+def test_create_partnership_action_adds_channel_and_cost() -> None:
+    product = make_product("Channel Core", target_segment=MarketSegment.ENTERPRISE)
+    state = make_state(product, cash_on_hand=Decimal("9000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.CREATE_PARTNERSHIP,
+        context=ActionContext(
+            target_product_id=product.id,
+            partner_channel=PartnerChannel.RESELLER,
+        ),
+    )
+
+    assert len(outcome.state.partnerships) == 1
+    assert outcome.state.partnerships[0].channel is PartnerChannel.RESELLER
+    assert outcome.state.company.cash_on_hand == Decimal("8720.00")
+
+
+def test_partnership_turn_summary_adds_users_revenue_and_support_pressure() -> None:
+    product = make_product(
+        "Partner API",
+        market_fit=68,
+        quality=72,
+        bug_level=10,
+        user_count=40,
+        revenue_per_user=Decimal("32.00"),
+    )
+    partnership = PartnershipDeal(
+        name="Partner API Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.ACTIVE,
+        quality=64,
+        risk=18,
+        enablement_level=46,
+        rev_share_rate=Decimal("0.1400"),
+    )
+    state = make_state(product, partnerships=[partnership], cash_on_hand=Decimal("7000.00"))
+
+    summary = apply_end_of_turn_partnerships(state)
+
+    assert summary.sourced_users > 0
+    assert summary.sourced_revenue > Decimal("0.00")
+    assert state.support_program.onboarding_ticket_pressure > 0
+    assert state.products[0].user_count > 40
+
+
+def test_set_capital_plan_action_updates_state() -> None:
+    product = make_product("Capital Core")
+    state = make_state(product)
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_CAPITAL_PLAN,
+        context=ActionContext(
+            capital_plan_mode=CapitalPlanMode.EXPAND,
+            capital_source_preference=CapitalSourcePreference.VENTURE,
+        ),
+    )
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.EXPAND
+    assert outcome.state.capital_plan.source_preference is CapitalSourcePreference.VENTURE
+    assert outcome.state.capital_plan.reserve_target == Decimal("1800.00")
+
+
+def test_run_badges_capture_channel_builder_when_partnerships_scale() -> None:
+    product = make_product("Channel One", lifecycle_stage=LifecycleStage.MATURE, user_count=120)
+    partnerships = [
+        PartnershipDeal(
+            name="Channel One Reseller",
+            product_id=product.id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.ACTIVE,
+            sourced_revenue=Decimal("1200.00"),
+            sourced_users=20,
+        ),
+        PartnershipDeal(
+            name="Channel One Marketplace",
+            product_id=product.id,
+            channel=PartnerChannel.MARKETPLACE,
+            status=PartnershipStatus.ACTIVE,
+            sourced_revenue=Decimal("980.00"),
+            sourced_users=24,
+        ),
+    ]
+    state = make_state(product, partnerships=partnerships, cash_on_hand=Decimal("11000.00"))
+
+    badges = calculate_run_badges(state, calculate_run_score(state))
+
+    assert "channel_builder" in badges
+
+
+def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
+    archives = [
+        RunArchiveSummary(
+            archive_key="run-1",
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_title="Founder Journey",
+            completed_turn=12,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="strategic_acquisition",
+            total_score=212,
+            score_tier="strong",
+            campaign_grade="A",
+            estimated_valuation=Decimal("52000.00"),
+            achievement_badges=("board_trusted", "channel_builder"),
+            strategic_outlook="strategic_acquisition",
+            offer_value=Decimal("61000.00"),
+            final_cash=Decimal("14000.00"),
+            final_reputation=68,
+            archived_at="2026-04-29T00:00:00+00:00",
+        )
+    ]
+
+    summary = summarize_meta_progression(archives)
+
+    assert summary.total_runs == 1
+    assert summary.victories == 1
+    assert "first_victory" in summary.unlocked_achievements
+    assert "channel_builder" in summary.unlocked_achievements
+    assert summary.campaign_tier in {"silver", "gold"}

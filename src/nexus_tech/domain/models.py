@@ -349,6 +349,39 @@ class SupportInvestmentFocus(StrEnum):
     SLA_PROGRAM = "sla_program"
 
 
+class PartnerChannel(StrEnum):
+    """Distribution channel used by one partnership."""
+
+    RESELLER = "reseller"
+    INTEGRATION = "integration"
+    MARKETPLACE = "marketplace"
+
+
+class PartnershipStatus(StrEnum):
+    """Operating state for one active partner relationship."""
+
+    ACTIVE = "active"
+    STRAINED = "strained"
+    PAUSED = "paused"
+
+
+class CapitalPlanMode(StrEnum):
+    """Capital-allocation posture for upcoming turns."""
+
+    CONSERVE = "conserve"
+    BALANCED = "balanced"
+    EXPAND = "expand"
+
+
+class CapitalSourcePreference(StrEnum):
+    """Preferred financing source when the plan expects outside capital."""
+
+    BOOTSTRAP = "bootstrap"
+    DEBT = "debt"
+    ANGEL = "angel"
+    VENTURE = "venture"
+
+
 class SupportLaneFocus(StrEnum):
     """Company-wide support lane emphasis."""
 
@@ -429,6 +462,10 @@ class TurnAction(StrEnum):
     EXECUTE_BOARD_RESPONSE = "execute_board_response"
     START_BOARD_RECOVERY_PLAN = "start_board_recovery_plan"
     EXECUTE_RESTRUCTURE_PLAN = "execute_restructure_plan"
+    CREATE_PARTNERSHIP = "create_partnership"
+    INVEST_IN_PARTNER_ENABLEMENT = "invest_in_partner_enablement"
+    REVIEW_PARTNERSHIPS = "review_partnerships"
+    SET_CAPITAL_PLAN = "set_capital_plan"
     VIEW_REPORT = "view_report"
     WAIT = "wait"
     VIEW_STATUS = "view_status"
@@ -649,6 +686,32 @@ class FunctionalBudget(BaseModel):
         return self
 
 
+class CapitalPlan(BaseModel):
+    """Capital-planning posture for the next few turns."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    mode: CapitalPlanMode = CapitalPlanMode.BALANCED
+    source_preference: CapitalSourcePreference = CapitalSourcePreference.BOOTSTRAP
+    planning_horizon_turns: int = Field(default=6, ge=2, le=12)
+    reserve_target: Decimal = Field(default=Decimal("3000.00"), ge=Decimal("0"))
+    product_investment_share: int = Field(default=35, ge=0, le=100)
+    go_to_market_share: int = Field(default=35, ge=0, le=100)
+    reserve_share: int = Field(default=30, ge=0, le=100)
+
+    @field_validator("reserve_target", mode="before")
+    @classmethod
+    def _normalize_capital_plan_money(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+    @model_validator(mode="after")
+    def _validate_capital_allocation(self) -> "CapitalPlan":
+        total_share = self.product_investment_share + self.go_to_market_share + self.reserve_share
+        if total_share != 100:
+            raise ValueError("Capital plan shares must total 100.")
+        return self
+
+
 class SupportProgram(BaseModel):
     """Shared customer-support tooling and deflection state."""
 
@@ -673,6 +736,38 @@ class SupportProgram(BaseModel):
     @field_validator("service_cost_last_turn", mode="before")
     @classmethod
     def _normalize_service_cost(cls, value: Decimal) -> Decimal:
+        return quantize_money(value)
+
+
+class PartnershipDeal(BaseModel):
+    """A local partner relationship that drives channel distribution."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: UUID = Field(default_factory=uuid4)
+    name: str = Field(min_length=1, max_length=80)
+    product_id: UUID
+    channel: PartnerChannel
+    status: PartnershipStatus = PartnershipStatus.ACTIVE
+    quality: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    risk: int = Field(default=24, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    enablement_level: int = Field(default=28, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    rev_share_rate: Decimal = Field(default=Decimal("0.1800"), ge=Decimal("0"), le=Decimal("1"))
+    sourced_revenue: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
+    sourced_users: int = Field(default=0, ge=0)
+    conflict_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    started_turn: int = Field(default=1, ge=1)
+    last_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
+    summary: str = Field(default="", max_length=240)
+
+    @field_validator("rev_share_rate", mode="before")
+    @classmethod
+    def _normalize_rev_share(cls, value: Decimal) -> Decimal:
+        return quantize_rate(value)
+
+    @field_validator("sourced_revenue", mode="before")
+    @classmethod
+    def _normalize_sourced_revenue(cls, value: Decimal) -> Decimal:
         return quantize_money(value)
 
 
@@ -975,8 +1070,10 @@ class GameState(BaseModel):
     sales_deals: list[SalesDeal] = Field(default_factory=list)
     roadmap_projects: list[RoadmapProject] = Field(default_factory=list)
     competitor_intel: list[CompetitorIntelEntry] = Field(default_factory=list)
+    partnerships: list[PartnershipDeal] = Field(default_factory=list)
     quarter_plan: QuarterPlan = Field(default_factory=QuarterPlan)
     functional_budget: FunctionalBudget = Field(default_factory=FunctionalBudget)
+    capital_plan: CapitalPlan = Field(default_factory=CapitalPlan)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
     victory_achieved: bool = False
     victory_reason: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045

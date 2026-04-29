@@ -43,11 +43,15 @@ def calculate_endgame_readiness(
 
     score = score or calculate_run_score(state)
     account_revenue = calculate_account_revenue(state.customer_accounts)
+    active_partnerships = [deal for deal in state.partnerships if deal.status.value != "paused"]
+    unique_channels = {deal.channel.value for deal in active_partnerships}
+    reserve_target_met = state.company.cash_on_hand >= state.capital_plan.reserve_target
     ipo_readiness_score = _clamp_readiness(
         (score.total_score // 3)
         + (state.finance.board_confidence // BALANCE.exit_ipo_board_score_divisor)
         + (state.finance.board_score // BALANCE.exit_ipo_board_score_divisor)
         + (score.key_accounts * BALANCE.exit_ipo_key_account_bonus)
+        + (len(active_partnerships) * 2)
         - (state.finance.governance_risk // 2)
         - (state.finance.restructuring_pressure * 3)
     )
@@ -58,6 +62,7 @@ def calculate_endgame_readiness(
         )
         + (score.key_accounts * BALANCE.exit_acquisition_key_account_bonus)
         + (score.active_products * 4)
+        + (len(unique_channels) * 5)
         - (
             state.support_program.escalation_queue
             * BALANCE.exit_acquisition_support_penalty_divisor
@@ -75,6 +80,7 @@ def calculate_endgame_readiness(
         )
         + (state.company.reputation // 2)
         + (state.finance.board_team_health_score // 3)
+        + (4 if reserve_target_met else -3)
         - state.finance.investor_pressure
         - (state.finance.missed_board_targets * 4)
     )

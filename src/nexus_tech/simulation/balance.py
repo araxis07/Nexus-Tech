@@ -1715,6 +1715,202 @@ class BalanceConfig:
     hiring_salary_pressure_gain: int = 4
     hiring_negotiation_salary_step: Decimal = Decimal("45.00")
 
+    partnership_creation_cost_by_channel: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "reseller": Decimal("280.00"),
+            "integration": Decimal("230.00"),
+            "marketplace": Decimal("180.00"),
+        }
+    )
+    partnership_base_quality_by_channel: dict[str, int] = field(
+        default_factory=lambda: {
+            "reseller": 58,
+            "integration": 62,
+            "marketplace": 54,
+        }
+    )
+    partnership_base_risk_by_channel: dict[str, int] = field(
+        default_factory=lambda: {
+            "reseller": 26,
+            "integration": 22,
+            "marketplace": 30,
+        }
+    )
+    partnership_base_enablement_by_channel: dict[str, int] = field(
+        default_factory=lambda: {
+            "reseller": 32,
+            "integration": 28,
+            "marketplace": 36,
+        }
+    )
+    partnership_base_rev_share_by_channel: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "reseller": Decimal("0.1800"),
+            "integration": Decimal("0.1400"),
+            "marketplace": Decimal("0.2200"),
+        }
+    )
+    partnership_base_user_gain_by_channel: dict[str, int] = field(
+        default_factory=lambda: {
+            "reseller": 4,
+            "integration": 3,
+            "marketplace": 5,
+        }
+    )
+    partnership_support_cost_per_user_by_channel: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "reseller": Decimal("1.40"),
+            "integration": Decimal("1.10"),
+            "marketplace": Decimal("0.95"),
+        }
+    )
+    partnership_lane_pressure_by_channel: dict[str, str] = field(
+        default_factory=lambda: {
+            "reseller": "enterprise",
+            "integration": "onboarding",
+            "marketplace": "billing",
+        }
+    )
+    partnership_enablement_cost: Decimal = Decimal("140.00")
+    partnership_enablement_gain: int = 12
+    partnership_enablement_quality_gain: int = 5
+    partnership_enablement_risk_relief: int = 6
+    partnership_enablement_conflict_relief: int = 5
+    partnership_enablement_summary_horizon: int = 3
+    partnership_market_fit_user_bonus_divisor: int = 18
+    partnership_quality_user_bonus_divisor: int = 22
+    partnership_enablement_user_bonus_divisor: int = 16
+    partnership_bug_user_penalty_divisor: int = 24
+    partnership_bug_risk_divisor: int = 12
+    partnership_debt_risk_divisor: int = 14
+    partnership_quality_risk_relief_divisor: int = 20
+    partnership_channel_conflict_gain: dict[str, int] = field(
+        default_factory=lambda: {
+            "reseller": 4,
+            "integration": 2,
+            "marketplace": 5,
+        }
+    )
+    partnership_packaging_conflict_bonus: dict[str, int] = field(
+        default_factory=lambda: {
+            "streamlined": 0,
+            "modular": 1,
+            "suite": 2,
+        }
+    )
+    partnership_premium_conflict_bonus: int = 2
+    partnership_strained_user_penalty: int = 2
+    partnership_strained_reputation_loss: int = 1
+    partnership_risk_strained_threshold: int = 55
+    partnership_conflict_strained_threshold: int = 52
+    partnership_pause_threshold: int = 78
+    partnership_cooldown_conflict_relief: int = 4
+    partnership_cooldown_risk_relief: int = 3
+    partnership_resume_threshold: int = 42
+
+    capital_plan_reserve_target_by_mode: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "conserve": Decimal("5200.00"),
+            "balanced": Decimal("3200.00"),
+            "expand": Decimal("1800.00"),
+        }
+    )
+    capital_plan_horizon_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 8,
+            "balanced": 6,
+            "expand": 4,
+        }
+    )
+    capital_plan_product_share_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 25,
+            "balanced": 35,
+            "expand": 45,
+        }
+    )
+    capital_plan_go_to_market_share_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 20,
+            "balanced": 35,
+            "expand": 40,
+        }
+    )
+    capital_plan_reserve_share_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 55,
+            "balanced": 30,
+            "expand": 15,
+        }
+    )
+    capital_plan_runway_target_modifier_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": -1,
+            "balanced": 0,
+            "expand": 1,
+        }
+    )
+    capital_plan_negative_cash_pressure_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 0,
+            "balanced": 1,
+            "expand": 2,
+        }
+    )
+    capital_plan_reserve_shortfall_pressure_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 2,
+            "balanced": 1,
+            "expand": 1,
+        }
+    )
+    capital_plan_reserve_surplus_confidence_bonus_by_mode: dict[str, int] = field(
+        default_factory=lambda: {
+            "conserve": 2,
+            "balanced": 1,
+            "expand": 0,
+        }
+    )
+    capital_plan_bootstrap_confidence_bonus: int = 1
+    capital_plan_bootstrap_pressure_relief: int = 1
+    capital_plan_debt_covenant_penalty: int = 2
+    capital_plan_angel_pressure_relief: int = 1
+    capital_plan_venture_pressure_relief: int = 2
+    capital_plan_expand_confidence_penalty: int = 1
+    capital_plan_conserve_covenant_relief: int = 1
+    capital_plan_expand_investor_pressure_relief_cash_threshold: Decimal = Decimal("1200.00")
+
+    event_bridge_round_weight: int = 10
+    event_bridge_round_cooldown: int = 7
+    event_bridge_round_turn_threshold: int = 8
+    event_bridge_round_cash_threshold: Decimal = Decimal("2200.00")
+    event_bridge_round_take_cash_gain: Decimal = Decimal("2600.00")
+    event_bridge_round_take_dilution_gain: Decimal = Decimal("0.0300")
+    event_bridge_round_take_pressure_gain: int = 6
+    event_bridge_round_cut_burn_cost: Decimal = Decimal("180.00")
+    event_bridge_round_cut_burn_confidence_gain: int = 2
+    event_bridge_round_cut_burn_morale_loss: int = 2
+
+    event_exit_interest_weight: int = 8
+    event_exit_interest_cooldown: int = 8
+    event_exit_interest_turn_threshold: int = 10
+    event_exit_interest_readiness_threshold: int = 62
+    event_exit_interest_confidence_gain: int = 4
+    event_exit_interest_pressure_gain: int = 4
+    event_exit_interest_cash_gain: Decimal = Decimal("450.00")
+    event_exit_interest_reputation_gain: int = 2
+    event_exit_interest_independence_confidence_gain: int = 2
+    event_exit_interest_independence_pressure_relief: int = 2
+
+    event_channel_conflict_weight: int = 10
+    event_channel_conflict_cooldown: int = 6
+    event_channel_conflict_conflict_threshold: int = 58
+    event_channel_conflict_direct_relief: int = 12
+    event_channel_conflict_direct_user_loss: int = 5
+    event_channel_conflict_partner_user_gain: int = 8
+    event_channel_conflict_partner_conflict_gain: int = 8
+    event_channel_conflict_partner_pressure_gain: int = 4
+
     exit_acquisition_score_threshold: int = 170
     exit_acquisition_value_multiplier: Decimal = Decimal("1.15")
     exit_ipo_score_threshold: int = 250

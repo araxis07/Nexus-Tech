@@ -12,6 +12,9 @@ from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
+    CapitalPlan,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     Company,
     CompanyStrategy,
     Competitor,
@@ -42,6 +45,9 @@ from nexus_tech.domain.models import (
     MilestoneEntry,
     MilestoneId,
     PackagingStrategy,
+    PartnerChannel,
+    PartnershipDeal,
+    PartnershipStatus,
     PendingEvent,
     PricingTier,
     Product,
@@ -357,6 +363,22 @@ def make_state() -> GameState:
         market_salary_pressure=12,
         negotiation_rounds=1,
     )
+    partnership = PartnershipDeal(
+        name="Nexus One Reseller Channel",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.ACTIVE,
+        quality=66,
+        risk=24,
+        enablement_level=48,
+        rev_share_rate=Decimal("0.1800"),
+        sourced_revenue=Decimal("940.00"),
+        sourced_users=18,
+        conflict_pressure=20,
+        started_turn=3,
+        last_review_turn=4,
+        summary="Reseller channel opened for enterprise expansion.",
+    )
     return GameState(
         company=Company(
             name="NEXUS TECH",
@@ -374,6 +396,7 @@ def make_state() -> GameState:
         sales_deals=[sales_deal],
         roadmap_projects=[roadmap_project],
         competitor_intel=[competitor_intel],
+        partnerships=[partnership],
         quarter_plan=quarter_plan,
         functional_budget=FunctionalBudget(
             preset=FunctionalBudgetPreset.CUSTOMER_TRUST,
@@ -398,6 +421,15 @@ def make_state() -> GameState:
             enterprise_ticket_pressure=9,
             billing_ticket_pressure=6,
             service_cost_last_turn=Decimal("164.00"),
+        ),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.CONSERVE,
+            source_preference=CapitalSourcePreference.BOOTSTRAP,
+            planning_horizon_turns=8,
+            reserve_target=Decimal("5200.00"),
+            product_investment_share=25,
+            go_to_market_share=20,
+            reserve_share=55,
         ),
         difficulty_mode=DifficultyMode.FOUNDER,
         campaign_goal_id=CampaignGoalId.CATEGORY_LEADER,
@@ -457,6 +489,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "roadmap_projects",
         "competitor_intel",
         "hiring_candidates",
+        "partnerships",
+        "capital_plan",
         "run_archives",
     }.issubset(table_names)
 
@@ -622,7 +656,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "renewal_offer_type",
         "win_back_attempts",
     }.issubset(customer_columns)
-    assert user_version >= 21
+    assert user_version >= 22
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -771,7 +805,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "board_resolution_window",
         "board_resolution_miss_streak",
     }.issubset(finance_columns)
-    assert user_version >= 21
+    assert user_version >= 22
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -809,7 +843,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 2
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 21
+    assert summaries[0].schema_version >= 22
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -822,7 +856,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 21
+    assert report.schema_version >= 22
 
 
 def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:

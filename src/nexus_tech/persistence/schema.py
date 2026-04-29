@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 21
+CURRENT_SCHEMA_VERSION = 22
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 21,
+        schema_version INTEGER NOT NULL DEFAULT 22,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -472,6 +472,43 @@ SCHEMA_STATEMENTS = (
         negotiation_rounds INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (slot_name, candidate_id),
         UNIQUE (slot_name, display_order)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS partnerships (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        partnership_id TEXT NOT NULL,
+        display_order INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        quality INTEGER NOT NULL DEFAULT 55,
+        risk INTEGER NOT NULL DEFAULT 24,
+        enablement_level INTEGER NOT NULL DEFAULT 28,
+        rev_share_rate TEXT NOT NULL DEFAULT '0.1800',
+        sourced_revenue TEXT NOT NULL DEFAULT '0.00',
+        sourced_users INTEGER NOT NULL DEFAULT 0,
+        conflict_pressure INTEGER NOT NULL DEFAULT 0,
+        started_turn INTEGER NOT NULL DEFAULT 1,
+        last_review_turn INTEGER,
+        summary TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (slot_name, partnership_id),
+        UNIQUE (slot_name, display_order)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS capital_plan (
+        slot_name TEXT PRIMARY KEY
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        mode TEXT NOT NULL DEFAULT 'balanced',
+        source_preference TEXT NOT NULL DEFAULT 'bootstrap',
+        planning_horizon_turns INTEGER NOT NULL DEFAULT 6,
+        reserve_target TEXT NOT NULL DEFAULT '3000.00',
+        product_investment_share INTEGER NOT NULL DEFAULT 35,
+        go_to_market_share INTEGER NOT NULL DEFAULT 35,
+        reserve_share INTEGER NOT NULL DEFAULT 30
     )
     """,
 )

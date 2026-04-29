@@ -186,6 +186,10 @@ def calculate_run_badges(
         and run_score.key_accounts >= 2
     ):
         badges.append("monetization_architect")
+    if len(
+        {deal.channel.value for deal in state.partnerships if deal.status.value != "paused"}
+    ) >= 2 and any(deal.sourced_revenue > ZERO_MONEY for deal in state.partnerships):
+        badges.append("channel_builder")
     if run_score.active_products >= 3 and run_score.mature_products >= 1:
         badges.append("portfolio_architect")
     if (

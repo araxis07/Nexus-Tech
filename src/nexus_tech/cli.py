@@ -26,6 +26,8 @@ from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
     CandidateTrait,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     CompanyStrategy,
     DifficultyMode,
     Employee,
@@ -35,6 +37,7 @@ from nexus_tech.domain.models import (
     HiringCandidateStage,
     MarketSegment,
     PackagingStrategy,
+    PartnerChannel,
     PendingEvent,
     PricingTier,
     Product,
@@ -72,6 +75,8 @@ from nexus_tech.presentation.dashboard import (
     render_game_over,
     render_glossary,
     render_intro,
+    render_meta_progression,
+    render_partnership_view,
     render_pending_event,
     render_pipeline_view,
     render_product_picker,
@@ -107,12 +112,14 @@ from nexus_tech.simulation.engine import (
     create_new_game,
     get_customer_choices,
     get_employee_choices,
+    get_partnership_choices,
     get_product_choices,
     resolve_turn,
 )
 from nexus_tech.simulation.event_registry import get_event_registry
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.hiring import generate_candidate_pool
+from nexus_tech.simulation.meta_progression import summarize_meta_progression
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scenarios import (
@@ -253,6 +260,10 @@ ACTION_KEYS = {
     "62": TurnAction.MAKE_RENEWAL_OFFER,
     "63": TurnAction.RUN_WIN_BACK_PLAY,
     "64": TurnAction.SET_SUPPORT_LANE_FOCUS,
+    "70": TurnAction.CREATE_PARTNERSHIP,
+    "71": TurnAction.INVEST_IN_PARTNER_ENABLEMENT,
+    "72": TurnAction.REVIEW_PARTNERSHIPS,
+    "73": TurnAction.SET_CAPITAL_PLAN,
 }
 UTILITY_ACTION_KEYS = {
     "65": "save_game",
@@ -730,6 +741,20 @@ def list_archives_command(
     render_run_archive_catalog(console, archives)
 
 
+@app.command("show-progression")
+def show_progression_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Summarize archive-derived meta progression for the local install."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        archives = coordinator.list_run_archives()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Progression Read Failed", error)
+    render_meta_progression(console, summarize_meta_progression(archives))
+
+
 @app.command("check-saves")
 def check_saves_command(
     db_path: Path = DB_PATH_OPTION,
@@ -1032,6 +1057,10 @@ def run_game_loop(
                     render_board_view(console, state)
                     continue
 
+                if action is TurnAction.REVIEW_PARTNERSHIPS:
+                    render_partnership_view(console, state)
+                    continue
+
                 if action is TurnAction.VIEW_REPORT:
                     render_report(console, state)
                     continue
@@ -1070,6 +1099,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         TurnAction.REVIEW_CUSTOMERS,
         TurnAction.REVIEW_PIPELINE,
         TurnAction.REVIEW_BOARD,
+        TurnAction.REVIEW_PARTNERSHIPS,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
         TurnAction.WAIT,
@@ -1156,6 +1186,26 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             case_sensitive=False,
         )
         return ActionContext(functional_budget_preset=FunctionalBudgetPreset(budget_key))
+
+    if action is TurnAction.SET_CAPITAL_PLAN:
+        mode_key = ask_choice_input(
+            "Capital plan mode",
+            choices=["conserve", "balanced", "expand"],
+            default=state.capital_plan.mode.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        source_key = ask_choice_input(
+            "Capital source bias",
+            choices=["bootstrap", "debt", "angel", "venture"],
+            default=state.capital_plan.source_preference.value,
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(
+            capital_plan_mode=CapitalPlanMode(mode_key),
+            capital_source_preference=CapitalSourcePreference(source_key),
+        )
 
     if action is TurnAction.HIRE_EMPLOYEE:
         candidate_seed = (state.company.current_turn * 101) + (len(state.employees) * 17)
@@ -1361,6 +1411,28 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         if customer_account_id is None:
             return None
         return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.CREATE_PARTNERSHIP:
+        product_id = choose_product_id(state, action)
+        if product_id is None:
+            return None
+        channel_key = ask_choice_input(
+            "Partner channel",
+            choices=["reseller", "integration", "marketplace"],
+            default="reseller",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(
+            target_product_id=product_id,
+            partner_channel=PartnerChannel(channel_key),
+        )
+
+    if action is TurnAction.INVEST_IN_PARTNER_ENABLEMENT:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.PLAN_RELEASE:
         product_id = choose_product_id(state, action)
@@ -1732,6 +1804,50 @@ def choose_customer_account_id(
     choices = {str(index): account for index, account in enumerate(accounts, start=1)}
     selected_key = ask_choice_input(
         "Select a customer account",
+        choices=list(choices),
+        default="1",
+        show_choices=False,
+    )
+    return choices[selected_key].id
+
+
+def choose_partnership_id(state: GameState) -> UUID | None:
+    """Prompt the user to select one active partnership."""
+
+    partnerships = get_partnership_choices(state, actionable_only=True)
+    if not partnerships:
+        console.print(
+            Panel.fit(
+                "No active partnerships are available yet. Create one first.",
+                title="Selection Error",
+                border_style="red",
+            )
+        )
+        return None
+
+    product_names = {product.id: product.name for product in state.products}
+    table = Table(box=None, expand=True)
+    table.add_column("#", justify="right")
+    table.add_column("Partner", style="bold")
+    table.add_column("Product")
+    table.add_column("Channel")
+    table.add_column("Status")
+    table.add_column("Enable", justify="right")
+    table.add_column("Risk", justify="right")
+    for index, partnership in enumerate(partnerships, start=1):
+        table.add_row(
+            str(index),
+            partnership.name,
+            product_names.get(partnership.product_id, "unknown"),
+            partnership.channel.value,
+            partnership.status.value,
+            str(partnership.enablement_level),
+            str(partnership.risk),
+        )
+    console.print(Panel(table, title="Partnerships", border_style="magenta", expand=True))
+    choices = {str(index): partnership for index, partnership in enumerate(partnerships, start=1)}
+    selected_key = ask_choice_input(
+        "Select a partnership",
         choices=list(choices),
         default="1",
         show_choices=False,

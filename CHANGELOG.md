@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.27.0 - 2026-04-29
+
+- Added real reseller, integration, and marketplace partnerships with channel-specific setup cost, enablement depth, sourced users, sourced revenue, support pressure, and conflict risk
+- Added capital-planning posture with `conserve`, `balanced`, and `expand` modes plus bootstrap, debt, angel, and venture source preferences that now shape finance drift and reserve discipline
+- Added archive-derived meta progression through a new `show-progression` CLI command plus campaign-tier and unlock summaries built from completed run history
+- Added partnership and capital-plan persistence in SQLite, plus dedicated terminal review panels for channel state and reserve posture
+- Added new scale-stage events for channel conflict, bridge capital, and inbound exit interest, and tied partner-offer events into the partnership system
+- Expanded regression coverage for partnership actions, capital-plan actions, archive progression, new event flows, and round-trip persistence
+- Promoted the package version to `0.27.0`
+
 ## 0.26.0 - 2026-04-29
 
 - Added lane-aware support escalation routing so onboarding, enterprise, and billing pressure now resolve through different relief paths instead of one generic support action
