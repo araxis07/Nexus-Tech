@@ -65,6 +65,57 @@ class SupportOpsActionSummary:
     message: str
 
 
+def calculate_support_lane_staffing_plan(state: GameState) -> dict[SupportLaneFocus, int]:
+    """Distribute available staffing intent across support lanes."""
+
+    active_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    weights = {
+        SupportLaneFocus.ONBOARDING: 1,
+        SupportLaneFocus.ENTERPRISE: 1,
+        SupportLaneFocus.BILLING: 1,
+    }
+    for account in active_accounts:
+        lane = classify_account_support_lane(account)
+        if lane is SupportLaneFocus.BALANCED:
+            continue
+        weights[lane] += 2
+        if account.support_tier is SupportTier.PRIORITY:
+            weights[lane] += 1
+        elif account.support_tier is SupportTier.WHITE_GLOVE:
+            weights[lane] += 2
+        if lane is SupportLaneFocus.BILLING and (
+            account.failed_payment_risk > 0 or account.dunning_steps > 0
+        ):
+            weights[lane] += 1
+    if state.support_program.lane_focus is not SupportLaneFocus.BALANCED:
+        weights[state.support_program.lane_focus] += 2
+
+    planning_units = max(
+        1,
+        state.support_program.staffing_level
+        + max(1, state.functional_budget.customer_success_share // 20),
+    )
+    weight_total = sum(weights.values())
+    remaining_units = planning_units
+    allocations: dict[SupportLaneFocus, int] = {}
+    ordered_lanes = sorted(weights, key=lambda lane: weights[lane], reverse=True)
+    for index, lane in enumerate(ordered_lanes):
+        if index == len(ordered_lanes) - 1:
+            lane_units = remaining_units
+        else:
+            lane_units = int((planning_units * weights[lane]) / max(1, weight_total))
+            if weights[lane] > 1:
+                lane_units = max(1, lane_units)
+            lane_units = min(remaining_units, lane_units)
+        remaining_units = max(0, remaining_units - lane_units)
+        allocations[lane] = lane_units
+    return allocations
+
+
 def calculate_support_program_relief(
     support_program: SupportProgram,
     *,
@@ -236,6 +287,24 @@ def apply_end_of_turn_support_program(
         + (Decimal(queue_age_pressure) * BALANCE.support_program_service_cost_per_queue_age)
         + (Decimal(focus_mismatch_penalty) * BALANCE.support_program_service_cost_per_queue_age)
         + (Decimal(lane_overflow_pressure) * BALANCE.support_program_service_cost_per_lane_overflow)
+        + (
+            Decimal(
+                sum(
+                    1 for account in active_accounts if account.support_tier is SupportTier.PRIORITY
+                )
+            )
+            * BALANCE.support_program_service_cost_per_priority_account
+        )
+        + (
+            Decimal(
+                sum(
+                    1
+                    for account in active_accounts
+                    if account.support_tier is SupportTier.WHITE_GLOVE
+                )
+            )
+            * BALANCE.support_program_service_cost_per_white_glove_account
+        )
     )
     state.support_program.service_cost_last_turn = service_cost
 
@@ -695,8 +764,12 @@ def calculate_support_lane_snapshots(
         )
 
     weights: dict[SupportLaneFocus, int] = {}
+    staffing_plan = calculate_support_lane_staffing_plan(state)
     for lane in lane_pressures:
         weights[lane] = max(1, lane_pressures[lane] + (lane_counts[lane] * 2))
+        weights[lane] += (
+            staffing_plan.get(lane, 0) * BALANCE.support_program_lane_staffing_weight_unit
+        )
     if state.support_program.lane_focus is not SupportLaneFocus.BALANCED:
         weights[state.support_program.lane_focus] += (
             BALANCE.support_program_focus_lane_capacity_bonus

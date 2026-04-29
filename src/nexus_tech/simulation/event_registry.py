@@ -15,6 +15,7 @@ from nexus_tech.domain.models import (
     FundingType,
     GameState,
     MarketSegment,
+    PartnershipStatus,
     PendingEvent,
     Product,
 )
@@ -273,6 +274,46 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_procurement_delay_cooldown,
             is_eligible=_is_enterprise_procurement_delay_eligible,
             build_pending_event=_build_enterprise_procurement_delay_event,
+        ),
+        EventDefinition(
+            event_id="support_meltdown",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_support_meltdown_weight,
+            cooldown_turns=BALANCE.event_support_meltdown_cooldown,
+            is_eligible=_is_support_meltdown_eligible,
+            build_pending_event=_build_support_meltdown_event,
+        ),
+        EventDefinition(
+            event_id="board_reckoning",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reckoning_weight,
+            cooldown_turns=BALANCE.event_board_reckoning_cooldown,
+            is_eligible=_is_board_reckoning_eligible,
+            build_pending_event=_build_board_reckoning_event,
+        ),
+        EventDefinition(
+            event_id="partner_qbr",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_partner_qbr_weight,
+            cooldown_turns=BALANCE.event_partner_qbr_cooldown,
+            is_eligible=_is_partner_qbr_eligible,
+            build_pending_event=_build_partner_qbr_event,
+        ),
+        EventDefinition(
+            event_id="capital_market_freeze",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_capital_market_freeze_weight,
+            cooldown_turns=BALANCE.event_capital_market_freeze_cooldown,
+            is_eligible=_is_capital_market_freeze_eligible,
+            build_pending_event=_build_capital_market_freeze_event,
+        ),
+        EventDefinition(
+            event_id="succession_gap",
+            category=EventCategory.EMPLOYEE_ISSUE,
+            weight=BALANCE.event_succession_gap_weight,
+            cooldown_turns=BALANCE.event_succession_gap_cooldown,
+            is_eligible=_is_succession_gap_eligible,
+            build_pending_event=_build_succession_gap_event,
         ),
     )
 
@@ -1747,6 +1788,254 @@ def _build_enterprise_procurement_delay_event(
                 id="wait_out_process",
                 label="Wait out the process",
                 description="Protect cash, but reputation and account confidence slip.",
+            ),
+        ],
+    )
+
+
+def _is_support_meltdown_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"support_backlog"},
+        BALANCE.event_chain_recent_window_turns,
+    ) or (
+        state.support_program.backlog_queue >= BALANCE.event_support_meltdown_backlog_threshold
+        or state.support_program.escalation_queue
+        >= BALANCE.event_support_meltdown_escalation_threshold
+    )
+
+
+def _build_support_meltdown_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.bug_level + product.technical_debt,
+    )
+    return PendingEvent(
+        event_id="support_meltdown",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Support Meltdown",
+        description=(
+            f"Ticket queues around {target.name} are spilling into renewals and escalations. "
+            "You can staff an emergency response or ration support and accept customer pain."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="support_chain",
+        chain_stage=2,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="staff_emergency",
+                label="Staff an emergency response",
+                description="Spend cash to expand staffing and drain queues quickly.",
+            ),
+            EventOption(
+                id="ration_support",
+                label="Ration support",
+                description="Protect cash, but churn risk and reputation take a visible hit.",
+            ),
+        ],
+    )
+
+
+def _is_board_reckoning_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"board_scrutiny", "exit_interest", "down_round_pressure"},
+        BALANCE.event_chain_recent_window_turns,
+    ) or (
+        state.finance.board_resolution_due
+        or state.finance.board_pressure >= BALANCE.event_board_reckoning_pressure_threshold
+        or state.finance.governance_crisis_active
+    )
+
+
+def _build_board_reckoning_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_reckoning",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Reckoning",
+        description=(
+            "Directors want proof that the current plan can either tighten execution or justify "
+            "continued growth risk. You can reset toward discipline or defend the aggressive line."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="governance_chain",
+        chain_stage=2,
+        options=[
+            EventOption(
+                id="reset_plan",
+                label="Reset the plan",
+                description="Cut scope, move toward conservation, and buy board confidence.",
+            ),
+            EventOption(
+                id="defend_growth",
+                label="Defend growth",
+                description="Keep pressing growth and accept higher board pressure.",
+            ),
+        ],
+    )
+
+
+def _is_partner_qbr_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"partner_offer", "channel_conflict"},
+        BALANCE.event_chain_recent_window_turns,
+    ) and any(
+        partnership.status is not PartnershipStatus.PAUSED for partnership in state.partnerships
+    )
+
+
+def _build_partner_qbr_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnership = max(
+        [deal for deal in state.partnerships if deal.status is not PartnershipStatus.PAUSED],
+        key=lambda deal: deal.conflict_pressure + deal.risk + deal.enablement_level,
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        target = _pick_best_product(
+            [product for product in state.products if product.is_active],
+            rng,
+            score=lambda product: product.user_count + product.market_fit,
+        )
+    return PendingEvent(
+        event_id="partner_qbr",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Channel Partner QBR",
+        description=(
+            f"Partners selling {target.name} want a clearer joint plan. "
+            "You can deepen enablement for more sourced growth or pause the channel and simplify."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=2,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="double_enablement",
+                label="Double down on enablement",
+                description="Spend cash to reduce channel risk and add sourced demand.",
+            ),
+            EventOption(
+                id="pause_channel",
+                label="Pause the noisiest channel",
+                description="Reduce conflict and board pressure, but give up some near-term users.",
+            ),
+        ],
+    )
+
+
+def _is_capital_market_freeze_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"bridge_round", "down_round_pressure", "loan_covenant"},
+        BALANCE.event_chain_recent_window_turns,
+    ) or (
+        state.finance.investor_pressure >= BALANCE.event_capital_market_freeze_pressure_threshold
+        and state.company.cash_on_hand < state.capital_plan.reserve_target
+    )
+
+
+def _build_capital_market_freeze_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="capital_market_freeze",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Capital Market Freeze",
+        description=(
+            "Financing sentiment has tightened. You can freeze hiring and preserve runway or "
+            "accept expensive bridge terms to keep the current plan alive."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=2,
+        options=[
+            EventOption(
+                id="freeze_hiring",
+                label="Freeze hiring and preserve runway",
+                description="Protect covenants and cash, but morale slips across the team.",
+            ),
+            EventOption(
+                id="accept_bridge_terms",
+                label="Accept bridge terms",
+                description="Add cash now, but dilution climbs and the story gets harder.",
+            ),
+        ],
+    )
+
+
+def _is_succession_gap_eligible(state: GameState) -> bool:
+    return any(
+        employee.succession_risk >= BALANCE.event_succession_gap_risk_threshold
+        for employee in state.employees
+        if employee.role
+        in {
+            EmployeeRole.ENGINEER,
+            EmployeeRole.PRODUCT_MANAGER,
+            EmployeeRole.DESIGNER,
+        }
+    )
+
+
+def _build_succession_gap_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_employee(
+        [
+            employee
+            for employee in state.employees
+            if employee.succession_risk >= BALANCE.event_succession_gap_risk_threshold
+        ],
+        rng,
+        score=lambda employee: employee.succession_risk + employee.leadership_score,
+    )
+    return PendingEvent(
+        event_id="succession_gap",
+        category=EventCategory.EMPLOYEE_ISSUE,
+        title="Succession Gap",
+        description=(
+            f"{target.full_name} is carrying too much of the operating load. "
+            "You can elevate internal backup capacity now or accept growing attrition risk."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="org_chain",
+        chain_stage=1,
+        target_employee_id=target.id,
+        options=[
+            EventOption(
+                id="promote_internal_lead",
+                label="Elevate internal backup",
+                description="Reduce succession risk and stabilize morale around the team.",
+            ),
+            EventOption(
+                id="wait_and_hope",
+                label="Wait and hope",
+                description="Spend nothing now, but attrition and team-health pressure rise.",
             ),
         ],
     )

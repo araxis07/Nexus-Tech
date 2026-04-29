@@ -6,17 +6,20 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from nexus_tech.domain.models import (
+    CapitalPlanMode,
     CustomerAccount,
     CustomerAccountStatus,
     Employee,
     EventHistoryEntry,
     GameState,
     PartnerChannel,
+    PartnershipStatus,
     PendingEvent,
     Product,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.economy import is_game_over
 from nexus_tech.simulation.event_registry import get_designer_or_marketer_support
 from nexus_tech.simulation.finance import apply_raise_angel
@@ -1494,6 +1497,302 @@ def _apply_enterprise_procurement_delay(
     raise ValueError(f"Unsupported option {option_id} for enterprise procurement delay.")
 
 
+def _apply_support_meltdown(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    stressed_accounts = _get_most_stressed_accounts(state, limit=3)
+
+    if option_id == "staff_emergency":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_support_meltdown_staff_cost
+        )
+        state.support_program.staffing_level = clamp_int(
+            state.support_program.staffing_level + BALANCE.event_support_meltdown_staffing_gain,
+            0,
+            20,
+        )
+        state.support_program.backlog_queue = max(
+            0,
+            state.support_program.backlog_queue - BALANCE.event_support_meltdown_backlog_relief,
+        )
+        state.support_program.escalation_queue = max(
+            0,
+            state.support_program.escalation_queue
+            - BALANCE.event_support_meltdown_escalation_relief,
+        )
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.event_support_meltdown_morale_loss,
+                0,
+                100,
+            )
+        for account in stressed_accounts:
+            account.open_tickets = max(0, account.open_tickets - 4)
+            account.sla_breach_risk = clamp_int(account.sla_breach_risk - 6, 0, 100)
+            account.churn_risk = clamp_int(account.churn_risk - 4, 0, 100)
+        return (
+            f"You staffed an emergency response around {product.name}. Cash "
+            f"-{BALANCE.event_support_meltdown_staff_cost}, backlog "
+            f"-{BALANCE.event_support_meltdown_backlog_relief}."
+        )
+
+    if option_id == "ration_support":
+        state.support_program.backlog_queue += BALANCE.event_support_meltdown_ration_queue_gain
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_support_meltdown_ration_reputation_loss,
+            0,
+            100,
+        )
+        for account in stressed_accounts:
+            account.churn_risk = clamp_int(
+                account.churn_risk + BALANCE.event_support_meltdown_ration_account_risk_gain,
+                0,
+                100,
+            )
+            account.ticket_queue_age += 1
+            if account.churn_risk >= BALANCE.key_account_status_at_risk_threshold:
+                account.status = CustomerAccountStatus.AT_RISK
+        return (
+            f"You rationed support around {product.name}. Reputation "
+            f"-{BALANCE.event_support_meltdown_ration_reputation_loss}, backlog "
+            f"+{BALANCE.event_support_meltdown_ration_queue_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for support meltdown.")
+
+
+def _apply_board_reckoning(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "reset_plan":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_board_reckoning_cut_cost
+        )
+        state.capital_plan = get_capital_plan_profile(
+            CapitalPlanMode.CONSERVE,
+            state.capital_plan.source_preference,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_board_reckoning_cut_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_board_reckoning_cut_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = False
+        state.finance.board_resolution_window = 0
+        for product in state.products:
+            if product.is_active:
+                product.acquisition_rate = clamp_rate(
+                    product.acquisition_rate - BALANCE.event_board_reckoning_cut_growth_penalty
+                )
+        return (
+            f"You reset the plan for the board. Cash "
+            f"-{BALANCE.event_board_reckoning_cut_cost}, board pressure "
+            f"-{BALANCE.event_board_reckoning_cut_pressure_relief}."
+        )
+
+    if option_id == "defend_growth":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_board_reckoning_defend_cash_gain
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_board_reckoning_defend_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence - BALANCE.event_board_reckoning_defend_confidence_loss,
+            0,
+            100,
+        )
+        for product in state.products:
+            if product.is_active:
+                product.acquisition_rate = clamp_rate(
+                    product.acquisition_rate + BALANCE.event_board_reckoning_defend_growth_gain
+                )
+        return (
+            f"You defended the aggressive plan. Cash "
+            f"+{BALANCE.event_board_reckoning_defend_cash_gain}, board pressure "
+            f"+{BALANCE.event_board_reckoning_defend_pressure_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for board reckoning.")
+
+
+def _apply_partner_qbr(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_conflicted_partnership(state, product.id)
+
+    if option_id == "double_enablement":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_partner_qbr_enablement_cost
+        )
+        partnership.enablement_level = clamp_int(partnership.enablement_level + 8, 0, 100)
+        partnership.quality = clamp_int(
+            partnership.quality + BALANCE.event_partner_qbr_quality_gain,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_partner_qbr_risk_relief,
+            0,
+            100,
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure - BALANCE.event_partner_qbr_conflict_relief,
+            0,
+            100,
+        )
+        partnership.last_review_turn = state.company.current_turn
+        product.user_count += BALANCE.event_partner_qbr_user_gain
+        partnership.sourced_users += BALANCE.event_partner_qbr_user_gain
+        state.support_program.backlog_queue += 2
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You deepened channel enablement for {product.name}. Cash "
+            f"-{BALANCE.event_partner_qbr_enablement_cost}, users "
+            f"+{BALANCE.event_partner_qbr_user_gain}."
+        )
+
+    if option_id == "pause_channel":
+        partnership.status = PartnershipStatus.PAUSED
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure - BALANCE.event_partner_qbr_pause_conflict_relief,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(partnership.risk - 4, 0, 100)
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_partner_qbr_pause_pressure_relief,
+            0,
+            100,
+        )
+        product.user_count = max(0, product.user_count - BALANCE.event_partner_qbr_pause_user_loss)
+        return (
+            f"You paused channel expansion for {product.name}. Users "
+            f"-{BALANCE.event_partner_qbr_pause_user_loss}, board pressure "
+            f"-{BALANCE.event_partner_qbr_pause_pressure_relief}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for partner QBR.")
+
+
+def _apply_capital_market_freeze(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "freeze_hiring":
+        state.capital_plan = get_capital_plan_profile(
+            CapitalPlanMode.CONSERVE,
+            state.capital_plan.source_preference,
+        )
+        state.finance.covenant_risk = clamp_int(
+            state.finance.covenant_risk
+            - BALANCE.event_capital_market_freeze_freeze_covenant_relief,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure - BALANCE.event_capital_market_freeze_pressure_relief,
+            0,
+            100,
+        )
+        for employee in state.employees:
+            employee.morale = clamp_int(
+                employee.morale - BALANCE.event_capital_market_freeze_freeze_morale_loss,
+                0,
+                100,
+            )
+        return (
+            "You froze hiring and protected runway. "
+            f"Investor pressure -{BALANCE.event_capital_market_freeze_pressure_relief}."
+        )
+
+    if option_id == "accept_bridge_terms":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_capital_market_freeze_cash_gain
+        )
+        state.finance.total_raised = quantize_money(
+            state.finance.total_raised + BALANCE.event_capital_market_freeze_cash_gain
+        )
+        state.finance.equity_dilution = clamp_rate(
+            state.finance.equity_dilution + BALANCE.event_capital_market_freeze_dilution
+        )
+        state.finance.board_pressure = clamp_int(state.finance.board_pressure + 2, 0, 100)
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence - 1, 0, 100)
+        return (
+            "You accepted expensive bridge terms. Cash "
+            f"+{BALANCE.event_capital_market_freeze_cash_gain}, dilution "
+            f"+{BALANCE.event_capital_market_freeze_dilution}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for capital market freeze.")
+
+
+def _apply_succession_gap(state: GameState, event: PendingEvent, option_id: str) -> str:
+    employee = _get_target_employee(state, event)
+
+    if option_id == "promote_internal_lead":
+        employee.is_team_lead = True
+        employee.leadership_score = clamp_int(
+            employee.leadership_score + BALANCE.event_succession_gap_leadership_gain,
+            0,
+            100,
+        )
+        employee.succession_risk = clamp_int(
+            employee.succession_risk - BALANCE.event_succession_gap_attrition_relief,
+            0,
+            100,
+        )
+        employee.attrition_risk = clamp_int(
+            employee.attrition_risk - BALANCE.event_succession_gap_attrition_relief,
+            0,
+            100,
+        )
+        employee.morale = clamp_int(
+            employee.morale + BALANCE.event_succession_gap_morale_gain,
+            0,
+            100,
+        )
+        state.finance.board_team_health_score = clamp_int(
+            state.finance.board_team_health_score + 2,
+            0,
+            100,
+        )
+        return (
+            f"You elevated backup leadership around {employee.full_name}. "
+            f"Morale +{BALANCE.event_succession_gap_morale_gain}, attrition risk "
+            f"-{BALANCE.event_succession_gap_attrition_relief}."
+        )
+
+    if option_id == "wait_and_hope":
+        employee.attrition_risk = clamp_int(
+            employee.attrition_risk + BALANCE.event_succession_gap_wait_attrition_gain,
+            0,
+            100,
+        )
+        employee.morale = clamp_int(
+            employee.morale - BALANCE.event_succession_gap_wait_morale_loss,
+            0,
+            100,
+        )
+        state.finance.board_team_health_score = clamp_int(
+            state.finance.board_team_health_score - 2,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(state.finance.board_pressure + 1, 0, 100)
+        return (
+            f"You deferred succession work around {employee.full_name}. Attrition risk "
+            f"+{BALANCE.event_succession_gap_wait_attrition_gain}, morale "
+            f"-{BALANCE.event_succession_gap_wait_morale_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for succession gap.")
+
+
 def _apply_channel_conflict(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
     partnership = _get_most_conflicted_partnership(state, product.id)
@@ -1639,6 +1938,25 @@ def _get_best_active_account_for_product(state: GameState, product_id: UUID) -> 
     return max(accounts, key=lambda account: account.satisfaction + account.expansion_potential)
 
 
+def _get_most_stressed_accounts(state: GameState, *, limit: int) -> list[CustomerAccount]:
+    accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    return sorted(
+        accounts,
+        key=lambda account: (
+            account.open_tickets
+            + account.sla_breach_risk
+            + account.ticket_queue_age
+            + account.failed_payment_risk
+            + account.escalation_count
+        ),
+        reverse=True,
+    )[:limit]
+
+
 def _get_primary_active_product(state: GameState) -> Product:
     active_products = [product for product in state.products if product.is_active]
     if not active_products:
@@ -1682,4 +2000,9 @@ EVENT_EFFECT_HANDLERS = {
     "launch_aftershock": _apply_launch_aftershock,
     "exit_interest": _apply_exit_interest,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
+    "support_meltdown": _apply_support_meltdown,
+    "board_reckoning": _apply_board_reckoning,
+    "partner_qbr": _apply_partner_qbr,
+    "capital_market_freeze": _apply_capital_market_freeze,
+    "succession_gap": _apply_succession_gap,
 }

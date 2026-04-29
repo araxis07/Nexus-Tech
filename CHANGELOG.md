@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.29.0 - 2026-04-30
+
+- Expanded archive-derived meta progression with campaign stages, achievement progress, outcome coverage, and archive highlights so late-game history now feels more like a real progression layer
+- Added new chained scale-stage events for support meltdowns, board reckonings, partner QBRs, capital-market freezes, and succession gaps to deepen late-game variety without changing the offline scope
+- Deepened org simulation through promotion pressure, compensation pressure, underperformance drag, and stronger overload or succession penalties inside team-management drift
+- Improved support-ops realism with lane staffing plans, premium-tier service-cost pressure, and clearer lane staffing visibility in the dashboard
+- Extended capital-planning diagnostics with reserve state, execution status, alignment scoring, and clearer recommended posture guidance
+- Added regression coverage for new event handlers, support staffing behavior, employee career pressure, and richer meta progression summaries
+- Promoted the package version to `0.29.0`
+
 ## 0.28.0 - 2026-04-30
 
 - Added lane-capacity and lane-overflow modeling for support ops so onboarding, enterprise, and billing pressure now consume differentiated capacity instead of one flat queue

@@ -28,6 +28,7 @@ from nexus_tech.domain.models import (
     EmployeeRole,
     EventCategory,
     EventHistoryEntry,
+    EventOption,
     ExitOutcome,
     FinanceState,
     FunctionalBudget,
@@ -87,6 +88,7 @@ from nexus_tech.simulation.economy import (
     calculate_total_revenue,
     calculate_total_salary_cost,
 )
+from nexus_tech.simulation.employee_progression import apply_end_of_turn_employee_progression
 from nexus_tech.simulation.endgame import apply_exit_outcome, calculate_endgame_readiness
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.event_registry import EventDefinition, get_event_registry
@@ -147,6 +149,7 @@ from nexus_tech.simulation.scaling import (
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
     calculate_support_lane_snapshots,
+    calculate_support_lane_staffing_plan,
     calculate_support_staff_capacity,
     classify_account_support_lane,
     triage_support_backlog,
@@ -2271,6 +2274,82 @@ def test_new_event_ids_are_registered() -> None:
     assert "audit_followup_review" in registry_ids
     assert "launch_aftershock" in registry_ids
     assert "enterprise_procurement_delay" in registry_ids
+    assert "support_meltdown" in registry_ids
+    assert "board_reckoning" in registry_ids
+    assert "partner_qbr" in registry_ids
+    assert "capital_market_freeze" in registry_ids
+    assert "succession_gap" in registry_ids
+
+
+def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
+    product = make_product("Board Core")
+    state = make_state(product, cash_on_hand=Decimal("6000.00"))
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.VENTURE,
+        planning_horizon_turns=6,
+        reserve_target=Decimal("4000.00"),
+        product_investment_share=35,
+        go_to_market_share=40,
+        reserve_share=25,
+    )
+    state.pending_event = PendingEvent(
+        event_id="board_reckoning",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Reckoning",
+        description="Test event",
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=5,
+        options=[
+            EventOption(id="reset_plan", label="Reset", description="Reset"),
+            EventOption(id="defend_growth", label="Defend", description="Defend"),
+        ],
+    )
+
+    outcome = resolve_pending_event(state, "reset_plan")
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.CONSERVE
+    assert outcome.state.finance.board_resolution_due is False
+
+
+def test_support_meltdown_event_can_trade_cash_for_queue_relief() -> None:
+    product = make_product("Support Core")
+    account = CustomerAccount(
+        name="Escalated Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1280.00"),
+        satisfaction=62,
+        expansion_potential=64,
+        renewal_turn=8,
+        churn_risk=26,
+        support_tier=SupportTier.WHITE_GLOVE,
+        open_tickets=14,
+        sla_breach_risk=44,
+        escalation_count=2,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("7000.00"))
+    state.support_program.backlog_queue = 24
+    state.support_program.escalation_queue = 5
+    state.pending_event = PendingEvent(
+        event_id="support_meltdown",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Support Meltdown",
+        description="Test event",
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=5,
+        target_product_id=product.id,
+        options=[
+            EventOption(id="staff_emergency", label="Staff", description="Staff"),
+            EventOption(id="ration_support", label="Ration", description="Ration"),
+        ],
+    )
+
+    outcome = resolve_pending_event(state, "staff_emergency")
+
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.staffing_level > state.support_program.staffing_level
 
 
 def test_archetype_competitor_adds_segment_pressure() -> None:
@@ -2671,6 +2750,27 @@ def test_promote_employee_advances_seniority_and_salary() -> None:
     assert updated_employee.seniority is Seniority.MID
     assert updated_employee.salary > employee.salary
     assert updated_employee.productivity > employee.productivity
+
+
+def test_employee_progression_adds_career_pressure_for_ready_under_market_staff() -> None:
+    employee = make_employee(
+        "Terry",
+        EmployeeRole.ENGINEER,
+        seniority=Seniority.MID,
+        salary=Decimal("700.00"),
+        productivity=72,
+    )
+    employee.promotion_readiness = 76
+    employee.performance_rating = 78
+    employee.tenure_turns = 5
+
+    summary = apply_end_of_turn_employee_progression(
+        [employee],
+        net_cash_flow=Decimal("200.00"),
+    )
+
+    assert summary.high_attrition_risk_count == 0 or employee.attrition_risk > 0
+    assert employee.attrition_risk >= BALANCE.employee_promotion_pressure_attrition_gain
 
 
 def test_low_performance_reduces_effective_productivity() -> None:
@@ -4253,6 +4353,86 @@ def test_support_lane_snapshots_surface_lane_overflow_when_focus_is_off() -> Non
     assert snapshots[SupportLaneFocus.ONBOARDING].capacity > 0
 
 
+def test_support_lane_staffing_plan_biases_units_toward_billing_focus() -> None:
+    product = make_product("Billing Load")
+    accounts = [
+        CustomerAccount(
+            name="Collections A",
+            product_id=product.id,
+            segment=MarketSegment.SMB,
+            contract_value=Decimal("620.00"),
+            satisfaction=60,
+            expansion_potential=48,
+            renewal_turn=6,
+            churn_risk=28,
+            invoice_risk=56,
+            failed_payment_risk=48,
+            dunning_steps=2,
+            open_tickets=2,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Enterprise Anchor",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1240.00"),
+            satisfaction=70,
+            expansion_potential=64,
+            renewal_turn=8,
+            churn_risk=16,
+            support_tier=SupportTier.WHITE_GLOVE,
+            open_tickets=8,
+            sla_breach_risk=40,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
+    state = make_state(product, customer_accounts=accounts)
+    state.support_program.staffing_level = 4
+    state.support_program.lane_focus = SupportLaneFocus.BILLING
+
+    staffing_plan = calculate_support_lane_staffing_plan(state)
+
+    assert staffing_plan[SupportLaneFocus.BILLING] >= staffing_plan[SupportLaneFocus.ONBOARDING]
+
+
+def test_support_program_service_cost_rises_for_premium_support_tiers() -> None:
+    product = make_product("Premium Support")
+    priority_account = CustomerAccount(
+        name="Priority",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("640.00"),
+        satisfaction=66,
+        expansion_potential=52,
+        renewal_turn=7,
+        churn_risk=18,
+        support_tier=SupportTier.PRIORITY,
+        open_tickets=5,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    white_glove_account = CustomerAccount(
+        name="White Glove",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1420.00"),
+        satisfaction=70,
+        expansion_potential=66,
+        renewal_turn=9,
+        churn_risk=14,
+        support_tier=SupportTier.WHITE_GLOVE,
+        open_tickets=5,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+
+    priority_state = make_state(product, customer_accounts=[priority_account])
+    white_glove_state = make_state(product, customer_accounts=[white_glove_account])
+
+    priority_summary = apply_end_of_turn_support_program(priority_state)
+    white_glove_summary = apply_end_of_turn_support_program(white_glove_state)
+
+    assert white_glove_summary.service_cost > priority_summary.service_cost
+
+
 def test_run_badges_capture_durable_company_strength() -> None:
     products = [
         make_product("Ops Core", lifecycle_stage=LifecycleStage.MATURE, user_count=180),
@@ -4739,4 +4919,7 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert summary.victories == 1
     assert "first_victory" in summary.unlocked_achievements
     assert "channel_builder" in summary.unlocked_achievements
+    assert summary.campaign_stage in {"operator", "institutional"}
+    assert "core achievements" in summary.achievement_progress
+    assert summary.archive_highlights
     assert summary.campaign_tier in {"silver", "gold"}

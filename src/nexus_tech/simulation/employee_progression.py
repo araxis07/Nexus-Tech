@@ -11,7 +11,7 @@ from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.support import clamp_int
-from nexus_tech.simulation.team import sanitize_management_links
+from nexus_tech.simulation.team import calculate_salary, sanitize_management_links
 
 
 @dataclass(frozen=True)
@@ -163,6 +163,7 @@ def apply_end_of_turn_employee_progression(
             underperforming_count += 1
         else:
             employee.underperformance_streak = max(0, employee.underperformance_streak - 1)
+        _apply_career_pressure(employee)
 
         if _should_resign(employee, rng):
             resigned_employees.append(employee.full_name)
@@ -199,6 +200,43 @@ def _apply_performance_drift(employee: Employee) -> None:
     if employee.assigned_product_id is not None and performance_delta >= 0:
         performance_delta += BALANCE.employee_performance_recovery_gain
     employee.performance_rating = clamp_int(employee.performance_rating + performance_delta)
+
+
+def _apply_career_pressure(employee: Employee) -> None:
+    benchmark_salary = calculate_salary(employee.role, employee.seniority)
+    under_market = employee.salary < quantize_money(
+        benchmark_salary * BALANCE.employee_compensation_pressure_salary_ratio_floor
+    )
+
+    if (
+        employee.promotion_readiness >= BALANCE.employee_promotion_readiness_threshold
+        and employee.performance_rating >= BALANCE.employee_performance_good_threshold
+        and employee.tenure_turns >= BALANCE.employee_promotion_pressure_tenure_threshold
+    ):
+        employee.attrition_risk = clamp_int(
+            employee.attrition_risk + BALANCE.employee_promotion_pressure_attrition_gain
+        )
+        employee.morale = clamp_int(
+            employee.morale - BALANCE.employee_promotion_pressure_morale_loss
+        )
+
+    if (
+        under_market
+        and employee.performance_rating >= BALANCE.employee_performance_good_threshold
+        and employee.tenure_turns >= BALANCE.employee_compensation_pressure_tenure_threshold
+    ):
+        employee.attrition_risk = clamp_int(
+            employee.attrition_risk + BALANCE.employee_compensation_pressure_attrition_gain
+        )
+        employee.morale = clamp_int(
+            employee.morale - BALANCE.employee_compensation_pressure_morale_loss
+        )
+
+    if employee.underperformance_streak >= BALANCE.employee_underperformance_streak_warning:
+        employee.attrition_risk = clamp_int(
+            employee.attrition_risk + BALANCE.employee_underperformance_attrition_gain
+        )
+        employee.morale = clamp_int(employee.morale - BALANCE.employee_underperformance_morale_loss)
 
 
 def _should_resign(employee: Employee, rng: RandomLike | None) -> bool:

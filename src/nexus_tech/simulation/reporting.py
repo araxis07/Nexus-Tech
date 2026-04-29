@@ -190,6 +190,13 @@ def calculate_run_badges(
         {deal.channel.value for deal in state.partnerships if deal.status.value != "paused"}
     ) >= 2 and any(deal.sourced_revenue > ZERO_MONEY for deal in state.partnerships):
         badges.append("channel_builder")
+    if (
+        len(state.customer_accounts) >= 3
+        and state.support_program.backlog_queue
+        < BALANCE.support_program_backlog_reputation_threshold // 2
+        and state.support_program.escalation_queue <= 1
+    ):
+        badges.append("support_resilient")
     if run_score.active_products >= 3 and run_score.mature_products >= 1:
         badges.append("portfolio_architect")
     if (
@@ -197,9 +204,31 @@ def calculate_run_badges(
         and state.finance.board_team_health_score >= BALANCE.board_score_team_health_target
     ):
         badges.append("people_builder")
+    if (
+        state.finance.board_team_health_score >= BALANCE.board_score_team_health_target
+        and not any(
+            employee.attrition_risk >= BALANCE.employee_high_attrition_risk_threshold
+            for employee in state.employees
+        )
+        and len(state.employees) >= 3
+    ):
+        badges.append("people_stable")
+    if (
+        state.finance.board_score >= BALANCE.board_score_profitability_target
+        and state.finance.board_confidence >= BALANCE.board_confidence_high_threshold
+        and state.exit_outcome is not None
+        and state.exit_outcome.value == "ipo_ready"
+    ):
+        badges.append("ipo_candidate")
+    if (
+        state.finance.debt_principal <= ZERO_MONEY
+        and state.company.cash_on_hand >= BALANCE.exit_independence_cash_threshold
+        and state.finance.investor_pressure <= BALANCE.victory_max_investor_pressure
+    ):
+        badges.append("independent_engine")
     if not badges:
         badges.append(run_score.score_tier)
-    return tuple(badges[:4])
+    return tuple(badges[:6])
 
 
 def check_victory(state: GameState) -> str | None:

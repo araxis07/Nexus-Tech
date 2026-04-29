@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from nexus_tech.domain.money import quantize_money
+from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
 
 
@@ -21,6 +21,10 @@ class MetaProgressionSummary:
     unique_outcomes: tuple[str, ...]
     unlocked_achievements: tuple[str, ...]
     campaign_tier: str
+    campaign_stage: str
+    achievement_progress: str
+    unlocks_remaining: tuple[str, ...]
+    archive_highlights: tuple[str, ...]
     next_goal: str
 
 
@@ -39,38 +43,52 @@ def summarize_meta_progression(
             unique_outcomes=tuple(),
             unlocked_achievements=("first_archive_pending",),
             campaign_tier="unranked",
+            campaign_stage="foundation",
+            achievement_progress="0/11 core achievements",
+            unlocks_remaining=(
+                "first_archive",
+                "first_victory",
+                "repeat_operator",
+                "board_steward",
+                "channel_builder",
+                "monetization_architect",
+                "support_resilient",
+                "people_stable",
+                "ipo_pathfinder",
+                "strategic_closer",
+                "independent_operator",
+            ),
+            archive_highlights=("No archived runs yet.",),
             next_goal="Finish and archive one run to unlock campaign progression.",
         )
 
     victories = sum(1 for archive in archives if archive.victory_achieved)
     best_archive = max(archives, key=lambda archive: archive.total_score)
+    latest_archive = max(archives, key=lambda archive: archive.archived_at)
     unique_outcomes = tuple(
         sorted({archive.exit_outcome for archive in archives if archive.exit_outcome})
     )
     badge_pool = {badge for archive in archives for badge in archive.achievement_badges}
+    best_offer = max(archives, key=lambda archive: archive.offer_value)
     average_offer_value = quantize_money(
         sum((archive.offer_value for archive in archives), Decimal("0.00")) / Decimal(len(archives))
     )
 
-    unlocks: list[str] = ["first_archive"]
-    if victories >= 1:
-        unlocks.append("first_victory")
-    if len(archives) >= 3:
-        unlocks.append("repeat_operator")
-    if "board_trusted" in badge_pool:
-        unlocks.append("board_steward")
-    if "channel_builder" in badge_pool:
-        unlocks.append("channel_builder")
-    if "monetization_architect" in badge_pool:
-        unlocks.append("monetization_architect")
-    if "governance_survivor" in badge_pool:
-        unlocks.append("governance_survivor")
-    if "ipo_ready" in unique_outcomes:
-        unlocks.append("ipo_pathfinder")
-    if "strategic_acquisition" in unique_outcomes:
-        unlocks.append("strategic_closer")
-    if "profitable_independence" in unique_outcomes:
-        unlocks.append("independent_operator")
+    achievement_checks = (
+        ("first_archive", True),
+        ("first_victory", victories >= 1),
+        ("repeat_operator", len(archives) >= 3),
+        ("board_steward", "board_trusted" in badge_pool),
+        ("channel_builder", "channel_builder" in badge_pool),
+        ("monetization_architect", "monetization_architect" in badge_pool),
+        ("support_resilient", "support_resilient" in badge_pool),
+        ("people_stable", "people_stable" in badge_pool),
+        ("ipo_pathfinder", "ipo_ready" in unique_outcomes),
+        ("strategic_closer", "strategic_acquisition" in unique_outcomes),
+        ("independent_operator", "profitable_independence" in unique_outcomes),
+    )
+    unlocks = [name for name, unlocked in achievement_checks if unlocked]
+    unlocks_remaining = tuple(name for name, unlocked in achievement_checks if not unlocked)
 
     campaign_tier = "bronze"
     if best_archive.total_score >= 180 or victories >= 2:
@@ -80,12 +98,32 @@ def summarize_meta_progression(
     if best_archive.total_score >= 280 and victories >= 3:
         campaign_tier = "platinum"
 
+    campaign_stage = "foundation"
+    if len(unlocks) >= 3 or best_archive.total_score >= 140:
+        campaign_stage = "portfolio"
+    if len(unlocks) >= 5 or victories >= 1:
+        campaign_stage = "operator"
+    if len(unlocks) >= 8 or "ipo_ready" in unique_outcomes:
+        campaign_stage = "institutional"
+    if len(unlocks) >= 10 and victories >= 2:
+        campaign_stage = "franchise"
+
+    archive_highlights = (
+        f"Latest archive: {latest_archive.exit_outcome} on turn {latest_archive.completed_turn}.",
+        (f"Best offer: {format_money(best_offer.offer_value)} from {best_offer.exit_outcome}."),
+        (
+            f"Outcome coverage: {len(unique_outcomes)} path(s) across "
+            f"{len({archive.campaign_grade for archive in archives})} grade tier(s)."
+        ),
+    )
+    achievement_progress = f"{len(unlocks)}/{len(achievement_checks)} core achievements"
+
     if victories == 0:
         next_goal = "Push one run to a victory state to unlock the next campaign tier."
+    elif unlocks_remaining:
+        next_goal = f"Next unlock target: {unlocks_remaining[0]}."
     elif "ipo_ready" not in unique_outcomes:
         next_goal = "Reach an IPO-ready ending to complete the public-market ladder."
-    elif len(unlocks) < 6:
-        next_goal = "Diversify outcomes and badges across more completed runs."
     else:
         next_goal = "The archive already covers the core campaign ladder."
 
@@ -98,5 +136,9 @@ def summarize_meta_progression(
         unique_outcomes=unique_outcomes,
         unlocked_achievements=tuple(unlocks),
         campaign_tier=campaign_tier,
+        campaign_stage=campaign_stage,
+        achievement_progress=achievement_progress,
+        unlocks_remaining=unlocks_remaining,
+        archive_highlights=archive_highlights,
         next_goal=next_goal,
     )

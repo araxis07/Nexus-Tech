@@ -34,6 +34,10 @@ class CapitalPlanDrift:
     board_confidence_delta: int
     runway_target_modifier: int
     reserve_gap: Decimal
+    alignment_score: int
+    reserve_status: str
+    execution_status: str
+    recommended_posture: str
     summary: str
 
 
@@ -171,6 +175,49 @@ def evaluate_capital_plan(
         board_confidence_delta -= BALANCE.capital_plan_venture_dilution_confidence_penalty
         summary_notes.append("venture dilution is becoming a board concern")
 
+    reserve_status = "covered"
+    if reserve_gap < Decimal("0.00"):
+        reserve_status = "under target"
+    elif reserve_gap >= capital_plan.reserve_target * Decimal("0.30"):
+        reserve_status = "buffered"
+
+    execution_status = "aligned"
+    if support_backlog >= BALANCE.support_program_backlog_reputation_threshold:
+        execution_status = "support constrained"
+    elif (
+        technical_debt_load >= 50
+        and capital_plan.product_investment_share < BALANCE.capital_plan_low_product_share_threshold
+    ):
+        execution_status = "product constrained"
+    elif (
+        capital_plan.go_to_market_share >= BALANCE.capital_plan_high_gtm_share_threshold
+        and active_channels == 0
+    ):
+        execution_status = "gtm ahead of execution"
+
+    if reserve_gap < Decimal("0.00"):
+        recommended_posture = "Move closer to conserve until the reserve target is covered."
+    elif execution_status == "gtm ahead of execution":
+        recommended_posture = "Convert GTM allocation into active channels before expanding spend."
+    elif execution_status == "product constrained":
+        recommended_posture = "Rebalance more capital into product quality and debt reduction."
+    elif execution_status == "support constrained":
+        recommended_posture = "Fund support relief before pushing more customer volume."
+    else:
+        recommended_posture = "Current capital posture is coherent with execution."
+
+    alignment_score = max(
+        0,
+        min(
+            100,
+            58
+            + (board_confidence_delta * 5)
+            - (investor_pressure_delta * 4)
+            - (covenant_risk_delta * 6)
+            + (4 if reserve_gap >= Decimal("0.00") else -6),
+        ),
+    )
+
     summary = (
         f"{capital_plan.mode.value} / {capital_plan.source_preference.value} plan, "
         f"reserve gap {format_money(reserve_gap)}"
@@ -184,5 +231,9 @@ def evaluate_capital_plan(
             capital_plan.mode.value
         ],
         reserve_gap=reserve_gap,
+        alignment_score=alignment_score,
+        reserve_status=reserve_status,
+        execution_status=execution_status,
+        recommended_posture=recommended_posture,
         summary=summary,
     )

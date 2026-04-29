@@ -70,6 +70,7 @@ from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
 from nexus_tech.simulation.support_program import (
     calculate_support_lane_snapshots,
+    calculate_support_lane_staffing_plan,
     calculate_support_staff_capacity,
     classify_account_support_lane,
     count_escalating_accounts,
@@ -1110,6 +1111,8 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
     overview.add_row("Best Grade", summary.best_grade)
     overview.add_row("Avg Offer", format_money(summary.average_offer_value))
     overview.add_row("Campaign Tier", summary.campaign_tier)
+    overview.add_row("Campaign Stage", summary.campaign_stage)
+    overview.add_row("Achievement Prog.", summary.achievement_progress)
     overview.add_row(
         "Outcomes",
         ", ".join(summary.unique_outcomes) if summary.unique_outcomes else "-",
@@ -1118,10 +1121,16 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
         "Unlocks",
         ", ".join(summary.unlocked_achievements),
     )
+    overview.add_row(
+        "Remaining",
+        ", ".join(summary.unlocks_remaining[:3]) if summary.unlocks_remaining else "-",
+    )
+    highlights = "\n".join(f"- {line}" for line in summary.archive_highlights)
     console.print(
         Columns(
             [
                 Panel(overview, title="Meta Progression", border_style="cyan", expand=True),
+                Panel(highlights, title="Archive Highlights", border_style="magenta", expand=True),
                 Panel(summary.next_goal, title="Next Goal", border_style="green", expand=True),
             ],
             equal=True,
@@ -2501,6 +2510,7 @@ def _build_support_program_panel(state: GameState) -> Panel:
     escalating_accounts = count_escalating_accounts(state.customer_accounts)
     staffing_capacity = calculate_support_staff_capacity(state)
     lane_snapshots = calculate_support_lane_snapshots(state)
+    staffing_plan = calculate_support_lane_staffing_plan(state)
     lane_counts = {
         "onboarding": 0,
         "enterprise": 0,
@@ -2544,6 +2554,14 @@ def _build_support_program_panel(state: GameState) -> Panel:
             f"O {lane_snapshots[SupportLaneFocus.ONBOARDING].overflow} / "
             f"E {lane_snapshots[SupportLaneFocus.ENTERPRISE].overflow} / "
             f"B {lane_snapshots[SupportLaneFocus.BILLING].overflow}"
+        ),
+    )
+    table.add_row(
+        "Lane Staff",
+        (
+            f"O {staffing_plan[SupportLaneFocus.ONBOARDING]} / "
+            f"E {staffing_plan[SupportLaneFocus.ENTERPRISE]} / "
+            f"B {staffing_plan[SupportLaneFocus.BILLING]}"
         ),
     )
     table.add_row(
@@ -2658,6 +2676,7 @@ def _build_capital_plan_panel(state: GameState) -> Panel:
     table.add_row("Horizon", f"{state.capital_plan.planning_horizon_turns} turns")
     table.add_row("Reserve Target", format_money(state.capital_plan.reserve_target))
     table.add_row("Reserve Gap", format_signed_money(reserve_gap))
+    table.add_row("Reserve State", capital_drift.reserve_status)
     table.add_row(
         "Allocation",
         (
@@ -2667,6 +2686,8 @@ def _build_capital_plan_panel(state: GameState) -> Panel:
         ),
     )
     table.add_row("Latest Cashflow", format_signed_money(latest_net_cash_flow))
+    table.add_row("Alignment Score", str(capital_drift.alignment_score))
+    table.add_row("Execution", capital_drift.execution_status)
     table.add_row(
         "Plan Drift",
         (
@@ -2676,6 +2697,7 @@ def _build_capital_plan_panel(state: GameState) -> Panel:
         ),
     )
     table.add_row("Alignment", capital_drift.summary)
+    table.add_row("Recommended", capital_drift.recommended_posture)
     return Panel(table, title="Capital Plan", border_style="bright_cyan", expand=True)
 
 

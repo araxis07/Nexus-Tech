@@ -627,6 +627,8 @@ def apply_end_of_turn_team_drift(
 
     org_structure = calculate_org_structure(employees)
     product_map = {product.id: product for product in products}
+    employee_map = {employee.id: employee for employee in employees}
+    manager_report_counts = _build_manager_report_counts(employees)
     strategy_profile = get_strategy_profile(company_strategy)
 
     for employee in employees:
@@ -665,6 +667,24 @@ def apply_end_of_turn_team_drift(
         if employee.manager_id is None:
             energy_loss += BALANCE.management_unmanaged_energy_penalty
             morale_loss += BALANCE.management_unmanaged_morale_penalty
+        else:
+            manager = employee_map.get(employee.manager_id)
+            if manager is not None:
+                overload = max(
+                    0,
+                    manager_report_counts.get(manager.id, 0) - calculate_manager_capacity(manager),
+                )
+                if overload > 0:
+                    energy_loss += BALANCE.management_overload_report_energy_penalty
+                if manager.succession_risk >= BALANCE.management_succession_high_risk_threshold:
+                    morale_loss += BALANCE.management_succession_report_morale_penalty
+                    energy_loss += BALANCE.management_succession_report_energy_penalty
+        if (
+            is_eligible_manager(employee)
+            and employee.succession_risk >= BALANCE.management_succession_high_risk_threshold
+        ):
+            energy_loss += BALANCE.management_succession_manager_energy_penalty
+            morale_loss += BALANCE.management_succession_manager_morale_penalty
         energy_loss += org_structure.org_drag
 
         employee.energy = clamp_int(employee.energy - energy_loss)
