@@ -93,7 +93,10 @@ from nexus_tech.simulation.finance import (
     apply_end_of_turn_finance_drift,
     calculate_cash_flow_forecast_scenarios,
 )
-from nexus_tech.simulation.governance import apply_end_of_turn_governance
+from nexus_tech.simulation.governance import (
+    apply_end_of_turn_governance,
+    get_governance_tradeoff_focus,
+)
 from nexus_tech.simulation.growth import (
     calculate_acquired_users,
     calculate_churned_users,
@@ -114,7 +117,10 @@ from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
-from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
+from nexus_tech.simulation.pricing import (
+    calculate_effective_revenue_per_user,
+    determine_target_subscription_package,
+)
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.releases import plan_product_release, work_product_release
@@ -132,6 +138,7 @@ from nexus_tech.simulation.scaling import (
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
     calculate_support_staff_capacity,
+    classify_account_support_lane,
     triage_support_backlog,
 )
 from nexus_tech.simulation.team import (
@@ -2878,6 +2885,48 @@ def test_set_support_lane_focus_updates_program_bias() -> None:
     assert outcome.state.support_program.backlog_queue == 4
 
 
+def test_route_support_escalation_prioritizes_billing_lane_pressure() -> None:
+    product = make_product("Collections Desk")
+    account = CustomerAccount(
+        name="Late Invoice Co",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("720.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        satisfaction=45,
+        onboarding_health=52,
+        support_load=26,
+        open_tickets=5,
+        sla_breach_risk=18,
+        invoice_risk=78,
+        failed_payment_risk=74,
+        dunning_steps=2,
+        escalation_count=1,
+        expansion_potential=44,
+        renewal_health=38,
+        renewal_turn=4,
+        churn_risk=53,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+    state.support_program.escalation_queue = 3
+
+    lane = classify_account_support_lane(account)
+    outcome = apply_action(
+        state,
+        TurnAction.ROUTE_SUPPORT_ESCALATION,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated = outcome.state.customer_accounts[0]
+    assert lane is SupportLaneFocus.BILLING
+    assert "billing escalation" in outcome.message
+    assert updated.invoice_risk < account.invoice_risk
+    assert updated.failed_payment_risk < account.failed_payment_risk
+    assert updated.dunning_steps < account.dunning_steps
+    assert updated.renewal_health > account.renewal_health
+
+
 def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     product = make_product("Hiring Hub")
     state = make_state(product, cash_on_hand=Decimal("15000.00"))
@@ -3248,6 +3297,45 @@ def test_governance_tracks_board_ask_and_warning_level() -> None:
     assert state.finance.board_warning_active is True
 
 
+def test_governance_forced_tradeoff_applies_when_resolution_is_due() -> None:
+    product = make_product("Risk Atlas", bug_level=36, technical_debt=30)
+    state = make_state(product)
+    state.finance.active_board_ask = BoardAsk.RELIABILITY
+    state.finance.board_resolution_due = True
+    state.finance.board_resolution_window = 2
+    state.support_program.backlog_queue = 26
+    state.support_program.escalation_queue = 7
+    starting_backlog = state.support_program.backlog_queue
+    starting_bug_level = state.products[0].bug_level
+
+    customer_summary = apply_end_of_turn_customers(
+        state.customer_accounts,
+        [product],
+        current_turn=4,
+    )
+    operations_summary = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
+    )
+    summary = apply_end_of_turn_governance(
+        state,
+        resolved_turn=4,
+        total_revenue=Decimal("900.00"),
+        net_cash_flow=Decimal("-900.00"),
+        customer_summary=customer_summary,
+        operations_summary=operations_summary,
+    )
+
+    assert summary.forced_tradeoff_active is True
+    assert summary.forced_tradeoff_focus is BoardAsk.RELIABILITY
+    assert get_governance_tradeoff_focus(state) is BoardAsk.RELIABILITY
+    assert state.support_program.backlog_queue < starting_backlog
+    assert state.products[0].bug_level < starting_bug_level
+    assert "Forced trade-off" in summary.summary
+
+
 def test_run_price_increase_lifts_product_and_account_revenue() -> None:
     product = make_product(
         "Monetize Me",
@@ -3295,6 +3383,97 @@ def test_run_price_increase_lifts_product_and_account_revenue() -> None:
     assert outcome.state.products[0].revenue_per_user > product.revenue_per_user
     assert outcome.state.customer_accounts[0].contract_value > account.contract_value
     assert outcome.state.customer_accounts[0].satisfaction < account.satisfaction
+
+
+def test_determine_target_subscription_package_uses_catalog_depth() -> None:
+    product = make_product(
+        "Catalog Engine",
+        packaging_strategy=PackagingStrategy.SUITE,
+        target_segment=MarketSegment.ENTERPRISE,
+        package_catalog_depth=3,
+        add_on_catalog_depth=2,
+    )
+    account = CustomerAccount(
+        name="Tiered Buyer",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1100.00"),
+        plan_tier=PricingTier.PREMIUM,
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=74,
+        expansion_potential=64,
+        renewal_turn=6,
+        churn_risk=18,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+
+    target_package = determine_target_subscription_package(product, account)
+
+    assert target_package is SubscriptionPackage.ENTERPRISE_SUITE
+
+
+def test_package_migration_and_catalog_expansion_prepare_accounts() -> None:
+    product = make_product(
+        "Monetization Grid",
+        packaging_strategy=PackagingStrategy.SUITE,
+        target_segment=MarketSegment.ENTERPRISE,
+        package_catalog_depth=2,
+        add_on_catalog_depth=1,
+    )
+    account = CustomerAccount(
+        name="Expansion Buyer",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("980.00"),
+        plan_tier=PricingTier.PREMIUM,
+        subscription_package=SubscriptionPackage.GROWTH,
+        support_tier=SupportTier.PRIORITY,
+        contract_cadence=ContractCadence.ANNUAL,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=18,
+        usage_units=0,
+        add_on_count=1,
+        annual_prepay=False,
+        discount_rate=Decimal("0.0100"),
+        satisfaction=77,
+        onboarding_health=70,
+        support_load=18,
+        open_tickets=2,
+        sla_breach_risk=12,
+        invoice_risk=14,
+        failed_payment_risk=10,
+        expansion_potential=66,
+        renewal_health=68,
+        renewal_turn=6,
+        churn_risk=17,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("6000.00"))
+    state.action_points_remaining = 4
+
+    package_expansion = apply_action(
+        state,
+        TurnAction.EXPAND_PACKAGE_CATALOG,
+        context=ActionContext(target_product_id=product.id),
+    )
+    add_on_expansion = apply_action(
+        package_expansion.state,
+        TurnAction.EXPAND_ADD_ON_CATALOG,
+        context=ActionContext(target_product_id=product.id),
+    )
+    migrated = apply_action(
+        add_on_expansion.state,
+        TurnAction.RUN_PACKAGE_MIGRATION,
+        context=ActionContext(target_product_id=product.id),
+    )
+
+    updated_account = migrated.state.customer_accounts[0]
+    assert "prepared 1 account" in package_expansion.message
+    assert "primed 1 account" in add_on_expansion.message
+    assert updated_account.subscription_package is SubscriptionPackage.ENTERPRISE_SUITE
+    assert updated_account.contract_value > account.contract_value
+    assert updated_account.annual_prepay is True
+    assert updated_account.add_on_count > account.add_on_count
 
 
 def test_suite_packaging_creates_expansion_drift_before_renewal() -> None:
@@ -4024,6 +4203,56 @@ def test_run_badges_capture_durable_company_strength() -> None:
     assert "capital_disciplined" in badges
     assert "board_trusted" in badges
     assert "enterprise_operator" in badges
+
+
+def test_run_badges_capture_billing_governance_and_monetization_depth() -> None:
+    products = [
+        make_product(
+            "Billing Suite",
+            lifecycle_stage=LifecycleStage.MATURE,
+            user_count=140,
+            package_catalog_depth=2,
+            add_on_catalog_depth=2,
+        ),
+        make_product("Expansion Hub", user_count=90),
+    ]
+    accounts = [
+        CustomerAccount(
+            name="Core Buyer",
+            product_id=products[0].id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1350.00"),
+            satisfaction=78,
+            expansion_potential=70,
+            renewal_turn=7,
+            churn_risk=14,
+            dunning_steps=0,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Ops Buyer",
+            product_id=products[1].id,
+            segment=MarketSegment.SMB,
+            contract_value=Decimal("640.00"),
+            satisfaction=74,
+            expansion_potential=58,
+            renewal_turn=7,
+            churn_risk=16,
+            dunning_steps=0,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
+    state = make_state(*products, customer_accounts=accounts, cash_on_hand=Decimal("9500.00"))
+    state.finance.board_confidence = 61
+    state.finance.quarterly_review_count = 2
+    state.support_program.billing_ticket_pressure = 6
+    state.support_program.escalation_queue = 1
+
+    badges = calculate_run_badges(state, calculate_run_score(state))
+
+    assert "billing_operator" in badges
+    assert "governance_survivor" in badges
+    assert "monetization_architect" in badges
 
 
 def test_endgame_readiness_surfaces_acquisition_and_ipo_scores() -> None:

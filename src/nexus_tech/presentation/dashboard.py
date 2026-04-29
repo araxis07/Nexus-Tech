@@ -50,6 +50,7 @@ from nexus_tech.simulation.finance import (
     estimate_runway,
 )
 from nexus_tech.simulation.functional_budgeting import get_functional_budget_profile
+from nexus_tech.simulation.governance import get_governance_tradeoff_focus
 from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
@@ -66,6 +67,7 @@ from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
 from nexus_tech.simulation.support_program import (
     calculate_support_staff_capacity,
+    classify_account_support_lane,
     count_escalating_accounts,
 )
 from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
@@ -1041,6 +1043,7 @@ def render_report(console: Console, state: GameState) -> None:
                 _build_finance_panel(state),
                 _build_governance_panel(state),
                 _build_customer_accounts_panel(state),
+                _build_support_program_panel(state),
                 _build_operations_panel(state),
                 _build_late_game_panel(state),
                 Panel(
@@ -2363,6 +2366,7 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
         table.add_column("Dunning", justify="right")
         table.add_column("Esc", justify="right")
         table.add_column("Queue Age", justify="right")
+        table.add_column("Lane")
         table.add_column("Offer")
 
     for account in active_accounts:
@@ -2399,6 +2403,7 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
                     str(account.dunning_steps),
                     str(account.escalation_count),
                     str(account.ticket_queue_age),
+                    classify_account_support_lane(account).value,
                     (
                         account.renewal_offer_type.value
                         if account.renewal_offer_type is not None
@@ -2422,6 +2427,15 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
 def _build_support_program_panel(state: GameState) -> Panel:
     escalating_accounts = count_escalating_accounts(state.customer_accounts)
     staffing_capacity = calculate_support_staff_capacity(state)
+    lane_counts = {
+        "onboarding": 0,
+        "enterprise": 0,
+        "billing": 0,
+    }
+    for account in state.customer_accounts:
+        lane = classify_account_support_lane(account)
+        if lane.value in lane_counts:
+            lane_counts[lane.value] += 1
     staffing_gap = max(
         0,
         escalating_accounts
@@ -2442,6 +2456,14 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Onboarding Q", str(state.support_program.onboarding_ticket_pressure))
     table.add_row("Enterprise Q", str(state.support_program.enterprise_ticket_pressure))
     table.add_row("Billing Q", str(state.support_program.billing_ticket_pressure))
+    table.add_row(
+        "Lane Mix",
+        (
+            f"O {lane_counts['onboarding']} / "
+            f"E {lane_counts['enterprise']} / "
+            f"B {lane_counts['billing']}"
+        ),
+    )
     table.add_row("Resolved", str(state.support_program.resolved_last_turn))
     table.add_row("Deflection", str(state.support_program.deflection_score))
     table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))
@@ -2524,6 +2546,7 @@ def _build_finance_panel(state: GameState) -> Panel:
 
 def _build_governance_panel(state: GameState) -> Panel:
     directive = state.finance.board_directive.value.replace("_", " ")
+    tradeoff_focus = get_governance_tradeoff_focus(state)
     table = Table.grid(padding=(0, 1))
     table.add_row("Board Confidence", str(state.finance.board_confidence))
     table.add_row("Board Score", str(state.finance.board_score))
@@ -2535,6 +2558,10 @@ def _build_governance_panel(state: GameState) -> Panel:
     table.add_row("Resolution Window", str(state.finance.board_resolution_window))
     table.add_row("Miss Streak", str(state.finance.board_resolution_miss_streak))
     table.add_row("Board Ask", state.finance.active_board_ask.value.replace("_", " "))
+    table.add_row(
+        "Trade-off",
+        tradeoff_focus.value.replace("_", " ") if tradeoff_focus is not None else "-",
+    )
     table.add_row(
         "Scorecard",
         (

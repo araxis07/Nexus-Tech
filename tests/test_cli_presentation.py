@@ -1063,6 +1063,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Roadmap" in output
     assert "Segment" in output
     assert "Onboarding" in output
+    assert "Trade-off" in output
 
 
 def test_turn_resolution_rendering_contains_summary_sections() -> None:
@@ -1096,6 +1097,8 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Estimated Value" in output
     assert "Exit Outlook" in output
     assert "Key Accounts" in output
+    assert "Lane Mix" in output
+    assert "Trade-off" in output
 
 
 def test_template_catalog_rendering_contains_catalog_title() -> None:

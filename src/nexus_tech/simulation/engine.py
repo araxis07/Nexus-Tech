@@ -982,7 +982,11 @@ def apply_action(
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.EXPAND_PACKAGE_CATALOG:
-        summary = apply_expand_package_catalog(next_state.company, product)
+        summary = apply_expand_package_catalog(
+            next_state.company,
+            product,
+            next_state.customer_accounts,
+        )
         next_state.company.game_over = is_game_over(next_state.company)
         return ActionOutcome(
             state=next_state,
@@ -991,7 +995,11 @@ def apply_action(
         )
 
     if action is TurnAction.EXPAND_ADD_ON_CATALOG:
-        summary = apply_expand_add_on_catalog(next_state.company, product)
+        summary = apply_expand_add_on_catalog(
+            next_state.company,
+            product,
+            next_state.customer_accounts,
+        )
         next_state.company.game_over = is_game_over(next_state.company)
         return ActionOutcome(
             state=next_state,

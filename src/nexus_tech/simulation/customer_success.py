@@ -16,6 +16,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.pricing import determine_target_subscription_package
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 from nexus_tech.simulation.support_program import improve_support_program
 
@@ -161,8 +162,27 @@ def make_renewal_offer(
             + BALANCE.renewal_offer_light_discount_extra
         )
     elif offer_type is RenewalOfferType.BUNDLE_UPGRADE:
+        product = next(
+            (product for product in state.products if product.id == account.product_id),
+            None,
+        )
         account.add_on_count += BALANCE.renewal_offer_bundle_add_on_gain
-        account.subscription_package = _upgrade_subscription_package(account.subscription_package)
+        if product is None:
+            account.subscription_package = _upgrade_subscription_package(
+                account.subscription_package
+            )
+        else:
+            account.add_on_count += max(0, product.add_on_catalog_depth // 2)
+            target_package = determine_target_subscription_package(product, account)
+            if _package_rank(target_package) <= _package_rank(account.subscription_package):
+                account.subscription_package = _upgrade_subscription_package(
+                    account.subscription_package
+                )
+            else:
+                account.subscription_package = target_package
+            account.renewal_health = clamp_int(
+                account.renewal_health + product.package_catalog_depth
+            )
         account.renewal_health = clamp_int(
             account.renewal_health + BALANCE.renewal_offer_bundle_health_gain
         )
@@ -260,3 +280,11 @@ def _upgrade_subscription_package(package: SubscriptionPackage) -> SubscriptionP
     if package is SubscriptionPackage.STARTER:
         return SubscriptionPackage.GROWTH
     return SubscriptionPackage.ENTERPRISE_SUITE
+
+
+def _package_rank(package: SubscriptionPackage) -> int:
+    if package is SubscriptionPackage.STARTER:
+        return 0
+    if package is SubscriptionPackage.GROWTH:
+        return 1
+    return 2

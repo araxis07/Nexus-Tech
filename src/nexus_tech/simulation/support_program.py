@@ -38,6 +38,7 @@ class SupportProgramSummary:
     onboarding_ticket_pressure: int
     enterprise_ticket_pressure: int
     billing_ticket_pressure: int
+    dominant_lane: SupportLaneFocus
     focus_mismatch_penalty: int
     service_cost: Decimal
     reputation_delta: int
@@ -125,6 +126,11 @@ def apply_end_of_turn_support_program(
         if (
             account.invoice_risk > 0 or account.failed_payment_risk > 0 or account.dunning_steps > 0
         )
+    )
+    dominant_lane = _get_dominant_pressure_lane(
+        onboarding_ticket_pressure=onboarding_ticket_pressure,
+        enterprise_ticket_pressure=enterprise_ticket_pressure,
+        billing_ticket_pressure=billing_ticket_pressure,
     )
     weighted_ticket_pressure = total_open_tickets + sum(
         max(0, BALANCE.support_program_segment_ticket_weight[account.segment.value] - 1)
@@ -247,8 +253,11 @@ def apply_end_of_turn_support_program(
         summary = "Support tooling is keeping ticket flow under control."
     elif focus_mismatch_penalty > 0:
         summary = (
-            "Support lanes are mismatched with demand and one customer lane is waiting too long."
+            "Support lanes are mismatched with demand and "
+            f"{dominant_lane.value} pressure is waiting too long."
         )
+    elif dominant_lane is SupportLaneFocus.BILLING:
+        summary = "Support is stable, but billing queues are now the main post-sale pressure."
     elif staffing_gap > 0:
         summary = "Support demand is outrunning staffed capacity and enterprise pressure is rising."
     else:
@@ -269,6 +278,7 @@ def apply_end_of_turn_support_program(
         onboarding_ticket_pressure=onboarding_ticket_pressure,
         enterprise_ticket_pressure=enterprise_ticket_pressure,
         billing_ticket_pressure=billing_ticket_pressure,
+        dominant_lane=dominant_lane,
         focus_mismatch_penalty=focus_mismatch_penalty,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
@@ -319,9 +329,9 @@ def triage_support_backlog(state: GameState) -> SupportOpsActionSummary:
         for account in sorted(
             state.customer_accounts,
             key=lambda account: (
-                account.escalation_count,
-                account.open_tickets,
-                account.sla_breach_risk,
+                _calculate_account_support_severity(account),
+                account.ticket_queue_age,
+                account.churn_risk,
             ),
             reverse=True,
         )
@@ -468,29 +478,84 @@ def route_support_escalation(
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.support_program_route_escalation_cost
     )
-    if account.support_tier is SupportTier.STANDARD:
-        account.support_tier = SupportTier.PRIORITY
-    elif account.support_tier is SupportTier.PRIORITY and account.segment.value == "enterprise":
-        account.support_tier = SupportTier.WHITE_GLOVE
-    account.open_tickets = max(
-        0, account.open_tickets - BALANCE.support_program_route_ticket_relief
-    )
-    account.sla_breach_risk = clamp_int(
-        account.sla_breach_risk - BALANCE.support_program_route_sla_relief
-    )
+    lane = classify_account_support_lane(account)
+    lane_label = lane.value
+    if lane is SupportLaneFocus.BILLING:
+        account.invoice_risk = clamp_int(
+            account.invoice_risk - BALANCE.support_program_route_billing_invoice_relief
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk - BALANCE.support_program_route_billing_payment_relief
+        )
+        account.dunning_steps = max(
+            0,
+            account.dunning_steps - BALANCE.support_program_route_billing_dunning_relief,
+        )
+        account.open_tickets = max(
+            0,
+            account.open_tickets - max(1, BALANCE.support_program_route_ticket_relief // 2),
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - max(2, BALANCE.support_program_route_sla_relief // 2)
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.support_program_route_billing_renewal_health_gain
+        )
+        if account.support_tier is SupportTier.STANDARD and account.open_tickets > 6:
+            account.support_tier = SupportTier.PRIORITY
+    elif lane is SupportLaneFocus.ENTERPRISE:
+        if account.support_tier is SupportTier.STANDARD:
+            account.support_tier = SupportTier.PRIORITY
+        elif account.support_tier is SupportTier.PRIORITY:
+            account.support_tier = SupportTier.WHITE_GLOVE
+        account.open_tickets = max(
+            0,
+            account.open_tickets
+            - (
+                BALANCE.support_program_route_ticket_relief
+                + BALANCE.support_program_route_enterprise_ticket_relief_bonus
+            ),
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk
+            - (
+                BALANCE.support_program_route_sla_relief
+                + BALANCE.support_program_route_enterprise_sla_relief_bonus
+            )
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk - (BALANCE.support_program_route_sla_relief // 2)
+        )
+        account.renewal_health = clamp_int(account.renewal_health + 4)
+    else:
+        account.open_tickets = max(
+            0,
+            account.open_tickets - BALANCE.support_program_route_ticket_relief,
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.support_program_route_sla_relief
+        )
+        account.support_load = clamp_int(
+            account.support_load - BALANCE.support_program_route_onboarding_support_load_relief
+        )
+        account.onboarding_health = clamp_int(
+            account.onboarding_health + BALANCE.support_program_route_onboarding_health_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_route_onboarding_satisfaction_gain
+        )
     account.failed_payment_risk = clamp_int(
         account.failed_payment_risk - (BALANCE.support_program_route_sla_relief // 2)
     )
     account.support_load = clamp_int(account.support_load - 2)
     account.churn_risk = clamp_int(account.churn_risk - BALANCE.support_program_route_churn_relief)
-    account.renewal_health = clamp_int(account.renewal_health + 4)
     account.escalation_count = max(0, account.escalation_count - 1)
     account.ticket_queue_age = max(0, account.ticket_queue_age - 2)
     state.support_program.escalation_queue = max(0, state.support_program.escalation_queue - 1)
 
     return SupportOpsActionSummary(
         message=(
-            f"Routed escalation for {account.name}. "
+            f"Routed {lane_label} escalation for {account.name}. "
             f"Tier {account.support_tier.value}, cash -"
             f"{BALANCE.support_program_route_escalation_cost}."
         )
@@ -545,19 +610,7 @@ def _focus_capacity_bonus(state: GameState) -> int:
     for account in state.customer_accounts:
         if account.status is CustomerAccountStatus.CHURNED:
             continue
-        if focus is SupportLaneFocus.BILLING:
-            if (
-                account.invoice_risk > 0
-                or account.failed_payment_risk > 0
-                or account.dunning_steps > 0
-            ):
-                targeted_accounts += 1
-            continue
-        if account.open_tickets <= 0:
-            continue
-        if (focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise") or (
-            focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise"
-        ):
+        if classify_account_support_lane(account) is focus:
             targeted_accounts += 1
     return targeted_accounts // BALANCE.support_program_focus_ticket_relief_divisor
 
@@ -570,16 +623,13 @@ def _calculate_support_focus_bonus(
         return 0
     focus_bonus = 0
     for account in accounts:
-        if focus is SupportLaneFocus.BILLING and (
-            account.invoice_risk > 0 or account.failed_payment_risk > 0 or account.dunning_steps > 0
-        ):
-            focus_bonus += BALANCE.support_program_focus_billing_bonus
-        elif account.open_tickets <= 0:
-            continue
-        elif focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise":
+        account_lane = classify_account_support_lane(account)
+        if account_lane is focus and focus is SupportLaneFocus.ENTERPRISE:
             focus_bonus += BALANCE.support_program_focus_enterprise_bonus
-        elif focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise":
+        elif account_lane is focus and focus is SupportLaneFocus.ONBOARDING:
             focus_bonus += BALANCE.support_program_focus_onboarding_bonus
+        elif account_lane is focus and focus is SupportLaneFocus.BILLING:
+            focus_bonus += BALANCE.support_program_focus_billing_bonus
     return focus_bonus
 
 
@@ -615,3 +665,80 @@ def _get_account_by_id(accounts: list[CustomerAccount], account_id) -> CustomerA
         if account.id == account_id:
             return account
     raise ValueError("Selected customer account was not found.")
+
+
+def classify_account_support_lane(account: CustomerAccount) -> SupportLaneFocus:
+    """Classify the dominant lane creating pressure for one account."""
+
+    billing_pressure = (
+        (account.invoice_risk // BALANCE.support_program_billing_pressure_invoice_divisor)
+        + (
+            account.failed_payment_risk
+            // BALANCE.support_program_billing_pressure_failed_payment_divisor
+        )
+        + (account.dunning_steps * BALANCE.support_program_billing_pressure_dunning_weight)
+    )
+    enterprise_pressure = 0
+    if account.segment.value == "enterprise" or account.support_tier is SupportTier.WHITE_GLOVE:
+        enterprise_pressure = (
+            account.open_tickets
+            + (account.sla_breach_risk // 8)
+            + BALANCE.support_tier_capacity_cost[account.support_tier.value]
+        )
+    onboarding_pressure = (
+        account.open_tickets
+        + max(
+            0,
+            (
+                BALANCE.support_program_onboarding_health_pressure_threshold
+                - account.onboarding_health
+            ),
+        )
+        // 10
+        + max(0, account.support_load - 22) // 6
+    )
+    lane_pressures = {
+        SupportLaneFocus.BILLING: billing_pressure,
+        SupportLaneFocus.ENTERPRISE: enterprise_pressure,
+        SupportLaneFocus.ONBOARDING: onboarding_pressure,
+    }
+    lane, pressure = max(lane_pressures.items(), key=lambda item: item[1])
+    if pressure <= 0:
+        return SupportLaneFocus.BALANCED
+    return lane
+
+
+def _calculate_account_support_severity(account: CustomerAccount) -> int:
+    lane = classify_account_support_lane(account)
+    lane_bias = {
+        SupportLaneFocus.BILLING: account.failed_payment_risk + (account.dunning_steps * 8),
+        SupportLaneFocus.ENTERPRISE: account.sla_breach_risk + (account.ticket_queue_age * 4),
+        SupportLaneFocus.ONBOARDING: account.open_tickets + (account.support_load * 2),
+        SupportLaneFocus.BALANCED: 0,
+    }[lane]
+    return (
+        (account.escalation_count * 12)
+        + account.open_tickets
+        + account.sla_breach_risk
+        + lane_bias
+        + (account.churn_risk // 2)
+    )
+
+
+def _get_dominant_pressure_lane(
+    *,
+    onboarding_ticket_pressure: int,
+    enterprise_ticket_pressure: int,
+    billing_ticket_pressure: int,
+) -> SupportLaneFocus:
+    lane, pressure = max(
+        {
+            SupportLaneFocus.ONBOARDING: onboarding_ticket_pressure,
+            SupportLaneFocus.ENTERPRISE: enterprise_ticket_pressure,
+            SupportLaneFocus.BILLING: billing_ticket_pressure,
+        }.items(),
+        key=lambda item: item[1],
+    )
+    if pressure <= 0:
+        return SupportLaneFocus.BALANCED
+    return lane

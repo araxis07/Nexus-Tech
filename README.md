@@ -99,6 +99,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track quarterly board resolutions and restructuring pressure so repeated misses create visible strategic consequences
 - Track formal board-response deadlines so ignored resolutions can re-intensify governance pressure a few turns later
 - Let repeated board misses escalate into an explicit governance crisis so late-game pressure compounds when the company ignores follow-through
+- Force governance trade-offs when a board resolution stays open so the company has to bias toward profitability, reliability, team recovery, or portfolio focus
 - Track explicit endgame readiness across IPO, acquisition, and profitable independence so late-game strategy is easier to read before the run ends
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
@@ -117,6 +118,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Route accounts into `standard`, `priority`, or `white_glove` support tiers as the portfolio matures
 - Let healthy accounts expand between renewals through packaging-driven add-ons, suite upgrades, and contract growth
 - Run explicit add-on campaigns and packaging migrations to rebalance monetization, support burden, and retention posture
+- Let package-catalog depth and add-on-catalog depth prepare accounts for richer migrations, stronger renewal posture, and deeper contract expansion
 - Make proactive renewal offers and run win-back plays so churned accounts can still become commercial recovery opportunities
 - Choose renewal-offer types such as `light_discount`, `bundle_upgrade`, and `term_extension` so commercial saves carry clearer trade-offs
 - Track open tickets and SLA pressure so support quality can directly affect renewals and retention
@@ -128,6 +130,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Aim support operations at `balanced`, `onboarding`, `enterprise`, or `billing` lanes to change which queues get relief first
 - Track onboarding and enterprise ticket pressure separately so support-lane focus creates clearer trade-offs instead of generic backlog relief
 - Track billing pressure from invoice risk, failed payment risk, and dunning so post-sale operations now cover collections pressure too
+- Route escalations differently for onboarding, enterprise, and billing accounts so support actions now match the real queue that is failing
 - Invest in dedicated support staffing and pay visible service cost every turn as the installed base becomes heavier to serve
 - Run explicit support triage actions that cut backlog, escalation pressure, and payment-risk spillover
 - Review key accounts directly from the in-game `review_customers` action

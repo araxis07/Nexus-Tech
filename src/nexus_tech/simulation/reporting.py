@@ -158,12 +158,34 @@ def calculate_run_badges(
     ):
         badges.append("enterprise_operator")
     if (
+        state.support_program.billing_ticket_pressure > 0
+        and state.support_program.escalation_queue
+        < BALANCE.support_program_triage_escalation_relief * 2
+        and not any(account.dunning_steps >= 2 for account in state.customer_accounts)
+    ):
+        badges.append("billing_operator")
+    if (
         run_score.key_accounts >= 2
         and state.support_program.escalation_queue
         < BALANCE.support_program_triage_escalation_relief * 2
         and state.finance.board_reliability_score >= BALANCE.board_score_reliability_target
     ):
         badges.append("customer_trusted")
+    if (
+        state.finance.quarterly_review_count >= 2
+        and not state.finance.governance_crisis_active
+        and state.finance.board_confidence >= 50
+    ):
+        badges.append("governance_survivor")
+    if (
+        any(
+            product.package_catalog_depth >= 2 and product.add_on_catalog_depth >= 2
+            for product in state.products
+            if product.is_active
+        )
+        and run_score.key_accounts >= 2
+    ):
+        badges.append("monetization_architect")
     if run_score.active_products >= 3 and run_score.mature_products >= 1:
         badges.append("portfolio_architect")
     if (

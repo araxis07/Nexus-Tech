@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.26.0 - 2026-04-29
+
+- Added lane-aware support escalation routing so onboarding, enterprise, and billing pressure now resolve through different relief paths instead of one generic support action
+- Deepened package-catalog and add-on-catalog actions so account expansion, package migration, and renewal posture respond more directly to monetization depth
+- Added forced governance trade-offs whenever board resolutions or crises are active, pushing the run toward cash discipline, reliability, team recovery, or portfolio focus
+- Expanded dashboard visibility with per-account support lanes, support lane mix, and active governance trade-off cues
+- Added new archive/reporting flavor through billing, governance, and monetization run badges plus broader regression coverage for the new support, pricing, and governance behavior
+- Promoted the package version to `0.26.0`
+
 ## 0.25.0 - 2026-04-29
 
 - Added a `billing` support lane plus billing-pressure tracking from invoice risk, failed payments, and dunning so post-sale ops now cover revenue collection pressure too

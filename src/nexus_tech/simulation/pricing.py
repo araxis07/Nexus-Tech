@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     PricingTier,
     Product,
     SubscriptionPackage,
+    SupportTier,
 )
 from nexus_tech.domain.money import format_money, quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
@@ -211,6 +212,35 @@ def get_default_subscription_package(product: Product) -> SubscriptionPackage:
     return SubscriptionPackage.STARTER
 
 
+def determine_target_subscription_package(
+    product: Product,
+    account: CustomerAccount,
+) -> SubscriptionPackage:
+    """Return the best-fit package for one account under the current catalog depth."""
+
+    if product.packaging_strategy is PackagingStrategy.SUITE:
+        if (
+            account.segment.value == "enterprise"
+            or account.support_tier is not SupportTier.STANDARD
+            or product.package_catalog_depth >= 3
+        ):
+            return SubscriptionPackage.ENTERPRISE_SUITE
+        return SubscriptionPackage.GROWTH
+    if product.packaging_strategy is PackagingStrategy.MODULAR:
+        if product.package_catalog_depth >= 2 and (
+            account.segment.value == "enterprise"
+            or account.plan_tier is PricingTier.PREMIUM
+            or account.add_on_count >= 2
+        ):
+            return SubscriptionPackage.ENTERPRISE_SUITE
+        if product.add_on_catalog_depth >= 1 or account.plan_tier is not PricingTier.BUDGET:
+            return SubscriptionPackage.GROWTH
+        return SubscriptionPackage.STARTER
+    if account.segment.value == "enterprise" and product.package_catalog_depth >= 2:
+        return SubscriptionPackage.GROWTH
+    return SubscriptionPackage.STARTER
+
+
 def apply_adjust_pricing(
     product: Product,
     pricing_tier: PricingTier,
@@ -385,26 +415,41 @@ def apply_run_package_migration(
     migrated_accounts = 0
     upgraded_accounts = 0
     downgraded_accounts = 0
-    target_package = get_default_subscription_package(product)
-    upgrade_gain = quantize_money(
-        BALANCE.packaging_migration_upgrade_contract_gain
-        + (
-            Decimal(product.package_catalog_depth)
-            * BALANCE.packaging_catalog_contract_gain_per_depth
-        )
-    )
     for account in customer_accounts:
         if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
             continue
+        target_package = determine_target_subscription_package(product, account)
         if account.subscription_package is target_package:
             continue
         migrated_accounts += 1
-        if _package_rank(target_package) > _package_rank(account.subscription_package):
+        rank_delta = _package_rank(target_package) - _package_rank(account.subscription_package)
+        upgrade_gain = quantize_money(
+            (
+                BALANCE.packaging_migration_upgrade_contract_gain
+                + (
+                    Decimal(product.package_catalog_depth)
+                    * BALANCE.packaging_catalog_contract_gain_per_depth
+                )
+            )
+            * Decimal(max(1, abs(rank_delta)))
+        )
+        if rank_delta > 0:
             upgraded_accounts += 1
             account.contract_value = quantize_money(account.contract_value + upgrade_gain)
-            account.add_on_count += BALANCE.packaging_migration_add_on_gain
+            account.add_on_count += BALANCE.packaging_migration_add_on_gain + max(
+                0, product.add_on_catalog_depth // 2
+            )
             account.satisfaction = clamp_int(account.satisfaction - 1)
             account.support_load = clamp_int(account.support_load + 1)
+            account.invoice_risk = clamp_int(
+                account.invoice_risk + BALANCE.packaging_migration_upgrade_invoice_risk_gain
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health + BALANCE.packaging_migration_upgrade_renewal_health_gain
+            )
+            if target_package is SubscriptionPackage.ENTERPRISE_SUITE:
+                account.plan_tier = PricingTier.PREMIUM
+                account.annual_prepay = True
         else:
             downgraded_accounts += 1
             account.contract_value = quantize_money(
@@ -420,7 +465,12 @@ def apply_run_package_migration(
             account.churn_risk = clamp_int(
                 account.churn_risk - BALANCE.packaging_migration_churn_relief
             )
-            account.support_load = clamp_int(account.support_load - 2)
+            account.invoice_risk = clamp_int(
+                account.invoice_risk - BALANCE.packaging_migration_downgrade_invoice_risk_relief
+            )
+            account.support_load = clamp_int(
+                account.support_load - BALANCE.packaging_migration_downgrade_support_load_relief
+            )
         account.subscription_package = target_package
 
     if migrated_accounts == 0:
@@ -437,6 +487,7 @@ def apply_run_package_migration(
 def apply_expand_package_catalog(
     company: Company,
     product: Product,
+    customer_accounts: list[CustomerAccount],
 ) -> CatalogExpansionSummary:
     """Spend cash to improve package depth and enterprise-ready packaging."""
 
@@ -452,11 +503,22 @@ def apply_expand_package_catalog(
     product.market_fit = clamp_int(
         product.market_fit + BALANCE.package_catalog_expand_market_fit_gain
     )
+    prepared_accounts = 0
+    for account in customer_accounts:
+        if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
+            continue
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.package_catalog_expand_account_health_gain
+        )
+        account.expansion_potential = clamp_int(
+            account.expansion_potential + BALANCE.package_catalog_expand_account_expansion_gain
+        )
+        prepared_accounts += 1
     return CatalogExpansionSummary(
         message=(
             f"Expanded package catalog for {product.name}. "
-            f"Depth {product.package_catalog_depth}, cash -"
-            f"{BALANCE.package_catalog_expand_cost}."
+            f"Depth {product.package_catalog_depth}, prepared {prepared_accounts} account(s), "
+            f"cash -{BALANCE.package_catalog_expand_cost}."
         )
     )
 
@@ -464,6 +526,7 @@ def apply_expand_package_catalog(
 def apply_expand_add_on_catalog(
     company: Company,
     product: Product,
+    customer_accounts: list[CustomerAccount],
 ) -> CatalogExpansionSummary:
     """Spend cash to deepen add-on surface for one product."""
 
@@ -477,11 +540,22 @@ def apply_expand_add_on_catalog(
     product.technical_debt = clamp_int(
         product.technical_debt + BALANCE.add_on_catalog_expand_debt_gain
     )
+    primed_accounts = 0
+    for account in customer_accounts:
+        if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
+            continue
+        account.expansion_potential = clamp_int(
+            account.expansion_potential + BALANCE.add_on_catalog_expand_account_expansion_gain
+        )
+        account.support_load = clamp_int(
+            account.support_load + BALANCE.add_on_catalog_expand_account_support_load_gain
+        )
+        primed_accounts += 1
     return CatalogExpansionSummary(
         message=(
             f"Expanded add-on catalog for {product.name}. "
-            f"Depth {product.add_on_catalog_depth}, cash -"
-            f"{BALANCE.add_on_catalog_expand_cost}."
+            f"Depth {product.add_on_catalog_depth}, primed {primed_accounts} account(s), "
+            f"cash -{BALANCE.add_on_catalog_expand_cost}."
         )
     )
 

@@ -53,6 +53,8 @@ class GovernanceSummary:
     governance_crisis_level: int
     board_resolution_miss_streak: int
     board_recovery_turns_remaining: int
+    forced_tradeoff_active: bool
+    forced_tradeoff_focus: BoardAsk | None
     summary: str
 
 
@@ -227,6 +229,29 @@ def apply_end_of_turn_governance(
         finance.board_warning_level = _calculate_board_warning_level(finance)
         finance.board_warning_active = finance.board_warning_level > 0
 
+    if (
+        finance.board_resolution_due
+        and board_ask_met
+        and not finance.board_warning_active
+        and finance.governance_crisis_level == 0
+        and finance.board_score >= _get_target_score_for_ask(finance.active_board_ask)
+    ):
+        finance.board_resolution_due = False
+        finance.board_resolution_window = 0
+        finance.board_resolution_miss_streak = max(0, finance.board_resolution_miss_streak - 1)
+
+    forced_tradeoff_focus = get_governance_tradeoff_focus(state)
+    forced_tradeoff_active = forced_tradeoff_focus is not None
+    tradeoff_summary = ""
+    if forced_tradeoff_focus is not None:
+        tradeoff_summary = _apply_forced_tradeoff(state, forced_tradeoff_focus)
+        finance.board_pressure = clamp_int(
+            finance.board_pressure - BALANCE.board_tradeoff_pressure_relief
+        )
+        finance.board_confidence = clamp_int(
+            finance.board_confidence + BALANCE.board_tradeoff_confidence_gain
+        )
+
     return GovernanceSummary(
         burn_multiple=burn_multiple,
         board_pressure_delta=board_pressure_delta,
@@ -252,6 +277,8 @@ def apply_end_of_turn_governance(
         governance_crisis_level=finance.governance_crisis_level,
         board_resolution_miss_streak=finance.board_resolution_miss_streak,
         board_recovery_turns_remaining=finance.board_recovery_turns_remaining,
+        forced_tradeoff_active=forced_tradeoff_active,
+        forced_tradeoff_focus=forced_tradeoff_focus,
         summary=_build_governance_summary(
             board_review_happened=board_review_happened,
             warning_active=finance.board_warning_active,
@@ -272,6 +299,7 @@ def apply_end_of_turn_governance(
             board_resolution_miss_streak=finance.board_resolution_miss_streak,
             recovery_focus=finance.board_recovery_focus,
             recovery_turns_remaining=finance.board_recovery_turns_remaining,
+            tradeoff_summary=tradeoff_summary,
         ),
     )
 
@@ -708,6 +736,16 @@ def _calculate_board_review_grade(
     return "C"
 
 
+def _get_target_score_for_ask(board_ask: BoardAsk) -> int:
+    if board_ask is BoardAsk.PROFITABILITY:
+        return BALANCE.board_score_profitability_target
+    if board_ask is BoardAsk.RELIABILITY:
+        return BALANCE.board_score_reliability_target
+    if board_ask is BoardAsk.TEAM_HEALTH:
+        return BALANCE.board_score_team_health_target
+    return BALANCE.board_score_portfolio_focus_target
+
+
 def _select_board_resolution(
     state: GameState,
     burn_multiple: Decimal,
@@ -755,6 +793,95 @@ def _calculate_governance_crisis_level(finance) -> int:
     return 0
 
 
+def get_governance_tradeoff_focus(state: GameState) -> BoardAsk | None:
+    """Return the current forced trade-off focus, if governance is constraining the run."""
+
+    finance = state.finance
+    if finance.board_recovery_turns_remaining > 0:
+        return finance.board_recovery_focus
+    if finance.governance_crisis_active or finance.board_resolution_due:
+        return finance.active_board_ask
+    return None
+
+
+def _apply_forced_tradeoff(state: GameState, board_ask: BoardAsk) -> str:
+    if board_ask is BoardAsk.PROFITABILITY:
+        for product in state.products:
+            if not product.is_active:
+                continue
+            product.acquisition_rate = clamp_rate(
+                product.acquisition_rate - BALANCE.board_tradeoff_profitability_growth_penalty
+            )
+        return "Forced trade-off: cash discipline is suppressing growth bets."
+
+    if board_ask is BoardAsk.RELIABILITY:
+        state.support_program.backlog_queue = max(
+            0,
+            state.support_program.backlog_queue - BALANCE.board_tradeoff_reliability_backlog_relief,
+        )
+        state.support_program.escalation_queue = max(
+            0,
+            state.support_program.escalation_queue
+            - BALANCE.board_tradeoff_reliability_escalation_relief,
+        )
+        riskiest_product = max(
+            (product for product in state.products if product.is_active),
+            key=lambda product: (product.bug_level, product.technical_debt),
+            default=None,
+        )
+        if riskiest_product is not None:
+            riskiest_product.bug_level = clamp_int(
+                riskiest_product.bug_level - BALANCE.board_tradeoff_reliability_bug_relief
+            )
+            riskiest_product.acquisition_rate = clamp_rate(
+                riskiest_product.acquisition_rate
+                - BALANCE.board_tradeoff_reliability_growth_penalty
+            )
+        return "Forced trade-off: reliability work is taking priority over growth."
+
+    if board_ask is BoardAsk.TEAM_HEALTH:
+        for employee in state.employees:
+            employee.energy = clamp_int(
+                employee.energy + BALANCE.board_tradeoff_team_health_energy_gain
+            )
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.board_tradeoff_team_health_morale_gain
+            )
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk - BALANCE.board_tradeoff_team_health_attrition_relief
+            )
+        for product in state.products:
+            if product.is_active:
+                product.acquisition_rate = clamp_rate(
+                    product.acquisition_rate - BALANCE.board_tradeoff_team_health_growth_penalty
+                )
+        return "Forced trade-off: team recovery is slowing execution tempo."
+
+    focused_product = max(
+        (product for product in state.products if product.is_active),
+        key=lambda product: (product.market_fit, product.quality, -product.technical_debt),
+        default=None,
+    )
+    if focused_product is not None:
+        focused_product.quality = clamp_int(
+            focused_product.quality + BALANCE.board_tradeoff_portfolio_focus_quality_gain
+        )
+        focused_product.technical_debt = clamp_int(
+            focused_product.technical_debt - BALANCE.board_tradeoff_portfolio_focus_debt_relief
+        )
+    for product in state.products:
+        if not product.is_active or focused_product is None or product.id == focused_product.id:
+            continue
+        product.market_fit = clamp_int(
+            product.market_fit - BALANCE.board_tradeoff_portfolio_focus_secondary_fit_penalty
+        )
+        product.acquisition_rate = clamp_rate(
+            product.acquisition_rate
+            - BALANCE.board_tradeoff_portfolio_focus_secondary_growth_penalty
+        )
+    return "Forced trade-off: the board is pushing focus onto the strongest product."
+
+
 def _build_governance_summary(
     *,
     board_review_happened: bool,
@@ -776,6 +903,7 @@ def _build_governance_summary(
     board_resolution_miss_streak: int,
     recovery_focus: BoardAsk,
     recovery_turns_remaining: int,
+    tradeoff_summary: str,
 ) -> str:
     scorecard_summary = (
         " Scorecard: "
@@ -796,6 +924,7 @@ def _build_governance_summary(
             f" Recovery plan: {recovery_focus.value.replace('_', ' ')} "
             f"for {recovery_turns_remaining} more turn(s)."
         )
+    tradeoff_line = f" {tradeoff_summary}" if tradeoff_summary else ""
     resolution_summary = ""
     if board_resolution_due:
         resolution_summary = f" Formal response due in {board_resolution_window} turn(s)."
@@ -810,6 +939,7 @@ def _build_governance_summary(
             f"{crisis_summary}"
             f"{resolution_summary}"
             f"{recovery_summary}"
+            f"{tradeoff_line}"
         )
     if board_review_happened:
         ask_result = "met" if board_ask_met else "missed"
@@ -821,6 +951,7 @@ def _build_governance_summary(
             f"{crisis_summary}"
             f"{resolution_summary}"
             f"{recovery_summary}"
+            f"{tradeoff_line}"
         )
     return (
         f"Board score {board_score}. Ask remains {active_board_ask.value.replace('_', ' ')}. "
@@ -830,4 +961,5 @@ def _build_governance_summary(
         f"{crisis_summary}"
         f"{resolution_summary}"
         f"{recovery_summary}"
+        f"{tradeoff_line}"
     )
