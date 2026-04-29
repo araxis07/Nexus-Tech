@@ -37,6 +37,7 @@ class SupportProgramSummary:
     queue_age_pressure: int
     onboarding_ticket_pressure: int
     enterprise_ticket_pressure: int
+    billing_ticket_pressure: int
     focus_mismatch_penalty: int
     service_cost: Decimal
     reputation_delta: int
@@ -112,6 +113,19 @@ def apply_end_of_turn_support_program(
         for account in active_accounts
         if account.segment.value == "enterprise" or account.support_tier is SupportTier.WHITE_GLOVE
     )
+    billing_ticket_pressure = sum(
+        (account.invoice_risk // BALANCE.support_program_billing_pressure_invoice_divisor)
+        + (
+            account.failed_payment_risk
+            // BALANCE.support_program_billing_pressure_failed_payment_divisor
+        )
+        + (account.dunning_steps * BALANCE.support_program_billing_pressure_dunning_weight)
+        + (account.open_tickets // 2)
+        for account in active_accounts
+        if (
+            account.invoice_risk > 0 or account.failed_payment_risk > 0 or account.dunning_steps > 0
+        )
+    )
     weighted_ticket_pressure = total_open_tickets + sum(
         max(0, BALANCE.support_program_segment_ticket_weight[account.segment.value] - 1)
         for account in active_accounts
@@ -126,6 +140,7 @@ def apply_end_of_turn_support_program(
         state.support_program.lane_focus,
         onboarding_ticket_pressure=onboarding_ticket_pressure,
         enterprise_ticket_pressure=enterprise_ticket_pressure,
+        billing_ticket_pressure=billing_ticket_pressure,
     )
     weighted_ticket_pressure += focus_mismatch_penalty
     sla_breaches = sum(
@@ -180,6 +195,7 @@ def apply_end_of_turn_support_program(
     state.support_program.queue_age_pressure = queue_age_pressure
     state.support_program.onboarding_ticket_pressure = onboarding_ticket_pressure
     state.support_program.enterprise_ticket_pressure = enterprise_ticket_pressure
+    state.support_program.billing_ticket_pressure = billing_ticket_pressure
     service_cost = quantize_money(
         (Decimal(total_open_tickets) * BALANCE.support_program_service_cost_per_ticket)
         + (
@@ -252,6 +268,7 @@ def apply_end_of_turn_support_program(
         queue_age_pressure=queue_age_pressure,
         onboarding_ticket_pressure=onboarding_ticket_pressure,
         enterprise_ticket_pressure=enterprise_ticket_pressure,
+        billing_ticket_pressure=billing_ticket_pressure,
         focus_mismatch_penalty=focus_mismatch_penalty,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
@@ -526,7 +543,17 @@ def _focus_capacity_bonus(state: GameState) -> int:
         return 0
     targeted_accounts = 0
     for account in state.customer_accounts:
-        if account.status is CustomerAccountStatus.CHURNED or account.open_tickets <= 0:
+        if account.status is CustomerAccountStatus.CHURNED:
+            continue
+        if focus is SupportLaneFocus.BILLING:
+            if (
+                account.invoice_risk > 0
+                or account.failed_payment_risk > 0
+                or account.dunning_steps > 0
+            ):
+                targeted_accounts += 1
+            continue
+        if account.open_tickets <= 0:
             continue
         if (focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise") or (
             focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise"
@@ -543,9 +570,13 @@ def _calculate_support_focus_bonus(
         return 0
     focus_bonus = 0
     for account in accounts:
-        if account.open_tickets <= 0:
+        if focus is SupportLaneFocus.BILLING and (
+            account.invoice_risk > 0 or account.failed_payment_risk > 0 or account.dunning_steps > 0
+        ):
+            focus_bonus += BALANCE.support_program_focus_billing_bonus
+        elif account.open_tickets <= 0:
             continue
-        if focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise":
+        elif focus is SupportLaneFocus.ENTERPRISE and account.segment.value == "enterprise":
             focus_bonus += BALANCE.support_program_focus_enterprise_bonus
         elif focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise":
             focus_bonus += BALANCE.support_program_focus_onboarding_bonus
@@ -557,13 +588,20 @@ def _calculate_focus_mismatch_penalty(
     *,
     onboarding_ticket_pressure: int,
     enterprise_ticket_pressure: int,
+    billing_ticket_pressure: int,
 ) -> int:
     if focus is SupportLaneFocus.BALANCED:
         return 0
-    if focus is SupportLaneFocus.ONBOARDING:
-        pressure_gap = enterprise_ticket_pressure - onboarding_ticket_pressure
-    else:
-        pressure_gap = onboarding_ticket_pressure - enterprise_ticket_pressure
+    pressures = {
+        SupportLaneFocus.ONBOARDING: onboarding_ticket_pressure,
+        SupportLaneFocus.ENTERPRISE: enterprise_ticket_pressure,
+        SupportLaneFocus.BILLING: billing_ticket_pressure,
+    }
+    focus_pressure = pressures[focus]
+    highest_other_pressure = max(
+        pressure for lane, pressure in pressures.items() if lane is not focus
+    )
+    pressure_gap = highest_other_pressure - focus_pressure
     if pressure_gap <= 0:
         return 0
     return min(

@@ -80,6 +80,7 @@ from nexus_tech.simulation.economy import (
     calculate_total_revenue,
     calculate_total_salary_cost,
 )
+from nexus_tech.simulation.endgame import apply_exit_outcome, calculate_endgame_readiness
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.event_registry import EventDefinition, get_event_registry
 from nexus_tech.simulation.events import (
@@ -1865,7 +1866,6 @@ def test_exit_evaluation_can_classify_independent_outcome() -> None:
     resolution = resolve_turn(state, FixedRandom(0))
     resolution.state.victory_achieved = True
     resolution.state.exit_outcome = None
-    from nexus_tech.simulation.endgame import apply_exit_outcome
 
     evaluation = apply_exit_outcome(resolution.state)
 
@@ -3943,6 +3943,33 @@ def test_support_lane_focus_penalizes_mismatched_queue_mix() -> None:
     assert state.support_program.enterprise_ticket_pressure == summary.enterprise_ticket_pressure
 
 
+def test_support_billing_lane_tracks_invoice_and_dunning_pressure() -> None:
+    product = make_product("Billing Core")
+    account = CustomerAccount(
+        name="Collections Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("620.00"),
+        satisfaction=60,
+        expansion_potential=48,
+        renewal_turn=6,
+        churn_risk=28,
+        invoice_risk=56,
+        failed_payment_risk=48,
+        dunning_steps=2,
+        open_tickets=2,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account])
+    state.support_program.lane_focus = SupportLaneFocus.BILLING
+
+    summary = apply_end_of_turn_support_program(state)
+
+    assert summary.billing_ticket_pressure > 0
+    assert state.support_program.billing_ticket_pressure == summary.billing_ticket_pressure
+    assert summary.focus_mismatch_penalty == 0
+
+
 def test_run_badges_capture_durable_company_strength() -> None:
     products = [
         make_product("Ops Core", lifecycle_stage=LifecycleStage.MATURE, user_count=180),
@@ -3997,3 +4024,56 @@ def test_run_badges_capture_durable_company_strength() -> None:
     assert "capital_disciplined" in badges
     assert "board_trusted" in badges
     assert "enterprise_operator" in badges
+
+
+def test_endgame_readiness_surfaces_acquisition_and_ipo_scores() -> None:
+    product = make_product(
+        "Scale Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=220,
+        market_fit=72,
+        technical_debt=18,
+        bug_level=14,
+    )
+    accounts = [
+        CustomerAccount(
+            name="Northwind Bank",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1680.00"),
+            satisfaction=82,
+            expansion_potential=74,
+            renewal_turn=8,
+            churn_risk=10,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Atlas Cloud",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1440.00"),
+            satisfaction=78,
+            expansion_potential=68,
+            renewal_turn=8,
+            churn_risk=12,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
+    state = make_state(product, customer_accounts=accounts, cash_on_hand=Decimal("22000.00"))
+    state.company.reputation = 76
+    state.finance.board_confidence = 80
+    state.finance.board_score = 78
+    state.finance.board_team_health_score = 74
+    state.finance.governance_risk = 12
+    state.finance.restructuring_pressure = 2
+
+    readiness = calculate_endgame_readiness(state, calculate_run_score(state))
+
+    assert readiness.ipo_readiness_score > 0
+    assert readiness.acquisition_interest_score > 0
+    assert readiness.independence_score > 0
+    assert readiness.strategic_outlook in {
+        "ipo_ready",
+        "strategic_acquisition",
+        "profitable_independence",
+    }

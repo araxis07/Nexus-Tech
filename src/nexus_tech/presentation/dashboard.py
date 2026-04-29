@@ -42,7 +42,7 @@ from nexus_tech.simulation.balance_profiles import BalanceProfile
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
-from nexus_tech.simulation.endgame import evaluate_exit_outcome
+from nexus_tech.simulation.endgame import calculate_endgame_readiness, evaluate_exit_outcome
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import (
@@ -486,6 +486,8 @@ def render_run_archive_catalog(
     table.add_column("Tier")
     table.add_column("Grade")
     table.add_column("Badges")
+    table.add_column("Outlook")
+    table.add_column("Offer", justify="right")
     table.add_column("Value", justify="right")
     table.add_column("Cash", justify="right")
     table.add_column("Rep", justify="right")
@@ -503,6 +505,8 @@ def render_run_archive_catalog(
             archive.score_tier,
             archive.campaign_grade,
             ", ".join(archive.achievement_badges) if archive.achievement_badges else "-",
+            archive.strategic_outlook.replace("_", " "),
+            format_money(archive.offer_value),
             format_money(archive.estimated_valuation),
             format_money(archive.final_cash),
             str(archive.final_reputation),
@@ -1115,12 +1119,22 @@ def render_victory(console: Console, state: GameState) -> None:
     """Render the winning state."""
 
     run_score = calculate_run_score(state)
+    readiness = calculate_endgame_readiness(state, run_score)
     content = Table.grid(padding=(0, 1))
     content.add_row("Outcome", state.victory_reason or "The company reached durable scale.")
     content.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
     content.add_row("Grade", run_score.campaign_grade)
     content.add_row("Badges", ", ".join(calculate_run_badges(state, run_score)))
     content.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    content.add_row("Strategic Outlook", readiness.strategic_outlook.replace("_", " "))
+    content.add_row(
+        "Readiness",
+        (
+            f"IPO {readiness.ipo_readiness_score} / "
+            f"M&A {readiness.acquisition_interest_score} / "
+            f"Ind {readiness.independence_score}"
+        ),
+    )
     if state.exit_outcome is not None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
         content.add_row("Exit Path", exit_evaluation.title)
@@ -1397,6 +1411,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     active_products = [product for product in state.products if product.is_active]
     run_score = calculate_run_score(state)
     badges = calculate_run_badges(state, run_score)
+    readiness = calculate_endgame_readiness(state, run_score)
     scale_pressure = calculate_company_scale_pressure(
         state.products,
         headcount=len(state.employees),
@@ -1409,6 +1424,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
     table.add_row("Badges", ", ".join(badges))
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
+    table.add_row("Exit Outlook", readiness.strategic_outlook.replace("_", " "))
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     table.add_row("Competitors", str(len(state.competitors)))
@@ -1916,7 +1932,7 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row(
         "64",
         "set_support_lane_focus",
-        "Bias support toward onboarding, enterprise, or balance.",
+        "Bias support toward onboarding, enterprise, billing, or balance.",
     )
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
@@ -2215,12 +2231,24 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
 def _build_report_score_panel(state: GameState) -> Panel:
     run_score = calculate_run_score(state)
     badges = calculate_run_badges(state, run_score)
+    readiness = calculate_endgame_readiness(state, run_score)
+    exit_evaluation = evaluate_exit_outcome(state, run_score)
     active_segments = sorted(
         {product.target_segment.value for product in state.products if product.is_active}
     )
     table = Table.grid(padding=(0, 1))
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     table.add_row("Grade", run_score.campaign_grade)
+    table.add_row("Exit Outlook", readiness.strategic_outlook.replace("_", " "))
+    table.add_row("Exit Value", format_money(exit_evaluation.offer_value))
+    table.add_row(
+        "Readiness",
+        (
+            f"IPO {readiness.ipo_readiness_score} / "
+            f"M&A {readiness.acquisition_interest_score} / "
+            f"Ind {readiness.independence_score}"
+        ),
+    )
     table.add_row("Active Products", str(run_score.active_products))
     table.add_row("Mature Products", str(run_score.mature_products))
     table.add_row("Portfolio Users", str(run_score.total_users))
@@ -2413,6 +2441,7 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Queue Age", str(state.support_program.queue_age_pressure))
     table.add_row("Onboarding Q", str(state.support_program.onboarding_ticket_pressure))
     table.add_row("Enterprise Q", str(state.support_program.enterprise_ticket_pressure))
+    table.add_row("Billing Q", str(state.support_program.billing_ticket_pressure))
     table.add_row("Resolved", str(state.support_program.resolved_last_turn))
     table.add_row("Deflection", str(state.support_program.deflection_score))
     table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))

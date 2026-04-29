@@ -57,6 +57,7 @@ from nexus_tech.persistence.finance_repository import FinanceRepository
 from nexus_tech.persistence.product_repository import ProductRepository
 from nexus_tech.persistence.quarter_plan_repository import QuarterPlanRepository
 from nexus_tech.persistence.schema import CURRENT_SCHEMA_VERSION
+from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_badges
 
@@ -124,6 +125,8 @@ class RunArchiveSummary:
     campaign_grade: str
     estimated_valuation: Decimal
     achievement_badges: tuple[str, ...]
+    strategic_outlook: str
+    offer_value: Decimal
     final_cash: Decimal
     final_reputation: int
     archived_at: str
@@ -249,6 +252,7 @@ class SaveLoadCoordinator:
                         support_queue_age_pressure,
                         support_onboarding_ticket_pressure,
                         support_enterprise_ticket_pressure,
+                        support_billing_ticket_pressure,
                         support_service_cost_last_turn,
                         market_cycle,
                         market_cycle_turns_remaining,
@@ -374,6 +378,9 @@ class SaveLoadCoordinator:
                             enterprise_ticket_pressure=(
                                 slot_row["support_enterprise_ticket_pressure"] or 0
                             ),
+                            billing_ticket_pressure=(
+                                slot_row["support_billing_ticket_pressure"] or 0
+                            ),
                             service_cost_last_turn=Decimal(
                                 slot_row["support_service_cost_last_turn"] or "0.00"
                             ),
@@ -497,6 +504,8 @@ class SaveLoadCoordinator:
                         campaign_grade,
                         estimated_valuation,
                         achievement_badges,
+                        strategic_outlook,
+                        offer_value,
                         final_cash,
                         final_reputation,
                         archived_at
@@ -524,6 +533,8 @@ class SaveLoadCoordinator:
                 achievement_badges=tuple(
                     badge for badge in (row["achievement_badges"] or "").split(",") if badge
                 ),
+                strategic_outlook=row["strategic_outlook"] or "profitable_independence",
+                offer_value=Decimal(row["offer_value"] or "0.00"),
                 final_cash=Decimal(row["final_cash"] or "0.00"),
                 final_reputation=row["final_reputation"] or 0,
                 archived_at=row["archived_at"],
@@ -680,6 +691,7 @@ class SaveLoadCoordinator:
                 support_program.queue_age_pressure,
                 support_program.onboarding_ticket_pressure,
                 support_program.enterprise_ticket_pressure,
+                support_program.billing_ticket_pressure,
                 str(support_program.service_cost_last_turn),
                 market_cycle.value,
                 market_cycle_turns_remaining,
@@ -727,6 +739,7 @@ class SaveLoadCoordinator:
                     support_queue_age_pressure,
                     support_onboarding_ticket_pressure,
                     support_enterprise_ticket_pressure,
+                    support_billing_ticket_pressure,
                     support_service_cost_last_turn,
                     market_cycle,
                     market_cycle_turns_remaining,
@@ -778,6 +791,7 @@ class SaveLoadCoordinator:
                 support_queue_age_pressure = ?,
                 support_onboarding_ticket_pressure = ?,
                 support_enterprise_ticket_pressure = ?,
+                support_billing_ticket_pressure = ?,
                 support_service_cost_last_turn = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
@@ -821,6 +835,7 @@ class SaveLoadCoordinator:
                 support_program.queue_age_pressure,
                 support_program.onboarding_ticket_pressure,
                 support_program.enterprise_ticket_pressure,
+                support_program.billing_ticket_pressure,
                 str(support_program.service_cost_last_turn),
                 market_cycle.value,
                 market_cycle_turns_remaining,
@@ -852,6 +867,7 @@ class SaveLoadCoordinator:
         from nexus_tech.simulation.reporting import calculate_run_score
 
         run_score = calculate_run_score(state)
+        exit_evaluation = evaluate_exit_outcome(state, run_score)
         connection.execute(
             """
             INSERT OR REPLACE INTO run_archives (
@@ -870,11 +886,13 @@ class SaveLoadCoordinator:
                 campaign_grade,
                 estimated_valuation,
                 achievement_badges,
+                strategic_outlook,
+                offer_value,
                 final_cash,
                 final_reputation,
                 archived_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 archive_key,
@@ -892,6 +910,8 @@ class SaveLoadCoordinator:
                 run_score.campaign_grade,
                 str(run_score.estimated_valuation),
                 ",".join(calculate_run_badges(state, run_score)),
+                exit_evaluation.readiness.strategic_outlook,
+                str(exit_evaluation.offer_value),
                 str(state.company.cash_on_hand),
                 state.company.reputation,
                 timestamp,

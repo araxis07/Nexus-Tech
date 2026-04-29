@@ -396,6 +396,7 @@ def make_state() -> GameState:
             queue_age_pressure=5,
             onboarding_ticket_pressure=4,
             enterprise_ticket_pressure=9,
+            billing_ticket_pressure=6,
             service_cost_last_turn=Decimal("164.00"),
         ),
         difficulty_mode=DifficultyMode.FOUNDER,
@@ -517,6 +518,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "support_queue_age_pressure",
         "support_onboarding_ticket_pressure",
         "support_enterprise_ticket_pressure",
+        "support_billing_ticket_pressure",
         "support_service_cost_last_turn",
         "market_cycle",
         "market_cycle_turns_remaining",
@@ -620,7 +622,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "renewal_offer_type",
         "win_back_attempts",
     }.issubset(customer_columns)
-    assert user_version >= 20
+    assert user_version >= 21
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -769,7 +771,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "board_resolution_window",
         "board_resolution_miss_streak",
     }.issubset(finance_columns)
-    assert user_version >= 20
+    assert user_version >= 21
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -807,7 +809,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 2
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 20
+    assert summaries[0].schema_version >= 21
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -820,7 +822,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 20
+    assert report.schema_version >= 21
 
 
 def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
@@ -839,6 +841,8 @@ def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
     assert archives[0].campaign_grade
     assert archives[0].estimated_valuation > Decimal("0.00")
     assert archives[0].achievement_badges
+    assert archives[0].strategic_outlook
+    assert archives[0].offer_value > Decimal("0.00")
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

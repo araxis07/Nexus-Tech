@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 20
+CURRENT_SCHEMA_VERSION = 21
 
 SCHEMA_STATEMENTS = (
     """
@@ -40,6 +40,7 @@ SCHEMA_STATEMENTS = (
         support_queue_age_pressure INTEGER NOT NULL DEFAULT 0,
         support_onboarding_ticket_pressure INTEGER NOT NULL DEFAULT 0,
         support_enterprise_ticket_pressure INTEGER NOT NULL DEFAULT 0,
+        support_billing_ticket_pressure INTEGER NOT NULL DEFAULT 0,
         support_service_cost_last_turn TEXT NOT NULL DEFAULT '0.00',
         market_cycle TEXT NOT NULL DEFAULT 'steady',
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
@@ -48,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 20,
+        schema_version INTEGER NOT NULL DEFAULT 21,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -70,6 +71,8 @@ SCHEMA_STATEMENTS = (
         campaign_grade TEXT NOT NULL DEFAULT 'D',
         estimated_valuation TEXT NOT NULL DEFAULT '0.00',
         achievement_badges TEXT NOT NULL DEFAULT '',
+        strategic_outlook TEXT NOT NULL DEFAULT 'profitable_independence',
+        offer_value TEXT NOT NULL DEFAULT '0.00',
         final_cash TEXT NOT NULL,
         final_reputation INTEGER NOT NULL,
         archived_at TEXT NOT NULL
@@ -682,6 +685,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="support_billing_ticket_pressure",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="support_service_cost_last_turn",
         column_definition="TEXT NOT NULL DEFAULT '0.00'",
     )
@@ -1134,6 +1143,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="run_archives",
         column_name="achievement_badges",
         column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="strategic_outlook",
+        column_definition="TEXT NOT NULL DEFAULT 'profitable_independence'",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="offer_value",
+        column_definition="TEXT NOT NULL DEFAULT '0.00'",
     )
     _ensure_column(
         connection,

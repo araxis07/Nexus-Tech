@@ -99,6 +99,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track quarterly board resolutions and restructuring pressure so repeated misses create visible strategic consequences
 - Track formal board-response deadlines so ignored resolutions can re-intensify governance pressure a few turns later
 - Let repeated board misses escalate into an explicit governance crisis so late-game pressure compounds when the company ignores follow-through
+- Track explicit endgame readiness across IPO, acquisition, and profitable independence so late-game strategy is easier to read before the run ends
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
 - Execute a formal restructure plan when governance pressure becomes too high to ignore
@@ -124,8 +125,9 @@ Each turn represents a business interval. You review the company, choose actions
 - Invest directly in customer success and run targeted retention plays on fragile accounts
 - Improve a shared support program with knowledge-base and automation depth that lowers ticket pressure across the portfolio
 - Upgrade support operations directly through knowledge-base, automation, and SLA investments instead of relying only on passive drift
-- Aim support operations at `balanced`, `onboarding`, or `enterprise` lanes to change which queues get relief first
+- Aim support operations at `balanced`, `onboarding`, `enterprise`, or `billing` lanes to change which queues get relief first
 - Track onboarding and enterprise ticket pressure separately so support-lane focus creates clearer trade-offs instead of generic backlog relief
+- Track billing pressure from invoice risk, failed payment risk, and dunning so post-sale operations now cover collections pressure too
 - Invest in dedicated support staffing and pay visible service cost every turn as the installed base becomes heavier to serve
 - Run explicit support triage actions that cut backlog, escalation pressure, and payment-risk spillover
 - Review key accounts directly from the in-game `review_customers` action
@@ -204,6 +206,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Archive completed runs and inspect them later through `list-archives`
 - Archive run score tier, campaign grade, and estimated valuation so completed runs are easier to compare later
 - Archive compact run badges such as capital discipline, board trust, and enterprise execution so meta history is easier to scan quickly
+- Archive strategic outlook and modeled offer value so completed runs can be compared by likely business outcome as well as score
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
 - Persist release plans, sales deals, roadmap projects, competitor intel, scenario objectives, and hiring traits
 - Use SQLite schema versioning and additive migrations to keep local save files upgradeable

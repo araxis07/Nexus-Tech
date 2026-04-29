@@ -1573,9 +1573,13 @@ class BalanceConfig:
     support_program_service_cost_per_staffing_level: Decimal = Decimal("28.00")
     support_program_service_cost_per_queue_age: Decimal = Decimal("5.00")
     support_program_onboarding_health_pressure_threshold: int = 64
+    support_program_billing_pressure_invoice_divisor: int = 14
+    support_program_billing_pressure_failed_payment_divisor: int = 12
+    support_program_billing_pressure_dunning_weight: int = 3
     support_program_focus_ticket_relief_divisor: int = 2
     support_program_focus_onboarding_bonus: int = 2
     support_program_focus_enterprise_bonus: int = 2
+    support_program_focus_billing_bonus: int = 2
     support_program_focus_mismatch_divisor: int = 8
     support_program_focus_mismatch_backlog_cap: int = 3
     support_program_queue_age_threshold: int = 3
@@ -1687,6 +1691,14 @@ class BalanceConfig:
     exit_restructure_cash_threshold: Decimal = Decimal("2500.00")
     exit_max_restructuring_pressure_for_win: int = 18
     exit_ipo_governance_risk_cap: int = 26
+    exit_readiness_score_cap: int = 100
+    exit_ipo_board_score_divisor: int = 2
+    exit_ipo_key_account_bonus: int = 6
+    exit_acquisition_revenue_divisor: Decimal = Decimal("150.00")
+    exit_acquisition_key_account_bonus: int = 8
+    exit_acquisition_support_penalty_divisor: int = 3
+    exit_independence_cash_divisor: Decimal = Decimal("250.00")
+    exit_independence_debt_divisor: Decimal = Decimal("220.00")
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

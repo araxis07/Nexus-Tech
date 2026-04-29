@@ -1263,7 +1263,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
     if action is TurnAction.SET_SUPPORT_LANE_FOCUS:
         focus_key = ask_choice_input(
             "Support lane focus",
-            choices=["balanced", "onboarding", "enterprise"],
+            choices=["balanced", "onboarding", "enterprise", "billing"],
             default=state.support_program.lane_focus.value,
             show_choices=False,
             case_sensitive=False,

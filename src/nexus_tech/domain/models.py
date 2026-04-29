@@ -355,6 +355,7 @@ class SupportLaneFocus(StrEnum):
     BALANCED = "balanced"
     ONBOARDING = "onboarding"
     ENTERPRISE = "enterprise"
+    BILLING = "billing"
 
 
 class RenewalOfferType(StrEnum):
@@ -666,6 +667,7 @@ class SupportProgram(BaseModel):
     queue_age_pressure: int = Field(default=0, ge=0)
     onboarding_ticket_pressure: int = Field(default=0, ge=0)
     enterprise_ticket_pressure: int = Field(default=0, ge=0)
+    billing_ticket_pressure: int = Field(default=0, ge=0)
     service_cost_last_turn: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
 
     @field_validator("service_cost_last_turn", mode="before")

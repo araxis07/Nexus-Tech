@@ -878,6 +878,8 @@ def test_list_archives_command_renders_archive_catalog(
             campaign_grade="A",
             estimated_valuation=Decimal("48600.00"),
             achievement_badges=("board_trusted", "enterprise_operator"),
+            strategic_outlook="strategic_acquisition",
+            offer_value=Decimal("55890.00"),
             final_cash=Decimal("12400.00"),
             final_reputation=64,
             archived_at="2026-04-28T01:00:00+00:00",
@@ -1092,6 +1094,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Finance" in output
     assert "Competitor Watch" in output
     assert "Estimated Value" in output
+    assert "Exit Outlook" in output
     assert "Key Accounts" in output
 
 
@@ -1183,3 +1186,4 @@ def test_victory_rendering_contains_summary_metrics() -> None:
     assert "Run Score" in output
     assert "Estimated Value" in output
     assert "Exit Path" in output
+    assert "Strategic Outlook" in output

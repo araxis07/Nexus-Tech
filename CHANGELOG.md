@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.25.0 - 2026-04-29
+
+- Added a `billing` support lane plus billing-pressure tracking from invoice risk, failed payments, and dunning so post-sale ops now cover revenue collection pressure too
+- Extended support-lane mismatch logic to compare onboarding, enterprise, and billing demand instead of only two queue families
+- Added endgame-readiness scoring across IPO readiness, acquisition interest, and profitable independence for clearer late-game strategic reading
+- Extended archived run metadata with strategic outlook and modeled offer value so completed runs are easier to compare beyond raw score
+- Extended dashboards, reports, victory output, SQLite persistence, and regression coverage for the new support and endgame depth
+- Promoted the package version to `0.25.0`
+
 ## 0.24.0 - 2026-04-29
 
 - Added a board scorecard across profitability, reliability, team health, and portfolio focus so governance pressure is easier to read and tune
