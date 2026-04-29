@@ -877,6 +877,7 @@ def test_list_archives_command_renders_archive_catalog(
             score_tier="strong",
             campaign_grade="A",
             estimated_valuation=Decimal("48600.00"),
+            achievement_badges=("board_trusted", "enterprise_operator"),
             final_cash=Decimal("12400.00"),
             final_reputation=64,
             archived_at="2026-04-28T01:00:00+00:00",

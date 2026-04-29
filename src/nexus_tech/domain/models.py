@@ -570,14 +570,21 @@ class FinanceState(BaseModel):
     active_board_ask: BoardAsk = BoardAsk.PROFITABILITY
     board_resolution: BoardResolution = BoardResolution.HOLD_COURSE
     board_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_profitability_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_reliability_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_team_health_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    board_portfolio_focus_score: int = Field(default=55, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     board_warning_active: bool = False
     board_warning_level: int = Field(default=0, ge=0, le=3)
     quarterly_review_count: int = Field(default=0, ge=0)
     restructuring_pressure: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
+    governance_crisis_active: bool = False
+    governance_crisis_level: int = Field(default=0, ge=0, le=3)
     board_recovery_focus: BoardAsk = BoardAsk.PROFITABILITY
     board_recovery_turns_remaining: int = Field(default=0, ge=0)
     board_resolution_due: bool = False
     board_resolution_window: int = Field(default=0, ge=0)
+    board_resolution_miss_streak: int = Field(default=0, ge=0)
     last_board_review_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
     last_funding_turn: Optional[int] = Field(default=None, ge=1)  # noqa: UP045
 
@@ -657,6 +664,8 @@ class SupportProgram(BaseModel):
     deflection_score: int = Field(default=0, ge=ATTRIBUTE_MIN, le=ATTRIBUTE_MAX)
     sla_breaches_last_turn: int = Field(default=0, ge=0)
     queue_age_pressure: int = Field(default=0, ge=0)
+    onboarding_ticket_pressure: int = Field(default=0, ge=0)
+    enterprise_ticket_pressure: int = Field(default=0, ge=0)
     service_cost_last_turn: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0"))
 
     @field_validator("service_cost_last_turn", mode="before")

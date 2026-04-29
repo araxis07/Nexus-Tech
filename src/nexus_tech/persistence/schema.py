@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 19
+CURRENT_SCHEMA_VERSION = 20
 
 SCHEMA_STATEMENTS = (
     """
@@ -38,6 +38,8 @@ SCHEMA_STATEMENTS = (
         support_deflection_score INTEGER NOT NULL DEFAULT 0,
         support_sla_breaches_last_turn INTEGER NOT NULL DEFAULT 0,
         support_queue_age_pressure INTEGER NOT NULL DEFAULT 0,
+        support_onboarding_ticket_pressure INTEGER NOT NULL DEFAULT 0,
+        support_enterprise_ticket_pressure INTEGER NOT NULL DEFAULT 0,
         support_service_cost_last_turn TEXT NOT NULL DEFAULT '0.00',
         market_cycle TEXT NOT NULL DEFAULT 'steady',
         market_cycle_turns_remaining INTEGER NOT NULL DEFAULT 3,
@@ -46,7 +48,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 19,
+        schema_version INTEGER NOT NULL DEFAULT 20,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -67,6 +69,7 @@ SCHEMA_STATEMENTS = (
         score_tier TEXT NOT NULL DEFAULT 'fragile',
         campaign_grade TEXT NOT NULL DEFAULT 'D',
         estimated_valuation TEXT NOT NULL DEFAULT '0.00',
+        achievement_badges TEXT NOT NULL DEFAULT '',
         final_cash TEXT NOT NULL,
         final_reputation INTEGER NOT NULL,
         archived_at TEXT NOT NULL
@@ -230,14 +233,21 @@ SCHEMA_STATEMENTS = (
         active_board_ask TEXT NOT NULL DEFAULT 'profitability',
         board_resolution TEXT NOT NULL DEFAULT 'hold_course',
         board_score INTEGER NOT NULL DEFAULT 55,
+        board_profitability_score INTEGER NOT NULL DEFAULT 55,
+        board_reliability_score INTEGER NOT NULL DEFAULT 55,
+        board_team_health_score INTEGER NOT NULL DEFAULT 55,
+        board_portfolio_focus_score INTEGER NOT NULL DEFAULT 55,
         board_warning_active INTEGER NOT NULL DEFAULT 0,
         board_warning_level INTEGER NOT NULL DEFAULT 0,
         quarterly_review_count INTEGER NOT NULL DEFAULT 0,
         restructuring_pressure INTEGER NOT NULL DEFAULT 0,
+        governance_crisis_active INTEGER NOT NULL DEFAULT 0,
+        governance_crisis_level INTEGER NOT NULL DEFAULT 0,
         board_recovery_focus TEXT NOT NULL DEFAULT 'profitability',
         board_recovery_turns_remaining INTEGER NOT NULL DEFAULT 0,
         board_resolution_due INTEGER NOT NULL DEFAULT 0,
         board_resolution_window INTEGER NOT NULL DEFAULT 0,
+        board_resolution_miss_streak INTEGER NOT NULL DEFAULT 0,
         last_board_review_turn INTEGER,
         last_funding_turn INTEGER
     )
@@ -660,6 +670,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="save_slots",
+        column_name="support_onboarding_ticket_pressure",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
+        column_name="support_enterprise_ticket_pressure",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="save_slots",
         column_name="support_service_cost_last_turn",
         column_definition="TEXT NOT NULL DEFAULT '0.00'",
     )
@@ -792,6 +814,30 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="finance_state",
+        column_name="board_profitability_score",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_reliability_score",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_team_health_score",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_portfolio_focus_score",
+        column_definition="INTEGER NOT NULL DEFAULT 55",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
         column_name="board_warning_active",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
@@ -816,6 +862,18 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     _ensure_column(
         connection,
         table_name="finance_state",
+        column_name="governance_crisis_active",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="governance_crisis_level",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
         column_name="board_recovery_focus",
         column_definition="TEXT NOT NULL DEFAULT 'profitability'",
     )
@@ -835,6 +893,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         connection,
         table_name="finance_state",
         column_name="board_resolution_window",
+        column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="finance_state",
+        column_name="board_resolution_miss_streak",
         column_definition="INTEGER NOT NULL DEFAULT 0",
     )
     _ensure_column(
@@ -1064,6 +1128,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="run_archives",
         column_name="estimated_valuation",
         column_definition="TEXT NOT NULL DEFAULT '0.00'",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="achievement_badges",
+        column_definition="TEXT NOT NULL DEFAULT ''",
     )
     _ensure_column(
         connection,

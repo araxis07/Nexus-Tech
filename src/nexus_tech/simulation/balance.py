@@ -1516,6 +1516,11 @@ class BalanceConfig:
     board_resolution_expiry_pressure_gain: int = 4
     board_resolution_expiry_risk_gain: int = 3
     board_resolution_expiry_confidence_loss: int = 2
+    governance_crisis_level_two_miss_threshold: int = 2
+    governance_crisis_level_three_miss_threshold: int = 4
+    governance_crisis_pressure_gain_per_level: int = 2
+    governance_crisis_risk_gain_per_level: int = 2
+    governance_crisis_confidence_loss_per_level: int = 1
     board_response_min_pressure_threshold: int = 28
     board_response_confidence_gain: int = 2
     board_response_governance_relief: int = 3
@@ -1567,9 +1572,12 @@ class BalanceConfig:
     support_program_service_cost_per_escalation: Decimal = Decimal("22.00")
     support_program_service_cost_per_staffing_level: Decimal = Decimal("28.00")
     support_program_service_cost_per_queue_age: Decimal = Decimal("5.00")
+    support_program_onboarding_health_pressure_threshold: int = 64
     support_program_focus_ticket_relief_divisor: int = 2
     support_program_focus_onboarding_bonus: int = 2
     support_program_focus_enterprise_bonus: int = 2
+    support_program_focus_mismatch_divisor: int = 8
+    support_program_focus_mismatch_backlog_cap: int = 3
     support_program_queue_age_threshold: int = 3
     support_program_queue_age_satisfaction_loss: int = 2
     support_program_queue_age_churn_gain: int = 4

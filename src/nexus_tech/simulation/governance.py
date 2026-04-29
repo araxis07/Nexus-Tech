@@ -36,6 +36,10 @@ class GovernanceSummary:
     board_warning_active: bool
     board_warning_level: int
     board_score: int
+    board_profitability_score: int
+    board_reliability_score: int
+    board_team_health_score: int
+    board_portfolio_focus_score: int
     board_directive: BoardDirective
     active_board_ask: BoardAsk
     board_ask_met: bool
@@ -45,6 +49,9 @@ class GovernanceSummary:
     board_resolution_window: int
     quarterly_review_count: int
     restructuring_pressure: int
+    governance_crisis_active: bool
+    governance_crisis_level: int
+    board_resolution_miss_streak: int
     board_recovery_turns_remaining: int
     summary: str
 
@@ -78,12 +85,18 @@ def apply_end_of_turn_governance(
     finance = state.finance
     burn_multiple = calculate_burn_multiple(total_revenue, net_cash_flow)
     finance.burn_multiple = burn_multiple
-    finance.board_score = _calculate_board_score(
+    (
+        finance.board_profitability_score,
+        finance.board_reliability_score,
+        finance.board_team_health_score,
+        finance.board_portfolio_focus_score,
+    ) = _calculate_board_scorecard(
         state,
         burn_multiple=burn_multiple,
         customer_summary=customer_summary,
         operations_summary=operations_summary,
     )
+    finance.board_score = _calculate_board_score(finance)
 
     board_pressure_delta = 0
     governance_risk_delta = 0
@@ -107,6 +120,7 @@ def apply_end_of_turn_governance(
             )
             board_pressure_delta -= BALANCE.board_recovery_pressure_relief
             governance_risk_delta -= BALANCE.board_recovery_governance_relief
+            finance.board_resolution_miss_streak = max(0, finance.board_resolution_miss_streak - 1)
         else:
             finance.missed_board_targets += BALANCE.board_recovery_miss_penalty
         finance.board_recovery_turns_remaining = max(
@@ -122,6 +136,7 @@ def apply_end_of_turn_governance(
                 finance.missed_board_targets - BALANCE.board_ask_hit_relief,
             )
             finance.board_confidence = clamp_int(finance.board_confidence + 1)
+            finance.board_resolution_miss_streak = max(0, finance.board_resolution_miss_streak - 1)
         else:
             finance.missed_board_targets += BALANCE.board_ask_miss_penalty
             finance.board_confidence = clamp_int(finance.board_confidence - 1)
@@ -159,6 +174,7 @@ def apply_end_of_turn_governance(
     finance.governance_risk = clamp_int(finance.governance_risk + governance_risk_delta)
     finance.board_directive = _select_board_directive(state, burn_multiple, customer_summary)
     finance.active_board_ask = _select_board_ask(state, burn_multiple, customer_summary)
+    finance.board_score = _calculate_board_score(finance)
     finance.board_warning_level = _calculate_board_warning_level(finance)
     finance.board_warning_active = finance.board_warning_level > 0
     if finance.board_warning_level >= 2 or finance.missed_board_targets >= 2:
@@ -183,7 +199,33 @@ def apply_end_of_turn_governance(
             finance.board_confidence = clamp_int(
                 finance.board_confidence - BALANCE.board_resolution_expiry_confidence_loss
             )
+            finance.board_resolution_miss_streak += 1
             finance.board_resolution_window = BALANCE.board_resolution_window_turns
+
+    finance.governance_crisis_level = _calculate_governance_crisis_level(finance)
+    finance.governance_crisis_active = finance.governance_crisis_level > 0
+    if finance.governance_crisis_active:
+        finance.board_pressure = clamp_int(
+            finance.board_pressure
+            + (finance.governance_crisis_level * BALANCE.governance_crisis_pressure_gain_per_level)
+        )
+        finance.governance_risk = clamp_int(
+            finance.governance_risk
+            + (finance.governance_crisis_level * BALANCE.governance_crisis_risk_gain_per_level)
+        )
+        finance.board_confidence = clamp_int(
+            finance.board_confidence
+            - (
+                finance.governance_crisis_level
+                * BALANCE.governance_crisis_confidence_loss_per_level
+            )
+        )
+        if finance.governance_crisis_level >= 2:
+            finance.restructuring_pressure = clamp_int(finance.restructuring_pressure + 1)
+        if finance.board_resolution is BoardResolution.HOLD_COURSE:
+            finance.board_resolution = BoardResolution.TARGETED_RESET
+        finance.board_warning_level = _calculate_board_warning_level(finance)
+        finance.board_warning_active = finance.board_warning_level > 0
 
     return GovernanceSummary(
         burn_multiple=burn_multiple,
@@ -193,6 +235,10 @@ def apply_end_of_turn_governance(
         board_warning_active=finance.board_warning_active,
         board_warning_level=finance.board_warning_level,
         board_score=finance.board_score,
+        board_profitability_score=finance.board_profitability_score,
+        board_reliability_score=finance.board_reliability_score,
+        board_team_health_score=finance.board_team_health_score,
+        board_portfolio_focus_score=finance.board_portfolio_focus_score,
         board_directive=finance.board_directive,
         active_board_ask=finance.active_board_ask,
         board_ask_met=board_ask_met,
@@ -202,18 +248,28 @@ def apply_end_of_turn_governance(
         board_resolution_window=finance.board_resolution_window,
         quarterly_review_count=finance.quarterly_review_count,
         restructuring_pressure=finance.restructuring_pressure,
+        governance_crisis_active=finance.governance_crisis_active,
+        governance_crisis_level=finance.governance_crisis_level,
+        board_resolution_miss_streak=finance.board_resolution_miss_streak,
         board_recovery_turns_remaining=finance.board_recovery_turns_remaining,
         summary=_build_governance_summary(
             board_review_happened=board_review_happened,
             warning_active=finance.board_warning_active,
             warning_level=finance.board_warning_level,
             board_score=finance.board_score,
+            board_profitability_score=finance.board_profitability_score,
+            board_reliability_score=finance.board_reliability_score,
+            board_team_health_score=finance.board_team_health_score,
+            board_portfolio_focus_score=finance.board_portfolio_focus_score,
             directive=finance.board_directive,
             active_board_ask=finance.active_board_ask,
             board_ask_met=board_ask_met,
             board_resolution=finance.board_resolution,
             board_resolution_due=finance.board_resolution_due,
             board_resolution_window=finance.board_resolution_window,
+            governance_crisis_active=finance.governance_crisis_active,
+            governance_crisis_level=finance.governance_crisis_level,
+            board_resolution_miss_streak=finance.board_resolution_miss_streak,
             recovery_focus=finance.board_recovery_focus,
             recovery_turns_remaining=finance.board_recovery_turns_remaining,
         ),
@@ -340,10 +396,13 @@ def execute_board_response(state: GameState) -> BoardResponseSummary:
         finance.board_confidence + BALANCE.board_response_confidence_gain
     )
     finance.missed_board_targets = max(0, finance.missed_board_targets - 1)
+    finance.board_resolution_miss_streak = 0
     finance.board_resolution_due = False
     finance.board_resolution_window = 0
     finance.board_warning_level = _calculate_board_warning_level(finance)
     finance.board_warning_active = finance.board_warning_level > 0
+    finance.governance_crisis_level = _calculate_governance_crisis_level(finance)
+    finance.governance_crisis_active = finance.governance_crisis_level > 0
     return BoardResponseSummary(
         message=(f"Executed a board response for {ask.value.replace('_', ' ')}. {message_suffix}")
     )
@@ -398,10 +457,13 @@ def execute_restructure_plan(state: GameState) -> BoardResponseSummary:
         finance.governance_risk - BALANCE.board_restructure_governance_relief
     )
     finance.board_resolution = BoardResolution.TARGETED_RESET
+    finance.board_resolution_miss_streak = 0
     finance.board_resolution_due = False
     finance.board_resolution_window = 0
     finance.board_warning_level = _calculate_board_warning_level(finance)
     finance.board_warning_active = finance.board_warning_level > 0
+    finance.governance_crisis_level = _calculate_governance_crisis_level(finance)
+    finance.governance_crisis_active = finance.governance_crisis_level > 0
 
     for employee in state.employees:
         employee.morale = clamp_int(employee.morale - BALANCE.board_restructure_morale_loss)
@@ -444,10 +506,13 @@ def start_board_recovery_plan(state: GameState) -> BoardResponseSummary:
     finance.board_confidence = clamp_int(
         finance.board_confidence + BALANCE.board_recovery_confidence_gain
     )
+    finance.board_resolution_miss_streak = 0
     finance.board_resolution_due = False
     finance.board_resolution_window = 0
     finance.board_warning_level = _calculate_board_warning_level(finance)
     finance.board_warning_active = finance.board_warning_level > 0
+    finance.governance_crisis_level = _calculate_governance_crisis_level(finance)
+    finance.governance_crisis_active = finance.governance_crisis_level > 0
     return BoardResponseSummary(
         message=(
             "Started a board recovery plan focused on "
@@ -563,13 +628,13 @@ def _calculate_board_warning_level(finance) -> int:
     return 0
 
 
-def _calculate_board_score(
+def _calculate_board_scorecard(
     state: GameState,
     *,
     burn_multiple: Decimal,
     customer_summary: CustomerTurnSummary,
     operations_summary: OperationsSummary,
-) -> int:
+) -> tuple[int, int, int, int]:
     finance = state.finance
     team_size = max(1, len(state.employees))
     active_products = max(1, sum(1 for product in state.products if product.is_active))
@@ -603,14 +668,26 @@ def _calculate_board_score(
         - max(0, active_products - max(2, team_size // 2))
         - min(14, finance.governance_risk // 4)
     )
+    return (
+        clamp_int(profitability_score),
+        clamp_int(reliability_score),
+        clamp_int(team_health_score),
+        clamp_int(portfolio_focus_score),
+    )
+
+
+def _calculate_board_score(finance) -> int:
     focus_score = {
-        BoardAsk.PROFITABILITY: profitability_score,
-        BoardAsk.RELIABILITY: reliability_score,
-        BoardAsk.TEAM_HEALTH: team_health_score,
-        BoardAsk.PORTFOLIO_FOCUS: portfolio_focus_score,
+        BoardAsk.PROFITABILITY: finance.board_profitability_score,
+        BoardAsk.RELIABILITY: finance.board_reliability_score,
+        BoardAsk.TEAM_HEALTH: finance.board_team_health_score,
+        BoardAsk.PORTFOLIO_FOCUS: finance.board_portfolio_focus_score,
     }[finance.active_board_ask]
     blended_score = (
-        profitability_score + reliability_score + team_health_score + portfolio_focus_score
+        finance.board_profitability_score
+        + finance.board_reliability_score
+        + finance.board_team_health_score
+        + finance.board_portfolio_focus_score
     ) // 4
     return clamp_int(((focus_score * 2) + blended_score) // 3)
 
@@ -620,6 +697,8 @@ def _calculate_board_review_grade(
     burn_multiple: Decimal,
     board_ask_met: bool,
 ) -> str:
+    if finance.governance_crisis_active:
+        return "F"
     if finance.board_confidence >= BALANCE.board_confidence_high_threshold and board_ask_met:
         return "A"
     if burn_multiple < BALANCE.finance_burn_multiple_warning and board_ask_met:
@@ -654,21 +733,63 @@ def _select_board_resolution(
     return BoardResolution.HOLD_COURSE
 
 
+def _calculate_governance_crisis_level(finance) -> int:
+    if (
+        finance.board_warning_level >= 3
+        or finance.board_resolution_miss_streak
+        >= BALANCE.governance_crisis_level_three_miss_threshold
+        or finance.restructuring_pressure >= 18
+        or finance.missed_board_targets >= 4
+    ):
+        return 3
+    if (
+        finance.board_warning_level >= 2
+        or finance.board_resolution_miss_streak
+        >= BALANCE.governance_crisis_level_two_miss_threshold
+        or finance.restructuring_pressure >= 12
+        or finance.missed_board_targets >= 2
+    ):
+        return 2
+    if finance.board_warning_level >= 1 or finance.board_resolution_miss_streak > 0:
+        return 1
+    return 0
+
+
 def _build_governance_summary(
     *,
     board_review_happened: bool,
     warning_active: bool,
     warning_level: int,
     board_score: int,
+    board_profitability_score: int,
+    board_reliability_score: int,
+    board_team_health_score: int,
+    board_portfolio_focus_score: int,
     directive: BoardDirective,
     active_board_ask: BoardAsk,
     board_ask_met: bool,
     board_resolution: BoardResolution,
     board_resolution_due: bool,
     board_resolution_window: int,
+    governance_crisis_active: bool,
+    governance_crisis_level: int,
+    board_resolution_miss_streak: int,
     recovery_focus: BoardAsk,
     recovery_turns_remaining: int,
 ) -> str:
+    scorecard_summary = (
+        " Scorecard: "
+        f"P{board_profitability_score}/"
+        f"R{board_reliability_score}/"
+        f"T{board_team_health_score}/"
+        f"F{board_portfolio_focus_score}."
+    )
+    crisis_summary = ""
+    if governance_crisis_active:
+        crisis_summary = (
+            f" Governance crisis L{governance_crisis_level} active"
+            f" with miss streak {board_resolution_miss_streak}."
+        )
     recovery_summary = ""
     if recovery_turns_remaining > 0:
         recovery_summary = (
@@ -685,6 +806,8 @@ def _build_governance_summary(
             f"Ask: {active_board_ask.value.replace('_', ' ')}, "
             f"directive: {directive.value.replace('_', ' ')}, "
             f"resolution: {board_resolution.value.replace('_', ' ')}."
+            f"{scorecard_summary}"
+            f"{crisis_summary}"
             f"{resolution_summary}"
             f"{recovery_summary}"
         )
@@ -694,6 +817,8 @@ def _build_governance_summary(
             f"Board review completed. Score {board_score}; prior ask {ask_result}; "
             f"new ask: {active_board_ask.value.replace('_', ' ')}; "
             f"resolution: {board_resolution.value.replace('_', ' ')}."
+            f"{scorecard_summary}"
+            f"{crisis_summary}"
             f"{resolution_summary}"
             f"{recovery_summary}"
         )
@@ -701,6 +826,8 @@ def _build_governance_summary(
         f"Board score {board_score}. Ask remains {active_board_ask.value.replace('_', ' ')}. "
         f"Directive: {directive.value.replace('_', ' ')}. "
         f"Resolution: {board_resolution.value.replace('_', ' ')}."
+        f"{scorecard_summary}"
+        f"{crisis_summary}"
         f"{resolution_summary}"
         f"{recovery_summary}"
     )

@@ -58,6 +58,7 @@ from nexus_tech.persistence.product_repository import ProductRepository
 from nexus_tech.persistence.quarter_plan_repository import QuarterPlanRepository
 from nexus_tech.persistence.schema import CURRENT_SCHEMA_VERSION
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.reporting import calculate_run_badges
 
 try:
     UTC = datetime.UTC
@@ -122,6 +123,7 @@ class RunArchiveSummary:
     score_tier: str
     campaign_grade: str
     estimated_valuation: Decimal
+    achievement_badges: tuple[str, ...]
     final_cash: Decimal
     final_reputation: int
     archived_at: str
@@ -245,6 +247,8 @@ class SaveLoadCoordinator:
                         support_deflection_score,
                         support_sla_breaches_last_turn,
                         support_queue_age_pressure,
+                        support_onboarding_ticket_pressure,
+                        support_enterprise_ticket_pressure,
                         support_service_cost_last_turn,
                         market_cycle,
                         market_cycle_turns_remaining,
@@ -364,6 +368,12 @@ class SaveLoadCoordinator:
                                 slot_row["support_sla_breaches_last_turn"] or 0
                             ),
                             queue_age_pressure=slot_row["support_queue_age_pressure"] or 0,
+                            onboarding_ticket_pressure=(
+                                slot_row["support_onboarding_ticket_pressure"] or 0
+                            ),
+                            enterprise_ticket_pressure=(
+                                slot_row["support_enterprise_ticket_pressure"] or 0
+                            ),
                             service_cost_last_turn=Decimal(
                                 slot_row["support_service_cost_last_turn"] or "0.00"
                             ),
@@ -486,6 +496,7 @@ class SaveLoadCoordinator:
                         score_tier,
                         campaign_grade,
                         estimated_valuation,
+                        achievement_badges,
                         final_cash,
                         final_reputation,
                         archived_at
@@ -510,6 +521,9 @@ class SaveLoadCoordinator:
                 score_tier=row["score_tier"] or "fragile",
                 campaign_grade=row["campaign_grade"] or "D",
                 estimated_valuation=Decimal(row["estimated_valuation"] or "0.00"),
+                achievement_badges=tuple(
+                    badge for badge in (row["achievement_badges"] or "").split(",") if badge
+                ),
                 final_cash=Decimal(row["final_cash"] or "0.00"),
                 final_reputation=row["final_reputation"] or 0,
                 archived_at=row["archived_at"],
@@ -634,8 +648,53 @@ class SaveLoadCoordinator:
             (slot_name,),
         ).fetchone()
         if existing is None:
+            insert_values = (
+                slot_name,
+                action_points_remaining,
+                rng_seed,
+                rng_state,
+                scenario_id,
+                scenario_title,
+                scenario_objective,
+                scenario_objective_metric.value,
+                scenario_objective_target,
+                difficulty_mode.value,
+                campaign_goal_id.value,
+                roadmap_focus.value,
+                roadmap_set_turn,
+                functional_budget.preset.value,
+                functional_budget.engineering_share,
+                functional_budget.marketing_share,
+                functional_budget.customer_success_share,
+                functional_budget.g_and_a_share,
+                support_program.knowledge_base_level,
+                support_program.automation_level,
+                support_program.sla_target,
+                support_program.lane_focus.value,
+                support_program.backlog_queue,
+                support_program.escalation_queue,
+                support_program.staffing_level,
+                support_program.resolved_last_turn,
+                support_program.deflection_score,
+                support_program.sla_breaches_last_turn,
+                support_program.queue_age_pressure,
+                support_program.onboarding_ticket_pressure,
+                support_program.enterprise_ticket_pressure,
+                str(support_program.service_cost_last_turn),
+                market_cycle.value,
+                market_cycle_turns_remaining,
+                int(victory_achieved),
+                victory_reason,
+                exit_outcome.value if exit_outcome is not None else None,
+                exit_summary,
+                saved_with_version,
+                schema_version,
+                timestamp,
+                timestamp,
+            )
+            placeholders = ", ".join(["?"] * len(insert_values))
             connection.execute(
-                """
+                f"""
                 INSERT INTO save_slots (
                     slot_name,
                     action_points_remaining,
@@ -666,6 +725,8 @@ class SaveLoadCoordinator:
                     support_deflection_score,
                     support_sla_breaches_last_turn,
                     support_queue_age_pressure,
+                    support_onboarding_ticket_pressure,
+                    support_enterprise_ticket_pressure,
                     support_service_cost_last_turn,
                     market_cycle,
                     market_cycle_turns_remaining,
@@ -678,53 +739,9 @@ class SaveLoadCoordinator:
                     created_at,
                     updated_at
                 )
-                VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                )
+                VALUES ({placeholders})
                 """,
-                (
-                    slot_name,
-                    action_points_remaining,
-                    rng_seed,
-                    rng_state,
-                    scenario_id,
-                    scenario_title,
-                    scenario_objective,
-                    scenario_objective_metric.value,
-                    scenario_objective_target,
-                    difficulty_mode.value,
-                    campaign_goal_id.value,
-                    roadmap_focus.value,
-                    roadmap_set_turn,
-                    functional_budget.preset.value,
-                    functional_budget.engineering_share,
-                    functional_budget.marketing_share,
-                    functional_budget.customer_success_share,
-                    functional_budget.g_and_a_share,
-                    support_program.knowledge_base_level,
-                    support_program.automation_level,
-                    support_program.sla_target,
-                    support_program.lane_focus.value,
-                    support_program.backlog_queue,
-                    support_program.escalation_queue,
-                    support_program.staffing_level,
-                    support_program.resolved_last_turn,
-                    support_program.deflection_score,
-                    support_program.sla_breaches_last_turn,
-                    support_program.queue_age_pressure,
-                    str(support_program.service_cost_last_turn),
-                    market_cycle.value,
-                    market_cycle_turns_remaining,
-                    int(victory_achieved),
-                    victory_reason,
-                    exit_outcome.value if exit_outcome is not None else None,
-                    exit_summary,
-                    saved_with_version,
-                    schema_version,
-                    timestamp,
-                    timestamp,
-                ),
+                insert_values,
             )
             return
 
@@ -759,6 +776,8 @@ class SaveLoadCoordinator:
                 support_deflection_score = ?,
                 support_sla_breaches_last_turn = ?,
                 support_queue_age_pressure = ?,
+                support_onboarding_ticket_pressure = ?,
+                support_enterprise_ticket_pressure = ?,
                 support_service_cost_last_turn = ?,
                 market_cycle = ?,
                 market_cycle_turns_remaining = ?,
@@ -800,6 +819,8 @@ class SaveLoadCoordinator:
                 support_program.deflection_score,
                 support_program.sla_breaches_last_turn,
                 support_program.queue_age_pressure,
+                support_program.onboarding_ticket_pressure,
+                support_program.enterprise_ticket_pressure,
                 str(support_program.service_cost_last_turn),
                 market_cycle.value,
                 market_cycle_turns_remaining,
@@ -848,11 +869,12 @@ class SaveLoadCoordinator:
                 score_tier,
                 campaign_grade,
                 estimated_valuation,
+                achievement_badges,
                 final_cash,
                 final_reputation,
                 archived_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 archive_key,
@@ -869,6 +891,7 @@ class SaveLoadCoordinator:
                 run_score.score_tier,
                 run_score.campaign_grade,
                 str(run_score.estimated_valuation),
+                ",".join(calculate_run_badges(state, run_score)),
                 str(state.company.cash_on_hand),
                 state.company.reputation,
                 timestamp,

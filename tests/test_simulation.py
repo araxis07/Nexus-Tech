@@ -117,7 +117,7 @@ from nexus_tech.simulation.pricing import calculate_effective_revenue_per_user
 from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.releases import plan_product_release, work_product_release
-from nexus_tech.simulation.reporting import calculate_run_score
+from nexus_tech.simulation.reporting import calculate_run_badges, calculate_run_score
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.roadmap_projects import (
     start_roadmap_project,
@@ -3867,3 +3867,133 @@ def test_board_actions_clear_resolution_deadline() -> None:
 
     assert outcome.state.finance.board_resolution_due is False
     assert outcome.state.finance.board_resolution_window == 0
+
+
+def test_governance_crisis_activates_after_repeated_resolution_misses() -> None:
+    product = make_product("Crisis Clock")
+    state = make_state(product, current_turn=5)
+    state.finance.board_pressure = 58
+    state.finance.board_confidence = 28
+    state.finance.governance_risk = 46
+    state.finance.board_resolution_due = True
+    state.finance.board_resolution_window = 1
+    state.finance.board_resolution_miss_streak = 1
+    state.finance.forecast_runway_turns = 5
+    state.finance.active_board_ask = BoardAsk.PROFITABILITY
+
+    summary = apply_end_of_turn_governance(
+        state,
+        resolved_turn=5,
+        total_revenue=Decimal("900.00"),
+        net_cash_flow=Decimal("-1200.00"),
+        customer_summary=apply_end_of_turn_customers([], [product], current_turn=5),
+        operations_summary=calculate_operations_summary(
+            state.products,
+            state.employees,
+            current_turn=5,
+            customer_accounts=state.customer_accounts,
+            support_backlog_queue=state.support_program.backlog_queue,
+        ),
+    )
+
+    assert state.finance.board_resolution_miss_streak >= 2
+    assert state.finance.governance_crisis_active is True
+    assert state.finance.governance_crisis_level >= 2
+    assert summary.governance_crisis_active is True
+
+
+def test_support_lane_focus_penalizes_mismatched_queue_mix() -> None:
+    product = make_product("Lane Mix")
+    enterprise_account = CustomerAccount(
+        name="Enterprise Queue",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1200.00"),
+        satisfaction=70,
+        expansion_potential=68,
+        renewal_turn=7,
+        churn_risk=16,
+        open_tickets=10,
+        support_tier=SupportTier.WHITE_GLOVE,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    startup_account = CustomerAccount(
+        name="Onboarding Queue",
+        product_id=product.id,
+        segment=MarketSegment.STARTUP,
+        contract_value=Decimal("420.00"),
+        satisfaction=64,
+        onboarding_health=52,
+        expansion_potential=52,
+        renewal_turn=6,
+        churn_risk=24,
+        open_tickets=2,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(
+        product,
+        customer_accounts=[enterprise_account, startup_account],
+    )
+    state.support_program.lane_focus = SupportLaneFocus.ONBOARDING
+
+    summary = apply_end_of_turn_support_program(state)
+
+    assert summary.enterprise_ticket_pressure > summary.onboarding_ticket_pressure
+    assert summary.focus_mismatch_penalty > 0
+    assert state.support_program.enterprise_ticket_pressure == summary.enterprise_ticket_pressure
+
+
+def test_run_badges_capture_durable_company_strength() -> None:
+    products = [
+        make_product("Ops Core", lifecycle_stage=LifecycleStage.MATURE, user_count=180),
+        make_product("Growth Edge", user_count=120),
+        make_product("Trust Layer", user_count=90),
+    ]
+    employees = [
+        make_employee("Lead PM", EmployeeRole.PRODUCT_MANAGER, seniority=Seniority.SENIOR),
+        make_employee("Senior Eng", EmployeeRole.ENGINEER, seniority=Seniority.SENIOR),
+        make_employee("Designer", EmployeeRole.DESIGNER),
+        make_employee("Marketer", EmployeeRole.MARKETER),
+    ]
+    accounts = [
+        CustomerAccount(
+            name="Atlas Bank",
+            product_id=products[0].id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1400.00"),
+            satisfaction=80,
+            expansion_potential=72,
+            renewal_turn=8,
+            churn_risk=10,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Northwind Ops",
+            product_id=products[1].id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1180.00"),
+            satisfaction=78,
+            expansion_potential=66,
+            renewal_turn=8,
+            churn_risk=12,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
+    state = make_state(
+        *products,
+        employees=employees,
+        customer_accounts=accounts,
+        cash_on_hand=Decimal("18000.00"),
+    )
+    state.company.reputation = 74
+    state.finance.board_confidence = 78
+    state.finance.board_reliability_score = 70
+    state.finance.board_team_health_score = 73
+    state.support_program.enterprise_ticket_pressure = 9
+    state.support_program.onboarding_ticket_pressure = 2
+
+    badges = calculate_run_badges(state, calculate_run_score(state))
+
+    assert "capital_disciplined" in badges
+    assert "board_trusted" in badges
+    assert "enterprise_operator" in badges

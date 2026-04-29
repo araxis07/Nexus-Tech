@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.24.0 - 2026-04-29
+
+- Added a board scorecard across profitability, reliability, team health, and portfolio focus so governance pressure is easier to read and tune
+- Added governance-crisis escalation with resolution-miss streaks so ignored board deadlines now compound into stronger late-game pressure
+- Added deeper support-lane telemetry through onboarding versus enterprise queue pressure plus mismatch penalties when the lane focus drifts from demand
+- Added archive badges such as capital discipline, board trust, and enterprise operation so completed runs are easier to compare as meta history
+- Extended SQLite persistence, dashboard panels, and regression coverage for the new governance, support, and archive metadata
+- Promoted the package version to `0.24.0`
+
 ## 0.23.0 - 2026-04-28
 
 - Added support-lane focus with `balanced`, `onboarding`, and `enterprise` routing so support capacity can be aimed at the current customer mix

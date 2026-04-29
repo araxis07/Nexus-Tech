@@ -35,6 +35,9 @@ class SupportProgramSummary:
     weighted_ticket_pressure: int
     staffing_gap: int
     queue_age_pressure: int
+    onboarding_ticket_pressure: int
+    enterprise_ticket_pressure: int
+    focus_mismatch_penalty: int
     service_cost: Decimal
     reputation_delta: int
     morale_penalty: int
@@ -89,6 +92,26 @@ def apply_end_of_turn_support_program(
             account.ticket_queue_age = max(0, account.ticket_queue_age - 1)
         queue_age_pressure += max(0, account.ticket_queue_age - 1)
     total_open_tickets = sum(account.open_tickets for account in active_accounts)
+    onboarding_ticket_pressure = sum(
+        account.open_tickets
+        + max(
+            0,
+            (
+                BALANCE.support_program_onboarding_health_pressure_threshold
+                - account.onboarding_health
+            ),
+        )
+        // 10
+        for account in active_accounts
+        if account.segment.value != "enterprise"
+    )
+    enterprise_ticket_pressure = sum(
+        account.open_tickets
+        + BALANCE.support_tier_capacity_cost[account.support_tier.value]
+        + (1 if account.segment.value == "enterprise" else 0)
+        for account in active_accounts
+        if account.segment.value == "enterprise" or account.support_tier is SupportTier.WHITE_GLOVE
+    )
     weighted_ticket_pressure = total_open_tickets + sum(
         max(0, BALANCE.support_program_segment_ticket_weight[account.segment.value] - 1)
         for account in active_accounts
@@ -99,6 +122,12 @@ def apply_end_of_turn_support_program(
         BALANCE.support_tier_capacity_cost[account.support_tier.value]
         for account in active_accounts
     )
+    focus_mismatch_penalty = _calculate_focus_mismatch_penalty(
+        state.support_program.lane_focus,
+        onboarding_ticket_pressure=onboarding_ticket_pressure,
+        enterprise_ticket_pressure=enterprise_ticket_pressure,
+    )
+    weighted_ticket_pressure += focus_mismatch_penalty
     sla_breaches = sum(
         1
         for account in active_accounts
@@ -149,6 +178,8 @@ def apply_end_of_turn_support_program(
     state.support_program.deflection_score = deflection_score
     state.support_program.sla_breaches_last_turn = sla_breaches
     state.support_program.queue_age_pressure = queue_age_pressure
+    state.support_program.onboarding_ticket_pressure = onboarding_ticket_pressure
+    state.support_program.enterprise_ticket_pressure = enterprise_ticket_pressure
     service_cost = quantize_money(
         (Decimal(total_open_tickets) * BALANCE.support_program_service_cost_per_ticket)
         + (
@@ -160,6 +191,7 @@ def apply_end_of_turn_support_program(
             * BALANCE.support_program_service_cost_per_staffing_level
         )
         + (Decimal(queue_age_pressure) * BALANCE.support_program_service_cost_per_queue_age)
+        + (Decimal(focus_mismatch_penalty) * BALANCE.support_program_service_cost_per_queue_age)
     )
     state.support_program.service_cost_last_turn = service_cost
 
@@ -189,11 +221,18 @@ def apply_end_of_turn_support_program(
         morale_penalty = BALANCE.support_program_backlog_morale_penalty
     if staffing_gap > 0:
         morale_penalty += BALANCE.support_program_staffing_gap_morale_penalty
+    if focus_mismatch_penalty > 0:
+        state.support_program.backlog_queue += focus_mismatch_penalty
+        state.support_program.escalation_queue += max(0, focus_mismatch_penalty - 1)
 
     if not active_accounts:
         summary = "Support tooling is idle."
     elif state.support_program.backlog_queue == 0:
         summary = "Support tooling is keeping ticket flow under control."
+    elif focus_mismatch_penalty > 0:
+        summary = (
+            "Support lanes are mismatched with demand and one customer lane is waiting too long."
+        )
     elif staffing_gap > 0:
         summary = "Support demand is outrunning staffed capacity and enterprise pressure is rising."
     else:
@@ -211,6 +250,9 @@ def apply_end_of_turn_support_program(
         weighted_ticket_pressure=weighted_ticket_pressure,
         staffing_gap=staffing_gap,
         queue_age_pressure=queue_age_pressure,
+        onboarding_ticket_pressure=onboarding_ticket_pressure,
+        enterprise_ticket_pressure=enterprise_ticket_pressure,
+        focus_mismatch_penalty=focus_mismatch_penalty,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
@@ -508,6 +550,26 @@ def _calculate_support_focus_bonus(
         elif focus is SupportLaneFocus.ONBOARDING and account.segment.value != "enterprise":
             focus_bonus += BALANCE.support_program_focus_onboarding_bonus
     return focus_bonus
+
+
+def _calculate_focus_mismatch_penalty(
+    focus: SupportLaneFocus,
+    *,
+    onboarding_ticket_pressure: int,
+    enterprise_ticket_pressure: int,
+) -> int:
+    if focus is SupportLaneFocus.BALANCED:
+        return 0
+    if focus is SupportLaneFocus.ONBOARDING:
+        pressure_gap = enterprise_ticket_pressure - onboarding_ticket_pressure
+    else:
+        pressure_gap = onboarding_ticket_pressure - enterprise_ticket_pressure
+    if pressure_gap <= 0:
+        return 0
+    return min(
+        BALANCE.support_program_focus_mismatch_backlog_cap,
+        pressure_gap // BALANCE.support_program_focus_mismatch_divisor,
+    )
 
 
 def _get_account_by_id(accounts: list[CustomerAccount], account_id) -> CustomerAccount:

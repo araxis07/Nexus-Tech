@@ -131,6 +131,51 @@ def calculate_run_score(state: GameState) -> RunScore:
     )
 
 
+def calculate_run_badges(
+    state: GameState,
+    run_score: RunScore | None = None,
+) -> tuple[str, ...]:
+    """Return compact badges that describe the run's strongest traits."""
+
+    run_score = run_score or calculate_run_score(state)
+    badges: list[str] = []
+    if (
+        state.finance.debt_principal <= ZERO_MONEY
+        and state.finance.burn_multiple < BALANCE.finance_burn_multiple_warning
+        and state.company.cash_on_hand >= BALANCE.exit_independence_cash_threshold
+    ):
+        badges.append("capital_disciplined")
+    if (
+        state.finance.board_confidence >= BALANCE.board_confidence_high_threshold
+        and state.finance.governance_crisis_level == 0
+        and state.finance.missed_board_targets == 0
+    ):
+        badges.append("board_trusted")
+    if (
+        state.support_program.enterprise_ticket_pressure
+        > state.support_program.onboarding_ticket_pressure
+        and run_score.key_accounts >= 2
+    ):
+        badges.append("enterprise_operator")
+    if (
+        run_score.key_accounts >= 2
+        and state.support_program.escalation_queue
+        < BALANCE.support_program_triage_escalation_relief * 2
+        and state.finance.board_reliability_score >= BALANCE.board_score_reliability_target
+    ):
+        badges.append("customer_trusted")
+    if run_score.active_products >= 3 and run_score.mature_products >= 1:
+        badges.append("portfolio_architect")
+    if (
+        len(state.employees) >= 4
+        and state.finance.board_team_health_score >= BALANCE.board_score_team_health_target
+    ):
+        badges.append("people_builder")
+    if not badges:
+        badges.append(run_score.score_tier)
+    return tuple(badges[:4])
+
+
 def check_victory(state: GameState) -> str | None:
     """Return a victory reason when the company has reached durable scale."""
 

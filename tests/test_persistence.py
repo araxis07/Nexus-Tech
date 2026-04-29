@@ -247,14 +247,21 @@ def make_state() -> GameState:
         active_board_ask=BoardAsk.RELIABILITY,
         board_resolution=BoardResolution.TARGETED_RESET,
         board_score=63,
+        board_profitability_score=52,
+        board_reliability_score=67,
+        board_team_health_score=61,
+        board_portfolio_focus_score=58,
         board_warning_active=True,
         board_warning_level=2,
         quarterly_review_count=2,
         restructuring_pressure=7,
+        governance_crisis_active=True,
+        governance_crisis_level=2,
         board_recovery_focus=BoardAsk.RELIABILITY,
         board_recovery_turns_remaining=2,
         board_resolution_due=True,
         board_resolution_window=2,
+        board_resolution_miss_streak=1,
         last_board_review_turn=4,
         last_funding_turn=3,
     )
@@ -387,6 +394,8 @@ def make_state() -> GameState:
             deflection_score=41,
             sla_breaches_last_turn=1,
             queue_age_pressure=5,
+            onboarding_ticket_pressure=4,
+            enterprise_ticket_pressure=9,
             service_cost_last_turn=Decimal("164.00"),
         ),
         difficulty_mode=DifficultyMode.FOUNDER,
@@ -506,6 +515,8 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "support_deflection_score",
         "support_sla_breaches_last_turn",
         "support_queue_age_pressure",
+        "support_onboarding_ticket_pressure",
+        "support_enterprise_ticket_pressure",
         "support_service_cost_last_turn",
         "market_cycle",
         "market_cycle_turns_remaining",
@@ -538,14 +549,21 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "active_board_ask",
         "board_resolution",
         "board_score",
+        "board_profitability_score",
+        "board_reliability_score",
+        "board_team_health_score",
+        "board_portfolio_focus_score",
         "board_warning_active",
         "board_warning_level",
         "quarterly_review_count",
         "restructuring_pressure",
+        "governance_crisis_active",
+        "governance_crisis_level",
         "board_recovery_focus",
         "board_recovery_turns_remaining",
         "board_resolution_due",
         "board_resolution_window",
+        "board_resolution_miss_streak",
         "last_board_review_turn",
     }.issubset(finance_columns)
     assert {
@@ -602,7 +620,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "renewal_offer_type",
         "win_back_attempts",
     }.issubset(customer_columns)
-    assert user_version >= 19
+    assert user_version >= 20
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -741,13 +759,17 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
         "board_directive",
         "active_board_ask",
         "board_resolution",
+        "board_profitability_score",
+        "board_reliability_score",
+        "governance_crisis_level",
         "board_warning_level",
         "quarterly_review_count",
         "restructuring_pressure",
         "board_resolution_due",
         "board_resolution_window",
+        "board_resolution_miss_streak",
     }.issubset(finance_columns)
-    assert user_version >= 19
+    assert user_version >= 20
 
 
 def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) -> None:
@@ -785,7 +807,7 @@ def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     assert summaries[0].active_products == 1
     assert summaries[0].headcount == 2
     assert summaries[0].saved_with_version
-    assert summaries[0].schema_version >= 18
+    assert summaries[0].schema_version >= 20
 
 
 def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
@@ -798,7 +820,7 @@ def test_check_save_health_reports_healthy_database(tmp_path: Path) -> None:
     assert report.integrity_ok is True
     assert report.foreign_key_ok is True
     assert report.slot_count == 1
-    assert report.schema_version >= 19
+    assert report.schema_version >= 20
 
 
 def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
@@ -816,6 +838,7 @@ def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
     assert archives[0].score_tier
     assert archives[0].campaign_grade
     assert archives[0].estimated_valuation > Decimal("0.00")
+    assert archives[0].achievement_badges
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:
