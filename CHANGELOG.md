@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.28.0 - 2026-04-30
+
+- Added lane-capacity and lane-overflow modeling for support ops so onboarding, enterprise, and billing pressure now consume differentiated capacity instead of one flat queue
+- Deepened board governance with scorecard-driven consequences plus recovery-plan tracks that now shift capital posture, support focus, team health, or roadmap focus based on the active board ask
+- Expanded pricing and packaging depth with catalog-aware acquisition/churn modifiers, softer price-increase shock for deeper catalogs, and stronger package-expansion drift across seats, usage, and bundle depth
+- Deepened partnerships with neglected-channel decay, multi-channel conflict pressure, enablement-driven rev-share improvement, and capital-plan-aware channel scaling
+- Strengthened capital planning and finance forecasting with alignment checks across reserve posture, GTM execution, technical debt load, support backlog, and dilution-sensitive venture planning
+- Extended terminal panels and regression coverage for the new support, governance, pricing, partnership, and finance depth
+- Promoted the package version to `0.28.0`
+
 ## 0.27.0 - 2026-04-29
 
 - Added real reseller, integration, and marketplace partnerships with channel-specific setup cost, enablement depth, sourced users, sourced revenue, support pressure, and conflict risk

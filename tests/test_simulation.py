@@ -146,6 +146,7 @@ from nexus_tech.simulation.scaling import (
 )
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
+    calculate_support_lane_snapshots,
     calculate_support_staff_capacity,
     classify_account_support_lane,
     triage_support_backlog,
@@ -4046,6 +4047,54 @@ def test_start_board_recovery_plan_sets_focus_and_duration() -> None:
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
+def test_start_board_recovery_plan_profitability_shifts_capital_posture() -> None:
+    product = make_product("Capital Discipline")
+    state = make_state(product, cash_on_hand=Decimal("5200.00"))
+    state.finance.board_pressure = 40
+    state.finance.active_board_ask = BoardAsk.PROFITABILITY
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.VENTURE,
+    )
+
+    outcome = apply_action(state, TurnAction.START_BOARD_RECOVERY_PLAN)
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.CONSERVE
+    assert outcome.state.capital_plan.source_preference is CapitalSourcePreference.VENTURE
+
+
+def test_start_board_recovery_plan_reliability_shifts_support_focus_and_tooling() -> None:
+    product = make_product("Support Heat")
+    account = CustomerAccount(
+        name="Billing Heat",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("680.00"),
+        satisfaction=62,
+        expansion_potential=52,
+        renewal_turn=7,
+        churn_risk=26,
+        invoice_risk=58,
+        failed_payment_risk=44,
+        dunning_steps=2,
+        open_tickets=3,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+    state.finance.board_pressure = 40
+    state.finance.active_board_ask = BoardAsk.RELIABILITY
+    state.support_program.billing_ticket_pressure = 16
+
+    outcome = apply_action(state, TurnAction.START_BOARD_RECOVERY_PLAN)
+
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.BILLING
+    assert outcome.state.support_program.automation_level > state.support_program.automation_level
+    assert (
+        outcome.state.support_program.knowledge_base_level
+        > state.support_program.knowledge_base_level
+    )
+
+
 def test_board_actions_clear_resolution_deadline() -> None:
     product = make_product("Board Relief")
     state = make_state(product, cash_on_hand=Decimal("7000.00"))
@@ -4160,6 +4209,48 @@ def test_support_billing_lane_tracks_invoice_and_dunning_pressure() -> None:
     assert summary.billing_ticket_pressure > 0
     assert state.support_program.billing_ticket_pressure == summary.billing_ticket_pressure
     assert summary.focus_mismatch_penalty == 0
+
+
+def test_support_lane_snapshots_surface_lane_overflow_when_focus_is_off() -> None:
+    product = make_product("Lane Capacity")
+    accounts = [
+        CustomerAccount(
+            name="Enterprise One",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1200.00"),
+            satisfaction=68,
+            expansion_potential=60,
+            renewal_turn=6,
+            churn_risk=18,
+            support_tier=SupportTier.WHITE_GLOVE,
+            open_tickets=12,
+            sla_breach_risk=40,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Enterprise Two",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1280.00"),
+            satisfaction=70,
+            expansion_potential=64,
+            renewal_turn=6,
+            churn_risk=16,
+            support_tier=SupportTier.PRIORITY,
+            open_tickets=10,
+            sla_breach_risk=36,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
+    state = make_state(product, customer_accounts=accounts)
+    state.support_program.lane_focus = SupportLaneFocus.ONBOARDING
+
+    snapshots = calculate_support_lane_snapshots(state)
+
+    assert snapshots[SupportLaneFocus.ENTERPRISE].pressure > 0
+    assert snapshots[SupportLaneFocus.ENTERPRISE].overflow > 0
+    assert snapshots[SupportLaneFocus.ONBOARDING].capacity > 0
 
 
 def test_run_badges_capture_durable_company_strength() -> None:
@@ -4423,6 +4514,56 @@ def test_partnership_turn_summary_adds_users_revenue_and_support_pressure() -> N
     assert state.products[0].user_count > 40
 
 
+def test_partnership_neglect_and_channel_crowding_raise_conflict_pressure() -> None:
+    product = make_product(
+        "Channel Crowd",
+        market_fit=70,
+        quality=72,
+        bug_level=10,
+        user_count=80,
+    )
+    partnerships = [
+        PartnershipDeal(
+            name="Crowd Reseller",
+            product_id=product.id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.ACTIVE,
+            quality=66,
+            risk=20,
+            enablement_level=42,
+            conflict_pressure=18,
+            started_turn=1,
+            last_review_turn=1,
+        ),
+        PartnershipDeal(
+            name="Crowd Marketplace",
+            product_id=product.id,
+            channel=PartnerChannel.MARKETPLACE,
+            status=PartnershipStatus.ACTIVE,
+            quality=62,
+            risk=18,
+            enablement_level=40,
+            conflict_pressure=16,
+            started_turn=1,
+            last_review_turn=1,
+        ),
+    ]
+    state = make_state(
+        product,
+        partnerships=partnerships,
+        current_turn=5,
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.VENTURE,
+        ),
+    )
+
+    apply_end_of_turn_partnerships(state)
+
+    assert state.partnerships[0].conflict_pressure > 18
+    assert state.partnerships[1].risk > 18
+
+
 def test_set_capital_plan_action_updates_state() -> None:
     product = make_product("Capital Core")
     state = make_state(product)
@@ -4439,6 +4580,106 @@ def test_set_capital_plan_action_updates_state() -> None:
     assert outcome.state.capital_plan.mode is CapitalPlanMode.EXPAND
     assert outcome.state.capital_plan.source_preference is CapitalSourcePreference.VENTURE
     assert outcome.state.capital_plan.reserve_target == Decimal("1800.00")
+
+
+def test_finance_drift_penalizes_misaligned_capital_plan() -> None:
+    finance = FinanceState(
+        debt_principal=Decimal("5400.00"),
+        loan_interest_rate=Decimal("0.0300"),
+        investor_pressure=14,
+        board_confidence=62,
+        equity_dilution=Decimal("0.2400"),
+    )
+    company = Company(
+        name="Capital Stress",
+        cash_on_hand=Decimal("1700.00"),
+        reputation=54,
+    )
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.VENTURE,
+    )
+
+    summary = apply_end_of_turn_finance_drift(
+        finance,
+        company,
+        capital_plan=capital_plan,
+        net_cash_flow=Decimal("-950.00"),
+        turn_history=[],
+        technical_debt_load=68,
+        active_channels=0,
+        support_backlog=28,
+    )
+
+    assert finance.investor_pressure > 14
+    assert finance.covenant_risk > 0
+    assert finance.board_confidence < 62
+    assert summary.forecast_net_cash_flow < Decimal("0.00")
+
+
+def test_deeper_catalog_softens_price_increase_account_shock() -> None:
+    shallow_product = make_product(
+        "Shallow Suite",
+        quality=72,
+        revenue_per_user=Decimal("50.00"),
+        pricing_tier=PricingTier.PREMIUM,
+        packaging_strategy=PackagingStrategy.SUITE,
+        target_segment=MarketSegment.ENTERPRISE,
+        package_catalog_depth=0,
+        add_on_catalog_depth=0,
+    )
+    deep_product = shallow_product.model_copy(
+        update={
+            "id": UUID("00000000-0000-0000-0000-000000000111"),
+            "name": "Deep Suite",
+            "package_catalog_depth": 3,
+            "add_on_catalog_depth": 2,
+        }
+    )
+    shallow_account = CustomerAccount(
+        name="Shallow Anchor",
+        product_id=shallow_product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1200.00"),
+        plan_tier=PricingTier.PREMIUM,
+        subscription_package=SubscriptionPackage.GROWTH,
+        annual_prepay=True,
+        satisfaction=78,
+        expansion_potential=68,
+        renewal_turn=6,
+        churn_risk=16,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    deep_account = shallow_account.model_copy(
+        update={
+            "id": UUID("00000000-0000-0000-0000-000000000222"),
+            "name": "Deep Anchor",
+            "product_id": deep_product.id,
+        }
+    )
+
+    shallow_state = make_state(shallow_product, customer_accounts=[shallow_account])
+    deep_state = make_state(deep_product, customer_accounts=[deep_account])
+
+    shallow_outcome = apply_action(
+        shallow_state,
+        TurnAction.RUN_PRICE_INCREASE,
+        context=ActionContext(target_product_id=shallow_product.id),
+    )
+    deep_outcome = apply_action(
+        deep_state,
+        TurnAction.RUN_PRICE_INCREASE,
+        context=ActionContext(target_product_id=deep_product.id),
+    )
+
+    shallow_invoice_gain = (
+        shallow_outcome.state.customer_accounts[0].invoice_risk - shallow_account.invoice_risk
+    )
+    deep_invoice_gain = (
+        deep_outcome.state.customer_accounts[0].invoice_risk - deep_account.invoice_risk
+    )
+
+    assert deep_invoice_gain < shallow_invoice_gain
 
 
 def test_run_badges_capture_channel_builder_when_partnerships_scale() -> None:

@@ -29,6 +29,7 @@ from nexus_tech.domain.models import (
     ProductReleaseStatus,
     RoadmapProjectStatus,
     SalesDealStage,
+    SupportLaneFocus,
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
@@ -40,6 +41,7 @@ from nexus_tech.simulation.balance_lab import (
 )
 from nexus_tech.simulation.balance_profiles import BalanceProfile
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
+from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.endgame import calculate_endgame_readiness, evaluate_exit_outcome
@@ -67,6 +69,7 @@ from nexus_tech.simulation.roadmap import (
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
 from nexus_tech.simulation.support_program import (
+    calculate_support_lane_snapshots,
     calculate_support_staff_capacity,
     classify_account_support_lane,
     count_escalating_accounts,
@@ -2497,6 +2500,7 @@ def _build_customer_accounts_panel(state: GameState, *, compact: bool = True) ->
 def _build_support_program_panel(state: GameState) -> Panel:
     escalating_accounts = count_escalating_accounts(state.customer_accounts)
     staffing_capacity = calculate_support_staff_capacity(state)
+    lane_snapshots = calculate_support_lane_snapshots(state)
     lane_counts = {
         "onboarding": 0,
         "enterprise": 0,
@@ -2526,6 +2530,22 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Onboarding Q", str(state.support_program.onboarding_ticket_pressure))
     table.add_row("Enterprise Q", str(state.support_program.enterprise_ticket_pressure))
     table.add_row("Billing Q", str(state.support_program.billing_ticket_pressure))
+    table.add_row(
+        "Lane Cap",
+        (
+            f"O {lane_snapshots[SupportLaneFocus.ONBOARDING].capacity} / "
+            f"E {lane_snapshots[SupportLaneFocus.ENTERPRISE].capacity} / "
+            f"B {lane_snapshots[SupportLaneFocus.BILLING].capacity}"
+        ),
+    )
+    table.add_row(
+        "Lane Overflow",
+        (
+            f"O {lane_snapshots[SupportLaneFocus.ONBOARDING].overflow} / "
+            f"E {lane_snapshots[SupportLaneFocus.ENTERPRISE].overflow} / "
+            f"B {lane_snapshots[SupportLaneFocus.BILLING].overflow}"
+        ),
+    )
     table.add_row(
         "Lane Mix",
         (
@@ -2571,6 +2591,8 @@ def _build_finance_panel(state: GameState) -> Panel:
             state.company.cash_on_hand,
             state.turn_history,
             latest_net_cash_flow=_latest_net_cash_flow(state),
+            finance=state.finance,
+            capital_plan=state.capital_plan,
         )
     )
     turn_interest = (
@@ -2617,6 +2639,19 @@ def _build_finance_panel(state: GameState) -> Panel:
 def _build_capital_plan_panel(state: GameState) -> Panel:
     latest_net_cash_flow = _latest_net_cash_flow(state)
     reserve_gap = state.company.cash_on_hand - state.capital_plan.reserve_target
+    capital_drift = evaluate_capital_plan(
+        state.company,
+        state.finance,
+        state.capital_plan,
+        latest_net_cash_flow=latest_net_cash_flow,
+        technical_debt_load=sum(
+            product.technical_debt for product in state.products if product.is_active
+        ),
+        active_channels=sum(
+            1 for partnership in state.partnerships if partnership.status.value != "paused"
+        ),
+        support_backlog=state.support_program.backlog_queue,
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Mode", state.capital_plan.mode.value)
     table.add_row("Source Bias", state.capital_plan.source_preference.value)
@@ -2632,6 +2667,15 @@ def _build_capital_plan_panel(state: GameState) -> Panel:
         ),
     )
     table.add_row("Latest Cashflow", format_signed_money(latest_net_cash_flow))
+    table.add_row(
+        "Plan Drift",
+        (
+            f"P {capital_drift.investor_pressure_delta:+d} / "
+            f"C {capital_drift.covenant_risk_delta:+d} / "
+            f"B {capital_drift.board_confidence_delta:+d}"
+        ),
+    )
+    table.add_row("Alignment", capital_drift.summary)
     return Panel(table, title="Capital Plan", border_style="bright_cyan", expand=True)
 
 

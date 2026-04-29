@@ -1338,6 +1338,13 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         capital_plan=next_state.capital_plan,
         net_cash_flow=net_cash_flow,
         turn_history=next_state.turn_history,
+        technical_debt_load=sum(
+            product.technical_debt for product in next_state.products if product.is_active
+        ),
+        active_channels=sum(
+            1 for partnership in next_state.partnerships if partnership.status.value != "paused"
+        ),
+        support_backlog=next_state.support_program.backlog_queue,
     )
     next_state.finance.board_confidence = clamp_int(
         next_state.finance.board_confidence + functional_budget_profile.board_confidence_bonus

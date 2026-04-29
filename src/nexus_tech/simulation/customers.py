@@ -438,6 +438,14 @@ def _apply_packaging_expansion_drift(
         return ZERO_MONEY
 
     revenue_before = calculate_account_recurring_revenue(account)
+    package_depth_bonus = max(
+        0,
+        product.package_catalog_depth // BALANCE.packaging_expansion_package_depth_bonus_divisor,
+    )
+    add_on_depth_bonus = max(
+        0,
+        product.add_on_catalog_depth // BALANCE.packaging_expansion_add_on_depth_bonus_divisor,
+    )
     if product.packaging_strategy.value == "suite":
         if (
             account.segment is MarketSegment.ENTERPRISE
@@ -445,12 +453,25 @@ def _apply_packaging_expansion_drift(
         ):
             account.subscription_package = SubscriptionPackage.ENTERPRISE_SUITE
             account.support_tier = SupportTier.WHITE_GLOVE
-        account.add_on_count += BALANCE.packaging_expansion_add_on_gain
+        account.add_on_count += BALANCE.packaging_expansion_add_on_gain + add_on_depth_bonus
+        if account.billing_model.value == "seat_based":
+            account.seat_count += (
+                BALANCE.packaging_expansion_enterprise_seat_gain + package_depth_bonus
+            )
+        elif account.billing_model.value == "usage_based":
+            account.usage_units += BALANCE.packaging_expansion_usage_gain + (add_on_depth_bonus * 2)
     elif product.packaging_strategy.value == "modular":
-        account.add_on_count += BALANCE.packaging_expansion_add_on_gain
+        account.add_on_count += BALANCE.packaging_expansion_add_on_gain + add_on_depth_bonus
+        if (
+            product.package_catalog_depth >= BALANCE.package_catalog_enterprise_upgrade_threshold
+            and account.subscription_package is SubscriptionPackage.STARTER
+        ):
+            account.subscription_package = SubscriptionPackage.GROWTH
     else:
         account.contract_value = quantize_money(
-            account.contract_value + BALANCE.packaging_expansion_contract_gain
+            account.contract_value
+            + BALANCE.packaging_expansion_contract_gain
+            + (Decimal(package_depth_bonus) * BALANCE.packaging_catalog_contract_gain_per_depth)
         )
         if account.support_tier is SupportTier.WHITE_GLOVE:
             account.support_tier = SupportTier.PRIORITY

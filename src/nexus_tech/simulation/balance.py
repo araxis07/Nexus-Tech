@@ -101,6 +101,7 @@ class BalanceConfig:
     price_increase_quality_relief_divisor: int = 24
     price_increase_churn_rate_gain: Decimal = Decimal("0.0040")
     price_increase_account_value_multiplier: Decimal = Decimal("1.05")
+    price_increase_catalog_protection_divisor: int = 2
     price_increase_account_satisfaction_loss_by_segment: dict[str, int] = field(
         default_factory=lambda: {
             "indie": 5,
@@ -189,12 +190,23 @@ class BalanceConfig:
             "suite": {"indie": -2, "startup": -1, "smb": 1, "enterprise": 2},
         }
     )
+    packaging_support_cost_depth_step: Decimal = Decimal("0.0100")
+    packaging_catalog_acquisition_depth_divisor: int = 2
+    add_on_catalog_acquisition_depth_divisor: int = 3
+    packaging_churn_relief_depth_divisor: int = 2
+    package_catalog_enterprise_upgrade_threshold: int = 3
+    add_on_catalog_growth_upgrade_threshold: int = 2
+    add_on_campaign_min_catalog_depth: int = 1
     packaging_expansion_interval: int = 3
     packaging_expansion_satisfaction_threshold: int = 74
     packaging_expansion_onboarding_threshold: int = 68
     packaging_expansion_ticket_threshold: int = 6
     packaging_expansion_add_on_gain: int = 1
     packaging_expansion_contract_gain: Decimal = Decimal("90.00")
+    packaging_expansion_package_depth_bonus_divisor: int = 2
+    packaging_expansion_add_on_depth_bonus_divisor: int = 2
+    packaging_expansion_enterprise_seat_gain: int = 2
+    packaging_expansion_usage_gain: int = 4
 
     segment_base_acquisition_bonus: dict[str, int] = field(
         default_factory=lambda: {
@@ -1564,6 +1576,22 @@ class BalanceConfig:
     board_tradeoff_portfolio_focus_debt_relief: int = 2
     board_tradeoff_portfolio_focus_secondary_fit_penalty: int = 2
     board_tradeoff_portfolio_focus_secondary_growth_penalty: Decimal = Decimal("0.0020")
+    board_scorecard_severe_gap_threshold: int = 10
+    board_scorecard_profitability_growth_penalty: Decimal = Decimal("0.0030")
+    board_scorecard_profitability_pressure_gain: int = 2
+    board_scorecard_reliability_backlog_penalty: int = 4
+    board_scorecard_reliability_escalation_penalty: int = 1
+    board_scorecard_team_energy_loss: int = 3
+    board_scorecard_team_morale_loss: int = 3
+    board_scorecard_team_attrition_gain: int = 4
+    board_scorecard_portfolio_fit_penalty: int = 2
+    board_scorecard_portfolio_growth_penalty: Decimal = Decimal("0.0020")
+    board_recovery_plan_reliability_automation_gain: int = 4
+    board_recovery_plan_reliability_knowledge_gain: int = 4
+    board_recovery_plan_reliability_sla_gain: int = 4
+    board_recovery_plan_team_energy_gain: int = 4
+    board_recovery_plan_team_morale_gain: int = 4
+    board_recovery_plan_team_attrition_relief: int = 5
     board_restructure_min_pressure: int = 10
     board_restructure_severance_per_employee: Decimal = Decimal("140.00")
     board_restructure_pressure_relief: int = 8
@@ -1603,8 +1631,13 @@ class BalanceConfig:
     support_program_focus_onboarding_bonus: int = 2
     support_program_focus_enterprise_bonus: int = 2
     support_program_focus_billing_bonus: int = 2
+    support_program_focus_lane_capacity_bonus: int = 6
     support_program_focus_mismatch_divisor: int = 8
     support_program_focus_mismatch_backlog_cap: int = 3
+    support_program_lane_overflow_divisor: int = 5
+    support_program_service_cost_per_lane_overflow: Decimal = Decimal("4.00")
+    support_program_lane_overflow_reputation_threshold: int = 8
+    support_program_lane_overflow_reputation_loss: int = 1
     support_program_queue_age_threshold: int = 3
     support_program_queue_age_satisfaction_loss: int = 2
     support_program_queue_age_churn_gain: int = 4
@@ -1801,6 +1834,25 @@ class BalanceConfig:
     partnership_premium_conflict_bonus: int = 2
     partnership_strained_user_penalty: int = 2
     partnership_strained_reputation_loss: int = 1
+    partnership_neglect_turn_threshold: int = 2
+    partnership_neglect_user_penalty: int = 3
+    partnership_neglect_risk_gain: int = 3
+    partnership_neglect_conflict_gain: int = 2
+    partnership_multi_channel_conflict_bonus: int = 2
+    partnership_expand_mode_user_bonus: int = 2
+    partnership_gtm_share_user_divisor: int = 20
+    partnership_product_share_risk_relief_divisor: int = 20
+    partnership_enablement_rev_share_relief: Decimal = Decimal("0.0100")
+    partnership_min_rev_share_by_channel: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "reseller": Decimal("0.1200"),
+            "integration": Decimal("0.1000"),
+            "marketplace": Decimal("0.1400"),
+        }
+    )
+    partnership_maturity_quality_gain_threshold: int = 12
+    partnership_revenue_milestone_rev_share_threshold: Decimal = Decimal("1600.00")
+    partnership_maturity_quality_gain: int = 1
     partnership_risk_strained_threshold: int = 55
     partnership_conflict_strained_threshold: int = 52
     partnership_pause_threshold: int = 78
@@ -1879,6 +1931,22 @@ class BalanceConfig:
     capital_plan_expand_confidence_penalty: int = 1
     capital_plan_conserve_covenant_relief: int = 1
     capital_plan_expand_investor_pressure_relief_cash_threshold: Decimal = Decimal("1200.00")
+    capital_plan_low_product_share_threshold: int = 30
+    capital_plan_high_gtm_share_threshold: int = 40
+    capital_plan_low_reserve_share_threshold: int = 25
+    capital_plan_gtm_without_channels_pressure_gain: int = 1
+    capital_plan_low_product_share_confidence_penalty: int = 1
+    capital_plan_support_reserve_covenant_penalty: int = 1
+    capital_plan_dilution_warning_threshold: Decimal = Decimal("0.2200")
+    capital_plan_venture_dilution_confidence_penalty: int = 2
+    capital_plan_expand_execution_bonus: int = 1
+    capital_plan_conserve_execution_bonus: int = 1
+
+    finance_forecast_conservative_expand_extra_drag: Decimal = Decimal("0.0600")
+    finance_forecast_conservative_conserve_relief: Decimal = Decimal("0.0300")
+    finance_forecast_aggressive_expand_bonus: Decimal = Decimal("0.0500")
+    finance_forecast_aggressive_conserve_penalty: Decimal = Decimal("0.0200")
+    finance_forecast_venture_volatility_drag: Decimal = Decimal("0.0300")
 
     event_bridge_round_weight: int = 10
     event_bridge_round_cooldown: int = 7

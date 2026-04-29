@@ -118,6 +118,8 @@ def calculate_cash_flow_forecast_scenarios(
     turn_history: list[TurnLedgerEntry],
     *,
     latest_net_cash_flow: Decimal,
+    finance: FinanceState | None = None,
+    capital_plan: CapitalPlan | None = None,
 ) -> tuple[ForecastScenarioSnapshot, ForecastScenarioSnapshot, ForecastScenarioSnapshot]:
     """Return base, conservative, and aggressive forecast snapshots."""
 
@@ -125,13 +127,35 @@ def calculate_cash_flow_forecast_scenarios(
         turn_history,
         latest_net_cash_flow=latest_net_cash_flow,
     )
+    conservative_drag = BALANCE.finance_forecast_conservative_drag
+    aggressive_relief = BALANCE.finance_forecast_aggressive_relief
+    if capital_plan is not None:
+        if capital_plan.mode.value == "expand":
+            conservative_drag += BALANCE.finance_forecast_conservative_expand_extra_drag
+            aggressive_relief += BALANCE.finance_forecast_aggressive_expand_bonus
+        elif capital_plan.mode.value == "conserve":
+            conservative_drag = max(
+                Decimal("0.0000"),
+                conservative_drag - BALANCE.finance_forecast_conservative_conserve_relief,
+            )
+            aggressive_relief = max(
+                Decimal("0.0000"),
+                aggressive_relief - BALANCE.finance_forecast_aggressive_conserve_penalty,
+            )
+    if (
+        finance is not None
+        and capital_plan is not None
+        and capital_plan.source_preference.value == "venture"
+        and finance.equity_dilution >= BALANCE.capital_plan_dilution_warning_threshold
+    ):
+        conservative_drag += BALANCE.finance_forecast_venture_volatility_drag
     conservative_forecast = _adjust_forecast(
         base_forecast,
-        drag=BALANCE.finance_forecast_conservative_drag,
+        drag=conservative_drag,
     )
     aggressive_forecast = _adjust_forecast(
         base_forecast,
-        drag=-BALANCE.finance_forecast_aggressive_relief,
+        drag=-aggressive_relief,
     )
     return (
         ForecastScenarioSnapshot(
@@ -335,6 +359,9 @@ def apply_end_of_turn_finance_drift(
     capital_plan: CapitalPlan | None = None,
     net_cash_flow: Decimal,
     turn_history: list[TurnLedgerEntry] | None = None,
+    technical_debt_load: int = 0,
+    active_channels: int = 0,
+    support_backlog: int = 0,
 ) -> FinanceTurnSummary:
     """Apply passive finance pressure changes after the turn resolves."""
 
@@ -364,6 +391,9 @@ def apply_end_of_turn_finance_drift(
             finance,
             capital_plan,
             latest_net_cash_flow=net_cash_flow,
+            technical_debt_load=technical_debt_load,
+            active_channels=active_channels,
+            support_backlog=support_backlog,
         )
         if capital_plan is not None
         else None

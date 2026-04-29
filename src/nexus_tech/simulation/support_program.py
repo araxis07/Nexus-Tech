@@ -40,10 +40,22 @@ class SupportProgramSummary:
     billing_ticket_pressure: int
     dominant_lane: SupportLaneFocus
     focus_mismatch_penalty: int
+    lane_overflow_pressure: int
     service_cost: Decimal
     reputation_delta: int
     morale_penalty: int
     summary: str
+
+
+@dataclass(frozen=True)
+class SupportLaneSnapshot:
+    """Lane-specific pressure versus staffed capacity."""
+
+    lane: SupportLaneFocus
+    pressure: int
+    capacity: int
+    overflow: int
+    account_count: int
 
 
 @dataclass(frozen=True)
@@ -169,7 +181,16 @@ def apply_end_of_turn_support_program(
         + ticket_relief
         + calculate_support_staff_capacity(state)
     )
+    lane_snapshots = calculate_support_lane_snapshots(
+        state,
+        customer_success_bonus=customer_success_bonus,
+        total_capacity=effective_capacity,
+    )
+    lane_overflow_pressure = sum(snapshot.overflow for snapshot in lane_snapshots.values())
     incoming_ticket_pressure = weighted_ticket_pressure + state.support_program.backlog_queue
+    incoming_ticket_pressure += (
+        lane_overflow_pressure // BALANCE.support_program_lane_overflow_divisor
+    )
     resolved_tickets = min(incoming_ticket_pressure, effective_capacity)
     deflected_tickets = min(total_open_tickets, ticket_relief + resolved_tickets)
     queue_increase = max(0, incoming_ticket_pressure - resolved_tickets)
@@ -214,6 +235,7 @@ def apply_end_of_turn_support_program(
         )
         + (Decimal(queue_age_pressure) * BALANCE.support_program_service_cost_per_queue_age)
         + (Decimal(focus_mismatch_penalty) * BALANCE.support_program_service_cost_per_queue_age)
+        + (Decimal(lane_overflow_pressure) * BALANCE.support_program_service_cost_per_lane_overflow)
     )
     state.support_program.service_cost_last_turn = service_cost
 
@@ -225,6 +247,8 @@ def apply_end_of_turn_support_program(
         >= BALANCE.support_program_triage_escalation_relief * 2
     ):
         reputation_delta = -BALANCE.support_program_backlog_reputation_loss
+    if lane_overflow_pressure >= BALANCE.support_program_lane_overflow_reputation_threshold:
+        reputation_delta -= BALANCE.support_program_lane_overflow_reputation_loss
     if staffing_gap >= BALANCE.support_program_staffing_gap_reputation_threshold:
         reputation_delta -= 1
     if queue_age_pressure >= BALANCE.support_program_queue_age_threshold:
@@ -258,6 +282,11 @@ def apply_end_of_turn_support_program(
         )
     elif dominant_lane is SupportLaneFocus.BILLING:
         summary = "Support is stable, but billing queues are now the main post-sale pressure."
+    elif lane_overflow_pressure > 0:
+        summary = (
+            f"{dominant_lane.value} support demand is outrunning lane capacity and queues "
+            "are compounding."
+        )
     elif staffing_gap > 0:
         summary = "Support demand is outrunning staffed capacity and enterprise pressure is rising."
     else:
@@ -280,6 +309,7 @@ def apply_end_of_turn_support_program(
         billing_ticket_pressure=billing_ticket_pressure,
         dominant_lane=dominant_lane,
         focus_mismatch_penalty=focus_mismatch_penalty,
+        lane_overflow_pressure=lane_overflow_pressure,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
@@ -338,9 +368,15 @@ def triage_support_backlog(state: GameState) -> SupportOpsActionSummary:
         if account.status is not CustomerAccountStatus.CHURNED
     ]
     improved_accounts = 0
+    lane_relief = {
+        SupportLaneFocus.ONBOARDING: 0,
+        SupportLaneFocus.ENTERPRISE: 0,
+        SupportLaneFocus.BILLING: 0,
+    }
     for account in accounts[:3]:
         if account.open_tickets <= 0 and account.sla_breach_risk <= 0:
             continue
+        lane = classify_account_support_lane(account)
         account.open_tickets = max(
             0,
             account.open_tickets - BALANCE.support_program_triage_ticket_relief,
@@ -352,7 +388,18 @@ def triage_support_backlog(state: GameState) -> SupportOpsActionSummary:
             account.failed_payment_risk - (BALANCE.support_program_triage_sla_relief // 2)
         )
         account.escalation_count = max(0, account.escalation_count - 1)
+        if lane is not SupportLaneFocus.BALANCED:
+            lane_relief[lane] += 1
         improved_accounts += 1
+
+    for lane, relieved_accounts in lane_relief.items():
+        if relieved_accounts <= 0:
+            continue
+        _apply_lane_program_relief(
+            state.support_program,
+            lane,
+            relieved_accounts * 2,
+        )
 
     return SupportOpsActionSummary(
         message=(
@@ -503,6 +550,7 @@ def route_support_escalation(
         )
         if account.support_tier is SupportTier.STANDARD and account.open_tickets > 6:
             account.support_tier = SupportTier.PRIORITY
+        _apply_lane_program_relief(state.support_program, SupportLaneFocus.BILLING, 4)
     elif lane is SupportLaneFocus.ENTERPRISE:
         if account.support_tier is SupportTier.STANDARD:
             account.support_tier = SupportTier.PRIORITY
@@ -527,6 +575,7 @@ def route_support_escalation(
             account.failed_payment_risk - (BALANCE.support_program_route_sla_relief // 2)
         )
         account.renewal_health = clamp_int(account.renewal_health + 4)
+        _apply_lane_program_relief(state.support_program, SupportLaneFocus.ENTERPRISE, 4)
     else:
         account.open_tickets = max(
             0,
@@ -544,6 +593,7 @@ def route_support_escalation(
         account.satisfaction = clamp_int(
             account.satisfaction + BALANCE.support_program_route_onboarding_satisfaction_gain
         )
+        _apply_lane_program_relief(state.support_program, SupportLaneFocus.ONBOARDING, 4)
     account.failed_payment_risk = clamp_int(
         account.failed_payment_risk - (BALANCE.support_program_route_sla_relief // 2)
     )
@@ -602,6 +652,83 @@ def calculate_support_staff_capacity(state: GameState) -> int:
     )
 
 
+def calculate_support_lane_snapshots(
+    state: GameState,
+    *,
+    customer_success_bonus: int = 0,
+    total_capacity: int | None = None,
+) -> dict[SupportLaneFocus, SupportLaneSnapshot]:
+    """Return lane-specific pressure, capacity, and overflow for dashboard and simulation."""
+
+    active_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    lane_pressures = {
+        SupportLaneFocus.ONBOARDING: 0,
+        SupportLaneFocus.ENTERPRISE: 0,
+        SupportLaneFocus.BILLING: 0,
+    }
+    lane_counts = {
+        SupportLaneFocus.ONBOARDING: 0,
+        SupportLaneFocus.ENTERPRISE: 0,
+        SupportLaneFocus.BILLING: 0,
+    }
+    for account in active_accounts:
+        pressures = _build_account_lane_pressures(account)
+        for lane, pressure in pressures.items():
+            lane_pressures[lane] += pressure
+        dominant_lane = classify_account_support_lane(account)
+        if dominant_lane is not SupportLaneFocus.BALANCED:
+            lane_counts[dominant_lane] += 1
+
+    if total_capacity is None:
+        ticket_relief, _ = calculate_support_program_relief(
+            state.support_program,
+            customer_success_bonus=customer_success_bonus,
+        )
+        total_capacity = (
+            BALANCE.support_program_base_capacity
+            + ticket_relief
+            + calculate_support_staff_capacity(state)
+        )
+
+    weights: dict[SupportLaneFocus, int] = {}
+    for lane in lane_pressures:
+        weights[lane] = max(1, lane_pressures[lane] + (lane_counts[lane] * 2))
+    if state.support_program.lane_focus is not SupportLaneFocus.BALANCED:
+        weights[state.support_program.lane_focus] += (
+            BALANCE.support_program_focus_lane_capacity_bonus
+        )
+
+    weight_total = sum(weights.values())
+    remaining_capacity = max(0, total_capacity)
+    snapshots: dict[SupportLaneFocus, SupportLaneSnapshot] = {}
+    ordered_lanes = sorted(
+        weights,
+        key=lambda lane: (weights[lane], lane_pressures[lane], lane_counts[lane]),
+        reverse=True,
+    )
+    for index, lane in enumerate(ordered_lanes):
+        if index == len(ordered_lanes) - 1:
+            lane_capacity = remaining_capacity
+        else:
+            lane_capacity = int((total_capacity * weights[lane]) / max(1, weight_total))
+            if lane_counts[lane] > 0 and total_capacity > 0:
+                lane_capacity = max(1, lane_capacity)
+            lane_capacity = min(remaining_capacity, lane_capacity)
+        remaining_capacity = max(0, remaining_capacity - lane_capacity)
+        snapshots[lane] = SupportLaneSnapshot(
+            lane=lane,
+            pressure=lane_pressures[lane],
+            capacity=lane_capacity,
+            overflow=max(0, lane_pressures[lane] - lane_capacity),
+            account_count=lane_counts[lane],
+        )
+    return snapshots
+
+
 def _focus_capacity_bonus(state: GameState) -> int:
     focus = state.support_program.lane_focus
     if focus is SupportLaneFocus.BALANCED:
@@ -631,6 +758,29 @@ def _calculate_support_focus_bonus(
         elif account_lane is focus and focus is SupportLaneFocus.BILLING:
             focus_bonus += BALANCE.support_program_focus_billing_bonus
     return focus_bonus
+
+
+def _apply_lane_program_relief(
+    support_program: SupportProgram,
+    lane: SupportLaneFocus,
+    relief: int,
+) -> None:
+    if lane is SupportLaneFocus.ONBOARDING:
+        support_program.onboarding_ticket_pressure = max(
+            0,
+            support_program.onboarding_ticket_pressure - relief,
+        )
+    elif lane is SupportLaneFocus.ENTERPRISE:
+        support_program.enterprise_ticket_pressure = max(
+            0,
+            support_program.enterprise_ticket_pressure - relief,
+        )
+    elif lane is SupportLaneFocus.BILLING:
+        support_program.billing_ticket_pressure = max(
+            0,
+            support_program.billing_ticket_pressure - relief,
+        )
+    support_program.backlog_queue = max(0, support_program.backlog_queue - max(1, relief // 2))
 
 
 def _calculate_focus_mismatch_penalty(
@@ -670,6 +820,14 @@ def _get_account_by_id(accounts: list[CustomerAccount], account_id) -> CustomerA
 def classify_account_support_lane(account: CustomerAccount) -> SupportLaneFocus:
     """Classify the dominant lane creating pressure for one account."""
 
+    lane_pressures = _build_account_lane_pressures(account)
+    lane, pressure = max(lane_pressures.items(), key=lambda item: item[1])
+    if pressure <= 0:
+        return SupportLaneFocus.BALANCED
+    return lane
+
+
+def _build_account_lane_pressures(account: CustomerAccount) -> dict[SupportLaneFocus, int]:
     billing_pressure = (
         (account.invoice_risk // BALANCE.support_program_billing_pressure_invoice_divisor)
         + (
@@ -677,6 +835,7 @@ def classify_account_support_lane(account: CustomerAccount) -> SupportLaneFocus:
             // BALANCE.support_program_billing_pressure_failed_payment_divisor
         )
         + (account.dunning_steps * BALANCE.support_program_billing_pressure_dunning_weight)
+        + (account.open_tickets // 2)
     )
     enterprise_pressure = 0
     if account.segment.value == "enterprise" or account.support_tier is SupportTier.WHITE_GLOVE:
@@ -697,15 +856,11 @@ def classify_account_support_lane(account: CustomerAccount) -> SupportLaneFocus:
         // 10
         + max(0, account.support_load - 22) // 6
     )
-    lane_pressures = {
+    return {
         SupportLaneFocus.BILLING: billing_pressure,
         SupportLaneFocus.ENTERPRISE: enterprise_pressure,
         SupportLaneFocus.ONBOARDING: onboarding_pressure,
     }
-    lane, pressure = max(lane_pressures.items(), key=lambda item: item[1])
-    if pressure <= 0:
-        return SupportLaneFocus.BALANCED
-    return lane
 
 
 def _calculate_account_support_severity(account: CustomerAccount) -> int:

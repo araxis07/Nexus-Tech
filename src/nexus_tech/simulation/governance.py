@@ -10,11 +10,15 @@ from nexus_tech.domain.models import (
     BoardAsk,
     BoardDirective,
     BoardResolution,
+    CapitalPlanMode,
     GameState,
     LifecycleStage,
+    RoadmapFocus,
+    SupportLaneFocus,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.customers import CustomerTurnSummary
 from nexus_tech.simulation.operations import OperationsSummary
 from nexus_tech.simulation.support import clamp_int, clamp_rate
@@ -114,6 +118,7 @@ def apply_end_of_turn_governance(
     board_review_happened = resolved_turn % BALANCE.board_review_interval == 0
     board_ask_met = _board_ask_met(state, finance.active_board_ask, burn_multiple)
     board_resolution_triggered = False
+    scorecard_consequence_summary = ""
     if finance.board_recovery_turns_remaining > 0:
         recovery_met = _board_ask_met(state, finance.board_recovery_focus, burn_multiple)
         if recovery_met:
@@ -171,6 +176,12 @@ def apply_end_of_turn_governance(
             )
         else:
             finance.restructuring_pressure = clamp_int(finance.restructuring_pressure - 1)
+        (
+            scorecard_consequence_summary,
+            scorecard_resolution_triggered,
+        ) = _apply_board_scorecard_consequences(state)
+        if scorecard_resolution_triggered:
+            board_resolution_triggered = True
 
     finance.board_pressure = clamp_int(finance.board_pressure + board_pressure_delta)
     finance.governance_risk = clamp_int(finance.governance_risk + governance_risk_delta)
@@ -299,6 +310,7 @@ def apply_end_of_turn_governance(
             board_resolution_miss_streak=finance.board_resolution_miss_streak,
             recovery_focus=finance.board_recovery_focus,
             recovery_turns_remaining=finance.board_recovery_turns_remaining,
+            scorecard_consequence_summary=scorecard_consequence_summary,
             tradeoff_summary=tradeoff_summary,
         ),
     )
@@ -524,6 +536,67 @@ def start_board_recovery_plan(state: GameState) -> BoardResponseSummary:
         state.company.cash_on_hand - BALANCE.board_recovery_plan_cost
     )
     finance.board_recovery_focus = finance.active_board_ask
+    track_summary = ""
+    if finance.board_recovery_focus is BoardAsk.PROFITABILITY:
+        state.capital_plan = get_capital_plan_profile(
+            mode=CapitalPlanMode.CONSERVE,
+            source_preference=state.capital_plan.source_preference,
+        )
+        track_summary = " Capital plan shifted to conserve cash."
+    elif finance.board_recovery_focus is BoardAsk.RELIABILITY:
+        dominant_lane = _get_dominant_pressure_lane(
+            state.support_program.onboarding_ticket_pressure,
+            state.support_program.enterprise_ticket_pressure,
+            state.support_program.billing_ticket_pressure,
+        )
+        if dominant_lane is not None:
+            state.support_program.lane_focus = dominant_lane
+        state.support_program.automation_level = clamp_int(
+            state.support_program.automation_level
+            + BALANCE.board_recovery_plan_reliability_automation_gain
+        )
+        state.support_program.knowledge_base_level = clamp_int(
+            state.support_program.knowledge_base_level
+            + BALANCE.board_recovery_plan_reliability_knowledge_gain
+        )
+        state.support_program.sla_target = clamp_int(
+            state.support_program.sla_target + BALANCE.board_recovery_plan_reliability_sla_gain
+        )
+        track_summary = (
+            f" Support focus shifted to {state.support_program.lane_focus.value} with "
+            "extra reliability tooling."
+        )
+    elif finance.board_recovery_focus is BoardAsk.TEAM_HEALTH:
+        for employee in state.employees:
+            employee.energy = clamp_int(
+                employee.energy + BALANCE.board_recovery_plan_team_energy_gain
+            )
+            employee.morale = clamp_int(
+                employee.morale + BALANCE.board_recovery_plan_team_morale_gain
+            )
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk - BALANCE.board_recovery_plan_team_attrition_relief
+            )
+        track_summary = " Team recovery budget is now protecting morale and attrition."
+    else:
+        state.roadmap_focus = RoadmapFocus.PORTFOLIO_CONSOLIDATION
+        strongest_product = max(
+            (product for product in state.products if product.is_active),
+            key=lambda product: (product.market_fit, product.quality, product.user_count),
+            default=None,
+        )
+        for product in state.products:
+            if not product.is_active:
+                continue
+            if strongest_product is not None and product.id == strongest_product.id:
+                product.quality = clamp_int(product.quality + 1)
+                product.technical_debt = clamp_int(product.technical_debt - 1)
+                continue
+            product.acquisition_rate = clamp_rate(
+                product.acquisition_rate
+                - BALANCE.board_tradeoff_portfolio_focus_secondary_growth_penalty
+            )
+        track_summary = " Roadmap shifted to portfolio consolidation."
     finance.board_recovery_turns_remaining = BALANCE.board_recovery_turns
     finance.board_pressure = clamp_int(
         finance.board_pressure - BALANCE.board_recovery_pressure_relief
@@ -547,6 +620,7 @@ def start_board_recovery_plan(state: GameState) -> BoardResponseSummary:
             f"{finance.board_recovery_focus.value.replace('_', ' ')}. "
             f"Cash -{BALANCE.board_recovery_plan_cost}, "
             f"{finance.board_recovery_turns_remaining} turns committed."
+            f"{track_summary}"
         )
     )
 
@@ -804,6 +878,99 @@ def get_governance_tradeoff_focus(state: GameState) -> BoardAsk | None:
     return None
 
 
+def _apply_board_scorecard_consequences(state: GameState) -> tuple[str, bool]:
+    finance = state.finance
+    target_scores = {
+        BoardAsk.PROFITABILITY: BALANCE.board_score_profitability_target,
+        BoardAsk.RELIABILITY: BALANCE.board_score_reliability_target,
+        BoardAsk.TEAM_HEALTH: BALANCE.board_score_team_health_target,
+        BoardAsk.PORTFOLIO_FOCUS: BALANCE.board_score_portfolio_focus_target,
+    }
+    score_map = {
+        BoardAsk.PROFITABILITY: finance.board_profitability_score,
+        BoardAsk.RELIABILITY: finance.board_reliability_score,
+        BoardAsk.TEAM_HEALTH: finance.board_team_health_score,
+        BoardAsk.PORTFOLIO_FOCUS: finance.board_portfolio_focus_score,
+    }
+    summary_parts: list[str] = []
+    force_resolution = False
+
+    profitability_gap = max(
+        0,
+        target_scores[BoardAsk.PROFITABILITY] - score_map[BoardAsk.PROFITABILITY],
+    )
+    if profitability_gap >= BALANCE.board_scorecard_severe_gap_threshold:
+        for product in state.products:
+            if product.is_active:
+                product.acquisition_rate = clamp_rate(
+                    product.acquisition_rate - BALANCE.board_scorecard_profitability_growth_penalty
+                )
+        finance.board_pressure = clamp_int(
+            finance.board_pressure + BALANCE.board_scorecard_profitability_pressure_gain
+        )
+        summary_parts.append("Profitability score forced slower growth pacing.")
+        force_resolution = True
+
+    reliability_gap = max(
+        0,
+        target_scores[BoardAsk.RELIABILITY] - score_map[BoardAsk.RELIABILITY],
+    )
+    if reliability_gap >= BALANCE.board_scorecard_severe_gap_threshold:
+        state.support_program.backlog_queue += BALANCE.board_scorecard_reliability_backlog_penalty
+        state.support_program.escalation_queue += (
+            BALANCE.board_scorecard_reliability_escalation_penalty
+        )
+        fragile_accounts = sorted(
+            (account for account in state.customer_accounts if account.status.value != "churned"),
+            key=lambda account: (account.sla_breach_risk, account.open_tickets, account.churn_risk),
+            reverse=True,
+        )
+        for account in fragile_accounts[:2]:
+            account.satisfaction = clamp_int(account.satisfaction - 1)
+            account.churn_risk = clamp_int(account.churn_risk + 2)
+        summary_parts.append("Reliability score pushed more support backlog into the queue.")
+        force_resolution = True
+
+    team_gap = max(0, target_scores[BoardAsk.TEAM_HEALTH] - score_map[BoardAsk.TEAM_HEALTH])
+    if team_gap >= BALANCE.board_scorecard_severe_gap_threshold:
+        for employee in state.employees:
+            employee.energy = clamp_int(employee.energy - BALANCE.board_scorecard_team_energy_loss)
+            employee.morale = clamp_int(employee.morale - BALANCE.board_scorecard_team_morale_loss)
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk + BALANCE.board_scorecard_team_attrition_gain
+            )
+        summary_parts.append("Team-health score raised burnout and attrition pressure.")
+        force_resolution = True
+
+    focus_gap = max(
+        0,
+        target_scores[BoardAsk.PORTFOLIO_FOCUS] - score_map[BoardAsk.PORTFOLIO_FOCUS],
+    )
+    if focus_gap >= BALANCE.board_scorecard_severe_gap_threshold:
+        strongest_product = max(
+            (product for product in state.products if product.is_active),
+            key=lambda product: (product.market_fit, product.quality, product.user_count),
+            default=None,
+        )
+        for product in state.products:
+            if (
+                not product.is_active
+                or strongest_product is None
+                or product.id == strongest_product.id
+            ):
+                continue
+            product.market_fit = clamp_int(
+                product.market_fit - BALANCE.board_scorecard_portfolio_fit_penalty
+            )
+            product.acquisition_rate = clamp_rate(
+                product.acquisition_rate - BALANCE.board_scorecard_portfolio_growth_penalty
+            )
+        summary_parts.append("Portfolio-focus score penalized weaker side bets.")
+        force_resolution = True
+
+    return " ".join(summary_parts), force_resolution
+
+
 def _apply_forced_tradeoff(state: GameState, board_ask: BoardAsk) -> str:
     if board_ask is BoardAsk.PROFITABILITY:
         for product in state.products:
@@ -815,14 +982,18 @@ def _apply_forced_tradeoff(state: GameState, board_ask: BoardAsk) -> str:
         return "Forced trade-off: cash discipline is suppressing growth bets."
 
     if board_ask is BoardAsk.RELIABILITY:
+        backlog_relief = BALANCE.board_tradeoff_reliability_backlog_relief
+        escalation_relief = BALANCE.board_tradeoff_reliability_escalation_relief
+        if state.finance.board_resolution_due or state.finance.governance_crisis_active:
+            backlog_relief += BALANCE.board_scorecard_reliability_backlog_penalty
+            escalation_relief += BALANCE.board_scorecard_reliability_escalation_penalty
         state.support_program.backlog_queue = max(
             0,
-            state.support_program.backlog_queue - BALANCE.board_tradeoff_reliability_backlog_relief,
+            state.support_program.backlog_queue - backlog_relief,
         )
         state.support_program.escalation_queue = max(
             0,
-            state.support_program.escalation_queue
-            - BALANCE.board_tradeoff_reliability_escalation_relief,
+            state.support_program.escalation_queue - escalation_relief,
         )
         riskiest_product = max(
             (product for product in state.products if product.is_active),
@@ -903,6 +1074,7 @@ def _build_governance_summary(
     board_resolution_miss_streak: int,
     recovery_focus: BoardAsk,
     recovery_turns_remaining: int,
+    scorecard_consequence_summary: str,
     tradeoff_summary: str,
 ) -> str:
     scorecard_summary = (
@@ -924,6 +1096,9 @@ def _build_governance_summary(
             f" Recovery plan: {recovery_focus.value.replace('_', ' ')} "
             f"for {recovery_turns_remaining} more turn(s)."
         )
+    scorecard_consequence_line = (
+        f" {scorecard_consequence_summary}" if scorecard_consequence_summary else ""
+    )
     tradeoff_line = f" {tradeoff_summary}" if tradeoff_summary else ""
     resolution_summary = ""
     if board_resolution_due:
@@ -939,6 +1114,7 @@ def _build_governance_summary(
             f"{crisis_summary}"
             f"{resolution_summary}"
             f"{recovery_summary}"
+            f"{scorecard_consequence_line}"
             f"{tradeoff_line}"
         )
     if board_review_happened:
@@ -951,6 +1127,7 @@ def _build_governance_summary(
             f"{crisis_summary}"
             f"{resolution_summary}"
             f"{recovery_summary}"
+            f"{scorecard_consequence_line}"
             f"{tradeoff_line}"
         )
     return (
@@ -961,5 +1138,28 @@ def _build_governance_summary(
         f"{crisis_summary}"
         f"{resolution_summary}"
         f"{recovery_summary}"
+        f"{scorecard_consequence_line}"
         f"{tradeoff_line}"
     )
+
+
+def _get_dominant_pressure_lane(
+    onboarding_pressure: int,
+    enterprise_pressure: int,
+    billing_pressure: int,
+) -> SupportLaneFocus | None:
+    lane, pressure = max(
+        {
+            "onboarding": onboarding_pressure,
+            "enterprise": enterprise_pressure,
+            "billing": billing_pressure,
+        }.items(),
+        key=lambda item: item[1],
+    )
+    if pressure <= 0:
+        return None
+    return {
+        "onboarding": SupportLaneFocus.ONBOARDING,
+        "enterprise": SupportLaneFocus.ENTERPRISE,
+        "billing": SupportLaneFocus.BILLING,
+    }[lane]

@@ -8,13 +8,14 @@ from uuid import UUID
 
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
+    CapitalPlanMode,
     GameState,
     PartnerChannel,
     PartnershipDeal,
     PartnershipStatus,
     Product,
 )
-from nexus_tech.domain.money import format_money, quantize_money
+from nexus_tech.domain.money import format_money, quantize_money, quantize_rate
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
 from nexus_tech.simulation.support import clamp_int
@@ -103,6 +104,7 @@ def create_partnership(
         enablement_level=clamp_int(BALANCE.partnership_base_enablement_by_channel[channel.value]),
         rev_share_rate=BALANCE.partnership_base_rev_share_by_channel[channel.value],
         started_turn=state.company.current_turn,
+        last_review_turn=state.company.current_turn,
         summary=f"Opened from {product.name} into the {channel.value} channel.",
     )
     state.partnerships.append(partnership)
@@ -129,6 +131,11 @@ def invest_in_partner_enablement(
     )
     partnership.quality = clamp_int(
         partnership.quality + BALANCE.partnership_enablement_quality_gain
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(partnership.rev_share_rate - BALANCE.partnership_enablement_rev_share_relief),
     )
     partnership.risk = clamp_int(partnership.risk - BALANCE.partnership_enablement_risk_relief)
     partnership.conflict_pressure = clamp_int(
@@ -159,10 +166,21 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
     sourced_users = 0
     service_cost = ZERO_MONEY
     reputation_delta = 0
+    active_channel_count_by_product = {
+        product.id: sum(
+            1
+            for partnership in state.partnerships
+            if partnership.product_id == product.id
+            and partnership.status is not PartnershipStatus.PAUSED
+        )
+        for product in state.products
+    }
 
     for partnership in state.partnerships:
         product = _get_product_by_id(state.products, partnership.product_id)
-        partnership.last_review_turn = state.company.current_turn
+        neglected_turns = state.company.current_turn - (
+            partnership.last_review_turn or partnership.started_turn
+        )
 
         if not product.is_active:
             partnership.status = PartnershipStatus.PAUSED
@@ -188,15 +206,31 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
                 partnership.status = PartnershipStatus.STRAINED
             continue
 
+        capital_bonus = 0
+        if state.capital_plan.mode is CapitalPlanMode.EXPAND:
+            capital_bonus += BALANCE.partnership_expand_mode_user_bonus
+        capital_bonus += (
+            state.capital_plan.go_to_market_share // BALANCE.partnership_gtm_share_user_divisor
+        )
         user_gain = max(
             0,
             BALANCE.partnership_base_user_gain_by_channel[partnership.channel.value]
             + (partnership.enablement_level // BALANCE.partnership_enablement_user_bonus_divisor)
             + (product.market_fit // BALANCE.partnership_market_fit_user_bonus_divisor)
             + (product.quality // BALANCE.partnership_quality_user_bonus_divisor)
+            + capital_bonus
             - (product.bug_level // BALANCE.partnership_bug_user_penalty_divisor)
             - (partnership.conflict_pressure // 25),
         )
+        if neglected_turns > BALANCE.partnership_neglect_turn_threshold:
+            user_gain = max(
+                0,
+                user_gain
+                - (
+                    (neglected_turns - BALANCE.partnership_neglect_turn_threshold)
+                    * BALANCE.partnership_neglect_user_penalty
+                ),
+            )
         if partnership.status is PartnershipStatus.STRAINED:
             user_gain = max(0, user_gain - BALANCE.partnership_strained_user_penalty)
 
@@ -229,6 +263,10 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
             + product.technical_debt // BALANCE.partnership_debt_risk_divisor
             - product.quality // BALANCE.partnership_quality_risk_relief_divisor
             - partnership.enablement_level // 30
+            - (
+                state.capital_plan.product_investment_share
+                // BALANCE.partnership_product_share_risk_relief_divisor
+            )
         )
         conflict_delta = BALANCE.partnership_channel_conflict_gain[partnership.channel.value]
         if product.pricing_tier.value == "premium":
@@ -236,11 +274,44 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
         conflict_delta += BALANCE.partnership_packaging_conflict_bonus[
             product.packaging_strategy.value
         ]
+        conflict_delta += (
+            max(
+                0,
+                active_channel_count_by_product.get(product.id, 1) - 1,
+            )
+            * BALANCE.partnership_multi_channel_conflict_bonus
+        )
+        if neglected_turns > BALANCE.partnership_neglect_turn_threshold:
+            risk_delta += (
+                neglected_turns - BALANCE.partnership_neglect_turn_threshold
+            ) * BALANCE.partnership_neglect_risk_gain
+            conflict_delta += (
+                neglected_turns - BALANCE.partnership_neglect_turn_threshold
+            ) * BALANCE.partnership_neglect_conflict_gain
         if partnership.status is PartnershipStatus.STRAINED:
             conflict_delta += 1
 
         partnership.risk = clamp_int(partnership.risk + risk_delta)
         partnership.conflict_pressure = clamp_int(partnership.conflict_pressure + conflict_delta)
+        if (
+            user_gain >= BALANCE.partnership_maturity_quality_gain_threshold
+            and partnership.risk < BALANCE.partnership_risk_strained_threshold
+            and partnership.conflict_pressure < BALANCE.partnership_conflict_strained_threshold
+        ):
+            partnership.quality = clamp_int(
+                partnership.quality + BALANCE.partnership_maturity_quality_gain
+            )
+        if (
+            partnership.sourced_revenue >= BALANCE.partnership_revenue_milestone_rev_share_threshold
+            and partnership.rev_share_rate
+            > BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+        ):
+            partnership.rev_share_rate = max(
+                BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value],
+                quantize_rate(
+                    partnership.rev_share_rate - BALANCE.partnership_enablement_rev_share_relief
+                ),
+            )
         previous_status = partnership.status
         if (
             partnership.risk >= BALANCE.partnership_pause_threshold

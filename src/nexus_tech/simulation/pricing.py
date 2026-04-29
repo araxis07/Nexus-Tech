@@ -141,12 +141,10 @@ def get_packaging_profile(packaging_strategy: PackagingStrategy) -> PackagingPro
     return _PACKAGING_PROFILES[packaging_strategy]
 
 
-def calculate_effective_revenue_per_user(product: Product) -> Decimal:
-    """Return revenue per user after pricing-tier modifiers."""
+def calculate_catalog_revenue_multiplier(product: Product) -> Decimal:
+    """Return the revenue lift created by package and add-on catalog depth."""
 
-    pricing_profile = get_pricing_profile(product.pricing_tier)
-    packaging_profile = get_packaging_profile(product.packaging_strategy)
-    catalog_multiplier = quantize_rate(
+    return quantize_rate(
         Decimal("1.0000")
         + (
             Decimal(product.package_catalog_depth)
@@ -154,6 +152,31 @@ def calculate_effective_revenue_per_user(product: Product) -> Decimal:
         )
         + (Decimal(product.add_on_catalog_depth) * BALANCE.add_on_catalog_revenue_multiplier_step)
     )
+
+
+def calculate_catalog_protection_score(product: Product) -> int:
+    """Return how much packaging depth protects against pricing and churn shock."""
+
+    return (product.package_catalog_depth // BALANCE.price_increase_catalog_protection_divisor) + (
+        product.add_on_catalog_depth // BALANCE.price_increase_catalog_protection_divisor
+    )
+
+
+def calculate_catalog_complexity_penalty(product: Product) -> Decimal:
+    """Return the support-cost drag created by a deeper monetization surface."""
+
+    depth = product.package_catalog_depth + product.add_on_catalog_depth
+    return quantize_rate(
+        Decimal("1.0000") + (Decimal(depth) * BALANCE.packaging_support_cost_depth_step)
+    )
+
+
+def calculate_effective_revenue_per_user(product: Product) -> Decimal:
+    """Return revenue per user after pricing-tier modifiers."""
+
+    pricing_profile = get_pricing_profile(product.pricing_tier)
+    packaging_profile = get_packaging_profile(product.packaging_strategy)
+    catalog_multiplier = calculate_catalog_revenue_multiplier(product)
     return quantize_money(
         product.revenue_per_user
         * pricing_profile.revenue_multiplier
@@ -167,7 +190,12 @@ def get_pricing_acquisition_bonus(product: Product) -> int:
 
     pricing_profile = get_pricing_profile(product.pricing_tier)
     packaging_profile = get_packaging_profile(product.packaging_strategy)
-    return pricing_profile.acquisition_bonus + packaging_profile.acquisition_bonus
+    return (
+        pricing_profile.acquisition_bonus
+        + packaging_profile.acquisition_bonus
+        + (product.package_catalog_depth // BALANCE.packaging_catalog_acquisition_depth_divisor)
+        + (product.add_on_catalog_depth // BALANCE.add_on_catalog_acquisition_depth_divisor)
+    )
 
 
 def get_pricing_churn_modifier(product: Product) -> Decimal:
@@ -175,13 +203,21 @@ def get_pricing_churn_modifier(product: Product) -> Decimal:
 
     pricing_profile = get_pricing_profile(product.pricing_tier)
     packaging_profile = get_packaging_profile(product.packaging_strategy)
-    return quantize_rate(pricing_profile.churn_modifier + packaging_profile.churn_modifier)
+    churn_relief = Decimal(
+        product.package_catalog_depth // BALANCE.packaging_churn_relief_depth_divisor
+    ) * Decimal("0.0010")
+    return quantize_rate(
+        pricing_profile.churn_modifier + packaging_profile.churn_modifier - churn_relief
+    )
 
 
 def get_packaging_support_cost_multiplier(product: Product) -> Decimal:
     """Return the operating-cost multiplier created by packaging complexity."""
 
-    return get_packaging_profile(product.packaging_strategy).support_cost_multiplier
+    return quantize_rate(
+        get_packaging_profile(product.packaging_strategy).support_cost_multiplier
+        * calculate_catalog_complexity_penalty(product)
+    )
 
 
 def get_packaging_add_on_bonus(product: Product) -> int:
@@ -218,11 +254,19 @@ def determine_target_subscription_package(
 ) -> SubscriptionPackage:
     """Return the best-fit package for one account under the current catalog depth."""
 
+    package_readiness = (
+        product.package_catalog_depth
+        + (product.add_on_catalog_depth // 2)
+        + (1 if account.plan_tier is PricingTier.PREMIUM else 0)
+        + (1 if account.expansion_potential >= 65 else 0)
+        + (1 if account.renewal_health >= 68 else 0)
+    )
     if product.packaging_strategy is PackagingStrategy.SUITE:
         if (
             account.segment.value == "enterprise"
             or account.support_tier is not SupportTier.STANDARD
-            or product.package_catalog_depth >= 3
+            or product.package_catalog_depth >= BALANCE.package_catalog_enterprise_upgrade_threshold
+            or package_readiness >= 4
         ):
             return SubscriptionPackage.ENTERPRISE_SUITE
         return SubscriptionPackage.GROWTH
@@ -231,9 +275,14 @@ def determine_target_subscription_package(
             account.segment.value == "enterprise"
             or account.plan_tier is PricingTier.PREMIUM
             or account.add_on_count >= 2
+            or package_readiness >= 4
         ):
             return SubscriptionPackage.ENTERPRISE_SUITE
-        if product.add_on_catalog_depth >= 1 or account.plan_tier is not PricingTier.BUDGET:
+        if (
+            product.add_on_catalog_depth >= BALANCE.add_on_catalog_growth_upgrade_threshold
+            or account.plan_tier is not PricingTier.BUDGET
+            or package_readiness >= 2
+        ):
             return SubscriptionPackage.GROWTH
         return SubscriptionPackage.STARTER
     if account.segment.value == "enterprise" and product.package_catalog_depth >= 2:
@@ -317,6 +366,7 @@ def apply_run_price_increase(
         multiplier += BALANCE.price_increase_suite_bonus
 
     product.revenue_per_user = quantize_money(product.revenue_per_user * multiplier)
+    catalog_protection = calculate_catalog_protection_score(product)
     market_fit_penalty = max(
         1,
         BALANCE.price_increase_market_fit_penalty_by_segment[product.target_segment.value]
@@ -338,24 +388,32 @@ def apply_run_price_increase(
             1,
             BALANCE.price_increase_account_satisfaction_loss_by_segment[account.segment.value]
             - (1 if account.annual_prepay else 0)
-            - (1 if product.packaging_strategy is PackagingStrategy.SUITE else 0),
+            - (1 if product.packaging_strategy is PackagingStrategy.SUITE else 0)
+            - catalog_protection,
         )
         account.satisfaction = clamp_int(account.satisfaction - satisfaction_loss)
         account.renewal_health = clamp_int(
-            account.renewal_health - BALANCE.price_increase_account_renewal_health_loss
+            account.renewal_health
+            - max(
+                1,
+                BALANCE.price_increase_account_renewal_health_loss - catalog_protection,
+            )
         )
         account.invoice_risk = clamp_int(
-            account.invoice_risk + BALANCE.price_increase_account_invoice_risk_gain
+            account.invoice_risk
+            + max(1, BALANCE.price_increase_account_invoice_risk_gain - catalog_protection)
         )
         account.churn_risk = clamp_int(
-            account.churn_risk + BALANCE.price_increase_account_churn_risk_gain
+            account.churn_risk
+            + max(1, BALANCE.price_increase_account_churn_risk_gain - catalog_protection)
         )
 
     return PriceIncreaseSummary(
         message=(
             f"Raised pricing on {product.name}. Base ARPU is now "
             f"{format_money(product.revenue_per_user)} with market fit "
-            f"-{market_fit_penalty} and {adjusted_accounts} account(s) repriced."
+            f"-{market_fit_penalty}, catalog protection {catalog_protection}, "
+            f"and {adjusted_accounts} account(s) repriced."
         )
     )
 
@@ -368,6 +426,17 @@ def apply_run_add_on_campaign(
 
     if product.packaging_strategy is PackagingStrategy.STREAMLINED:
         raise ValueError("Streamlined products do not have enough add-on surface for a campaign.")
+    existing_surface = any(
+        account.product_id == product.id
+        and account.status is not CustomerAccountStatus.CHURNED
+        and account.add_on_count > 0
+        for account in customer_accounts
+    )
+    if (
+        product.add_on_catalog_depth < BALANCE.add_on_campaign_min_catalog_depth
+        and not existing_surface
+    ):
+        raise ValueError("Expand the add-on catalog before running a broader add-on campaign.")
 
     converted_accounts = 0
     contract_gain = quantize_money(
@@ -377,7 +446,7 @@ def apply_run_add_on_campaign(
     for account in customer_accounts:
         if account.product_id != product.id or account.status is CustomerAccountStatus.CHURNED:
             continue
-        if account.satisfaction < 60:
+        if account.satisfaction < 60 or account.expansion_potential < 40:
             continue
         account.add_on_count += BALANCE.add_on_campaign_add_on_gain
         account.contract_value = quantize_money(account.contract_value + contract_gain)
