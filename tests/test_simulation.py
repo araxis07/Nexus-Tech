@@ -129,6 +129,7 @@ from nexus_tech.simulation.late_game import (
 )
 from nexus_tech.simulation.meta_progression import (
     build_archive_comparison,
+    build_unlock_catalog,
     summarize_meta_progression,
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
@@ -2000,6 +2001,8 @@ def test_exit_evaluation_can_classify_independent_outcome() -> None:
         ExitOutcome.STRATEGIC_ACQUISITION,
         ExitOutcome.IPO_READY,
     }
+    assert evaluation.ending_variant
+    assert evaluation.outcome_tags
     assert resolution.state.exit_summary
 
 
@@ -2380,9 +2383,11 @@ def test_new_event_ids_are_registered() -> None:
     assert "board_reckoning" in registry_ids
     assert "partner_qbr" in registry_ids
     assert "partner_breakdown" in registry_ids
+    assert "partner_renegotiation" in registry_ids
     assert "board_recovery_window" in registry_ids
     assert "capital_market_freeze" in registry_ids
     assert "succession_gap" in registry_ids
+    assert "strategic_crossroads" in registry_ids
 
 
 def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
@@ -4789,6 +4794,9 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
     assert planner.horizon_turns == 6
     assert planner.conservative_end_cash <= planner.aggressive_end_cash
     assert planner.recommended_posture in {"conserve", "balanced", "expand"}
+    assert planner.reserve_break_risk in {"critical", "high", "elevated", "controlled"}
+    assert planner.allocation_signal
+    assert len(planner.scenario_compare) == 3
     assert planner.capital_alert
     assert planner.summary
 
@@ -4846,6 +4854,33 @@ def test_exit_interest_event_rewards_strong_company_signal() -> None:
     assert outcome.state.company.cash_on_hand > state.company.cash_on_hand
     assert outcome.state.company.reputation >= state.company.reputation
     assert outcome.history_entry.event_id == "exit_interest"
+
+
+def test_strategic_crossroads_event_can_formalize_late_game_path() -> None:
+    product = make_product(
+        "Crossroads Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=240,
+        quality=76,
+        market_fit=74,
+    )
+    state = make_state(product, cash_on_hand=Decimal("18400.00"), current_turn=11)
+    state.company.reputation = 74
+    state.finance.board_confidence = 77
+    state.finance.board_score = 73
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "strategic_crossroads"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "formalize_process")
+
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.history_entry.event_id == "strategic_crossroads"
 
 
 def test_create_partnership_action_adds_channel_and_cost() -> None:
@@ -4927,6 +4962,42 @@ def test_partner_breakdown_event_can_push_channel_into_recovery() -> None:
     assert outcome.state.partnerships[0].status is PartnershipStatus.RECOVERY
     assert outcome.state.partnerships[0].conflict_pressure < partnership.conflict_pressure
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_partner_renegotiation_event_trades_margin_for_stability() -> None:
+    product = make_product("Channel Terms", market_fit=66, quality=69, bug_level=14)
+    partnership = PartnershipDeal(
+        name="Channel Terms Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.STRAINED,
+        quality=60,
+        risk=48,
+        conflict_pressure=44,
+        enablement_level=34,
+        sourced_revenue=Decimal("1200.00"),
+        rev_share_rate=Decimal("0.1600"),
+    )
+    state = make_state(product, partnerships=[partnership], cash_on_hand=Decimal("6800.00"))
+    state.pending_event = PendingEvent(
+        event_id="partner_renegotiation",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Partner Renegotiation",
+        description="Test event",
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=5,
+        target_product_id=product.id,
+        options=[
+            EventOption(id="concede_margin", label="Concede", description="Concede"),
+            EventOption(id="hold_line", label="Hold", description="Hold"),
+        ],
+    )
+
+    outcome = resolve_pending_event(state, "concede_margin")
+
+    assert outcome.state.partnerships[0].status is PartnershipStatus.RECOVERY
+    assert outcome.state.partnerships[0].rev_share_rate > partnership.rev_share_rate
+    assert outcome.state.partnerships[0].conflict_pressure < partnership.conflict_pressure
 
 
 def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
@@ -5015,6 +5086,32 @@ def test_partnership_neglect_and_channel_crowding_raise_conflict_pressure() -> N
     assert state.partnerships[0].conflict_pressure > 18
     assert state.partnerships[1].risk > 18
     assert calculate_partnership_fatigue(state, state.partnerships[0]) > 0
+
+
+def test_renegotiate_partnership_action_trades_margin_for_stability() -> None:
+    product = make_product("Lane Terms", market_fit=67, quality=70, bug_level=12)
+    partnership = PartnershipDeal(
+        name="Lane Terms Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.STRAINED,
+        quality=63,
+        risk=46,
+        conflict_pressure=43,
+        enablement_level=36,
+        rev_share_rate=Decimal("0.1400"),
+    )
+    state = make_state(product, partnerships=[partnership], cash_on_hand=Decimal("7200.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.RENEGOTIATE_PARTNERSHIP,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    assert outcome.state.partnerships[0].rev_share_rate > Decimal("0.1400")
+    assert outcome.state.partnerships[0].conflict_pressure < 43
+    assert outcome.state.company.cash_on_hand < Decimal("7200.00")
 
 
 def test_set_capital_plan_action_updates_state() -> None:
@@ -5201,6 +5298,41 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert summary.next_reward
 
 
+def test_unlock_catalog_surfaces_exact_reward_metadata() -> None:
+    archives = [
+        RunArchiveSummary(
+            archive_key="run-1",
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_title="Founder Journey",
+            completed_turn=12,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="ipo_ready",
+            total_score=236,
+            score_tier="strong",
+            campaign_grade="S",
+            estimated_valuation=Decimal("72000.00"),
+            achievement_badges=("board_trusted", "channel_builder", "monetization_architect"),
+            strategic_outlook="ipo_ready",
+            offer_value=Decimal("88000.00"),
+            final_cash=Decimal("18000.00"),
+            final_reputation=74,
+            archived_at="2026-04-30T00:00:00+00:00",
+        )
+    ]
+
+    catalog = build_unlock_catalog(archives)
+
+    assert catalog.total_rewards >= 11
+    assert catalog.unlocked_rewards >= 4
+    assert any(entry.reward_type == "scenario" for entry in catalog.entries if entry.unlocked)
+    assert any(
+        entry.reward_id == "board_command_cloud" for entry in catalog.entries if entry.unlocked
+    )
+    assert catalog.next_unlock_label
+
+
 def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
     archives = [
         RunArchiveSummary(
@@ -5252,3 +5384,4 @@ def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
     assert "Signal Forge" in comparison.strongest_cash_label
     assert "NEXUS TECH" in comparison.best_offer_label
     assert comparison.outcome_mix == ("profitable_independence", "strategic_acquisition")
+    assert comparison.missing_outcomes == ("ipo_ready",)

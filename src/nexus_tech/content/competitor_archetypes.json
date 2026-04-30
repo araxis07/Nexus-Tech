@@ -380,5 +380,31 @@
     "current_move": "hold",
     "momentum": 66,
     "funding_level": 3
+  },
+  {
+    "archetype_id": "rollup_raider",
+    "title": "Rollup Raider",
+    "description": "A late-stage rival that buys distribution, rolls up partner lanes, and pressures weaker operators into defensive restructures.",
+    "focus_segment": "enterprise",
+    "strength": 82,
+    "aggression": 61,
+    "pricing_tier": "premium",
+    "active_product_count": 4,
+    "current_move": "feature_sprint",
+    "momentum": 70,
+    "funding_level": 4
+  },
+  {
+    "archetype_id": "margin_channel_house",
+    "title": "Margin Channel House",
+    "description": "A commercial rival that squeezes rev-share, repackages offers, and compounds growth through calmer but more expensive partner economics.",
+    "focus_segment": "smb",
+    "strength": 76,
+    "aggression": 64,
+    "pricing_tier": "standard",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 69,
+    "funding_level": 3
   }
 ]

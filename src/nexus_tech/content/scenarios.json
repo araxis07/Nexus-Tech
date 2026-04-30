@@ -3879,5 +3879,143 @@
       "board_confidence": 44,
       "total_raised": "8800.00"
     }
+  },
+  {
+    "scenario_id": "public_market_countdown",
+    "title": "Public Market Countdown",
+    "description": "A late-stage operating company is close enough to a public-market story to matter, but governance discipline and reserve planning still have to hold together.",
+    "objective": "Push board confidence above 78 while keeping the reserve target intact.",
+    "objective_metric": "reputation",
+    "objective_target": 80,
+    "company_name": "Signal Summit",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "ai_trust_program",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "15400.00",
+    "reputation": 66,
+    "products": [
+      {
+        "key": "market",
+        "template_id": "public_market_console",
+        "name": "Signal Summit",
+        "lifecycle_stage": "growth",
+        "quality": 67,
+        "bug_level": 14,
+        "market_fit": 59,
+        "technical_debt": 21,
+        "user_count": 126,
+        "revenue_per_user": "92.00",
+        "feature_count": 4,
+        "maintenance_cost": "372.00",
+        "acquisition_rate": "0.0260",
+        "churn_rate": "0.0490",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium",
+        "packaging_strategy": "suite"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Elena Ward",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "governance_ops",
+        "assigned_product_key": "market",
+        "energy": 73,
+        "morale": 70
+      },
+      {
+        "full_name": "Marcus Ives",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "market",
+        "energy": 71,
+        "morale": 68
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Rollup Raider",
+        "archetype_id": "rollup_raider"
+      }
+    ],
+    "finance": {
+      "debt_principal": "2800.00",
+      "loan_interest_rate": "0.0280",
+      "equity_dilution": "0.0900",
+      "investor_pressure": 18,
+      "board_confidence": 58,
+      "total_raised": "11800.00"
+    }
+  },
+  {
+    "scenario_id": "channel_margin_squeeze",
+    "title": "Channel Margin Squeeze",
+    "description": "Partner distribution is working, but lane fatigue and rev-share pressure are compressing margins faster than the company can normalize them.",
+    "objective": "Hold closed deals steady while restoring commercial discipline.",
+    "objective_metric": "closed_deals",
+    "objective_target": 2,
+    "company_name": "Margin Harbor",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "enterprise_sales_push",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "9800.00",
+    "reputation": 57,
+    "products": [
+      {
+        "key": "margin",
+        "template_id": "channel_margin_mesh",
+        "name": "Margin Harbor",
+        "lifecycle_stage": "growth",
+        "quality": 60,
+        "bug_level": 17,
+        "market_fit": 58,
+        "technical_debt": 23,
+        "user_count": 90,
+        "revenue_per_user": "61.00",
+        "feature_count": 3,
+        "maintenance_cost": "304.00",
+        "acquisition_rate": "0.0320",
+        "churn_rate": "0.0580",
+        "target_segment": "smb",
+        "pricing_tier": "standard",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Iris Nolan",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "channel_growth",
+        "assigned_product_key": "margin",
+        "energy": 74,
+        "morale": 66
+      },
+      {
+        "full_name": "Jon Park",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "partner_ops",
+        "assigned_product_key": "margin",
+        "energy": 72,
+        "morale": 64
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Margin Channel House",
+        "archetype_id": "margin_channel_house"
+      }
+    ]
   }
 ]

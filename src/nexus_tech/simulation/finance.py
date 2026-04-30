@@ -14,7 +14,7 @@ from nexus_tech.domain.models import (
     FundingType,
     TurnLedgerEntry,
 )
-from nexus_tech.domain.money import quantize_money
+from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.support import clamp_int
@@ -65,6 +65,9 @@ class FinancePlannerSnapshot:
     reserve_hit_turn_conservative: int | None
     reserve_hit_turn_aggressive: int | None
     recommended_posture: str
+    reserve_break_risk: str
+    allocation_signal: str
+    scenario_compare: tuple[str, ...]
     capital_alert: str
     summary: str
 
@@ -250,6 +253,49 @@ def build_finance_planner(
         recommended_posture = "balanced"
         capital_alert = "Execution is viable, but capital allocation still needs discipline."
 
+    if conservative_hit_turn == 1 or base_hit_turn == 1:
+        reserve_break_risk = "critical"
+    elif conservative_hit_turn is not None or reserve_gap < ZERO_MONEY:
+        reserve_break_risk = "high"
+    elif aggressive_hit_turn is not None:
+        reserve_break_risk = "elevated"
+    else:
+        reserve_break_risk = "controlled"
+
+    if (
+        finance.active_board_ask.value == "profitability"
+        and capital_plan.reserve_share < capital_plan.product_investment_share
+    ):
+        allocation_signal = "Reserve allocation is light for the current profitability mandate."
+    elif (
+        finance.active_board_ask.value == "reliability"
+        and capital_plan.go_to_market_share > capital_plan.product_investment_share
+    ):
+        allocation_signal = "Go-to-market spend is outrunning the current reliability mandate."
+    elif (
+        finance.active_board_ask.value == "team_health"
+        and capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold
+    ):
+        allocation_signal = "Reserve coverage is thin for a team-health recovery posture."
+    else:
+        allocation_signal = (
+            "Capital allocation broadly matches the current board and reserve posture."
+        )
+
+    scenario_compare = (
+        f"Base ends at {format_money(base_end_cash)}.",
+        (
+            f"Conservative breaks reserve on turn {conservative_hit_turn}."
+            if conservative_hit_turn is not None
+            else "Conservative still protects reserve."
+        ),
+        (
+            f"Aggressive breaks reserve on turn {aggressive_hit_turn}."
+            if aggressive_hit_turn is not None
+            else f"Aggressive still ends at {format_money(aggressive_end_cash)}."
+        ),
+    )
+
     return FinancePlannerSnapshot(
         horizon_turns=horizon,
         base_end_cash=base_end_cash,
@@ -260,6 +306,9 @@ def build_finance_planner(
         reserve_hit_turn_conservative=conservative_hit_turn,
         reserve_hit_turn_aggressive=aggressive_hit_turn,
         recommended_posture=recommended_posture,
+        reserve_break_risk=reserve_break_risk,
+        allocation_signal=allocation_signal,
+        scenario_compare=scenario_compare,
         capital_alert=capital_alert,
         summary=summary,
     )

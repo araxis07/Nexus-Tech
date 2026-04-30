@@ -177,6 +177,53 @@ def invest_in_partner_enablement(
     )
 
 
+def renegotiate_partnership(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Trade economics for a calmer partner relationship."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if state.company.cash_on_hand < BALANCE.partnership_renegotiation_cost:
+        raise ValueError("Not enough cash to renegotiate this partnership.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_renegotiation_cost
+    )
+    partnership.rev_share_rate = min(
+        BALANCE.partnership_max_rev_share_by_channel[partnership.channel.value],
+        quantize_rate(
+            partnership.rev_share_rate + BALANCE.partnership_renegotiation_rev_share_penalty
+        ),
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_renegotiation_enablement_gain
+    )
+    partnership.risk = clamp_int(partnership.risk - BALANCE.partnership_renegotiation_risk_relief)
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure - BALANCE.partnership_renegotiation_conflict_relief
+    )
+    partnership.last_review_turn = state.company.current_turn
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if partnership.status is PartnershipStatus.PAUSED:
+        partnership.status = PartnershipStatus.RECOVERY
+    elif fatigue <= BALANCE.partnership_recovery_resume_threshold:
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} was renegotiated. Rev-share is now "
+        f"{partnership.rev_share_rate:.2%}, risk {partnership.risk}, conflict "
+        f"{partnership.conflict_pressure}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Renegotiated {partnership.name}. Cash -{BALANCE.partnership_renegotiation_cost}, "
+            f"rev-share now {partnership.rev_share_rate:.2%}."
+        )
+    )
+
+
 def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
     """Apply channel-driven user, support, and revenue effects."""
 
@@ -500,6 +547,12 @@ def calculate_partnership_fatigue(state: GameState, partnership: PartnershipDeal
         fatigue += BALANCE.partnership_fatigue_expand_mode_gain
     if partnership.status is PartnershipStatus.RECOVERY:
         fatigue += BALANCE.partnership_fatigue_recovery_penalty
+    if partnership.channel is PartnerChannel.INTEGRATION and product.technical_debt >= 40:
+        fatigue += 3
+    if partnership.channel is PartnerChannel.MARKETPLACE and product.add_on_catalog_depth < 2:
+        fatigue += 2
+    if partnership.channel is PartnerChannel.RESELLER and product.pricing_tier.value == "budget":
+        fatigue += 2
     if product.packaging_strategy.value == "suite":
         fatigue += 2
     return clamp_int(fatigue)

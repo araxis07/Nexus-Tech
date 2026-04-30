@@ -1388,6 +1388,25 @@ class BalanceConfig:
     event_succession_gap_morale_gain: int = 5
     event_succession_gap_wait_attrition_gain: int = 6
     event_succession_gap_wait_morale_loss: int = 4
+    event_partner_renegotiation_weight: int = 3
+    event_partner_renegotiation_cooldown: int = 6
+    event_partner_renegotiation_fatigue_threshold: int = 30
+    event_partner_renegotiation_rev_share_penalty: Decimal = Decimal("0.0200")
+    event_partner_renegotiation_conflict_relief: int = 9
+    event_partner_renegotiation_risk_relief: int = 7
+    event_partner_renegotiation_quality_gain: int = 2
+    event_partner_renegotiation_hold_line_user_loss: int = 5
+    event_partner_renegotiation_hold_line_pressure_gain: int = 2
+    event_strategic_crossroads_weight: int = 3
+    event_strategic_crossroads_cooldown: int = 6
+    event_strategic_crossroads_readiness_threshold: int = 62
+    event_strategic_crossroads_process_cost: Decimal = Decimal("320.00")
+    event_strategic_crossroads_process_confidence_gain: int = 4
+    event_strategic_crossroads_process_score_gain: int = 4
+    event_strategic_crossroads_process_pressure_gain: int = 2
+    event_strategic_crossroads_independence_reputation_gain: int = 2
+    event_strategic_crossroads_independence_pressure_relief: int = 3
+    event_strategic_crossroads_independence_team_gain: int = 4
 
     cash_reserve_milestone_threshold: Decimal = Decimal("12000.00")
     team_growth_milestone_headcount: int = 4
@@ -1936,6 +1955,11 @@ class BalanceConfig:
     partnership_recovery_user_penalty: int = 3
     partnership_recovery_resume_threshold: int = 18
     partnership_enablement_fatigue_relief: int = 8
+    partnership_renegotiation_cost: Decimal = Decimal("180.00")
+    partnership_renegotiation_enablement_gain: int = 5
+    partnership_renegotiation_risk_relief: int = 8
+    partnership_renegotiation_conflict_relief: int = 10
+    partnership_renegotiation_rev_share_penalty: Decimal = Decimal("0.0150")
     partnership_multi_channel_conflict_bonus: int = 2
     partnership_expand_mode_user_bonus: int = 2
     partnership_gtm_share_user_divisor: int = 20
@@ -1946,6 +1970,13 @@ class BalanceConfig:
             "reseller": Decimal("0.1200"),
             "integration": Decimal("0.1000"),
             "marketplace": Decimal("0.1400"),
+        }
+    )
+    partnership_max_rev_share_by_channel: dict[str, Decimal] = field(
+        default_factory=lambda: {
+            "reseller": Decimal("0.2600"),
+            "integration": Decimal("0.2200"),
+            "marketplace": Decimal("0.2800"),
         }
     )
     partnership_maturity_quality_gain_threshold: int = 12

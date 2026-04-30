@@ -858,5 +858,43 @@
     "target_segment": "enterprise",
     "pricing_tier": "premium",
     "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "public_market_console",
+    "title": "Public Market Console",
+    "description": "A governance-heavy operating platform built to reward cleaner scorecards, steadier reserve planning, and durable late-stage execution.",
+    "lifecycle_stage": "prototype",
+    "quality": 53,
+    "bug_level": 11,
+    "market_fit": 34,
+    "technical_debt": 14,
+    "user_count": 0,
+    "revenue_per_user": "88.00",
+    "feature_count": 0,
+    "maintenance_cost": "346.00",
+    "acquisition_rate": "0.0230",
+    "churn_rate": "0.0510",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "channel_margin_mesh",
+    "title": "Channel Margin Mesh",
+    "description": "A partner-sensitive revenue platform that rewards careful rev-share management, calmer lanes, and cleaner marketplace economics.",
+    "lifecycle_stage": "prototype",
+    "quality": 49,
+    "bug_level": 15,
+    "market_fit": 36,
+    "technical_debt": 18,
+    "user_count": 0,
+    "revenue_per_user": "60.00",
+    "feature_count": 0,
+    "maintenance_cost": "292.00",
+    "acquisition_rate": "0.0310",
+    "churn_rate": "0.0570",
+    "target_segment": "smb",
+    "pricing_tier": "standard",
+    "packaging_strategy": "modular"
   }
 ]

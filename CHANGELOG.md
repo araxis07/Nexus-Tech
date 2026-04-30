@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.32.0 - 2026-04-30
+
+- Added a true archive unlock catalog with typed rewards plus a new `list-unlocks` CLI command so progression now exposes exact scenario, template, rival, tool, and insight rewards instead of only hint text
+- Deepened exit evaluation with sharper ending variants, outcome tags, richer archive-comparison guidance, and stronger late-game reporting around dominant and missing endgame paths
+- Added partner renegotiation as a playable channel action, expanded channel fatigue logic by lane style, and introduced new partner-renegotiation event pressure to make margin-versus-stability trade-offs visible
+- Strengthened finance planning with reserve-break risk, capital-allocation signals, and scenario-comparison notes alongside the existing planner posture alerts
+- Added new strategic-crossroads event pressure plus new public-market and channel-margin content across scenarios, templates, and rival archetypes
+- Expanded regression coverage for unlock catalogs, ending variants, partnership renegotiation, new late-game events, and updated finance-planner diagnostics
+- Promoted the package version to `0.32.0`
+
 ## 0.31.0 - 2026-04-30
 
 - Added a fuller archive meta layer with achievement rewards, archive comparison, and richer progression guidance so completed runs now feed an actual repeat-play loop instead of only one summary panel

@@ -1193,6 +1193,51 @@ def test_show_progression_command_renders_meta_summary(
     assert "first_victory" in result.output
 
 
+def test_list_unlocks_command_renders_unlock_catalog(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    archives = [
+        RunArchiveSummary(
+            archive_key="active:8:ipo_ready",
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_title="Founder Journey",
+            completed_turn=8,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="ipo_ready",
+            total_score=228,
+            score_tier="strong",
+            campaign_grade="S",
+            estimated_valuation=Decimal("68600.00"),
+            achievement_badges=("board_trusted", "channel_builder"),
+            strategic_outlook="ipo_ready",
+            offer_value=Decimal("80200.00"),
+            final_cash=Decimal("16400.00"),
+            final_reputation=72,
+            archived_at="2026-04-30T01:00:00+00:00",
+        )
+    ]
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            self.db_path = db_path
+
+        def list_run_archives(self) -> list[RunArchiveSummary]:
+            return archives
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+
+    db_path = tmp_path / "archives.db"
+    result = runner.invoke(app, ["list-unlocks", "--db-path", str(db_path)])
+
+    assert result.exit_code == 0
+    assert "Unlock Catalog" in result.output
+    assert "Reward Id" in result.output
+    assert "Next Unlock" in result.output
+
+
 def test_template_catalog_rendering_contains_catalog_title() -> None:
     templates = cli_module.get_available_product_templates()
     console = Console(record=True, width=140)

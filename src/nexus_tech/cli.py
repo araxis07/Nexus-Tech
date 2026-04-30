@@ -93,6 +93,7 @@ from nexus_tech.presentation.dashboard import (
     render_team_view,
     render_turn_resolution,
     render_tutorial,
+    render_unlock_catalog,
     render_victory,
 )
 from nexus_tech.simulation.balance import BALANCE
@@ -120,7 +121,7 @@ from nexus_tech.simulation.engine import (
 from nexus_tech.simulation.event_registry import get_event_registry
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.hiring import generate_candidate_pool
-from nexus_tech.simulation.meta_progression import summarize_meta_progression
+from nexus_tech.simulation.meta_progression import build_unlock_catalog, summarize_meta_progression
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scenarios import (
@@ -265,6 +266,7 @@ ACTION_KEYS = {
     "71": TurnAction.INVEST_IN_PARTNER_ENABLEMENT,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
+    "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
 }
 UTILITY_ACTION_KEYS = {
     "65": "save_game",
@@ -768,6 +770,20 @@ def show_progression_command(
     except PersistenceError as error:
         raise_cli_persistence_error("Progression Read Failed", error)
     render_meta_progression(console, summarize_meta_progression(archives))
+
+
+@app.command("list-unlocks")
+def list_unlocks_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Render the archive-driven unlock catalog with exact reward ids."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        archives = coordinator.list_run_archives()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Unlock Read Failed", error)
+    render_unlock_catalog(console, build_unlock_catalog(archives))
 
 
 @app.command("check-saves")
@@ -1444,6 +1460,12 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         )
 
     if action is TurnAction.INVEST_IN_PARTNER_ENABLEMENT:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RENEGOTIATE_PARTNERSHIP:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

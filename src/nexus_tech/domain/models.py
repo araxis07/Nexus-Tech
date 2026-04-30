@@ -465,6 +465,7 @@ class TurnAction(StrEnum):
     EXECUTE_RESTRUCTURE_PLAN = "execute_restructure_plan"
     CREATE_PARTNERSHIP = "create_partnership"
     INVEST_IN_PARTNER_ENABLEMENT = "invest_in_partner_enablement"
+    RENEGOTIATE_PARTNERSHIP = "renegotiate_partnership"
     REVIEW_PARTNERSHIPS = "review_partnerships"
     SET_CAPITAL_PLAN = "set_capital_plan"
     VIEW_REPORT = "view_report"

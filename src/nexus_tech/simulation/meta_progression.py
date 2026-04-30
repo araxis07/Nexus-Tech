@@ -16,7 +16,38 @@ class AchievementDefinition:
     achievement_id: str
     title: str
     description: str
+    reward_type: str
+    reward_id: str
+    reward_name: str
+
+    @property
+    def reward_label(self) -> str:
+        return f"Unlock {self.reward_type}: {self.reward_name} [{self.reward_id}]"
+
+
+@dataclass(frozen=True)
+class UnlockCatalogEntry:
+    """One archive-driven unlock entry with explicit reward metadata."""
+
+    achievement_id: str
+    title: str
+    description: str
+    reward_type: str
+    reward_id: str
+    reward_name: str
     reward_label: str
+    unlocked: bool
+
+
+@dataclass(frozen=True)
+class UnlockCatalogSummary:
+    """Full reward catalog derived from archived runs."""
+
+    total_rewards: int
+    unlocked_rewards: int
+    reward_mix: tuple[str, ...]
+    entries: tuple[UnlockCatalogEntry, ...]
+    next_unlock_label: str
 
 
 @dataclass(frozen=True)
@@ -33,7 +64,9 @@ class ArchiveComparisonSummary:
     average_offer_value: Decimal
     average_final_cash: Decimal
     outcome_mix: tuple[str, ...]
+    missing_outcomes: tuple[str, ...]
     grade_mix: tuple[str, ...]
+    dominant_path: str
     recommendation: str
 
 
@@ -67,68 +100,128 @@ def get_achievement_definitions() -> tuple[AchievementDefinition, ...]:
             achievement_id="first_archive",
             title="Archive Analyst",
             description="Finish and archive the first completed run.",
-            reward_label="Unlock: archive comparison review",
+            reward_type="tool",
+            reward_id="compare_archives",
+            reward_name="Archive Comparison Review",
         ),
         AchievementDefinition(
             achievement_id="first_victory",
             title="First Victory",
             description="Reach any victory outcome.",
-            reward_label="Unlock: campaign_ladder_climb scenario",
+            reward_type="scenario",
+            reward_id="campaign_ladder_climb",
+            reward_name="Campaign Ladder Climb",
         ),
         AchievementDefinition(
             achievement_id="repeat_operator",
             title="Repeat Operator",
             description="Archive at least three completed runs.",
-            reward_label="Unlock: archive_governance_studio template",
+            reward_type="template",
+            reward_id="archive_governance_studio",
+            reward_name="Archive Governance Studio",
         ),
         AchievementDefinition(
             achievement_id="board_steward",
             title="Board Steward",
             description="Earn the board_trusted badge in any archived run.",
-            reward_label="Unlock: board_recovery_crucible scenario",
+            reward_type="scenario",
+            reward_id="board_recovery_crucible",
+            reward_name="Board Recovery Crucible",
         ),
         AchievementDefinition(
             achievement_id="channel_builder",
             title="Channel Builder",
             description="Earn the channel_builder badge in any archived run.",
-            reward_label="Unlock: partner_recovery_cloud template",
+            reward_type="template",
+            reward_id="partner_recovery_cloud",
+            reward_name="Partner Recovery Cloud",
         ),
         AchievementDefinition(
             achievement_id="monetization_architect",
             title="Monetization Architect",
             description="Earn the monetization_architect badge in any archived run.",
-            reward_label="Unlock: archive_scale_operator rival archetype",
+            reward_type="rival",
+            reward_id="archive_scale_operator",
+            reward_name="Archive Scale Operator",
         ),
         AchievementDefinition(
             achievement_id="support_resilient",
             title="Support Resilient",
             description="Earn the support_resilient badge in any archived run.",
-            reward_label="Unlock: channel_rebuild_marathon scenario",
+            reward_type="scenario",
+            reward_id="channel_rebuild_marathon",
+            reward_name="Channel Rebuild Marathon",
         ),
         AchievementDefinition(
             achievement_id="people_stable",
             title="People Stable",
             description="Earn the people_stable badge in any archived run.",
-            reward_label="Unlock: partner_fatigue_broker rival archetype",
+            reward_type="rival",
+            reward_id="partner_fatigue_broker",
+            reward_name="Partner Fatigue Broker",
         ),
         AchievementDefinition(
             achievement_id="ipo_pathfinder",
             title="IPO Pathfinder",
             description="Reach at least one IPO-ready archive outcome.",
-            reward_label="Unlock: board_command_cloud endgame track",
+            reward_type="template",
+            reward_id="board_command_cloud",
+            reward_name="Board Command Cloud",
         ),
         AchievementDefinition(
             achievement_id="strategic_closer",
             title="Strategic Closer",
             description="Reach at least one strategic acquisition archive outcome.",
-            reward_label="Unlock: acquisition-comparison insight",
+            reward_type="insight",
+            reward_id="acquisition_compare",
+            reward_name="Acquisition Comparison Lens",
         ),
         AchievementDefinition(
             achievement_id="independent_operator",
             title="Independent Operator",
             description="Reach at least one profitable independence archive outcome.",
-            reward_label="Unlock: independence-comparison insight",
+            reward_type="insight",
+            reward_id="independence_compare",
+            reward_name="Independence Comparison Lens",
         ),
+    )
+
+
+def build_unlock_catalog(archives: list[RunArchiveSummary]) -> UnlockCatalogSummary:
+    """Resolve the explicit unlock catalog from archived runs."""
+
+    definitions = get_achievement_definitions()
+    unlock_status = _compute_unlock_status(archives)
+    entries = tuple(
+        UnlockCatalogEntry(
+            achievement_id=definition.achievement_id,
+            title=definition.title,
+            description=definition.description,
+            reward_type=definition.reward_type,
+            reward_id=definition.reward_id,
+            reward_name=definition.reward_name,
+            reward_label=definition.reward_label,
+            unlocked=unlock_status.get(definition.achievement_id, False),
+        )
+        for definition in definitions
+    )
+    reward_type_counts: dict[str, int] = {}
+    for entry in entries:
+        reward_type_counts[entry.reward_type] = reward_type_counts.get(entry.reward_type, 0) + 1
+    reward_mix = tuple(
+        f"{reward_type}:{count}"
+        for reward_type, count in sorted(reward_type_counts.items(), key=lambda item: item[0])
+    )
+    next_unlock_label = next(
+        (entry.reward_label for entry in entries if not entry.unlocked),
+        "All archive rewards are already unlocked.",
+    )
+    return UnlockCatalogSummary(
+        total_rewards=len(entries),
+        unlocked_rewards=sum(1 for entry in entries if entry.unlocked),
+        reward_mix=reward_mix,
+        entries=entries,
+        next_unlock_label=next_unlock_label,
     )
 
 
@@ -138,6 +231,7 @@ def summarize_meta_progression(
     """Collapse archived completed runs into one progression summary."""
 
     if not archives:
+        unlock_catalog = build_unlock_catalog(archives)
         return MetaProgressionSummary(
             total_runs=0,
             victories=0,
@@ -148,7 +242,7 @@ def summarize_meta_progression(
             unlocked_achievements=tuple(),
             campaign_tier="unranked",
             campaign_stage="foundation",
-            achievement_progress="0/11 core achievements",
+            achievement_progress=f"0/{len(get_achievement_definitions())} core achievements",
             campaign_ladder=(
                 "1. foundation [pending]",
                 "2. portfolio [pending]",
@@ -156,7 +250,9 @@ def summarize_meta_progression(
                 "4. institutional [pending]",
                 "5. franchise [pending]",
             ),
-            unlocked_rewards=tuple(),
+            unlocked_rewards=tuple(
+                entry.reward_label for entry in unlock_catalog.entries if entry.unlocked
+            ),
             unlocks_remaining=(
                 "first_archive",
                 "first_victory",
@@ -172,7 +268,7 @@ def summarize_meta_progression(
             ),
             archive_highlights=("No archived runs yet.",),
             next_goal="Finish and archive one run to unlock campaign progression.",
-            next_reward="Unlock: archive comparison review",
+            next_reward=unlock_catalog.next_unlock_label,
         )
 
     victories = sum(1 for archive in archives if archive.victory_achieved)
@@ -181,29 +277,23 @@ def summarize_meta_progression(
     unique_outcomes = tuple(
         sorted({archive.exit_outcome for archive in archives if archive.exit_outcome})
     )
-    badge_pool = {badge for archive in archives for badge in archive.achievement_badges}
     best_offer = max(archives, key=lambda archive: archive.offer_value)
     average_offer_value = quantize_money(
         sum((archive.offer_value for archive in archives), Decimal("0.00")) / Decimal(len(archives))
     )
 
-    achievement_checks = (
-        ("first_archive", True),
-        ("first_victory", victories >= 1),
-        ("repeat_operator", len(archives) >= 3),
-        ("board_steward", "board_trusted" in badge_pool),
-        ("channel_builder", "channel_builder" in badge_pool),
-        ("monetization_architect", "monetization_architect" in badge_pool),
-        ("support_resilient", "support_resilient" in badge_pool),
-        ("people_stable", "people_stable" in badge_pool),
-        ("ipo_pathfinder", "ipo_ready" in unique_outcomes),
-        ("strategic_closer", "strategic_acquisition" in unique_outcomes),
-        ("independent_operator", "profitable_independence" in unique_outcomes),
-    )
     achievement_definitions = get_achievement_definitions()
-    unlocks = [name for name, unlocked in achievement_checks if unlocked]
-    unlock_status = {name: unlocked for name, unlocked in achievement_checks}
-    unlocks_remaining = tuple(name for name, unlocked in achievement_checks if not unlocked)
+    unlock_status = _compute_unlock_status(archives)
+    unlocks = [
+        definition.achievement_id
+        for definition in achievement_definitions
+        if unlock_status.get(definition.achievement_id, False)
+    ]
+    unlocks_remaining = tuple(
+        definition.achievement_id
+        for definition in achievement_definitions
+        if not unlock_status.get(definition.achievement_id, False)
+    )
     unlocked_rewards = tuple(
         definition.reward_label
         for definition in achievement_definitions
@@ -236,7 +326,7 @@ def summarize_meta_progression(
             f"{len({archive.campaign_grade for archive in archives})} grade tier(s)."
         ),
     )
-    achievement_progress = f"{len(unlocks)}/{len(achievement_checks)} core achievements"
+    achievement_progress = f"{len(unlocks)}/{len(achievement_definitions)} core achievements"
     campaign_ladder = (
         _format_ladder_step("foundation", len(unlocks) >= 1, 1),
         _format_ladder_step(
@@ -309,7 +399,9 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
             average_offer_value=Decimal("0.00"),
             average_final_cash=Decimal("0.00"),
             outcome_mix=tuple(),
+            missing_outcomes=("ipo_ready", "strategic_acquisition", "profitable_independence"),
             grade_mix=tuple(),
+            dominant_path="-",
             recommendation="Archive at least one completed run before comparing outcomes.",
         )
 
@@ -328,11 +420,39 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
     outcome_mix = tuple(
         sorted({archive.exit_outcome for archive in archives if archive.exit_outcome})
     )
+    missing_outcomes = tuple(
+        outcome
+        for outcome in ("ipo_ready", "strategic_acquisition", "profitable_independence")
+        if outcome not in outcome_mix
+    )
     grade_mix = tuple(
         sorted({archive.campaign_grade for archive in archives if archive.campaign_grade})
     )
+    dominant_path = max(
+        (
+            ("ipo_ready", sum(1 for archive in archives if archive.exit_outcome == "ipo_ready")),
+            (
+                "strategic_acquisition",
+                sum(1 for archive in archives if archive.exit_outcome == "strategic_acquisition"),
+            ),
+            (
+                "profitable_independence",
+                sum(1 for archive in archives if archive.exit_outcome == "profitable_independence"),
+            ),
+            (
+                "restructure",
+                sum(1 for archive in archives if archive.exit_outcome == "restructure"),
+            ),
+        ),
+        key=lambda item: item[1],
+    )[0]
 
-    if len(outcome_mix) == 1:
+    if missing_outcomes:
+        recommendation = (
+            "Coverage is still narrow. Next archive target: "
+            f"{missing_outcomes[0].replace('_', ' ')}."
+        )
+    elif len(outcome_mix) == 1:
         recommendation = (
             "Archive a different ending path next. The current history is consistent, "
             "but outcome diversity is still narrow."
@@ -373,9 +493,38 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
         average_offer_value=average_offer_value,
         average_final_cash=average_final_cash,
         outcome_mix=outcome_mix,
+        missing_outcomes=missing_outcomes,
         grade_mix=grade_mix,
+        dominant_path=dominant_path,
         recommendation=recommendation,
     )
+
+
+def _compute_unlock_status(archives: list[RunArchiveSummary]) -> dict[str, bool]:
+    definitions = get_achievement_definitions()
+    if not archives:
+        return {definition.achievement_id: False for definition in definitions}
+
+    victories = sum(1 for archive in archives if archive.victory_achieved)
+    unique_outcomes = {
+        archive.exit_outcome
+        for archive in archives
+        if archive.exit_outcome and archive.exit_outcome
+    }
+    badge_pool = {badge for archive in archives for badge in archive.achievement_badges}
+    return {
+        "first_archive": True,
+        "first_victory": victories >= 1,
+        "repeat_operator": len(archives) >= 3,
+        "board_steward": "board_trusted" in badge_pool,
+        "channel_builder": "channel_builder" in badge_pool,
+        "monetization_architect": "monetization_architect" in badge_pool,
+        "support_resilient": "support_resilient" in badge_pool,
+        "people_stable": "people_stable" in badge_pool,
+        "ipo_pathfinder": "ipo_ready" in unique_outcomes,
+        "strategic_closer": "strategic_acquisition" in unique_outcomes,
+        "independent_operator": "profitable_independence" in unique_outcomes,
+    }
 
 
 def _format_ladder_step(label: str, complete: bool, step: int) -> str:

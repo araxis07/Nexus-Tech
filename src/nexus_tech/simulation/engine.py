@@ -111,6 +111,7 @@ from nexus_tech.simulation.partnerships import (
     create_partnership,
     get_partnership_by_id,
     invest_in_partner_enablement,
+    renegotiate_partnership,
 )
 from nexus_tech.simulation.planning import (
     build_quarter_plan,
@@ -842,6 +843,19 @@ def apply_action(
         summary = invest_in_partner_enablement(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Invested in partner enablement for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RENEGOTIATE_PARTNERSHIP:
+        if context.partnership_id is None:
+            raise ValueError("Renegotiating a partnership requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = renegotiate_partnership(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Renegotiated partnership %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

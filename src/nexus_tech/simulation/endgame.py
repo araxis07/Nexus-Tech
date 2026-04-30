@@ -29,11 +29,13 @@ class ExitEvaluation:
 
     outcome: ExitOutcome
     title: str
+    ending_variant: str
     summary: str
     grade: str
     offer_value: Decimal
     board_readout: str
     next_chapter: str
+    outcome_tags: tuple[str, ...]
     readiness: EndgameReadiness
 
 
@@ -119,6 +121,9 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
     adjusted_value = quantize_money(score.estimated_valuation + account_revenue * Decimal("4.00"))
     grade = _calculate_grade(score.total_score, state.finance.board_confidence)
     readiness = calculate_endgame_readiness(state, score)
+    active_partnerships = [deal for deal in state.partnerships if deal.status.value != "paused"]
+    unique_channels = {deal.channel.value for deal in active_partnerships}
+    reserve_target_met = state.company.cash_on_hand >= state.capital_plan.reserve_target
 
     if (
         score.total_score >= BALANCE.exit_ipo_score_threshold
@@ -127,32 +132,84 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         and state.finance.restructuring_pressure <= BALANCE.exit_max_restructuring_pressure_for_win
     ):
         offer_value = quantize_money(adjusted_value * BALANCE.exit_ipo_value_multiplier)
+        if state.finance.board_score >= 74 and state.finance.governance_risk <= 12:
+            ending_variant = "Governance Premium Listing"
+            board_readout = (
+                "Directors believe the company now looks institutionally credible, not just large."
+            )
+            next_chapter = (
+                "Preserve reporting quality, reliability, and capital discipline into public scale."
+            )
+            outcome_tags = ("ipo", "governance", "institutional")
+        elif len(unique_channels) >= 2 and score.active_products >= 3:
+            ending_variant = "Platform Roll-Up Listing"
+            board_readout = (
+                "The board sees a diversified platform with enough distribution breadth to list."
+            )
+            next_chapter = (
+                "Keep the portfolio coherent, protect channel trust, and reduce integration drag."
+            )
+            outcome_tags = ("ipo", "portfolio", "distribution")
+        else:
+            ending_variant = "Flagship Scale Listing"
+            board_readout = (
+                "The board sees a controlled public-market narrative with room to scale."
+            )
+            next_chapter = "Invest in durability, reporting discipline, and flagship reliability."
+            outcome_tags = ("ipo", "flagship", "scale")
         return ExitEvaluation(
             outcome=ExitOutcome.IPO_READY,
             title="IPO-Ready Operator",
+            ending_variant=ending_variant,
             summary=(
                 "The company has enough scale, governance confidence, "
                 "and durable revenue to look public-market ready."
             ),
             grade=grade,
             offer_value=offer_value,
-            board_readout="The board sees a controlled public-market narrative with room to scale.",
-            next_chapter="Invest in durability, reporting discipline, and flagship reliability.",
+            board_readout=board_readout,
+            next_chapter=next_chapter,
+            outcome_tags=outcome_tags,
             readiness=readiness,
         )
 
     if score.total_score >= BALANCE.exit_acquisition_score_threshold:
         offer_value = quantize_money(adjusted_value * BALANCE.exit_acquisition_value_multiplier)
+        if len(unique_channels) >= 2 and score.active_products >= 2:
+            ending_variant = "Platform Roll-Up Acquisition"
+            board_readout = (
+                "Buyers would pay for the portfolio, partner distribution, and account footprint."
+            )
+            next_chapter = (
+                "Increase negotiation leverage by calming support load and strengthening renewals."
+            )
+            outcome_tags = ("acquisition", "portfolio", "channel")
+        elif len(state.employees) >= 6 and state.finance.board_team_health_score >= 68:
+            ending_variant = "Talent-and-Execution Acquisition"
+            board_readout = (
+                "The team itself has become strategic enough to attract platform buyers."
+            )
+            next_chapter = (
+                "Protect team health, reduce attrition exposure, and keep flagship velocity high."
+            )
+            outcome_tags = ("acquisition", "team", "execution")
+        else:
+            ending_variant = "Strategic Product Acquisition"
+            board_readout = "Directors see strategic optionality and credible buyer interest."
+            next_chapter = (
+                "Increase negotiation leverage through cleaner revenue and calmer support load."
+            )
+            outcome_tags = ("acquisition", "product", "accounts")
         return ExitEvaluation(
             outcome=ExitOutcome.STRATEGIC_ACQUISITION,
             title="Strategic Acquisition",
             summary="A larger platform could justify acquiring the portfolio and customer base.",
+            ending_variant=ending_variant,
             grade=grade,
             offer_value=offer_value,
-            board_readout="Directors see strategic optionality and credible buyer interest.",
-            next_chapter=(
-                "Increase negotiation leverage through cleaner revenue and calmer support load."
-            ),
+            board_readout=board_readout,
+            next_chapter=next_chapter,
+            outcome_tags=outcome_tags,
             readiness=readiness,
         )
 
@@ -160,38 +217,98 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         restructure_value = quantize_money(
             max(Decimal("0.00"), adjusted_value - BALANCE.exit_restructure_cash_threshold)
         )
+        if state.finance.governance_crisis_active or state.finance.board_warning_level >= 3:
+            ending_variant = "Board-Led Reset"
+            board_readout = "The board is no longer underwriting the current operating shape."
+            next_chapter = (
+                "Stabilize cash, cut drag, and narrow the portfolio before growing again."
+            )
+            outcome_tags = ("restructure", "board", "reset")
+        elif state.support_program.escalation_queue >= 6 or len(active_partnerships) >= 3:
+            ending_variant = "Operational Restructure"
+            board_readout = (
+                "Leadership has scale assets, but delivery and service coordination broke first."
+            )
+            next_chapter = (
+                "Reduce channel noise, simplify service promises, and restore execution control."
+            )
+            outcome_tags = ("restructure", "operations", "coordination")
+        else:
+            ending_variant = "Portfolio Consolidation"
+            board_readout = (
+                "The board wants a tighter company shape before it funds another scale phase."
+            )
+            next_chapter = "Cut weak lines, protect the core, and rebuild investor trust."
+            outcome_tags = ("restructure", "portfolio", "focus")
         return ExitEvaluation(
             outcome=ExitOutcome.RESTRUCTURE,
             title="Board-Led Restructure",
+            ending_variant=ending_variant,
             summary=(
                 "The company still has assets, but governance pressure now points toward a "
                 "forced reset before durable scale can continue."
             ),
             grade=grade,
             offer_value=restructure_value,
-            board_readout="The board is no longer underwriting the current operating shape.",
-            next_chapter="Stabilize cash, cut drag, and narrow the portfolio before growing again.",
+            board_readout=board_readout,
+            next_chapter=next_chapter,
+            outcome_tags=outcome_tags,
             readiness=readiness,
         )
 
     if state.company.cash_on_hand >= BALANCE.exit_independence_cash_threshold:
+        if (
+            reserve_target_met
+            and state.finance.debt_principal <= Decimal("0.00")
+            and state.finance.equity_dilution <= Decimal("0.1200")
+        ):
+            ending_variant = "Capital-Disciplined Compounder"
+            board_readout = (
+                "Leadership has earned an independent path with unusual capital discipline."
+            )
+            next_chapter = (
+                "Compound renewals, protect reserves, and expand only where execution stays clean."
+            )
+            outcome_tags = ("independence", "capital", "discipline")
+        elif score.active_products == 1:
+            ending_variant = "Focused Core Operator"
+            board_readout = (
+                "The company is still concentrated, but the core business is durably independent."
+            )
+            next_chapter = (
+                "Broaden the moat around the flagship before taking on more portfolio complexity."
+            )
+            outcome_tags = ("independence", "focus", "flagship")
+        else:
+            ending_variant = "Independent Portfolio Operator"
+            board_readout = "Leadership has earned an independent path with disciplined execution."
+            next_chapter = "Compound renewals, broaden the portfolio carefully, and defend margins."
+            outcome_tags = ("independence", "portfolio", "durability")
         return ExitEvaluation(
             outcome=ExitOutcome.PROFITABLE_INDEPENDENCE,
             title="Profitable Independence",
+            ending_variant=ending_variant,
             summary="The company is not a breakout yet, but it can keep operating independently.",
             grade=grade,
             offer_value=adjusted_value,
-            board_readout="Leadership has earned an independent path with disciplined execution.",
-            next_chapter="Compound renewals, broaden the portfolio carefully, and defend margins.",
+            board_readout=board_readout,
+            next_chapter=next_chapter,
+            outcome_tags=outcome_tags,
             readiness=readiness,
         )
 
     restructure_value = quantize_money(
         max(Decimal("0.00"), adjusted_value - BALANCE.exit_restructure_cash_threshold)
     )
+    ending_variant = (
+        "Board Reset Candidate"
+        if state.finance.governance_crisis_active
+        else "Fragile Consolidation Candidate"
+    )
     return ExitEvaluation(
         outcome=ExitOutcome.RESTRUCTURE,
         title="Restructure Candidate",
+        ending_variant=ending_variant,
         summary=(
             "The company has assets, but the run points toward consolidation or a painful reset."
         ),
@@ -201,6 +318,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             "The company still has value, but current coordination and cash posture are unstable."
         ),
         next_chapter="Reset the operating plan before chasing another scale phase.",
+        outcome_tags=("restructure", "fragile", "reset"),
         readiness=readiness,
     )
 
@@ -210,7 +328,7 @@ def apply_exit_outcome(state: GameState) -> ExitEvaluation:
 
     evaluation = evaluate_exit_outcome(state)
     state.exit_outcome = evaluation.outcome
-    state.exit_summary = f"{evaluation.title}: {evaluation.summary}"
+    state.exit_summary = f"{evaluation.title} [{evaluation.ending_variant}]: {evaluation.summary}"
     return evaluation
 
 

@@ -1737,6 +1737,59 @@ def _apply_partner_breakdown(state: GameState, event: PendingEvent, option_id: s
     raise ValueError(f"Unsupported option {option_id} for partner breakdown.")
 
 
+def _apply_partner_renegotiation(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_stressed_partnership(state, product.id)
+
+    if option_id == "concede_margin":
+        partnership.rev_share_rate = clamp_rate(
+            partnership.rev_share_rate + BALANCE.event_partner_renegotiation_rev_share_penalty
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure - BALANCE.event_partner_renegotiation_conflict_relief,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_partner_renegotiation_risk_relief,
+            0,
+            100,
+        )
+        partnership.quality = clamp_int(
+            partnership.quality + BALANCE.event_partner_renegotiation_quality_gain,
+            0,
+            100,
+        )
+        partnership.last_review_turn = state.company.current_turn
+        partnership.status = PartnershipStatus.RECOVERY
+        return (
+            f"You conceded economics for {partnership.name}. Rev-share "
+            f"+{BALANCE.event_partner_renegotiation_rev_share_penalty:.2%}, conflict "
+            f"-{BALANCE.event_partner_renegotiation_conflict_relief}."
+        )
+
+    if option_id == "hold_line":
+        product.user_count = max(
+            0,
+            product.user_count - BALANCE.event_partner_renegotiation_hold_line_user_loss,
+        )
+        partnership.conflict_pressure = clamp_int(partnership.conflict_pressure + 4, 0, 100)
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_partner_renegotiation_hold_line_pressure_gain,
+            0,
+            100,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You held the line on {partnership.name}. Users "
+            f"-{BALANCE.event_partner_renegotiation_hold_line_user_loss}, board pressure "
+            f"+{BALANCE.event_partner_renegotiation_hold_line_pressure_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for partner renegotiation.")
+
+
 def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
     del event
 
@@ -2003,6 +2056,65 @@ def _apply_exit_interest(state: GameState, event: PendingEvent, option_id: str) 
     raise ValueError(f"Unsupported option {option_id} for exit interest.")
 
 
+def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "formalize_process":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_strategic_crossroads_process_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_strategic_crossroads_process_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_strategic_crossroads_process_score_gain,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            + BALANCE.event_strategic_crossroads_process_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            f"You formalized the strategic path around {product.name}. Cash "
+            f"-{BALANCE.event_strategic_crossroads_process_cost}, board confidence "
+            f"+{BALANCE.event_strategic_crossroads_process_confidence_gain}."
+        )
+
+    if option_id == "defend_independence":
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            + BALANCE.event_strategic_crossroads_independence_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_strategic_crossroads_independence_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.board_team_health_score = clamp_int(
+            state.finance.board_team_health_score
+            + BALANCE.event_strategic_crossroads_independence_team_gain,
+            0,
+            100,
+        )
+        return (
+            f"You defended independence around {product.name}. Reputation "
+            f"+{BALANCE.event_strategic_crossroads_independence_reputation_gain}, "
+            "investor pressure "
+            f"-{BALANCE.event_strategic_crossroads_independence_pressure_relief}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for strategic crossroads.")
+
+
 def _get_target_product(state: GameState, event: PendingEvent) -> Product:
     if event.target_product_id is None:
         raise ValueError("This event expected a product target.")
@@ -2138,7 +2250,9 @@ EVENT_EFFECT_HANDLERS = {
     "board_reckoning": _apply_board_reckoning,
     "partner_qbr": _apply_partner_qbr,
     "partner_breakdown": _apply_partner_breakdown,
+    "partner_renegotiation": _apply_partner_renegotiation,
     "board_recovery_window": _apply_board_recovery_window,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
+    "strategic_crossroads": _apply_strategic_crossroads,
 }

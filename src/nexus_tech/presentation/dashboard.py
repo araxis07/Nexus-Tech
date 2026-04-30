@@ -60,6 +60,7 @@ from nexus_tech.simulation.market import get_market_profile
 from nexus_tech.simulation.meta_progression import (
     ArchiveComparisonSummary,
     MetaProgressionSummary,
+    UnlockCatalogSummary,
     build_archive_comparison,
 )
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
@@ -1202,6 +1203,46 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
     )
 
 
+def render_unlock_catalog(console: Console, summary: UnlockCatalogSummary) -> None:
+    """Render the explicit archive unlock catalog."""
+
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Rewards", f"{summary.unlocked_rewards}/{summary.total_rewards}")
+    overview.add_row("Mix", ", ".join(summary.reward_mix) if summary.reward_mix else "-")
+    overview.add_row("Next Unlock", summary.next_unlock_label)
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Status", style="bold")
+    table.add_column("Type")
+    table.add_column("Reward")
+    table.add_column("Reward Id")
+    table.add_column("Achievement")
+    for entry in summary.entries:
+        table.add_row(
+            "unlocked" if entry.unlocked else "locked",
+            entry.reward_type,
+            entry.reward_name,
+            entry.reward_id,
+            entry.title,
+        )
+
+    highlights = (
+        "\n".join(f"- {entry.reward_label}" for entry in summary.entries if entry.unlocked)
+        or "No archive rewards unlocked yet."
+    )
+    console.print(
+        Columns(
+            [
+                Panel(overview, title="Unlock Overview", border_style="cyan", expand=True),
+                Panel(highlights, title="Unlocked Rewards", border_style="yellow", expand=True),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
+    console.print(Panel(table, title="Unlock Catalog", border_style="green", expand=True))
+
+
 def render_turn_resolution(console: Console, resolution: TurnResolution) -> None:
     """Render the end-of-turn summary."""
 
@@ -1270,7 +1311,9 @@ def render_victory(console: Console, state: GameState) -> None:
     if state.exit_outcome is not None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
         content.add_row("Exit Path", exit_evaluation.title)
+        content.add_row("Exit Variant", exit_evaluation.ending_variant)
         content.add_row("Exit Value", format_money(exit_evaluation.offer_value))
+        content.add_row("Exit Tags", ", ".join(exit_evaluation.outcome_tags))
         content.add_row("Board Readout", exit_evaluation.board_readout)
         content.add_row("Next Chapter", exit_evaluation.next_chapter)
         content.add_row("Exit Summary", state.exit_summary or exit_evaluation.summary)
@@ -2084,6 +2127,11 @@ def _build_action_menu_panel() -> Panel:
         "set_capital_plan",
         "Change reserve posture and preferred capital source.",
     )
+    primary_actions.add_row(
+        "74",
+        "renegotiate_partnership",
+        "Trade some margin for a calmer channel relationship.",
+    )
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
     utility_actions.add_column("Key", justify="center", style="bold cyan")
@@ -2390,6 +2438,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     table.add_row("Grade", run_score.campaign_grade)
     table.add_row("Exit Path", exit_evaluation.title)
+    table.add_row("Exit Variant", exit_evaluation.ending_variant)
     table.add_row("Exit Outlook", readiness.strategic_outlook.replace("_", " "))
     table.add_row("Exit Value", format_money(exit_evaluation.offer_value))
     table.add_row(
@@ -2407,6 +2456,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Headcount", str(len(state.employees)))
     table.add_row("Milestones", str(len(state.milestone_history)))
     table.add_row("Badges", ", ".join(badges))
+    table.add_row("Exit Tags", ", ".join(exit_evaluation.outcome_tags))
     table.add_row("Segments", ", ".join(active_segments) if active_segments else "-")
     table.add_row("Board Readout", exit_evaluation.board_readout)
     table.add_row("Next Chapter", exit_evaluation.next_chapter)
@@ -2745,6 +2795,9 @@ def _build_finance_panel(state: GameState) -> Panel:
     )
     table.add_row("Reserve Gap", format_signed_money(planner.reserve_gap))
     table.add_row("Rec. Posture", planner.recommended_posture)
+    table.add_row("Reserve Risk", planner.reserve_break_risk)
+    table.add_row("Alloc Signal", planner.allocation_signal)
+    table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
     table.add_row("Planner Alert", planner.capital_alert)
     table.add_row("Planner", planner.summary)
     return Panel(table, title="Finance", border_style="cyan", expand=True)
@@ -2927,6 +2980,13 @@ def _render_archive_comparison_summary(
     coverage.add_row(
         "Outcomes",
         ", ".join(comparison.outcome_mix) if comparison.outcome_mix else "-",
+    )
+    coverage.add_row("Dominant", comparison.dominant_path.replace("_", " "))
+    coverage.add_row(
+        "Missing",
+        ", ".join(path.replace("_", " ") for path in comparison.missing_outcomes)
+        if comparison.missing_outcomes
+        else "-",
     )
     coverage.add_row(
         "Grades",

@@ -308,6 +308,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_partner_breakdown_event,
         ),
         EventDefinition(
+            event_id="partner_renegotiation",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_partner_renegotiation_weight,
+            cooldown_turns=BALANCE.event_partner_renegotiation_cooldown,
+            is_eligible=_is_partner_renegotiation_eligible,
+            build_pending_event=_build_partner_renegotiation_event,
+        ),
+        EventDefinition(
             event_id="board_recovery_window",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_board_recovery_window_weight,
@@ -330,6 +338,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_succession_gap_cooldown,
             is_eligible=_is_succession_gap_eligible,
             build_pending_event=_build_succession_gap_event,
+        ),
+        EventDefinition(
+            event_id="strategic_crossroads",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_strategic_crossroads_weight,
+            cooldown_turns=BALANCE.event_strategic_crossroads_cooldown,
+            is_eligible=_is_strategic_crossroads_eligible,
+            build_pending_event=_build_strategic_crossroads_event,
         ),
     )
 
@@ -2017,6 +2033,63 @@ def _build_partner_breakdown_event(
     )
 
 
+def _is_partner_renegotiation_eligible(state: GameState) -> bool:
+    return any(
+        partnership.status is not PartnershipStatus.PAUSED
+        and partnership.sourced_revenue > 0
+        and partnership.conflict_pressure + partnership.risk
+        >= BALANCE.event_partner_renegotiation_fatigue_threshold
+        for partnership in state.partnerships
+    ) and not _has_recent_event(
+        state,
+        {"partner_breakdown", "partner_qbr"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_partner_renegotiation_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnership = max(
+        [deal for deal in state.partnerships if deal.status is not PartnershipStatus.PAUSED],
+        key=lambda deal: deal.conflict_pressure + deal.risk + deal.enablement_level,
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    return PendingEvent(
+        event_id="partner_renegotiation",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Partner Renegotiation",
+        description=(
+            f"{partnership.name} wants cleaner economics before scaling {target.name} further. "
+            "You can concede some margin to stabilize the lane or hold the line and risk "
+            "slower growth."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=3,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="concede_margin",
+                label="Concede margin",
+                description=(
+                    "Raise rev-share and calm the relationship before channel damage spreads."
+                ),
+            ),
+            EventOption(
+                id="hold_line",
+                label="Hold the line",
+                description=(
+                    "Protect economics now, but accept user loss and higher board scrutiny."
+                ),
+            ),
+        ],
+    )
+
+
 def _is_board_recovery_window_eligible(state: GameState) -> bool:
     return _has_recent_event(
         state,
@@ -2159,6 +2232,62 @@ def _build_succession_gap_event(
     )
 
 
+def _is_strategic_crossroads_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    return (
+        max(
+            readiness.ipo_readiness_score,
+            readiness.acquisition_interest_score,
+            readiness.independence_score,
+        )
+        >= BALANCE.event_strategic_crossroads_readiness_threshold
+        and state.company.current_turn >= 8
+        and not _has_recent_event(
+            state,
+            {"exit_interest", "board_recovery_window", "capital_market_freeze"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+    )
+
+
+def _build_strategic_crossroads_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    readiness = calculate_endgame_readiness(state)
+    target = _get_primary_product(state.products)
+    return PendingEvent(
+        event_id="strategic_crossroads",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Strategic Crossroads",
+        description=(
+            f"{target.name} is pulling the company toward a "
+            f"{readiness.strategic_outlook.replace('_', ' ')} story. "
+            "You can formalize that path for the board or defend independence and tighten "
+            "operations."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=1,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="formalize_process",
+                label="Formalize the process",
+                description="Spend cash to sharpen the story and improve board conviction.",
+            ),
+            EventOption(
+                id="defend_independence",
+                label="Defend independence",
+                description="Relieve outside pressure and strengthen team conviction instead.",
+            ),
+        ],
+    )
+
+
 def _get_product_by_id(products: list[Product], product_id: UUID) -> Product | None:
     return next((product for product in products if product.id == product_id), None)
 
@@ -2189,6 +2318,13 @@ def _pick_best_employee(
     best_score = max(score(employee) for employee in employees)
     candidates = [employee for employee in employees if score(employee) == best_score]
     return candidates[rng.randint(0, len(candidates) - 1)]
+
+
+def _get_primary_product(products: list[Product]) -> Product:
+    active_products = [product for product in products if product.is_active]
+    if not active_products:
+        raise ValueError("This event expected at least one active product.")
+    return max(active_products, key=lambda product: (product.user_count, product.quality))
 
 
 def get_designer_or_marketer_support(
