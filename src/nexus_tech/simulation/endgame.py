@@ -32,6 +32,8 @@ class ExitEvaluation:
     summary: str
     grade: str
     offer_value: Decimal
+    board_readout: str
+    next_chapter: str
     readiness: EndgameReadiness
 
 
@@ -134,6 +136,8 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             ),
             grade=grade,
             offer_value=offer_value,
+            board_readout="The board sees a controlled public-market narrative with room to scale.",
+            next_chapter="Invest in durability, reporting discipline, and flagship reliability.",
             readiness=readiness,
         )
 
@@ -145,6 +149,10 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             summary="A larger platform could justify acquiring the portfolio and customer base.",
             grade=grade,
             offer_value=offer_value,
+            board_readout="Directors see strategic optionality and credible buyer interest.",
+            next_chapter=(
+                "Increase negotiation leverage through cleaner revenue and calmer support load."
+            ),
             readiness=readiness,
         )
 
@@ -161,6 +169,8 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             ),
             grade=grade,
             offer_value=restructure_value,
+            board_readout="The board is no longer underwriting the current operating shape.",
+            next_chapter="Stabilize cash, cut drag, and narrow the portfolio before growing again.",
             readiness=readiness,
         )
 
@@ -171,6 +181,8 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             summary="The company is not a breakout yet, but it can keep operating independently.",
             grade=grade,
             offer_value=adjusted_value,
+            board_readout="Leadership has earned an independent path with disciplined execution.",
+            next_chapter="Compound renewals, broaden the portfolio carefully, and defend margins.",
             readiness=readiness,
         )
 
@@ -185,6 +197,10 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         ),
         grade=grade,
         offer_value=restructure_value,
+        board_readout=(
+            "The company still has value, but current coordination and cash posture are unstable."
+        ),
+        next_chapter="Reset the operating plan before chasing another scale phase.",
         readiness=readiness,
     )
 

@@ -59,6 +59,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Add open-source, enterprise-AI-ops, vertical-compliance, and community-marketplace templates plus objective-driven scale scenarios
 - Add sales-enablement AI, data-quality, and release-ops templates plus enterprise pipeline, data trust, and release-crunch scenarios
 - Add subscription-billing, support-automation, and revenue-forecast templates plus renewal, support, and board-recovery scenarios
+- Add campaign-ladder and reserve-planning templates plus governance-climb and reserve-discipline scenarios for heavier late-game practice runs
 - Keep scenario and template definitions in JSON so the content layer can grow without rewriting core systems
 - Track scenario-specific objectives with measurable progress such as closed deals, reputation, or enterprise users
 - Support custom company and primary product overrides on top of scenario defaults
@@ -104,6 +105,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Set a capital plan with explicit reserve posture and preferred capital source so runway expectations can differ between conserve, balanced, and expand modes
 - Track explicit endgame readiness across IPO, acquisition, and profitable independence so late-game strategy is easier to read before the run ends
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
+- Review a multi-turn finance planner with projected end-cash and reserve-break visibility instead of relying on one-turn forecast drift alone
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
 - Execute a formal restructure plan when governance pressure becomes too high to ignore
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
@@ -204,6 +206,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track run score, estimated company value, turn history, and victory conditions in the terminal report
 - Classify successful runs into exit paths such as profitable independence, strategic acquisition, IPO-ready, or restructure
 - Summarize completed-run history into archive-driven meta progression with campaign tiers and unlock-style achievement tracking
+- Surface a visible campaign ladder, archive benchmarks, and next-goal hints so repeat runs feel like structured progression instead of isolated saves
 
 ### 💾 Local Save / Load
 
@@ -215,6 +218,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Archive run score tier, campaign grade, and estimated valuation so completed runs are easier to compare later
 - Archive compact run badges such as capital discipline, board trust, and enterprise execution so meta history is easier to scan quickly
 - Archive strategic outlook and modeled offer value so completed runs can be compared by likely business outcome as well as score
+- Compare completed runs through archive benchmarks such as best score, best offer, and exit-path coverage directly in the terminal
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
 - Persist partnerships and capital-plan posture so channel strategy and reserve discipline survive save/load boundaries
 - Persist release plans, sales deals, roadmap projects, competitor intel, scenario objectives, and hiring traits
@@ -227,6 +231,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
 - Finance and support panels now surface forecast scenarios, staffing capacity, and staffing gaps for faster live decision-making
+- Partnership and archive panels now surface portfolio health, dominant channel, archive benchmarks, and campaign-ladder progress for cleaner late-game demos
 - Built-in quick guide flow for onboarding and live demos
 - Built-in first-run tutorial and glossary commands for new players
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history

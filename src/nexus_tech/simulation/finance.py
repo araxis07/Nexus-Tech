@@ -52,6 +52,20 @@ class ForecastScenarioSnapshot:
     projected_runway_turns: int | None
 
 
+@dataclass(frozen=True)
+class FinancePlannerSnapshot:
+    """Multi-turn capital-planning view derived from current forecast posture."""
+
+    horizon_turns: int
+    base_end_cash: Decimal
+    conservative_end_cash: Decimal
+    aggressive_end_cash: Decimal
+    reserve_hit_turn_base: int | None
+    reserve_hit_turn_conservative: int | None
+    reserve_hit_turn_aggressive: int | None
+    summary: str
+
+
 def count_funding_rounds(
     funding_history: list[FundingHistoryEntry],
     funding_type: FundingType,
@@ -174,6 +188,81 @@ def calculate_cash_flow_forecast_scenarios(
             projected_runway_turns=estimate_runway(cash_on_hand, aggressive_forecast),
         ),
     )
+
+
+def build_finance_planner(
+    company: Company,
+    finance: FinanceState,
+    turn_history: list[TurnLedgerEntry],
+    *,
+    latest_net_cash_flow: Decimal,
+    capital_plan: CapitalPlan,
+) -> FinancePlannerSnapshot:
+    """Project end-cash and reserve stress over the active planning horizon."""
+
+    base, conservative, aggressive = calculate_cash_flow_forecast_scenarios(
+        company.cash_on_hand,
+        turn_history,
+        latest_net_cash_flow=latest_net_cash_flow,
+        finance=finance,
+        capital_plan=capital_plan,
+    )
+    horizon = capital_plan.planning_horizon_turns
+    base_end_cash, base_hit_turn = _project_cash_position(
+        company.cash_on_hand,
+        base.projected_net_cash_flow,
+        reserve_target=capital_plan.reserve_target,
+        horizon_turns=horizon,
+    )
+    conservative_end_cash, conservative_hit_turn = _project_cash_position(
+        company.cash_on_hand,
+        conservative.projected_net_cash_flow,
+        reserve_target=capital_plan.reserve_target,
+        horizon_turns=horizon,
+    )
+    aggressive_end_cash, aggressive_hit_turn = _project_cash_position(
+        company.cash_on_hand,
+        aggressive.projected_net_cash_flow,
+        reserve_target=capital_plan.reserve_target,
+        horizon_turns=horizon,
+    )
+    if conservative_hit_turn == 1:
+        summary = "The current capital plan falls below the reserve target almost immediately."
+    elif conservative_hit_turn is not None:
+        summary = (
+            f"Conservative execution breaks the reserve target by turn {conservative_hit_turn}."
+        )
+    elif base_end_cash >= capital_plan.reserve_target:
+        summary = "The active plan stays above the reserve target across the planning horizon."
+    else:
+        summary = "The plan holds for now, but reserve discipline is not yet secure."
+
+    return FinancePlannerSnapshot(
+        horizon_turns=horizon,
+        base_end_cash=base_end_cash,
+        conservative_end_cash=conservative_end_cash,
+        aggressive_end_cash=aggressive_end_cash,
+        reserve_hit_turn_base=base_hit_turn,
+        reserve_hit_turn_conservative=conservative_hit_turn,
+        reserve_hit_turn_aggressive=aggressive_hit_turn,
+        summary=summary,
+    )
+
+
+def _project_cash_position(
+    starting_cash: Decimal,
+    turn_cash_flow: Decimal,
+    *,
+    reserve_target: Decimal,
+    horizon_turns: int,
+) -> tuple[Decimal, int | None]:
+    cash = starting_cash
+    reserve_hit_turn: int | None = None
+    for turn in range(1, horizon_turns + 1):
+        cash = quantize_money(cash + turn_cash_flow)
+        if reserve_hit_turn is None and cash < reserve_target:
+            reserve_hit_turn = turn
+    return cash, reserve_hit_turn
 
 
 def _adjust_forecast(net_cash_flow: Decimal, *, drag: Decimal) -> Decimal:

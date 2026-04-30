@@ -782,5 +782,43 @@
     "target_segment": "enterprise",
     "pricing_tier": "premium",
     "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "campaign_ladder_console",
+    "title": "Campaign Ladder Console",
+    "description": "A durable multi-product operations console that rewards archive-worthy execution, cleaner governance posture, and measured expansion.",
+    "lifecycle_stage": "prototype",
+    "quality": 50,
+    "bug_level": 13,
+    "market_fit": 33,
+    "technical_debt": 16,
+    "user_count": 0,
+    "revenue_per_user": "68.00",
+    "feature_count": 0,
+    "maintenance_cost": "305.00",
+    "acquisition_rate": "0.0280",
+    "churn_rate": "0.0570",
+    "target_segment": "smb",
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
+  },
+  {
+    "template_id": "reserve_planner_hub",
+    "title": "Reserve Planner Hub",
+    "description": "A finance-heavy planning platform that compounds through disciplined reserve management, calmer billing operations, and steady commercial expansion.",
+    "lifecycle_stage": "prototype",
+    "quality": 49,
+    "bug_level": 14,
+    "market_fit": 32,
+    "technical_debt": 17,
+    "user_count": 0,
+    "revenue_per_user": "72.00",
+    "feature_count": 0,
+    "maintenance_cost": "315.00",
+    "acquisition_rate": "0.0270",
+    "churn_rate": "0.0550",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium",
+    "packaging_strategy": "modular"
   }
 ]

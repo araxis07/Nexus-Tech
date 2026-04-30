@@ -23,6 +23,7 @@ class MetaProgressionSummary:
     campaign_tier: str
     campaign_stage: str
     achievement_progress: str
+    campaign_ladder: tuple[str, ...]
     unlocks_remaining: tuple[str, ...]
     archive_highlights: tuple[str, ...]
     next_goal: str
@@ -45,6 +46,13 @@ def summarize_meta_progression(
             campaign_tier="unranked",
             campaign_stage="foundation",
             achievement_progress="0/11 core achievements",
+            campaign_ladder=(
+                "1. foundation [pending]",
+                "2. portfolio [pending]",
+                "3. operator [pending]",
+                "4. institutional [pending]",
+                "5. franchise [pending]",
+            ),
             unlocks_remaining=(
                 "first_archive",
                 "first_victory",
@@ -117,6 +125,25 @@ def summarize_meta_progression(
         ),
     )
     achievement_progress = f"{len(unlocks)}/{len(achievement_checks)} core achievements"
+    campaign_ladder = (
+        _format_ladder_step("foundation", len(unlocks) >= 1, 1),
+        _format_ladder_step(
+            "portfolio",
+            campaign_stage in {"portfolio", "operator", "institutional", "franchise"},
+            2,
+        ),
+        _format_ladder_step(
+            "operator",
+            campaign_stage in {"operator", "institutional", "franchise"},
+            3,
+        ),
+        _format_ladder_step(
+            "institutional",
+            campaign_stage in {"institutional", "franchise"},
+            4,
+        ),
+        _format_ladder_step("franchise", campaign_stage == "franchise", 5),
+    )
 
     if victories == 0:
         next_goal = "Push one run to a victory state to unlock the next campaign tier."
@@ -138,7 +165,13 @@ def summarize_meta_progression(
         campaign_tier=campaign_tier,
         campaign_stage=campaign_stage,
         achievement_progress=achievement_progress,
+        campaign_ladder=campaign_ladder,
         unlocks_remaining=unlocks_remaining,
         archive_highlights=archive_highlights,
         next_goal=next_goal,
     )
+
+
+def _format_ladder_step(label: str, complete: bool, step: int) -> str:
+    status = "done" if complete else "pending"
+    return f"{step}. {label} [{status}]"

@@ -89,7 +89,11 @@ from nexus_tech.simulation.economy import (
     calculate_total_salary_cost,
 )
 from nexus_tech.simulation.employee_progression import apply_end_of_turn_employee_progression
-from nexus_tech.simulation.endgame import apply_exit_outcome, calculate_endgame_readiness
+from nexus_tech.simulation.endgame import (
+    apply_exit_outcome,
+    calculate_endgame_readiness,
+    evaluate_exit_outcome,
+)
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.event_registry import EventDefinition, get_event_registry
 from nexus_tech.simulation.events import (
@@ -100,6 +104,7 @@ from nexus_tech.simulation.events import (
 )
 from nexus_tech.simulation.finance import (
     apply_end_of_turn_finance_drift,
+    build_finance_planner,
     calculate_cash_flow_forecast_scenarios,
 )
 from nexus_tech.simulation.governance import (
@@ -126,7 +131,10 @@ from nexus_tech.simulation.meta_progression import summarize_meta_progression
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
-from nexus_tech.simulation.partnerships import apply_end_of_turn_partnerships
+from nexus_tech.simulation.partnerships import (
+    apply_end_of_turn_partnerships,
+    calculate_partnership_portfolio,
+)
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.pricing import (
     calculate_effective_revenue_per_user,
@@ -1189,6 +1197,96 @@ def test_three_turn_gameplay_integration_remains_stable() -> None:
     assert state.employees[0].assigned_product_id == new_product.id
     assert len(state.turn_history) == 3
     assert state.company.cash_on_hand != BALANCE.starting_cash
+
+
+def test_thirty_turn_long_run_simulation_remains_stable() -> None:
+    products = [
+        make_product(
+            "Core Suite",
+            lifecycle_stage=LifecycleStage.GROWTH,
+            quality=62,
+            bug_level=16,
+            market_fit=56,
+            technical_debt=24,
+            user_count=38,
+            revenue_per_user=Decimal("28.00"),
+            maintenance_cost=Decimal("300.00"),
+            acquisition_rate=Decimal("0.0320"),
+            churn_rate=Decimal("0.0380"),
+            pricing_tier=PricingTier.PREMIUM,
+            packaging_strategy=PackagingStrategy.SUITE,
+            target_segment=MarketSegment.ENTERPRISE,
+        ),
+        make_product(
+            "Ops Edge",
+            lifecycle_stage=LifecycleStage.GROWTH,
+            quality=58,
+            bug_level=18,
+            market_fit=52,
+            technical_debt=26,
+            user_count=24,
+            revenue_per_user=Decimal("22.00"),
+            maintenance_cost=Decimal("240.00"),
+            acquisition_rate=Decimal("0.0300"),
+            churn_rate=Decimal("0.0400"),
+            packaging_strategy=PackagingStrategy.MODULAR,
+            target_segment=MarketSegment.SMB,
+        ),
+    ]
+    manager = make_employee(
+        "Mira Holt",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=products[0].id,
+        leadership_score=80,
+    )
+    manager.is_team_lead = True
+    employees = [
+        manager,
+        make_employee(
+            "Dev Lin",
+            EmployeeRole.ENGINEER,
+            seniority=Seniority.SENIOR,
+            assigned_product_id=products[0].id,
+            manager_id=manager.id,
+        ),
+        make_employee(
+            "June Park",
+            EmployeeRole.MARKETER,
+            assigned_product_id=products[1].id,
+            manager_id=manager.id,
+        ),
+        make_employee(
+            "Rae Ito",
+            EmployeeRole.DESIGNER,
+            assigned_product_id=products[1].id,
+            manager_id=manager.id,
+        ),
+    ]
+    state = make_state(
+        *products,
+        employees=employees,
+        cash_on_hand=Decimal("45000.00"),
+        current_turn=1,
+        market_cycle=MarketCycle.EXPANDING,
+        market_cycle_turns_remaining=3,
+        campaign_goal_id=CampaignGoalId.PORTFOLIO_EMPIRE,
+    )
+    state.finance.debt_principal = Decimal("6500.00")
+    state.finance.investor_pressure = 18
+    rng = RandomSource(seed=73)
+
+    for _ in range(30):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            state = resolve_pending_event(state, state.pending_event.options[0].id).state
+        if state.company.game_over:
+            break
+
+    assert state.company.current_turn >= 20
+    assert len(state.turn_history) >= 19
+    assert state.turn_history[-1].cash_on_hand == state.company.cash_on_hand
 
 
 def test_weighted_selection_prefers_heavier_event() -> None:
@@ -4592,6 +4690,74 @@ def test_endgame_readiness_surfaces_acquisition_and_ipo_scores() -> None:
     }
 
 
+def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
+    product = make_product(
+        "Exit Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=210,
+        market_fit=74,
+        technical_debt=14,
+        bug_level=10,
+    )
+    state = make_state(product, cash_on_hand=Decimal("26000.00"))
+    state.company.reputation = 78
+    state.finance.board_confidence = 82
+    state.finance.board_score = 79
+    state.finance.board_team_health_score = 76
+    state.finance.governance_risk = 10
+    state.finance.restructuring_pressure = 1
+
+    evaluation = evaluate_exit_outcome(state, calculate_run_score(state))
+
+    assert evaluation.board_readout
+    assert evaluation.next_chapter
+    assert evaluation.outcome in {
+        ExitOutcome.IPO_READY,
+        ExitOutcome.STRATEGIC_ACQUISITION,
+        ExitOutcome.PROFITABLE_INDEPENDENCE,
+        ExitOutcome.RESTRUCTURE,
+    }
+
+
+def test_finance_planner_projects_horizon_cash_positions() -> None:
+    product = make_product("Planner Core", user_count=120)
+    state = make_state(product, cash_on_hand=Decimal("9000.00"))
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.BOOTSTRAP,
+        planning_horizon_turns=6,
+        reserve_target=Decimal("5000.00"),
+        product_investment_share=35,
+        go_to_market_share=35,
+        reserve_share=30,
+    )
+    state.turn_history = [
+        TurnLedgerEntry(
+            turn=1,
+            total_revenue=Decimal("4200.00"),
+            total_operating_cost=Decimal("4650.00"),
+            net_cash_flow=Decimal("-450.00"),
+            cash_on_hand=Decimal("9550.00"),
+            reputation=60,
+            total_users=110,
+            headcount=0,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        )
+    ]
+
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-400.00"),
+        capital_plan=state.capital_plan,
+    )
+
+    assert planner.horizon_turns == 6
+    assert planner.conservative_end_cash <= planner.aggressive_end_cash
+    assert planner.summary
+
+
 def test_bridge_round_event_applies_cash_and_dilution() -> None:
     product = make_product("Bridge Core")
     capital_plan = CapitalPlan(
@@ -4692,6 +4858,41 @@ def test_partnership_turn_summary_adds_users_revenue_and_support_pressure() -> N
     assert summary.sourced_revenue > Decimal("0.00")
     assert state.support_program.onboarding_ticket_pressure > 0
     assert state.products[0].user_count > 40
+
+
+def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
+    product = make_product("Partner Hub")
+    partnerships = [
+        PartnershipDeal(
+            name="Reseller",
+            product_id=product.id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.ACTIVE,
+            sourced_revenue=Decimal("1200.00"),
+            sourced_users=18,
+            quality=70,
+            risk=28,
+        ),
+        PartnershipDeal(
+            name="Marketplace",
+            product_id=product.id,
+            channel=PartnerChannel.MARKETPLACE,
+            status=PartnershipStatus.STRAINED,
+            sourced_revenue=Decimal("820.00"),
+            sourced_users=12,
+            quality=62,
+            risk=46,
+        ),
+    ]
+    state = make_state(product, partnerships=partnerships)
+
+    summary = calculate_partnership_portfolio(state)
+
+    assert summary.total_count == 2
+    assert summary.active_count == 1
+    assert summary.strained_count == 1
+    assert summary.sourced_revenue == Decimal("2020.00")
+    assert summary.dominant_channel in {"reseller", "marketplace"}
 
 
 def test_partnership_neglect_and_channel_crowding_raise_conflict_pressure() -> None:
@@ -4921,5 +5122,6 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert "channel_builder" in summary.unlocked_achievements
     assert summary.campaign_stage in {"operator", "institutional"}
     assert "core achievements" in summary.achievement_progress
+    assert summary.campaign_ladder
     assert summary.archive_highlights
     assert summary.campaign_tier in {"silver", "gold"}

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.30.0 - 2026-04-30
+
+- Expanded archive-derived progression with a visible campaign ladder, richer archive benchmarks, and clearer next-goal guidance so repeat runs now read more like a structured campaign layer
+- Deepened late-game reporting through explicit board readouts, next-chapter guidance, partnership portfolio summaries, and a multi-turn finance planner that surfaces reserve-break risk
+- Added long-run hardening coverage for thirty-turn simulation stability, richer exit evaluation reporting, and multi-turn save/load round trips after live gameplay progression
+- Expanded the content pack again with new campaign-ladder and reserve-planning templates, new governance and reserve-discipline scenarios, and matching late-scale rival archetypes
+- Promoted the package version to `0.30.0`
+
 ## 0.29.0 - 2026-04-30
 
 - Expanded archive-derived meta progression with campaign stages, achievement progress, outcome coverage, and archive highlights so late-game history now feels more like a real progression layer

@@ -48,6 +48,7 @@ from nexus_tech.simulation.endgame import calculate_endgame_readiness, evaluate_
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import (
+    build_finance_planner,
     calculate_cash_flow_forecast_scenarios,
     estimate_runway,
 )
@@ -59,6 +60,7 @@ from nexus_tech.simulation.market import get_market_profile
 from nexus_tech.simulation.meta_progression import MetaProgressionSummary
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
+from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_badges, calculate_run_score
 from nexus_tech.simulation.roadmap import (
@@ -520,7 +522,31 @@ def render_run_archive_catalog(
             archive.archived_at,
         )
 
-    console.print(Panel(table, title="Run Archives", border_style="green", expand=True))
+    best_archive = max(archives, key=lambda archive: archive.total_score)
+    latest_archive = archives[0]
+    outcome_count = len({archive.exit_outcome for archive in archives if archive.exit_outcome})
+    summary_table = Table.grid(padding=(0, 1))
+    summary_table.add_row("Runs", str(len(archives)))
+    summary_table.add_row(
+        "Latest", f"{latest_archive.exit_outcome} / turn {latest_archive.completed_turn}"
+    )
+    summary_table.add_row(
+        "Best Score", f"{best_archive.total_score} ({best_archive.campaign_grade})"
+    )
+    summary_table.add_row(
+        "Best Offer", format_money(max(archive.offer_value for archive in archives))
+    )
+    summary_table.add_row("Outcome Coverage", str(outcome_count))
+    console.print(
+        Columns(
+            [
+                Panel(summary_table, title="Archive Benchmarks", border_style="green", expand=True),
+                Panel(table, title="Run Archives", border_style="green", expand=True),
+            ],
+            equal=False,
+            expand=True,
+        )
+    )
 
 
 def render_quick_guide(console: Console) -> None:
@@ -1126,10 +1152,12 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
         ", ".join(summary.unlocks_remaining[:3]) if summary.unlocks_remaining else "-",
     )
     highlights = "\n".join(f"- {line}" for line in summary.archive_highlights)
+    ladder = "\n".join(summary.campaign_ladder)
     console.print(
         Columns(
             [
                 Panel(overview, title="Meta Progression", border_style="cyan", expand=True),
+                Panel(ladder, title="Campaign Ladder", border_style="blue", expand=True),
                 Panel(highlights, title="Archive Highlights", border_style="magenta", expand=True),
                 Panel(summary.next_goal, title="Next Goal", border_style="green", expand=True),
             ],
@@ -1208,6 +1236,8 @@ def render_victory(console: Console, state: GameState) -> None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
         content.add_row("Exit Path", exit_evaluation.title)
         content.add_row("Exit Value", format_money(exit_evaluation.offer_value))
+        content.add_row("Board Readout", exit_evaluation.board_readout)
+        content.add_row("Next Chapter", exit_evaluation.next_chapter)
         content.add_row("Exit Summary", state.exit_summary or exit_evaluation.summary)
     content.add_row("Portfolio Users", str(run_score.total_users))
     content.add_row("Key Accounts", str(run_score.key_accounts))
@@ -2324,6 +2354,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table = Table.grid(padding=(0, 1))
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     table.add_row("Grade", run_score.campaign_grade)
+    table.add_row("Exit Path", exit_evaluation.title)
     table.add_row("Exit Outlook", readiness.strategic_outlook.replace("_", " "))
     table.add_row("Exit Value", format_money(exit_evaluation.offer_value))
     table.add_row(
@@ -2342,6 +2373,8 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Milestones", str(len(state.milestone_history)))
     table.add_row("Badges", ", ".join(badges))
     table.add_row("Segments", ", ".join(active_segments) if active_segments else "-")
+    table.add_row("Board Readout", exit_evaluation.board_readout)
+    table.add_row("Next Chapter", exit_evaluation.next_chapter)
     return Panel(table, title="Scorecard", border_style="yellow", expand=True)
 
 
@@ -2618,6 +2651,13 @@ def _build_finance_panel(state: GameState) -> Panel:
         if state.finance.debt_principal > Decimal("0")
         else Decimal("0.00")
     )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=_latest_net_cash_flow(state),
+        capital_plan=state.capital_plan,
+    )
     table = Table.grid(padding=(0, 1))
     table.add_row("Debt", format_money(state.finance.debt_principal))
     table.add_row("Dilution", format_rate(state.finance.equity_dilution))
@@ -2651,6 +2691,24 @@ def _build_finance_panel(state: GameState) -> Panel:
         if aggressive_forecast.projected_runway_turns is None
         else f"{aggressive_forecast.projected_runway_turns} turns",
     )
+    table.add_row("Plan Horizon", f"{planner.horizon_turns} turns")
+    table.add_row(
+        "End Cash",
+        (
+            f"B {format_money(planner.base_end_cash)} / "
+            f"C {format_money(planner.conservative_end_cash)} / "
+            f"A {format_money(planner.aggressive_end_cash)}"
+        ),
+    )
+    table.add_row(
+        "Reserve Break",
+        (
+            f"B {planner.reserve_hit_turn_base or '-'} / "
+            f"C {planner.reserve_hit_turn_conservative or '-'} / "
+            f"A {planner.reserve_hit_turn_aggressive or '-'}"
+        ),
+    )
+    table.add_row("Planner", planner.summary)
     return Panel(table, title="Finance", border_style="cyan", expand=True)
 
 
@@ -2711,21 +2769,20 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         )
 
     product_names = {product.id: product.name for product in state.products}
+    portfolio = calculate_partnership_portfolio(state)
     if compact:
-        active_count = sum(1 for deal in state.partnerships if deal.status.value == "active")
-        strained_count = sum(1 for deal in state.partnerships if deal.status.value == "strained")
-        sourced_revenue = sum(
-            (deal.sourced_revenue for deal in state.partnerships),
-            Decimal("0.00"),
-        )
-        sourced_users = sum(deal.sourced_users for deal in state.partnerships)
         channels = sorted({deal.channel.value for deal in state.partnerships})
         table = Table.grid(padding=(0, 1))
-        table.add_row("Count", str(len(state.partnerships)))
+        table.add_row("Count", str(portfolio.total_count))
         table.add_row("Channels", ", ".join(channels))
-        table.add_row("Active / Strained", f"{active_count} / {strained_count}")
-        table.add_row("Sourced Users", str(sourced_users))
-        table.add_row("Sourced Revenue", format_money(sourced_revenue))
+        table.add_row(
+            "Active / Strained / Paused",
+            f"{portfolio.active_count} / {portfolio.strained_count} / {portfolio.paused_count}",
+        )
+        table.add_row("Dominant", portfolio.dominant_channel)
+        table.add_row("Sourced Users", str(portfolio.sourced_users))
+        table.add_row("Sourced Revenue", format_money(portfolio.sourced_revenue))
+        table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 
     table = Table(box=box.SIMPLE_HEAVY, expand=True)

@@ -39,6 +39,22 @@ class PartnershipTurnSummary:
     summary: str
 
 
+@dataclass(frozen=True)
+class PartnershipPortfolioSummary:
+    """Aggregated channel-health summary for dashboards and reports."""
+
+    total_count: int
+    active_count: int
+    strained_count: int
+    paused_count: int
+    dominant_channel: str
+    sourced_revenue: Decimal
+    sourced_users: int
+    average_quality: int
+    average_risk: int
+    summary: str
+
+
 def get_partnership_by_id(
     partnerships: list[PartnershipDeal],
     partnership_id: UUID | None,
@@ -351,6 +367,68 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
         sourced_users=sourced_users,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
+        summary=summary,
+    )
+
+
+def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSummary:
+    """Summarize channel-health and sourced contribution across active deals."""
+
+    if not state.partnerships:
+        return PartnershipPortfolioSummary(
+            total_count=0,
+            active_count=0,
+            strained_count=0,
+            paused_count=0,
+            dominant_channel="-",
+            sourced_revenue=ZERO_MONEY,
+            sourced_users=0,
+            average_quality=0,
+            average_risk=0,
+            summary="No active channel portfolio yet.",
+        )
+
+    channel_counts: dict[str, int] = {}
+    for partnership in state.partnerships:
+        channel_counts[partnership.channel.value] = (
+            channel_counts.get(partnership.channel.value, 0) + 1
+        )
+    dominant_channel = max(channel_counts.items(), key=lambda item: item[1])[0]
+    sourced_revenue = quantize_money(
+        sum((partnership.sourced_revenue for partnership in state.partnerships), ZERO_MONEY)
+    )
+    sourced_users = sum(partnership.sourced_users for partnership in state.partnerships)
+    active_count = sum(
+        1 for partnership in state.partnerships if partnership.status is PartnershipStatus.ACTIVE
+    )
+    strained_count = sum(
+        1 for partnership in state.partnerships if partnership.status is PartnershipStatus.STRAINED
+    )
+    paused_count = sum(
+        1 for partnership in state.partnerships if partnership.status is PartnershipStatus.PAUSED
+    )
+    average_quality = sum(partnership.quality for partnership in state.partnerships) // len(
+        state.partnerships
+    )
+    average_risk = sum(partnership.risk for partnership in state.partnerships) // len(
+        state.partnerships
+    )
+    if paused_count > 0:
+        summary = "Some channels are paused and need recovery before they can scale again."
+    elif strained_count > 0:
+        summary = "The partner portfolio is producing demand, but at least one lane is strained."
+    else:
+        summary = "The partner portfolio is contributing without visible channel distress."
+    return PartnershipPortfolioSummary(
+        total_count=len(state.partnerships),
+        active_count=active_count,
+        strained_count=strained_count,
+        paused_count=paused_count,
+        dominant_channel=dominant_channel,
+        sourced_revenue=sourced_revenue,
+        sourced_users=sourced_users,
+        average_quality=average_quality,
+        average_risk=average_risk,
         summary=summary,
     )
 

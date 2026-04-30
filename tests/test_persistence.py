@@ -73,6 +73,8 @@ from nexus_tech.domain.models import (
 from nexus_tech.persistence.database import DatabaseManager
 from nexus_tech.persistence.errors import CorruptSaveError, SaveNotFoundError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
+from nexus_tech.simulation.engine import resolve_turn
+from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
 
 
@@ -821,6 +823,32 @@ def test_save_then_load_round_trip_preserves_full_state_and_rng(tmp_path: Path) 
     loaded = coordinator.load_game(DEFAULT_SAVE_SLOT)
 
     assert loaded.slot_name == DEFAULT_SAVE_SLOT
+    assert loaded.state.model_dump() == state.model_dump()
+    assert loaded.rng.randint(1, 100) == expected_next_roll
+
+
+def test_save_then_load_round_trip_after_multi_turn_progression(tmp_path: Path) -> None:
+    db_path = tmp_path / "multi-turn-round-trip.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    state = make_state()
+    rng = RandomSource(seed=41)
+
+    for _ in range(4):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            option_id = state.pending_event.options[0].id
+            state = resolve_pending_event(state, option_id).state
+        if state.company.game_over:
+            break
+
+    coordinator.save_game(DEFAULT_SAVE_SLOT, state, rng)
+    expected_next_roll = rng.randint(1, 100)
+
+    loaded = coordinator.load_game(DEFAULT_SAVE_SLOT)
+
+    assert loaded.state.company.current_turn >= 5
+    assert len(loaded.state.turn_history) >= 2
     assert loaded.state.model_dump() == state.model_dump()
     assert loaded.rng.randint(1, 100) == expected_next_roll
 

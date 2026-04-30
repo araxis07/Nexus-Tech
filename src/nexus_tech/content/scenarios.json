@@ -3595,5 +3595,151 @@
       "board_confidence": 43,
       "total_raised": "8600.00"
     }
+  },
+  {
+    "scenario_id": "campaign_ladder_climb",
+    "title": "Campaign Ladder Climb",
+    "description": "The company already has a credible product core, but the next jump depends on cleaner governance, calmer support, and repeatable expansion.",
+    "objective": "Finish with a credible higher-tier run by improving reputation and stabilizing the account base.",
+    "objective_metric": "reputation",
+    "objective_target": 76,
+    "company_name": "Northstar Ladder",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "premium_expansion",
+    "budget_stance": "balanced",
+    "market_cycle": "expanding",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "11200.00",
+    "reputation": 58,
+    "products": [
+      {
+        "key": "ladder",
+        "template_id": "campaign_ladder_console",
+        "name": "Northstar Ladder",
+        "lifecycle_stage": "growth",
+        "quality": 60,
+        "bug_level": 18,
+        "market_fit": 57,
+        "technical_debt": 24,
+        "user_count": 88,
+        "revenue_per_user": "66.00",
+        "feature_count": 3,
+        "maintenance_cost": "320.00",
+        "acquisition_rate": "0.0310",
+        "churn_rate": "0.0520",
+        "target_segment": "smb",
+        "pricing_tier": "premium",
+        "packaging_strategy": "suite"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Mara Quinn",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "scale_ops",
+        "assigned_product_key": "ladder",
+        "energy": 74,
+        "morale": 68
+      },
+      {
+        "full_name": "Jon Reed",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "expansion",
+        "assigned_product_key": "ladder",
+        "energy": 77,
+        "morale": 70
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Boardroom Climber",
+        "archetype_id": "durability_board_house"
+      }
+    ],
+    "finance": {
+      "debt_principal": "2600.00",
+      "loan_interest_rate": "0.0280",
+      "equity_dilution": "0.0500",
+      "investor_pressure": 11,
+      "board_confidence": 55,
+      "total_raised": "6400.00"
+    }
+  },
+  {
+    "scenario_id": "reserve_discipline_run",
+    "title": "Reserve Discipline Run",
+    "description": "Growth is available, but only if the company can stay above reserve targets while billing pressure and partner noise keep chipping at cash.",
+    "objective": "Protect the reserve while building a finance story that can survive late-game pressure.",
+    "objective_metric": "cash",
+    "objective_target": 14000,
+    "company_name": "Reserve Orbit",
+    "company_strategy": "efficiency",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "profit_machine",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "lean",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 4,
+    "cash_on_hand": "9800.00",
+    "reputation": 54,
+    "products": [
+      {
+        "key": "planner",
+        "template_id": "reserve_planner_hub",
+        "name": "Reserve Orbit",
+        "lifecycle_stage": "growth",
+        "quality": 59,
+        "bug_level": 17,
+        "market_fit": 55,
+        "technical_debt": 22,
+        "user_count": 74,
+        "revenue_per_user": "70.00",
+        "feature_count": 2,
+        "maintenance_cost": "328.00",
+        "acquisition_rate": "0.0280",
+        "churn_rate": "0.0510",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Elise Ward",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "planner",
+        "energy": 73,
+        "morale": 67
+      },
+      {
+        "full_name": "Niko Shah",
+        "role": "product_manager",
+        "seniority": "mid",
+        "specialization": "finance_ops",
+        "assigned_product_key": "planner",
+        "energy": 76,
+        "morale": 69
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Channel Capital Broker",
+        "archetype_id": "channel_capital_broker"
+      }
+    ],
+    "finance": {
+      "debt_principal": "3400.00",
+      "loan_interest_rate": "0.0310",
+      "equity_dilution": "0.0600",
+      "investor_pressure": 13,
+      "board_confidence": 49,
+      "total_raised": "7200.00"
+    }
   }
 ]

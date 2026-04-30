@@ -328,5 +328,31 @@
     "current_move": "discount_push",
     "momentum": 69,
     "funding_level": 2
+  },
+  {
+    "archetype_id": "durability_board_house",
+    "title": "Durability Board House",
+    "description": "A governance-first rival that compounds through steadier board optics, calmer support posture, and disciplined portfolio expansion.",
+    "focus_segment": "enterprise",
+    "strength": 77,
+    "aggression": 50,
+    "pricing_tier": "premium",
+    "active_product_count": 2,
+    "current_move": "hold",
+    "momentum": 62,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "channel_capital_broker",
+    "title": "Channel Capital Broker",
+    "description": "A capital-savvy rival that leans on partners, reserve discipline, and commercial patience to outlast weaker operators.",
+    "focus_segment": "smb",
+    "strength": 75,
+    "aggression": 58,
+    "pricing_tier": "standard",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 64,
+    "funding_level": 2
   }
 ]
