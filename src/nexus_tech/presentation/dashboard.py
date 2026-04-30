@@ -57,10 +57,17 @@ from nexus_tech.simulation.governance import get_governance_tradeoff_focus
 from nexus_tech.simulation.hiring import CandidateProfile
 from nexus_tech.simulation.late_game import calculate_late_game_summary
 from nexus_tech.simulation.market import get_market_profile
-from nexus_tech.simulation.meta_progression import MetaProgressionSummary
+from nexus_tech.simulation.meta_progression import (
+    ArchiveComparisonSummary,
+    MetaProgressionSummary,
+    build_archive_comparison,
+)
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
-from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
+from nexus_tech.simulation.partnerships import (
+    calculate_partnership_fatigue,
+    calculate_partnership_portfolio,
+)
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_badges, calculate_run_score
 from nexus_tech.simulation.roadmap import (
@@ -547,6 +554,23 @@ def render_run_archive_catalog(
             expand=True,
         )
     )
+
+
+def render_archive_comparison(console: Console, archives: list[RunArchiveSummary]) -> None:
+    """Render cross-run comparison for archived completed runs."""
+
+    if not archives:
+        console.print(
+            Panel(
+                "No completed runs have been archived yet.",
+                title="Archive Comparison",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+        return
+
+    _render_archive_comparison_summary(console, build_archive_comparison(archives))
 
 
 def render_quick_guide(console: Console) -> None:
@@ -1145,7 +1169,7 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
     )
     overview.add_row(
         "Unlocks",
-        ", ".join(summary.unlocked_achievements),
+        ", ".join(summary.unlocked_achievements) if summary.unlocked_achievements else "-",
     )
     overview.add_row(
         "Remaining",
@@ -1153,13 +1177,24 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
     )
     highlights = "\n".join(f"- {line}" for line in summary.archive_highlights)
     ladder = "\n".join(summary.campaign_ladder)
+    rewards = (
+        "\n".join(f"- {reward}" for reward in summary.unlocked_rewards)
+        if summary.unlocked_rewards
+        else "No archive rewards unlocked yet."
+    )
     console.print(
         Columns(
             [
                 Panel(overview, title="Meta Progression", border_style="cyan", expand=True),
                 Panel(ladder, title="Campaign Ladder", border_style="blue", expand=True),
+                Panel(rewards, title="Unlocked Rewards", border_style="yellow", expand=True),
                 Panel(highlights, title="Archive Highlights", border_style="magenta", expand=True),
-                Panel(summary.next_goal, title="Next Goal", border_style="green", expand=True),
+                Panel(
+                    f"{summary.next_goal}\n\nNext reward: {summary.next_reward}",
+                    title="Next Goal",
+                    border_style="green",
+                    expand=True,
+                ),
             ],
             equal=True,
             expand=True,
@@ -2708,6 +2743,9 @@ def _build_finance_panel(state: GameState) -> Panel:
             f"A {planner.reserve_hit_turn_aggressive or '-'}"
         ),
     )
+    table.add_row("Reserve Gap", format_signed_money(planner.reserve_gap))
+    table.add_row("Rec. Posture", planner.recommended_posture)
+    table.add_row("Planner Alert", planner.capital_alert)
     table.add_row("Planner", planner.summary)
     return Panel(table, title="Finance", border_style="cyan", expand=True)
 
@@ -2776,12 +2814,16 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Count", str(portfolio.total_count))
         table.add_row("Channels", ", ".join(channels))
         table.add_row(
-            "Active / Strained / Paused",
-            f"{portfolio.active_count} / {portfolio.strained_count} / {portfolio.paused_count}",
+            "Active / Strained / Rec / Paused",
+            (
+                f"{portfolio.active_count} / {portfolio.strained_count} / "
+                f"{portfolio.recovery_count} / {portfolio.paused_count}"
+            ),
         )
         table.add_row("Dominant", portfolio.dominant_channel)
         table.add_row("Sourced Users", str(portfolio.sourced_users))
         table.add_row("Sourced Revenue", format_money(portfolio.sourced_revenue))
+        table.add_row("Avg Fatigue", str(portfolio.average_fatigue))
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 
@@ -2793,6 +2835,7 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
     table.add_column("Enable", justify="right")
     table.add_column("Risk", justify="right")
     table.add_column("Conflict", justify="right")
+    table.add_column("Fatigue", justify="right")
     table.add_column("Rev Share", justify="right")
     table.add_column("Sourced Rev", justify="right")
     for partnership in state.partnerships:
@@ -2804,6 +2847,7 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
             str(partnership.enablement_level),
             str(partnership.risk),
             str(partnership.conflict_pressure),
+            str(calculate_partnership_fatigue(state, partnership)),
             format_rate(partnership.rev_share_rate),
             format_money(partnership.sourced_revenue),
         )
@@ -2860,6 +2904,47 @@ def _build_governance_panel(state: GameState) -> Panel:
     table.add_row("Covenant Risk", str(state.finance.covenant_risk))
     table.add_row("Missed Targets", str(state.finance.missed_board_targets))
     return Panel(table, title="Board / Governance", border_style="magenta", expand=True)
+
+
+def _render_archive_comparison_summary(
+    console: Console,
+    comparison: ArchiveComparisonSummary,
+) -> None:
+    benchmarks = Table.grid(padding=(0, 1))
+    benchmarks.add_row("Runs", str(comparison.compared_runs))
+    benchmarks.add_row("Latest", comparison.latest_label)
+    benchmarks.add_row("Avg Score", str(comparison.average_score))
+    benchmarks.add_row("Avg Offer", format_money(comparison.average_offer_value))
+    benchmarks.add_row("Avg Cash", format_money(comparison.average_final_cash))
+
+    leaders = Table.grid(padding=(0, 1))
+    leaders.add_row("Best Score", comparison.best_score_label)
+    leaders.add_row("Best Offer", comparison.best_offer_label)
+    leaders.add_row("Best Cash", comparison.strongest_cash_label)
+    leaders.add_row("Best Reputation", comparison.strongest_reputation_label)
+
+    coverage = Table.grid(padding=(0, 1))
+    coverage.add_row(
+        "Outcomes",
+        ", ".join(comparison.outcome_mix) if comparison.outcome_mix else "-",
+    )
+    coverage.add_row(
+        "Grades",
+        ", ".join(comparison.grade_mix) if comparison.grade_mix else "-",
+    )
+    coverage.add_row("Recommendation", comparison.recommendation)
+
+    console.print(
+        Columns(
+            [
+                Panel(benchmarks, title="Archive Comparison", border_style="yellow", expand=True),
+                Panel(leaders, title="Run Leaders", border_style="cyan", expand=True),
+                Panel(coverage, title="Coverage", border_style="magenta", expand=True),
+            ],
+            equal=True,
+            expand=True,
+        )
+    )
 
 
 def _build_competitor_table(state: GameState) -> Table:

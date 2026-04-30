@@ -362,6 +362,7 @@ class PartnershipStatus(StrEnum):
 
     ACTIVE = "active"
     STRAINED = "strained"
+    RECOVERY = "recovery"
     PAUSED = "paused"
 
 

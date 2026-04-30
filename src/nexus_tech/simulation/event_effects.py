@@ -23,7 +23,10 @@ from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.economy import is_game_over
 from nexus_tech.simulation.event_registry import get_designer_or_marketer_support
 from nexus_tech.simulation.finance import apply_raise_angel
-from nexus_tech.simulation.partnerships import create_partnership
+from nexus_tech.simulation.partnerships import (
+    calculate_partnership_fatigue,
+    create_partnership,
+)
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 
@@ -1680,6 +1683,123 @@ def _apply_partner_qbr(state: GameState, event: PendingEvent, option_id: str) ->
     raise ValueError(f"Unsupported option {option_id} for partner QBR.")
 
 
+def _apply_partner_breakdown(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_stressed_partnership(state, product.id)
+
+    if option_id == "fund_recovery":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_partner_breakdown_recovery_cost
+        )
+        partnership.status = PartnershipStatus.RECOVERY
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure - BALANCE.event_partner_breakdown_conflict_relief,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_partner_breakdown_risk_relief,
+            0,
+            100,
+        )
+        partnership.quality = clamp_int(
+            partnership.quality + BALANCE.event_partner_breakdown_quality_gain,
+            0,
+            100,
+        )
+        partnership.last_review_turn = state.company.current_turn
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You funded channel recovery for {product.name}. Cash "
+            f"-{BALANCE.event_partner_breakdown_recovery_cost}, conflict "
+            f"-{BALANCE.event_partner_breakdown_conflict_relief}."
+        )
+
+    if option_id == "freeze_lane":
+        partnership.status = PartnershipStatus.PAUSED
+        partnership.conflict_pressure = clamp_int(partnership.conflict_pressure - 6, 0, 100)
+        partnership.risk = clamp_int(partnership.risk - 3, 0, 100)
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_partner_breakdown_pause_pressure_relief,
+            0,
+            100,
+        )
+        product.user_count = max(
+            0, product.user_count - BALANCE.event_partner_breakdown_pause_user_loss
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You froze the channel for {product.name}. Users "
+            f"-{BALANCE.event_partner_breakdown_pause_user_loss}, board pressure "
+            f"-{BALANCE.event_partner_breakdown_pause_pressure_relief}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for partner breakdown.")
+
+
+def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "fund_control_room":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_board_recovery_window_cash_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_board_recovery_window_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_board_recovery_window_score_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk - BALANCE.event_board_recovery_window_risk_relief,
+            0,
+            100,
+        )
+        state.finance.board_recovery_turns_remaining = max(
+            0,
+            state.finance.board_recovery_turns_remaining - 1,
+        )
+        return (
+            f"You funded a board recovery control room. Cash "
+            f"-{BALANCE.event_board_recovery_window_cash_cost}, board confidence "
+            f"+{BALANCE.event_board_recovery_window_confidence_gain}."
+        )
+
+    if option_id == "narrow_scope":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_board_recovery_window_scope_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score
+            + BALANCE.event_board_recovery_window_scope_focus_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_board_recovery_window_scope_reputation_loss,
+            0,
+            100,
+        )
+        state.finance.board_recovery_turns_remaining = max(
+            0,
+            state.finance.board_recovery_turns_remaining - 1,
+        )
+        return (
+            f"You narrowed scope to satisfy the board. Board pressure "
+            f"-{BALANCE.event_board_recovery_window_scope_pressure_relief}, reputation "
+            f"-{BALANCE.event_board_recovery_window_scope_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for board recovery window.")
+
+
 def _apply_capital_market_freeze(state: GameState, event: PendingEvent, option_id: str) -> str:
     del event
 
@@ -1931,6 +2051,20 @@ def _get_most_conflicted_partnership(state: GameState, product_id: UUID):
     )
 
 
+def _get_most_stressed_partnership(state: GameState, product_id: UUID):
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.product_id == product_id and partnership.status.value != "paused"
+    ]
+    if not partnerships:
+        raise ValueError("This event expected an active partnership.")
+    return max(
+        partnerships,
+        key=lambda partnership: calculate_partnership_fatigue(state, partnership),
+    )
+
+
 def _get_best_active_account_for_product(state: GameState, product_id: UUID) -> CustomerAccount:
     accounts = _get_active_accounts_for_product(state, product_id)
     if not accounts:
@@ -2003,6 +2137,8 @@ EVENT_EFFECT_HANDLERS = {
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
     "partner_qbr": _apply_partner_qbr,
+    "partner_breakdown": _apply_partner_breakdown,
+    "board_recovery_window": _apply_board_recovery_window,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
 }

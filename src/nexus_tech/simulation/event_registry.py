@@ -300,6 +300,22 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_partner_qbr_event,
         ),
         EventDefinition(
+            event_id="partner_breakdown",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_partner_breakdown_weight,
+            cooldown_turns=BALANCE.event_partner_breakdown_cooldown,
+            is_eligible=_is_partner_breakdown_eligible,
+            build_pending_event=_build_partner_breakdown_event,
+        ),
+        EventDefinition(
+            event_id="board_recovery_window",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_recovery_window_weight,
+            cooldown_turns=BALANCE.event_board_recovery_window_cooldown,
+            is_eligible=_is_board_recovery_window_eligible,
+            build_pending_event=_build_board_recovery_window_event,
+        ),
+        EventDefinition(
             event_id="capital_market_freeze",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_capital_market_freeze_weight,
@@ -1937,6 +1953,108 @@ def _build_partner_qbr_event(
                 id="pause_channel",
                 label="Pause the noisiest channel",
                 description="Reduce conflict and board pressure, but give up some near-term users.",
+            ),
+        ],
+    )
+
+
+def _is_partner_breakdown_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"partner_qbr", "channel_conflict"},
+        BALANCE.event_chain_recent_window_turns,
+    ) and any(
+        (
+            partnership.status in {PartnershipStatus.STRAINED, PartnershipStatus.RECOVERY}
+            or partnership.conflict_pressure + partnership.risk
+            >= BALANCE.event_partner_breakdown_fatigue_threshold
+        )
+        for partnership in state.partnerships
+    )
+
+
+def _build_partner_breakdown_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnership = max(
+        [deal for deal in state.partnerships if deal.status is not PartnershipStatus.PAUSED],
+        key=lambda deal: deal.conflict_pressure + deal.risk,
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        target = _pick_best_product(
+            [product for product in state.products if product.is_active],
+            rng,
+            score=lambda product: product.user_count + product.market_fit,
+        )
+    return PendingEvent(
+        event_id="partner_breakdown",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Partner Breakdown Risk",
+        description=(
+            f"The channel around {target.name} is close to breaking down. "
+            "You can fund a recovery sprint or freeze the lane and protect the core business."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=3,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_recovery",
+                label="Fund recovery",
+                description="Spend cash to calm the partner and rebuild channel quality.",
+            ),
+            EventOption(
+                id="freeze_lane",
+                label="Freeze the lane",
+                description="Pause the lane, protect the core business, and accept user loss.",
+            ),
+        ],
+    )
+
+
+def _is_board_recovery_window_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"board_reckoning", "board_scrutiny"},
+        BALANCE.event_chain_recent_window_turns,
+    ) and (
+        state.finance.board_recovery_turns_remaining > 0 or state.finance.governance_crisis_active
+    )
+
+
+def _build_board_recovery_window_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_recovery_window",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Recovery Window",
+        description=(
+            "Directors are giving the company a short window to prove recovery discipline. "
+            "You can fund tighter controls or narrow scope and reset expectations."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="governance_chain",
+        chain_stage=3,
+        options=[
+            EventOption(
+                id="fund_control_room",
+                label="Fund a control room",
+                description="Spend cash to improve confidence, score, and governance optics.",
+            ),
+            EventOption(
+                id="narrow_scope",
+                label="Narrow scope",
+                description="Reduce pressure by cutting scope and leaning into board focus.",
             ),
         ],
     )

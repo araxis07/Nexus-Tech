@@ -41,6 +41,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Shift each product between `streamlined`, `modular`, and `suite` packaging to rebalance monetization, acquisition, and support complexity
 - Expand package catalogs and add-on catalogs over time so monetization depth can scale beyond the base packaging posture
 - Open reseller, integration, and marketplace partnerships that add sourced growth, revenue-share trade-offs, support load, and direct-channel conflict
+- Track partner fatigue and recovery posture so channel growth can stall, stabilize, and recover instead of scaling linearly forever
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
 - Plan and ship product releases such as stability patches, minor releases, and major launches
 - Use multi-action roadmap projects for larger bets like platform rebuilds, enterprise certification, marketplace launches, and sales playbooks
@@ -106,6 +107,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track explicit endgame readiness across IPO, acquisition, and profitable independence so late-game strategy is easier to read before the run ends
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Review a multi-turn finance planner with projected end-cash and reserve-break visibility instead of relying on one-turn forecast drift alone
+- Get explicit recommended capital posture and planner alerts when reserve stress or covenant pressure starts to dominate the run
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
 - Execute a formal restructure plan when governance pressure becomes too high to ignore
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
@@ -182,6 +184,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Scale-stage runs can now trigger talent bidding wars and platform breakthroughs with clearer team and product trade-offs
 - Finance-heavy runs can surface loan covenant pressure and down-round trade-offs
 - Scale-stage runs can now surface channel-conflict, bridge-capital, and inbound exit-interest decisions tied to the new partnership and endgame systems
+- Scale-stage runs can now surface partner-breakdown and board-recovery-window follow-up events when channel or governance pressure compounds
 - Customer-heavy and enterprise-heavy runs can surface key-account expansion and security-audit trade-offs
 - Scale-stage runs can now surface enterprise sales cycles, product launch windows, platform outages, competitor acquisitions, and regulatory shifts
 - Follow-up event chains can now appear after related audit, launch, and enterprise-sales events
@@ -207,6 +210,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Classify successful runs into exit paths such as profitable independence, strategic acquisition, IPO-ready, or restructure
 - Summarize completed-run history into archive-driven meta progression with campaign tiers and unlock-style achievement tracking
 - Surface a visible campaign ladder, archive benchmarks, and next-goal hints so repeat runs feel like structured progression instead of isolated saves
+- Compare archived runs directly through score, cash, offer, grade, and outcome coverage so late-game experimentation becomes easier to review
 
 ### 💾 Local Save / Load
 
@@ -215,10 +219,12 @@ Each turn represents a business interval. You review the company, choose actions
 - List, rename, and delete save slots directly from the CLI
 - Archive completed runs and inspect them later through `list-archives`
 - Derive campaign-level progression from archived runs through `show-progression`
+- Compare archived runs directly through `compare-archives`
 - Archive run score tier, campaign grade, and estimated valuation so completed runs are easier to compare later
 - Archive compact run badges such as capital discipline, board trust, and enterprise execution so meta history is easier to scan quickly
 - Archive strategic outlook and modeled offer value so completed runs can be compared by likely business outcome as well as score
 - Compare completed runs through archive benchmarks such as best score, best offer, and exit-path coverage directly in the terminal
+- Unlock archive-driven reward hints for scenarios, templates, rivals, and review tools as progression achievements stack up
 - Persist roadmap state, market cycle, quarter plan, finance state, funding history, competitors, key accounts, product targeting, event history, team assignments, exit summaries, and turn history
 - Persist partnerships and capital-plan posture so channel strategy and reserve discipline survive save/load boundaries
 - Persist release plans, sales deals, roadmap projects, competitor intel, scenario objectives, and hiring traits

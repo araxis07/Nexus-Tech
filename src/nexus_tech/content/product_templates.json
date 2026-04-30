@@ -820,5 +820,43 @@
     "target_segment": "enterprise",
     "pricing_tier": "premium",
     "packaging_strategy": "modular"
+  },
+  {
+    "template_id": "partner_recovery_cloud",
+    "title": "Partner Recovery Cloud",
+    "description": "A channel-heavy operations product built for partner enablement, cleaner recovery loops, and calmer rev-share execution.",
+    "lifecycle_stage": "prototype",
+    "quality": 48,
+    "bug_level": 14,
+    "market_fit": 35,
+    "technical_debt": 16,
+    "user_count": 0,
+    "revenue_per_user": "58.00",
+    "feature_count": 0,
+    "maintenance_cost": "288.00",
+    "acquisition_rate": "0.0300",
+    "churn_rate": "0.0580",
+    "target_segment": "smb",
+    "pricing_tier": "standard",
+    "packaging_strategy": "modular"
+  },
+  {
+    "template_id": "archive_governance_studio",
+    "title": "Archive Governance Studio",
+    "description": "A board-facing planning suite that rewards clean reporting, disciplined portfolio calls, and repeatable late-game execution.",
+    "lifecycle_stage": "prototype",
+    "quality": 51,
+    "bug_level": 12,
+    "market_fit": 33,
+    "technical_debt": 15,
+    "user_count": 0,
+    "revenue_per_user": "82.00",
+    "feature_count": 0,
+    "maintenance_cost": "332.00",
+    "acquisition_rate": "0.0240",
+    "churn_rate": "0.0530",
+    "target_segment": "enterprise",
+    "pricing_tier": "premium",
+    "packaging_strategy": "suite"
   }
 ]

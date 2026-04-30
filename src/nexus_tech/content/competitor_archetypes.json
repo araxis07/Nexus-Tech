@@ -354,5 +354,31 @@
     "current_move": "discount_push",
     "momentum": 64,
     "funding_level": 2
+  },
+  {
+    "archetype_id": "partner_fatigue_broker",
+    "title": "Partner Fatigue Broker",
+    "description": "A distribution-led rival that wins by rotating partner attention faster than slower operators can recover.",
+    "focus_segment": "smb",
+    "strength": 73,
+    "aggression": 65,
+    "pricing_tier": "standard",
+    "active_product_count": 3,
+    "current_move": "discount_push",
+    "momentum": 68,
+    "funding_level": 2
+  },
+  {
+    "archetype_id": "archive_scale_operator",
+    "title": "Archive Scale Operator",
+    "description": "A disciplined scale rival that compounds through portfolio focus, calmer boards, and more repeatable late-game execution.",
+    "focus_segment": "enterprise",
+    "strength": 79,
+    "aggression": 53,
+    "pricing_tier": "premium",
+    "active_product_count": 3,
+    "current_move": "hold",
+    "momentum": 66,
+    "funding_level": 3
   }
 ]

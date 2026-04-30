@@ -127,12 +127,16 @@ from nexus_tech.simulation.late_game import (
     apply_end_of_turn_late_game,
     calculate_late_game_summary,
 )
-from nexus_tech.simulation.meta_progression import summarize_meta_progression
+from nexus_tech.simulation.meta_progression import (
+    build_archive_comparison,
+    summarize_meta_progression,
+)
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.partnerships import (
     apply_end_of_turn_partnerships,
+    calculate_partnership_fatigue,
     calculate_partnership_portfolio,
 )
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
@@ -2375,6 +2379,8 @@ def test_new_event_ids_are_registered() -> None:
     assert "support_meltdown" in registry_ids
     assert "board_reckoning" in registry_ids
     assert "partner_qbr" in registry_ids
+    assert "partner_breakdown" in registry_ids
+    assert "board_recovery_window" in registry_ids
     assert "capital_market_freeze" in registry_ids
     assert "succession_gap" in registry_ids
 
@@ -2408,6 +2414,33 @@ def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
 
     assert outcome.state.capital_plan.mode is CapitalPlanMode.CONSERVE
     assert outcome.state.finance.board_resolution_due is False
+
+
+def test_board_recovery_window_event_improves_governance_signals() -> None:
+    product = make_product("Recovery Core")
+    state = make_state(product, cash_on_hand=Decimal("7200.00"))
+    state.finance.board_recovery_turns_remaining = 2
+    state.finance.board_confidence = 48
+    state.finance.board_score = 50
+    state.finance.governance_risk = 24
+    state.pending_event = PendingEvent(
+        event_id="board_recovery_window",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Recovery Window",
+        description="Test event",
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=5,
+        options=[
+            EventOption(id="fund_control_room", label="Fund", description="Fund"),
+            EventOption(id="narrow_scope", label="Narrow", description="Narrow"),
+        ],
+    )
+
+    outcome = resolve_pending_event(state, "fund_control_room")
+
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
 
 
 def test_support_meltdown_event_can_trade_cash_for_queue_relief() -> None:
@@ -4755,6 +4788,8 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
 
     assert planner.horizon_turns == 6
     assert planner.conservative_end_cash <= planner.aggressive_end_cash
+    assert planner.recommended_posture in {"conserve", "balanced", "expand"}
+    assert planner.capital_alert
     assert planner.summary
 
 
@@ -4860,6 +4895,40 @@ def test_partnership_turn_summary_adds_users_revenue_and_support_pressure() -> N
     assert state.products[0].user_count > 40
 
 
+def test_partner_breakdown_event_can_push_channel_into_recovery() -> None:
+    product = make_product("Recovery Channel", market_fit=64, quality=68, bug_level=12)
+    partnership = PartnershipDeal(
+        name="Recovery Channel Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.STRAINED,
+        quality=62,
+        risk=54,
+        conflict_pressure=57,
+        enablement_level=34,
+    )
+    state = make_state(product, partnerships=[partnership], cash_on_hand=Decimal("6400.00"))
+    state.pending_event = PendingEvent(
+        event_id="partner_breakdown",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Partner Breakdown",
+        description="Test event",
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=5,
+        target_product_id=product.id,
+        options=[
+            EventOption(id="fund_recovery", label="Recover", description="Recover"),
+            EventOption(id="freeze_lane", label="Freeze", description="Freeze"),
+        ],
+    )
+
+    outcome = resolve_pending_event(state, "fund_recovery")
+
+    assert outcome.state.partnerships[0].status is PartnershipStatus.RECOVERY
+    assert outcome.state.partnerships[0].conflict_pressure < partnership.conflict_pressure
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
 def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     product = make_product("Partner Hub")
     partnerships = [
@@ -4877,11 +4946,12 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
             name="Marketplace",
             product_id=product.id,
             channel=PartnerChannel.MARKETPLACE,
-            status=PartnershipStatus.STRAINED,
+            status=PartnershipStatus.RECOVERY,
             sourced_revenue=Decimal("820.00"),
             sourced_users=12,
             quality=62,
             risk=46,
+            conflict_pressure=42,
         ),
     ]
     state = make_state(product, partnerships=partnerships)
@@ -4890,8 +4960,9 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
 
     assert summary.total_count == 2
     assert summary.active_count == 1
-    assert summary.strained_count == 1
+    assert summary.recovery_count == 1
     assert summary.sourced_revenue == Decimal("2020.00")
+    assert summary.average_fatigue >= 0
     assert summary.dominant_channel in {"reseller", "marketplace"}
 
 
@@ -4943,6 +5014,7 @@ def test_partnership_neglect_and_channel_crowding_raise_conflict_pressure() -> N
 
     assert state.partnerships[0].conflict_pressure > 18
     assert state.partnerships[1].risk > 18
+    assert calculate_partnership_fatigue(state, state.partnerships[0]) > 0
 
 
 def test_set_capital_plan_action_updates_state() -> None:
@@ -5123,5 +5195,60 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert summary.campaign_stage in {"operator", "institutional"}
     assert "core achievements" in summary.achievement_progress
     assert summary.campaign_ladder
+    assert summary.unlocked_rewards
     assert summary.archive_highlights
     assert summary.campaign_tier in {"silver", "gold"}
+    assert summary.next_reward
+
+
+def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
+    archives = [
+        RunArchiveSummary(
+            archive_key="run-1",
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_title="Founder Journey",
+            completed_turn=12,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="strategic_acquisition",
+            total_score=212,
+            score_tier="strong",
+            campaign_grade="A",
+            estimated_valuation=Decimal("52000.00"),
+            achievement_badges=("board_trusted", "channel_builder"),
+            strategic_outlook="strategic_acquisition",
+            offer_value=Decimal("61000.00"),
+            final_cash=Decimal("14000.00"),
+            final_reputation=68,
+            archived_at="2026-04-29T00:00:00+00:00",
+        ),
+        RunArchiveSummary(
+            archive_key="run-2",
+            slot_name="active",
+            company_name="Signal Forge",
+            scenario_title="Reserve Discipline Run",
+            completed_turn=15,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="profitable_independence",
+            total_score=196,
+            score_tier="strong",
+            campaign_grade="A",
+            estimated_valuation=Decimal("48000.00"),
+            achievement_badges=("capital_disciplined",),
+            strategic_outlook="profitable_independence",
+            offer_value=Decimal("38000.00"),
+            final_cash=Decimal("18800.00"),
+            final_reputation=72,
+            archived_at="2026-04-30T00:00:00+00:00",
+        ),
+    ]
+
+    comparison = build_archive_comparison(archives)
+
+    assert comparison.compared_runs == 2
+    assert comparison.average_score > 0
+    assert "Signal Forge" in comparison.strongest_cash_label
+    assert "NEXUS TECH" in comparison.best_offer_label
+    assert comparison.outcome_mix == ("profitable_independence", "strategic_acquisition")

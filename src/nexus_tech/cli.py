@@ -57,6 +57,7 @@ from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
 from nexus_tech.presentation.dashboard import (
     render_action_feedback,
+    render_archive_comparison,
     render_balance_audit,
     render_balance_comparison,
     render_balance_lab,
@@ -739,6 +740,20 @@ def list_archives_command(
     except PersistenceError as error:
         raise_cli_persistence_error("Archive List Failed", error)
     render_run_archive_catalog(console, archives)
+
+
+@app.command("compare-archives")
+def compare_archives_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Compare archived completed runs across score, cash, and exit outcomes."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        archives = coordinator.list_run_archives()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Archive Compare Failed", error)
+    render_archive_comparison(console, archives)
 
 
 @app.command("show-progression")

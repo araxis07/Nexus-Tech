@@ -46,12 +46,15 @@ class PartnershipPortfolioSummary:
     total_count: int
     active_count: int
     strained_count: int
+    recovery_count: int
     paused_count: int
     dominant_channel: str
     sourced_revenue: Decimal
     sourced_users: int
     average_quality: int
     average_risk: int
+    average_fatigue: int
+    fatigued_count: int
     summary: str
 
 
@@ -158,15 +161,14 @@ def invest_in_partner_enablement(
         partnership.conflict_pressure - BALANCE.partnership_enablement_conflict_relief
     )
     partnership.last_review_turn = state.company.current_turn
-    if (
-        partnership.status is PartnershipStatus.PAUSED
-        and partnership.risk <= BALANCE.partnership_resume_threshold
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
         and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
-    ) or (
-        partnership.risk < BALANCE.partnership_risk_strained_threshold
-        and partnership.conflict_pressure < BALANCE.partnership_conflict_strained_threshold
     ):
         partnership.status = PartnershipStatus.ACTIVE
+    elif partnership.status in {PartnershipStatus.PAUSED, PartnershipStatus.RECOVERY}:
+        partnership.status = PartnershipStatus.RECOVERY
     return PartnershipActionSummary(
         message=(
             f"Invested in {partnership.name}. Cash -{BALANCE.partnership_enablement_cost}, "
@@ -216,10 +218,10 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
                 partnership.risk - BALANCE.partnership_cooldown_risk_relief
             )
             if (
-                partnership.risk <= BALANCE.partnership_resume_threshold
-                and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+                calculate_partnership_fatigue(state, partnership)
+                <= BALANCE.partnership_resume_threshold
             ):
-                partnership.status = PartnershipStatus.STRAINED
+                partnership.status = PartnershipStatus.RECOVERY
             continue
 
         capital_bonus = 0
@@ -249,6 +251,14 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
             )
         if partnership.status is PartnershipStatus.STRAINED:
             user_gain = max(0, user_gain - BALANCE.partnership_strained_user_penalty)
+        if partnership.status is PartnershipStatus.RECOVERY:
+            user_gain = max(0, user_gain - BALANCE.partnership_recovery_user_penalty)
+            partnership.conflict_pressure = clamp_int(
+                partnership.conflict_pressure - BALANCE.partnership_recovery_conflict_relief
+            )
+            partnership.risk = clamp_int(
+                partnership.risk - BALANCE.partnership_recovery_risk_relief
+            )
 
         gross_revenue = quantize_money(Decimal(user_gain) * product.revenue_per_user)
         net_revenue = quantize_money(
@@ -329,14 +339,26 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
                 ),
             )
         previous_status = partnership.status
+        fatigue = calculate_partnership_fatigue(state, partnership)
         if (
             partnership.risk >= BALANCE.partnership_pause_threshold
             or partnership.conflict_pressure >= BALANCE.partnership_pause_threshold
+            or fatigue >= BALANCE.partnership_fatigue_pause_threshold
         ):
             partnership.status = PartnershipStatus.PAUSED
+        elif previous_status is PartnershipStatus.RECOVERY:
+            if (
+                fatigue <= BALANCE.partnership_recovery_resume_threshold
+                and partnership.risk < BALANCE.partnership_resume_threshold
+                and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
+            ):
+                partnership.status = PartnershipStatus.ACTIVE
+            else:
+                partnership.status = PartnershipStatus.RECOVERY
         elif (
             partnership.risk >= BALANCE.partnership_risk_strained_threshold
             or partnership.conflict_pressure >= BALANCE.partnership_conflict_strained_threshold
+            or fatigue >= BALANCE.partnership_fatigue_strained_threshold
         ):
             partnership.status = PartnershipStatus.STRAINED
         else:
@@ -347,7 +369,8 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
         if previous_status is not partnership.status:
             partnership.summary = (
                 f"{partnership.name} is now {partnership.status.value} after conflict "
-                f"{partnership.conflict_pressure} and risk {partnership.risk}."
+                f"{partnership.conflict_pressure}, risk {partnership.risk}, "
+                f"and fatigue {fatigue}."
             )
 
         sourced_users += user_gain
@@ -379,12 +402,15 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             total_count=0,
             active_count=0,
             strained_count=0,
+            recovery_count=0,
             paused_count=0,
             dominant_channel="-",
             sourced_revenue=ZERO_MONEY,
             sourced_users=0,
             average_quality=0,
             average_risk=0,
+            average_fatigue=0,
+            fatigued_count=0,
             summary="No active channel portfolio yet.",
         )
 
@@ -404,17 +430,29 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
     strained_count = sum(
         1 for partnership in state.partnerships if partnership.status is PartnershipStatus.STRAINED
     )
+    recovery_count = sum(
+        1 for partnership in state.partnerships if partnership.status is PartnershipStatus.RECOVERY
+    )
     paused_count = sum(
         1 for partnership in state.partnerships if partnership.status is PartnershipStatus.PAUSED
     )
+    fatigue_scores = [
+        calculate_partnership_fatigue(state, partnership) for partnership in state.partnerships
+    ]
     average_quality = sum(partnership.quality for partnership in state.partnerships) // len(
         state.partnerships
     )
     average_risk = sum(partnership.risk for partnership in state.partnerships) // len(
         state.partnerships
     )
+    average_fatigue = sum(fatigue_scores) // len(fatigue_scores)
+    fatigued_count = sum(
+        1 for fatigue in fatigue_scores if fatigue >= BALANCE.partnership_fatigue_strained_threshold
+    )
     if paused_count > 0:
         summary = "Some channels are paused and need recovery before they can scale again."
+    elif recovery_count > 0:
+        summary = "At least one channel is recovering. Near-term growth is cleaner but slower."
     elif strained_count > 0:
         summary = "The partner portfolio is producing demand, but at least one lane is strained."
     else:
@@ -423,14 +461,48 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         total_count=len(state.partnerships),
         active_count=active_count,
         strained_count=strained_count,
+        recovery_count=recovery_count,
         paused_count=paused_count,
         dominant_channel=dominant_channel,
         sourced_revenue=sourced_revenue,
         sourced_users=sourced_users,
         average_quality=average_quality,
         average_risk=average_risk,
+        average_fatigue=average_fatigue,
+        fatigued_count=fatigued_count,
         summary=summary,
     )
+
+
+def calculate_partnership_fatigue(state: GameState, partnership: PartnershipDeal) -> int:
+    """Estimate partner fatigue from neglect, overlap, risk, and channel friction."""
+
+    product = _get_product_by_id(state.products, partnership.product_id)
+    neglected_turns = state.company.current_turn - (
+        partnership.last_review_turn or partnership.started_turn
+    )
+    active_channel_count = sum(
+        1
+        for candidate in state.partnerships
+        if candidate.product_id == partnership.product_id
+        and candidate.status is not PartnershipStatus.PAUSED
+    )
+    fatigue = (
+        partnership.risk // BALANCE.partnership_fatigue_risk_divisor
+        + partnership.conflict_pressure // BALANCE.partnership_fatigue_conflict_divisor
+    )
+    if neglected_turns > BALANCE.partnership_fatigue_neglect_turn_threshold:
+        fatigue += (
+            neglected_turns - BALANCE.partnership_fatigue_neglect_turn_threshold
+        ) * BALANCE.partnership_fatigue_neglect_gain
+    fatigue += max(0, active_channel_count - 1) * BALANCE.partnership_fatigue_multi_channel_gain
+    if state.capital_plan.mode is CapitalPlanMode.EXPAND:
+        fatigue += BALANCE.partnership_fatigue_expand_mode_gain
+    if partnership.status is PartnershipStatus.RECOVERY:
+        fatigue += BALANCE.partnership_fatigue_recovery_penalty
+    if product.packaging_strategy.value == "suite":
+        fatigue += 2
+    return clamp_int(fatigue)
 
 
 def _get_product_by_id(products: list[Product], product_id: UUID) -> Product:

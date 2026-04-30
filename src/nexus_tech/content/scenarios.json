@@ -3741,5 +3741,143 @@
       "board_confidence": 49,
       "total_raised": "7200.00"
     }
+  },
+  {
+    "scenario_id": "channel_rebuild_marathon",
+    "title": "Channel Rebuild Marathon",
+    "description": "A partner-led growth motion is still intact, but fatigue, conflict, and support pressure are starting to collapse the channel mix.",
+    "objective": "Stabilize the partner motion without losing the core business.",
+    "objective_metric": "closed_deals",
+    "objective_target": 2,
+    "company_name": "Lane Harbor",
+    "company_strategy": "balanced",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "10600.00",
+    "reputation": 55,
+    "products": [
+      {
+        "key": "channel",
+        "template_id": "partner_recovery_cloud",
+        "name": "Lane Harbor",
+        "lifecycle_stage": "growth",
+        "quality": 58,
+        "bug_level": 19,
+        "market_fit": 56,
+        "technical_debt": 24,
+        "user_count": 82,
+        "revenue_per_user": "56.00",
+        "feature_count": 2,
+        "maintenance_cost": "300.00",
+        "acquisition_rate": "0.0310",
+        "churn_rate": "0.0590",
+        "target_segment": "smb",
+        "pricing_tier": "standard",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Lena Ford",
+        "role": "marketer",
+        "seniority": "mid",
+        "specialization": "channel_ops",
+        "assigned_product_key": "channel",
+        "energy": 75,
+        "morale": 67
+      },
+      {
+        "full_name": "Micah Vale",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "partner_enablement",
+        "assigned_product_key": "channel",
+        "energy": 72,
+        "morale": 65
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Partner Fatigue Broker",
+        "archetype_id": "partner_fatigue_broker"
+      }
+    ]
+  },
+  {
+    "scenario_id": "board_recovery_crucible",
+    "title": "Board Recovery Crucible",
+    "description": "The business still has revenue and a viable product core, but board confidence is fragile and the next few turns will decide whether the run matures or resets.",
+    "objective": "Push governance and reputation back into a credible operating range.",
+    "objective_metric": "reputation",
+    "objective_target": 78,
+    "company_name": "Signal Ledger",
+    "company_strategy": "quality",
+    "difficulty_mode": "founder",
+    "campaign_goal_id": "category_leader",
+    "roadmap_focus": "platform_rebuild",
+    "budget_stance": "lean",
+    "market_cycle": "cooling",
+    "market_cycle_turns_remaining": 2,
+    "cash_on_hand": "8900.00",
+    "reputation": 51,
+    "products": [
+      {
+        "key": "governance",
+        "template_id": "archive_governance_studio",
+        "name": "Signal Ledger",
+        "lifecycle_stage": "growth",
+        "quality": 61,
+        "bug_level": 18,
+        "market_fit": 54,
+        "technical_debt": 26,
+        "user_count": 70,
+        "revenue_per_user": "80.00",
+        "feature_count": 3,
+        "maintenance_cost": "344.00",
+        "acquisition_rate": "0.0240",
+        "churn_rate": "0.0560",
+        "target_segment": "enterprise",
+        "pricing_tier": "premium",
+        "packaging_strategy": "suite"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Nadia Price",
+        "role": "engineer",
+        "seniority": "senior",
+        "specialization": "reliability",
+        "assigned_product_key": "governance",
+        "energy": 71,
+        "morale": 63
+      },
+      {
+        "full_name": "Tariq Bell",
+        "role": "product_manager",
+        "seniority": "senior",
+        "specialization": "board_ops",
+        "assigned_product_key": "governance",
+        "energy": 69,
+        "morale": 62
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Archive Scale Operator",
+        "archetype_id": "archive_scale_operator"
+      }
+    ],
+    "finance": {
+      "debt_principal": "3600.00",
+      "loan_interest_rate": "0.0320",
+      "equity_dilution": "0.0700",
+      "investor_pressure": 15,
+      "board_confidence": 44,
+      "total_raised": "8800.00"
+    }
   }
 ]

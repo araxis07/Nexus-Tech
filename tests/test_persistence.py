@@ -853,6 +853,22 @@ def test_save_then_load_round_trip_after_multi_turn_progression(tmp_path: Path) 
     assert loaded.rng.randint(1, 100) == expected_next_roll
 
 
+def test_save_then_load_round_trip_preserves_recovery_partnership_state(tmp_path: Path) -> None:
+    db_path = tmp_path / "partnership-recovery.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    state = make_state()
+    state.partnerships[0].status = PartnershipStatus.RECOVERY
+    state.partnerships[0].conflict_pressure = 38
+    state.partnerships[0].risk = 34
+
+    coordinator.save_game(DEFAULT_SAVE_SLOT, state, RandomSource(seed=23))
+    loaded = coordinator.load_game(DEFAULT_SAVE_SLOT)
+
+    assert loaded.state.partnerships[0].status is PartnershipStatus.RECOVERY
+    assert loaded.state.partnerships[0].conflict_pressure == 38
+    assert loaded.state.partnerships[0].risk == 34
+
+
 def test_list_save_slots_returns_compact_metadata(tmp_path: Path) -> None:
     db_path = tmp_path / "slots.db"
     coordinator = SaveLoadCoordinator(db_path)

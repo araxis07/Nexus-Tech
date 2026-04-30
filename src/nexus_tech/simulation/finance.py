@@ -60,9 +60,12 @@ class FinancePlannerSnapshot:
     base_end_cash: Decimal
     conservative_end_cash: Decimal
     aggressive_end_cash: Decimal
+    reserve_gap: Decimal
     reserve_hit_turn_base: int | None
     reserve_hit_turn_conservative: int | None
     reserve_hit_turn_aggressive: int | None
+    recommended_posture: str
+    capital_alert: str
     summary: str
 
 
@@ -226,6 +229,7 @@ def build_finance_planner(
         reserve_target=capital_plan.reserve_target,
         horizon_turns=horizon,
     )
+    reserve_gap = quantize_money(base_end_cash - capital_plan.reserve_target)
     if conservative_hit_turn == 1:
         summary = "The current capital plan falls below the reserve target almost immediately."
     elif conservative_hit_turn is not None:
@@ -236,15 +240,27 @@ def build_finance_planner(
         summary = "The active plan stays above the reserve target across the planning horizon."
     else:
         summary = "The plan holds for now, but reserve discipline is not yet secure."
+    if conservative_hit_turn is not None or finance.covenant_risk >= 20:
+        recommended_posture = "conserve"
+        capital_alert = "Reserve stress or covenant pressure suggests a tighter posture."
+    elif aggressive_end_cash > capital_plan.reserve_target and finance.board_pressure < 24:
+        recommended_posture = "expand"
+        capital_alert = "The company can press growth without breaking reserve discipline yet."
+    else:
+        recommended_posture = "balanced"
+        capital_alert = "Execution is viable, but capital allocation still needs discipline."
 
     return FinancePlannerSnapshot(
         horizon_turns=horizon,
         base_end_cash=base_end_cash,
         conservative_end_cash=conservative_end_cash,
         aggressive_end_cash=aggressive_end_cash,
+        reserve_gap=reserve_gap,
         reserve_hit_turn_base=base_hit_turn,
         reserve_hit_turn_conservative=conservative_hit_turn,
         reserve_hit_turn_aggressive=aggressive_hit_turn,
+        recommended_posture=recommended_posture,
+        capital_alert=capital_alert,
         summary=summary,
     )
 

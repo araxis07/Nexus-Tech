@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.31.0 - 2026-04-30
+
+- Added a fuller archive meta layer with achievement rewards, archive comparison, and richer progression guidance so completed runs now feed an actual repeat-play loop instead of only one summary panel
+- Deepened partnership scale behavior with derived channel fatigue, a new recovery state, richer portfolio health reporting, and new partner-breakdown event pressure
+- Extended late-game event chains with partner-breakdown and board-recovery-window follow-ups plus richer finance-planner guidance around reserve stress and recommended posture
+- Expanded the content pack again with new partner-recovery and archive-governance templates, new channel-rebuild and board-recovery scenarios, and new late-scale rival archetypes
+- Added regression coverage for archive comparison, progression rewards, recovery-state persistence, and the new governance and partner event handlers
+- Promoted the package version to `0.31.0`
+
 ## 0.30.0 - 2026-04-30
 
 - Expanded archive-derived progression with a visible campaign ladder, richer archive benchmarks, and clearer next-goal guidance so repeat runs now read more like a structured campaign layer
