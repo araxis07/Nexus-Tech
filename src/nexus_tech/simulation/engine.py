@@ -71,6 +71,7 @@ from nexus_tech.simulation.economy import (
 from nexus_tech.simulation.employee_progression import (
     apply_end_of_turn_employee_progression,
     promote_employee,
+    run_comp_review,
     train_employee,
 )
 from nexus_tech.simulation.endgame import apply_exit_outcome
@@ -111,6 +112,7 @@ from nexus_tech.simulation.partnerships import (
     create_partnership,
     get_partnership_by_id,
     invest_in_partner_enablement,
+    reactivate_partnership,
     renegotiate_partnership,
 )
 from nexus_tech.simulation.planning import (
@@ -184,6 +186,7 @@ from nexus_tech.simulation.team import (
     create_employee,
     get_employee_by_id,
     run_org_reorg,
+    run_succession_review,
     sanitize_management_links,
     unassign_employee,
     unassign_employees_from_product,
@@ -490,6 +493,23 @@ def apply_action(
         employee = get_employee_by_id(next_state.employees, context.employee_id)
         summary = promote_employee(employee)
         logger.debug("Promoted employee %s.", employee.full_name)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RUN_COMP_REVIEW:
+        employee = get_employee_by_id(next_state.employees, context.employee_id)
+        summary = run_comp_review(next_state.company, employee)
+        logger.debug("Ran compensation review for %s.", employee.full_name)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.RUN_SUCCESSION_REVIEW:
+        if context.employee_id is None:
+            raise ValueError("Running a succession review requires choosing a manager.")
+        summary = run_succession_review(
+            next_state.company,
+            next_state.employees,
+            employee_id=context.employee_id,
+        )
+        logger.debug("Ran succession review for employee %s.", context.employee_id)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.SOURCE_CANDIDATES:
@@ -856,6 +876,19 @@ def apply_action(
         summary = renegotiate_partnership(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Renegotiated partnership %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.REACTIVATE_PARTNERSHIP:
+        if context.partnership_id is None:
+            raise ValueError("Reactivating a partnership requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = reactivate_partnership(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel recovery for partnership %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

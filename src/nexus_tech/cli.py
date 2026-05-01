@@ -229,6 +229,8 @@ ACTION_KEYS = {
     "29": TurnAction.TRAIN_EMPLOYEE,
     "30": TurnAction.PROMOTE_EMPLOYEE,
     "31": TurnAction.APPOINT_TEAM_LEAD,
+    "75": TurnAction.RUN_COMP_REVIEW,
+    "76": TurnAction.RUN_SUCCESSION_REVIEW,
     "32": TurnAction.ROUTE_SUPPORT_ESCALATION,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
@@ -267,6 +269,7 @@ ACTION_KEYS = {
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
+    "77": TurnAction.REACTIVATE_PARTNERSHIP,
 }
 UTILITY_ACTION_KEYS = {
     "65": "save_game",
@@ -1299,7 +1302,12 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             return None
         return ActionContext(employee_id=employee_id)
 
-    if action in {TurnAction.TRAIN_EMPLOYEE, TurnAction.PROMOTE_EMPLOYEE}:
+    if action in {
+        TurnAction.TRAIN_EMPLOYEE,
+        TurnAction.PROMOTE_EMPLOYEE,
+        TurnAction.RUN_COMP_REVIEW,
+        TurnAction.RUN_SUCCESSION_REVIEW,
+    }:
         employee_id = choose_employee_id(state, action)
         if employee_id is None:
             return None
@@ -1466,6 +1474,12 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RENEGOTIATE_PARTNERSHIP:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.REACTIVATE_PARTNERSHIP:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

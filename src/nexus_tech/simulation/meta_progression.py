@@ -60,13 +60,18 @@ class ArchiveComparisonSummary:
     best_offer_label: str
     strongest_cash_label: str
     strongest_reputation_label: str
+    best_ipo_label: str
+    best_acquisition_label: str
+    best_independence_label: str
     average_score: int
     average_offer_value: Decimal
     average_final_cash: Decimal
     outcome_mix: tuple[str, ...]
     missing_outcomes: tuple[str, ...]
     grade_mix: tuple[str, ...]
+    badge_coverage: tuple[str, ...]
     dominant_path: str
+    next_gap: str
     recommendation: str
 
 
@@ -84,6 +89,8 @@ class MetaProgressionSummary:
     campaign_tier: str
     campaign_stage: str
     achievement_progress: str
+    outcome_coverage_progress: str
+    reward_mix: tuple[str, ...]
     campaign_ladder: tuple[str, ...]
     unlocked_rewards: tuple[str, ...]
     unlocks_remaining: tuple[str, ...]
@@ -243,6 +250,8 @@ def summarize_meta_progression(
             campaign_tier="unranked",
             campaign_stage="foundation",
             achievement_progress=f"0/{len(get_achievement_definitions())} core achievements",
+            outcome_coverage_progress="0/3 major endings",
+            reward_mix=unlock_catalog.reward_mix,
             campaign_ladder=(
                 "1. foundation [pending]",
                 "2. portfolio [pending]",
@@ -299,6 +308,7 @@ def summarize_meta_progression(
         for definition in achievement_definitions
         if unlock_status.get(definition.achievement_id, False)
     )
+    unlock_catalog = build_unlock_catalog(archives)
 
     campaign_tier = "bronze"
     if best_archive.total_score >= 180 or victories >= 2:
@@ -327,6 +337,7 @@ def summarize_meta_progression(
         ),
     )
     achievement_progress = f"{len(unlocks)}/{len(achievement_definitions)} core achievements"
+    outcome_coverage_progress = f"{len(unique_outcomes)}/3 major endings"
     campaign_ladder = (
         _format_ladder_step("foundation", len(unlocks) >= 1, 1),
         _format_ladder_step(
@@ -375,6 +386,8 @@ def summarize_meta_progression(
         campaign_tier=campaign_tier,
         campaign_stage=campaign_stage,
         achievement_progress=achievement_progress,
+        outcome_coverage_progress=outcome_coverage_progress,
+        reward_mix=unlock_catalog.reward_mix,
         campaign_ladder=campaign_ladder,
         unlocked_rewards=unlocked_rewards,
         unlocks_remaining=unlocks_remaining,
@@ -395,13 +408,18 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
             best_offer_label="-",
             strongest_cash_label="-",
             strongest_reputation_label="-",
+            best_ipo_label="-",
+            best_acquisition_label="-",
+            best_independence_label="-",
             average_score=0,
             average_offer_value=Decimal("0.00"),
             average_final_cash=Decimal("0.00"),
             outcome_mix=tuple(),
             missing_outcomes=("ipo_ready", "strategic_acquisition", "profitable_independence"),
             grade_mix=tuple(),
+            badge_coverage=tuple(),
             dominant_path="-",
+            next_gap="Archive at least one completed run before comparing paths.",
             recommendation="Archive at least one completed run before comparing outcomes.",
         )
 
@@ -410,6 +428,9 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
     best_offer_archive = max(archives, key=lambda archive: archive.offer_value)
     strongest_cash_archive = max(archives, key=lambda archive: archive.final_cash)
     strongest_reputation_archive = max(archives, key=lambda archive: archive.final_reputation)
+    best_ipo_archive = _best_archive_for_outcome(archives, "ipo_ready")
+    best_acquisition_archive = _best_archive_for_outcome(archives, "strategic_acquisition")
+    best_independence_archive = _best_archive_for_outcome(archives, "profitable_independence")
     average_score = sum(archive.total_score for archive in archives) // len(archives)
     average_offer_value = quantize_money(
         sum((archive.offer_value for archive in archives), Decimal("0.00")) / Decimal(len(archives))
@@ -428,6 +449,18 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
     grade_mix = tuple(
         sorted({archive.campaign_grade for archive in archives if archive.campaign_grade})
     )
+    badge_counts = {
+        "board_trusted": sum(
+            1 for archive in archives if "board_trusted" in archive.achievement_badges
+        ),
+        "capital_disciplined": sum(
+            1 for archive in archives if "capital_disciplined" in archive.achievement_badges
+        ),
+        "channel_builder": sum(
+            1 for archive in archives if "channel_builder" in archive.achievement_badges
+        ),
+    }
+    badge_coverage = tuple(f"{badge}:{count}" for badge, count in badge_counts.items() if count > 0)
     dominant_path = max(
         (
             ("ipo_ready", sum(1 for archive in archives if archive.exit_outcome == "ipo_ready")),
@@ -448,21 +481,25 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
     )[0]
 
     if missing_outcomes:
+        next_gap = missing_outcomes[0].replace("_", " ")
         recommendation = (
             "Coverage is still narrow. Next archive target: "
             f"{missing_outcomes[0].replace('_', ' ')}."
         )
     elif len(outcome_mix) == 1:
+        next_gap = "second viable ending path"
         recommendation = (
             "Archive a different ending path next. The current history is consistent, "
             "but outcome diversity is still narrow."
         )
     elif best_offer_archive.offer_value > strongest_cash_archive.final_cash * Decimal("4.00"):
+        next_gap = "durability versus exit premium"
         recommendation = (
             "M&A-style runs are paying up more than independent cash discipline. "
             "Decide whether to optimize for exits or durability."
         )
     else:
+        next_gap = "late-game consistency"
         recommendation = (
             "The archive already shows multiple viable paths. Compare score, cash, "
             "and offer quality before deciding the next campaign target."
@@ -489,13 +526,18 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
             f"{strongest_reputation_archive.company_name} / "
             f"{strongest_reputation_archive.final_reputation}"
         ),
+        best_ipo_label=_format_archive_label(best_ipo_archive),
+        best_acquisition_label=_format_archive_label(best_acquisition_archive),
+        best_independence_label=_format_archive_label(best_independence_archive),
         average_score=average_score,
         average_offer_value=average_offer_value,
         average_final_cash=average_final_cash,
         outcome_mix=outcome_mix,
         missing_outcomes=missing_outcomes,
         grade_mix=grade_mix,
+        badge_coverage=badge_coverage,
         dominant_path=dominant_path,
+        next_gap=next_gap,
         recommendation=recommendation,
     )
 
@@ -530,3 +572,19 @@ def _compute_unlock_status(archives: list[RunArchiveSummary]) -> dict[str, bool]
 def _format_ladder_step(label: str, complete: bool, step: int) -> str:
     status = "done" if complete else "pending"
     return f"{step}. {label} [{status}]"
+
+
+def _best_archive_for_outcome(
+    archives: list[RunArchiveSummary],
+    outcome: str,
+) -> RunArchiveSummary | None:
+    matches = [archive for archive in archives if archive.exit_outcome == outcome]
+    if not matches:
+        return None
+    return max(matches, key=lambda archive: archive.total_score)
+
+
+def _format_archive_label(archive: RunArchiveSummary | None) -> str:
+    if archive is None:
+        return "-"
+    return f"{archive.company_name} / {archive.total_score} / {archive.campaign_grade}"

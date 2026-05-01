@@ -1164,6 +1164,8 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
     overview.add_row("Campaign Tier", summary.campaign_tier)
     overview.add_row("Campaign Stage", summary.campaign_stage)
     overview.add_row("Achievement Prog.", summary.achievement_progress)
+    overview.add_row("Outcome Coverage", summary.outcome_coverage_progress)
+    overview.add_row("Reward Mix", ", ".join(summary.reward_mix) if summary.reward_mix else "-")
     overview.add_row(
         "Outcomes",
         ", ".join(summary.unique_outcomes) if summary.unique_outcomes else "-",
@@ -2062,6 +2064,16 @@ def _build_action_menu_panel() -> Panel:
     )
     primary_actions.add_row("29", "train_employee", "Increase readiness and productivity.")
     primary_actions.add_row("30", "promote_employee", "Level up a ready team member.")
+    primary_actions.add_row(
+        "75",
+        "run_comp_review",
+        "Raise pay on one teammate to cut attrition pressure.",
+    )
+    primary_actions.add_row(
+        "76",
+        "run_succession_review",
+        "Build backup leadership around one manager or lead.",
+    )
     primary_actions.add_row("32", "route_support_escalation", "Escalate one fragile account.")
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
@@ -2131,6 +2143,11 @@ def _build_action_menu_panel() -> Panel:
         "74",
         "renegotiate_partnership",
         "Trade some margin for a calmer channel relationship.",
+    )
+    primary_actions.add_row(
+        "77",
+        "reactivate_partnership",
+        "Spend directly to recover a paused or strained channel.",
     )
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)
@@ -2797,6 +2814,10 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Rec. Posture", planner.recommended_posture)
     table.add_row("Reserve Risk", planner.reserve_break_risk)
     table.add_row("Alloc Signal", planner.allocation_signal)
+    table.add_row("Capital Mix", " | ".join(planner.capital_mix))
+    table.add_row("Funding Posture", planner.funding_posture)
+    table.add_row("Dilution Outlook", planner.dilution_outlook)
+    table.add_row("Covenant Outlook", planner.covenant_outlook)
     table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
     table.add_row("Planner Alert", planner.capital_alert)
     table.add_row("Planner", planner.summary)
@@ -2877,6 +2898,10 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Sourced Users", str(portfolio.sourced_users))
         table.add_row("Sourced Revenue", format_money(portfolio.sourced_revenue))
         table.add_row("Avg Fatigue", str(portfolio.average_fatigue))
+        table.add_row("Neglected", str(portfolio.neglected_count))
+        table.add_row("Recovery Ready", str(portfolio.recovery_ready_count))
+        table.add_row("Conflict", str(portfolio.channel_conflict_index))
+        table.add_row("Dominant Share", f"{portfolio.dominant_share_percent}%")
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 
@@ -2975,6 +3000,9 @@ def _render_archive_comparison_summary(
     leaders.add_row("Best Offer", comparison.best_offer_label)
     leaders.add_row("Best Cash", comparison.strongest_cash_label)
     leaders.add_row("Best Reputation", comparison.strongest_reputation_label)
+    leaders.add_row("Best IPO", comparison.best_ipo_label)
+    leaders.add_row("Best M&A", comparison.best_acquisition_label)
+    leaders.add_row("Best Independence", comparison.best_independence_label)
 
     coverage = Table.grid(padding=(0, 1))
     coverage.add_row(
@@ -2992,6 +3020,11 @@ def _render_archive_comparison_summary(
         "Grades",
         ", ".join(comparison.grade_mix) if comparison.grade_mix else "-",
     )
+    coverage.add_row(
+        "Badges",
+        ", ".join(comparison.badge_coverage) if comparison.badge_coverage else "-",
+    )
+    coverage.add_row("Next Gap", comparison.next_gap)
     coverage.add_row("Recommendation", comparison.recommendation)
 
     console.print(

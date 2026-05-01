@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.33.0 - 2026-05-01
+
+- Deepened finance planning with richer capital-mix diagnostics, funding-posture guidance, dilution outlook, covenant outlook, and clearer multi-scenario planning notes in the dashboard
+- Expanded partnership lifecycle depth with an explicit `reactivate_partnership` action plus stronger portfolio-health reporting around neglect, recovery readiness, conflict load, and dominant-channel concentration
+- Added playable people-ops depth through `run_comp_review` and `run_succession_review` so compensation pressure and backup leadership can now be managed directly instead of only passively
+- Extended archive progression and archive comparison with reward-mix coverage, outcome-coverage progress, badge coverage, path-specific leaders, and clearer next-gap guidance
+- Strengthened hardening coverage with a longer extended-play regression, deeper partnership-action tests, and richer finance/meta assertions across the existing deterministic test suite
+- Promoted the package version to `0.33.0`
+
 ## 0.32.0 - 2026-04-30
 
 - Added a true archive unlock catalog with typed rewards plus a new `list-unlocks` CLI command so progression now exposes exact scenario, template, rival, tool, and insight rewards instead of only hint text

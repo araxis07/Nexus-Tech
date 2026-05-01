@@ -9,6 +9,7 @@ from uuid import UUID
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     CandidateTrait,
+    Company,
     CompanyStrategy,
     Employee,
     EmployeeRole,
@@ -536,6 +537,78 @@ def clear_manager_assignment(
         raise ValueError(f"{report.full_name} does not have a manager assigned.")
     report.manager_id = None
     return TeamActionSummary(message=f"Removed manager assignment for {report.full_name}.")
+
+
+def run_succession_review(
+    company: Company,
+    employees: list[Employee],
+    *,
+    employee_id: UUID,
+) -> TeamActionSummary:
+    """Invest in backup leadership around one manager or lead."""
+
+    if company.cash_on_hand < BALANCE.management_succession_review_cost:
+        raise ValueError("Not enough cash to run a succession review this turn.")
+
+    employee = get_employee_by_id(employees, employee_id)
+    if not is_eligible_manager(employee):
+        raise ValueError(f"{employee.full_name} is not yet a meaningful succession anchor.")
+
+    direct_reports = [report for report in employees if report.manager_id == employee.id]
+    if len(direct_reports) < BALANCE.management_succession_review_direct_report_min:
+        raise ValueError("This manager does not yet have enough reporting depth to review.")
+
+    company.cash_on_hand = quantize_money(
+        company.cash_on_hand - BALANCE.management_succession_review_cost
+    )
+    employee.leadership_score = clamp_int(
+        employee.leadership_score + BALANCE.management_succession_review_leadership_gain
+    )
+    employee.morale = clamp_int(employee.morale + BALANCE.management_succession_review_morale_gain)
+    employee.energy = clamp_int(employee.energy + BALANCE.management_succession_review_energy_gain)
+    employee.attrition_risk = clamp_int(
+        employee.attrition_risk - BALANCE.management_succession_review_attrition_relief
+    )
+
+    backup_name = ""
+    backup_candidates = sorted(
+        (
+            report
+            for report in direct_reports
+            if not report.is_team_lead
+            and report.leadership_score
+            >= BALANCE.management_succession_review_backup_leadership_threshold
+        ),
+        key=lambda report: (
+            report.assigned_product_id != employee.assigned_product_id,
+            -report.leadership_score,
+            -report.performance_rating,
+        ),
+    )
+    if backup_candidates:
+        backup = backup_candidates[0]
+        backup.is_team_lead = True
+        backup.morale = clamp_int(
+            backup.morale + BALANCE.management_succession_review_backup_morale_gain
+        )
+        backup_name = backup.full_name
+
+    for report in direct_reports:
+        report.morale = clamp_int(
+            report.morale + BALANCE.management_succession_review_report_morale_gain
+        )
+        report.attrition_risk = clamp_int(
+            report.attrition_risk - BALANCE.management_succession_review_report_attrition_relief
+        )
+
+    update_succession_risk(employees)
+    message = (
+        f"Ran succession review for {employee.full_name}. "
+        f"Cash -{BALANCE.management_succession_review_cost}."
+    )
+    if backup_name:
+        message = f"{message} {backup_name} is now flagged as a team lead backup."
+    return TeamActionSummary(message=message)
 
 
 def clear_manager_links(employees: list[Employee], manager_id: UUID) -> int:

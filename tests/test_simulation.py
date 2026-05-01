@@ -1294,6 +1294,124 @@ def test_thirty_turn_long_run_simulation_remains_stable() -> None:
     assert state.turn_history[-1].cash_on_hand == state.company.cash_on_hand
 
 
+def test_long_run_regression_stays_coherent_through_extended_play() -> None:
+    products = [
+        make_product(
+            "Core Platform",
+            lifecycle_stage=LifecycleStage.MATURE,
+            quality=74,
+            bug_level=10,
+            market_fit=70,
+            technical_debt=18,
+            user_count=160,
+            revenue_per_user=Decimal("34.00"),
+        ),
+        make_product(
+            "Ops Cloud",
+            lifecycle_stage=LifecycleStage.GROWTH,
+            quality=66,
+            bug_level=14,
+            market_fit=62,
+            technical_debt=20,
+            user_count=96,
+            revenue_per_user=Decimal("28.00"),
+        ),
+    ]
+    manager = make_employee(
+        "June Park",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        salary=Decimal("1180.00"),
+        productivity=72,
+        leadership_score=72,
+        assigned_product_id=products[0].id,
+    )
+    employees = [
+        manager,
+        make_employee(
+            "Rin Costa",
+            EmployeeRole.ENGINEER,
+            assigned_product_id=products[0].id,
+            manager_id=manager.id,
+        ),
+        make_employee(
+            "Ari Vale",
+            EmployeeRole.MARKETER,
+            assigned_product_id=products[1].id,
+            manager_id=manager.id,
+        ),
+        make_employee(
+            "Lena Hart",
+            EmployeeRole.DESIGNER,
+            assigned_product_id=products[1].id,
+            manager_id=manager.id,
+        ),
+    ]
+    accounts = [
+        CustomerAccount(
+            name="Scale Anchor",
+            product_id=products[0].id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1800.00"),
+            satisfaction=76,
+            onboarding_health=72,
+            support_load=24,
+            expansion_potential=64,
+            renewal_turn=8,
+            churn_risk=10,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Growth Team",
+            product_id=products[1].id,
+            segment=MarketSegment.SMB,
+            contract_value=Decimal("820.00"),
+            satisfaction=71,
+            onboarding_health=70,
+            support_load=18,
+            expansion_potential=58,
+            renewal_turn=7,
+            churn_risk=12,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
+    state = make_state(
+        *products,
+        employees=employees,
+        customer_accounts=accounts,
+        cash_on_hand=Decimal("62000.00"),
+        current_turn=1,
+        market_cycle=MarketCycle.EXPANDING,
+        market_cycle_turns_remaining=3,
+        campaign_goal_id=CampaignGoalId.PORTFOLIO_EMPIRE,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.BOOTSTRAP,
+        planning_horizon_turns=8,
+        reserve_target=Decimal("8000.00"),
+        product_investment_share=36,
+        go_to_market_share=34,
+        reserve_share=30,
+    )
+    rng = RandomSource(seed=133)
+
+    for _ in range(60):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            state = resolve_pending_event(state, state.pending_event.options[0].id).state
+        if state.company.game_over or state.victory_achieved:
+            break
+
+    assert state.company.current_turn >= 10
+    assert len(state.turn_history) >= 9
+    assert state.turn_history[-1].cash_on_hand == state.company.cash_on_hand
+    assert state.turn_history[-1].headcount == len(state.employees)
+    if state.victory_achieved:
+        assert state.exit_outcome is not None
+
+
 def test_weighted_selection_prefers_heavier_event() -> None:
     lightweight = EventDefinition(
         event_id="lightweight",
@@ -2886,6 +3004,76 @@ def test_promote_employee_advances_seniority_and_salary() -> None:
     assert updated_employee.seniority is Seniority.MID
     assert updated_employee.salary > employee.salary
     assert updated_employee.productivity > employee.productivity
+
+
+def test_comp_review_action_raises_salary_and_reduces_attrition() -> None:
+    product = make_product("Core")
+    employee = make_employee(
+        "Ada",
+        EmployeeRole.ENGINEER,
+        seniority=Seniority.MID,
+        salary=Decimal("620.00"),
+        assigned_product_id=product.id,
+    )
+    employee.attrition_risk = 42
+    employee.performance_rating = 76
+    state = make_state(product, employees=[employee], cash_on_hand=Decimal("5000.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_COMP_REVIEW,
+        ActionContext(employee_id=employee.id),
+    )
+
+    updated_employee = outcome.state.employees[0]
+    assert updated_employee.salary > employee.salary
+    assert updated_employee.attrition_risk < employee.attrition_risk
+    assert updated_employee.performance_rating >= employee.performance_rating
+
+
+def test_succession_review_action_can_designate_backup_lead() -> None:
+    product = make_product("Core")
+    manager = make_employee(
+        "June",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        salary=Decimal("1180.00"),
+        assigned_product_id=product.id,
+        leadership_score=64,
+    )
+    report_a = make_employee(
+        "Kai",
+        EmployeeRole.ENGINEER,
+        assigned_product_id=product.id,
+        manager_id=manager.id,
+        leadership_score=58,
+    )
+    report_b = make_employee(
+        "Nia",
+        EmployeeRole.DESIGNER,
+        assigned_product_id=product.id,
+        manager_id=manager.id,
+        leadership_score=56,
+    )
+    state = make_state(
+        product,
+        employees=[manager, report_a, report_b],
+        cash_on_hand=Decimal("5200.00"),
+    )
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_SUCCESSION_REVIEW,
+        ActionContext(employee_id=manager.id),
+    )
+
+    updated_manager = next(
+        employee for employee in outcome.state.employees if employee.id == manager.id
+    )
+    backup_count = sum(1 for employee in outcome.state.employees if employee.is_team_lead)
+    assert updated_manager.leadership_score > manager.leadership_score
+    assert backup_count >= 1
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
 def test_employee_progression_adds_career_pressure_for_ready_under_market_staff() -> None:
@@ -4796,6 +4984,19 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
     assert planner.recommended_posture in {"conserve", "balanced", "expand"}
     assert planner.reserve_break_risk in {"critical", "high", "elevated", "controlled"}
     assert planner.allocation_signal
+    assert len(planner.capital_mix) == 3
+    assert planner.funding_posture
+    assert planner.dilution_outlook in {
+        "no dilution pressure",
+        "contained dilution",
+        "elevated dilution",
+        "heavy dilution",
+    }
+    assert planner.covenant_outlook in {
+        "covenants are controlled",
+        "covenants need monitoring",
+        "covenants are fragile",
+    }
     assert len(planner.scenario_compare) == 3
     assert planner.capital_alert
     assert planner.summary
@@ -5034,7 +5235,43 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.recovery_count == 1
     assert summary.sourced_revenue == Decimal("2020.00")
     assert summary.average_fatigue >= 0
+    assert summary.channel_conflict_index >= 0
+    assert summary.dominant_share_percent >= 50
     assert summary.dominant_channel in {"reseller", "marketplace"}
+
+
+def test_reactivate_partnership_action_recovers_paused_channel() -> None:
+    product = make_product("Paused Lane", market_fit=68, quality=72, bug_level=12)
+    partnership = PartnershipDeal(
+        name="Paused Lane Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.PAUSED,
+        quality=60,
+        risk=58,
+        conflict_pressure=54,
+        enablement_level=30,
+        last_review_turn=1,
+        started_turn=1,
+    )
+    state = make_state(
+        product,
+        partnerships=[partnership],
+        cash_on_hand=Decimal("7600.00"),
+        current_turn=6,
+    )
+
+    outcome = apply_action(
+        state,
+        TurnAction.REACTIVATE_PARTNERSHIP,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated = outcome.state.partnerships[0]
+    assert updated.status in {PartnershipStatus.RECOVERY, PartnershipStatus.ACTIVE}
+    assert updated.risk < partnership.risk
+    assert updated.conflict_pressure < partnership.conflict_pressure
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
 def test_partnership_neglect_and_channel_crowding_raise_conflict_pressure() -> None:
@@ -5291,6 +5528,8 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert "channel_builder" in summary.unlocked_achievements
     assert summary.campaign_stage in {"operator", "institutional"}
     assert "core achievements" in summary.achievement_progress
+    assert summary.outcome_coverage_progress
+    assert summary.reward_mix
     assert summary.campaign_ladder
     assert summary.unlocked_rewards
     assert summary.archive_highlights
@@ -5385,3 +5624,6 @@ def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
     assert "NEXUS TECH" in comparison.best_offer_label
     assert comparison.outcome_mix == ("profitable_independence", "strategic_acquisition")
     assert comparison.missing_outcomes == ("ipo_ready",)
+    assert comparison.best_acquisition_label != "-"
+    assert comparison.best_independence_label != "-"
+    assert comparison.next_gap

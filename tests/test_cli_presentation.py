@@ -945,6 +945,7 @@ def test_compare_archives_command_renders_archive_comparison(
     assert result.exit_code == 0
     assert "Archive Comparison" in result.output
     assert "Run Leaders" in result.output
+    assert "Next Gap" in result.output
 
 
 def test_rename_save_command_calls_coordinator(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:

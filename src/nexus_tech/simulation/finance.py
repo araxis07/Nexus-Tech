@@ -67,6 +67,10 @@ class FinancePlannerSnapshot:
     recommended_posture: str
     reserve_break_risk: str
     allocation_signal: str
+    capital_mix: tuple[str, ...]
+    funding_posture: str
+    dilution_outlook: str
+    covenant_outlook: str
     scenario_compare: tuple[str, ...]
     capital_alert: str
     summary: str
@@ -233,6 +237,7 @@ def build_finance_planner(
         horizon_turns=horizon,
     )
     reserve_gap = quantize_money(base_end_cash - capital_plan.reserve_target)
+    scenario_spread = quantize_money(aggressive_end_cash - conservative_end_cash)
     if conservative_hit_turn == 1:
         summary = "The current capital plan falls below the reserve target almost immediately."
     elif conservative_hit_turn is not None:
@@ -282,6 +287,45 @@ def build_finance_planner(
             "Capital allocation broadly matches the current board and reserve posture."
         )
 
+    capital_mix = (
+        (
+            f"Product {capital_plan.product_investment_share}% vs GTM "
+            f"{capital_plan.go_to_market_share}%."
+        ),
+        (
+            f"Reserve {capital_plan.reserve_share}% against "
+            f"{format_money(capital_plan.reserve_target)} target."
+        ),
+        f"Scenario spread {_format_signed_money(scenario_spread)} across {horizon} turns.",
+    )
+
+    if capital_plan.source_preference.value == "bootstrap":
+        funding_posture = (
+            "Bootstrap posture rewards reserve discipline and punishes avoidable execution drift."
+        )
+    elif capital_plan.source_preference.value == "debt":
+        funding_posture = "Debt posture can work, but only while covenants stay calm."
+    elif capital_plan.source_preference.value == "angel":
+        funding_posture = "Angel posture buys flexibility, but the board will expect signal soon."
+    else:
+        funding_posture = "Venture posture supports expansion, but dilution must stay credible."
+
+    if finance.equity_dilution >= Decimal("0.3000"):
+        dilution_outlook = "heavy dilution"
+    elif finance.equity_dilution >= BALANCE.capital_plan_dilution_warning_threshold:
+        dilution_outlook = "elevated dilution"
+    elif finance.equity_dilution > Decimal("0.0000"):
+        dilution_outlook = "contained dilution"
+    else:
+        dilution_outlook = "no dilution pressure"
+
+    if finance.covenant_risk >= 24:
+        covenant_outlook = "covenants are fragile"
+    elif finance.covenant_risk >= 12:
+        covenant_outlook = "covenants need monitoring"
+    else:
+        covenant_outlook = "covenants are controlled"
+
     scenario_compare = (
         f"Base ends at {format_money(base_end_cash)}.",
         (
@@ -308,6 +352,10 @@ def build_finance_planner(
         recommended_posture=recommended_posture,
         reserve_break_risk=reserve_break_risk,
         allocation_signal=allocation_signal,
+        capital_mix=capital_mix,
+        funding_posture=funding_posture,
+        dilution_outlook=dilution_outlook,
+        covenant_outlook=covenant_outlook,
         scenario_compare=scenario_compare,
         capital_alert=capital_alert,
         summary=summary,
@@ -336,6 +384,14 @@ def _adjust_forecast(net_cash_flow: Decimal, *, drag: Decimal) -> Decimal:
     if net_cash_flow < ZERO_MONEY:
         return quantize_money(net_cash_flow * (Decimal("1.0000") + drag))
     return quantize_money(net_cash_flow * (Decimal("1.0000") - drag))
+
+
+def _format_signed_money(value: Decimal) -> str:
+    if value > ZERO_MONEY:
+        return f"+{format_money(value)}"
+    if value < ZERO_MONEY:
+        return f"-{format_money(abs(value))}"
+    return format_money(value)
 
 
 def apply_take_loan(

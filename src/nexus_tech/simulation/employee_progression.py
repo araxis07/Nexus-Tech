@@ -103,6 +103,37 @@ def promote_employee(employee: Employee) -> EmployeeProgressionSummary:
     )
 
 
+def run_comp_review(company: Company, employee: Employee) -> EmployeeProgressionSummary:
+    """Raise compensation to reduce attrition and reinforce top performers."""
+
+    benchmark_salary = quantize_money(
+        calculate_salary(employee.role, employee.seniority)
+        * BALANCE.employee_comp_review_salary_ratio_target
+    )
+    target_salary = benchmark_salary
+    if employee.salary >= benchmark_salary:
+        target_salary = quantize_money(employee.salary + BALANCE.employee_comp_review_min_raise)
+    additional_burn = max(ZERO_MONEY, quantize_money(target_salary - employee.salary))
+    if company.cash_on_hand - additional_burn < BALANCE.employee_comp_review_min_cash_buffer:
+        raise ValueError("Not enough cash buffer to commit to a compensation review safely.")
+
+    employee.salary = target_salary
+    employee.morale = clamp_int(employee.morale + BALANCE.employee_comp_review_morale_gain)
+    employee.attrition_risk = clamp_int(
+        employee.attrition_risk - BALANCE.employee_comp_review_attrition_relief
+    )
+    employee.performance_rating = clamp_int(
+        employee.performance_rating + BALANCE.employee_comp_review_performance_gain
+    )
+    employee.underperformance_streak = max(0, employee.underperformance_streak - 1)
+    return EmployeeProgressionSummary(
+        message=(
+            f"Ran a compensation review for {employee.full_name}. "
+            f"Recurring salary +{additional_burn} to {employee.salary}."
+        )
+    )
+
+
 def apply_end_of_turn_employee_progression(
     employees: list[Employee],
     *,

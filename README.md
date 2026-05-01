@@ -43,6 +43,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Open reseller, integration, and marketplace partnerships that add sourced growth, revenue-share trade-offs, support load, and direct-channel conflict
 - Track partner fatigue and recovery posture so channel growth can stall, stabilize, and recover instead of scaling linearly forever
 - Renegotiate stressed partnerships to deliberately trade margin for a calmer channel lane when scale starts to outrun trust
+- Reactivate paused or strained partnerships with a direct recovery action when channel execution has to be repaired before growth can continue
 - Create products from reusable templates, improve quality, add features, market products, reduce debt, and sunset weak products
 - Plan and ship product releases such as stability patches, minor releases, and major launches
 - Use multi-action roadmap projects for larger bets like platform rebuilds, enterprise certification, marketplace launches, and sales playbooks
@@ -110,6 +111,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
 - Review a multi-turn finance planner with projected end-cash and reserve-break visibility instead of relying on one-turn forecast drift alone
 - Get explicit recommended capital posture, reserve-break risk, allocation signals, and planner alerts when reserve stress or covenant pressure starts to dominate the run
+- Read capital-mix guidance, funding posture, dilution outlook, and covenant outlook directly in the planner instead of inferring them from raw cash alone
 - Execute direct board-response plays to answer profitability, reliability, team-health, or portfolio-focus pressure
 - Execute a formal restructure plan when governance pressure becomes too high to ignore
 - Balance growth capital against repayment pressure, score penalties, and long-term victory quality
@@ -163,6 +165,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Track management layers and span-of-control risk so larger orgs create visible coordination drag instead of scaling cleanly forever
 - Promote product-facing team leads and track succession risk when too much execution leverage sits on one person
 - Run explicit org reorg actions to rebalance reporting lines and cut overloaded-manager drag
+- Run explicit compensation reviews and succession reviews so people pressure can be managed directly instead of only showing up as passive attrition
 
 ### 🧭 Functional Budgeting
 
@@ -214,6 +217,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Surface a visible campaign ladder, archive benchmarks, and next-goal hints so repeat runs feel like structured progression instead of isolated saves
 - Expose an explicit unlock catalog with reward ids for archive-driven scenarios, templates, rivals, tools, and late-game insight lenses
 - Compare archived runs directly through score, cash, offer, grade, and outcome coverage so late-game experimentation becomes easier to review
+- Surface path-specific archive leaders, badge coverage, reward mix, and next-gap guidance so the meta layer can point toward what the player has not yet mastered
 
 ### 💾 Local Save / Load
 

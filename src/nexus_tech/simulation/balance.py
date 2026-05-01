@@ -446,6 +446,12 @@ class BalanceConfig:
     employee_compensation_pressure_salary_ratio_floor: Decimal = Decimal("0.9200")
     employee_compensation_pressure_attrition_gain: int = 4
     employee_compensation_pressure_morale_loss: int = 2
+    employee_comp_review_min_cash_buffer: Decimal = Decimal("600.00")
+    employee_comp_review_min_raise: Decimal = Decimal("60.00")
+    employee_comp_review_salary_ratio_target: Decimal = Decimal("1.0000")
+    employee_comp_review_morale_gain: int = 6
+    employee_comp_review_attrition_relief: int = 12
+    employee_comp_review_performance_gain: int = 2
     employee_resignation_attrition_threshold: int = 82
     employee_resignation_morale_threshold: int = 38
     employee_resignation_energy_threshold: int = 32
@@ -490,6 +496,16 @@ class BalanceConfig:
     management_layer_drag_threshold: int = 2
     management_layer_drag_per_layer: int = 2
     management_span_soft_cap: int = 4
+    management_succession_review_cost: Decimal = Decimal("190.00")
+    management_succession_review_direct_report_min: int = 2
+    management_succession_review_backup_leadership_threshold: int = 54
+    management_succession_review_leadership_gain: int = 8
+    management_succession_review_morale_gain: int = 4
+    management_succession_review_energy_gain: int = 3
+    management_succession_review_attrition_relief: int = 8
+    management_succession_review_report_morale_gain: int = 2
+    management_succession_review_report_attrition_relief: int = 3
+    management_succession_review_backup_morale_gain: int = 3
 
     roadmap_duration_turns: int = 4
     roadmap_growth_acquisition_bonus: int = 2
@@ -1960,6 +1976,11 @@ class BalanceConfig:
     partnership_renegotiation_risk_relief: int = 8
     partnership_renegotiation_conflict_relief: int = 10
     partnership_renegotiation_rev_share_penalty: Decimal = Decimal("0.0150")
+    partnership_reactivation_cost: Decimal = Decimal("220.00")
+    partnership_reactivation_enablement_gain: int = 8
+    partnership_reactivation_quality_gain: int = 2
+    partnership_reactivation_risk_relief: int = 12
+    partnership_reactivation_conflict_relief: int = 14
     partnership_multi_channel_conflict_bonus: int = 2
     partnership_expand_mode_user_bonus: int = 2
     partnership_gtm_share_user_divisor: int = 20

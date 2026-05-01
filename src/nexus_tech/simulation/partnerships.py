@@ -55,6 +55,10 @@ class PartnershipPortfolioSummary:
     average_risk: int
     average_fatigue: int
     fatigued_count: int
+    neglected_count: int
+    recovery_ready_count: int
+    channel_conflict_index: int
+    dominant_share_percent: int
     summary: str
 
 
@@ -220,6 +224,59 @@ def renegotiate_partnership(
         message=(
             f"Renegotiated {partnership.name}. Cash -{BALANCE.partnership_renegotiation_cost}, "
             f"rev-share now {partnership.rev_share_rate:.2%}."
+        )
+    )
+
+
+def reactivate_partnership(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Spend directly to recover or resume a paused/strained channel."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if state.company.cash_on_hand < BALANCE.partnership_reactivation_cost:
+        raise ValueError("Not enough cash to run a channel recovery plan.")
+
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if (
+        partnership.status is PartnershipStatus.ACTIVE
+        and fatigue < BALANCE.partnership_fatigue_strained_threshold
+    ):
+        raise ValueError("This partnership does not currently need a recovery plan.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_reactivation_cost
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_reactivation_enablement_gain
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_reactivation_quality_gain
+    )
+    partnership.risk = clamp_int(partnership.risk - BALANCE.partnership_reactivation_risk_relief)
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure - BALANCE.partnership_reactivation_conflict_relief
+    )
+    partnership.last_review_turn = state.company.current_turn
+    updated_fatigue = calculate_partnership_fatigue(state, partnership)
+    if (
+        partnership.risk < BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
+        and updated_fatigue <= BALANCE.partnership_recovery_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} entered {partnership.status.value} after a channel recovery plan. "
+        f"Risk {partnership.risk}, conflict {partnership.conflict_pressure}, fatigue "
+        f"{updated_fatigue}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran channel recovery for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_reactivation_cost}."
         )
     )
 
@@ -458,6 +515,10 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             average_risk=0,
             average_fatigue=0,
             fatigued_count=0,
+            neglected_count=0,
+            recovery_ready_count=0,
+            channel_conflict_index=0,
+            dominant_share_percent=0,
             summary="No active channel portfolio yet.",
         )
 
@@ -493,11 +554,31 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         state.partnerships
     )
     average_fatigue = sum(fatigue_scores) // len(fatigue_scores)
+    neglected_count = sum(
+        1
+        for partnership in state.partnerships
+        if state.company.current_turn - (partnership.last_review_turn or partnership.started_turn)
+        > BALANCE.partnership_neglect_turn_threshold
+    )
+    recovery_ready_count = sum(
+        1
+        for partnership, fatigue in zip(state.partnerships, fatigue_scores, strict=False)
+        if partnership.status in {PartnershipStatus.PAUSED, PartnershipStatus.RECOVERY}
+        and partnership.risk < BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
+        and fatigue <= BALANCE.partnership_recovery_resume_threshold
+    )
     fatigued_count = sum(
         1 for fatigue in fatigue_scores if fatigue >= BALANCE.partnership_fatigue_strained_threshold
     )
+    channel_conflict_index = sum(
+        partnership.conflict_pressure for partnership in state.partnerships
+    ) // len(state.partnerships)
+    dominant_share_percent = int(
+        ((channel_counts.get(dominant_channel, 0) / max(1, len(state.partnerships))) * 100)
+    )
     if paused_count > 0:
-        summary = "Some channels are paused and need recovery before they can scale again."
+        summary = "Some channels are paused and need deliberate recovery before they can scale."
     elif recovery_count > 0:
         summary = "At least one channel is recovering. Near-term growth is cleaner but slower."
     elif strained_count > 0:
@@ -517,6 +598,10 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         average_risk=average_risk,
         average_fatigue=average_fatigue,
         fatigued_count=fatigued_count,
+        neglected_count=neglected_count,
+        recovery_ready_count=recovery_ready_count,
+        channel_conflict_index=channel_conflict_index,
+        dominant_share_percent=dominant_share_percent,
         summary=summary,
     )
 
