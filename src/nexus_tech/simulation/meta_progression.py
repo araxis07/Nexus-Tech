@@ -232,6 +232,39 @@ def build_unlock_catalog(archives: list[RunArchiveSummary]) -> UnlockCatalogSumm
     )
 
 
+def get_locked_reward_ids(reward_type: str) -> tuple[str, ...]:
+    """Return reward ids gated behind archive progression for one content type."""
+
+    return tuple(
+        definition.reward_id
+        for definition in get_achievement_definitions()
+        if definition.reward_type == reward_type
+    )
+
+
+def is_reward_locked(reward_type: str, reward_id: str) -> bool:
+    """Return whether one reward id is progression-gated."""
+
+    return reward_id in set(get_locked_reward_ids(reward_type))
+
+
+def is_reward_unlocked(
+    archives: list[RunArchiveSummary],
+    *,
+    reward_type: str,
+    reward_id: str,
+) -> bool:
+    """Return whether one progression-gated reward id is currently unlocked."""
+
+    if not is_reward_locked(reward_type, reward_id):
+        return True
+    unlock_status = _compute_unlock_status(archives)
+    for definition in get_achievement_definitions():
+        if definition.reward_type == reward_type and definition.reward_id == reward_id:
+            return unlock_status.get(definition.achievement_id, False)
+    return False
+
+
 def summarize_meta_progression(
     archives: list[RunArchiveSummary],
 ) -> MetaProgressionSummary:

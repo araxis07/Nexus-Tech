@@ -130,6 +130,7 @@ from nexus_tech.simulation.late_game import (
 from nexus_tech.simulation.meta_progression import (
     build_archive_comparison,
     build_unlock_catalog,
+    is_reward_unlocked,
     summarize_meta_progression,
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
@@ -5369,6 +5370,34 @@ def test_set_capital_plan_action_updates_state() -> None:
     assert outcome.state.capital_plan.reserve_target == Decimal("1800.00")
 
 
+def test_set_capital_plan_action_accepts_custom_allocations() -> None:
+    product = make_product("Capital Tuning Core")
+    state = make_state(product)
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_CAPITAL_PLAN,
+        context=ActionContext(
+            capital_plan_mode=CapitalPlanMode.BALANCED,
+            capital_source_preference=CapitalSourcePreference.ANGEL,
+            capital_plan_horizon_turns=9,
+            capital_plan_reserve_target=Decimal("4200.00"),
+            capital_plan_product_share=42,
+            capital_plan_go_to_market_share=28,
+            capital_plan_reserve_share=30,
+        ),
+    )
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.BALANCED
+    assert outcome.state.capital_plan.source_preference is CapitalSourcePreference.ANGEL
+    assert outcome.state.capital_plan.planning_horizon_turns == 9
+    assert outcome.state.capital_plan.reserve_target == Decimal("4200.00")
+    assert outcome.state.capital_plan.product_investment_share == 42
+    assert outcome.state.capital_plan.go_to_market_share == 28
+    assert outcome.state.capital_plan.reserve_share == 30
+    assert "Allocation P 42% / GTM 28% / Reserve 30%" in outcome.message
+
+
 def test_finance_drift_penalizes_misaligned_capital_plan() -> None:
     finance = FinanceState(
         debt_principal=Decimal("5400.00"),
@@ -5570,6 +5599,49 @@ def test_unlock_catalog_surfaces_exact_reward_metadata() -> None:
         entry.reward_id == "board_command_cloud" for entry in catalog.entries if entry.unlocked
     )
     assert catalog.next_unlock_label
+
+
+def test_reward_unlocks_gate_progression_content_ids() -> None:
+    locked_without_archives = is_reward_unlocked(
+        [],
+        reward_type="scenario",
+        reward_id="campaign_ladder_climb",
+    )
+    unlocked_baseline_content = is_reward_unlocked(
+        [],
+        reward_type="scenario",
+        reward_id="bootstrap_studio",
+    )
+    unlocked_with_victory_archive = is_reward_unlocked(
+        [
+            RunArchiveSummary(
+                archive_key="run-1",
+                slot_name="active",
+                company_name="NEXUS TECH",
+                scenario_title="Founder Journey",
+                completed_turn=12,
+                victory_achieved=True,
+                game_over=False,
+                exit_outcome="strategic_acquisition",
+                total_score=212,
+                score_tier="strong",
+                campaign_grade="A",
+                estimated_valuation=Decimal("52000.00"),
+                achievement_badges=("board_trusted",),
+                strategic_outlook="strategic_acquisition",
+                offer_value=Decimal("61000.00"),
+                final_cash=Decimal("14000.00"),
+                final_reputation=68,
+                archived_at="2026-04-29T00:00:00+00:00",
+            )
+        ],
+        reward_type="scenario",
+        reward_id="campaign_ladder_climb",
+    )
+
+    assert locked_without_archives is False
+    assert unlocked_baseline_content is True
+    assert unlocked_with_victory_archive is True
 
 
 def test_archive_comparison_summary_surfaces_archive_leaders() -> None:

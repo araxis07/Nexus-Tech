@@ -411,6 +411,28 @@ def test_list_scenarios_command_renders_catalog(monkeypatch: MonkeyPatch) -> Non
     assert "Bootstrap Studio" in result.output
 
 
+def test_list_scenarios_command_marks_progression_locked_entries(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    scenarios = tuple(
+        scenario
+        for scenario in cli_module.get_available_scenarios()
+        if scenario.scenario_id in {"bootstrap_studio", "campaign_ladder_climb"}
+    )
+    monkeypatch.setattr(cli_module, "get_available_scenarios", lambda: scenarios)
+    db_path = tmp_path / "progression.db"
+    console = Console(record=True, width=160)
+    monkeypatch.setattr(cli_module, "console", console)
+
+    cli_module.list_scenarios_command(db_path=db_path)
+    output = console.export_text()
+
+    assert "Campaign Ladder Climb" in output
+    assert "Bootstrap Studio" in output
+    assert "locked" in output
+
+
 def test_list_templates_command_renders_catalog(monkeypatch: MonkeyPatch) -> None:
     templates = cli_module.get_available_product_templates()
     monkeypatch.setattr(cli_module, "get_available_product_templates", lambda: templates[:1])
@@ -438,6 +460,24 @@ def test_list_rivals_command_renders_catalog() -> None:
     assert result.exit_code == 0
     assert "Competitor Archetypes" in result.output
     assert "price_raider" in result.output
+
+
+def test_new_game_rejects_locked_progression_scenario(tmp_path: Path) -> None:
+    db_path = tmp_path / "progression.db"
+    result = runner.invoke(
+        app,
+        [
+            "new-game",
+            "--scenario",
+            "campaign_ladder_climb",
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Scenario Locked" in result.output
+    assert "list-unlocks" in result.output
 
 
 def test_list_events_command_renders_registry() -> None:

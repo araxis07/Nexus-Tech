@@ -118,11 +118,18 @@ def render_intro(
     )
 
 
-def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinition, ...]) -> None:
+def render_scenario_catalog(
+    console: Console,
+    scenarios: tuple[ScenarioDefinition, ...],
+    *,
+    locked_ids: set[str] | None = None,
+) -> None:
     """Render the available starting scenarios."""
 
+    locked_ids = locked_ids or set()
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Scenario", style="bold")
+    table.add_column("Status")
     table.add_column("Company")
     table.add_column("Strategy")
     table.add_column("Difficulty")
@@ -142,6 +149,7 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
             description = f"{description}\n[dim]Objective: {objective}[/dim]"
         table.add_row(
             f"{scenario.title}\n[dim]{scenario.scenario_id}[/dim]",
+            "locked" if scenario.scenario_id in locked_ids else "unlocked",
             scenario.company_name,
             scenario.company_strategy.value,
             scenario.difficulty_mode.value,
@@ -163,11 +171,15 @@ def render_scenario_catalog(console: Console, scenarios: tuple[ScenarioDefinitio
 def render_product_template_catalog(
     console: Console,
     templates: tuple[ProductTemplateDefinition, ...],
+    *,
+    locked_ids: set[str] | None = None,
 ) -> None:
     """Render the available product templates."""
 
+    locked_ids = locked_ids or set()
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Template", style="bold")
+    table.add_column("Status")
     table.add_column("Stage")
     table.add_column("Segment")
     table.add_column("Price")
@@ -181,6 +193,7 @@ def render_product_template_catalog(
     for template in templates:
         table.add_row(
             f"{template.title}\n[dim]{template.template_id}[/dim]",
+            "locked" if template.template_id in locked_ids else "unlocked",
             template.lifecycle_stage.value,
             template.target_segment.value,
             template.pricing_tier.value,
@@ -344,11 +357,15 @@ def render_campaign_goal_catalog(
 def render_competitor_archetype_catalog(
     console: Console,
     archetypes: tuple[CompetitorArchetypeDefinition, ...],
+    *,
+    locked_ids: set[str] | None = None,
 ) -> None:
     """Render the available competitor archetypes."""
 
+    locked_ids = locked_ids or set()
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Archetype", style="bold")
+    table.add_column("Status")
     table.add_column("Segment")
     table.add_column("Price")
     table.add_column("Move")
@@ -360,6 +377,7 @@ def render_competitor_archetype_catalog(
     for archetype in archetypes:
         table.add_row(
             f"{archetype.title}\n[dim]{archetype.archetype_id}[/dim]",
+            "locked" if archetype.archetype_id in locked_ids else "unlocked",
             archetype.focus_segment.value,
             archetype.pricing_tier.value,
             archetype.current_move.value,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.34.0 - 2026-05-05
+
+- Turned archive progression into real gameplay gating so locked reward scenarios, product templates, and rival archetypes now surface in terminal catalogs with status markers and stay unavailable until the local archive unlocks them
+- Extended new-game validation and product-creation flows so progression-locked content fails cleanly with CLI guidance instead of leaking into playable runs
+- Deepened finance planning through custom capital-plan tuning, allowing manual horizon, reserve target, and product versus GTM versus reserve allocation on top of the existing mode and source presets
+- Strengthened terminal UX around progression and finance by exposing lock state directly in catalog views and by surfacing richer capital-plan summaries after changes
+- Added regression coverage for locked scenario access, unlock-aware catalog rendering, archive reward gating, and custom capital-plan application
+- Promoted the package version to `0.34.0`
+
 ## 0.33.0 - 2026-05-01
 
 - Deepened finance planning with richer capital-mix diagnostics, funding-posture guidance, dilution outlook, covenant outlook, and clearer multi-scenario planning notes in the dashboard

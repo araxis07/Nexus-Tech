@@ -231,6 +231,11 @@ class ActionContext:
     partnership_id: UUID | None = None
     capital_plan_mode: CapitalPlanMode | None = None
     capital_source_preference: CapitalSourcePreference | None = None
+    capital_plan_horizon_turns: int | None = None
+    capital_plan_reserve_target: Decimal | None = None
+    capital_plan_product_share: int | None = None
+    capital_plan_go_to_market_share: int | None = None
+    capital_plan_reserve_share: int | None = None
 
 
 @dataclass(frozen=True)
@@ -617,6 +622,11 @@ def apply_action(
             next_state,
             context.capital_plan_mode,
             context.capital_source_preference,
+            planning_horizon_turns=context.capital_plan_horizon_turns,
+            reserve_target=context.capital_plan_reserve_target,
+            product_investment_share=context.capital_plan_product_share,
+            go_to_market_share=context.capital_plan_go_to_market_share,
+            reserve_share=context.capital_plan_reserve_share,
         )
         logger.debug(
             "Changed capital plan to %s / %s.",

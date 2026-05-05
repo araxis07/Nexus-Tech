@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -54,7 +55,11 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.persistence.errors import PersistenceError
-from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
+from nexus_tech.persistence.save_coordinator import (
+    DEFAULT_SAVE_SLOT,
+    RunArchiveSummary,
+    SaveLoadCoordinator,
+)
 from nexus_tech.presentation.dashboard import (
     render_action_feedback,
     render_archive_comparison,
@@ -107,6 +112,7 @@ from nexus_tech.simulation.balance_lab import (
 )
 from nexus_tech.simulation.balance_profiles import list_balance_profiles
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
+from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.catalog_validation import validate_content_catalogs
 from nexus_tech.simulation.engine import (
     ActionContext,
@@ -121,7 +127,12 @@ from nexus_tech.simulation.engine import (
 from nexus_tech.simulation.event_registry import get_event_registry
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.hiring import generate_candidate_pool
-from nexus_tech.simulation.meta_progression import build_unlock_catalog, summarize_meta_progression
+from nexus_tech.simulation.meta_progression import (
+    build_unlock_catalog,
+    get_locked_reward_ids,
+    is_reward_unlocked,
+    summarize_meta_progression,
+)
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scenarios import (
@@ -427,17 +438,35 @@ def play_alias(
 
 
 @app.command("list-scenarios")
-def list_scenarios_command() -> None:
+def list_scenarios_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
     """Print the available starting scenarios."""
 
-    render_scenario_catalog(console, get_available_scenarios())
+    render_scenario_catalog(
+        console,
+        get_available_scenarios(),
+        locked_ids=_build_locked_content_ids(
+            reward_type="scenario",
+            db_path=db_path,
+        ),
+    )
 
 
 @app.command("list-templates")
-def list_templates_command() -> None:
+def list_templates_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
     """Print the available product templates."""
 
-    render_product_template_catalog(console, get_available_product_templates())
+    render_product_template_catalog(
+        console,
+        get_available_product_templates(),
+        locked_ids=_build_locked_content_ids(
+            reward_type="template",
+            db_path=db_path,
+        ),
+    )
 
 
 @app.command("list-goals")
@@ -448,10 +477,19 @@ def list_goals_command() -> None:
 
 
 @app.command("list-rivals")
-def list_rivals_command() -> None:
+def list_rivals_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
     """Print the available competitor archetypes."""
 
-    render_competitor_archetype_catalog(console, get_available_competitor_archetypes())
+    render_competitor_archetype_catalog(
+        console,
+        get_available_competitor_archetypes(),
+        locked_ids=_build_locked_content_ids(
+            reward_type="rival",
+            db_path=db_path,
+        ),
+    )
 
 
 @app.command("list-events")
@@ -990,6 +1028,7 @@ def start_new_game(
     """Create a brand new run and enter the interactive loop."""
 
     validate_scenario_id(scenario_id)
+    validate_player_scenario_access(scenario_id, db_path=db_path)
     state = create_new_game(
         company_name=company_name,
         product_name=product_name,
@@ -1056,7 +1095,7 @@ def run_game_loop(
                 action = ACTION_KEYS[choice]
 
                 try:
-                    context = collect_action_context(state, action)
+                    context = collect_action_context(state, action, db_path=db_path)
                     if context is None:
                         continue
 
@@ -1123,7 +1162,12 @@ def run_game_loop(
         raise typer.Exit(code=130) from error
 
 
-def collect_action_context(state: GameState, action: TurnAction) -> ActionContext | None:
+def collect_action_context(
+    state: GameState,
+    action: TurnAction,
+    *,
+    db_path: Path,
+) -> ActionContext | None:
     """Collect the optional context needed for a chosen action."""
 
     if action in (
@@ -1158,7 +1202,7 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
         return ActionContext()
 
     if action is TurnAction.CREATE_PRODUCT:
-        product_template = choose_product_template(action)
+        product_template = choose_product_template(action, db_path=db_path)
         if product_template is None:
             return None
         return ActionContext(
@@ -1236,9 +1280,73 @@ def collect_action_context(state: GameState, action: TurnAction) -> ActionContex
             show_choices=False,
             case_sensitive=False,
         )
+        plan_mode = CapitalPlanMode(mode_key)
+        source_preference = CapitalSourcePreference(source_key)
+        plan_profile = get_capital_plan_profile(plan_mode, source_preference)
+        customization_mode = ask_choice_input(
+            "Capital plan shape",
+            choices=["profile", "custom"],
+            default="profile",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        if customization_mode == "profile":
+            return ActionContext(
+                capital_plan_mode=plan_mode,
+                capital_source_preference=source_preference,
+            )
+
+        horizon_turns = ask_int_input(
+            "Planning horizon (turns)",
+            default=plan_profile.planning_horizon_turns,
+            minimum=2,
+            maximum=12,
+        )
+        reserve_target = ask_decimal_input(
+            "Reserve target",
+            default=plan_profile.reserve_target,
+            minimum=Decimal("0.00"),
+        )
+        while True:
+            product_share = ask_int_input(
+                "Product investment share",
+                default=plan_profile.product_investment_share,
+                minimum=0,
+                maximum=100,
+            )
+            go_to_market_share = ask_int_input(
+                "Go-to-market share",
+                default=plan_profile.go_to_market_share,
+                minimum=0,
+                maximum=100,
+            )
+            reserve_share = ask_int_input(
+                "Reserve share",
+                default=plan_profile.reserve_share,
+                minimum=0,
+                maximum=100,
+            )
+            total_share = product_share + go_to_market_share + reserve_share
+            if total_share == 100:
+                break
+            console.print(
+                Panel.fit(
+                    (
+                        "Capital allocation shares must total exactly 100.\n"
+                        f"Current total: {total_share}"
+                    ),
+                    title="Allocation Error",
+                    border_style="yellow",
+                )
+            )
         return ActionContext(
-            capital_plan_mode=CapitalPlanMode(mode_key),
-            capital_source_preference=CapitalSourcePreference(source_key),
+            capital_plan_mode=plan_mode,
+            capital_source_preference=source_preference,
+            capital_plan_horizon_turns=horizon_turns,
+            capital_plan_reserve_target=reserve_target,
+            capital_plan_product_share=product_share,
+            capital_plan_go_to_market_share=go_to_market_share,
+            capital_plan_reserve_share=reserve_share,
         )
 
     if action is TurnAction.HIRE_EMPLOYEE:
@@ -1631,14 +1739,26 @@ def choose_product_id(state: GameState, action: TurnAction) -> UUID | None:
     return product.id
 
 
-def choose_product_template(action: TurnAction) -> ProductTemplateDefinition | None:
+def choose_product_template(
+    action: TurnAction,
+    *,
+    db_path: Path,
+) -> ProductTemplateDefinition | None:
     """Prompt the user to select a product template for creation."""
 
-    templates = list(get_available_product_templates())
+    templates = [
+        template
+        for template in get_available_product_templates()
+        if _is_content_available(
+            reward_type="template",
+            reward_id=template.template_id,
+            db_path=db_path,
+        )
+    ]
     if not templates:
         console.print(
             Panel.fit(
-                "No product templates are available.",
+                "No unlocked product templates are available in this install yet.",
                 title="Selection Error",
                 border_style="red",
             )
@@ -2129,6 +2249,84 @@ def ask_text_input(prompt: str, *, default: str | None = None) -> str:
         )
 
 
+def ask_int_input(
+    prompt: str,
+    *,
+    default: int,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int:
+    """Ask for an integer input with bounded validation."""
+
+    while True:
+        raw_value = ask_text_input(prompt, default=str(default))
+        try:
+            value = int(raw_value)
+        except ValueError:
+            console.print(
+                Panel.fit(
+                    "Enter a whole number.",
+                    title="Input Needed",
+                    border_style="yellow",
+                )
+            )
+            continue
+
+        if minimum is not None and value < minimum:
+            console.print(
+                Panel.fit(
+                    f"Value must be at least {minimum}.",
+                    title="Input Needed",
+                    border_style="yellow",
+                )
+            )
+            continue
+        if maximum is not None and value > maximum:
+            console.print(
+                Panel.fit(
+                    f"Value must be at most {maximum}.",
+                    title="Input Needed",
+                    border_style="yellow",
+                )
+            )
+            continue
+        return value
+
+
+def ask_decimal_input(
+    prompt: str,
+    *,
+    default: Decimal,
+    minimum: Decimal | None = None,
+) -> Decimal:
+    """Ask for a Decimal input with lightweight validation."""
+
+    while True:
+        raw_value = ask_text_input(prompt, default=str(default))
+        try:
+            value = Decimal(raw_value)
+        except InvalidOperation:
+            console.print(
+                Panel.fit(
+                    "Enter a numeric amount.",
+                    title="Input Needed",
+                    border_style="yellow",
+                )
+            )
+            continue
+
+        if minimum is not None and value < minimum:
+            console.print(
+                Panel.fit(
+                    f"Value must be at least {minimum}.",
+                    title="Input Needed",
+                    border_style="yellow",
+                )
+            )
+            continue
+        return value
+
+
 def handle_prompt_abort(message: str, error: BaseException, *, exit_code: int) -> None:
     """Render a clean prompt-abort message and stop the CLI."""
 
@@ -2327,6 +2525,29 @@ def validate_scenario_id(scenario_id: str) -> None:
     raise typer.Exit(code=1)
 
 
+def validate_player_scenario_access(scenario_id: str, *, db_path: Path) -> None:
+    """Exit cleanly when a player-targeted scenario is still progression-locked."""
+
+    if _is_content_available(
+        reward_type="scenario",
+        reward_id=scenario_id,
+        db_path=db_path,
+    ):
+        return
+    console.print(
+        Panel.fit(
+            (
+                f"Scenario '{scenario_id}' is still locked for this local profile.\n"
+                "Archive more completed runs and review `nexus-tech list-unlocks` "
+                "or `nexus-tech show-progression`."
+            ),
+            title="Scenario Locked",
+            border_style="yellow",
+        )
+    )
+    raise typer.Exit(code=1)
+
+
 def resolve_scenario_ids(scenario_ids: list[str] | None) -> list[str]:
     """Resolve optional scenario CLI input and validate all ids."""
 
@@ -2335,6 +2556,40 @@ def resolve_scenario_ids(scenario_ids: list[str] | None) -> list[str]:
     for scenario_id in scenario_ids:
         validate_scenario_id(scenario_id)
     return scenario_ids
+
+
+def _load_archives_for_progression(db_path: Path) -> list[RunArchiveSummary]:
+    """Return archived runs for progression-aware catalog decisions."""
+
+    if not db_path.exists():
+        return []
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        return coordinator.list_run_archives()
+    except PersistenceError:
+        return []
+
+
+def _is_content_available(*, reward_type: str, reward_id: str, db_path: Path) -> bool:
+    archives = _load_archives_for_progression(db_path)
+    return is_reward_unlocked(
+        archives,
+        reward_type=reward_type,
+        reward_id=reward_id,
+    )
+
+
+def _build_locked_content_ids(*, reward_type: str, db_path: Path) -> set[str]:
+    archives = _load_archives_for_progression(db_path)
+    return {
+        reward_id
+        for reward_id in get_locked_reward_ids(reward_type)
+        if not is_reward_unlocked(
+            archives,
+            reward_type=reward_type,
+            reward_id=reward_id,
+        )
+    }
 
 
 def main() -> None:

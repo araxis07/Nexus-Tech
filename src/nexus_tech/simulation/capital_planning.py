@@ -62,16 +62,50 @@ def apply_set_capital_plan(
     state: GameState,
     mode: CapitalPlanMode,
     source_preference: CapitalSourcePreference,
+    *,
+    planning_horizon_turns: int | None = None,
+    reserve_target: Decimal | None = None,
+    product_investment_share: int | None = None,
+    go_to_market_share: int | None = None,
+    reserve_share: int | None = None,
 ) -> CapitalPlanSummary:
     """Apply a new capital-planning posture to the in-memory run state."""
 
     capital_plan = get_capital_plan_profile(mode, source_preference)
+    capital_plan = CapitalPlan(
+        mode=mode,
+        source_preference=source_preference,
+        planning_horizon_turns=(
+            planning_horizon_turns
+            if planning_horizon_turns is not None
+            else capital_plan.planning_horizon_turns
+        ),
+        reserve_target=reserve_target
+        if reserve_target is not None
+        else capital_plan.reserve_target,
+        product_investment_share=(
+            product_investment_share
+            if product_investment_share is not None
+            else capital_plan.product_investment_share
+        ),
+        go_to_market_share=(
+            go_to_market_share
+            if go_to_market_share is not None
+            else capital_plan.go_to_market_share
+        ),
+        reserve_share=reserve_share if reserve_share is not None else capital_plan.reserve_share,
+    )
     state.capital_plan = capital_plan
+    allocation_summary = (
+        f"P {capital_plan.product_investment_share}% / "
+        f"GTM {capital_plan.go_to_market_share}% / "
+        f"Reserve {capital_plan.reserve_share}%"
+    )
     return CapitalPlanSummary(
         message=(
             f"Capital plan set to {mode.value} with a {source_preference.value} bias. "
             f"Reserve target {format_money(capital_plan.reserve_target)} over "
-            f"{capital_plan.planning_horizon_turns} turns."
+            f"{capital_plan.planning_horizon_turns} turns. Allocation {allocation_summary}."
         ),
         capital_plan=capital_plan,
     )

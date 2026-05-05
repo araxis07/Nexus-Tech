@@ -53,7 +53,9 @@ Each turn represents a business interval. You review the company, choose actions
 ### 🧩 Data-Driven Content
 
 - Start runs from a scenario catalog instead of a single hard-coded opening
+- Gate select reward scenarios behind archive progression while still surfacing them in the catalog with explicit locked or unlocked status
 - Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
+- Gate select reward templates and rival archetypes behind archive progression so repeat runs can unlock new starts without changing the offline scope
 - Expand the catalog with AI copilot, analytics, support-ops, compliance, embedded API, and capital-pressure scenarios
 - Extend the catalog further with renewal-cloud, customer-portal, and ops-intelligence templates plus channel and concentration-risk scenarios
 - Add a second content-pack pass with billing-hub and partner-stack templates plus talent-race and moat-builder scenarios
@@ -106,6 +108,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Let repeated board misses escalate into an explicit governance crisis so late-game pressure compounds when the company ignores follow-through
 - Force governance trade-offs when a board resolution stays open so the company has to bias toward profitability, reliability, team recovery, or portfolio focus
 - Set a capital plan with explicit reserve posture and preferred capital source so runway expectations can differ between conserve, balanced, and expand modes
+- Tune capital plans manually with custom planning horizon, reserve target, and product versus GTM versus reserve allocation instead of relying only on posture presets
 - Track explicit endgame readiness across IPO, acquisition, and profitable independence so late-game strategy is easier to read before the run ends
 - Break endgame evaluations into sharper variants such as governance-premium IPO paths, platform acquisitions, independent compounders, and board-led resets
 - Review base, conservative, and aggressive finance forecasts directly in the dashboard before committing to riskier turns
@@ -216,6 +219,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Summarize completed-run history into archive-driven meta progression with campaign tiers and unlock-style achievement tracking
 - Surface a visible campaign ladder, archive benchmarks, and next-goal hints so repeat runs feel like structured progression instead of isolated saves
 - Expose an explicit unlock catalog with reward ids for archive-driven scenarios, templates, rivals, tools, and late-game insight lenses
+- Apply archive-driven unlocks to real gameplay entry points so locked reward starts cannot be launched until the local archive progression earns them
 - Compare archived runs directly through score, cash, offer, grade, and outcome coverage so late-game experimentation becomes easier to review
 - Surface path-specific archive leaders, badge coverage, reward mix, and next-gap guidance so the meta layer can point toward what the player has not yet mastered
 
