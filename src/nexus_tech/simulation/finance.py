@@ -72,6 +72,7 @@ class FinancePlannerSnapshot:
     dilution_outlook: str
     covenant_outlook: str
     scenario_compare: tuple[str, ...]
+    recommended_actions: tuple[str, ...]
     capital_alert: str
     summary: str
 
@@ -339,6 +340,19 @@ def build_finance_planner(
             else f"Aggressive still ends at {format_money(aggressive_end_cash)}."
         ),
     )
+    recommended_actions: list[str] = []
+    if finance.debt_principal >= BALANCE.finance_refinance_min_debt and (
+        finance.covenant_risk >= 16 or conservative_hit_turn is not None
+    ):
+        recommended_actions.append("refinance_debt")
+    if finance.debt_principal > ZERO_MONEY and company.cash_on_hand > capital_plan.reserve_target:
+        recommended_actions.append("repay_debt")
+    if reserve_gap < ZERO_MONEY or conservative_hit_turn is not None:
+        recommended_actions.append("set_capital_plan")
+    if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
+        recommended_actions.append("execute_board_response")
+    if not recommended_actions:
+        recommended_actions.append("review_finance")
 
     return FinancePlannerSnapshot(
         horizon_turns=horizon,
@@ -357,6 +371,7 @@ def build_finance_planner(
         dilution_outlook=dilution_outlook,
         covenant_outlook=covenant_outlook,
         scenario_compare=scenario_compare,
+        recommended_actions=tuple(recommended_actions),
         capital_alert=capital_alert,
         summary=summary,
     )
@@ -558,6 +573,57 @@ def apply_repay_debt(
     )
     return FinanceActionSummary(
         message=(f"Repaid {payment} of company debt. Remaining debt is {finance.debt_principal}."),
+        history_entry=history_entry,
+    )
+
+
+def apply_refinance_debt(
+    company: Company,
+    finance: FinanceState,
+    *,
+    current_turn: int,
+) -> FinanceActionSummary:
+    """Extend runway by refinancing existing debt into a costlier but calmer package."""
+
+    if finance.debt_principal < BALANCE.finance_refinance_min_debt:
+        raise ValueError("The company needs a larger debt load before refinancing makes sense.")
+
+    company.cash_on_hand = quantize_money(
+        company.cash_on_hand + BALANCE.finance_refinance_cash_infusion
+    )
+    finance.debt_principal = quantize_money(
+        finance.debt_principal + BALANCE.finance_refinance_cash_infusion
+    )
+    finance.loan_interest_rate = min(
+        Decimal("0.1200"),
+        finance.loan_interest_rate + BALANCE.finance_refinance_interest_rate_gain,
+    )
+    finance.total_raised = quantize_money(
+        finance.total_raised + BALANCE.finance_refinance_cash_infusion
+    )
+    finance.last_funding_turn = current_turn
+    finance.covenant_risk = clamp_int(
+        finance.covenant_risk - BALANCE.finance_refinance_covenant_relief
+    )
+    finance.investor_pressure = clamp_int(
+        finance.investor_pressure + BALANCE.finance_refinance_pressure_gain
+    )
+    finance.board_confidence = clamp_int(
+        finance.board_confidence - BALANCE.finance_refinance_board_confidence_loss
+    )
+    history_entry = FundingHistoryEntry(
+        funding_type=FundingType.LOAN,
+        turn=current_turn,
+        amount=BALANCE.finance_refinance_cash_infusion,
+        debt_added=BALANCE.finance_refinance_cash_infusion,
+        summary="Refinanced the debt stack for extra runway and softer covenants.",
+    )
+    return FinanceActionSummary(
+        message=(
+            "Refinanced debt for "
+            f"{BALANCE.finance_refinance_cash_infusion}. Interest is now "
+            f"{finance.loan_interest_rate * Decimal('100')}% and covenant risk eased."
+        ),
         history_entry=history_entry,
     )
 

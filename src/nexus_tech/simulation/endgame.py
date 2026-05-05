@@ -10,6 +10,7 @@ from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.reporting import RunScore, calculate_run_score
+from nexus_tech.simulation.support_program import calculate_support_account_risk_counts
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,20 @@ class EndgameReadiness:
     acquisition_interest_score: int
     independence_score: int
     strategic_outlook: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class EndgamePressureSummary:
+    """Late-game pressure profile built from exit-readiness plus operating strain."""
+
+    public_market_scrutiny: int
+    acquirer_diligence: int
+    independence_discipline: int
+    restructure_heat: int
+    dominant_pressure: str
+    active_pressures: tuple[str, ...]
+    recommendation: str
     summary: str
 
 
@@ -109,6 +124,102 @@ def calculate_endgame_readiness(
         acquisition_interest_score=acquisition_interest_score,
         independence_score=independence_score,
         strategic_outlook=strategic_outlook,
+        summary=summary,
+    )
+
+
+def calculate_endgame_pressure(
+    state: GameState,
+    readiness: EndgameReadiness | None = None,
+) -> EndgamePressureSummary:
+    """Estimate which late-game pressure is currently driving the run."""
+
+    readiness = readiness or calculate_endgame_readiness(state)
+    active_partnerships = [
+        partnership for partnership in state.partnerships if partnership.status.value != "paused"
+    ]
+    revenue_at_risk_accounts, _ = calculate_support_account_risk_counts(state)
+    average_channel_conflict = (
+        sum(partnership.conflict_pressure + partnership.risk for partnership in active_partnerships)
+        // len(active_partnerships)
+        if active_partnerships
+        else 0
+    )
+    reserve_gap_units = max(
+        0,
+        int(
+            (
+                max(Decimal("0.00"), state.capital_plan.reserve_target - state.company.cash_on_hand)
+                / Decimal("500.00")
+            ).to_integral_value()
+        ),
+    )
+    public_market_scrutiny = _clamp_readiness(
+        max(0, readiness.ipo_readiness_score - 35)
+        + state.finance.governance_risk
+        + (state.finance.board_pressure // 2)
+        + state.support_program.sla_breaches_last_turn
+    )
+    acquirer_diligence = _clamp_readiness(
+        max(0, readiness.acquisition_interest_score - 35)
+        + average_channel_conflict
+        + state.support_program.escalation_queue
+        + (revenue_at_risk_accounts * 3)
+    )
+    independence_discipline = _clamp_readiness(
+        max(0, readiness.independence_score - 35)
+        + state.finance.covenant_risk
+        + state.finance.investor_pressure
+        + reserve_gap_units
+    )
+    restructure_heat = _clamp_readiness(
+        (state.finance.restructuring_pressure * 4)
+        + (state.finance.governance_crisis_level * 10)
+        + (state.support_program.backlog_queue // 2)
+    )
+    pressure_scores = {
+        "public_market_scrutiny": public_market_scrutiny,
+        "acquirer_diligence": acquirer_diligence,
+        "independence_discipline": independence_discipline,
+        "restructure_heat": restructure_heat,
+    }
+    dominant_pressure = max(pressure_scores, key=pressure_scores.get)
+    active_pressures = tuple(
+        pressure_name
+        for pressure_name, score in pressure_scores.items()
+        if score >= BALANCE.event_strategic_crossroads_readiness_threshold
+    )
+    if dominant_pressure == "public_market_scrutiny":
+        recommendation = (
+            "Tighten controls, reporting, and support quality before telling a bigger story."
+        )
+        summary = "The run is leaning toward public-market scrutiny before it is fully ready."
+    elif dominant_pressure == "acquirer_diligence":
+        recommendation = (
+            "Calm partner conflict and customer risk before buyers price in execution drag."
+        )
+        summary = (
+            "Acquirer interest is real, but diligence risk is climbing "
+            "with channel and support noise."
+        )
+    elif dominant_pressure == "independence_discipline":
+        recommendation = (
+            "Protect reserves, manage debt, and prove the company can stay independent cleanly."
+        )
+        summary = "The independent path is viable only if capital discipline stays credible."
+    else:
+        recommendation = (
+            "Narrow scope, stabilize operations, and reduce governance heat before scaling again."
+        )
+        summary = "Operating complexity is now creating visible restructure pressure."
+    return EndgamePressureSummary(
+        public_market_scrutiny=public_market_scrutiny,
+        acquirer_diligence=acquirer_diligence,
+        independence_discipline=independence_discipline,
+        restructure_heat=restructure_heat,
+        dominant_pressure=dominant_pressure,
+        active_pressures=active_pressures,
+        recommendation=recommendation,
         summary=summary,
     )
 

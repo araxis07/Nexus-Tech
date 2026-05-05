@@ -424,6 +424,7 @@ class TurnAction(StrEnum):
     RAISE_ANGEL = "raise_angel"
     RAISE_VC = "raise_vc"
     REPAY_DEBT = "repay_debt"
+    REFINANCE_DEBT = "refinance_debt"
     REVIEW_FINANCE = "review_finance"
     HIRE_EMPLOYEE = "hire_employee"
     FIRE_EMPLOYEE = "fire_employee"

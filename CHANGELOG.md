@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.35.0 - 2026-05-06
+
+- Added `refinance_debt` as a playable finance action so late-stage runs can trade pricier debt for calmer covenant pressure instead of only choosing between new debt and repayment
+- Deepened support-ops visibility with revenue-at-risk and renewal-pressure account tracking that now feeds post-sale decision-making and raises the consequence of long queue age or lane mismatch
+- Expanded partnership portfolio reporting with dependency risk, paused-revenue share, and renegotiation readiness so channel scale is easier to manage as a commercial system instead of a flat count
+- Introduced endgame-pressure modeling across public-market scrutiny, acquirer diligence, independence discipline, and restructure heat, and surfaced those signals directly in the dashboard and victory reporting
+- Added three new late-game event paths: `public_market_scrutiny`, `acquirer_diligence`, and `independence_reckoning`, each tied to the new pressure model with explicit trade-offs
+- Strengthened regression coverage for refinance flow, support commercial risk counts, partnership dependency reporting, and the new endgame event handlers
+- Promoted the package version to `0.35.0`
+
 ## 0.34.0 - 2026-05-05
 
 - Turned archive progression into real gameplay gating so locked reward scenarios, product templates, and rival archetypes now surface in terminal catalogs with status markers and stay unavailable until the local archive unlocks them

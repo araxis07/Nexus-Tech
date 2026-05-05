@@ -226,6 +226,7 @@ ACTION_KEYS = {
     "15": TurnAction.RAISE_VC,
     "16": TurnAction.REPAY_DEBT,
     "17": TurnAction.REVIEW_FINANCE,
+    "78": TurnAction.REFINANCE_DEBT,
     "18": TurnAction.HIRE_EMPLOYEE,
     "19": TurnAction.FIRE_EMPLOYEE,
     "20": TurnAction.ASSIGN_EMPLOYEE,

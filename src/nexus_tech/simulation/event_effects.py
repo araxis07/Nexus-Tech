@@ -2056,6 +2056,176 @@ def _apply_exit_interest(state: GameState, event: PendingEvent, option_id: str) 
     raise ValueError(f"Unsupported option {option_id} for exit interest.")
 
 
+def _apply_public_market_scrutiny(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "tighten_controls":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_public_market_scrutiny_control_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_public_market_scrutiny_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_public_market_scrutiny_score_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk - BALANCE.event_public_market_scrutiny_risk_relief,
+            0,
+            100,
+        )
+        state.support_program.backlog_queue = max(0, state.support_program.backlog_queue - 2)
+        return (
+            f"You tightened controls around {product.name}. Cash "
+            f"-{BALANCE.event_public_market_scrutiny_control_cost}, board confidence "
+            f"+{BALANCE.event_public_market_scrutiny_confidence_gain}."
+        )
+
+    if option_id == "sell_story":
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_public_market_scrutiny_story_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_public_market_scrutiny_story_pressure_gain,
+            0,
+            100,
+        )
+        state.support_program.backlog_queue += (
+            BALANCE.event_public_market_scrutiny_story_backlog_gain
+        )
+        return (
+            f"You sold a bigger story around {product.name}. Reputation "
+            f"+{BALANCE.event_public_market_scrutiny_story_reputation_gain}, board pressure "
+            f"+{BALANCE.event_public_market_scrutiny_story_pressure_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for public market scrutiny.")
+
+
+def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "open_data_room":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_acquirer_diligence_data_room_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_acquirer_diligence_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_acquirer_diligence_score_gain,
+            0,
+            100,
+        )
+        for partnership in state.partnerships:
+            if partnership.product_id == product.id and partnership.status.value != "paused":
+                partnership.risk = clamp_int(
+                    partnership.risk - BALANCE.event_acquirer_diligence_partner_risk_relief,
+                    0,
+                    100,
+                )
+                partnership.conflict_pressure = clamp_int(
+                    partnership.conflict_pressure
+                    - (BALANCE.event_acquirer_diligence_partner_risk_relief // 2),
+                    0,
+                    100,
+                )
+        return (
+            f"You opened diligence around {product.name}. Cash "
+            f"-{BALANCE.event_acquirer_diligence_data_room_cost}, board confidence "
+            f"+{BALANCE.event_acquirer_diligence_confidence_gain}."
+        )
+
+    if option_id == "protect_optionality":
+        state.company.reputation = clamp_int(
+            state.company.reputation + BALANCE.event_acquirer_diligence_optionality_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_acquirer_diligence_optionality_pressure_relief,
+            0,
+            100,
+        )
+        for account in _get_active_accounts_for_product(state, product.id)[:2]:
+            account.renewal_health = clamp_int(account.renewal_health + 2, 0, 100)
+        return (
+            f"You protected optionality around {product.name}. Reputation "
+            f"+{BALANCE.event_acquirer_diligence_optionality_reputation_gain}, investor pressure "
+            f"-{BALANCE.event_acquirer_diligence_optionality_pressure_relief}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for acquirer diligence.")
+
+
+def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "double_down_efficiency":
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_independence_reckoning_efficiency_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.covenant_risk = clamp_int(
+            state.finance.covenant_risk
+            - BALANCE.event_independence_reckoning_efficiency_covenant_relief,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            + BALANCE.event_independence_reckoning_efficiency_reputation_gain,
+            0,
+            100,
+        )
+        product_shift = min(3, state.capital_plan.product_investment_share)
+        gtm_shift = min(2, state.capital_plan.go_to_market_share)
+        state.capital_plan.product_investment_share -= product_shift
+        state.capital_plan.go_to_market_share -= gtm_shift
+        state.capital_plan.reserve_share += product_shift + gtm_shift
+        return (
+            "You doubled down on independence discipline. Investor pressure "
+            f"-{BALANCE.event_independence_reckoning_efficiency_pressure_relief}, covenant risk "
+            f"-{BALANCE.event_independence_reckoning_efficiency_covenant_relief}."
+        )
+
+    if option_id == "take_bridge_flex":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_independence_reckoning_bridge_cash_gain
+        )
+        state.finance.debt_principal = quantize_money(
+            state.finance.debt_principal + BALANCE.event_independence_reckoning_bridge_debt_gain
+        )
+        state.finance.loan_interest_rate = clamp_rate(
+            state.finance.loan_interest_rate
+            + BALANCE.event_independence_reckoning_bridge_interest_gain
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            + BALANCE.event_independence_reckoning_bridge_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            "You took a flexibility bridge. Cash "
+            f"+{BALANCE.event_independence_reckoning_bridge_cash_gain}, debt "
+            f"+{BALANCE.event_independence_reckoning_bridge_debt_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for independence reckoning.")
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -2245,6 +2415,9 @@ EVENT_EFFECT_HANDLERS = {
     "audit_followup_review": _apply_audit_followup_review,
     "launch_aftershock": _apply_launch_aftershock,
     "exit_interest": _apply_exit_interest,
+    "public_market_scrutiny": _apply_public_market_scrutiny,
+    "acquirer_diligence": _apply_acquirer_diligence,
+    "independence_reckoning": _apply_independence_reckoning,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,

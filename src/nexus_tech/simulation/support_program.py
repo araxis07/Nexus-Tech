@@ -38,6 +38,8 @@ class SupportProgramSummary:
     onboarding_ticket_pressure: int
     enterprise_ticket_pressure: int
     billing_ticket_pressure: int
+    revenue_at_risk_accounts: int
+    renewal_pressure_accounts: int
     dominant_lane: SupportLaneFocus
     focus_mismatch_penalty: int
     lane_overflow_pressure: int
@@ -63,6 +65,39 @@ class SupportOpsActionSummary:
     """Summary of an explicit support-ops intervention."""
 
     message: str
+
+
+def calculate_support_account_risk_counts(state: GameState) -> tuple[int, int]:
+    """Return account counts currently under commercial stress from support issues."""
+
+    active_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    revenue_at_risk_accounts = 0
+    renewal_pressure_accounts = 0
+    for account in active_accounts:
+        stressed_account = (
+            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
+            or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+            or account.sla_breach_risk >= state.support_program.sla_target
+        )
+        if (
+            stressed_account
+            and (
+                account.contract_value >= BALANCE.support_program_revenue_at_risk_contract_threshold
+                or account.segment.value == "enterprise"
+            )
+        ) or account.failed_payment_risk >= BALANCE.support_program_queue_age_threshold * 10:
+            revenue_at_risk_accounts += 1
+        if (
+            account.renewal_health <= BALANCE.support_program_renewal_pressure_health_threshold
+            or account.churn_risk >= BALANCE.support_program_renewal_pressure_churn_threshold
+            or account.renewal_offer_active
+        ):
+            renewal_pressure_accounts += 1
+    return revenue_at_risk_accounts, renewal_pressure_accounts
 
 
 def calculate_support_lane_staffing_plan(state: GameState) -> dict[SupportLaneFocus, int]:
@@ -329,6 +364,28 @@ def apply_end_of_turn_support_program(
                 account.churn_risk = clamp_int(
                     account.churn_risk + BALANCE.support_program_queue_age_churn_gain
                 )
+                account.renewal_health = clamp_int(
+                    account.renewal_health - BALANCE.support_program_queue_age_renewal_health_loss
+                )
+                account.expansion_potential = clamp_int(
+                    account.expansion_potential - BALANCE.support_program_queue_age_expansion_loss
+                )
+    for account in active_accounts:
+        stressed_account = (
+            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
+            or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+            or account.sla_breach_risk >= state.support_program.sla_target
+        )
+        if (
+            stressed_account
+            and lane_overflow_pressure > 0
+            and classify_account_support_lane(account) is dominant_lane
+        ):
+            account.renewal_health = clamp_int(account.renewal_health - 1)
+            account.expansion_potential = clamp_int(account.expansion_potential - 1)
+    revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
+        state
+    )
     if (
         state.support_program.backlog_queue
         >= BALANCE.support_program_backlog_morale_penalty_threshold
@@ -376,6 +433,8 @@ def apply_end_of_turn_support_program(
         onboarding_ticket_pressure=onboarding_ticket_pressure,
         enterprise_ticket_pressure=enterprise_ticket_pressure,
         billing_ticket_pressure=billing_ticket_pressure,
+        revenue_at_risk_accounts=revenue_at_risk_accounts,
+        renewal_pressure_accounts=renewal_pressure_accounts,
         dominant_lane=dominant_lane,
         focus_mismatch_penalty=focus_mismatch_penalty,
         lane_overflow_pressure=lane_overflow_pressure,

@@ -20,7 +20,7 @@ from nexus_tech.domain.models import (
     Product,
 )
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.endgame import calculate_endgame_readiness
+from nexus_tech.simulation.endgame import calculate_endgame_pressure, calculate_endgame_readiness
 from nexus_tech.simulation.finance import count_funding_rounds
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.randomness import RandomLike
@@ -266,6 +266,30 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_exit_interest_cooldown,
             is_eligible=_is_exit_interest_eligible,
             build_pending_event=_build_exit_interest_event,
+        ),
+        EventDefinition(
+            event_id="public_market_scrutiny",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_public_market_scrutiny_weight,
+            cooldown_turns=BALANCE.event_public_market_scrutiny_cooldown,
+            is_eligible=_is_public_market_scrutiny_eligible,
+            build_pending_event=_build_public_market_scrutiny_event,
+        ),
+        EventDefinition(
+            event_id="acquirer_diligence",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_acquirer_diligence_weight,
+            cooldown_turns=BALANCE.event_acquirer_diligence_cooldown,
+            is_eligible=_is_acquirer_diligence_eligible,
+            build_pending_event=_build_acquirer_diligence_event,
+        ),
+        EventDefinition(
+            event_id="independence_reckoning",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_reckoning_weight,
+            cooldown_turns=BALANCE.event_independence_reckoning_cooldown,
+            is_eligible=_is_independence_reckoning_eligible,
+            build_pending_event=_build_independence_reckoning_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -1732,6 +1756,161 @@ def _is_exit_interest_eligible(state: GameState) -> bool:
             readiness.independence_score,
         )
         >= BALANCE.event_exit_interest_readiness_threshold
+    )
+
+
+def _is_public_market_scrutiny_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
+        and any(product.is_active for product in state.products)
+        and pressure.public_market_scrutiny
+        >= BALANCE.event_public_market_scrutiny_pressure_threshold
+        and not _has_recent_event(
+            state,
+            {"exit_interest", "strategic_crossroads"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+    )
+
+
+def _build_public_market_scrutiny_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="public_market_scrutiny",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Public-Market Scrutiny",
+        description=(
+            f"Operators and investors are starting to question whether {target.name} can support "
+            "a cleaner public-market narrative. You can tighten controls or tell a bigger story "
+            "and accept more operating scrutiny."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=2,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="tighten_controls",
+                label="Tighten controls",
+                description="Spend cash to improve governance optics and calm the board.",
+            ),
+            EventOption(
+                id="sell_story",
+                label="Sell the bigger story",
+                description="Gain narrative momentum, but increase pressure on operations.",
+            ),
+        ],
+    )
+
+
+def _is_acquirer_diligence_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
+        and any(product.is_active for product in state.products)
+        and pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
+        and bool(state.customer_accounts)
+        and not _has_recent_event(
+            state,
+            {"partner_breakdown", "partner_renegotiation"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+    )
+
+
+def _build_acquirer_diligence_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="acquirer_diligence",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Acquirer Diligence",
+        description=(
+            f"Potential buyers are asking harder questions about {target.name}, the support load, "
+            "and channel quality. You can open the data room or protect optionality and keep "
+            "control of the process."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=2,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="open_data_room",
+                label="Open the data room",
+                description="Spend cash to improve board conviction and calm diligence risk.",
+            ),
+            EventOption(
+                id="protect_optionality",
+                label="Protect optionality",
+                description="Stay selective, reinforce independence, and relieve some pressure.",
+            ),
+        ],
+    )
+
+
+def _is_independence_reckoning_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
+        and pressure.independence_discipline
+        >= BALANCE.event_independence_reckoning_pressure_threshold
+        and not _has_recent_event(
+            state,
+            {"capital_market_freeze", "bridge_round"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+    )
+
+
+def _build_independence_reckoning_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_reckoning",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Reckoning",
+        description=(
+            "The company can stay independent, but only if capital discipline gets sharper. "
+            "You can double down on efficiency or accept a small bridge to protect flexibility."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=3,
+        options=[
+            EventOption(
+                id="double_down_efficiency",
+                label="Double down on efficiency",
+                description="Lower pressure and covenants, but ask for more operating discipline.",
+            ),
+            EventOption(
+                id="take_bridge_flex",
+                label="Take a small flexibility bridge",
+                description="Add cash now, but debt and outside pressure rise again.",
+            ),
+        ],
     )
 
 

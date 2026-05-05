@@ -44,7 +44,11 @@ from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_camp
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
-from nexus_tech.simulation.endgame import calculate_endgame_readiness, evaluate_exit_outcome
+from nexus_tech.simulation.endgame import (
+    calculate_endgame_pressure,
+    calculate_endgame_readiness,
+    evaluate_exit_outcome,
+)
 from nexus_tech.simulation.engine import TurnResolution, get_total_users
 from nexus_tech.simulation.event_registry import EventDefinition
 from nexus_tech.simulation.finance import (
@@ -79,6 +83,7 @@ from nexus_tech.simulation.roadmap import (
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
 from nexus_tech.simulation.support_program import (
+    calculate_support_account_risk_counts,
     calculate_support_lane_snapshots,
     calculate_support_lane_staffing_plan,
     calculate_support_staff_capacity,
@@ -1313,6 +1318,7 @@ def render_victory(console: Console, state: GameState) -> None:
 
     run_score = calculate_run_score(state)
     readiness = calculate_endgame_readiness(state, run_score)
+    pressure = calculate_endgame_pressure(state, readiness)
     content = Table.grid(padding=(0, 1))
     content.add_row("Outcome", state.victory_reason or "The company reached durable scale.")
     content.add_row("Run Score", f"{run_score.total_score} ({run_score.score_tier})")
@@ -1320,6 +1326,7 @@ def render_victory(console: Console, state: GameState) -> None:
     content.add_row("Badges", ", ".join(calculate_run_badges(state, run_score)))
     content.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     content.add_row("Strategic Outlook", readiness.strategic_outlook.replace("_", " "))
+    content.add_row("Pressure Path", pressure.dominant_pressure.replace("_", " "))
     content.add_row(
         "Readiness",
         (
@@ -1328,6 +1335,7 @@ def render_victory(console: Console, state: GameState) -> None:
             f"Ind {readiness.independence_score}"
         ),
     )
+    content.add_row("Pressure Note", pressure.summary)
     if state.exit_outcome is not None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
         content.add_row("Exit Path", exit_evaluation.title)
@@ -1609,6 +1617,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     run_score = calculate_run_score(state)
     badges = calculate_run_badges(state, run_score)
     readiness = calculate_endgame_readiness(state, run_score)
+    pressure = calculate_endgame_pressure(state, readiness)
     scale_pressure = calculate_company_scale_pressure(
         state.products,
         headcount=len(state.employees),
@@ -1622,6 +1631,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Badges", ", ".join(badges))
     table.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     table.add_row("Exit Outlook", readiness.strategic_outlook.replace("_", " "))
+    table.add_row("Endgame Pressure", pressure.dominant_pressure.replace("_", " "))
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
     table.add_row("Runway", "cashflow+" if runway is None else f"{runway} turns")
     table.add_row("Competitors", str(len(state.competitors)))
@@ -1636,6 +1646,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Ops Cost", format_money(operations.added_cost))
     table.add_row("Ticket Backlog", str(operations.support_backlog))
     table.add_row("Scale State", scale_pressure.summary)
+    table.add_row("Pressure Note", pressure.summary)
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
 
@@ -2059,6 +2070,7 @@ def _build_action_menu_panel() -> Panel:
     primary_actions.add_row("14", "raise_angel", "Take smaller capital with dilution.")
     primary_actions.add_row("15", "raise_vc", "Raise a larger round once traction is real.")
     primary_actions.add_row("16", "repay_debt", "Reduce interest and capital pressure.")
+    primary_actions.add_row("78", "refinance_debt", "Trade pricier debt for calmer covenants.")
     primary_actions.add_row("17", "review_finance", "Open the capital and runway view.")
     primary_actions.add_row("18", "hire_employee", "Add capability and salary burn.")
     primary_actions.add_row("19", "fire_employee", "Remove salary burden.")
@@ -2664,6 +2676,9 @@ def _build_support_program_panel(state: GameState) -> Panel:
     staffing_capacity = calculate_support_staff_capacity(state)
     lane_snapshots = calculate_support_lane_snapshots(state)
     staffing_plan = calculate_support_lane_staffing_plan(state)
+    revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
+        state
+    )
     lane_counts = {
         "onboarding": 0,
         "enterprise": 0,
@@ -2693,6 +2708,8 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Onboarding Q", str(state.support_program.onboarding_ticket_pressure))
     table.add_row("Enterprise Q", str(state.support_program.enterprise_ticket_pressure))
     table.add_row("Billing Q", str(state.support_program.billing_ticket_pressure))
+    table.add_row("Revenue at Risk", str(revenue_at_risk_accounts))
+    table.add_row("Renewal Pressure", str(renewal_pressure_accounts))
     table.add_row(
         "Lane Cap",
         (
@@ -2837,6 +2854,7 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Dilution Outlook", planner.dilution_outlook)
     table.add_row("Covenant Outlook", planner.covenant_outlook)
     table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
+    table.add_row("Next Actions", " | ".join(planner.recommended_actions))
     table.add_row("Planner Alert", planner.capital_alert)
     table.add_row("Planner", planner.summary)
     return Panel(table, title="Finance", border_style="cyan", expand=True)
@@ -2918,8 +2936,11 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Avg Fatigue", str(portfolio.average_fatigue))
         table.add_row("Neglected", str(portfolio.neglected_count))
         table.add_row("Recovery Ready", str(portfolio.recovery_ready_count))
+        table.add_row("Renegotiate", str(portfolio.renegotiation_ready_count))
         table.add_row("Conflict", str(portfolio.channel_conflict_index))
         table.add_row("Dominant Share", f"{portfolio.dominant_share_percent}%")
+        table.add_row("Paused Rev Share", f"{portfolio.paused_revenue_share_percent}%")
+        table.add_row("Dependency Risk", str(portfolio.channel_dependency_risk))
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 

@@ -81,6 +81,7 @@ from nexus_tech.simulation.finance import (
     apply_end_of_turn_finance_drift,
     apply_raise_angel,
     apply_raise_vc,
+    apply_refinance_debt,
     apply_repay_debt,
     apply_take_loan,
 )
@@ -363,6 +364,7 @@ def apply_action(
         TurnAction.REVIEW_CUSTOMERS,
         TurnAction.REVIEW_PIPELINE,
         TurnAction.REVIEW_BOARD,
+        TurnAction.REVIEW_PARTNERSHIPS,
         TurnAction.VIEW_REPORT,
         TurnAction.END_TURN,
     ):
@@ -679,6 +681,16 @@ def apply_action(
         )
         next_state.funding_history.append(summary.history_entry)
         logger.debug("Repaid debt on turn %s.", next_state.company.current_turn)
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.REFINANCE_DEBT:
+        summary = apply_refinance_debt(
+            next_state.company,
+            next_state.finance,
+            current_turn=next_state.company.current_turn,
+        )
+        next_state.funding_history.append(summary.history_entry)
+        logger.debug("Refinanced debt on turn %s.", next_state.company.current_turn)
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.FIRE_EMPLOYEE:

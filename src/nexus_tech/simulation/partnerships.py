@@ -57,8 +57,11 @@ class PartnershipPortfolioSummary:
     fatigued_count: int
     neglected_count: int
     recovery_ready_count: int
+    renegotiation_ready_count: int
     channel_conflict_index: int
     dominant_share_percent: int
+    paused_revenue_share_percent: int
+    channel_dependency_risk: int
     summary: str
 
 
@@ -517,8 +520,11 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             fatigued_count=0,
             neglected_count=0,
             recovery_ready_count=0,
+            renegotiation_ready_count=0,
             channel_conflict_index=0,
             dominant_share_percent=0,
+            paused_revenue_share_percent=0,
+            channel_dependency_risk=0,
             summary="No active channel portfolio yet.",
         )
 
@@ -568,6 +574,13 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
         and fatigue <= BALANCE.partnership_recovery_resume_threshold
     )
+    renegotiation_ready_count = sum(
+        1
+        for partnership, fatigue in zip(state.partnerships, fatigue_scores, strict=False)
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.sourced_revenue > ZERO_MONEY
+        and fatigue >= BALANCE.partnership_renegotiation_ready_fatigue_threshold
+    )
     fatigued_count = sum(
         1 for fatigue in fatigue_scores if fatigue >= BALANCE.partnership_fatigue_strained_threshold
     )
@@ -576,6 +589,28 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
     ) // len(state.partnerships)
     dominant_share_percent = int(
         ((channel_counts.get(dominant_channel, 0) / max(1, len(state.partnerships))) * 100)
+    )
+    paused_revenue = quantize_money(
+        sum(
+            (
+                partnership.sourced_revenue
+                for partnership in state.partnerships
+                if partnership.status is PartnershipStatus.PAUSED
+            ),
+            ZERO_MONEY,
+        )
+    )
+    paused_revenue_share_percent = (
+        int((paused_revenue / sourced_revenue * Decimal("100")).to_integral_value())
+        if sourced_revenue > ZERO_MONEY
+        else 0
+    )
+    channel_dependency_risk = clamp_int(
+        (dominant_share_percent // 2)
+        + (channel_conflict_index // 2)
+        + (average_risk // 3)
+        + (strained_count * BALANCE.partnership_dependency_risk_strained_bonus)
+        + (paused_count * BALANCE.partnership_dependency_risk_paused_bonus)
     )
     if paused_count > 0:
         summary = "Some channels are paused and need deliberate recovery before they can scale."
@@ -600,8 +635,11 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         fatigued_count=fatigued_count,
         neglected_count=neglected_count,
         recovery_ready_count=recovery_ready_count,
+        renegotiation_ready_count=renegotiation_ready_count,
         channel_conflict_index=channel_conflict_index,
         dominant_share_percent=dominant_share_percent,
+        paused_revenue_share_percent=paused_revenue_share_percent,
+        channel_dependency_risk=channel_dependency_risk,
         summary=summary,
     )
 

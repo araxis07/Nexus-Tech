@@ -91,6 +91,7 @@ from nexus_tech.simulation.economy import (
 from nexus_tech.simulation.employee_progression import apply_end_of_turn_employee_progression
 from nexus_tech.simulation.endgame import (
     apply_exit_outcome,
+    calculate_endgame_pressure,
     calculate_endgame_readiness,
     evaluate_exit_outcome,
 )
@@ -162,6 +163,7 @@ from nexus_tech.simulation.scaling import (
 )
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
+    calculate_support_account_risk_counts,
     calculate_support_lane_snapshots,
     calculate_support_lane_staffing_plan,
     calculate_support_staff_capacity,
@@ -2139,6 +2141,27 @@ def test_take_loan_and_repay_debt_change_finance_state() -> None:
     assert repay_outcome.state.company.cash_on_hand == Decimal("8700.00")
 
 
+def test_refinance_debt_trades_interest_for_covenant_relief() -> None:
+    state = make_state(
+        make_product("Refi Core"),
+        cash_on_hand=Decimal("4200.00"),
+        finance=FinanceState(
+            debt_principal=Decimal("3400.00"),
+            loan_interest_rate=Decimal("0.0300"),
+            covenant_risk=26,
+            board_confidence=62,
+        ),
+    )
+
+    outcome = apply_action(state, TurnAction.REFINANCE_DEBT)
+
+    assert outcome.state.company.cash_on_hand == Decimal("5400.00")
+    assert outcome.state.finance.debt_principal == Decimal("4600.00")
+    assert outcome.state.finance.loan_interest_rate > Decimal("0.0300")
+    assert outcome.state.finance.covenant_risk < 26
+    assert outcome.state.finance.board_confidence < 62
+
+
 def test_raise_vc_requires_real_traction() -> None:
     weak_state = make_state(make_product("Core", user_count=35), cash_on_hand=Decimal("7000.00"))
     weak_state.company.reputation = 60
@@ -2507,6 +2530,9 @@ def test_new_event_ids_are_registered() -> None:
     assert "capital_market_freeze" in registry_ids
     assert "succession_gap" in registry_ids
     assert "strategic_crossroads" in registry_ids
+    assert "public_market_scrutiny" in registry_ids
+    assert "acquirer_diligence" in registry_ids
+    assert "independence_reckoning" in registry_ids
 
 
 def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
@@ -3294,6 +3320,43 @@ def test_support_program_backlog_creates_queue_pressure() -> None:
     assert summary.queue_age_pressure > 0
     assert summary.reputation_delta <= 0
     assert summary.morale_penalty >= 0
+
+
+def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
+    product = make_product("Renewal Queue", quality=44, bug_level=38, market_fit=52)
+    account = CustomerAccount(
+        name="Critical Renewal",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1400.00"),
+        satisfaction=50,
+        onboarding_health=46,
+        support_load=44,
+        open_tickets=18,
+        sla_breach_risk=68,
+        renewal_health=46,
+        expansion_potential=58,
+        renewal_turn=7,
+        churn_risk=42,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("8800.00"))
+    state.support_program = SupportProgram(
+        knowledge_base_level=10,
+        automation_level=8,
+        backlog_queue=16,
+    )
+
+    summary = apply_end_of_turn_support_program(state)
+    revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
+        state
+    )
+
+    assert summary.revenue_at_risk_accounts >= 1
+    assert summary.renewal_pressure_accounts >= 1
+    assert revenue_at_risk_accounts >= 1
+    assert renewal_pressure_accounts >= 1
+    assert state.customer_accounts[0].renewal_health < 46
 
 
 def test_set_support_lane_focus_updates_program_bias() -> None:
@@ -5085,6 +5148,82 @@ def test_strategic_crossroads_event_can_formalize_late_game_path() -> None:
     assert outcome.history_entry.event_id == "strategic_crossroads"
 
 
+def test_public_market_scrutiny_event_can_fund_control_response() -> None:
+    product = make_product(
+        "Listing Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=260,
+        quality=78,
+        market_fit=76,
+    )
+    state = make_state(product, cash_on_hand=Decimal("16000.00"), current_turn=12)
+    state.company.reputation = 78
+    state.finance.board_confidence = 74
+    state.finance.board_score = 75
+    state.finance.board_pressure = 20
+    state.finance.governance_risk = 18
+    state.support_program.sla_breaches_last_turn = 4
+    pressure = calculate_endgame_pressure(state)
+
+    assert (
+        pressure.public_market_scrutiny >= BALANCE.event_public_market_scrutiny_pressure_threshold
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "public_market_scrutiny"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "tighten_controls")
+
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.history_entry.event_id == "public_market_scrutiny"
+
+
+def test_independence_reckoning_event_can_take_bridge_flex() -> None:
+    product = make_product(
+        "Independent Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=180,
+        quality=70,
+        market_fit=68,
+    )
+    state = make_state(
+        product,
+        cash_on_hand=Decimal("4200.00"),
+        current_turn=12,
+        finance=FinanceState(
+            debt_principal=Decimal("2800.00"),
+            loan_interest_rate=Decimal("0.0320"),
+            investor_pressure=24,
+            covenant_risk=20,
+            board_confidence=66,
+        ),
+    )
+    state.company.reputation = 72
+    state.capital_plan.reserve_target = Decimal("5200.00")
+    pressure = calculate_endgame_pressure(state)
+
+    assert pressure.independence_discipline > 0
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "independence_reckoning"
+    )
+    pending_event = definition.build_pending_event(state, FixedRandom(0), definition.cooldown_turns)
+    state.pending_event = pending_event
+
+    outcome = resolve_pending_event(state, "take_bridge_flex")
+
+    assert outcome.state.company.cash_on_hand > state.company.cash_on_hand
+    assert outcome.state.finance.debt_principal > state.finance.debt_principal
+    assert outcome.state.finance.loan_interest_rate > state.finance.loan_interest_rate
+    assert outcome.history_entry.event_id == "independence_reckoning"
+
+
 def test_create_partnership_action_adds_channel_and_cost() -> None:
     product = make_product("Channel Core", target_segment=MarketSegment.ENTERPRISE)
     state = make_state(product, cash_on_hand=Decimal("9000.00"))
@@ -5239,6 +5378,43 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.channel_conflict_index >= 0
     assert summary.dominant_share_percent >= 50
     assert summary.dominant_channel in {"reseller", "marketplace"}
+
+
+def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk() -> None:
+    product = make_product("Dependency Hub", market_fit=70, quality=72, bug_level=12)
+    partnerships = [
+        PartnershipDeal(
+            name="Primary Reseller",
+            product_id=product.id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.STRAINED,
+            sourced_revenue=Decimal("2200.00"),
+            sourced_users=30,
+            quality=68,
+            risk=52,
+            conflict_pressure=48,
+            enablement_level=38,
+        ),
+        PartnershipDeal(
+            name="Paused Marketplace",
+            product_id=product.id,
+            channel=PartnerChannel.MARKETPLACE,
+            status=PartnershipStatus.PAUSED,
+            sourced_revenue=Decimal("900.00"),
+            sourced_users=12,
+            quality=58,
+            risk=60,
+            conflict_pressure=54,
+            enablement_level=30,
+        ),
+    ]
+    state = make_state(product, partnerships=partnerships, current_turn=6)
+
+    summary = calculate_partnership_portfolio(state)
+
+    assert summary.channel_dependency_risk > 0
+    assert summary.paused_revenue_share_percent > 0
+    assert summary.renegotiation_ready_count >= 1
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
