@@ -1838,6 +1838,16 @@ class BalanceConfig:
     support_program_upgrade_sla_gain: int = 8
     support_program_upgrade_backlog_relief: int = 4
     support_program_upgrade_escalation_relief: int = 1
+    commercial_pressure_board_pressure_per_revenue_at_risk: int = 2
+    commercial_pressure_board_confidence_loss_per_revenue_at_risk: int = 1
+    commercial_pressure_governance_risk_per_renewal_pressure: int = 2
+    commercial_pressure_lane_overflow_governance_divisor: int = 6
+    commercial_pressure_channel_dependency_threshold: int = 55
+    commercial_pressure_channel_dependency_board_penalty: int = 3
+    commercial_pressure_channel_dependency_confidence_loss: int = 2
+    commercial_pressure_paused_share_threshold: int = 30
+    commercial_pressure_paused_share_board_penalty: int = 2
+    commercial_pressure_paused_share_reputation_loss: int = 1
     renewal_offer_cost: Decimal = Decimal("110.00")
     renewal_offer_discount_increase: Decimal = Decimal("0.0100")
     renewal_offer_health_gain: int = 8

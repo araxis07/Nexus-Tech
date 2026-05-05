@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.36.0 - 2026-05-06
+
+- Added archive-gated `campaign start` modifiers plus a new `list-campaign-starts` CLI catalog so repeat runs can begin from distinct commercial and governance pressure profiles instead of always replaying turn-one openings
+- Wired campaign-start selection into `new-game`, the default root command, and the hidden `play` alias, including clean locked-content validation and intro-banner visibility for the chosen start profile
+- Deepened end-of-turn operating realism with a dedicated commercial-pressure layer that translates support risk, renewal stress, and channel dependency into board pressure, governance risk, customer risk status, and turn-summary narrative output
+- Extended terminal reporting so turn summaries now surface commercial pressure explicitly alongside existing operations, late-game, and scale signals
+- Strengthened regression coverage for campaign-start application, campaign-start CLI gating, and end-of-turn commercial-pressure escalation
+- Promoted the package version to `0.36.0`
+
 ## 0.35.0 - 2026-05-06
 
 - Added `refinance_debt` as a playable finance action so late-stage runs can trade pricier debt for calmer covenant pressure instead of only choosing between new debt and repayment

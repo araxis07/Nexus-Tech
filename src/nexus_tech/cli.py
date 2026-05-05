@@ -70,6 +70,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_profile_catalog,
     render_board_view,
     render_campaign_goal_catalog,
+    render_campaign_start_catalog,
     render_candidate_pool,
     render_competitor_archetype_catalog,
     render_content_health,
@@ -112,6 +113,11 @@ from nexus_tech.simulation.balance_lab import (
 )
 from nexus_tech.simulation.balance_profiles import list_balance_profiles
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
+from nexus_tech.simulation.campaign_starts import (
+    STANDARD_CAMPAIGN_START_ID,
+    get_campaign_start_definition,
+    list_campaign_starts,
+)
 from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.catalog_validation import validate_content_catalogs
 from nexus_tech.simulation.engine import (
@@ -194,6 +200,11 @@ GOAL_OPTION = typer.Option(
     None,
     "--goal",
     help="Optional campaign goal override. Use 'list-goals' to inspect the catalog.",
+)
+CAMPAIGN_START_OPTION = typer.Option(
+    STANDARD_CAMPAIGN_START_ID,
+    "--campaign-start",
+    help="Campaign start modifier id. Use 'list-campaign-starts' to inspect the catalog.",
 )
 BALANCE_DIFFICULTY_OPTION = typer.Option(
     DifficultyMode.STANDARD,
@@ -323,6 +334,7 @@ def root(
         help="Primary product name override. Applies to the first scenario product.",
     ),
     scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
     difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
     goal: CampaignGoalId | None = GOAL_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
@@ -356,6 +368,7 @@ def root(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario,
+        campaign_start_id=campaign_start,
         difficulty_mode=difficulty,
         campaign_goal_id=goal,
         seed=seed,
@@ -377,6 +390,7 @@ def new_game_command(
         help="Primary product name override. Applies to the first scenario product.",
     ),
     scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
     difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
     goal: CampaignGoalId | None = GOAL_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
@@ -393,6 +407,7 @@ def new_game_command(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario,
+        campaign_start_id=campaign_start,
         difficulty_mode=difficulty,
         campaign_goal_id=goal,
         seed=seed,
@@ -414,6 +429,7 @@ def play_alias(
         help="Primary product name override. Applies to the first scenario product.",
     ),
     scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
     difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
     goal: CampaignGoalId | None = GOAL_OPTION,
     seed: Optional[int] = typer.Option(  # noqa: UP045
@@ -430,6 +446,7 @@ def play_alias(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario,
+        campaign_start_id=campaign_start,
         difficulty_mode=difficulty,
         campaign_goal_id=goal,
         seed=seed,
@@ -451,6 +468,19 @@ def list_scenarios_command(
             reward_type="scenario",
             db_path=db_path,
         ),
+    )
+
+
+@app.command("list-campaign-starts")
+def list_campaign_starts_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Print archive-gated campaign start modifiers for new runs."""
+
+    render_campaign_start_catalog(
+        console,
+        list_campaign_starts(),
+        locked_ids=_build_locked_campaign_start_ids(db_path=db_path),
     )
 
 
@@ -1020,6 +1050,7 @@ def start_new_game(
     company_name: str | None,
     product_name: str | None,
     scenario_id: str,
+    campaign_start_id: str,
     difficulty_mode: DifficultyMode | None,
     campaign_goal_id: CampaignGoalId | None,
     seed: int | None,
@@ -1030,17 +1061,22 @@ def start_new_game(
 
     validate_scenario_id(scenario_id)
     validate_player_scenario_access(scenario_id, db_path=db_path)
+    validate_campaign_start_id(campaign_start_id)
+    validate_player_campaign_start_access(campaign_start_id, db_path=db_path)
     state = create_new_game(
         company_name=company_name,
         product_name=product_name,
         scenario_id=scenario_id,
         difficulty_mode=difficulty_mode,
         campaign_goal_id=campaign_goal_id,
+        campaign_start_id=campaign_start_id,
     )
+    campaign_start = get_campaign_start_definition(campaign_start_id)
     rng = RandomSource(seed=seed)
     logger.debug(
-        "Starting new game scenario=%s company=%s product=%s seed=%s slot=%s.",
+        "Starting new game scenario=%s campaign_start=%s company=%s product=%s seed=%s slot=%s.",
         scenario_id,
+        campaign_start_id,
         state.company.name,
         state.products[0].name,
         seed,
@@ -1050,6 +1086,7 @@ def start_new_game(
         console,
         company_name=state.company.name,
         scenario_title=state.scenario_title,
+        campaign_start_title=campaign_start.title,
         difficulty_label=state.difficulty_mode.value,
         campaign_goal_title=get_campaign_goal(state.campaign_goal_id).title,
         seed=seed,
@@ -2549,6 +2586,53 @@ def validate_player_scenario_access(scenario_id: str, *, db_path: Path) -> None:
     raise typer.Exit(code=1)
 
 
+def validate_campaign_start_id(campaign_start_id: str) -> None:
+    """Exit cleanly when a requested campaign start id is unknown."""
+
+    available_ids = {entry.start_id for entry in list_campaign_starts()}
+    if campaign_start_id in available_ids:
+        return
+    examples = "\n".join(f"- {start_id}" for start_id in sorted(available_ids))
+    console.print(
+        Panel.fit(
+            (
+                f"Unknown campaign start '{campaign_start_id}'.\n"
+                f"Available campaign start ids:\n{examples}\n"
+                "Run `nexus-tech list-campaign-starts` to inspect the full catalog."
+            ),
+            title="Invalid Campaign Start",
+            border_style="red",
+        )
+    )
+    raise typer.Exit(code=1)
+
+
+def validate_player_campaign_start_access(campaign_start_id: str, *, db_path: Path) -> None:
+    """Exit cleanly when a selected campaign start is still progression-locked."""
+
+    definition = get_campaign_start_definition(campaign_start_id)
+    if definition.unlock_reward_id is None:
+        return
+    if _is_content_available(
+        reward_type="scenario",
+        reward_id=definition.unlock_reward_id,
+        db_path=db_path,
+    ):
+        return
+    console.print(
+        Panel.fit(
+            (
+                f"Campaign start '{campaign_start_id}' is still locked for this local profile.\n"
+                "Archive more completed runs and review `nexus-tech list-unlocks` "
+                "or `nexus-tech show-progression`."
+            ),
+            title="Campaign Start Locked",
+            border_style="yellow",
+        )
+    )
+    raise typer.Exit(code=1)
+
+
 def resolve_scenario_ids(scenario_ids: list[str] | None) -> list[str]:
     """Resolve optional scenario CLI input and validate all ids."""
 
@@ -2589,6 +2673,19 @@ def _build_locked_content_ids(*, reward_type: str, db_path: Path) -> set[str]:
             archives,
             reward_type=reward_type,
             reward_id=reward_id,
+        )
+    }
+
+
+def _build_locked_campaign_start_ids(*, db_path: Path) -> set[str]:
+    return {
+        definition.start_id
+        for definition in list_campaign_starts()
+        if definition.unlock_reward_id is not None
+        and not _is_content_available(
+            reward_type="scenario",
+            reward_id=definition.unlock_reward_id,
+            db_path=db_path,
         )
     }
 

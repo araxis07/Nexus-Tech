@@ -41,6 +41,7 @@ from nexus_tech.simulation.balance_lab import (
 )
 from nexus_tech.simulation.balance_profiles import BalanceProfile
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
+from nexus_tech.simulation.campaign_starts import CampaignStartDefinition
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
@@ -98,6 +99,7 @@ def render_intro(
     *,
     company_name: str,
     scenario_title: str,
+    campaign_start_title: str,
     difficulty_label: str,
     campaign_goal_title: str,
     seed: int | None,
@@ -111,6 +113,7 @@ def render_intro(
                 f"[bold cyan]NEXUS TECH[/bold cyan]\n"
                 f"Company: [bold]{company_name}[/bold]\n"
                 f"Scenario: {scenario_title}\n"
+                f"Campaign Start: {campaign_start_title}\n"
                 f"Difficulty: {difficulty_label}\n"
                 f"Campaign Goal: {campaign_goal_title}\n"
                 f"{seed_text}\n\n"
@@ -121,6 +124,42 @@ def render_intro(
             border_style="cyan",
         )
     )
+
+
+def render_campaign_start_catalog(
+    console: Console,
+    starts: tuple[CampaignStartDefinition, ...],
+    *,
+    locked_ids: set[str] | None = None,
+) -> None:
+    """Render the available campaign-start modifiers."""
+
+    locked_ids = locked_ids or set()
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Campaign Start", style="bold")
+    table.add_column("Status")
+    table.add_column("Unlock")
+    table.add_column("Turn")
+    table.add_column("Pressure")
+    table.add_column("Description")
+
+    for start in starts:
+        table.add_row(
+            f"{start.title}\n[dim]{start.start_id}[/dim]",
+            "locked" if start.start_id in locked_ids else "unlocked",
+            start.unlock_reward_id or "baseline",
+            start.turn_hint,
+            start.pressure_hint,
+            start.description,
+        )
+
+    start_ids = ", ".join(f"{start.start_id} ({start.title})" for start in starts)
+    content = Group(
+        table,
+        "",
+        f"[dim]Use --campaign-start <id>. Available ids: {start_ids}[/dim]",
+    )
+    console.print(Panel(content, title="Campaign Start Catalog", border_style="cyan", expand=True))
 
 
 def render_scenario_catalog(
@@ -2330,6 +2369,7 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     )
     table.add_row("Ops State", resolution.operations_summary.summary)
     table.add_row("Late State", resolution.late_game_summary.summary)
+    table.add_row("Commercial", resolution.commercial_pressure_summary)
     table.add_row("Scale State", resolution.scale_pressure_summary)
     table.add_row(
         "Pressure Δ",

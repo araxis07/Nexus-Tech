@@ -267,6 +267,7 @@ def test_root_command_dispatches_to_start_new_game(
         company_name: str | None,
         product_name: str | None,
         scenario_id: str,
+        campaign_start_id: str,
         difficulty_mode: DifficultyMode | None,
         campaign_goal_id: CampaignGoalId | None,
         seed: int | None,
@@ -277,6 +278,7 @@ def test_root_command_dispatches_to_start_new_game(
             company_name=company_name,
             product_name=product_name,
             scenario_id=scenario_id,
+            campaign_start_id=campaign_start_id,
             difficulty_mode=difficulty_mode,
             campaign_goal_id=campaign_goal_id,
             seed=seed,
@@ -296,6 +298,8 @@ def test_root_command_dispatches_to_start_new_game(
             "Alpha",
             "--scenario",
             "vc_sprint",
+            "--campaign-start",
+            "channel_rebuild_marathon",
             "--difficulty",
             "founder",
             "--goal",
@@ -314,6 +318,7 @@ def test_root_command_dispatches_to_start_new_game(
         "company_name": "Demo Corp",
         "product_name": "Alpha",
         "scenario_id": "vc_sprint",
+        "campaign_start_id": "channel_rebuild_marathon",
         "difficulty_mode": DifficultyMode.FOUNDER,
         "campaign_goal_id": CampaignGoalId.PORTFOLIO_EMPIRE,
         "seed": 13,
@@ -332,6 +337,7 @@ def test_new_game_command_dispatches_to_start_new_game(
         company_name: str | None,
         product_name: str | None,
         scenario_id: str,
+        campaign_start_id: str,
         difficulty_mode: DifficultyMode | None,
         campaign_goal_id: CampaignGoalId | None,
         seed: int | None,
@@ -342,6 +348,7 @@ def test_new_game_command_dispatches_to_start_new_game(
             company_name=company_name,
             product_name=product_name,
             scenario_id=scenario_id,
+            campaign_start_id=campaign_start_id,
             difficulty_mode=difficulty_mode,
             campaign_goal_id=campaign_goal_id,
             seed=seed,
@@ -362,6 +369,8 @@ def test_new_game_command_dispatches_to_start_new_game(
             "Beta",
             "--scenario",
             "bootstrap_studio",
+            "--campaign-start",
+            "board_recovery_crucible",
             "--seed",
             "21",
             "--db-path",
@@ -374,6 +383,7 @@ def test_new_game_command_dispatches_to_start_new_game(
     assert result.exit_code == 0
     assert captured["product_name"] == "Beta"
     assert captured["scenario_id"] == "bootstrap_studio"
+    assert captured["campaign_start_id"] == "board_recovery_crucible"
     assert captured["difficulty_mode"] is None
     assert captured["campaign_goal_id"] is None
     assert captured["seed"] == 21
@@ -433,6 +443,21 @@ def test_list_scenarios_command_marks_progression_locked_entries(
     assert "locked" in output
 
 
+def test_list_campaign_starts_command_renders_catalog(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    console = Console(record=True, width=180)
+    monkeypatch.setattr(cli_module, "console", console)
+
+    cli_module.list_campaign_starts_command(db_path=tmp_path / "runs.db")
+    output = console.export_text()
+
+    assert "Campaign Start Catalog" in output
+    assert "standard" in output
+    assert "Board Recovery Start" in output
+
+
 def test_list_templates_command_renders_catalog(monkeypatch: MonkeyPatch) -> None:
     templates = cli_module.get_available_product_templates()
     monkeypatch.setattr(cli_module, "get_available_product_templates", lambda: templates[:1])
@@ -477,6 +502,26 @@ def test_new_game_rejects_locked_progression_scenario(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Scenario Locked" in result.output
+    assert "list-unlocks" in result.output
+
+
+def test_new_game_rejects_locked_campaign_start(tmp_path: Path) -> None:
+    db_path = tmp_path / "progression.db"
+    result = runner.invoke(
+        app,
+        [
+            "new-game",
+            "--scenario",
+            "bootstrap_studio",
+            "--campaign-start",
+            "board_recovery_crucible",
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Campaign Start Locked" in result.output
     assert "list-unlocks" in result.output
 
 

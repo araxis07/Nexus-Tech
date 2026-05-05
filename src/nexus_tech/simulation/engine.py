@@ -17,6 +17,7 @@ from nexus_tech.domain.models import (
     CapitalSourcePreference,
     CompanyStrategy,
     Competitor,
+    CustomerAccountStatus,
     DifficultyMode,
     Employee,
     EmployeeRole,
@@ -46,6 +47,10 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.campaign import (
     CampaignGoalProgress,
     evaluate_campaign_goal,
+)
+from nexus_tech.simulation.campaign_starts import (
+    STANDARD_CAMPAIGN_START_ID,
+    apply_campaign_start,
 )
 from nexus_tech.simulation.capital_planning import apply_set_capital_plan
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
@@ -110,6 +115,7 @@ from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.operations import OperationsSummary, apply_end_of_turn_operations
 from nexus_tech.simulation.partnerships import (
     apply_end_of_turn_partnerships,
+    calculate_partnership_portfolio,
     create_partnership,
     get_partnership_by_id,
     invest_in_partner_enablement,
@@ -166,6 +172,7 @@ from nexus_tech.simulation.segments import calculate_competitor_pressure
 from nexus_tech.simulation.strategy import apply_set_company_strategy, get_strategy_profile
 from nexus_tech.simulation.support import clamp_int
 from nexus_tech.simulation.support_program import (
+    SupportProgramSummary,
     apply_end_of_turn_support_program,
     invest_in_support_staffing,
     route_support_escalation,
@@ -299,6 +306,7 @@ class TurnResolution:
     market_cycle: MarketCycle
     market_cycle_changed: bool
     campaign_goal_progress: CampaignGoalProgress
+    commercial_pressure_summary: str
     scale_pressure_summary: str
     victory_reason: str | None
     narrative: str
@@ -311,6 +319,7 @@ def create_new_game(
     scenario_id: str = DEFAULT_SCENARIO_ID,
     difficulty_mode: DifficultyMode | None = None,
     campaign_goal_id: CampaignGoalId | None = None,
+    campaign_start_id: str = STANDARD_CAMPAIGN_START_ID,
 ) -> GameState:
     """Create the initial playable game state from a selected scenario."""
 
@@ -323,6 +332,7 @@ def create_new_game(
         state.difficulty_mode = difficulty_mode
     if campaign_goal_id is not None:
         state.campaign_goal_id = campaign_goal_id
+    apply_campaign_start(state, campaign_start_id)
     return state
 
 
@@ -1356,6 +1366,10 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     if support_summary.morale_penalty > 0:
         for employee in next_state.employees:
             employee.morale = clamp_int(employee.morale - support_summary.morale_penalty)
+    commercial_pressure_summary = apply_end_of_turn_commercial_pressure(
+        next_state,
+        support_summary=support_summary,
+    )
 
     operations_summary = apply_end_of_turn_operations(
         next_state,
@@ -1521,6 +1535,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         market_cycle=next_state.market_cycle,
         market_cycle_changed=market_cycle_changed,
         campaign_goal_progress=campaign_goal_progress,
+        commercial_pressure_summary=commercial_pressure_summary,
         scale_pressure_summary=scale_pressure.summary,
         operations_summary=operations_summary.summary,
         partnership_summary=partnership_summary.summary,
@@ -1564,6 +1579,7 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         market_cycle=next_state.market_cycle,
         market_cycle_changed=market_cycle_changed,
         campaign_goal_progress=campaign_goal_progress,
+        commercial_pressure_summary=commercial_pressure_summary,
         scale_pressure_summary=scale_pressure.summary,
         victory_reason=victory_reason,
         narrative=narrative,
@@ -1646,6 +1662,107 @@ def get_total_users(state: GameState) -> int:
     return sum(product.user_count for product in state.products if product.is_active)
 
 
+def apply_end_of_turn_commercial_pressure(
+    state: GameState,
+    *,
+    support_summary: SupportProgramSummary,
+) -> str:
+    """Translate support and channel stress into company-level commercial pressure."""
+
+    portfolio = calculate_partnership_portfolio(state)
+    for account in state.customer_accounts:
+        if account.status is CustomerAccountStatus.CHURNED:
+            continue
+        support_stressed = (
+            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
+            or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+            or account.sla_breach_risk >= state.support_program.sla_target
+        )
+        commercial_stressed = (
+            support_stressed
+            or account.failed_payment_risk >= BALANCE.support_program_queue_age_threshold * 10
+            or account.renewal_offer_active
+        )
+        if commercial_stressed:
+            account.status = CustomerAccountStatus.AT_RISK
+
+    board_pressure_delta = min(
+        8,
+        support_summary.revenue_at_risk_accounts
+        * BALANCE.commercial_pressure_board_pressure_per_revenue_at_risk,
+    )
+    board_confidence_loss = min(
+        5,
+        support_summary.revenue_at_risk_accounts
+        * BALANCE.commercial_pressure_board_confidence_loss_per_revenue_at_risk,
+    )
+    governance_risk_delta = min(
+        8,
+        support_summary.renewal_pressure_accounts
+        * BALANCE.commercial_pressure_governance_risk_per_renewal_pressure,
+    )
+    governance_risk_delta += (
+        support_summary.lane_overflow_pressure
+        // BALANCE.commercial_pressure_lane_overflow_governance_divisor
+    )
+
+    dependency_pressure = (
+        portfolio.total_count > 0
+        and portfolio.channel_dependency_risk
+        >= BALANCE.commercial_pressure_channel_dependency_threshold
+    )
+    paused_share_pressure = (
+        portfolio.paused_revenue_share_percent >= BALANCE.commercial_pressure_paused_share_threshold
+    )
+    if dependency_pressure:
+        board_pressure_delta += BALANCE.commercial_pressure_channel_dependency_board_penalty
+        board_confidence_loss += BALANCE.commercial_pressure_channel_dependency_confidence_loss
+    if paused_share_pressure:
+        board_pressure_delta += BALANCE.commercial_pressure_paused_share_board_penalty
+
+    if board_pressure_delta > 0:
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + board_pressure_delta
+        )
+    if board_confidence_loss > 0:
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence - board_confidence_loss
+        )
+    if governance_risk_delta > 0:
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk + governance_risk_delta
+        )
+    if paused_share_pressure:
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.commercial_pressure_paused_share_reputation_loss
+        )
+
+    summary_parts: list[str] = []
+    if support_summary.revenue_at_risk_accounts > 0:
+        summary_parts.append(
+            f"{support_summary.revenue_at_risk_accounts} revenue-critical accounts are exposed"
+        )
+    if support_summary.renewal_pressure_accounts > 0:
+        summary_parts.append(
+            f"{support_summary.renewal_pressure_accounts} renewals need active rescue"
+        )
+    if support_summary.lane_overflow_pressure > 0:
+        summary_parts.append(
+            f"support lanes overflowed by {support_summary.lane_overflow_pressure}"
+        )
+    if dependency_pressure:
+        summary_parts.append("channel dependency is elevated")
+    if paused_share_pressure:
+        summary_parts.append(
+            "paused channels still hold "
+            f"{portfolio.paused_revenue_share_percent}% of partner revenue"
+        )
+
+    if not summary_parts:
+        return "Commercial pressure is under control."
+    return "Commercial pressure is rising: " + ", ".join(summary_parts) + "."
+
+
 def build_turn_narrative(
     net_cash_flow: Decimal,
     reputation_delta: int,
@@ -1659,6 +1776,7 @@ def build_turn_narrative(
     market_cycle: MarketCycle,
     market_cycle_changed: bool,
     campaign_goal_progress: CampaignGoalProgress,
+    commercial_pressure_summary: str,
     scale_pressure_summary: str,
     operations_summary: str,
     partnership_summary: str,
@@ -1708,6 +1826,8 @@ def build_turn_narrative(
         return governance_summary.summary
     if governance_summary.restructuring_pressure >= BALANCE.board_restructure_min_pressure:
         return "Board pressure is now pointing toward a reset, not just tighter execution."
+    if commercial_pressure_summary != "Commercial pressure is under control.":
+        return commercial_pressure_summary
     if partnership_summary != "No active partner contribution this turn.":
         return partnership_summary
 

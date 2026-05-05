@@ -1102,6 +1102,76 @@ def test_resolve_turn_appends_turn_history_and_run_score() -> None:
     assert resolution.run_score.total_score == calculate_run_score(resolution.state).total_score
 
 
+def test_create_new_game_applies_board_recovery_campaign_start() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="board_recovery_crucible",
+    )
+
+    assert state.company.current_turn == 8
+    assert state.finance.active_board_ask is BoardAsk.RELIABILITY
+    assert state.finance.board_resolution_due is True
+    assert state.finance.board_recovery_turns_remaining >= 3
+    assert state.support_program.backlog_queue >= 10
+    assert state.customer_accounts
+
+
+def test_resolve_turn_surfaces_commercial_pressure_from_support_and_channel_risk() -> None:
+    state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
+    state.company.current_turn = 7
+    state.customer_accounts.append(
+        CustomerAccount(
+            name="Enterprise Anchor",
+            product_id=state.products[0].id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1600.00"),
+            plan_tier=PricingTier.PREMIUM,
+            support_tier=SupportTier.WHITE_GLOVE,
+            contract_cadence=ContractCadence.ANNUAL,
+            billing_model=ContractBillingModel.FLAT,
+            satisfaction=58,
+            onboarding_health=48,
+            support_load=42,
+            open_tickets=18,
+            sla_breach_risk=82,
+            invoice_risk=18,
+            failed_payment_risk=14,
+            ticket_queue_age=4,
+            expansion_potential=60,
+            renewal_health=46,
+            renewal_turn=8,
+            churn_risk=44,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    )
+    state.partnerships.append(
+        PartnershipDeal(
+            name="Dependence Lane",
+            product_id=state.products[0].id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.PAUSED,
+            quality=56,
+            risk=62,
+            conflict_pressure=58,
+            enablement_level=28,
+            sourced_revenue=Decimal("2400.00"),
+            sourced_users=34,
+        )
+    )
+    starting_board_pressure = state.finance.board_pressure
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert resolution.commercial_pressure_summary != "Commercial pressure is under control."
+    assert "revenue-critical accounts" in resolution.commercial_pressure_summary
+    assert resolution.state.finance.board_pressure > starting_board_pressure
+    assert any(
+        account.name == "Enterprise Anchor" and account.status is CustomerAccountStatus.AT_RISK
+        for account in resolution.state.customer_accounts
+    )
+
+
 def test_resolve_turn_sets_victory_when_company_hits_scale_threshold() -> None:
     state = make_state(
         make_product(
