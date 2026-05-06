@@ -2611,10 +2611,10 @@ def validate_player_campaign_start_access(campaign_start_id: str, *, db_path: Pa
     """Exit cleanly when a selected campaign start is still progression-locked."""
 
     definition = get_campaign_start_definition(campaign_start_id)
-    if definition.unlock_reward_id is None:
+    if definition.unlock_reward_id is None or definition.unlock_reward_type is None:
         return
     if _is_content_available(
-        reward_type="scenario",
+        reward_type=definition.unlock_reward_type,
         reward_id=definition.unlock_reward_id,
         db_path=db_path,
     ):
@@ -2682,8 +2682,9 @@ def _build_locked_campaign_start_ids(*, db_path: Path) -> set[str]:
         definition.start_id
         for definition in list_campaign_starts()
         if definition.unlock_reward_id is not None
+        and definition.unlock_reward_type is not None
         and not _is_content_available(
-            reward_type="scenario",
+            reward_type=definition.unlock_reward_type,
             reward_id=definition.unlock_reward_id,
             db_path=db_path,
         )

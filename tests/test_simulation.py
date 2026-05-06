@@ -164,6 +164,7 @@ from nexus_tech.simulation.scaling import (
 from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
     calculate_support_account_risk_counts,
+    calculate_support_account_risk_values,
     calculate_support_lane_snapshots,
     calculate_support_lane_staffing_plan,
     calculate_support_staff_capacity,
@@ -1117,6 +1118,47 @@ def test_create_new_game_applies_board_recovery_campaign_start() -> None:
     assert state.customer_accounts
 
 
+def test_create_new_game_applies_ipo_campaign_start() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="ipo_readiness_launchpad",
+    )
+
+    assert state.company.current_turn == 14
+    assert state.finance.board_confidence >= 68
+    assert state.capital_plan.source_preference is CapitalSourcePreference.ANGEL
+    assert len(state.customer_accounts) >= 2
+
+
+def test_create_new_game_applies_acquisition_diligence_campaign_start() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="acquisition_diligence_sprint",
+    )
+
+    assert state.company.current_turn == 15
+    assert state.capital_plan.source_preference is CapitalSourcePreference.VENTURE
+    assert state.support_program.backlog_queue >= 11
+    assert len(state.customer_accounts) >= 2
+    assert len(state.partnerships) >= 2
+
+
+def test_create_new_game_applies_independence_compounder_campaign_start() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="independence_compounder",
+    )
+
+    assert state.company.current_turn == 16
+    assert state.capital_plan.source_preference is CapitalSourcePreference.BOOTSTRAP
+    assert state.capital_plan.reserve_share >= 42
+    assert state.finance.board_confidence >= 70
+    assert len(state.customer_accounts) >= 1
+
+
 def test_resolve_turn_surfaces_commercial_pressure_from_support_and_channel_risk() -> None:
     state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
     state.company.current_turn = 7
@@ -1170,6 +1212,45 @@ def test_resolve_turn_surfaces_commercial_pressure_from_support_and_channel_risk
         account.name == "Enterprise Anchor" and account.status is CustomerAccountStatus.AT_RISK
         for account in resolution.state.customer_accounts
     )
+
+
+def test_resolve_turn_commercial_pressure_hits_direct_channel_conflict() -> None:
+    state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
+    for index in range(4):
+        state.customer_accounts.append(
+            CustomerAccount(
+                name=f"Conflict Account {index}",
+                product_id=state.products[0].id,
+                segment=MarketSegment.ENTERPRISE if index < 2 else MarketSegment.SMB,
+                contract_value=Decimal("1200.00"),
+                satisfaction=66,
+                onboarding_health=60,
+                support_load=26,
+                expansion_potential=60,
+                renewal_turn=state.company.current_turn + 3,
+                churn_risk=18,
+                status=CustomerAccountStatus.ACTIVE,
+            )
+        )
+    state.partnerships.append(
+        PartnershipDeal(
+            name="Direct Conflict Reseller",
+            product_id=state.products[0].id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.ACTIVE,
+            quality=62,
+            risk=28,
+            enablement_level=34,
+            conflict_pressure=28,
+        )
+    )
+    starting_focus_score = state.finance.board_portfolio_focus_score
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert "channel conflict" in resolution.commercial_pressure_summary
+    assert resolution.state.finance.board_pressure > state.finance.board_pressure
+    assert resolution.state.finance.board_portfolio_focus_score != starting_focus_score
 
 
 def test_resolve_turn_sets_victory_when_company_hits_scale_threshold() -> None:
@@ -3421,11 +3502,16 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
         state
     )
+    revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
 
     assert summary.revenue_at_risk_accounts >= 1
+    assert summary.revenue_at_risk_value >= Decimal("1400.00")
     assert summary.renewal_pressure_accounts >= 1
+    assert summary.renewal_pressure_value >= Decimal("1400.00")
     assert revenue_at_risk_accounts >= 1
     assert renewal_pressure_accounts >= 1
+    assert revenue_at_risk_value >= Decimal("1400.00")
+    assert renewal_pressure_value >= Decimal("1400.00")
     assert state.customer_accounts[0].renewal_health < 46
 
 
@@ -5131,9 +5217,42 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
         "covenants need monitoring",
         "covenants are fragile",
     }
+    assert planner.reserve_plan
+    assert planner.debt_rollover_signal
+    assert planner.funding_window
     assert len(planner.scenario_compare) == 3
+    assert planner.allocation_actions
     assert planner.capital_alert
     assert planner.summary
+
+
+def test_finance_planner_recommends_funding_actions_under_reserve_stress() -> None:
+    state = make_state(
+        make_product("Planner Stress"),
+        cash_on_hand=Decimal("1200.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.VENTURE,
+            reserve_target=Decimal("6000.00"),
+            product_investment_share=32,
+            go_to_market_share=43,
+            reserve_share=25,
+        ),
+    )
+    state.finance.investor_pressure = 14
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-900.00"),
+        capital_plan=state.capital_plan,
+    )
+
+    assert "raise_vc" in planner.recommended_actions
+    assert (
+        "slow_expansion" in planner.allocation_actions
+        or "lift_reserve_share" in planner.allocation_actions
+    )
 
 
 def test_bridge_round_event_applies_cash_and_dilution() -> None:
@@ -5413,6 +5532,28 @@ def test_partner_renegotiation_event_trades_margin_for_stability() -> None:
 
 def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     product = make_product("Partner Hub")
+    accounts = [
+        CustomerAccount(
+            name="Direct Enterprise One",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1600.00"),
+            satisfaction=66,
+            expansion_potential=60,
+            renewal_turn=6,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+        CustomerAccount(
+            name="Direct Enterprise Two",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1450.00"),
+            satisfaction=64,
+            expansion_potential=58,
+            renewal_turn=7,
+            status=CustomerAccountStatus.ACTIVE,
+        ),
+    ]
     partnerships = [
         PartnershipDeal(
             name="Reseller",
@@ -5423,6 +5564,7 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
             sourced_users=18,
             quality=70,
             risk=28,
+            rev_share_rate=Decimal("0.1800"),
         ),
         PartnershipDeal(
             name="Marketplace",
@@ -5434,9 +5576,10 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
             quality=62,
             risk=46,
             conflict_pressure=42,
+            rev_share_rate=Decimal("0.2400"),
         ),
     ]
-    state = make_state(product, partnerships=partnerships)
+    state = make_state(product, partnerships=partnerships, customer_accounts=accounts)
 
     summary = calculate_partnership_portfolio(state)
 
@@ -5446,8 +5589,10 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.sourced_revenue == Decimal("2020.00")
     assert summary.average_fatigue >= 0
     assert summary.channel_conflict_index >= 0
+    assert summary.direct_sales_conflict_accounts == 2
     assert summary.dominant_share_percent >= 50
     assert summary.dominant_channel in {"reseller", "marketplace"}
+    assert summary.weighted_rev_share_percent >= 21
 
 
 def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk() -> None:
@@ -5485,6 +5630,7 @@ def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk(
     assert summary.channel_dependency_risk > 0
     assert summary.paused_revenue_share_percent > 0
     assert summary.renegotiation_ready_count >= 1
+    assert summary.weighted_rev_share_percent > 0
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
@@ -5890,6 +6036,97 @@ def test_reward_unlocks_gate_progression_content_ids() -> None:
     assert unlocked_with_victory_archive is True
 
 
+def test_reward_unlocks_gate_campaign_start_ids() -> None:
+    locked_without_archives = is_reward_unlocked(
+        [],
+        reward_type="campaign_start",
+        reward_id="ipo_readiness_launchpad",
+    )
+    unlocked_with_ipo_archive = is_reward_unlocked(
+        [
+            RunArchiveSummary(
+                archive_key="run-ipo",
+                slot_name="active",
+                company_name="NEXUS TECH",
+                scenario_title="Founder Journey",
+                completed_turn=18,
+                victory_achieved=True,
+                game_over=False,
+                exit_outcome="ipo_ready",
+                total_score=244,
+                score_tier="elite",
+                campaign_grade="S",
+                estimated_valuation=Decimal("98000.00"),
+                achievement_badges=("board_trusted", "capital_disciplined"),
+                strategic_outlook="ipo_ready",
+                offer_value=Decimal("104000.00"),
+                final_cash=Decimal("22000.00"),
+                final_reputation=78,
+                archived_at="2026-05-06T00:00:00+00:00",
+            )
+        ],
+        reward_type="campaign_start",
+        reward_id="ipo_readiness_launchpad",
+    )
+    unlocked_with_acquisition_archive = is_reward_unlocked(
+        [
+            RunArchiveSummary(
+                archive_key="run-acq",
+                slot_name="active",
+                company_name="NEXUS TECH",
+                scenario_title="Founder Journey",
+                completed_turn=19,
+                victory_achieved=True,
+                game_over=False,
+                exit_outcome="strategic_acquisition",
+                total_score=246,
+                score_tier="elite",
+                campaign_grade="S",
+                estimated_valuation=Decimal("93000.00"),
+                achievement_badges=("board_trusted", "channel_builder"),
+                strategic_outlook="strategic_acquisition",
+                offer_value=Decimal("88000.00"),
+                final_cash=Decimal("19400.00"),
+                final_reputation=76,
+                archived_at="2026-05-06T00:00:00+00:00",
+            )
+        ],
+        reward_type="campaign_start",
+        reward_id="acquisition_diligence_sprint",
+    )
+    unlocked_with_independence_archive = is_reward_unlocked(
+        [
+            RunArchiveSummary(
+                archive_key="run-indie",
+                slot_name="active",
+                company_name="NEXUS TECH",
+                scenario_title="Founder Journey",
+                completed_turn=20,
+                victory_achieved=True,
+                game_over=False,
+                exit_outcome="profitable_independence",
+                total_score=234,
+                score_tier="elite",
+                campaign_grade="S",
+                estimated_valuation=Decimal("76000.00"),
+                achievement_badges=("capital_disciplined", "board_trusted"),
+                strategic_outlook="profitable_independence",
+                offer_value=Decimal("52000.00"),
+                final_cash=Decimal("18600.00"),
+                final_reputation=74,
+                archived_at="2026-05-06T00:00:00+00:00",
+            )
+        ],
+        reward_type="campaign_start",
+        reward_id="independence_compounder",
+    )
+
+    assert locked_without_archives is False
+    assert unlocked_with_ipo_archive is True
+    assert unlocked_with_acquisition_archive is True
+    assert unlocked_with_independence_archive is True
+
+
 def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
     archives = [
         RunArchiveSummary(
@@ -5944,4 +6181,6 @@ def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
     assert comparison.missing_outcomes == ("ipo_ready",)
     assert comparison.best_acquisition_label != "-"
     assert comparison.best_independence_label != "-"
+    assert comparison.best_restructure_label == "-"
+    assert comparison.path_balance_note
     assert comparison.next_gap

@@ -165,17 +165,20 @@ def calculate_endgame_pressure(
         + average_channel_conflict
         + state.support_program.escalation_queue
         + (revenue_at_risk_accounts * 3)
+        + (6 if state.finance.board_resolution_due else 0)
     )
     independence_discipline = _clamp_readiness(
         max(0, readiness.independence_score - 35)
         + state.finance.covenant_risk
         + state.finance.investor_pressure
         + reserve_gap_units
+        + (4 if state.finance.debt_principal > Decimal("0.00") and reserve_gap_units > 0 else 0)
     )
     restructure_heat = _clamp_readiness(
         (state.finance.restructuring_pressure * 4)
         + (state.finance.governance_crisis_level * 10)
         + (state.support_program.backlog_queue // 2)
+        + (6 if state.finance.board_resolution_due else 0)
     )
     pressure_scores = {
         "public_market_scrutiny": public_market_scrutiny,

@@ -1701,6 +1701,24 @@ def apply_end_of_turn_commercial_pressure(
         support_summary.renewal_pressure_accounts
         * BALANCE.commercial_pressure_governance_risk_per_renewal_pressure,
     )
+    board_pressure_delta += min(
+        6,
+        int(
+            (
+                support_summary.revenue_at_risk_value
+                / BALANCE.commercial_pressure_revenue_at_risk_value_divisor
+            ).to_integral_value()
+        ),
+    )
+    governance_risk_delta += min(
+        6,
+        int(
+            (
+                support_summary.renewal_pressure_value
+                / BALANCE.commercial_pressure_renewal_pressure_value_divisor
+            ).to_integral_value()
+        ),
+    )
     governance_risk_delta += (
         support_summary.lane_overflow_pressure
         // BALANCE.commercial_pressure_lane_overflow_governance_divisor
@@ -1714,11 +1732,17 @@ def apply_end_of_turn_commercial_pressure(
     paused_share_pressure = (
         portfolio.paused_revenue_share_percent >= BALANCE.commercial_pressure_paused_share_threshold
     )
+    direct_sales_conflict_pressure = (
+        portfolio.direct_sales_conflict_accounts
+        >= BALANCE.commercial_pressure_direct_sales_conflict_threshold
+    )
     if dependency_pressure:
         board_pressure_delta += BALANCE.commercial_pressure_channel_dependency_board_penalty
         board_confidence_loss += BALANCE.commercial_pressure_channel_dependency_confidence_loss
     if paused_share_pressure:
         board_pressure_delta += BALANCE.commercial_pressure_paused_share_board_penalty
+    if direct_sales_conflict_pressure:
+        board_pressure_delta += BALANCE.commercial_pressure_direct_sales_conflict_board_penalty
 
     if board_pressure_delta > 0:
         state.finance.board_pressure = clamp_int(
@@ -1732,19 +1756,37 @@ def apply_end_of_turn_commercial_pressure(
         state.finance.governance_risk = clamp_int(
             state.finance.governance_risk + governance_risk_delta
         )
+        state.finance.board_reliability_score = clamp_int(
+            state.finance.board_reliability_score - min(4, governance_risk_delta // 2)
+        )
     if paused_share_pressure:
         state.company.reputation = clamp_int(
             state.company.reputation - BALANCE.commercial_pressure_paused_share_reputation_loss
+        )
+    if support_summary.revenue_at_risk_accounts > 0:
+        state.finance.board_profitability_score = clamp_int(
+            state.finance.board_profitability_score
+            - min(4, support_summary.revenue_at_risk_accounts)
+        )
+    if direct_sales_conflict_pressure:
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score - 2
         )
 
     summary_parts: list[str] = []
     if support_summary.revenue_at_risk_accounts > 0:
         summary_parts.append(
-            f"{support_summary.revenue_at_risk_accounts} revenue-critical accounts are exposed"
+            (
+                f"{support_summary.revenue_at_risk_accounts} revenue-critical accounts expose "
+                f"{format_money(support_summary.revenue_at_risk_value)}"
+            )
         )
     if support_summary.renewal_pressure_accounts > 0:
         summary_parts.append(
-            f"{support_summary.renewal_pressure_accounts} renewals need active rescue"
+            (
+                f"{support_summary.renewal_pressure_accounts} renewals covering "
+                f"{format_money(support_summary.renewal_pressure_value)} need rescue"
+            )
         )
     if support_summary.lane_overflow_pressure > 0:
         summary_parts.append(
@@ -1756,6 +1798,10 @@ def apply_end_of_turn_commercial_pressure(
         summary_parts.append(
             "paused channels still hold "
             f"{portfolio.paused_revenue_share_percent}% of partner revenue"
+        )
+    if direct_sales_conflict_pressure:
+        summary_parts.append(
+            f"{portfolio.direct_sales_conflict_accounts} accounts are now in channel conflict"
         )
 
     if not summary_parts:

@@ -8,6 +8,9 @@ from decimal import Decimal
 from nexus_tech.domain.models import (
     BoardAsk,
     BoardResolution,
+    CapitalPlan,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     ContractBillingModel,
     ContractCadence,
     CustomerAccount,
@@ -36,6 +39,7 @@ class CampaignStartDefinition:
     start_id: str
     title: str
     description: str
+    unlock_reward_type: str | None
     unlock_reward_id: str | None
     turn_hint: str
     pressure_hint: str
@@ -49,6 +53,7 @@ def get_campaign_start_definitions() -> tuple[CampaignStartDefinition, ...]:
             start_id=STANDARD_CAMPAIGN_START_ID,
             title="Standard Opening",
             description="Play the chosen scenario exactly as authored.",
+            unlock_reward_type=None,
             unlock_reward_id=None,
             turn_hint="turn 1",
             pressure_hint="low",
@@ -59,6 +64,7 @@ def get_campaign_start_definitions() -> tuple[CampaignStartDefinition, ...]:
             description=(
                 "Start several turns into growth with more scale, more cash, and more pressure."
             ),
+            unlock_reward_type="scenario",
             unlock_reward_id="campaign_ladder_climb",
             turn_hint="turn 6",
             pressure_hint="medium",
@@ -70,6 +76,7 @@ def get_campaign_start_definitions() -> tuple[CampaignStartDefinition, ...]:
                 "Enter a tense late-early run where governance, reliability, and board trust "
                 "already need active management."
             ),
+            unlock_reward_type="scenario",
             unlock_reward_id="board_recovery_crucible",
             turn_hint="turn 8",
             pressure_hint="high",
@@ -81,9 +88,46 @@ def get_campaign_start_definitions() -> tuple[CampaignStartDefinition, ...]:
                 "Start inside a noisier commercial stack with support pressure and strained "
                 "channel relationships already live."
             ),
+            unlock_reward_type="scenario",
             unlock_reward_id="channel_rebuild_marathon",
             turn_hint="turn 8",
             pressure_hint="high",
+        ),
+        CampaignStartDefinition(
+            start_id="ipo_readiness_launchpad",
+            title="IPO Readiness Launchpad",
+            description=(
+                "Jump into a later-stage institutional run with stronger governance optics, "
+                "larger accounts, and public-market scrutiny already taking shape."
+            ),
+            unlock_reward_type="campaign_start",
+            unlock_reward_id="ipo_readiness_launchpad",
+            turn_hint="turn 14",
+            pressure_hint="high",
+        ),
+        CampaignStartDefinition(
+            start_id="acquisition_diligence_sprint",
+            title="Acquisition Diligence Sprint",
+            description=(
+                "Start near an M&A-style peak where enterprise accounts, partner revenue, "
+                "and diligence risk all matter immediately."
+            ),
+            unlock_reward_type="campaign_start",
+            unlock_reward_id="acquisition_diligence_sprint",
+            turn_hint="turn 15",
+            pressure_hint="high",
+        ),
+        CampaignStartDefinition(
+            start_id="independence_compounder",
+            title="Independence Compounder",
+            description=(
+                "Begin from a disciplined later-stage company with reserve targets, debt "
+                "choices, and independent durability already in play."
+            ),
+            unlock_reward_type="campaign_start",
+            unlock_reward_id="independence_compounder",
+            turn_hint="turn 16",
+            pressure_hint="medium",
         ),
     )
 
@@ -114,6 +158,12 @@ def apply_campaign_start(state: GameState, start_id: str) -> str:
         return _apply_board_recovery_crucible(state)
     if start_id == "channel_rebuild_marathon":
         return _apply_channel_rebuild_marathon(state)
+    if start_id == "ipo_readiness_launchpad":
+        return _apply_ipo_readiness_launchpad(state)
+    if start_id == "acquisition_diligence_sprint":
+        return _apply_acquisition_diligence_sprint(state)
+    if start_id == "independence_compounder":
+        return _apply_independence_compounder(state)
     raise ValueError(f"Unknown campaign start '{start_id}'.")
 
 
@@ -289,10 +339,285 @@ def _apply_channel_rebuild_marathon(state: GameState) -> str:
     return "Campaign start applied: channel rebuild marathon with live partner and support drag."
 
 
+def _apply_ipo_readiness_launchpad(state: GameState) -> str:
+    _shift_state_to_turn(state, 14)
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand + Decimal("4800.00"))
+    state.company.reputation = clamp_int(state.company.reputation + 10)
+    state.finance.board_confidence = max(state.finance.board_confidence, 68)
+    state.finance.board_score = max(state.finance.board_score, 66)
+    state.finance.board_profitability_score = max(state.finance.board_profitability_score, 64)
+    state.finance.board_reliability_score = max(state.finance.board_reliability_score, 67)
+    state.finance.board_team_health_score = max(state.finance.board_team_health_score, 61)
+    state.finance.board_portfolio_focus_score = max(
+        state.finance.board_portfolio_focus_score,
+        63,
+    )
+    state.finance.board_pressure = max(state.finance.board_pressure, 18)
+    state.finance.governance_risk = max(state.finance.governance_risk, 10)
+    state.finance.investor_pressure = max(state.finance.investor_pressure, 10)
+    _replace_capital_plan(
+        state,
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.ANGEL,
+        reserve_target=Decimal("6500.00"),
+        product_investment_share=36,
+        go_to_market_share=34,
+        reserve_share=30,
+    )
+    state.support_program.backlog_queue = max(state.support_program.backlog_queue, 8)
+    state.support_program.escalation_queue = max(state.support_program.escalation_queue, 3)
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+
+    primary_product = _get_primary_product(state)
+    primary_product.user_count += 170
+    primary_product.quality = clamp_int(primary_product.quality + 8)
+    primary_product.market_fit = clamp_int(primary_product.market_fit + 10)
+    primary_product.feature_count += 1
+    primary_product.package_catalog_depth += 1
+    primary_product.add_on_catalog_depth += 1
+
+    _ensure_customer_account(
+        state,
+        name="Institutional Audit Group",
+        product_id=primary_product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1680.00"),
+        subscription_package=SubscriptionPackage.ENTERPRISE_SUITE,
+        support_tier=SupportTier.WHITE_GLOVE,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=22,
+        satisfaction=70,
+        onboarding_health=66,
+        support_load=38,
+        open_tickets=8,
+        sla_breach_risk=40,
+        invoice_risk=8,
+        failed_payment_risk=4,
+        escalation_count=1,
+        expansion_potential=74,
+        renewal_health=64,
+        renewal_turn=state.company.current_turn + 2,
+        churn_risk=18,
+    )
+    _ensure_customer_account(
+        state,
+        name="Regulated Ops Network",
+        product_id=primary_product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1440.00"),
+        subscription_package=SubscriptionPackage.GROWTH,
+        support_tier=SupportTier.PRIORITY,
+        billing_model=ContractBillingModel.FLAT,
+        satisfaction=68,
+        onboarding_health=63,
+        support_load=30,
+        open_tickets=6,
+        sla_breach_risk=36,
+        invoice_risk=6,
+        failed_payment_risk=3,
+        expansion_potential=68,
+        renewal_health=62,
+        renewal_turn=state.company.current_turn + 3,
+        churn_risk=16,
+    )
+    return "Campaign start applied: IPO readiness launchpad with institutional pressure live."
+
+
+def _apply_acquisition_diligence_sprint(state: GameState) -> str:
+    _shift_state_to_turn(state, 15)
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand + Decimal("4300.00"))
+    state.company.reputation = clamp_int(state.company.reputation + 9)
+    state.finance.board_pressure = max(state.finance.board_pressure, 20)
+    state.finance.governance_risk = max(state.finance.governance_risk, 14)
+    state.finance.board_confidence = max(state.finance.board_confidence, 60)
+    state.finance.investor_pressure = max(state.finance.investor_pressure, 15)
+    _replace_capital_plan(
+        state,
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.VENTURE,
+        reserve_target=Decimal("5200.00"),
+        product_investment_share=32,
+        go_to_market_share=43,
+        reserve_share=25,
+    )
+    state.support_program.backlog_queue = max(state.support_program.backlog_queue, 11)
+    state.support_program.escalation_queue = max(state.support_program.escalation_queue, 4)
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+
+    primary_product = _get_primary_product(state)
+    primary_product.user_count += 145
+    primary_product.market_fit = clamp_int(primary_product.market_fit + 9)
+    primary_product.quality = clamp_int(primary_product.quality + 6)
+    primary_product.package_catalog_depth += 2
+    primary_product.add_on_catalog_depth += 1
+
+    _ensure_customer_account(
+        state,
+        name="Due Diligence Anchor",
+        product_id=primary_product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1880.00"),
+        subscription_package=SubscriptionPackage.ENTERPRISE_SUITE,
+        support_tier=SupportTier.WHITE_GLOVE,
+        billing_model=ContractBillingModel.SEAT_BASED,
+        seat_count=24,
+        satisfaction=67,
+        onboarding_health=61,
+        support_load=40,
+        open_tickets=10,
+        sla_breach_risk=46,
+        invoice_risk=12,
+        failed_payment_risk=6,
+        escalation_count=1,
+        expansion_potential=78,
+        renewal_health=58,
+        renewal_turn=state.company.current_turn + 2,
+        churn_risk=22,
+    )
+    _ensure_customer_account(
+        state,
+        name="Channel-Sourced Enterprise",
+        product_id=primary_product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1540.00"),
+        subscription_package=SubscriptionPackage.GROWTH,
+        support_tier=SupportTier.PRIORITY,
+        billing_model=ContractBillingModel.USAGE_BASED,
+        usage_units=42,
+        satisfaction=65,
+        onboarding_health=58,
+        support_load=34,
+        open_tickets=9,
+        sla_breach_risk=44,
+        invoice_risk=18,
+        failed_payment_risk=9,
+        dunning_steps=1,
+        expansion_potential=72,
+        renewal_health=56,
+        renewal_turn=state.company.current_turn + 2,
+        churn_risk=24,
+    )
+    if not state.partnerships:
+        state.partnerships.extend(
+            [
+                PartnershipDeal(
+                    name=f"{primary_product.name} Integration Alliance",
+                    product_id=primary_product.id,
+                    channel=PartnerChannel.INTEGRATION,
+                    status=PartnershipStatus.ACTIVE,
+                    quality=66,
+                    risk=38,
+                    enablement_level=42,
+                    sourced_revenue=Decimal("2600.00"),
+                    sourced_users=36,
+                    conflict_pressure=34,
+                    started_turn=state.company.current_turn - 3,
+                    last_review_turn=state.company.current_turn - 2,
+                    summary="Integration lane is creating revenue but draws diligence scrutiny.",
+                ),
+                PartnershipDeal(
+                    name=f"{primary_product.name} Reseller Frontier",
+                    product_id=primary_product.id,
+                    channel=PartnerChannel.RESELLER,
+                    status=PartnershipStatus.STRAINED,
+                    quality=60,
+                    risk=44,
+                    enablement_level=34,
+                    sourced_revenue=Decimal("2100.00"),
+                    sourced_users=30,
+                    conflict_pressure=41,
+                    started_turn=state.company.current_turn - 3,
+                    last_review_turn=state.company.current_turn - 3,
+                    summary="Reseller lane is useful but margin and conflict both need work.",
+                ),
+            ]
+        )
+    return "Campaign start applied: acquisition diligence sprint with live buyer pressure."
+
+
+def _apply_independence_compounder(state: GameState) -> str:
+    _shift_state_to_turn(state, 16)
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand + Decimal("6200.00"))
+    state.company.reputation = clamp_int(state.company.reputation + 8)
+    state.finance.debt_principal = quantize_money(state.finance.debt_principal * Decimal("0.45"))
+    state.finance.board_confidence = max(state.finance.board_confidence, 70)
+    state.finance.board_score = max(state.finance.board_score, 64)
+    state.finance.investor_pressure = min(state.finance.investor_pressure, 8)
+    state.finance.covenant_risk = min(state.finance.covenant_risk, 10)
+    state.finance.board_pressure = max(state.finance.board_pressure, 11)
+    _replace_capital_plan(
+        state,
+        mode=CapitalPlanMode.CONSERVE,
+        source_preference=CapitalSourcePreference.BOOTSTRAP,
+        reserve_target=Decimal("9000.00"),
+        product_investment_share=34,
+        go_to_market_share=24,
+        reserve_share=42,
+    )
+    state.support_program.backlog_queue = max(state.support_program.backlog_queue, 6)
+    state.support_program.escalation_queue = max(state.support_program.escalation_queue, 2)
+    state.support_program.lane_focus = SupportLaneFocus.BALANCED
+
+    primary_product = _get_primary_product(state)
+    primary_product.user_count += 120
+    primary_product.quality = clamp_int(primary_product.quality + 7)
+    primary_product.market_fit = clamp_int(primary_product.market_fit + 8)
+    primary_product.technical_debt = clamp_int(primary_product.technical_debt - 6)
+    primary_product.package_catalog_depth += 1
+    primary_product.add_on_catalog_depth += 1
+
+    _ensure_customer_account(
+        state,
+        name="Compounder Core Account",
+        product_id=primary_product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("980.00"),
+        subscription_package=SubscriptionPackage.GROWTH,
+        support_tier=SupportTier.PRIORITY,
+        billing_model=ContractBillingModel.FLAT,
+        satisfaction=74,
+        onboarding_health=72,
+        support_load=24,
+        open_tickets=5,
+        sla_breach_risk=26,
+        invoice_risk=6,
+        failed_payment_risk=3,
+        expansion_potential=70,
+        renewal_health=68,
+        renewal_turn=state.company.current_turn + 3,
+        churn_risk=14,
+    )
+    return "Campaign start applied: independence compounder with reserve discipline live."
+
+
 def _shift_state_to_turn(state: GameState, target_turn: int) -> None:
     state.company.current_turn = target_turn
     state.roadmap_set_turn = max(1, target_turn - 1)
+    state.action_points_remaining = BALANCE.actions_per_turn
     state.quarter_plan = build_quarter_plan(state, budget_stance=state.quarter_plan.budget_stance)
+
+
+def _replace_capital_plan(
+    state: GameState,
+    *,
+    mode: CapitalPlanMode,
+    source_preference: CapitalSourcePreference,
+    reserve_target: Decimal,
+    product_investment_share: int,
+    go_to_market_share: int,
+    reserve_share: int,
+) -> None:
+    state.capital_plan = CapitalPlan.model_validate(
+        {
+            **state.capital_plan.model_dump(mode="python"),
+            "mode": mode,
+            "source_preference": source_preference,
+            "reserve_target": reserve_target,
+            "product_investment_share": product_investment_share,
+            "go_to_market_share": go_to_market_share,
+            "reserve_share": reserve_share,
+        }
+    )
 
 
 def _get_primary_product(state: GameState):
@@ -302,4 +627,64 @@ def _get_primary_product(state: GameState):
     return max(
         active_products,
         key=lambda product: (product.user_count, product.market_fit, product.quality),
+    )
+
+
+def _ensure_customer_account(
+    state: GameState,
+    *,
+    name: str,
+    product_id,
+    segment: MarketSegment,
+    contract_value: Decimal,
+    subscription_package: SubscriptionPackage,
+    support_tier: SupportTier,
+    billing_model: ContractBillingModel,
+    satisfaction: int,
+    onboarding_health: int,
+    support_load: int,
+    open_tickets: int,
+    sla_breach_risk: int,
+    invoice_risk: int,
+    failed_payment_risk: int,
+    expansion_potential: int,
+    renewal_health: int,
+    renewal_turn: int,
+    churn_risk: int,
+    seat_count: int = 0,
+    usage_units: int = 0,
+    dunning_steps: int = 0,
+    escalation_count: int = 0,
+) -> None:
+    if any(account.name == name for account in state.customer_accounts):
+        return
+    primary_product = _get_primary_product(state)
+    state.customer_accounts.append(
+        CustomerAccount(
+            name=name,
+            product_id=product_id,
+            segment=segment,
+            contract_value=contract_value,
+            plan_tier=primary_product.pricing_tier,
+            subscription_package=subscription_package,
+            support_tier=support_tier,
+            contract_cadence=ContractCadence.ANNUAL,
+            billing_model=billing_model,
+            seat_count=seat_count,
+            usage_units=usage_units,
+            satisfaction=satisfaction,
+            onboarding_health=onboarding_health,
+            support_load=support_load,
+            open_tickets=open_tickets,
+            sla_breach_risk=sla_breach_risk,
+            invoice_risk=invoice_risk,
+            failed_payment_risk=failed_payment_risk,
+            dunning_steps=dunning_steps,
+            escalation_count=escalation_count,
+            expansion_potential=expansion_potential,
+            renewal_health=renewal_health,
+            renewal_turn=renewal_turn,
+            churn_risk=churn_risk,
+            status=CustomerAccountStatus.ACTIVE,
+        )
     )

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.37.0 - 2026-05-06
+
+- Added three archive-gated late-game campaign starts, `IPO Readiness Launchpad`, `Acquisition Diligence Sprint`, and `Independence Compounder`, so repeat runs can now begin from distinct public-market, M&A, and disciplined-bootstrap operating profiles
+- Deepened progression logic with campaign-start reward unlocks, a higher `institution_builder` ladder stage, and richer archive comparison output around restructure leaders and path-balance guidance
+- Strengthened commercial realism by valuing support exposure directly, escalating direct-sales channel conflict, and surfacing revenue-at-risk plus renewal-pressure money in end-of-turn governance pressure
+- Expanded finance and partnership reporting with reserve-plan guidance, debt-rollover signals, funding-window cues, allocation actions, direct-conflict counts, and weighted rev-share visibility
+- Extended terminal presentation and regression coverage for the new campaign starts, unlock rules, archive comparison notes, finance-planner diagnostics, and partnership conflict reporting
+- Promoted the package version to `0.37.0`
+
 ## 0.36.0 - 2026-05-06
 
 - Added archive-gated `campaign start` modifiers plus a new `list-campaign-starts` CLI catalog so repeat runs can begin from distinct commercial and governance pressure profiles instead of always replaying turn-one openings

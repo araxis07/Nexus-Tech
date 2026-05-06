@@ -71,7 +71,11 @@ class FinancePlannerSnapshot:
     funding_posture: str
     dilution_outlook: str
     covenant_outlook: str
+    reserve_plan: str
+    debt_rollover_signal: str
+    funding_window: str
     scenario_compare: tuple[str, ...]
+    allocation_actions: tuple[str, ...]
     recommended_actions: tuple[str, ...]
     capital_alert: str
     summary: str
@@ -327,6 +331,29 @@ def build_finance_planner(
     else:
         covenant_outlook = "covenants are controlled"
 
+    if reserve_gap < ZERO_MONEY:
+        reserve_plan = "Raise reserve coverage or cut burn before the next quarter."
+    elif capital_plan.reserve_share >= 35:
+        reserve_plan = "Reserve coverage is intentionally defensive and currently coherent."
+    else:
+        reserve_plan = "Reserve coverage is workable, but one weak quarter would still hurt."
+
+    if finance.debt_principal >= BALANCE.finance_refinance_min_debt and finance.covenant_risk >= 16:
+        debt_rollover_signal = "Debt should be refinanced before additional expansion spend."
+    elif finance.debt_principal > ZERO_MONEY and base_end_cash > capital_plan.reserve_target:
+        debt_rollover_signal = "Debt is serviceable, but rollover timing now matters."
+    else:
+        debt_rollover_signal = "Debt rollover pressure is controlled for now."
+
+    if capital_plan.source_preference.value == "venture":
+        funding_window = "Venture capital works best only while growth remains explainable."
+    elif capital_plan.source_preference.value == "angel":
+        funding_window = "Angel capital is viable, but the narrative still needs to stay clean."
+    elif capital_plan.source_preference.value == "debt":
+        funding_window = "Debt only works while reserve breaks and covenants stay contained."
+    else:
+        funding_window = "Bootstrap posture rewards slower but cleaner execution."
+
     scenario_compare = (
         f"Base ends at {format_money(base_end_cash)}.",
         (
@@ -340,6 +367,18 @@ def build_finance_planner(
             else f"Aggressive still ends at {format_money(aggressive_end_cash)}."
         ),
     )
+    allocation_actions: list[str] = []
+    if capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold:
+        allocation_actions.append("lift_reserve_share")
+    if (
+        capital_plan.go_to_market_share > capital_plan.product_investment_share
+        and finance.active_board_ask.value == "reliability"
+    ):
+        allocation_actions.append("rebalance_toward_product")
+    if conservative_hit_turn is not None and capital_plan.mode.value == "expand":
+        allocation_actions.append("slow_expansion")
+    if not allocation_actions:
+        allocation_actions.append("hold_allocation")
     recommended_actions: list[str] = []
     if finance.debt_principal >= BALANCE.finance_refinance_min_debt and (
         finance.covenant_risk >= 16 or conservative_hit_turn is not None
@@ -349,6 +388,16 @@ def build_finance_planner(
         recommended_actions.append("repay_debt")
     if reserve_gap < ZERO_MONEY or conservative_hit_turn is not None:
         recommended_actions.append("set_capital_plan")
+    if (
+        reserve_gap < ZERO_MONEY
+        and capital_plan.source_preference.value == "debt"
+        and finance.debt_principal < BALANCE.finance_max_total_debt
+    ):
+        recommended_actions.append("take_loan")
+    if reserve_gap < ZERO_MONEY and capital_plan.source_preference.value == "angel":
+        recommended_actions.append("raise_angel")
+    if reserve_gap < ZERO_MONEY and capital_plan.source_preference.value == "venture":
+        recommended_actions.append("raise_vc")
     if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
         recommended_actions.append("execute_board_response")
     if not recommended_actions:
@@ -370,7 +419,11 @@ def build_finance_planner(
         funding_posture=funding_posture,
         dilution_outlook=dilution_outlook,
         covenant_outlook=covenant_outlook,
+        reserve_plan=reserve_plan,
+        debt_rollover_signal=debt_rollover_signal,
+        funding_window=funding_window,
         scenario_compare=scenario_compare,
+        allocation_actions=tuple(allocation_actions),
         recommended_actions=tuple(recommended_actions),
         capital_alert=capital_alert,
         summary=summary,

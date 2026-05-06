@@ -39,7 +39,11 @@ class SupportProgramSummary:
     enterprise_ticket_pressure: int
     billing_ticket_pressure: int
     revenue_at_risk_accounts: int
+    revenue_at_risk_value: Decimal
     renewal_pressure_accounts: int
+    renewal_pressure_value: Decimal
+    priority_breach_accounts: int
+    white_glove_breach_accounts: int
     dominant_lane: SupportLaneFocus
     focus_mismatch_penalty: int
     lane_overflow_pressure: int
@@ -78,26 +82,29 @@ def calculate_support_account_risk_counts(state: GameState) -> tuple[int, int]:
     revenue_at_risk_accounts = 0
     renewal_pressure_accounts = 0
     for account in active_accounts:
-        stressed_account = (
-            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
-            or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
-            or account.sla_breach_risk >= state.support_program.sla_target
-        )
-        if (
-            stressed_account
-            and (
-                account.contract_value >= BALANCE.support_program_revenue_at_risk_contract_threshold
-                or account.segment.value == "enterprise"
-            )
-        ) or account.failed_payment_risk >= BALANCE.support_program_queue_age_threshold * 10:
+        if _is_revenue_at_risk_account(account, sla_target=state.support_program.sla_target):
             revenue_at_risk_accounts += 1
-        if (
-            account.renewal_health <= BALANCE.support_program_renewal_pressure_health_threshold
-            or account.churn_risk >= BALANCE.support_program_renewal_pressure_churn_threshold
-            or account.renewal_offer_active
-        ):
+        if _is_renewal_pressure_account(account):
             renewal_pressure_accounts += 1
     return revenue_at_risk_accounts, renewal_pressure_accounts
+
+
+def calculate_support_account_risk_values(state: GameState) -> tuple[Decimal, Decimal]:
+    """Return contract value currently under support and renewal pressure."""
+
+    active_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    revenue_at_risk_value = Decimal("0.00")
+    renewal_pressure_value = Decimal("0.00")
+    for account in active_accounts:
+        if _is_revenue_at_risk_account(account, sla_target=state.support_program.sla_target):
+            revenue_at_risk_value += account.contract_value
+        if _is_renewal_pressure_account(account):
+            renewal_pressure_value += account.contract_value
+    return quantize_money(revenue_at_risk_value), quantize_money(renewal_pressure_value)
 
 
 def calculate_support_lane_staffing_plan(state: GameState) -> dict[SupportLaneFocus, int]:
@@ -370,6 +377,23 @@ def apply_end_of_turn_support_program(
                 account.expansion_potential = clamp_int(
                     account.expansion_potential - BALANCE.support_program_queue_age_expansion_loss
                 )
+                if account.support_tier is SupportTier.PRIORITY:
+                    account.churn_risk = clamp_int(
+                        account.churn_risk + BALANCE.support_program_priority_queue_age_churn_gain
+                    )
+                    account.renewal_health = clamp_int(
+                        account.renewal_health
+                        - BALANCE.support_program_priority_queue_age_renewal_health_loss
+                    )
+                elif account.support_tier is SupportTier.WHITE_GLOVE:
+                    account.churn_risk = clamp_int(
+                        account.churn_risk
+                        + BALANCE.support_program_white_glove_queue_age_churn_gain
+                    )
+                    account.renewal_health = clamp_int(
+                        account.renewal_health
+                        - BALANCE.support_program_white_glove_queue_age_renewal_health_loss
+                    )
     for account in active_accounts:
         stressed_account = (
             account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
@@ -385,6 +409,19 @@ def apply_end_of_turn_support_program(
             account.expansion_potential = clamp_int(account.expansion_potential - 1)
     revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
         state
+    )
+    revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
+    priority_breach_accounts = sum(
+        1
+        for account in active_accounts
+        if account.support_tier is SupportTier.PRIORITY
+        and account.sla_breach_risk >= state.support_program.sla_target
+    )
+    white_glove_breach_accounts = sum(
+        1
+        for account in active_accounts
+        if account.support_tier is SupportTier.WHITE_GLOVE
+        and account.sla_breach_risk >= state.support_program.sla_target
     )
     if (
         state.support_program.backlog_queue
@@ -434,7 +471,11 @@ def apply_end_of_turn_support_program(
         enterprise_ticket_pressure=enterprise_ticket_pressure,
         billing_ticket_pressure=billing_ticket_pressure,
         revenue_at_risk_accounts=revenue_at_risk_accounts,
+        revenue_at_risk_value=revenue_at_risk_value,
         renewal_pressure_accounts=renewal_pressure_accounts,
+        renewal_pressure_value=renewal_pressure_value,
+        priority_breach_accounts=priority_breach_accounts,
+        white_glove_breach_accounts=white_glove_breach_accounts,
         dominant_lane=dominant_lane,
         focus_mismatch_penalty=focus_mismatch_penalty,
         lane_overflow_pressure=lane_overflow_pressure,
@@ -751,6 +792,29 @@ def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
             account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
             or account.sla_breach_risk >= BALANCE.support_program_escalation_sla_threshold
         )
+    )
+
+
+def _is_revenue_at_risk_account(account: CustomerAccount, *, sla_target: int) -> bool:
+    stressed_account = (
+        account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
+        or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+        or account.sla_breach_risk >= sla_target
+    )
+    return (
+        stressed_account
+        and (
+            account.contract_value >= BALANCE.support_program_revenue_at_risk_contract_threshold
+            or account.segment.value == "enterprise"
+        )
+    ) or account.failed_payment_risk >= BALANCE.support_program_queue_age_threshold * 10
+
+
+def _is_renewal_pressure_account(account: CustomerAccount) -> bool:
+    return (
+        account.renewal_health <= BALANCE.support_program_renewal_pressure_health_threshold
+        or account.churn_risk >= BALANCE.support_program_renewal_pressure_churn_threshold
+        or account.renewal_offer_active
     )
 
 

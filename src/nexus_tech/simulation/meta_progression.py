@@ -63,6 +63,7 @@ class ArchiveComparisonSummary:
     best_ipo_label: str
     best_acquisition_label: str
     best_independence_label: str
+    best_restructure_label: str
     average_score: int
     average_offer_value: Decimal
     average_final_cash: Decimal
@@ -71,6 +72,7 @@ class ArchiveComparisonSummary:
     grade_mix: tuple[str, ...]
     badge_coverage: tuple[str, ...]
     dominant_path: str
+    path_balance_note: str
     next_gap: str
     recommendation: str
 
@@ -191,6 +193,30 @@ def get_achievement_definitions() -> tuple[AchievementDefinition, ...]:
             reward_id="independence_compare",
             reward_name="Independence Comparison Lens",
         ),
+        AchievementDefinition(
+            achievement_id="institutional_operator",
+            title="Institutional Operator",
+            description="Pair an IPO-ready archive outcome with strong board trust.",
+            reward_type="campaign_start",
+            reward_id="ipo_readiness_launchpad",
+            reward_name="IPO Readiness Launchpad",
+        ),
+        AchievementDefinition(
+            achievement_id="exit_negotiator",
+            title="Exit Negotiator",
+            description="Land a strategic-acquisition archive with a premium offer value.",
+            reward_type="campaign_start",
+            reward_id="acquisition_diligence_sprint",
+            reward_name="Acquisition Diligence Sprint",
+        ),
+        AchievementDefinition(
+            achievement_id="durable_compounder",
+            title="Durable Compounder",
+            description="Reach profitable independence with visible capital discipline.",
+            reward_type="campaign_start",
+            reward_id="independence_compounder",
+            reward_name="Independence Compounder",
+        ),
     )
 
 
@@ -295,18 +321,8 @@ def summarize_meta_progression(
             unlocked_rewards=tuple(
                 entry.reward_label for entry in unlock_catalog.entries if entry.unlocked
             ),
-            unlocks_remaining=(
-                "first_archive",
-                "first_victory",
-                "repeat_operator",
-                "board_steward",
-                "channel_builder",
-                "monetization_architect",
-                "support_resilient",
-                "people_stable",
-                "ipo_pathfinder",
-                "strategic_closer",
-                "independent_operator",
+            unlocks_remaining=tuple(
+                definition.achievement_id for definition in get_achievement_definitions()
             ),
             archive_highlights=("No archived runs yet.",),
             next_goal="Finish and archive one run to unlock campaign progression.",
@@ -360,6 +376,8 @@ def summarize_meta_progression(
         campaign_stage = "institutional"
     if len(unlocks) >= 10 and victories >= 2:
         campaign_stage = "franchise"
+    if len(unlocks) >= 12 and len(unique_outcomes) >= 3:
+        campaign_stage = "institution_builder"
 
     archive_highlights = (
         f"Latest archive: {latest_archive.exit_outcome} on turn {latest_archive.completed_turn}.",
@@ -385,10 +403,15 @@ def summarize_meta_progression(
         ),
         _format_ladder_step(
             "institutional",
-            campaign_stage in {"institutional", "franchise"},
+            campaign_stage in {"institutional", "franchise", "institution_builder"},
             4,
         ),
-        _format_ladder_step("franchise", campaign_stage == "franchise", 5),
+        _format_ladder_step(
+            "franchise",
+            campaign_stage in {"franchise", "institution_builder"},
+            5,
+        ),
+        _format_ladder_step("institution_builder", campaign_stage == "institution_builder", 6),
     )
 
     if victories == 0:
@@ -444,6 +467,7 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
             best_ipo_label="-",
             best_acquisition_label="-",
             best_independence_label="-",
+            best_restructure_label="-",
             average_score=0,
             average_offer_value=Decimal("0.00"),
             average_final_cash=Decimal("0.00"),
@@ -452,6 +476,7 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
             grade_mix=tuple(),
             badge_coverage=tuple(),
             dominant_path="-",
+            path_balance_note="No endgame path coverage yet.",
             next_gap="Archive at least one completed run before comparing paths.",
             recommendation="Archive at least one completed run before comparing outcomes.",
         )
@@ -464,6 +489,7 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
     best_ipo_archive = _best_archive_for_outcome(archives, "ipo_ready")
     best_acquisition_archive = _best_archive_for_outcome(archives, "strategic_acquisition")
     best_independence_archive = _best_archive_for_outcome(archives, "profitable_independence")
+    best_restructure_archive = _best_archive_for_outcome(archives, "restructure")
     average_score = sum(archive.total_score for archive in archives) // len(archives)
     average_offer_value = quantize_money(
         sum((archive.offer_value for archive in archives), Decimal("0.00")) / Decimal(len(archives))
@@ -512,6 +538,16 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
         ),
         key=lambda item: item[1],
     )[0]
+    if len(outcome_mix) >= 3:
+        path_balance_note = "Archive history now covers multiple viable endgame paths."
+    elif dominant_path == "restructure":
+        path_balance_note = "The archive still leans defensive. Durable win paths need work."
+    elif dominant_path == "strategic_acquisition":
+        path_balance_note = "Exit premiums dominate the archive more than durable cash outcomes."
+    elif dominant_path == "ipo_ready":
+        path_balance_note = "Governance-heavy scale is currently the archive's strongest pattern."
+    else:
+        path_balance_note = "Independent durability is leading, but path diversity is still thin."
 
     if missing_outcomes:
         next_gap = missing_outcomes[0].replace("_", " ")
@@ -562,6 +598,7 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
         best_ipo_label=_format_archive_label(best_ipo_archive),
         best_acquisition_label=_format_archive_label(best_acquisition_archive),
         best_independence_label=_format_archive_label(best_independence_archive),
+        best_restructure_label=_format_archive_label(best_restructure_archive),
         average_score=average_score,
         average_offer_value=average_offer_value,
         average_final_cash=average_final_cash,
@@ -570,6 +607,7 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
         grade_mix=grade_mix,
         badge_coverage=badge_coverage,
         dominant_path=dominant_path,
+        path_balance_note=path_balance_note,
         next_gap=next_gap,
         recommendation=recommendation,
     )
@@ -587,6 +625,8 @@ def _compute_unlock_status(archives: list[RunArchiveSummary]) -> dict[str, bool]
         if archive.exit_outcome and archive.exit_outcome
     }
     badge_pool = {badge for archive in archives for badge in archive.achievement_badges}
+    best_offer_value = max(archive.offer_value for archive in archives)
+    strongest_cash = max(archive.final_cash for archive in archives)
     return {
         "first_archive": True,
         "first_victory": victories >= 1,
@@ -599,6 +639,16 @@ def _compute_unlock_status(archives: list[RunArchiveSummary]) -> dict[str, bool]
         "ipo_pathfinder": "ipo_ready" in unique_outcomes,
         "strategic_closer": "strategic_acquisition" in unique_outcomes,
         "independent_operator": "profitable_independence" in unique_outcomes,
+        "institutional_operator": (
+            "ipo_ready" in unique_outcomes and "board_trusted" in badge_pool
+        ),
+        "exit_negotiator": (
+            "strategic_acquisition" in unique_outcomes and best_offer_value >= Decimal("75000.00")
+        ),
+        "durable_compounder": (
+            "profitable_independence" in unique_outcomes
+            and ("capital_disciplined" in badge_pool or strongest_cash >= Decimal("15000.00"))
+        ),
     }
 
 

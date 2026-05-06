@@ -456,6 +456,7 @@ def test_list_campaign_starts_command_renders_catalog(
     assert "Campaign Start Catalog" in output
     assert "standard" in output
     assert "Board Recovery Start" in output
+    assert "IPO Readiness Launchpad" in output
 
 
 def test_list_templates_command_renders_catalog(monkeypatch: MonkeyPatch) -> None:

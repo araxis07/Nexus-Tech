@@ -62,6 +62,8 @@ class PartnershipPortfolioSummary:
     dominant_share_percent: int
     paused_revenue_share_percent: int
     channel_dependency_risk: int
+    direct_sales_conflict_accounts: int
+    weighted_rev_share_percent: int
     summary: str
 
 
@@ -300,6 +302,14 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
         )
         for product in state.products
     }
+    active_accounts_by_product = {
+        product.id: sum(
+            1
+            for account in state.customer_accounts
+            if account.product_id == product.id and account.status.value != "churned"
+        )
+        for product in state.products
+    }
 
     for partnership in state.partnerships:
         product = _get_product_by_id(state.products, partnership.product_id)
@@ -407,6 +417,20 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
         conflict_delta += BALANCE.partnership_packaging_conflict_bonus[
             product.packaging_strategy.value
         ]
+        direct_sales_conflict = (
+            active_accounts_by_product.get(product.id, 0)
+            // BALANCE.partnership_direct_sales_conflict_account_divisor
+        ) + (
+            state.capital_plan.go_to_market_share
+            // BALANCE.partnership_direct_sales_conflict_gtm_share_divisor
+        )
+        if any(
+            account.product_id == product.id and account.segment.value == "enterprise"
+            for account in state.customer_accounts
+            if account.status.value != "churned"
+        ):
+            direct_sales_conflict += BALANCE.partnership_direct_sales_conflict_enterprise_bonus
+        conflict_delta += direct_sales_conflict
         conflict_delta += (
             max(
                 0,
@@ -525,6 +549,8 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             dominant_share_percent=0,
             paused_revenue_share_percent=0,
             channel_dependency_risk=0,
+            direct_sales_conflict_accounts=0,
+            weighted_rev_share_percent=0,
             summary="No active channel portfolio yet.",
         )
 
@@ -605,12 +631,36 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         if sourced_revenue > ZERO_MONEY
         else 0
     )
+    direct_sales_conflict_accounts = sum(
+        1
+        for account in state.customer_accounts
+        if account.status.value != "churned"
+        and any(
+            partnership.product_id == account.product_id
+            and partnership.status is not PartnershipStatus.PAUSED
+            for partnership in state.partnerships
+        )
+    )
+    weighted_rev_share_percent = (
+        int(
+            (
+                sum(
+                    partnership.rev_share_rate * Decimal("100")
+                    for partnership in state.partnerships
+                )
+                / Decimal(len(state.partnerships))
+            ).to_integral_value()
+        )
+        if state.partnerships
+        else 0
+    )
     channel_dependency_risk = clamp_int(
         (dominant_share_percent // 2)
         + (channel_conflict_index // 2)
         + (average_risk // 3)
         + (strained_count * BALANCE.partnership_dependency_risk_strained_bonus)
         + (paused_count * BALANCE.partnership_dependency_risk_paused_bonus)
+        + (direct_sales_conflict_accounts // 2)
     )
     if paused_count > 0:
         summary = "Some channels are paused and need deliberate recovery before they can scale."
@@ -640,6 +690,8 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         dominant_share_percent=dominant_share_percent,
         paused_revenue_share_percent=paused_revenue_share_percent,
         channel_dependency_risk=channel_dependency_risk,
+        direct_sales_conflict_accounts=direct_sales_conflict_accounts,
+        weighted_rev_share_percent=weighted_rev_share_percent,
         summary=summary,
     )
 
@@ -678,6 +730,8 @@ def calculate_partnership_fatigue(state: GameState, partnership: PartnershipDeal
         fatigue += 2
     if product.packaging_strategy.value == "suite":
         fatigue += 2
+    if partnership.rev_share_rate >= BALANCE.partnership_high_rev_share_fatigue_threshold:
+        fatigue += BALANCE.partnership_high_rev_share_fatigue_gain
     return clamp_int(fatigue)
 
 

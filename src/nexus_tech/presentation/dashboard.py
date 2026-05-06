@@ -147,7 +147,11 @@ def render_campaign_start_catalog(
         table.add_row(
             f"{start.title}\n[dim]{start.start_id}[/dim]",
             "locked" if start.start_id in locked_ids else "unlocked",
-            start.unlock_reward_id or "baseline",
+            (
+                f"{start.unlock_reward_type}:{start.unlock_reward_id}"
+                if start.unlock_reward_id and start.unlock_reward_type
+                else "baseline"
+            ),
             start.turn_hint,
             start.pressure_hint,
             start.description,
@@ -2893,7 +2897,11 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Funding Posture", planner.funding_posture)
     table.add_row("Dilution Outlook", planner.dilution_outlook)
     table.add_row("Covenant Outlook", planner.covenant_outlook)
+    table.add_row("Reserve Plan", planner.reserve_plan)
+    table.add_row("Debt Rollover", planner.debt_rollover_signal)
+    table.add_row("Funding Window", planner.funding_window)
     table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
+    table.add_row("Alloc Actions", " | ".join(planner.allocation_actions))
     table.add_row("Next Actions", " | ".join(planner.recommended_actions))
     table.add_row("Planner Alert", planner.capital_alert)
     table.add_row("Planner", planner.summary)
@@ -2978,8 +2986,10 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Recovery Ready", str(portfolio.recovery_ready_count))
         table.add_row("Renegotiate", str(portfolio.renegotiation_ready_count))
         table.add_row("Conflict", str(portfolio.channel_conflict_index))
+        table.add_row("Rev Share", f"{portfolio.weighted_rev_share_percent}%")
         table.add_row("Dominant Share", f"{portfolio.dominant_share_percent}%")
         table.add_row("Paused Rev Share", f"{portfolio.paused_revenue_share_percent}%")
+        table.add_row("Direct Conflict", str(portfolio.direct_sales_conflict_accounts))
         table.add_row("Dependency Risk", str(portfolio.channel_dependency_risk))
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
@@ -3082,6 +3092,7 @@ def _render_archive_comparison_summary(
     leaders.add_row("Best IPO", comparison.best_ipo_label)
     leaders.add_row("Best M&A", comparison.best_acquisition_label)
     leaders.add_row("Best Independence", comparison.best_independence_label)
+    leaders.add_row("Best Reset", comparison.best_restructure_label)
 
     coverage = Table.grid(padding=(0, 1))
     coverage.add_row(
@@ -3103,6 +3114,7 @@ def _render_archive_comparison_summary(
         "Badges",
         ", ".join(comparison.badge_coverage) if comparison.badge_coverage else "-",
     )
+    coverage.add_row("Path Note", comparison.path_balance_note)
     coverage.add_row("Next Gap", comparison.next_gap)
     coverage.add_row("Recommendation", comparison.recommendation)
 
