@@ -11,7 +11,13 @@ from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.support import clamp_int
-from nexus_tech.simulation.team import calculate_salary, sanitize_management_links
+from nexus_tech.simulation.team import (
+    calculate_manager_capacity,
+    calculate_org_structure,
+    calculate_salary,
+    is_eligible_manager,
+    sanitize_management_links,
+)
 
 
 @dataclass(frozen=True)
@@ -94,6 +100,9 @@ def promote_employee(employee: Employee) -> EmployeeProgressionSummary:
     employee.performance_rating = clamp_int(
         employee.performance_rating + BALANCE.employee_promotion_performance_gain
     )
+    employee.leadership_score = clamp_int(
+        employee.leadership_score + BALANCE.employee_promotion_leadership_gain[next_seniority.value]
+    )
     employee.underperformance_streak = 0
     return EmployeeProgressionSummary(
         message=(
@@ -125,6 +134,10 @@ def run_comp_review(company: Company, employee: Employee) -> EmployeeProgression
     employee.performance_rating = clamp_int(
         employee.performance_rating + BALANCE.employee_comp_review_performance_gain
     )
+    if is_eligible_manager(employee):
+        employee.succession_risk = clamp_int(
+            employee.succession_risk - BALANCE.management_comp_review_succession_relief
+        )
     employee.underperformance_streak = max(0, employee.underperformance_streak - 1)
     return EmployeeProgressionSummary(
         message=(
@@ -142,6 +155,16 @@ def apply_end_of_turn_employee_progression(
     rng: RandomLike | None = None,
 ) -> EmployeeProgressionTurnSummary:
     """Advance progression readiness, performance, and attrition pressure."""
+
+    org_structure = calculate_org_structure(employees)
+    employee_map = {employee.id: employee for employee in employees}
+    manager_report_counts: dict = {}
+    for employee in employees:
+        if employee.manager_id is None:
+            continue
+        manager_report_counts[employee.manager_id] = (
+            manager_report_counts.get(employee.manager_id, 0) + 1
+        )
 
     promotion_ready_count = 0
     high_attrition_risk_count = 0
@@ -187,6 +210,57 @@ def apply_end_of_turn_employee_progression(
         if employee.manager_id is not None:
             employee.attrition_risk = clamp_int(
                 employee.attrition_risk - BALANCE.management_attrition_relief
+            )
+        elif employee.assigned_product_id is not None and org_structure.unmanaged_headcount > 0:
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk + BALANCE.management_unmanaged_attrition_gain
+            )
+
+        manager = employee_map.get(employee.manager_id)
+        if manager is not None:
+            overload = max(
+                0,
+                manager_report_counts.get(manager.id, 0) - calculate_manager_capacity(manager),
+            )
+            if overload > 0:
+                employee.attrition_risk = clamp_int(
+                    employee.attrition_risk + BALANCE.management_overload_attrition_gain
+                )
+            if manager.succession_risk >= BALANCE.management_succession_high_risk_threshold:
+                employee.attrition_risk = clamp_int(
+                    employee.attrition_risk
+                    + BALANCE.management_succession_blind_spot_attrition_gain
+                )
+
+        if is_eligible_manager(employee):
+            direct_reports = manager_report_counts.get(employee.id, 0)
+            overload = max(0, direct_reports - calculate_manager_capacity(employee))
+            if overload > 0:
+                employee.attrition_risk = clamp_int(
+                    employee.attrition_risk
+                    + BALANCE.management_manager_overload_attrition_gain
+                    + (
+                        org_structure.span_risk
+                        // BALANCE.management_span_risk_attrition_gain_divisor
+                    )
+                )
+                employee.performance_rating = clamp_int(
+                    employee.performance_rating
+                    - BALANCE.management_manager_overload_performance_loss
+                )
+
+        if org_structure.org_drag > BALANCE.management_org_drag_threshold:
+            employee.attrition_risk = clamp_int(
+                employee.attrition_risk
+                + (org_structure.org_drag // BALANCE.employee_org_drag_attrition_gain_divisor)
+            )
+            employee.performance_rating = clamp_int(
+                employee.performance_rating
+                - (org_structure.org_drag // BALANCE.employee_org_drag_performance_loss_divisor)
+            )
+            employee.morale = clamp_int(
+                employee.morale
+                - (org_structure.org_drag // BALANCE.employee_org_drag_morale_loss_divisor)
             )
 
         if employee.performance_rating <= BALANCE.employee_performance_low_threshold:

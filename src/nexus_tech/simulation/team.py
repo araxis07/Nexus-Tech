@@ -588,6 +588,12 @@ def run_succession_review(
     if backup_candidates:
         backup = backup_candidates[0]
         backup.is_team_lead = True
+        backup.promotion_readiness = clamp_int(
+            backup.promotion_readiness + BALANCE.management_succession_review_backup_readiness_gain
+        )
+        backup.performance_rating = clamp_int(
+            backup.performance_rating + BALANCE.management_succession_review_backup_performance_gain
+        )
         backup.morale = clamp_int(
             backup.morale + BALANCE.management_succession_review_backup_morale_gain
         )

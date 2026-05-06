@@ -95,7 +95,11 @@ from nexus_tech.simulation.support_program import (
     classify_account_support_lane,
     count_escalating_accounts,
 )
-from nexus_tech.simulation.team import calculate_effective_productivity, calculate_team_condition
+from nexus_tech.simulation.team import (
+    TeamCondition,
+    calculate_effective_productivity,
+    calculate_team_condition,
+)
 
 
 def render_intro(
@@ -1708,6 +1712,7 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     underperforming_count = sum(
         1 for employee in state.employees if employee.performance_rating <= 42
     )
+    org_note = _format_team_org_note(team_condition)
     table = Table.grid(padding=(0, 1))
     table.add_row("Headcount", str(team_condition.headcount))
     table.add_row("Assigned", str(team_condition.assigned_headcount))
@@ -1729,7 +1734,25 @@ def _build_team_summary_panel(state: GameState) -> Panel:
     table.add_row("Ready", str(promotion_ready))
     table.add_row("Attrition", str(high_attrition_risk))
     table.add_row("Underperf", str(underperforming_count))
+    table.add_row("Org Note", org_note)
     return Panel(table, title="Team Summary", border_style="cyan", expand=True)
+
+
+def _format_team_org_note(team_condition: TeamCondition) -> str:
+    if team_condition.org_drag == 0 and team_condition.high_succession_risk_count == 0:
+        return "stable"
+    if (
+        team_condition.high_succession_risk_count > 0
+        and team_condition.overloaded_manager_count > 0
+    ):
+        return "succession + manager load"
+    if team_condition.overloaded_manager_count > 0:
+        return "manager overload"
+    if team_condition.high_succession_risk_count > 0:
+        return "succession blind spots"
+    if team_condition.span_risk > 0:
+        return "span pressure"
+    return "coordination drag"
 
 
 def _build_portfolio_table(state: GameState) -> Table:

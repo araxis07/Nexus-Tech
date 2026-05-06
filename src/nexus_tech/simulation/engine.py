@@ -1476,6 +1476,23 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
     unlocked_milestones = resolve_new_milestones(next_state, unlocked_turn=resolved_turn)
     if unlocked_milestones:
         team_condition = calculate_team_condition(next_state.employees)
+    if team_condition.org_drag > BALANCE.management_org_drag_threshold:
+        next_state.finance.board_team_health_score = clamp_int(
+            next_state.finance.board_team_health_score
+            - min(
+                4,
+                team_condition.org_drag // BALANCE.management_org_drag_team_health_divisor,
+            )
+        )
+    if team_condition.high_succession_risk_count > 0:
+        next_state.finance.board_team_health_score = clamp_int(
+            next_state.finance.board_team_health_score
+            - min(
+                3,
+                team_condition.high_succession_risk_count
+                // BALANCE.management_team_health_succession_divisor,
+            )
+        )
 
     previous_competitors = [
         competitor.model_copy(deep=True) for competitor in next_state.competitors
@@ -1944,6 +1961,11 @@ def build_turn_narrative(
         return "The team is maturing. Some people are ready for broader responsibility."
     if underperforming_count > 0:
         return "Some team output is softening. Performance now needs direct management."
+    if (
+        team_condition.high_succession_risk_count > 0
+        or team_condition.org_drag > BALANCE.management_org_drag_threshold
+    ):
+        return "Management gaps are widening. Org structure now needs active intervention."
     if market_cycle_changed:
         return (
             f"The market shifted to {market_cycle.value}. "

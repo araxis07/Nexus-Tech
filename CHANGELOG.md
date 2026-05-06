@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.40.0 - 2026-05-06
+
+- Deepened org and people pressure so unmanaged teams, overloaded managers, and succession blind spots now feed attrition, morale, and performance drift during turn resolution
+- Extended employee progression with promotion leadership gains, manager compensation reviews that reduce succession risk, and succession reviews that materially prepare backup leads
+- Linked organization strain back into governance so board team-health now reacts to org drag and succession gaps instead of treating people pressure as a side metric
+- Improved the team dashboard and turn narrative with clearer org-risk messaging around management overload, span pressure, and succession exposure
+- Expanded regression coverage across promotion, compensation, succession, unmanaged-team pressure, and org-drag effects on turn outcomes
+- Promoted the package version to `0.40.0`
+
 ## 0.39.0 - 2026-05-06
 
 - Deepened endgame classification with path scorecards, stronger support/channel fragility weighting, and new outcome variants such as `Customer-Trust Listing`, `Distribution-Led Acquisition`, `Service-Led Compounder`, and `Commercial Containment Reset`

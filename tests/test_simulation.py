@@ -3204,6 +3204,7 @@ def test_promote_employee_advances_seniority_and_salary() -> None:
     assert updated_employee.seniority is Seniority.MID
     assert updated_employee.salary > employee.salary
     assert updated_employee.productivity > employee.productivity
+    assert updated_employee.leadership_score > employee.leadership_score
 
 
 def test_comp_review_action_raises_salary_and_reduces_attrition() -> None:
@@ -3229,6 +3230,30 @@ def test_comp_review_action_raises_salary_and_reduces_attrition() -> None:
     assert updated_employee.salary > employee.salary
     assert updated_employee.attrition_risk < employee.attrition_risk
     assert updated_employee.performance_rating >= employee.performance_rating
+
+
+def test_comp_review_relieves_succession_risk_for_manager() -> None:
+    product = make_product("Ops Grid")
+    manager = make_employee(
+        "June",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        salary=Decimal("1180.00"),
+        assigned_product_id=product.id,
+        leadership_score=70,
+    )
+    manager.succession_risk = 16
+    state = make_state(product, employees=[manager], cash_on_hand=Decimal("6400.00"))
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_COMP_REVIEW,
+        ActionContext(employee_id=manager.id),
+    )
+
+    updated_manager = outcome.state.employees[0]
+    assert updated_manager.salary > manager.salary
+    assert updated_manager.succession_risk < manager.succession_risk
 
 
 def test_succession_review_action_can_designate_backup_lead() -> None:
@@ -3270,9 +3295,16 @@ def test_succession_review_action_can_designate_backup_lead() -> None:
     updated_manager = next(
         employee for employee in outcome.state.employees if employee.id == manager.id
     )
+    backup = next(
+        employee
+        for employee in outcome.state.employees
+        if employee.id != manager.id and employee.is_team_lead
+    )
     backup_count = sum(1 for employee in outcome.state.employees if employee.is_team_lead)
     assert updated_manager.leadership_score > manager.leadership_score
     assert backup_count >= 1
+    assert backup.promotion_readiness > 0
+    assert backup.performance_rating >= report_a.performance_rating
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
@@ -3295,6 +3327,31 @@ def test_employee_progression_adds_career_pressure_for_ready_under_market_staff(
 
     assert summary.high_attrition_risk_count == 0 or employee.attrition_risk > 0
     assert employee.attrition_risk >= BALANCE.employee_promotion_pressure_attrition_gain
+
+
+def test_employee_progression_adds_org_gap_pressure_for_unmanaged_team() -> None:
+    product = make_product("Org Debt")
+    employees = [
+        make_employee(
+            f"Builder {index}",
+            EmployeeRole.ENGINEER,
+            assigned_product_id=product.id,
+            energy=60,
+            morale=60,
+        )
+        for index in range(1, 6)
+    ]
+
+    apply_end_of_turn_employee_progression(
+        employees,
+        net_cash_flow=Decimal("200.00"),
+    )
+
+    assert all(
+        employee.attrition_risk >= BALANCE.management_unmanaged_attrition_gain
+        for employee in employees
+    )
+    assert any(employee.morale < 60 for employee in employees)
 
 
 def test_low_performance_reduces_effective_productivity() -> None:
@@ -4263,6 +4320,49 @@ def test_team_condition_tracks_layers_and_span_risk() -> None:
     assert condition.management_layers >= 2
     assert condition.max_span >= 5
     assert condition.span_risk > 0
+
+
+def test_resolve_turn_org_drag_reduces_board_team_health_score() -> None:
+    product = make_product("Org Strain")
+    unmanaged_employees = [
+        make_employee(
+            f"Builder {index}",
+            EmployeeRole.ENGINEER,
+            assigned_product_id=product.id,
+            energy=64,
+            morale=62,
+        )
+        for index in range(1, 6)
+    ]
+    manager = make_employee(
+        "Morgan PM",
+        EmployeeRole.PRODUCT_MANAGER,
+        seniority=Seniority.SENIOR,
+        assigned_product_id=product.id,
+        leadership_score=86,
+    )
+    managed_reports = [
+        make_employee(
+            f"Managed {index}",
+            EmployeeRole.ENGINEER,
+            assigned_product_id=product.id,
+            energy=64,
+            morale=62,
+            manager_id=manager.id,
+        )
+        for index in range(1, 6)
+    ]
+
+    unmanaged_state = make_state(product, employees=unmanaged_employees)
+    managed_state = make_state(product, employees=[manager, *managed_reports])
+    unmanaged_resolution = resolve_turn(unmanaged_state, FixedRandom(7))
+    managed_resolution = resolve_turn(managed_state, FixedRandom(7))
+
+    assert (
+        unmanaged_resolution.state.finance.board_team_health_score
+        < managed_resolution.state.finance.board_team_health_score
+    )
+    assert unmanaged_resolution.team_condition.org_drag > managed_resolution.team_condition.org_drag
 
 
 def test_execute_board_response_reliability_resets_pressure() -> None:

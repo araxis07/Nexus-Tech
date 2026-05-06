@@ -423,6 +423,12 @@ class BalanceConfig:
     employee_promotion_morale_gain: int = 8
     employee_promotion_attrition_relief: int = 14
     employee_promotion_performance_gain: int = 6
+    employee_promotion_leadership_gain: dict[str, int] = field(
+        default_factory=lambda: {
+            "mid": 4,
+            "senior": 6,
+        }
+    )
     employee_attrition_morale_risk_gain: int = 7
     employee_attrition_energy_risk_gain: int = 9
     employee_attrition_negative_cash_flow_risk_gain: int = 4
@@ -452,6 +458,9 @@ class BalanceConfig:
     employee_comp_review_morale_gain: int = 6
     employee_comp_review_attrition_relief: int = 12
     employee_comp_review_performance_gain: int = 2
+    employee_org_drag_attrition_gain_divisor: int = 3
+    employee_org_drag_performance_loss_divisor: int = 4
+    employee_org_drag_morale_loss_divisor: int = 4
     employee_resignation_attrition_threshold: int = 82
     employee_resignation_morale_threshold: int = 38
     employee_resignation_energy_threshold: int = 32
@@ -474,8 +483,10 @@ class BalanceConfig:
     management_overload_coordination_penalty_divisor: int = 2
     management_unmanaged_energy_penalty: int = 1
     management_unmanaged_morale_penalty: int = 1
+    management_unmanaged_attrition_gain: int = 3
     management_attrition_relief: int = 5
     management_org_drag_threshold: int = 2
+    management_org_drag_team_health_divisor: int = 3
     management_reorg_cost: Decimal = Decimal("160.00")
     management_reorg_attrition_relief: int = 8
     management_reorg_energy_gain: int = 4
@@ -489,13 +500,19 @@ class BalanceConfig:
     management_succession_morale_threshold: int = 45
     management_succession_attrition_threshold: int = 55
     management_overload_report_energy_penalty: int = 1
+    management_overload_attrition_gain: int = 3
     management_succession_report_energy_penalty: int = 1
     management_succession_report_morale_penalty: int = 1
+    management_succession_blind_spot_attrition_gain: int = 2
     management_succession_manager_energy_penalty: int = 1
     management_succession_manager_morale_penalty: int = 1
+    management_manager_overload_attrition_gain: int = 2
+    management_manager_overload_performance_loss: int = 2
     management_layer_drag_threshold: int = 2
     management_layer_drag_per_layer: int = 2
     management_span_soft_cap: int = 4
+    management_span_risk_attrition_gain_divisor: int = 3
+    management_team_health_succession_divisor: int = 2
     management_succession_review_cost: Decimal = Decimal("190.00")
     management_succession_review_direct_report_min: int = 2
     management_succession_review_backup_leadership_threshold: int = 54
@@ -506,6 +523,9 @@ class BalanceConfig:
     management_succession_review_report_morale_gain: int = 2
     management_succession_review_report_attrition_relief: int = 3
     management_succession_review_backup_morale_gain: int = 3
+    management_succession_review_backup_readiness_gain: int = 8
+    management_succession_review_backup_performance_gain: int = 2
+    management_comp_review_succession_relief: int = 3
 
     roadmap_duration_turns: int = 4
     roadmap_growth_acquisition_bonus: int = 2
