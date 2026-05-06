@@ -17,6 +17,7 @@ from nexus_tech.content.models import (
     ScenarioDefinition,
 )
 from nexus_tech.domain.models import (
+    CustomerAccountStatus,
     Employee,
     EventHistoryEntry,
     FundingHistoryEntry,
@@ -30,9 +31,11 @@ from nexus_tech.domain.models import (
     RoadmapProjectStatus,
     SalesDealStage,
     SupportLaneFocus,
+    SupportTier,
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
+from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     BalanceAuditResult,
     BalanceBatchResult,
@@ -1388,6 +1391,7 @@ def render_victory(console: Console, state: GameState) -> None:
         content.add_row("Exit Tags", ", ".join(exit_evaluation.outcome_tags))
         content.add_row("Board Readout", exit_evaluation.board_readout)
         content.add_row("Pressure Readout", exit_evaluation.pressure_readout)
+        content.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
         content.add_row("Next Chapter", exit_evaluation.next_chapter)
         content.add_row("Exit Summary", state.exit_summary or exit_evaluation.summary)
     content.add_row("Portfolio Users", str(run_score.total_users))
@@ -2553,6 +2557,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Segments", ", ".join(active_segments) if active_segments else "-")
     table.add_row("Board Readout", exit_evaluation.board_readout)
     table.add_row("Pressure Readout", exit_evaluation.pressure_readout)
+    table.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
     table.add_row("Next Chapter", exit_evaluation.next_chapter)
     return Panel(table, title="Scorecard", border_style="yellow", expand=True)
 
@@ -2727,6 +2732,20 @@ def _build_support_program_panel(state: GameState) -> Panel:
         state
     )
     revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
+    white_glove_risk_value = sum(
+        (
+            account.contract_value
+            for account in state.customer_accounts
+            if account.status is not CustomerAccountStatus.CHURNED
+            and account.support_tier is SupportTier.WHITE_GLOVE
+            and (
+                account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold + 1
+                or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+                or account.sla_breach_risk >= state.support_program.sla_target
+            )
+        ),
+        Decimal("0.00"),
+    )
     priority_breach_accounts = sum(
         1
         for account in state.customer_accounts
@@ -2738,6 +2757,17 @@ def _build_support_program_panel(state: GameState) -> Panel:
         for account in state.customer_accounts
         if account.support_tier.value == "white_glove"
         and account.sla_breach_risk >= state.support_program.sla_target
+    )
+    severe_queue_accounts = sum(
+        1
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+        and account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
+        and (
+            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold + 1
+            or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+            or account.sla_breach_risk >= state.support_program.sla_target
+        )
     )
     lane_counts = {
         "onboarding": 0,
@@ -2770,10 +2800,12 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Billing Q", str(state.support_program.billing_ticket_pressure))
     table.add_row("Revenue at Risk", str(revenue_at_risk_accounts))
     table.add_row("Risk Value", format_money(revenue_at_risk_value))
+    table.add_row("White-Glove Risk", format_money(white_glove_risk_value))
     table.add_row("Renewal Pressure", str(renewal_pressure_accounts))
     table.add_row("Renewal Value", format_money(renewal_pressure_value))
     table.add_row("Priority Breach", str(priority_breach_accounts))
     table.add_row("White-Glove Breach", str(white_glove_breach_accounts))
+    table.add_row("Severe Queue", str(severe_queue_accounts))
     table.add_row(
         "Lane Cap",
         (
@@ -2835,6 +2867,8 @@ def _build_late_game_panel(state: GameState) -> Panel:
     table.add_row("Support Fragility", str(pressure.support_fragility))
     table.add_row("Channel Fragility", str(pressure.channel_fragility))
     table.add_row("Reset Risk", str(pressure.board_reset_risk))
+    table.add_row("Pressure Path", pressure.dominant_pressure.replace("_", " "))
+    table.add_row("Scorecard", " | ".join(pressure.path_scorecard[:2]))
     table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
     table.add_row("State", late_game.summary)
     return Panel(table, title="Late-Game", border_style="magenta", expand=True)
@@ -2842,6 +2876,7 @@ def _build_late_game_panel(state: GameState) -> Panel:
 
 def _build_finance_panel(state: GameState) -> Panel:
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
+    portfolio = calculate_partnership_portfolio(state)
     base_forecast, conservative_forecast, aggressive_forecast = (
         calculate_cash_flow_forecast_scenarios(
             state.company.cash_on_hand,
@@ -2862,6 +2897,10 @@ def _build_finance_panel(state: GameState) -> Panel:
         state.turn_history,
         latest_net_cash_flow=_latest_net_cash_flow(state),
         capital_plan=state.capital_plan,
+        support_backlog=state.support_program.backlog_queue,
+        support_escalations=state.support_program.escalation_queue,
+        channel_conflict_index=portfolio.channel_conflict_index,
+        channel_dependency_risk=portfolio.channel_dependency_risk,
     )
     table = Table.grid(padding=(0, 1))
     table.add_row("Debt", format_money(state.finance.debt_principal))
@@ -2936,7 +2975,10 @@ def _build_finance_panel(state: GameState) -> Panel:
     )
     table.add_row("Action Window", planner.capital_action_window)
     table.add_row("Tradeoff", planner.tradeoff_note)
+    table.add_row("Liquidity Risk", planner.liquidity_risk)
+    table.add_row("Exec Drag", planner.execution_drag)
     table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
+    table.add_row("Action Seq", " | ".join(planner.action_sequence))
     table.add_row("Alloc Actions", " | ".join(planner.allocation_actions))
     table.add_row("Next Actions", " | ".join(planner.recommended_actions))
     table.add_row("Planner Alert", planner.capital_alert)
@@ -3030,7 +3072,10 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Recovery Rev Share", f"{portfolio.recovery_revenue_share_percent}%")
         table.add_row("Concentration", str(portfolio.concentration_risk))
         table.add_row("Renegotiate P", str(portfolio.renegotiation_pressure))
+        table.add_row("Rev Share P", str(portfolio.rev_share_pressure))
+        table.add_row("Hotspot", portfolio.hotspot_channel)
         table.add_row("Dependency Risk", str(portfolio.channel_dependency_risk))
+        table.add_row("Mix Note", portfolio.channel_mix_note)
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 

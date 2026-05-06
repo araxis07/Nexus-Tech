@@ -23,6 +23,7 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.endgame import calculate_endgame_pressure, calculate_endgame_readiness
 from nexus_tech.simulation.finance import count_funding_rounds
 from nexus_tech.simulation.operations import calculate_operations_summary
+from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
 from nexus_tech.simulation.randomness import RandomLike
 from nexus_tech.simulation.team import calculate_effective_productivity
 
@@ -2006,6 +2007,15 @@ def _build_enterprise_procurement_delay_event(
 
 def _is_support_meltdown_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
+    premium_breach_accounts = any(
+        account.status is not CustomerAccountStatus.CHURNED
+        and account.support_tier.value in {"priority", "white_glove"}
+        and (
+            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold + 1
+            or account.sla_breach_risk >= state.support_program.sla_target
+        )
+        for account in state.customer_accounts
+    )
     return _has_recent_event(
         state,
         {"support_backlog"},
@@ -2015,6 +2025,7 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         or state.support_program.escalation_queue
         >= BALANCE.event_support_meltdown_escalation_threshold
         or pressure.support_fragility >= BALANCE.event_support_meltdown_fragility_threshold
+        or premium_breach_accounts
     )
 
 
@@ -2157,6 +2168,7 @@ def _build_partner_qbr_event(
 
 def _is_partner_breakdown_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
     return _has_recent_event(
         state,
         {"partner_qbr", "channel_conflict"},
@@ -2168,6 +2180,8 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             >= BALANCE.event_partner_breakdown_fatigue_threshold
             or pressure.channel_fragility
             >= BALANCE.event_partner_breakdown_channel_fragility_threshold
+            or portfolio.concentration_risk >= 55
+            or portfolio.rev_share_pressure >= 28
         )
         for partnership in state.partnerships
     )

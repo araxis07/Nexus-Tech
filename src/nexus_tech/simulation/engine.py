@@ -1752,6 +1752,9 @@ def apply_end_of_turn_commercial_pressure(
     channel_fatigue_pressure = (
         portfolio.renegotiation_pressure >= BALANCE.commercial_pressure_channel_fatigue_threshold
     )
+    channel_economics_pressure = (
+        portfolio.rev_share_pressure >= BALANCE.commercial_pressure_channel_economics_threshold
+    )
     if dependency_pressure:
         board_pressure_delta += BALANCE.commercial_pressure_channel_dependency_board_penalty
         board_confidence_loss += BALANCE.commercial_pressure_channel_dependency_confidence_loss
@@ -1762,6 +1765,8 @@ def apply_end_of_turn_commercial_pressure(
     if channel_fatigue_pressure:
         board_pressure_delta += BALANCE.commercial_pressure_channel_fatigue_board_penalty
         board_confidence_loss += BALANCE.commercial_pressure_channel_fatigue_confidence_loss
+    if channel_economics_pressure:
+        board_pressure_delta += BALANCE.commercial_pressure_channel_economics_board_penalty
 
     if board_pressure_delta > 0:
         state.finance.board_pressure = clamp_int(
@@ -1800,6 +1805,28 @@ def apply_end_of_turn_commercial_pressure(
                 ),
             )
         )
+    if support_summary.white_glove_revenue_at_risk_value > Decimal("0.00"):
+        state.finance.board_reliability_score = clamp_int(
+            state.finance.board_reliability_score
+            - min(
+                3,
+                int(
+                    (
+                        support_summary.white_glove_revenue_at_risk_value
+                        / BALANCE.commercial_pressure_revenue_at_risk_value_divisor
+                    ).to_integral_value()
+                ),
+            )
+        )
+    if support_summary.service_tier_pressure > 0:
+        state.finance.board_team_health_score = clamp_int(
+            state.finance.board_team_health_score
+            - min(
+                4,
+                support_summary.service_tier_pressure
+                // BALANCE.commercial_pressure_service_tier_team_health_divisor,
+            )
+        )
     if direct_sales_conflict_pressure:
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 2
@@ -1807,6 +1834,11 @@ def apply_end_of_turn_commercial_pressure(
     if channel_fatigue_pressure:
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 1
+        )
+    if channel_economics_pressure:
+        state.finance.board_profitability_score = clamp_int(
+            state.finance.board_profitability_score
+            - BALANCE.commercial_pressure_channel_economics_profitability_loss
         )
 
     summary_parts: list[str] = []
@@ -1831,6 +1863,11 @@ def apply_end_of_turn_commercial_pressure(
                 f"{format_money(support_summary.premium_revenue_at_risk_value)}"
             )
         )
+    if support_summary.severe_queue_accounts > 0:
+        summary_parts.append(
+            f"{support_summary.severe_queue_accounts} high-touch accounts "
+            "are still waiting too long"
+        )
     if support_summary.lane_overflow_pressure > 0:
         summary_parts.append(
             f"support lanes overflowed by {support_summary.lane_overflow_pressure}"
@@ -1841,6 +1878,11 @@ def apply_end_of_turn_commercial_pressure(
         summary_parts.append(
             "partner fatigue now touches "
             f"{portfolio.fatigued_revenue_share_percent}% of channel revenue"
+        )
+    if channel_economics_pressure:
+        summary_parts.append(
+            f"{portfolio.hotspot_channel} economics are straining at "
+            f"{portfolio.weighted_rev_share_percent}% rev share"
         )
     if paused_share_pressure:
         summary_parts.append(

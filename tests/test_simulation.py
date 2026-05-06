@@ -1208,6 +1208,7 @@ def test_resolve_turn_surfaces_commercial_pressure_from_support_and_channel_risk
     assert resolution.commercial_pressure_summary != "Commercial pressure is under control."
     assert "revenue-critical accounts" in resolution.commercial_pressure_summary
     assert resolution.state.finance.board_pressure > starting_board_pressure
+    assert resolution.state.finance.board_team_health_score <= state.finance.board_team_health_score
     assert any(
         account.name == "Enterprise Anchor" and account.status is CustomerAccountStatus.AT_RISK
         for account in resolution.state.customer_accounts
@@ -3530,9 +3531,12 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.revenue_at_risk_value >= Decimal("1400.00")
     assert summary.enterprise_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.premium_revenue_at_risk_value >= Decimal("1400.00")
+    assert summary.white_glove_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.renewal_pressure_accounts >= 1
     assert summary.renewal_pressure_value >= Decimal("1400.00")
     assert summary.white_glove_breach_accounts >= 1
+    assert summary.severe_queue_accounts >= 1
+    assert summary.service_tier_pressure >= 3
     assert summary.commercial_breach_pressure >= 2
     assert revenue_at_risk_accounts >= 1
     assert renewal_pressure_accounts >= 1
@@ -5183,6 +5187,7 @@ def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
 
     assert evaluation.board_readout
     assert evaluation.pressure_readout
+    assert len(evaluation.path_scorecard) == 4
     assert evaluation.next_chapter
     assert evaluation.outcome in {
         ExitOutcome.IPO_READY,
@@ -5249,7 +5254,10 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
     assert planner.funding_window
     assert planner.capital_action_window
     assert planner.tradeoff_note
+    assert planner.liquidity_risk
+    assert planner.execution_drag
     assert len(planner.scenario_compare) == 3
+    assert planner.action_sequence
     assert planner.allocation_actions
     assert planner.capital_alert
     assert planner.summary
@@ -5282,6 +5290,12 @@ def test_finance_planner_recommends_funding_actions_under_reserve_stress() -> No
         "slow_expansion" in planner.allocation_actions
         or "lift_reserve_share" in planner.allocation_actions
     )
+    assert planner.liquidity_risk in {
+        "reserve break is imminent",
+        "liquidity is fragile",
+        "liquidity needs active monitoring",
+        "liquidity is controlled",
+    }
 
 
 def test_bridge_round_event_applies_cash_and_dilution() -> None:
@@ -5460,6 +5474,7 @@ def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None
     assert pressure.support_fragility > 0
     assert pressure.channel_fragility > 0
     assert pressure.board_reset_risk > 0
+    assert len(pressure.path_scorecard) == 4
     assert pressure.restructure_heat >= pressure.board_reset_risk // 3
 
 
@@ -5688,6 +5703,9 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.recovery_revenue_share_percent >= 0
     assert summary.concentration_risk >= 0
     assert summary.renegotiation_pressure >= 0
+    assert summary.rev_share_pressure >= 0
+    assert summary.hotspot_channel in {"reseller", "marketplace"}
+    assert summary.channel_mix_note
 
 
 def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk() -> None:
@@ -5726,6 +5744,70 @@ def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk(
     assert summary.paused_revenue_share_percent > 0
     assert summary.renegotiation_ready_count >= 1
     assert summary.weighted_rev_share_percent > 0
+    assert summary.rev_share_pressure > 0
+    assert summary.hotspot_channel in {"reseller", "marketplace"}
+
+
+def test_finance_planner_surfaces_execution_drag_and_action_sequence() -> None:
+    product = make_product("Planner Ops Core", user_count=140)
+    state = make_state(product, cash_on_hand=Decimal("4200.00"))
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.DEBT,
+        planning_horizon_turns=8,
+        reserve_target=Decimal("5600.00"),
+        product_investment_share=30,
+        go_to_market_share=45,
+        reserve_share=25,
+    )
+    state.finance.debt_principal = Decimal("3400.00")
+    state.finance.covenant_risk = 22
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-780.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=22,
+        support_escalations=6,
+        channel_conflict_index=34,
+        channel_dependency_risk=62,
+    )
+
+    assert planner.liquidity_risk in {
+        "reserve break is imminent",
+        "liquidity is fragile",
+        "liquidity needs active monitoring",
+        "liquidity is controlled",
+    }
+    assert planner.execution_drag
+    assert any("support" in step or "channel" in step for step in planner.action_sequence)
+
+
+def test_long_run_standard_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int]:
+        state = create_new_game(DEFAULT_COMPANY_NAME, DEFAULT_PRODUCT_NAME)
+        rng = RandomSource(seed=seed)
+
+        for _ in range(24):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.support_program.backlog_queue,
+            len(state.turn_history),
+        )
+
+    assert run_once(91) == run_once(91)
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:

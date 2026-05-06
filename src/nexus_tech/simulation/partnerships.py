@@ -68,6 +68,9 @@ class PartnershipPortfolioSummary:
     recovery_revenue_share_percent: int
     concentration_risk: int
     renegotiation_pressure: int
+    rev_share_pressure: int
+    hotspot_channel: str
+    channel_mix_note: str
     summary: str
 
 
@@ -479,9 +482,22 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
             partnership.enablement_level = clamp_int(
                 partnership.enablement_level - BALANCE.partnership_high_fatigue_enablement_decay
             )
+            partnership.rev_share_rate = min(
+                BALANCE.partnership_max_rev_share_by_channel[partnership.channel.value],
+                quantize_rate(
+                    partnership.rev_share_rate + BALANCE.partnership_high_fatigue_rev_share_creep
+                ),
+            )
         if fatigue >= BALANCE.partnership_fatigue_pause_threshold:
             partnership.conflict_pressure = clamp_int(
                 partnership.conflict_pressure + BALANCE.partnership_high_fatigue_conflict_gain
+            )
+        if partnership.status is PartnershipStatus.RECOVERY:
+            partnership.rev_share_rate = max(
+                BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value],
+                quantize_rate(
+                    partnership.rev_share_rate - BALANCE.partnership_recovery_rev_share_relief
+                ),
             )
         if (
             partnership.risk >= BALANCE.partnership_pause_threshold
@@ -567,6 +583,9 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             recovery_revenue_share_percent=0,
             concentration_risk=0,
             renegotiation_pressure=0,
+            rev_share_pressure=0,
+            hotspot_channel="-",
+            channel_mix_note="No active channel portfolio yet.",
             summary="No active channel portfolio yet.",
         )
 
@@ -700,6 +719,17 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         if state.partnerships
         else 0
     )
+    channel_scores = {
+        channel: 0 for channel in {partnership.channel.value for partnership in state.partnerships}
+    }
+    for partnership, fatigue in zip(state.partnerships, fatigue_scores, strict=False):
+        channel_scores[partnership.channel.value] += (
+            partnership.conflict_pressure
+            + partnership.risk
+            + fatigue
+            + int((partnership.rev_share_rate * Decimal("100")).to_integral_value())
+        )
+    hotspot_channel = max(channel_scores.items(), key=lambda item: item[1])[0]
     channel_dependency_risk = clamp_int(
         (dominant_share_percent // 2)
         + (channel_conflict_index // 2)
@@ -726,6 +756,19 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         )
         + (channel_conflict_index // BALANCE.partnership_renegotiation_pressure_conflict_divisor)
     )
+    rev_share_pressure = clamp_int(
+        (weighted_rev_share_percent // BALANCE.partnership_rev_share_pressure_divisor)
+        + renegotiation_ready_count
+        + (fatigued_revenue_share_percent // 10)
+    )
+    if hotspot_channel == "marketplace":
+        channel_mix_note = (
+            "Marketplace exposure is the sharpest source of current channel friction."
+        )
+    elif hotspot_channel == "integration":
+        channel_mix_note = "Integration commitments are the main source of channel execution drag."
+    else:
+        channel_mix_note = "Reseller overlap is now the main commercial pressure inside channels."
     if paused_count > 0:
         summary = "Some channels are paused and need deliberate recovery before they can scale."
     elif concentration_risk >= 60:
@@ -764,6 +807,9 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         recovery_revenue_share_percent=recovery_revenue_share_percent,
         concentration_risk=concentration_risk,
         renegotiation_pressure=renegotiation_pressure,
+        rev_share_pressure=rev_share_pressure,
+        hotspot_channel=hotspot_channel,
+        channel_mix_note=channel_mix_note,
         summary=summary,
     )
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.39.0 - 2026-05-06
+
+- Deepened endgame classification with path scorecards, stronger support/channel fragility weighting, and new outcome variants such as `Customer-Trust Listing`, `Distribution-Led Acquisition`, `Service-Led Compounder`, and `Commercial Containment Reset`
+- Expanded support-ops pressure with severe high-touch queue tracking, white-glove revenue-at-risk exposure, and stronger commercial fallout when premium service promises slip
+- Extended partnership analytics with hotspot-channel detection, rev-share pressure tracking, and more realistic channel economics drift under fatigue and recovery
+- Strengthened finance-planner output with liquidity-risk language, execution-drag cues, and prioritized action sequences that now react to support and channel strain
+- Tightened event eligibility and regression coverage around support meltdowns, partner breakdowns, late-game scorecards, planner signals, and long-run seeded stability
+- Promoted the package version to `0.39.0`
+
 ## 0.38.0 - 2026-05-06
 
 - Deepened late-game pressure scoring with explicit `support_fragility`, `channel_fragility`, and `board_reset_risk` signals that now feed exit evaluation, board recommendations, and ending variants

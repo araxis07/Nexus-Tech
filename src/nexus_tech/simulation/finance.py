@@ -77,7 +77,10 @@ class FinancePlannerSnapshot:
     reserve_recovery_turn: int | None
     capital_action_window: str
     tradeoff_note: str
+    liquidity_risk: str
+    execution_drag: str
     scenario_compare: tuple[str, ...]
+    action_sequence: tuple[str, ...]
     allocation_actions: tuple[str, ...]
     recommended_actions: tuple[str, ...]
     capital_alert: str
@@ -215,6 +218,10 @@ def build_finance_planner(
     *,
     latest_net_cash_flow: Decimal,
     capital_plan: CapitalPlan,
+    support_backlog: int = 0,
+    support_escalations: int = 0,
+    channel_conflict_index: int = 0,
+    channel_dependency_risk: int = 0,
 ) -> FinancePlannerSnapshot:
     """Project end-cash and reserve stress over the active planning horizon."""
 
@@ -395,6 +402,28 @@ def build_finance_planner(
             "The capital plan is viable, but each extra growth bet now raises proof requirements."
         )
 
+    if reserve_break_risk == "critical":
+        liquidity_risk = "reserve break is imminent"
+    elif (
+        reserve_break_risk == "high"
+        or finance.covenant_risk >= 20
+        or finance.debt_principal >= BALANCE.finance_debt_distress_threshold
+    ):
+        liquidity_risk = "liquidity is fragile"
+    elif reserve_break_risk == "elevated" or finance.investor_pressure >= 24:
+        liquidity_risk = "liquidity needs active monitoring"
+    else:
+        liquidity_risk = "liquidity is controlled"
+
+    if support_backlog >= 20 or support_escalations >= 6:
+        execution_drag = "support operations are now shaping capital needs."
+    elif channel_conflict_index >= 32 or channel_dependency_risk >= 58:
+        execution_drag = "channel conflict is turning capital planning into a commercial problem."
+    elif support_backlog >= 10 or channel_conflict_index >= 20:
+        execution_drag = "execution drag is visible, but still recoverable."
+    else:
+        execution_drag = "execution drag is currently contained."
+
     scenario_compare = (
         f"Base ends at {format_money(base_end_cash)}.",
         (
@@ -444,6 +473,20 @@ def build_finance_planner(
     if not recommended_actions:
         recommended_actions.append("review_finance")
 
+    action_sequence: list[str] = []
+    if reserve_break_risk in {"critical", "high"}:
+        action_sequence.append("reset capital allocation immediately")
+    if finance.debt_principal >= BALANCE.finance_refinance_min_debt and finance.covenant_risk >= 16:
+        action_sequence.append("refinance debt before adding new growth spend")
+    if support_backlog >= 14 or support_escalations >= 4:
+        action_sequence.append("stabilize support before leaning harder into expansion")
+    if channel_dependency_risk >= 55 or channel_conflict_index >= 28:
+        action_sequence.append("de-risk channel mix before accelerating go-to-market")
+    if finance.investor_pressure >= 28:
+        action_sequence.append("prepare a board-facing capital response")
+    if not action_sequence:
+        action_sequence.append("hold posture and review the next planning window")
+
     return FinancePlannerSnapshot(
         horizon_turns=horizon,
         base_end_cash=base_end_cash,
@@ -466,7 +509,10 @@ def build_finance_planner(
         reserve_recovery_turn=reserve_recovery_turn,
         capital_action_window=capital_action_window,
         tradeoff_note=tradeoff_note,
+        liquidity_risk=liquidity_risk,
+        execution_drag=execution_drag,
         scenario_compare=scenario_compare,
+        action_sequence=tuple(action_sequence),
         allocation_actions=tuple(allocation_actions),
         recommended_actions=tuple(recommended_actions),
         capital_alert=capital_alert,

@@ -1777,6 +1777,11 @@ class BalanceConfig:
     support_program_white_glove_breach_reputation_loss: int = 1
     support_program_priority_breach_pressure_gain: int = 1
     support_program_white_glove_breach_pressure_gain: int = 2
+    support_program_priority_severe_queue_churn_gain: int = 1
+    support_program_priority_severe_queue_renewal_loss: int = 1
+    support_program_white_glove_severe_queue_churn_gain: int = 2
+    support_program_white_glove_severe_queue_renewal_loss: int = 2
+    support_program_white_glove_severe_queue_expansion_loss: int = 1
     support_program_revenue_at_risk_contract_threshold: Decimal = Decimal("900.00")
     support_program_renewal_pressure_health_threshold: int = 54
     support_program_renewal_pressure_churn_threshold: int = 38
@@ -1866,6 +1871,10 @@ class BalanceConfig:
     commercial_pressure_channel_fatigue_threshold: int = 28
     commercial_pressure_channel_fatigue_board_penalty: int = 2
     commercial_pressure_channel_fatigue_confidence_loss: int = 1
+    commercial_pressure_service_tier_team_health_divisor: int = 2
+    commercial_pressure_channel_economics_threshold: int = 24
+    commercial_pressure_channel_economics_board_penalty: int = 1
+    commercial_pressure_channel_economics_profitability_loss: int = 2
     renewal_offer_cost: Decimal = Decimal("110.00")
     renewal_offer_discount_increase: Decimal = Decimal("0.0100")
     renewal_offer_health_gain: int = 8
@@ -2030,6 +2039,8 @@ class BalanceConfig:
     partnership_high_rev_share_fatigue_gain: int = 3
     partnership_high_fatigue_enablement_decay: int = 1
     partnership_high_fatigue_conflict_gain: int = 2
+    partnership_high_fatigue_rev_share_creep: Decimal = Decimal("0.0050")
+    partnership_recovery_rev_share_relief: Decimal = Decimal("0.0025")
     partnership_multi_channel_conflict_bonus: int = 2
     partnership_expand_mode_user_bonus: int = 2
     partnership_gtm_share_user_divisor: int = 20
@@ -2039,6 +2050,7 @@ class BalanceConfig:
     partnership_renegotiation_pressure_fatigue_divisor: int = 2
     partnership_renegotiation_pressure_rev_share_divisor: int = 5
     partnership_renegotiation_pressure_conflict_divisor: int = 4
+    partnership_rev_share_pressure_divisor: int = 2
     partnership_enablement_rev_share_relief: Decimal = Decimal("0.0100")
     partnership_min_rev_share_by_channel: dict[str, Decimal] = field(
         default_factory=lambda: {
@@ -2235,6 +2247,7 @@ class BalanceConfig:
     exit_support_fragility_premium_breach_weight: int = 3
     exit_channel_fragility_dependency_bonus: int = 6
     exit_channel_fragility_revenue_share_divisor: int = 8
+    exit_channel_fragility_rev_share_pressure_divisor: int = 2
     exit_board_reset_warning_weight: int = 8
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
