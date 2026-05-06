@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.41.0 - 2026-05-07
+
+- Deepened support-ops realism with high-value account risk tracking, recovery-ready account detection, SLA credit operating cost, and a recovery loop that can claw back satisfaction and renewal health when support operations stabilize
+- Expanded partnership and channel analytics with volatile revenue-share exposure, fatigue hotspot tracking, commercial dependency scoring, and stronger fatigue or recovery effects on partner-sourced user growth
+- Strengthened finance-planner guidance with commercial financing risk, capital-priority framing, and recommended recovery actions that now react to revenue-at-risk, renewal pressure, and channel volatility
+- Extended late-game pressure and exit evaluation with commercial fragility, capital fragility, strategic clarity, path-gap analysis, and new ending variants such as `Institutional Quality Listing`, `Capital-Disciplined Compounder`, and `Liquidity Containment Reset`
+- Tightened event and persistence hardening by making independence-reckoning capital-plan updates atomic and syncing post-turn event outcomes back into the latest turn-history snapshot
+- Promoted the package version to `0.41.0`
+
 ## 0.40.0 - 2026-05-06
 
 - Deepened org and people pressure so unmanaged teams, overloaded managers, and succession blind spots now feed attrition, morale, and performance drift during turn resolution

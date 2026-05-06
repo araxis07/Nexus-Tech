@@ -3589,10 +3589,12 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.enterprise_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.premium_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.white_glove_revenue_at_risk_value >= Decimal("1400.00")
+    assert summary.high_value_risk_accounts >= 0
     assert summary.renewal_pressure_accounts >= 1
     assert summary.renewal_pressure_value >= Decimal("1400.00")
     assert summary.white_glove_breach_accounts >= 1
     assert summary.severe_queue_accounts >= 1
+    assert summary.sla_credit_cost > Decimal("0.00")
     assert summary.service_tier_pressure >= 3
     assert summary.commercial_breach_pressure >= 2
     assert revenue_at_risk_accounts >= 1
@@ -3600,6 +3602,41 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert revenue_at_risk_value >= Decimal("1400.00")
     assert renewal_pressure_value >= Decimal("1400.00")
     assert state.customer_accounts[0].renewal_health < 46
+
+
+def test_support_program_recovery_loop_restores_healthy_accounts() -> None:
+    product = make_product("Recovery Desk", quality=72, bug_level=10, market_fit=68)
+    account = CustomerAccount(
+        name="Recovering Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2200.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=70,
+        onboarding_health=72,
+        support_load=18,
+        open_tickets=0,
+        sla_breach_risk=10,
+        renewal_health=68,
+        expansion_potential=62,
+        renewal_turn=8,
+        churn_risk=12,
+        ticket_queue_age=1,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("9800.00"))
+    state.support_program = SupportProgram(
+        knowledge_base_level=28,
+        automation_level=24,
+        backlog_queue=1,
+        staffing_level=2,
+    )
+
+    summary = apply_end_of_turn_support_program(state)
+
+    assert summary.recovery_ready_accounts >= 1
+    assert state.customer_accounts[0].satisfaction > 70
+    assert state.customer_accounts[0].renewal_health > 68
+    assert state.customer_accounts[0].churn_risk < 12
 
 
 def test_set_support_lane_focus_updates_program_bias() -> None:
@@ -5288,6 +5325,7 @@ def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
     assert evaluation.board_readout
     assert evaluation.pressure_readout
     assert len(evaluation.path_scorecard) == 4
+    assert evaluation.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert evaluation.next_chapter
     assert evaluation.outcome in {
         ExitOutcome.IPO_READY,
@@ -5356,6 +5394,8 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
     assert planner.tradeoff_note
     assert planner.liquidity_risk
     assert planner.execution_drag
+    assert planner.commercial_financing_risk
+    assert planner.capital_priority
     assert len(planner.scenario_compare) == 3
     assert planner.action_sequence
     assert planner.allocation_actions
@@ -5396,6 +5436,50 @@ def test_finance_planner_recommends_funding_actions_under_reserve_stress() -> No
         "liquidity needs active monitoring",
         "liquidity is controlled",
     }
+
+
+def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
+    state = make_state(
+        make_product("Capital Stress"),
+        cash_on_hand=Decimal("3800.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.ANGEL,
+            reserve_target=Decimal("5200.00"),
+            product_investment_share=30,
+            go_to_market_share=45,
+            reserve_share=25,
+        ),
+    )
+    state.finance.covenant_risk = 18
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-680.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=16,
+        support_escalations=5,
+        revenue_at_risk_value=Decimal("4200.00"),
+        renewal_pressure_value=Decimal("2600.00"),
+        channel_conflict_index=30,
+        channel_dependency_risk=58,
+        commercial_dependency_score=72,
+        volatile_revenue_share_percent=44,
+    )
+
+    assert planner.commercial_financing_risk in {
+        "commercial exposure is large enough to distort funding quality.",
+        "commercial strain is now shaping which capital sources remain credible.",
+    }
+    assert planner.capital_priority in {
+        "protect reserve first",
+        "stabilize service revenue",
+        "de-risk channel mix",
+        "hold balanced execution",
+    }
+    assert "triage_support_backlog" in planner.recommended_actions
+    assert "invest_in_partner_enablement" in planner.recommended_actions
 
 
 def test_bridge_round_event_applies_cash_and_dilution() -> None:
@@ -5573,8 +5657,11 @@ def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None
 
     assert pressure.support_fragility > 0
     assert pressure.channel_fragility > 0
+    assert pressure.commercial_fragility > 0
+    assert pressure.capital_fragility > 0
     assert pressure.board_reset_risk > 0
     assert len(pressure.path_scorecard) == 4
+    assert pressure.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert pressure.restructure_heat >= pressure.board_reset_risk // 3
 
 
@@ -5801,9 +5888,12 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.weighted_rev_share_percent >= 21
     assert summary.fatigued_revenue_share_percent >= 0
     assert summary.recovery_revenue_share_percent >= 0
+    assert summary.volatile_revenue_share_percent >= 0
     assert summary.concentration_risk >= 0
     assert summary.renegotiation_pressure >= 0
     assert summary.rev_share_pressure >= 0
+    assert summary.fatigue_hotspot_count >= 0
+    assert summary.commercial_dependency_score >= 0
     assert summary.hotspot_channel in {"reseller", "marketplace"}
     assert summary.channel_mix_note
 
@@ -5845,6 +5935,8 @@ def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk(
     assert summary.renegotiation_ready_count >= 1
     assert summary.weighted_rev_share_percent > 0
     assert summary.rev_share_pressure > 0
+    assert summary.volatile_revenue_share_percent > 0
+    assert summary.commercial_dependency_score > 0
     assert summary.hotspot_channel in {"reseller", "marketplace"}
 
 
@@ -5908,6 +6000,37 @@ def test_long_run_standard_progression_is_seed_stable() -> None:
         )
 
     assert run_once(91) == run_once(91)
+
+
+def test_forty_turn_founder_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, int]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="campaign_ladder_climb",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(40):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.support_program.backlog_queue,
+            len(state.partnerships),
+            len(state.turn_history),
+        )
+
+    assert run_once(143) == run_once(143)
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:

@@ -66,9 +66,12 @@ class PartnershipPortfolioSummary:
     weighted_rev_share_percent: int
     fatigued_revenue_share_percent: int
     recovery_revenue_share_percent: int
+    volatile_revenue_share_percent: int
     concentration_risk: int
     renegotiation_pressure: int
     rev_share_pressure: int
+    fatigue_hotspot_count: int
+    commercial_dependency_score: int
     hotspot_channel: str
     channel_mix_note: str
     summary: str
@@ -354,6 +357,7 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
         capital_bonus += (
             state.capital_plan.go_to_market_share // BALANCE.partnership_gtm_share_user_divisor
         )
+        opening_fatigue = calculate_partnership_fatigue(state, partnership)
         user_gain = max(
             0,
             BALANCE.partnership_base_user_gain_by_channel[partnership.channel.value]
@@ -363,6 +367,10 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
             + capital_bonus
             - (product.bug_level // BALANCE.partnership_bug_user_penalty_divisor)
             - (partnership.conflict_pressure // 25),
+        )
+        user_gain = max(
+            0,
+            user_gain - (opening_fatigue // BALANCE.partnership_fatigue_user_penalty_divisor),
         )
         if neglected_turns > BALANCE.partnership_neglect_turn_threshold:
             user_gain = max(
@@ -499,6 +507,8 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
                     partnership.rev_share_rate - BALANCE.partnership_recovery_rev_share_relief
                 ),
             )
+            if fatigue <= BALANCE.partnership_recovery_resume_threshold:
+                partnership.quality = clamp_int(partnership.quality + 1)
         if (
             partnership.risk >= BALANCE.partnership_pause_threshold
             or partnership.conflict_pressure >= BALANCE.partnership_pause_threshold
@@ -522,6 +532,12 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
             partnership.status = PartnershipStatus.STRAINED
         else:
             partnership.status = PartnershipStatus.ACTIVE
+
+        if (
+            partnership.status is PartnershipStatus.STRAINED
+            and fatigue >= BALANCE.partnership_fatigue_strained_threshold
+        ):
+            partnership.quality = clamp_int(partnership.quality - 1)
 
         if partnership.status is PartnershipStatus.STRAINED:
             reputation_delta -= BALANCE.partnership_strained_reputation_loss
@@ -581,9 +597,12 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             weighted_rev_share_percent=0,
             fatigued_revenue_share_percent=0,
             recovery_revenue_share_percent=0,
+            volatile_revenue_share_percent=0,
             concentration_risk=0,
             renegotiation_pressure=0,
             rev_share_pressure=0,
+            fatigue_hotspot_count=0,
+            commercial_dependency_score=0,
             hotspot_channel="-",
             channel_mix_note="No active channel portfolio yet.",
             summary="No active channel portfolio yet.",
@@ -696,6 +715,22 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         if sourced_revenue > ZERO_MONEY
         else 0
     )
+    volatile_revenue = quantize_money(
+        sum(
+            (
+                partnership.sourced_revenue
+                for partnership, fatigue in zip(state.partnerships, fatigue_scores, strict=False)
+                if partnership.status in {PartnershipStatus.STRAINED, PartnershipStatus.RECOVERY}
+                or fatigue >= BALANCE.partnership_fatigue_strained_threshold
+            ),
+            ZERO_MONEY,
+        )
+    )
+    volatile_revenue_share_percent = (
+        int((volatile_revenue / sourced_revenue * Decimal("100")).to_integral_value())
+        if sourced_revenue > ZERO_MONEY
+        else 0
+    )
     direct_sales_conflict_accounts = sum(
         1
         for account in state.customer_accounts
@@ -718,6 +753,12 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         )
         if state.partnerships
         else 0
+    )
+    fatigue_hotspot_count = sum(
+        1
+        for partnership, fatigue in zip(state.partnerships, fatigue_scores, strict=False)
+        if partnership.sourced_revenue > ZERO_MONEY
+        and fatigue >= BALANCE.partnership_fatigue_strained_threshold
     )
     channel_scores = {
         channel: 0 for channel in {partnership.channel.value for partnership in state.partnerships}
@@ -761,6 +802,13 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         + renegotiation_ready_count
         + (fatigued_revenue_share_percent // 10)
     )
+    commercial_dependency_score = clamp_int(
+        channel_dependency_risk
+        + (concentration_risk // 2)
+        + (rev_share_pressure // BALANCE.partnership_commercial_dependency_rev_share_divisor)
+        + (volatile_revenue_share_percent // BALANCE.partnership_channel_volatility_share_divisor)
+        + (fatigue_hotspot_count * BALANCE.partnership_channel_volatility_hotspot_bonus)
+    )
     if hotspot_channel == "marketplace":
         channel_mix_note = (
             "Marketplace exposure is the sharpest source of current channel friction."
@@ -769,7 +817,15 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         channel_mix_note = "Integration commitments are the main source of channel execution drag."
     else:
         channel_mix_note = "Reseller overlap is now the main commercial pressure inside channels."
-    if paused_count > 0:
+    if commercial_dependency_score >= 70:
+        summary = (
+            "Channel economics are now concentrated enough to threaten the whole go-to-market mix."
+        )
+    elif volatile_revenue_share_percent >= 40:
+        summary = (
+            "A large share of partner revenue now sits inside strained or recovering channels."
+        )
+    elif paused_count > 0:
         summary = "Some channels are paused and need deliberate recovery before they can scale."
     elif concentration_risk >= 60:
         summary = "Channel revenue is getting concentrated and direct-sales overlap is rising."
@@ -805,9 +861,12 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         weighted_rev_share_percent=weighted_rev_share_percent,
         fatigued_revenue_share_percent=fatigued_revenue_share_percent,
         recovery_revenue_share_percent=recovery_revenue_share_percent,
+        volatile_revenue_share_percent=volatile_revenue_share_percent,
         concentration_risk=concentration_risk,
         renegotiation_pressure=renegotiation_pressure,
         rev_share_pressure=rev_share_pressure,
+        fatigue_hotspot_count=fatigue_hotspot_count,
+        commercial_dependency_score=commercial_dependency_score,
         hotspot_channel=hotspot_channel,
         channel_mix_note=channel_mix_note,
         summary=summary,

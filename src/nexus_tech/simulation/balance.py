@@ -1802,6 +1802,15 @@ class BalanceConfig:
     support_program_white_glove_severe_queue_churn_gain: int = 2
     support_program_white_glove_severe_queue_renewal_loss: int = 2
     support_program_white_glove_severe_queue_expansion_loss: int = 1
+    support_program_high_value_contract_threshold: Decimal = Decimal("1800.00")
+    support_program_recovery_backlog_threshold: int = 4
+    support_program_recovery_queue_age_max: int = 3
+    support_program_recovery_satisfaction_gain: int = 2
+    support_program_recovery_renewal_health_gain: int = 2
+    support_program_recovery_churn_relief: int = 3
+    support_program_recovery_expansion_gain: int = 1
+    support_program_service_cost_per_priority_sla_credit: Decimal = Decimal("22.00")
+    support_program_service_cost_per_white_glove_sla_credit: Decimal = Decimal("48.00")
     support_program_revenue_at_risk_contract_threshold: Decimal = Decimal("900.00")
     support_program_renewal_pressure_health_threshold: int = 54
     support_program_renewal_pressure_churn_threshold: int = 38
@@ -1892,6 +1901,10 @@ class BalanceConfig:
     commercial_pressure_channel_fatigue_board_penalty: int = 2
     commercial_pressure_channel_fatigue_confidence_loss: int = 1
     commercial_pressure_service_tier_team_health_divisor: int = 2
+    commercial_pressure_high_value_risk_board_penalty: int = 2
+    commercial_pressure_high_value_risk_confidence_loss: int = 1
+    commercial_pressure_channel_volatility_threshold: int = 34
+    commercial_pressure_channel_volatility_board_penalty: int = 2
     commercial_pressure_channel_economics_threshold: int = 24
     commercial_pressure_channel_economics_board_penalty: int = 1
     commercial_pressure_channel_economics_profitability_loss: int = 2
@@ -2057,6 +2070,7 @@ class BalanceConfig:
     partnership_direct_sales_conflict_enterprise_bonus: int = 2
     partnership_high_rev_share_fatigue_threshold: Decimal = Decimal("0.2400")
     partnership_high_rev_share_fatigue_gain: int = 3
+    partnership_fatigue_user_penalty_divisor: int = 12
     partnership_high_fatigue_enablement_decay: int = 1
     partnership_high_fatigue_conflict_gain: int = 2
     partnership_high_fatigue_rev_share_creep: Decimal = Decimal("0.0050")
@@ -2071,6 +2085,10 @@ class BalanceConfig:
     partnership_renegotiation_pressure_rev_share_divisor: int = 5
     partnership_renegotiation_pressure_conflict_divisor: int = 4
     partnership_rev_share_pressure_divisor: int = 2
+    partnership_channel_volatility_conflict_divisor: int = 3
+    partnership_channel_volatility_share_divisor: int = 4
+    partnership_channel_volatility_hotspot_bonus: int = 6
+    partnership_commercial_dependency_rev_share_divisor: int = 2
     partnership_enablement_rev_share_relief: Decimal = Decimal("0.0100")
     partnership_min_rev_share_by_channel: dict[str, Decimal] = field(
         default_factory=lambda: {
@@ -2183,6 +2201,10 @@ class BalanceConfig:
     finance_forecast_aggressive_expand_bonus: Decimal = Decimal("0.0500")
     finance_forecast_aggressive_conserve_penalty: Decimal = Decimal("0.0200")
     finance_forecast_venture_volatility_drag: Decimal = Decimal("0.0300")
+    finance_planner_commercial_risk_value_divisor: Decimal = Decimal("1800.00")
+    finance_planner_commercial_risk_renewal_divisor: Decimal = Decimal("1600.00")
+    finance_planner_channel_volatility_threshold: int = 34
+    finance_planner_volatile_share_threshold: int = 32
 
     event_bridge_round_weight: int = 10
     event_bridge_round_cooldown: int = 7
@@ -2269,6 +2291,11 @@ class BalanceConfig:
     exit_channel_fragility_revenue_share_divisor: int = 8
     exit_channel_fragility_rev_share_pressure_divisor: int = 2
     exit_board_reset_warning_weight: int = 8
+    exit_commercial_fragility_support_divisor: int = 2
+    exit_commercial_fragility_channel_divisor: int = 2
+    exit_capital_fragility_debt_divisor: Decimal = Decimal("1600.00")
+    exit_capital_fragility_pressure_divisor: int = 2
+    exit_path_clarity_gap_threshold: int = 10
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

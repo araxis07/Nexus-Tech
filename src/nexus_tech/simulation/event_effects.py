@@ -71,6 +71,12 @@ def apply_pending_event_choice(
     result_text = handler(next_state, pending_event, option_id)
     next_state.company.game_over = is_game_over(next_state.company)
     next_state.pending_event = None
+    if next_state.turn_history and next_state.turn_history[-1].turn == pending_event.triggered_turn:
+        latest_entry = next_state.turn_history[-1]
+        latest_entry.cash_on_hand = next_state.company.cash_on_hand
+        latest_entry.reputation = next_state.company.reputation
+        latest_entry.total_users = sum(product.user_count for product in next_state.products)
+        latest_entry.headcount = len(next_state.employees)
 
     history_entry = EventHistoryEntry(
         event_id=pending_event.event_id,
@@ -2191,9 +2197,15 @@ def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_
         )
         product_shift = min(3, state.capital_plan.product_investment_share)
         gtm_shift = min(2, state.capital_plan.go_to_market_share)
-        state.capital_plan.product_investment_share -= product_shift
-        state.capital_plan.go_to_market_share -= gtm_shift
-        state.capital_plan.reserve_share += product_shift + gtm_shift
+        state.capital_plan = state.capital_plan.model_copy(
+            update={
+                "product_investment_share": (
+                    state.capital_plan.product_investment_share - product_shift
+                ),
+                "go_to_market_share": state.capital_plan.go_to_market_share - gtm_shift,
+                "reserve_share": (state.capital_plan.reserve_share + product_shift + gtm_shift),
+            }
+        )
         return (
             "You doubled down on independence discipline. Investor pressure "
             f"-{BALANCE.event_independence_reckoning_efficiency_pressure_relief}, covenant risk "

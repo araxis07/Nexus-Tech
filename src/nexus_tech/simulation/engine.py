@@ -1769,6 +1769,10 @@ def apply_end_of_turn_commercial_pressure(
     channel_fatigue_pressure = (
         portfolio.renegotiation_pressure >= BALANCE.commercial_pressure_channel_fatigue_threshold
     )
+    channel_volatility_pressure = (
+        portfolio.volatile_revenue_share_percent
+        >= BALANCE.commercial_pressure_channel_volatility_threshold
+    )
     channel_economics_pressure = (
         portfolio.rev_share_pressure >= BALANCE.commercial_pressure_channel_economics_threshold
     )
@@ -1782,8 +1786,21 @@ def apply_end_of_turn_commercial_pressure(
     if channel_fatigue_pressure:
         board_pressure_delta += BALANCE.commercial_pressure_channel_fatigue_board_penalty
         board_confidence_loss += BALANCE.commercial_pressure_channel_fatigue_confidence_loss
+    if channel_volatility_pressure:
+        board_pressure_delta += BALANCE.commercial_pressure_channel_volatility_board_penalty
     if channel_economics_pressure:
         board_pressure_delta += BALANCE.commercial_pressure_channel_economics_board_penalty
+    if support_summary.high_value_risk_accounts > 0:
+        board_pressure_delta += min(
+            4,
+            support_summary.high_value_risk_accounts
+            * BALANCE.commercial_pressure_high_value_risk_board_penalty,
+        )
+        board_confidence_loss += min(
+            3,
+            support_summary.high_value_risk_accounts
+            * BALANCE.commercial_pressure_high_value_risk_confidence_loss,
+        )
 
     if board_pressure_delta > 0:
         state.finance.board_pressure = clamp_int(
@@ -1852,6 +1869,10 @@ def apply_end_of_turn_commercial_pressure(
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 1
         )
+    if channel_volatility_pressure:
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score - 1
+        )
     if channel_economics_pressure:
         state.finance.board_profitability_score = clamp_int(
             state.finance.board_profitability_score
@@ -1885,6 +1906,11 @@ def apply_end_of_turn_commercial_pressure(
             f"{support_summary.severe_queue_accounts} high-touch accounts "
             "are still waiting too long"
         )
+    if support_summary.high_value_risk_accounts > 0:
+        summary_parts.append(
+            f"{support_summary.high_value_risk_accounts} high-value accounts "
+            "now need service recovery"
+        )
     if support_summary.lane_overflow_pressure > 0:
         summary_parts.append(
             f"support lanes overflowed by {support_summary.lane_overflow_pressure}"
@@ -1895,6 +1921,10 @@ def apply_end_of_turn_commercial_pressure(
         summary_parts.append(
             "partner fatigue now touches "
             f"{portfolio.fatigued_revenue_share_percent}% of channel revenue"
+        )
+    if channel_volatility_pressure:
+        summary_parts.append(
+            f"{portfolio.volatile_revenue_share_percent}% of partner revenue is now volatile"
         )
     if channel_economics_pressure:
         summary_parts.append(

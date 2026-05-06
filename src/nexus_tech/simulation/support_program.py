@@ -43,11 +43,14 @@ class SupportProgramSummary:
     enterprise_revenue_at_risk_value: Decimal
     premium_revenue_at_risk_value: Decimal
     white_glove_revenue_at_risk_value: Decimal
+    high_value_risk_accounts: int
     renewal_pressure_accounts: int
     renewal_pressure_value: Decimal
     priority_breach_accounts: int
     white_glove_breach_accounts: int
     severe_queue_accounts: int
+    recovery_ready_accounts: int
+    sla_credit_cost: Decimal
     service_tier_pressure: int
     commercial_breach_pressure: int
     dominant_lane: SupportLaneFocus
@@ -322,7 +325,7 @@ def apply_end_of_turn_support_program(
     state.support_program.onboarding_ticket_pressure = onboarding_ticket_pressure
     state.support_program.enterprise_ticket_pressure = enterprise_ticket_pressure
     state.support_program.billing_ticket_pressure = billing_ticket_pressure
-    service_cost = quantize_money(
+    base_service_cost = quantize_money(
         (Decimal(total_open_tickets) * BALANCE.support_program_service_cost_per_ticket)
         + (
             Decimal(state.support_program.escalation_queue)
@@ -354,7 +357,6 @@ def apply_end_of_turn_support_program(
             * BALANCE.support_program_service_cost_per_white_glove_account
         )
     )
-    state.support_program.service_cost_last_turn = service_cost
 
     reputation_delta = 0
     morale_penalty = 0
@@ -480,6 +482,7 @@ def apply_end_of_turn_support_program(
             sla_target=state.support_program.sla_target,
         )
     )
+    recovery_ready_accounts = 0
     service_tier_pressure = (
         priority_breach_accounts + (white_glove_breach_accounts * 2) + severe_queue_accounts
     )
@@ -532,6 +535,68 @@ def apply_end_of_turn_support_program(
                         account.expansion_potential
                         - BALANCE.support_program_white_glove_severe_queue_expansion_loss
                     )
+    support_recovery_window = (
+        focus_mismatch_penalty == 0
+        and lane_overflow_pressure == 0
+        and state.support_program.backlog_queue
+        <= BALANCE.support_program_recovery_backlog_threshold
+    )
+    if support_recovery_window:
+        for account in active_accounts:
+            if not _is_support_recovery_ready_account(
+                account,
+                sla_target=state.support_program.sla_target,
+            ):
+                continue
+            recovery_ready_accounts += 1
+            account.satisfaction = clamp_int(
+                account.satisfaction + BALANCE.support_program_recovery_satisfaction_gain
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health + BALANCE.support_program_recovery_renewal_health_gain
+            )
+            account.churn_risk = clamp_int(
+                account.churn_risk - BALANCE.support_program_recovery_churn_relief
+            )
+            account.ticket_queue_age = max(0, account.ticket_queue_age - 1)
+            if account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}:
+                account.expansion_potential = clamp_int(
+                    account.expansion_potential + BALANCE.support_program_recovery_expansion_gain
+                )
+    else:
+        recovery_ready_accounts = sum(
+            1
+            for account in active_accounts
+            if _is_support_recovery_ready_account(
+                account,
+                sla_target=state.support_program.sla_target,
+            )
+        )
+    revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
+        state
+    )
+    revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
+    high_value_risk_accounts = sum(
+        1
+        for account in active_accounts
+        if account.contract_value >= BALANCE.support_program_high_value_contract_threshold
+        and _is_revenue_at_risk_account(
+            account,
+            sla_target=state.support_program.sla_target,
+        )
+    )
+    sla_credit_cost = quantize_money(
+        (
+            Decimal(priority_breach_accounts)
+            * BALANCE.support_program_service_cost_per_priority_sla_credit
+        )
+        + (
+            Decimal(white_glove_breach_accounts)
+            * BALANCE.support_program_service_cost_per_white_glove_sla_credit
+        )
+    )
+    service_cost = quantize_money(base_service_cost + sla_credit_cost)
+    state.support_program.service_cost_last_turn = service_cost
     if white_glove_breach_accounts > 0:
         reputation_delta -= BALANCE.support_program_white_glove_breach_reputation_loss
     if (
@@ -556,6 +621,10 @@ def apply_end_of_turn_support_program(
         )
     elif dominant_lane is SupportLaneFocus.BILLING:
         summary = "Support is stable, but billing queues are now the main post-sale pressure."
+    elif recovery_ready_accounts > 0 and support_recovery_window:
+        summary = (
+            f"Support recovery is rebuilding trust across {recovery_ready_accounts} account(s)."
+        )
     elif severe_queue_accounts > 0:
         summary = (
             "High-touch accounts are waiting too long. Support promises are now "
@@ -591,11 +660,14 @@ def apply_end_of_turn_support_program(
         enterprise_revenue_at_risk_value=enterprise_revenue_at_risk_value,
         premium_revenue_at_risk_value=premium_revenue_at_risk_value,
         white_glove_revenue_at_risk_value=white_glove_revenue_at_risk_value,
+        high_value_risk_accounts=high_value_risk_accounts,
         renewal_pressure_accounts=renewal_pressure_accounts,
         renewal_pressure_value=renewal_pressure_value,
         priority_breach_accounts=priority_breach_accounts,
         white_glove_breach_accounts=white_glove_breach_accounts,
         severe_queue_accounts=severe_queue_accounts,
+        recovery_ready_accounts=recovery_ready_accounts,
+        sla_credit_cost=sla_credit_cost,
         service_tier_pressure=service_tier_pressure,
         commercial_breach_pressure=commercial_breach_pressure,
         dominant_lane=dominant_lane,
@@ -950,6 +1022,15 @@ def _is_severe_queue_account(
         account.ticket_queue_age >= queue_age_threshold + 1
         or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
         or account.sla_breach_risk >= sla_target
+    )
+
+
+def _is_support_recovery_ready_account(account: CustomerAccount, *, sla_target: int) -> bool:
+    return (
+        account.open_tickets == 0
+        and account.sla_breach_risk < max(1, sla_target // 2)
+        and account.ticket_queue_age <= BALANCE.support_program_recovery_queue_age_max
+        and (account.satisfaction < 78 or account.renewal_health < 78 or account.churn_risk > 0)
     )
 
 

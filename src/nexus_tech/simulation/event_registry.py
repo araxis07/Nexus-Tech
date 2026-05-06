@@ -1872,8 +1872,11 @@ def _is_independence_reckoning_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
-        and pressure.independence_discipline
-        >= BALANCE.event_independence_reckoning_pressure_threshold
+        and (
+            pressure.independence_discipline
+            >= BALANCE.event_independence_reckoning_pressure_threshold
+            or pressure.capital_fragility >= BALANCE.event_independence_reckoning_pressure_threshold
+        )
         and not _has_recent_event(
             state,
             {"capital_market_freeze", "bridge_round"},
@@ -2025,6 +2028,7 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         or state.support_program.escalation_queue
         >= BALANCE.event_support_meltdown_escalation_threshold
         or pressure.support_fragility >= BALANCE.event_support_meltdown_fragility_threshold
+        or pressure.commercial_fragility >= BALANCE.event_support_meltdown_fragility_threshold
         or premium_breach_accounts
     )
 
@@ -2182,6 +2186,8 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             >= BALANCE.event_partner_breakdown_channel_fragility_threshold
             or portfolio.concentration_risk >= 55
             or portfolio.rev_share_pressure >= 28
+            or portfolio.commercial_dependency_score >= 68
+            or portfolio.volatile_revenue_share_percent >= 40
         )
         for partnership in state.partnerships
     )

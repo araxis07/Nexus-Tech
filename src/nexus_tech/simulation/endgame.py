@@ -39,10 +39,14 @@ class EndgamePressureSummary:
     restructure_heat: int
     support_fragility: int
     channel_fragility: int
+    commercial_fragility: int
+    capital_fragility: int
     board_reset_risk: int
     dominant_pressure: str
     active_pressures: tuple[str, ...]
     path_scorecard: tuple[str, ...]
+    path_gap: int
+    strategic_clarity: str
     recommendation: str
     summary: str
 
@@ -60,6 +64,7 @@ class ExitEvaluation:
     board_readout: str
     pressure_readout: str
     path_scorecard: tuple[str, ...]
+    strategic_clarity: str
     next_chapter: str
     outcome_tags: tuple[str, ...]
     readiness: EndgameReadiness
@@ -256,12 +261,44 @@ def calculate_endgame_pressure(
         + (6 if state.finance.board_resolution_due else 0)
         + (board_reset_risk // 3)
     )
+    commercial_fragility = _clamp_readiness(
+        (support_fragility // BALANCE.exit_commercial_fragility_support_divisor)
+        + (channel_fragility // BALANCE.exit_commercial_fragility_channel_divisor)
+        + (revenue_at_risk_accounts * 2)
+        + (portfolio.volatile_revenue_share_percent // 6)
+    )
+    capital_fragility = _clamp_readiness(
+        independence_discipline
+        + (board_reset_risk // BALANCE.exit_capital_fragility_pressure_divisor)
+        + int(
+            (
+                state.finance.debt_principal / BALANCE.exit_capital_fragility_debt_divisor
+            ).to_integral_value()
+        )
+        + reserve_gap_units
+    )
     pressure_scores = {
         "public_market_scrutiny": public_market_scrutiny,
         "acquirer_diligence": acquirer_diligence,
         "independence_discipline": independence_discipline,
         "restructure_heat": restructure_heat,
     }
+    sorted_readiness = sorted(
+        (
+            ("ipo_ready", readiness.ipo_readiness_score),
+            ("strategic_acquisition", readiness.acquisition_interest_score),
+            ("profitable_independence", readiness.independence_score),
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    path_gap = sorted_readiness[0][1] - sorted_readiness[1][1]
+    if path_gap >= BALANCE.exit_path_clarity_gap_threshold and commercial_fragility <= 34:
+        strategic_clarity = "clear path"
+    elif path_gap >= BALANCE.exit_path_clarity_gap_threshold:
+        strategic_clarity = "clear but stressed"
+    else:
+        strategic_clarity = "contested"
     dominant_pressure = max(pressure_scores, key=pressure_scores.get)
     active_pressures = tuple(
         pressure_name
@@ -274,6 +311,20 @@ def calculate_endgame_pressure(
             "and rebuild conviction fast."
         )
         summary = "Governance and operating strain are now close to forcing a board-led reset."
+    elif commercial_fragility >= 70:
+        recommendation = (
+            "Commercial fragility is now the main late-game constraint. "
+            "Fix support promises and de-risk channel revenue before scaling again."
+        )
+        summary = (
+            "Late-game pressure is now being driven by service and channel fragility together."
+        )
+    elif capital_fragility >= 66:
+        recommendation = (
+            "Capital fragility is now the main late-game constraint. "
+            "Tighten reserve discipline before pursuing another scale step."
+        )
+        summary = "Late-game pressure is now driven by cash discipline, debt, and board heat."
     elif dominant_pressure == "public_market_scrutiny":
         recommendation = (
             "Tighten controls, reporting, and support quality before telling a bigger story."
@@ -314,8 +365,12 @@ def calculate_endgame_pressure(
         dominant_pressure=dominant_pressure,
         active_pressures=active_pressures,
         path_scorecard=path_scorecard,
+        path_gap=path_gap,
+        strategic_clarity=strategic_clarity,
         recommendation=recommendation,
         summary=summary,
+        commercial_fragility=commercial_fragility,
+        capital_fragility=capital_fragility,
     )
 
 
@@ -345,6 +400,21 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
     ):
         offer_value = quantize_money(adjusted_value * BALANCE.exit_ipo_value_multiplier)
         if (
+            pressure.commercial_fragility <= 18
+            and pressure.capital_fragility <= 16
+            and pressure.path_gap >= BALANCE.exit_path_clarity_gap_threshold
+        ):
+            ending_variant = "Institutional Quality Listing"
+            board_readout = (
+                "The board sees a public-market story backed by clean "
+                "commercial execution and capital control."
+            )
+            next_chapter = (
+                "Protect institutional discipline while scaling without "
+                "letting support or channels drift."
+            )
+            outcome_tags = ("ipo", "institutional", "capital")
+        elif (
             pressure.support_fragility <= 16
             and state.finance.board_reliability_score >= 78
             and score.key_accounts >= 2
@@ -410,6 +480,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
             readiness=readiness,
@@ -481,6 +552,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
             readiness=readiness,
@@ -490,7 +562,18 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         restructure_value = quantize_money(
             max(Decimal("0.00"), adjusted_value - BALANCE.exit_restructure_cash_threshold)
         )
-        if pressure.board_reset_risk >= 72:
+        if pressure.capital_fragility >= 72:
+            ending_variant = "Liquidity Containment Reset"
+            board_readout = (
+                "Directors now see cash discipline and operating strain "
+                "as one linked reset problem."
+            )
+            next_chapter = (
+                "Shrink burn, protect renewals, and rebuild the balance "
+                "sheet before chasing scale again."
+            )
+            outcome_tags = ("restructure", "liquidity", "containment")
+        elif pressure.board_reset_risk >= 72:
             ending_variant = "Board Reset Mandate"
             board_readout = (
                 "Directors have moved from warnings to reset logic "
@@ -545,6 +628,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
             readiness=readiness,
@@ -552,6 +636,20 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
 
     if state.company.cash_on_hand >= BALANCE.exit_independence_cash_threshold:
         if (
+            pressure.capital_fragility <= 18
+            and pressure.path_gap >= BALANCE.exit_path_clarity_gap_threshold
+            and reserve_target_met
+        ):
+            ending_variant = "Capital-Disciplined Compounder"
+            board_readout = (
+                "Leadership earned independence by pairing reserve control "
+                "with a clean strategic path."
+            )
+            next_chapter = (
+                "Compound the strongest customer motions without letting capital posture drift."
+            )
+            outcome_tags = ("independence", "capital", "clarity")
+        elif (
             reserve_target_met
             and state.finance.debt_principal <= Decimal("0.00")
             and state.finance.equity_dilution <= Decimal("0.1200")
@@ -609,6 +707,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
             readiness=readiness,
@@ -636,6 +735,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         ),
         pressure_readout=pressure_readout,
         path_scorecard=pressure.path_scorecard,
+        strategic_clarity=pressure.strategic_clarity,
         next_chapter="Reset the operating plan before chasing another scale phase.",
         outcome_tags=("restructure", "fragile", "reset"),
         readiness=readiness,

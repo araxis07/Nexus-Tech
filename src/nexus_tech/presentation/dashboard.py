@@ -2824,11 +2824,45 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Revenue at Risk", str(revenue_at_risk_accounts))
     table.add_row("Risk Value", format_money(revenue_at_risk_value))
     table.add_row("White-Glove Risk", format_money(white_glove_risk_value))
+    table.add_row(
+        "High-Value Risk",
+        str(
+            sum(
+                1
+                for account in state.customer_accounts
+                if account.status is not CustomerAccountStatus.CHURNED
+                and account.contract_value >= BALANCE.support_program_high_value_contract_threshold
+                and (
+                    account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold
+                    or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
+                    or account.sla_breach_risk >= state.support_program.sla_target
+                )
+            )
+        ),
+    )
     table.add_row("Renewal Pressure", str(renewal_pressure_accounts))
     table.add_row("Renewal Value", format_money(renewal_pressure_value))
     table.add_row("Priority Breach", str(priority_breach_accounts))
     table.add_row("White-Glove Breach", str(white_glove_breach_accounts))
     table.add_row("Severe Queue", str(severe_queue_accounts))
+    table.add_row(
+        "Recovery Ready",
+        str(
+            sum(
+                1
+                for account in state.customer_accounts
+                if account.status is not CustomerAccountStatus.CHURNED
+                and account.open_tickets == 0
+                and account.sla_breach_risk < max(1, state.support_program.sla_target // 2)
+                and account.ticket_queue_age <= BALANCE.support_program_recovery_queue_age_max
+                and (
+                    account.satisfaction < 78
+                    or account.renewal_health < 78
+                    or account.churn_risk > 0
+                )
+            )
+        ),
+    )
     table.add_row(
         "Lane Cap",
         (
@@ -2864,6 +2898,19 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Resolved", str(state.support_program.resolved_last_turn))
     table.add_row("Deflection", str(state.support_program.deflection_score))
     table.add_row("SLA Breaches", str(state.support_program.sla_breaches_last_turn))
+    table.add_row(
+        "SLA Credit Cost",
+        format_money(
+            (
+                Decimal(priority_breach_accounts)
+                * BALANCE.support_program_service_cost_per_priority_sla_credit
+            )
+            + (
+                Decimal(white_glove_breach_accounts)
+                * BALANCE.support_program_service_cost_per_white_glove_sla_credit
+            )
+        ),
+    )
     table.add_row("Service Cost", format_money(state.support_program.service_cost_last_turn))
     table.add_row("Escalations", str(escalating_accounts))
     return Panel(table, title="Support Program", border_style="green", expand=True)
@@ -2889,8 +2936,12 @@ def _build_late_game_panel(state: GameState) -> Panel:
     table.add_row("Burnout Mod", str(late_game.burnout_modifier))
     table.add_row("Support Fragility", str(pressure.support_fragility))
     table.add_row("Channel Fragility", str(pressure.channel_fragility))
+    table.add_row("Commercial Frag", str(pressure.commercial_fragility))
+    table.add_row("Capital Frag", str(pressure.capital_fragility))
     table.add_row("Reset Risk", str(pressure.board_reset_risk))
     table.add_row("Pressure Path", pressure.dominant_pressure.replace("_", " "))
+    table.add_row("Clarity", pressure.strategic_clarity)
+    table.add_row("Path Gap", str(pressure.path_gap))
     table.add_row("Scorecard", " | ".join(pressure.path_scorecard[:2]))
     table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
     table.add_row("State", late_game.summary)
@@ -2900,6 +2951,7 @@ def _build_late_game_panel(state: GameState) -> Panel:
 def _build_finance_panel(state: GameState) -> Panel:
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
     portfolio = calculate_partnership_portfolio(state)
+    revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
     base_forecast, conservative_forecast, aggressive_forecast = (
         calculate_cash_flow_forecast_scenarios(
             state.company.cash_on_hand,
@@ -2922,8 +2974,12 @@ def _build_finance_panel(state: GameState) -> Panel:
         capital_plan=state.capital_plan,
         support_backlog=state.support_program.backlog_queue,
         support_escalations=state.support_program.escalation_queue,
+        revenue_at_risk_value=revenue_at_risk_value,
+        renewal_pressure_value=renewal_pressure_value,
         channel_conflict_index=portfolio.channel_conflict_index,
         channel_dependency_risk=portfolio.channel_dependency_risk,
+        commercial_dependency_score=portfolio.commercial_dependency_score,
+        volatile_revenue_share_percent=portfolio.volatile_revenue_share_percent,
     )
     table = Table.grid(padding=(0, 1))
     table.add_row("Debt", format_money(state.finance.debt_principal))
@@ -3000,6 +3056,8 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Tradeoff", planner.tradeoff_note)
     table.add_row("Liquidity Risk", planner.liquidity_risk)
     table.add_row("Exec Drag", planner.execution_drag)
+    table.add_row("Comm Risk", planner.commercial_financing_risk)
+    table.add_row("Priority", planner.capital_priority)
     table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
     table.add_row("Action Seq", " | ".join(planner.action_sequence))
     table.add_row("Alloc Actions", " | ".join(planner.allocation_actions))
@@ -3093,11 +3151,14 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Direct Conflict", str(portfolio.direct_sales_conflict_accounts))
         table.add_row("Fatigued Rev Share", f"{portfolio.fatigued_revenue_share_percent}%")
         table.add_row("Recovery Rev Share", f"{portfolio.recovery_revenue_share_percent}%")
+        table.add_row("Volatile Rev Share", f"{portfolio.volatile_revenue_share_percent}%")
         table.add_row("Concentration", str(portfolio.concentration_risk))
         table.add_row("Renegotiate P", str(portfolio.renegotiation_pressure))
         table.add_row("Rev Share P", str(portfolio.rev_share_pressure))
+        table.add_row("Fatigue Hotspots", str(portfolio.fatigue_hotspot_count))
         table.add_row("Hotspot", portfolio.hotspot_channel)
         table.add_row("Dependency Risk", str(portfolio.channel_dependency_risk))
+        table.add_row("Comm Dependency", str(portfolio.commercial_dependency_score))
         table.add_row("Mix Note", portfolio.channel_mix_note)
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)

@@ -79,6 +79,8 @@ class FinancePlannerSnapshot:
     tradeoff_note: str
     liquidity_risk: str
     execution_drag: str
+    commercial_financing_risk: str
+    capital_priority: str
     scenario_compare: tuple[str, ...]
     action_sequence: tuple[str, ...]
     allocation_actions: tuple[str, ...]
@@ -220,8 +222,12 @@ def build_finance_planner(
     capital_plan: CapitalPlan,
     support_backlog: int = 0,
     support_escalations: int = 0,
+    revenue_at_risk_value: Decimal = ZERO_MONEY,
+    renewal_pressure_value: Decimal = ZERO_MONEY,
     channel_conflict_index: int = 0,
     channel_dependency_risk: int = 0,
+    commercial_dependency_score: int = 0,
+    volatile_revenue_share_percent: int = 0,
 ) -> FinancePlannerSnapshot:
     """Project end-cash and reserve stress over the active planning horizon."""
 
@@ -424,6 +430,46 @@ def build_finance_planner(
     else:
         execution_drag = "execution drag is currently contained."
 
+    commercial_risk_score = (
+        int(
+            (
+                revenue_at_risk_value / BALANCE.finance_planner_commercial_risk_value_divisor
+            ).to_integral_value()
+        )
+        + int(
+            (
+                renewal_pressure_value / BALANCE.finance_planner_commercial_risk_renewal_divisor
+            ).to_integral_value()
+        )
+        + (commercial_dependency_score // 4)
+        + (volatile_revenue_share_percent // 10)
+    )
+    if commercial_risk_score >= 18 or revenue_at_risk_value >= Decimal("5000.00"):
+        commercial_financing_risk = (
+            "commercial exposure is large enough to distort funding quality."
+        )
+    elif (
+        commercial_risk_score >= 10
+        or commercial_dependency_score >= BALANCE.finance_planner_channel_volatility_threshold
+    ):
+        commercial_financing_risk = (
+            "commercial strain is now shaping which capital sources remain credible."
+        )
+    else:
+        commercial_financing_risk = "commercial exposure is not yet dominating financing options."
+
+    if reserve_break_risk in {"critical", "high"}:
+        capital_priority = "protect reserve first"
+    elif revenue_at_risk_value > renewal_pressure_value and revenue_at_risk_value > ZERO_MONEY:
+        capital_priority = "stabilize service revenue"
+    elif (
+        commercial_dependency_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        capital_priority = "de-risk channel mix"
+    else:
+        capital_priority = "hold balanced execution"
+
     scenario_compare = (
         f"Base ends at {format_money(base_end_cash)}.",
         (
@@ -458,6 +504,10 @@ def build_finance_planner(
         recommended_actions.append("repay_debt")
     if reserve_gap < ZERO_MONEY or conservative_hit_turn is not None:
         recommended_actions.append("set_capital_plan")
+    if support_backlog >= 12 or support_escalations >= 4:
+        recommended_actions.append("triage_support_backlog")
+    if revenue_at_risk_value >= Decimal("2400.00"):
+        recommended_actions.append("invest_in_support_staffing")
     if (
         reserve_gap < ZERO_MONEY
         and capital_plan.source_preference.value == "debt"
@@ -468,6 +518,13 @@ def build_finance_planner(
         recommended_actions.append("raise_angel")
     if reserve_gap < ZERO_MONEY and capital_plan.source_preference.value == "venture":
         recommended_actions.append("raise_vc")
+    if (
+        commercial_dependency_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        recommended_actions.append("invest_in_partner_enablement")
+    if channel_conflict_index >= 30:
+        recommended_actions.append("renegotiate_partnership")
     if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
         recommended_actions.append("execute_board_response")
     if not recommended_actions:
@@ -484,6 +541,13 @@ def build_finance_planner(
         action_sequence.append("de-risk channel mix before accelerating go-to-market")
     if finance.investor_pressure >= 28:
         action_sequence.append("prepare a board-facing capital response")
+    if commercial_risk_score >= 10:
+        action_sequence.append("treat renewals and support stability as a capital prerequisite")
+    if (
+        commercial_dependency_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        action_sequence.append("reduce volatile channel revenue before leaning on outside capital")
     if not action_sequence:
         action_sequence.append("hold posture and review the next planning window")
 
@@ -511,6 +575,8 @@ def build_finance_planner(
         tradeoff_note=tradeoff_note,
         liquidity_risk=liquidity_risk,
         execution_drag=execution_drag,
+        commercial_financing_risk=commercial_financing_risk,
+        capital_priority=capital_priority,
         scenario_compare=scenario_compare,
         action_sequence=tuple(action_sequence),
         allocation_actions=tuple(allocation_actions),
