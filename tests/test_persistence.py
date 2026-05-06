@@ -853,6 +853,36 @@ def test_save_then_load_round_trip_after_multi_turn_progression(tmp_path: Path) 
     assert loaded.rng.randint(1, 100) == expected_next_roll
 
 
+def test_save_then_load_round_trip_after_extended_late_game_progression(tmp_path: Path) -> None:
+    db_path = tmp_path / "extended-late-game-round-trip.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    state = make_state()
+    state.company.current_turn = 10
+    state.finance.board_pressure = 18
+    state.finance.restructuring_pressure = 6
+    state.support_program.backlog_queue = 10
+    state.support_program.escalation_queue = 3
+    rng = RandomSource(seed=67)
+
+    for _ in range(10):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            state = resolve_pending_event(state, state.pending_event.options[0].id).state
+        if state.company.game_over or state.victory_achieved:
+            break
+
+    coordinator.save_game(DEFAULT_SAVE_SLOT, state, rng)
+    expected_next_roll = rng.randint(1, 100)
+
+    loaded = coordinator.load_game(DEFAULT_SAVE_SLOT)
+
+    assert loaded.state.company.current_turn >= 11
+    assert len(loaded.state.turn_history) >= 4
+    assert loaded.state.model_dump() == state.model_dump()
+    assert loaded.rng.randint(1, 100) == expected_next_roll
+
+
 def test_save_then_load_round_trip_preserves_recovery_partnership_state(tmp_path: Path) -> None:
     db_path = tmp_path / "partnership-recovery.db"
     coordinator = SaveLoadCoordinator(db_path)

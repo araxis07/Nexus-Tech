@@ -176,30 +176,42 @@ class CustomerAccountRepository:
                 support_tier=SupportTier(row["support_tier"] or "standard"),
                 contract_cadence=ContractCadence(row["contract_cadence"] or "annual"),
                 billing_model=ContractBillingModel(row["billing_model"] or "flat"),
-                seat_count=row["seat_count"] or 0,
-                usage_units=row["usage_units"] or 0,
-                add_on_count=row["add_on_count"] or 0,
+                seat_count=row["seat_count"] if row["seat_count"] is not None else 0,
+                usage_units=row["usage_units"] if row["usage_units"] is not None else 0,
+                add_on_count=row["add_on_count"] if row["add_on_count"] is not None else 0,
                 annual_prepay=bool(row["annual_prepay"]),
                 discount_rate=Decimal(row["discount_rate"] or "0.0000"),
                 satisfaction=row["satisfaction"],
-                onboarding_health=row["onboarding_health"] or 60,
-                support_load=row["support_load"] or 20,
-                open_tickets=row["open_tickets"] or 0,
-                sla_breach_risk=row["sla_breach_risk"] or 0,
-                invoice_risk=row["invoice_risk"] or 0,
-                failed_payment_risk=row["failed_payment_risk"] or 0,
-                dunning_steps=row["dunning_steps"] or 0,
-                escalation_count=row["escalation_count"] or 0,
-                ticket_queue_age=row["ticket_queue_age"] or 0,
+                onboarding_health=(
+                    row["onboarding_health"] if row["onboarding_health"] is not None else 60
+                ),
+                support_load=row["support_load"] if row["support_load"] is not None else 20,
+                open_tickets=row["open_tickets"] if row["open_tickets"] is not None else 0,
+                sla_breach_risk=(
+                    row["sla_breach_risk"] if row["sla_breach_risk"] is not None else 0
+                ),
+                invoice_risk=row["invoice_risk"] if row["invoice_risk"] is not None else 0,
+                failed_payment_risk=(
+                    row["failed_payment_risk"] if row["failed_payment_risk"] is not None else 0
+                ),
+                dunning_steps=row["dunning_steps"] if row["dunning_steps"] is not None else 0,
+                escalation_count=(
+                    row["escalation_count"] if row["escalation_count"] is not None else 0
+                ),
+                ticket_queue_age=(
+                    row["ticket_queue_age"] if row["ticket_queue_age"] is not None else 0
+                ),
                 renewal_offer_active=bool(row["renewal_offer_active"]),
                 renewal_offer_type=(
                     RenewalOfferType(row["renewal_offer_type"])
                     if row["renewal_offer_type"]
                     else None
                 ),
-                win_back_attempts=row["win_back_attempts"] or 0,
+                win_back_attempts=(
+                    row["win_back_attempts"] if row["win_back_attempts"] is not None else 0
+                ),
                 expansion_potential=row["expansion_potential"],
-                renewal_health=row["renewal_health"] or 60,
+                renewal_health=row["renewal_health"] if row["renewal_health"] is not None else 60,
                 renewal_turn=row["renewal_turn"],
                 churn_risk=row["churn_risk"],
                 status=CustomerAccountStatus(row["status"]),

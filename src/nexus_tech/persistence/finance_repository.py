@@ -160,33 +160,65 @@ class FinanceRepository:
             board_confidence=(
                 row["board_confidence"] if row["board_confidence"] is not None else 55
             ),
-            covenant_risk=row["covenant_risk"] or 0,
-            missed_board_targets=row["missed_board_targets"] or 0,
+            covenant_risk=row["covenant_risk"] if row["covenant_risk"] is not None else 0,
+            missed_board_targets=(
+                row["missed_board_targets"] if row["missed_board_targets"] is not None else 0
+            ),
             total_raised=Decimal(row["total_raised"]),
             forecast_net_cash_flow=Decimal(row["forecast_net_cash_flow"] or "0.00"),
             forecast_runway_turns=row["forecast_runway_turns"],
             burn_multiple=Decimal(row["burn_multiple"] or "0.00"),
-            governance_risk=row["governance_risk"] or 0,
-            board_pressure=row["board_pressure"] or 0,
+            governance_risk=(row["governance_risk"] if row["governance_risk"] is not None else 0),
+            board_pressure=row["board_pressure"] if row["board_pressure"] is not None else 0,
             board_directive=BoardDirective(row["board_directive"] or "accelerate_growth"),
             active_board_ask=BoardAsk(row["active_board_ask"] or "profitability"),
             board_resolution=BoardResolution(row["board_resolution"] or "hold_course"),
-            board_score=row["board_score"] or 55,
-            board_profitability_score=row["board_profitability_score"] or 55,
-            board_reliability_score=row["board_reliability_score"] or 55,
-            board_team_health_score=row["board_team_health_score"] or 55,
-            board_portfolio_focus_score=row["board_portfolio_focus_score"] or 55,
+            board_score=row["board_score"] if row["board_score"] is not None else 55,
+            board_profitability_score=(
+                row["board_profitability_score"]
+                if row["board_profitability_score"] is not None
+                else 55
+            ),
+            board_reliability_score=(
+                row["board_reliability_score"] if row["board_reliability_score"] is not None else 55
+            ),
+            board_team_health_score=(
+                row["board_team_health_score"] if row["board_team_health_score"] is not None else 55
+            ),
+            board_portfolio_focus_score=(
+                row["board_portfolio_focus_score"]
+                if row["board_portfolio_focus_score"] is not None
+                else 55
+            ),
             board_warning_active=bool(row["board_warning_active"]),
-            board_warning_level=row["board_warning_level"] or 0,
-            quarterly_review_count=row["quarterly_review_count"] or 0,
-            restructuring_pressure=row["restructuring_pressure"] or 0,
+            board_warning_level=(
+                row["board_warning_level"] if row["board_warning_level"] is not None else 0
+            ),
+            quarterly_review_count=(
+                row["quarterly_review_count"] if row["quarterly_review_count"] is not None else 0
+            ),
+            restructuring_pressure=(
+                row["restructuring_pressure"] if row["restructuring_pressure"] is not None else 0
+            ),
             governance_crisis_active=bool(row["governance_crisis_active"]),
-            governance_crisis_level=row["governance_crisis_level"] or 0,
+            governance_crisis_level=(
+                row["governance_crisis_level"] if row["governance_crisis_level"] is not None else 0
+            ),
             board_recovery_focus=BoardAsk(row["board_recovery_focus"] or "profitability"),
-            board_recovery_turns_remaining=row["board_recovery_turns_remaining"] or 0,
+            board_recovery_turns_remaining=(
+                row["board_recovery_turns_remaining"]
+                if row["board_recovery_turns_remaining"] is not None
+                else 0
+            ),
             board_resolution_due=bool(row["board_resolution_due"]),
-            board_resolution_window=row["board_resolution_window"] or 0,
-            board_resolution_miss_streak=row["board_resolution_miss_streak"] or 0,
+            board_resolution_window=(
+                row["board_resolution_window"] if row["board_resolution_window"] is not None else 0
+            ),
+            board_resolution_miss_streak=(
+                row["board_resolution_miss_streak"]
+                if row["board_resolution_miss_streak"] is not None
+                else 0
+            ),
             last_board_review_turn=row["last_board_review_turn"],
             last_funding_turn=row["last_funding_turn"],
         )

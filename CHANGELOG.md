@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.38.0 - 2026-05-06
+
+- Deepened late-game pressure scoring with explicit `support_fragility`, `channel_fragility`, and `board_reset_risk` signals that now feed exit evaluation, board recommendations, and ending variants
+- Expanded support-ops realism with premium-tier breach penalties, enterprise and premium revenue-at-risk valuation, and commercial-breach pressure that now pushes governance and board confidence directly
+- Extended partnership and channel analysis with fatigued/recovery revenue share, concentration risk, renegotiation pressure, and higher decay for neglected high-fatigue channels
+- Strengthened finance-planner guidance with reserve-recovery timing, capital-action windows, and trade-off notes so late-stage cash planning is easier to interpret during long runs
+- Tightened event eligibility and hardening coverage around support meltdowns, partner breakdowns, board resets, extended late-game progression, and save/load persistence under multi-turn stress
+- Promoted the package version to `0.38.0`
+
 ## 0.37.0 - 2026-05-06
 
 - Added three archive-gated late-game campaign starts, `IPO Readiness Launchpad`, `Acquisition Diligence Sprint`, and `Independence Compounder`, so repeat runs can now begin from distinct public-market, M&A, and disciplined-bootstrap operating profiles

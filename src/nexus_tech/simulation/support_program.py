@@ -40,10 +40,13 @@ class SupportProgramSummary:
     billing_ticket_pressure: int
     revenue_at_risk_accounts: int
     revenue_at_risk_value: Decimal
+    enterprise_revenue_at_risk_value: Decimal
+    premium_revenue_at_risk_value: Decimal
     renewal_pressure_accounts: int
     renewal_pressure_value: Decimal
     priority_breach_accounts: int
     white_glove_breach_accounts: int
+    commercial_breach_pressure: int
     dominant_lane: SupportLaneFocus
     focus_mismatch_penalty: int
     lane_overflow_pressure: int
@@ -411,6 +414,34 @@ def apply_end_of_turn_support_program(
         state
     )
     revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
+    enterprise_revenue_at_risk_value = quantize_money(
+        sum(
+            (
+                account.contract_value
+                for account in active_accounts
+                if account.segment.value == "enterprise"
+                and _is_revenue_at_risk_account(
+                    account,
+                    sla_target=state.support_program.sla_target,
+                )
+            ),
+            Decimal("0.00"),
+        )
+    )
+    premium_revenue_at_risk_value = quantize_money(
+        sum(
+            (
+                account.contract_value
+                for account in active_accounts
+                if account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
+                and _is_revenue_at_risk_account(
+                    account,
+                    sla_target=state.support_program.sla_target,
+                )
+            ),
+            Decimal("0.00"),
+        )
+    )
     priority_breach_accounts = sum(
         1
         for account in active_accounts
@@ -423,6 +454,27 @@ def apply_end_of_turn_support_program(
         if account.support_tier is SupportTier.WHITE_GLOVE
         and account.sla_breach_risk >= state.support_program.sla_target
     )
+    commercial_breach_pressure = (
+        priority_breach_accounts * BALANCE.support_program_priority_breach_pressure_gain
+        + white_glove_breach_accounts * BALANCE.support_program_white_glove_breach_pressure_gain
+    )
+    if priority_breach_accounts > 0 or white_glove_breach_accounts > 0:
+        for account in active_accounts:
+            if account.sla_breach_risk < state.support_program.sla_target:
+                continue
+            if account.support_tier is SupportTier.PRIORITY:
+                account.satisfaction = clamp_int(
+                    account.satisfaction - BALANCE.support_program_priority_breach_satisfaction_loss
+                )
+            elif account.support_tier is SupportTier.WHITE_GLOVE:
+                account.satisfaction = clamp_int(
+                    account.satisfaction
+                    - BALANCE.support_program_white_glove_breach_satisfaction_loss
+                )
+                account.renewal_health = clamp_int(account.renewal_health - 1)
+                account.expansion_potential = clamp_int(account.expansion_potential - 1)
+    if white_glove_breach_accounts > 0:
+        reputation_delta -= BALANCE.support_program_white_glove_breach_reputation_loss
     if (
         state.support_program.backlog_queue
         >= BALANCE.support_program_backlog_morale_penalty_threshold
@@ -472,10 +524,13 @@ def apply_end_of_turn_support_program(
         billing_ticket_pressure=billing_ticket_pressure,
         revenue_at_risk_accounts=revenue_at_risk_accounts,
         revenue_at_risk_value=revenue_at_risk_value,
+        enterprise_revenue_at_risk_value=enterprise_revenue_at_risk_value,
+        premium_revenue_at_risk_value=premium_revenue_at_risk_value,
         renewal_pressure_accounts=renewal_pressure_accounts,
         renewal_pressure_value=renewal_pressure_value,
         priority_breach_accounts=priority_breach_accounts,
         white_glove_breach_accounts=white_glove_breach_accounts,
+        commercial_breach_pressure=commercial_breach_pressure,
         dominant_lane=dominant_lane,
         focus_mismatch_penalty=focus_mismatch_penalty,
         lane_overflow_pressure=lane_overflow_pressure,

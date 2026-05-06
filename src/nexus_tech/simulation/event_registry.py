@@ -2005,6 +2005,7 @@ def _build_enterprise_procurement_delay_event(
 
 
 def _is_support_meltdown_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
         state,
         {"support_backlog"},
@@ -2013,6 +2014,7 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         state.support_program.backlog_queue >= BALANCE.event_support_meltdown_backlog_threshold
         or state.support_program.escalation_queue
         >= BALANCE.event_support_meltdown_escalation_threshold
+        or pressure.support_fragility >= BALANCE.event_support_meltdown_fragility_threshold
     )
 
 
@@ -2154,6 +2156,7 @@ def _build_partner_qbr_event(
 
 
 def _is_partner_breakdown_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
         state,
         {"partner_qbr", "channel_conflict"},
@@ -2163,6 +2166,8 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             partnership.status in {PartnershipStatus.STRAINED, PartnershipStatus.RECOVERY}
             or partnership.conflict_pressure + partnership.risk
             >= BALANCE.event_partner_breakdown_fatigue_threshold
+            or pressure.channel_fragility
+            >= BALANCE.event_partner_breakdown_channel_fragility_threshold
         )
         for partnership in state.partnerships
     )
@@ -2270,12 +2275,15 @@ def _build_partner_renegotiation_event(
 
 
 def _is_board_recovery_window_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
         state,
         {"board_reckoning", "board_scrutiny"},
         BALANCE.event_chain_recent_window_turns,
     ) and (
-        state.finance.board_recovery_turns_remaining > 0 or state.finance.governance_crisis_active
+        state.finance.board_recovery_turns_remaining > 0
+        or state.finance.governance_crisis_active
+        or pressure.board_reset_risk >= BALANCE.event_board_recovery_window_reset_risk_threshold
     )
 
 

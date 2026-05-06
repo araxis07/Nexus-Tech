@@ -64,6 +64,10 @@ class PartnershipPortfolioSummary:
     channel_dependency_risk: int
     direct_sales_conflict_accounts: int
     weighted_rev_share_percent: int
+    fatigued_revenue_share_percent: int
+    recovery_revenue_share_percent: int
+    concentration_risk: int
+    renegotiation_pressure: int
     summary: str
 
 
@@ -471,6 +475,14 @@ def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
             )
         previous_status = partnership.status
         fatigue = calculate_partnership_fatigue(state, partnership)
+        if fatigue >= BALANCE.partnership_fatigue_strained_threshold:
+            partnership.enablement_level = clamp_int(
+                partnership.enablement_level - BALANCE.partnership_high_fatigue_enablement_decay
+            )
+        if fatigue >= BALANCE.partnership_fatigue_pause_threshold:
+            partnership.conflict_pressure = clamp_int(
+                partnership.conflict_pressure + BALANCE.partnership_high_fatigue_conflict_gain
+            )
         if (
             partnership.risk >= BALANCE.partnership_pause_threshold
             or partnership.conflict_pressure >= BALANCE.partnership_pause_threshold
@@ -551,6 +563,10 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             channel_dependency_risk=0,
             direct_sales_conflict_accounts=0,
             weighted_rev_share_percent=0,
+            fatigued_revenue_share_percent=0,
+            recovery_revenue_share_percent=0,
+            concentration_risk=0,
+            renegotiation_pressure=0,
             summary="No active channel portfolio yet.",
         )
 
@@ -631,6 +647,36 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         if sourced_revenue > ZERO_MONEY
         else 0
     )
+    fatigued_revenue = quantize_money(
+        sum(
+            (
+                partnership.sourced_revenue
+                for partnership, fatigue in zip(state.partnerships, fatigue_scores, strict=False)
+                if fatigue >= BALANCE.partnership_fatigue_strained_threshold
+            ),
+            ZERO_MONEY,
+        )
+    )
+    fatigued_revenue_share_percent = (
+        int((fatigued_revenue / sourced_revenue * Decimal("100")).to_integral_value())
+        if sourced_revenue > ZERO_MONEY
+        else 0
+    )
+    recovery_revenue = quantize_money(
+        sum(
+            (
+                partnership.sourced_revenue
+                for partnership in state.partnerships
+                if partnership.status in {PartnershipStatus.RECOVERY, PartnershipStatus.PAUSED}
+            ),
+            ZERO_MONEY,
+        )
+    )
+    recovery_revenue_share_percent = (
+        int((recovery_revenue / sourced_revenue * Decimal("100")).to_integral_value())
+        if sourced_revenue > ZERO_MONEY
+        else 0
+    )
     direct_sales_conflict_accounts = sum(
         1
         for account in state.customer_accounts
@@ -662,8 +708,30 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         + (paused_count * BALANCE.partnership_dependency_risk_paused_bonus)
         + (direct_sales_conflict_accounts // 2)
     )
+    concentration_risk = clamp_int(
+        (dominant_share_percent // BALANCE.partnership_concentration_share_divisor)
+        + direct_sales_conflict_accounts
+        + (
+            fatigued_revenue_share_percent
+            // BALANCE.partnership_concentration_fatigued_share_divisor
+        )
+        + (paused_revenue_share_percent // 2)
+    )
+    renegotiation_pressure = clamp_int(
+        (average_fatigue // BALANCE.partnership_renegotiation_pressure_fatigue_divisor)
+        + renegotiation_ready_count
+        + (
+            weighted_rev_share_percent
+            // BALANCE.partnership_renegotiation_pressure_rev_share_divisor
+        )
+        + (channel_conflict_index // BALANCE.partnership_renegotiation_pressure_conflict_divisor)
+    )
     if paused_count > 0:
         summary = "Some channels are paused and need deliberate recovery before they can scale."
+    elif concentration_risk >= 60:
+        summary = "Channel revenue is getting concentrated and direct-sales overlap is rising."
+    elif renegotiation_pressure >= 28:
+        summary = "Partner economics are getting strained enough to demand active renegotiation."
     elif recovery_count > 0:
         summary = "At least one channel is recovering. Near-term growth is cleaner but slower."
     elif strained_count > 0:
@@ -692,6 +760,10 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         channel_dependency_risk=channel_dependency_risk,
         direct_sales_conflict_accounts=direct_sales_conflict_accounts,
         weighted_rev_share_percent=weighted_rev_share_percent,
+        fatigued_revenue_share_percent=fatigued_revenue_share_percent,
+        recovery_revenue_share_percent=recovery_revenue_share_percent,
+        concentration_risk=concentration_risk,
+        renegotiation_pressure=renegotiation_pressure,
         summary=summary,
     )
 

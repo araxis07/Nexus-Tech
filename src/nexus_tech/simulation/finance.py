@@ -74,6 +74,9 @@ class FinancePlannerSnapshot:
     reserve_plan: str
     debt_rollover_signal: str
     funding_window: str
+    reserve_recovery_turn: int | None
+    capital_action_window: str
+    tradeoff_note: str
     scenario_compare: tuple[str, ...]
     allocation_actions: tuple[str, ...]
     recommended_actions: tuple[str, ...]
@@ -354,6 +357,44 @@ def build_finance_planner(
     else:
         funding_window = "Bootstrap posture rewards slower but cleaner execution."
 
+    reserve_recovery_turn = _find_reserve_recovery_turn(
+        company.cash_on_hand,
+        base.projected_net_cash_flow,
+        reserve_target=capital_plan.reserve_target,
+        horizon_turns=horizon,
+    )
+    if reserve_recovery_turn is None and aggressive.projected_net_cash_flow > ZERO_MONEY:
+        reserve_recovery_turn = _find_reserve_recovery_turn(
+            company.cash_on_hand,
+            aggressive.projected_net_cash_flow,
+            reserve_target=capital_plan.reserve_target,
+            horizon_turns=horizon,
+        )
+
+    if reserve_break_risk in {"critical", "high"} or finance.board_pressure >= 26:
+        capital_action_window = "immediate"
+    elif reserve_break_risk == "elevated" or finance.covenant_risk >= 16:
+        capital_action_window = "next two turns"
+    else:
+        capital_action_window = "flexible within horizon"
+
+    if capital_plan.source_preference.value == "debt" and capital_plan.mode.value == "expand":
+        tradeoff_note = "Debt can preserve momentum now, but covenant slack will disappear fast."
+    elif (
+        capital_plan.source_preference.value == "venture" and capital_plan.mode.value == "conserve"
+    ):
+        tradeoff_note = (
+            "The company is preserving runway, but the venture story needs clearer growth logic."
+        )
+    elif capital_plan.source_preference.value == "bootstrap":
+        tradeoff_note = (
+            "Every extra reserve dollar improves control, but it also slows the pace of bets."
+        )
+    else:
+        tradeoff_note = (
+            "The capital plan is viable, but each extra growth bet now raises proof requirements."
+        )
+
     scenario_compare = (
         f"Base ends at {format_money(base_end_cash)}.",
         (
@@ -422,6 +463,9 @@ def build_finance_planner(
         reserve_plan=reserve_plan,
         debt_rollover_signal=debt_rollover_signal,
         funding_window=funding_window,
+        reserve_recovery_turn=reserve_recovery_turn,
+        capital_action_window=capital_action_window,
+        tradeoff_note=tradeoff_note,
         scenario_compare=scenario_compare,
         allocation_actions=tuple(allocation_actions),
         recommended_actions=tuple(recommended_actions),
@@ -444,6 +488,25 @@ def _project_cash_position(
         if reserve_hit_turn is None and cash < reserve_target:
             reserve_hit_turn = turn
     return cash, reserve_hit_turn
+
+
+def _find_reserve_recovery_turn(
+    starting_cash: Decimal,
+    turn_cash_flow: Decimal,
+    *,
+    reserve_target: Decimal,
+    horizon_turns: int,
+) -> int | None:
+    if starting_cash >= reserve_target:
+        return 0
+    if turn_cash_flow <= ZERO_MONEY:
+        return None
+    cash = starting_cash
+    for turn in range(1, horizon_turns + 1):
+        cash = quantize_money(cash + turn_cash_flow)
+        if cash >= reserve_target:
+            return turn
+    return None
 
 
 def _adjust_forecast(net_cash_flow: Decimal, *, drag: Decimal) -> Decimal:

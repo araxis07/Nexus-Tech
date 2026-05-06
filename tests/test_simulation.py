@@ -1253,6 +1253,27 @@ def test_resolve_turn_commercial_pressure_hits_direct_channel_conflict() -> None
     assert resolution.state.finance.board_portfolio_focus_score != starting_focus_score
 
 
+def test_long_run_late_game_progression_resolves_without_crashing() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="independence_compounder",
+    )
+    rng = RandomSource(seed=29)
+
+    for _ in range(18):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            state = resolve_pending_event(state, state.pending_event.options[0].id).state
+        if state.company.game_over or state.victory_achieved:
+            break
+
+    assert len(state.turn_history) >= 1
+    assert state.company.current_turn >= 20 or state.victory_achieved or state.company.game_over
+    assert state.company.cash_on_hand == state.company.cash_on_hand
+
+
 def test_resolve_turn_sets_victory_when_company_hits_scale_threshold() -> None:
     state = make_state(
         make_product(
@@ -3480,6 +3501,7 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
         product_id=product.id,
         segment=MarketSegment.ENTERPRISE,
         contract_value=Decimal("1400.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
         satisfaction=50,
         onboarding_health=46,
         support_load=44,
@@ -3506,8 +3528,12 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
 
     assert summary.revenue_at_risk_accounts >= 1
     assert summary.revenue_at_risk_value >= Decimal("1400.00")
+    assert summary.enterprise_revenue_at_risk_value >= Decimal("1400.00")
+    assert summary.premium_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.renewal_pressure_accounts >= 1
     assert summary.renewal_pressure_value >= Decimal("1400.00")
+    assert summary.white_glove_breach_accounts >= 1
+    assert summary.commercial_breach_pressure >= 2
     assert revenue_at_risk_accounts >= 1
     assert renewal_pressure_accounts >= 1
     assert revenue_at_risk_value >= Decimal("1400.00")
@@ -5156,6 +5182,7 @@ def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
     evaluation = evaluate_exit_outcome(state, calculate_run_score(state))
 
     assert evaluation.board_readout
+    assert evaluation.pressure_readout
     assert evaluation.next_chapter
     assert evaluation.outcome in {
         ExitOutcome.IPO_READY,
@@ -5220,6 +5247,8 @@ def test_finance_planner_projects_horizon_cash_positions() -> None:
     assert planner.reserve_plan
     assert planner.debt_rollover_signal
     assert planner.funding_window
+    assert planner.capital_action_window
+    assert planner.tradeoff_note
     assert len(planner.scenario_compare) == 3
     assert planner.allocation_actions
     assert planner.capital_alert
@@ -5370,6 +5399,68 @@ def test_public_market_scrutiny_event_can_fund_control_response() -> None:
     assert outcome.state.finance.board_confidence > state.finance.board_confidence
     assert outcome.state.finance.governance_risk < state.finance.governance_risk
     assert outcome.history_entry.event_id == "public_market_scrutiny"
+
+
+def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None:
+    product = make_product(
+        "Fragility Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=240,
+        quality=72,
+        market_fit=70,
+    )
+    account = CustomerAccount(
+        name="Fragility Enterprise",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1800.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=54,
+        onboarding_health=48,
+        support_load=42,
+        open_tickets=20,
+        sla_breach_risk=74,
+        renewal_health=44,
+        expansion_potential=56,
+        renewal_turn=13,
+        churn_risk=44,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    partnership = PartnershipDeal(
+        name="Fragility Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.STRAINED,
+        quality=58,
+        risk=60,
+        conflict_pressure=62,
+        enablement_level=28,
+        sourced_revenue=Decimal("1800.00"),
+        rev_share_rate=Decimal("0.2500"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("5200.00"),
+        current_turn=14,
+    )
+    state.finance.board_pressure = 24
+    state.finance.board_warning_level = 2
+    state.finance.restructuring_pressure = 12
+    state.finance.governance_crisis_level = 1
+    state.finance.board_resolution_due = True
+    state.support_program.backlog_queue = 18
+    state.support_program.escalation_queue = 5
+    state.support_program.sla_breaches_last_turn = 3
+    state.support_program.queue_age_pressure = 5
+
+    pressure = calculate_endgame_pressure(state)
+
+    assert pressure.support_fragility > 0
+    assert pressure.channel_fragility > 0
+    assert pressure.board_reset_risk > 0
+    assert pressure.restructure_heat >= pressure.board_reset_risk // 3
 
 
 def test_independence_reckoning_event_can_take_bridge_flex() -> None:
@@ -5593,6 +5684,10 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.dominant_share_percent >= 50
     assert summary.dominant_channel in {"reseller", "marketplace"}
     assert summary.weighted_rev_share_percent >= 21
+    assert summary.fatigued_revenue_share_percent >= 0
+    assert summary.recovery_revenue_share_percent >= 0
+    assert summary.concentration_risk >= 0
+    assert summary.renegotiation_pressure >= 0
 
 
 def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk() -> None:
