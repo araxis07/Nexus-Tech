@@ -1761,10 +1761,12 @@ def _is_exit_interest_eligible(state: GameState) -> bool:
 
 
 def _is_public_market_scrutiny_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
         and any(product.is_active for product in state.products)
+        and readiness.strategic_outlook == "ipo_ready"
         and pressure.public_market_scrutiny
         >= BALANCE.event_public_market_scrutiny_pressure_threshold
         and not _has_recent_event(
@@ -1815,10 +1817,12 @@ def _build_public_market_scrutiny_event(
 
 
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
         and any(product.is_active for product in state.products)
+        and readiness.strategic_outlook == "strategic_acquisition"
         and pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
         and bool(state.customer_accounts)
         and not _has_recent_event(
@@ -1869,9 +1873,14 @@ def _build_acquirer_diligence_event(
 
 
 def _is_independence_reckoning_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
+        and (
+            readiness.strategic_outlook == "profitable_independence"
+            or pressure.capital_fragility >= BALANCE.event_independence_reckoning_pressure_threshold
+        )
         and (
             pressure.independence_discipline
             >= BALANCE.event_independence_reckoning_pressure_threshold

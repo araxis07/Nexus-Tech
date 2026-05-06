@@ -1378,6 +1378,7 @@ def render_victory(console: Console, state: GameState) -> None:
     content.add_row("Estimated Value", format_money(run_score.estimated_valuation))
     content.add_row("Strategic Outlook", readiness.strategic_outlook.replace("_", " "))
     content.add_row("Pressure Path", pressure.dominant_pressure.replace("_", " "))
+    content.add_row("Durability", pressure.operating_durability)
     content.add_row(
         "Readiness",
         (
@@ -1387,6 +1388,7 @@ def render_victory(console: Console, state: GameState) -> None:
         ),
     )
     content.add_row("Pressure Note", pressure.summary)
+    content.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     if state.exit_outcome is not None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
         content.add_row("Exit Path", exit_evaluation.title)
@@ -1699,6 +1701,7 @@ def _build_totals_panel(state: GameState) -> Panel:
     table.add_row("Ops Cost", format_money(operations.added_cost))
     table.add_row("Ticket Backlog", str(operations.support_backlog))
     table.add_row("Scale State", scale_pressure.summary)
+    table.add_row("Durability", pressure.operating_durability)
     table.add_row("Pressure Note", pressure.summary)
     return Panel(table, title="Portfolio Summary", border_style="yellow", expand=True)
 
@@ -2550,6 +2553,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
     run_score = calculate_run_score(state)
     badges = calculate_run_badges(state, run_score)
     readiness = calculate_endgame_readiness(state, run_score)
+    pressure = calculate_endgame_pressure(state, readiness)
     exit_evaluation = evaluate_exit_outcome(state, run_score)
     active_segments = sorted(
         {product.target_segment.value for product in state.products if product.is_active}
@@ -2581,6 +2585,8 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Board Readout", exit_evaluation.board_readout)
     table.add_row("Pressure Readout", exit_evaluation.pressure_readout)
     table.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
+    table.add_row("Durability", pressure.operating_durability)
+    table.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     table.add_row("Next Chapter", exit_evaluation.next_chapter)
     return Panel(table, title="Scorecard", border_style="yellow", expand=True)
 

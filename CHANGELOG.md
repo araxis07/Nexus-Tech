@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.43.0 - 2026-05-07
+
+- Deepened endgame pressure with operating-durability scoring, path watchlists, and more path-aware late-game event eligibility so IPO, acquisition, and independence pressure trigger more distinctly
+- Expanded support-ops realism with premium queue exposure, account-level queue-risk scoring, and stronger triage or escalation recovery effects on satisfaction, renewal health, and churn risk
+- Extended partnership analytics with strained revenue share and channel-volatility indexing so recovery-stage and fatigue-heavy channels contribute clearer commercial pressure
+- Strengthened finance-planner guidance with funding resilience, capital-discipline indexing, and more specific action recommendations around support routing, retention work, and partnership reactivation
+- Improved terminal reporting so victory, scorecard, finance, support, partnership, and late-game panels now surface the new durability, watchlist, volatility, and commercial-risk signals directly
+- Promoted the package version to `0.43.0`
+
 ## 0.42.0 - 2026-05-07
 
 - Deepened support-ops pressure with premium queue exposure, account-level queue-risk scoring, stronger triage recovery effects, and richer commercial fallout when high-touch service quality slips

@@ -5612,6 +5612,58 @@ def test_public_market_scrutiny_event_can_fund_control_response() -> None:
     assert outcome.history_entry.event_id == "public_market_scrutiny"
 
 
+def test_public_market_scrutiny_event_requires_ipo_outlook() -> None:
+    product = make_product(
+        "Durable Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=78,
+        quality=64,
+        market_fit=60,
+    )
+    account = CustomerAccount(
+        name="Independence Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1800.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=66,
+        onboarding_health=60,
+        support_load=34,
+        open_tickets=10,
+        sla_breach_risk=62,
+        renewal_health=60,
+        expansion_potential=58,
+        renewal_turn=15,
+        churn_risk=28,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("24000.00"))
+    state.company.current_turn = 16
+    state.company.reputation = 82
+    state.finance.board_confidence = 16
+    state.finance.board_score = 18
+    state.finance.board_pressure = 34
+    state.finance.governance_risk = 28
+    state.finance.board_team_health_score = 82
+    state.support_program.sla_breaches_last_turn = 5
+    state.support_program.escalation_queue = 4
+    state.support_program.queue_age_pressure = 6
+
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state, readiness)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "public_market_scrutiny"
+    )
+
+    assert readiness.strategic_outlook == "profitable_independence"
+    assert (
+        pressure.public_market_scrutiny >= BALANCE.event_public_market_scrutiny_pressure_threshold
+    )
+    assert definition.is_eligible(state) is False
+
+
 def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None:
     product = make_product(
         "Fragility Core",
@@ -5719,6 +5771,75 @@ def test_independence_reckoning_event_can_take_bridge_flex() -> None:
     assert outcome.state.finance.debt_principal > state.finance.debt_principal
     assert outcome.state.finance.loan_interest_rate > state.finance.loan_interest_rate
     assert outcome.history_entry.event_id == "independence_reckoning"
+
+
+def test_acquirer_diligence_event_requires_acquisition_outlook() -> None:
+    product = make_product(
+        "Listing Bias Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=260,
+        quality=80,
+        market_fit=78,
+    )
+    accounts = [
+        CustomerAccount(
+            name="Atlas Finance",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("1900.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=62,
+            onboarding_health=56,
+            support_load=36,
+            open_tickets=9,
+            sla_breach_risk=60,
+            renewal_health=58,
+            expansion_potential=64,
+            renewal_turn=14,
+            churn_risk=26,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    partnerships = [
+        PartnershipDeal(
+            name="Noisy Reseller",
+            product_id=product.id,
+            channel=PartnerChannel.RESELLER,
+            status=PartnershipStatus.STRAINED,
+            quality=64,
+            risk=52,
+            conflict_pressure=54,
+            enablement_level=34,
+            sourced_revenue=Decimal("1500.00"),
+            rev_share_rate=Decimal("0.2100"),
+        )
+    ]
+    state = make_state(
+        product,
+        customer_accounts=accounts,
+        partnerships=partnerships,
+        cash_on_hand=Decimal("18000.00"),
+    )
+    state.company.current_turn = 16
+    state.company.reputation = 80
+    state.finance.board_confidence = 84
+    state.finance.board_score = 82
+    state.finance.board_pressure = 24
+    state.finance.governance_risk = 10
+    state.support_program.escalation_queue = 6
+    state.support_program.sla_breaches_last_turn = 3
+
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state, readiness)
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "acquirer_diligence"
+    )
+
+    assert readiness.strategic_outlook == "ipo_ready"
+    assert pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
+    assert definition.is_eligible(state) is False
 
 
 def test_create_partnership_action_adds_channel_and_cost() -> None:
