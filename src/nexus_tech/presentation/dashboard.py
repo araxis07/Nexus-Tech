@@ -2825,6 +2825,26 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Risk Value", format_money(revenue_at_risk_value))
     table.add_row("White-Glove Risk", format_money(white_glove_risk_value))
     table.add_row(
+        "Premium Queue $",
+        format_money(
+            sum(
+                (
+                    account.contract_value
+                    for account in state.customer_accounts
+                    if account.status is not CustomerAccountStatus.CHURNED
+                    and account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
+                    and (
+                        account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold + 1
+                        or account.open_tickets
+                        >= BALANCE.support_program_escalation_ticket_threshold
+                        or account.sla_breach_risk >= state.support_program.sla_target
+                    )
+                ),
+                Decimal("0.00"),
+            )
+        ),
+    )
+    table.add_row(
         "High-Value Risk",
         str(
             sum(
@@ -2941,8 +2961,10 @@ def _build_late_game_panel(state: GameState) -> Panel:
     table.add_row("Reset Risk", str(pressure.board_reset_risk))
     table.add_row("Pressure Path", pressure.dominant_pressure.replace("_", " "))
     table.add_row("Clarity", pressure.strategic_clarity)
+    table.add_row("Durability", pressure.operating_durability)
     table.add_row("Path Gap", str(pressure.path_gap))
     table.add_row("Scorecard", " | ".join(pressure.path_scorecard[:2]))
+    table.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
     table.add_row("State", late_game.summary)
     return Panel(table, title="Late-Game", border_style="magenta", expand=True)
@@ -3058,6 +3080,8 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Exec Drag", planner.execution_drag)
     table.add_row("Comm Risk", planner.commercial_financing_risk)
     table.add_row("Priority", planner.capital_priority)
+    table.add_row("Funding Resilience", planner.funding_resilience)
+    table.add_row("Capital Discipline", str(planner.capital_discipline_index))
     table.add_row("Scenario Compare", " | ".join(planner.scenario_compare))
     table.add_row("Action Seq", " | ".join(planner.action_sequence))
     table.add_row("Alloc Actions", " | ".join(planner.allocation_actions))
@@ -3148,10 +3172,12 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Rev Share", f"{portfolio.weighted_rev_share_percent}%")
         table.add_row("Dominant Share", f"{portfolio.dominant_share_percent}%")
         table.add_row("Paused Rev Share", f"{portfolio.paused_revenue_share_percent}%")
+        table.add_row("Strained Rev Share", f"{portfolio.strained_revenue_share_percent}%")
         table.add_row("Direct Conflict", str(portfolio.direct_sales_conflict_accounts))
         table.add_row("Fatigued Rev Share", f"{portfolio.fatigued_revenue_share_percent}%")
         table.add_row("Recovery Rev Share", f"{portfolio.recovery_revenue_share_percent}%")
         table.add_row("Volatile Rev Share", f"{portfolio.volatile_revenue_share_percent}%")
+        table.add_row("Volatility", str(portfolio.channel_volatility_index))
         table.add_row("Concentration", str(portfolio.concentration_risk))
         table.add_row("Renegotiate P", str(portfolio.renegotiation_pressure))
         table.add_row("Rev Share P", str(portfolio.rev_share_pressure))

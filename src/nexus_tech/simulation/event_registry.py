@@ -2188,6 +2188,7 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             or portfolio.rev_share_pressure >= 28
             or portfolio.commercial_dependency_score >= 68
             or portfolio.volatile_revenue_share_percent >= 40
+            or portfolio.channel_volatility_index >= 58
         )
         for partnership in state.partnerships
     )

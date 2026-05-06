@@ -1809,8 +1809,10 @@ class BalanceConfig:
     support_program_recovery_renewal_health_gain: int = 2
     support_program_recovery_churn_relief: int = 3
     support_program_recovery_expansion_gain: int = 1
+    support_program_account_queue_risk_divisor: int = 18
     support_program_service_cost_per_priority_sla_credit: Decimal = Decimal("22.00")
     support_program_service_cost_per_white_glove_sla_credit: Decimal = Decimal("48.00")
+    support_program_service_cost_per_queue_risk_point: Decimal = Decimal("6.00")
     support_program_revenue_at_risk_contract_threshold: Decimal = Decimal("900.00")
     support_program_renewal_pressure_health_threshold: int = 54
     support_program_renewal_pressure_churn_threshold: int = 38
@@ -1875,6 +1877,9 @@ class BalanceConfig:
     support_program_triage_escalation_relief: int = 3
     support_program_triage_ticket_relief: int = 4
     support_program_triage_sla_relief: int = 6
+    support_program_triage_renewal_health_gain: int = 4
+    support_program_triage_satisfaction_gain: int = 3
+    support_program_triage_queue_age_relief: int = 2
     support_program_upgrade_cost: Decimal = Decimal("170.00")
     support_program_upgrade_knowledge_gain: int = 10
     support_program_upgrade_automation_gain: int = 10
@@ -1903,6 +1908,8 @@ class BalanceConfig:
     commercial_pressure_service_tier_team_health_divisor: int = 2
     commercial_pressure_high_value_risk_board_penalty: int = 2
     commercial_pressure_high_value_risk_confidence_loss: int = 1
+    commercial_pressure_account_queue_board_penalty: int = 2
+    commercial_pressure_premium_queue_confidence_loss: int = 2
     commercial_pressure_channel_volatility_threshold: int = 34
     commercial_pressure_channel_volatility_board_penalty: int = 2
     commercial_pressure_channel_economics_threshold: int = 24
@@ -2205,6 +2212,9 @@ class BalanceConfig:
     finance_planner_commercial_risk_renewal_divisor: Decimal = Decimal("1600.00")
     finance_planner_channel_volatility_threshold: int = 34
     finance_planner_volatile_share_threshold: int = 32
+    finance_planner_capital_discipline_cash_divisor: Decimal = Decimal("1000.00")
+    finance_planner_route_support_value_threshold: Decimal = Decimal("2800.00")
+    finance_planner_reactivate_dependency_threshold: int = 64
 
     event_bridge_round_weight: int = 10
     event_bridge_round_cooldown: int = 7
@@ -2296,6 +2306,8 @@ class BalanceConfig:
     exit_capital_fragility_debt_divisor: Decimal = Decimal("1600.00")
     exit_capital_fragility_pressure_divisor: int = 2
     exit_path_clarity_gap_threshold: int = 10
+    exit_operating_durability_resilient_threshold: int = 28
+    exit_operating_durability_stretched_threshold: int = 54
 
     game_over_cash_threshold: Decimal = Decimal("0.00")
 

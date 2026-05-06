@@ -45,8 +45,10 @@ class EndgamePressureSummary:
     dominant_pressure: str
     active_pressures: tuple[str, ...]
     path_scorecard: tuple[str, ...]
+    path_watchlist: tuple[str, ...]
     path_gap: int
     strategic_clarity: str
+    operating_durability: str
     recommendation: str
     summary: str
 
@@ -299,11 +301,40 @@ def calculate_endgame_pressure(
         strategic_clarity = "clear but stressed"
     else:
         strategic_clarity = "contested"
+    max_fragility = max(commercial_fragility, capital_fragility, board_reset_risk)
+    if max_fragility <= BALANCE.exit_operating_durability_resilient_threshold:
+        operating_durability = "resilient"
+    elif max_fragility <= BALANCE.exit_operating_durability_stretched_threshold:
+        operating_durability = "stretched"
+    else:
+        operating_durability = "fragile"
     dominant_pressure = max(pressure_scores, key=pressure_scores.get)
     active_pressures = tuple(
         pressure_name
         for pressure_name, score in pressure_scores.items()
         if score >= BALANCE.event_strategic_crossroads_readiness_threshold
+    )
+    path_watchlist = (
+        (
+            "IPO: tighten support and governance before inviting more scrutiny."
+            if public_market_scrutiny >= 56 or support_fragility >= 32
+            else "IPO: institutional controls currently look serviceable."
+        ),
+        (
+            "M&A: calm channel conflict and renewal risk before diligence deepens."
+            if acquirer_diligence >= 56 or channel_fragility >= 40
+            else "M&A: buyer diligence pressure is currently contained."
+        ),
+        (
+            "Independence: protect reserves and debt slack before compounding harder."
+            if independence_discipline >= 56 or capital_fragility >= 40
+            else "Independence: capital discipline is currently holding."
+        ),
+        (
+            "Reset: board pressure is close to forcing a company-wide reset."
+            if board_reset_risk >= 60 or restructure_heat >= 56
+            else "Reset: restructure pressure is real, but not yet dominant."
+        ),
     )
     if board_reset_risk >= 70:
         recommendation = (
@@ -365,8 +396,10 @@ def calculate_endgame_pressure(
         dominant_pressure=dominant_pressure,
         active_pressures=active_pressures,
         path_scorecard=path_scorecard,
+        path_watchlist=path_watchlist,
         path_gap=path_gap,
         strategic_clarity=strategic_clarity,
+        operating_durability=operating_durability,
         recommendation=recommendation,
         summary=summary,
         commercial_fragility=commercial_fragility,
@@ -488,7 +521,21 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
 
     if score.total_score >= BALANCE.exit_acquisition_score_threshold:
         offer_value = quantize_money(adjusted_value * BALANCE.exit_acquisition_value_multiplier)
-        if pressure.channel_fragility >= 62:
+        if (
+            pressure.operating_durability == "resilient"
+            and pressure.path_gap >= BALANCE.exit_path_clarity_gap_threshold
+            and portfolio.channel_volatility_index <= 42
+        ):
+            ending_variant = "Synergy Premium Acquisition"
+            board_readout = (
+                "Buyer interest carries a premium because the channel stack "
+                "and support operations both survived scale cleanly."
+            )
+            next_chapter = (
+                "Protect diligence quality and integration readiness so the premium holds."
+            )
+            outcome_tags = ("acquisition", "premium", "synergy")
+        elif pressure.channel_fragility >= 62:
             ending_variant = "Diligence-Discounted Acquisition"
             board_readout = (
                 "Buyer interest is credible, but channel and support noise "
@@ -649,6 +696,20 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
                 "Compound the strongest customer motions without letting capital posture drift."
             )
             outcome_tags = ("independence", "capital", "clarity")
+        elif (
+            pressure.operating_durability == "resilient"
+            and pressure.commercial_fragility <= 22
+            and revenue_at_risk_accounts == 0
+        ):
+            ending_variant = "Trust-Backed Compounder"
+            board_readout = (
+                "Leadership earned independence through unusually clean customer operations."
+            )
+            next_chapter = (
+                "Keep renewals clean, service promises credible, "
+                "and scale only along healthy lanes."
+            )
+            outcome_tags = ("independence", "trust", "operations")
         elif (
             reserve_target_met
             and state.finance.debt_principal <= Decimal("0.00")

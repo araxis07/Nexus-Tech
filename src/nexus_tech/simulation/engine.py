@@ -1801,6 +1801,29 @@ def apply_end_of_turn_commercial_pressure(
             support_summary.high_value_risk_accounts
             * BALANCE.commercial_pressure_high_value_risk_confidence_loss,
         )
+    if support_summary.account_queue_risk_score >= 10:
+        board_pressure_delta += min(
+            4,
+            support_summary.account_queue_risk_score
+            // BALANCE.commercial_pressure_account_queue_board_penalty,
+        )
+    if support_summary.premium_queue_exposure_value > Decimal("0.00"):
+        board_confidence_loss += min(
+            3,
+            int(
+                (
+                    support_summary.premium_queue_exposure_value
+                    / BALANCE.commercial_pressure_revenue_at_risk_value_divisor
+                ).to_integral_value()
+            )
+            + BALANCE.commercial_pressure_premium_queue_confidence_loss,
+        )
+    if (
+        portfolio.channel_volatility_index
+        >= BALANCE.commercial_pressure_channel_volatility_threshold
+    ):
+        board_pressure_delta += BALANCE.commercial_pressure_channel_volatility_board_penalty
+        board_confidence_loss += 1
 
     if board_pressure_delta > 0:
         state.finance.board_pressure = clamp_int(
@@ -1873,6 +1896,13 @@ def apply_end_of_turn_commercial_pressure(
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 1
         )
+    if (
+        portfolio.channel_volatility_index
+        >= BALANCE.commercial_pressure_channel_volatility_threshold
+    ):
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score - 1
+        )
     if channel_economics_pressure:
         state.finance.board_profitability_score = clamp_int(
             state.finance.board_profitability_score
@@ -1911,6 +1941,15 @@ def apply_end_of_turn_commercial_pressure(
             f"{support_summary.high_value_risk_accounts} high-value accounts "
             "now need service recovery"
         )
+    if support_summary.account_queue_risk_score >= 10:
+        summary_parts.append(
+            f"account-level queue risk reached {support_summary.account_queue_risk_score}"
+        )
+    if support_summary.premium_queue_exposure_value > Decimal("0.00"):
+        summary_parts.append(
+            "premium queue exposure now covers "
+            f"{format_money(support_summary.premium_queue_exposure_value)}"
+        )
     if support_summary.lane_overflow_pressure > 0:
         summary_parts.append(
             f"support lanes overflowed by {support_summary.lane_overflow_pressure}"
@@ -1926,10 +1965,21 @@ def apply_end_of_turn_commercial_pressure(
         summary_parts.append(
             f"{portfolio.volatile_revenue_share_percent}% of partner revenue is now volatile"
         )
+    if (
+        portfolio.channel_volatility_index
+        >= BALANCE.commercial_pressure_channel_volatility_threshold
+    ):
+        summary_parts.append(
+            f"channel volatility index climbed to {portfolio.channel_volatility_index}"
+        )
     if channel_economics_pressure:
         summary_parts.append(
             f"{portfolio.hotspot_channel} economics are straining at "
             f"{portfolio.weighted_rev_share_percent}% rev share"
+        )
+    if portfolio.strained_revenue_share_percent > 0:
+        summary_parts.append(
+            f"{portfolio.strained_revenue_share_percent}% of partner revenue is already strained"
         )
     if paused_share_pressure:
         summary_parts.append(

@@ -43,12 +43,14 @@ class SupportProgramSummary:
     enterprise_revenue_at_risk_value: Decimal
     premium_revenue_at_risk_value: Decimal
     white_glove_revenue_at_risk_value: Decimal
+    premium_queue_exposure_value: Decimal
     high_value_risk_accounts: int
     renewal_pressure_accounts: int
     renewal_pressure_value: Decimal
     priority_breach_accounts: int
     white_glove_breach_accounts: int
     severe_queue_accounts: int
+    account_queue_risk_score: int
     recovery_ready_accounts: int
     sla_credit_cost: Decimal
     service_tier_pressure: int
@@ -304,6 +306,18 @@ def apply_end_of_turn_support_program(
         queue_increase - queue_relief,
     )
     severe_accounts = count_escalating_accounts(active_accounts)
+    account_queue_risk_score = clamp_int(
+        sum(
+            _calculate_account_support_severity(account)
+            for account in active_accounts
+            if (
+                account.open_tickets > 0
+                or account.sla_breach_risk > 0
+                or account.escalation_count > 0
+            )
+        )
+        // BALANCE.support_program_account_queue_risk_divisor
+    )
     enterprise_pressure = sum(
         1 for account in active_accounts if account.segment.value == "enterprise"
     )
@@ -461,6 +475,21 @@ def apply_end_of_turn_support_program(
             Decimal("0.00"),
         )
     )
+    premium_queue_exposure_value = quantize_money(
+        sum(
+            (
+                account.contract_value
+                for account in active_accounts
+                if account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
+                and _is_severe_queue_account(
+                    account,
+                    queue_age_threshold=BALANCE.support_program_queue_age_threshold,
+                    sla_target=state.support_program.sla_target,
+                )
+            ),
+            Decimal("0.00"),
+        )
+    )
     priority_breach_accounts = sum(
         1
         for account in active_accounts
@@ -594,6 +623,10 @@ def apply_end_of_turn_support_program(
             Decimal(white_glove_breach_accounts)
             * BALANCE.support_program_service_cost_per_white_glove_sla_credit
         )
+        + (
+            Decimal(account_queue_risk_score)
+            * BALANCE.support_program_service_cost_per_queue_risk_point
+        )
     )
     service_cost = quantize_money(base_service_cost + sla_credit_cost)
     state.support_program.service_cost_last_turn = service_cost
@@ -660,12 +693,14 @@ def apply_end_of_turn_support_program(
         enterprise_revenue_at_risk_value=enterprise_revenue_at_risk_value,
         premium_revenue_at_risk_value=premium_revenue_at_risk_value,
         white_glove_revenue_at_risk_value=white_glove_revenue_at_risk_value,
+        premium_queue_exposure_value=premium_queue_exposure_value,
         high_value_risk_accounts=high_value_risk_accounts,
         renewal_pressure_accounts=renewal_pressure_accounts,
         renewal_pressure_value=renewal_pressure_value,
         priority_breach_accounts=priority_breach_accounts,
         white_glove_breach_accounts=white_glove_breach_accounts,
         severe_queue_accounts=severe_queue_accounts,
+        account_queue_risk_score=account_queue_risk_score,
         recovery_ready_accounts=recovery_ready_accounts,
         sla_credit_cost=sla_credit_cost,
         service_tier_pressure=service_tier_pressure,
@@ -749,6 +784,19 @@ def triage_support_backlog(state: GameState) -> SupportOpsActionSummary:
         )
         account.failed_payment_risk = clamp_int(
             account.failed_payment_risk - (BALANCE.support_program_triage_sla_relief // 2)
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.support_program_triage_renewal_health_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_triage_satisfaction_gain
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age - BALANCE.support_program_triage_queue_age_relief,
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk - BALANCE.support_program_triage_satisfaction_gain
         )
         account.escalation_count = max(0, account.escalation_count - 1)
         if lane is not SupportLaneFocus.BALANCED:
@@ -962,6 +1010,12 @@ def route_support_escalation(
     )
     account.support_load = clamp_int(account.support_load - 2)
     account.churn_risk = clamp_int(account.churn_risk - BALANCE.support_program_route_churn_relief)
+    account.renewal_health = clamp_int(
+        account.renewal_health + (BALANCE.support_program_route_churn_relief // 2)
+    )
+    account.satisfaction = clamp_int(
+        account.satisfaction + BALANCE.support_program_triage_satisfaction_gain
+    )
     account.escalation_count = max(0, account.escalation_count - 1)
     account.ticket_queue_age = max(0, account.ticket_queue_age - 2)
     state.support_program.escalation_queue = max(0, state.support_program.escalation_queue - 1)

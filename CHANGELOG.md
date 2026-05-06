@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.42.0 - 2026-05-07
+
+- Deepened support-ops pressure with premium queue exposure, account-level queue-risk scoring, stronger triage recovery effects, and richer commercial fallout when high-touch service quality slips
+- Expanded partnership and channel analytics with strained revenue share, channel-volatility indexing, and heavier lane pressure from fatigued or recovery-stage channels
+- Strengthened finance-planner guidance with funding-resilience framing, capital-discipline indexing, and more concrete recommended actions around escalation routing, retention work, and partnership reactivation
+- Extended late-game evaluation with operating durability, path watchlists, and additional ending variants such as `Synergy Premium Acquisition` and `Trust-Backed Compounder`
+- Increased hardening coverage with deeper regression assertions across support, finance, partnership, and endgame metrics plus a seeded sixty-turn late-game stability check
+- Promoted the package version to `0.42.0`
+
 ## 0.41.0 - 2026-05-07
 
 - Deepened support-ops realism with high-value account risk tracking, recovery-ready account detection, SLA credit operating cost, and a recovery loop that can claw back satisfaction and renewal health when support operations stabilize

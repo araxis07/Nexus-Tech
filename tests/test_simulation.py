@@ -3589,11 +3589,13 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.enterprise_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.premium_revenue_at_risk_value >= Decimal("1400.00")
     assert summary.white_glove_revenue_at_risk_value >= Decimal("1400.00")
+    assert summary.premium_queue_exposure_value >= Decimal("1400.00")
     assert summary.high_value_risk_accounts >= 0
     assert summary.renewal_pressure_accounts >= 1
     assert summary.renewal_pressure_value >= Decimal("1400.00")
     assert summary.white_glove_breach_accounts >= 1
     assert summary.severe_queue_accounts >= 1
+    assert summary.account_queue_risk_score > 0
     assert summary.sla_credit_cost > Decimal("0.00")
     assert summary.service_tier_pressure >= 3
     assert summary.commercial_breach_pressure >= 2
@@ -4508,6 +4510,8 @@ def test_route_support_escalation_upgrades_support_tier_and_reduces_risk() -> No
     assert routed.support_tier is SupportTier.PRIORITY
     assert routed.open_tickets < account.open_tickets
     assert routed.churn_risk < account.churn_risk
+    assert routed.renewal_health > account.renewal_health
+    assert routed.satisfaction > account.satisfaction
 
 
 def test_run_add_on_campaign_expands_healthy_accounts() -> None:
@@ -5478,8 +5482,17 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
         "de-risk channel mix",
         "hold balanced execution",
     }
+    assert planner.funding_resilience in {
+        "funding resilience is durable",
+        "funding resilience is workable but exposed",
+        "funding resilience is fragile",
+    }
+    assert planner.capital_discipline_index >= 0
     assert "triage_support_backlog" in planner.recommended_actions
     assert "invest_in_partner_enablement" in planner.recommended_actions
+    assert "route_support_escalation" in planner.recommended_actions
+    assert "reactivate_partnership" in planner.recommended_actions
+    assert "run_retention_play" in planner.recommended_actions
 
 
 def test_bridge_round_event_applies_cash_and_dilution() -> None:
@@ -5661,7 +5674,9 @@ def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None
     assert pressure.capital_fragility > 0
     assert pressure.board_reset_risk > 0
     assert len(pressure.path_scorecard) == 4
+    assert len(pressure.path_watchlist) == 4
     assert pressure.strategic_clarity in {"clear path", "clear but stressed", "contested"}
+    assert pressure.operating_durability in {"resilient", "stretched", "fragile"}
     assert pressure.restructure_heat >= pressure.board_reset_risk // 3
 
 
@@ -5886,6 +5901,7 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.dominant_share_percent >= 50
     assert summary.dominant_channel in {"reseller", "marketplace"}
     assert summary.weighted_rev_share_percent >= 21
+    assert summary.strained_revenue_share_percent >= 0
     assert summary.fatigued_revenue_share_percent >= 0
     assert summary.recovery_revenue_share_percent >= 0
     assert summary.volatile_revenue_share_percent >= 0
@@ -5893,6 +5909,7 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.renegotiation_pressure >= 0
     assert summary.rev_share_pressure >= 0
     assert summary.fatigue_hotspot_count >= 0
+    assert summary.channel_volatility_index >= 0
     assert summary.commercial_dependency_score >= 0
     assert summary.hotspot_channel in {"reseller", "marketplace"}
     assert summary.channel_mix_note
@@ -5935,7 +5952,9 @@ def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk(
     assert summary.renegotiation_ready_count >= 1
     assert summary.weighted_rev_share_percent > 0
     assert summary.rev_share_pressure > 0
+    assert summary.strained_revenue_share_percent > 0
     assert summary.volatile_revenue_share_percent > 0
+    assert summary.channel_volatility_index > 0
     assert summary.commercial_dependency_score > 0
     assert summary.hotspot_channel in {"reseller", "marketplace"}
 
@@ -6031,6 +6050,37 @@ def test_forty_turn_founder_progression_is_seed_stable() -> None:
         )
 
     assert run_once(143) == run_once(143)
+
+
+def test_sixty_turn_late_game_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="ipo_readiness_launchpad",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(60):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            len(state.partnerships),
+            len(state.turn_history),
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(211) == run_once(211)
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:

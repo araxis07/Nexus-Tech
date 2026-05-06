@@ -81,6 +81,8 @@ class FinancePlannerSnapshot:
     execution_drag: str
     commercial_financing_risk: str
     capital_priority: str
+    funding_resilience: str
+    capital_discipline_index: int
     scenario_compare: tuple[str, ...]
     action_sequence: tuple[str, ...]
     allocation_actions: tuple[str, ...]
@@ -470,6 +472,26 @@ def build_finance_planner(
     else:
         capital_priority = "hold balanced execution"
 
+    reserve_gap_penalty = int(
+        (
+            abs(min(ZERO_MONEY, reserve_gap))
+            / BALANCE.finance_planner_capital_discipline_cash_divisor
+        ).to_integral_value()
+    )
+    capital_discipline_index = clamp_int(
+        100
+        - reserve_gap_penalty
+        - finance.covenant_risk
+        - (finance.investor_pressure // 2)
+        - commercial_risk_score
+    )
+    if capital_discipline_index >= 72 and reserve_break_risk in {"controlled", "elevated"}:
+        funding_resilience = "funding resilience is durable"
+    elif capital_discipline_index >= 48:
+        funding_resilience = "funding resilience is workable but exposed"
+    else:
+        funding_resilience = "funding resilience is fragile"
+
     scenario_compare = (
         f"Base ends at {format_money(base_end_cash)}.",
         (
@@ -508,6 +530,10 @@ def build_finance_planner(
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
         recommended_actions.append("invest_in_support_staffing")
+    if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
+        recommended_actions.append("route_support_escalation")
+    if renewal_pressure_value >= Decimal("2200.00"):
+        recommended_actions.append("run_retention_play")
     if (
         reserve_gap < ZERO_MONEY
         and capital_plan.source_preference.value == "debt"
@@ -523,6 +549,11 @@ def build_finance_planner(
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
     ):
         recommended_actions.append("invest_in_partner_enablement")
+    if (
+        channel_dependency_risk >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        recommended_actions.append("reactivate_partnership")
     if channel_conflict_index >= 30:
         recommended_actions.append("renegotiate_partnership")
     if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
@@ -548,6 +579,8 @@ def build_finance_planner(
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
     ):
         action_sequence.append("reduce volatile channel revenue before leaning on outside capital")
+    if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
+        action_sequence.append("route top-risk accounts before promising another growth step")
     if not action_sequence:
         action_sequence.append("hold posture and review the next planning window")
 
@@ -577,6 +610,8 @@ def build_finance_planner(
         execution_drag=execution_drag,
         commercial_financing_risk=commercial_financing_risk,
         capital_priority=capital_priority,
+        funding_resilience=funding_resilience,
+        capital_discipline_index=capital_discipline_index,
         scenario_compare=scenario_compare,
         action_sequence=tuple(action_sequence),
         allocation_actions=tuple(allocation_actions),
