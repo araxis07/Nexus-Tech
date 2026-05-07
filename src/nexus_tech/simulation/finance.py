@@ -12,6 +12,7 @@ from nexus_tech.domain.models import (
     FinanceState,
     FundingHistoryEntry,
     FundingType,
+    SupportLaneFocus,
     TurnLedgerEntry,
 )
 from nexus_tech.domain.money import format_money, quantize_money
@@ -82,6 +83,8 @@ class FinancePlannerSnapshot:
     commercial_financing_risk: str
     support_lane_signal: str
     channel_recovery_note: str
+    path_pressure_bias: str
+    capital_rebalance_note: str
     capital_priority: str
     funding_resilience: str
     capital_discipline_index: int
@@ -234,10 +237,17 @@ def build_finance_planner(
     volatile_revenue_share_percent: int = 0,
     enterprise_queue_exposure_value: Decimal = ZERO_MONEY,
     renewal_queue_exposure_value: Decimal = ZERO_MONEY,
+    enterprise_queue_risk_accounts: int = 0,
+    renewal_queue_risk_accounts: int = 0,
     support_lane_saturation_index: int = 0,
+    support_hotspot_lane: SupportLaneFocus = SupportLaneFocus.BALANCED,
     recovery_drag_score: int = 0,
     paused_dependency_score: int = 0,
     hotspot_revenue_share_percent: int = 0,
+    strategic_outlook: str = "profitable_independence",
+    dominant_endgame_pressure: str = "independence_discipline",
+    commercial_fragility: int = 0,
+    capital_fragility: int = 0,
 ) -> FinancePlannerSnapshot:
     """Project end-cash and reserve stress over the active planning horizon."""
 
@@ -510,6 +520,41 @@ def build_finance_planner(
     else:
         channel_recovery_note = "channel recovery drag is present but not yet dominant."
 
+    if strategic_outlook == "ipo_ready":
+        path_pressure_bias = (
+            "public-market proof now matters more than another loose expansion story."
+        )
+    elif strategic_outlook == "strategic_acquisition":
+        path_pressure_bias = (
+            "buyer diligence will discount revenue that still looks concentrated or unstable."
+        )
+    else:
+        path_pressure_bias = (
+            "independence only holds if reserves, renewals, and debt discipline stay coherent."
+        )
+
+    if commercial_fragility >= 60:
+        capital_rebalance_note = (
+            "shift more capital toward service recovery before funding the next growth promise."
+        )
+    elif (
+        support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+        and enterprise_queue_risk_accounts >= max(1, renewal_queue_risk_accounts)
+    ):
+        capital_rebalance_note = (
+            "lean capital toward enterprise support stabilization before inviting more scrutiny."
+        )
+    elif support_hotspot_lane is SupportLaneFocus.BILLING and renewal_queue_risk_accounts > 0:
+        capital_rebalance_note = (
+            "billing friction is now threatening renewals, so reserve and CS coverage matter more."
+        )
+    elif capital_fragility >= 60:
+        capital_rebalance_note = (
+            "capital fragility is too high to keep funding growth and resilience at the same pace."
+        )
+    else:
+        capital_rebalance_note = "the current capital split is still workable with active review."
+
     if reserve_break_risk in {"critical", "high"}:
         capital_priority = "protect reserve first"
     elif revenue_at_risk_value > renewal_pressure_value and revenue_at_risk_value > ZERO_MONEY:
@@ -580,6 +625,8 @@ def build_finance_planner(
         recommended_actions.append("triage_support_backlog")
     if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
         recommended_actions.append("set_support_lane_focus")
+    if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
+        recommended_actions.append("upgrade_support_program")
     if revenue_at_risk_value >= Decimal("2400.00"):
         recommended_actions.append("invest_in_support_staffing")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
@@ -612,6 +659,19 @@ def build_finance_planner(
         recommended_actions.append("review_partnerships")
     if channel_conflict_index >= 30:
         recommended_actions.append("renegotiate_partnership")
+    if (
+        strategic_outlook == "strategic_acquisition"
+        and hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+        and "renegotiate_partnership" not in recommended_actions
+    ):
+        recommended_actions.append("renegotiate_partnership")
+    if (
+        strategic_outlook == "profitable_independence"
+        and capital_fragility >= 55
+        and finance.debt_principal > ZERO_MONEY
+        and "repay_debt" not in recommended_actions
+    ):
+        recommended_actions.append("repay_debt")
     if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
         recommended_actions.append("execute_board_response")
     if not recommended_actions:
@@ -641,6 +701,20 @@ def build_finance_planner(
         action_sequence.append("reduce volatile channel revenue before leaning on outside capital")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
         action_sequence.append("route top-risk accounts before promising another growth step")
+    if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
+        action_sequence.append(
+            "treat reliability proof as the gating item for the next growth step"
+        )
+    if (
+        strategic_outlook == "strategic_acquisition"
+        and dominant_endgame_pressure == "acquirer_diligence"
+    ):
+        action_sequence.append("deconcentrate channel revenue before leaning into buyer interest")
+    if (
+        strategic_outlook == "profitable_independence"
+        and dominant_endgame_pressure == "independence_discipline"
+    ):
+        action_sequence.append("protect reserve and renewal quality before adding fresh burn")
     if not action_sequence:
         action_sequence.append("hold posture and review the next planning window")
 
@@ -671,6 +745,8 @@ def build_finance_planner(
         commercial_financing_risk=commercial_financing_risk,
         support_lane_signal=support_lane_signal,
         channel_recovery_note=channel_recovery_note,
+        path_pressure_bias=path_pressure_bias,
+        capital_rebalance_note=capital_rebalance_note,
         capital_priority=capital_priority,
         funding_resilience=funding_resilience,
         capital_discipline_index=capital_discipline_index,

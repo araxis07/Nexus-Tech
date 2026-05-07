@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.45.0 - 2026-05-07
+
+- Deepened late-game branch pressure by letting IPO, acquisition, and independence outlooks amplify commercial stress differently once support or channel signals slip
+- Expanded support-ops realism with enterprise and renewal queue-risk account counts plus hotspot-lane tracking that now feeds planning and board pressure
+- Strengthened the finance planner with path-pressure bias, capital rebalance guidance, and clearer action recommendations tied to endgame posture
+- Added new regression coverage for path-specific commercial pressure and a seeded 90-turn IPO-launchpad stability run
+- Promoted the package version to `0.45.0`
+
 ## 0.44.0 - 2026-05-07
 
 - Deepened support-ops realism with enterprise queue exposure, renewal queue exposure, white-glove queue-risk counts, and lane saturation signals that now feed finance, governance, and late-game pressure

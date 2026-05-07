@@ -2924,6 +2924,9 @@ def _build_support_program_panel(state: GameState) -> Panel:
     )
     table.add_row("Service Cost", format_money(state.support_program.service_cost_last_turn))
     table.add_row("Escalations", str(escalating_accounts))
+    table.add_row("Ent Queue Accts", str(queue_exposure.enterprise_queue_risk_accounts))
+    table.add_row("Ren Queue Accts", str(queue_exposure.renewal_queue_risk_accounts))
+    table.add_row("Hotspot Lane", queue_exposure.hotspot_lane.value)
     return Panel(table, title="Support Program", border_style="green", expand=True)
 
 
@@ -2965,6 +2968,8 @@ def _build_finance_panel(state: GameState) -> Panel:
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
     portfolio = calculate_partnership_portfolio(state)
     queue_exposure = calculate_support_queue_exposure(state)
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state, readiness)
     revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
     base_forecast, conservative_forecast, aggressive_forecast = (
         calculate_cash_flow_forecast_scenarios(
@@ -2996,10 +3001,17 @@ def _build_finance_panel(state: GameState) -> Panel:
         volatile_revenue_share_percent=portfolio.volatile_revenue_share_percent,
         enterprise_queue_exposure_value=queue_exposure.enterprise_queue_exposure_value,
         renewal_queue_exposure_value=queue_exposure.renewal_queue_exposure_value,
+        enterprise_queue_risk_accounts=queue_exposure.enterprise_queue_risk_accounts,
+        renewal_queue_risk_accounts=queue_exposure.renewal_queue_risk_accounts,
         support_lane_saturation_index=queue_exposure.lane_saturation_index,
+        support_hotspot_lane=queue_exposure.hotspot_lane,
         recovery_drag_score=portfolio.recovery_drag_score,
         paused_dependency_score=portfolio.paused_dependency_score,
         hotspot_revenue_share_percent=portfolio.hotspot_revenue_share_percent,
+        strategic_outlook=readiness.strategic_outlook,
+        dominant_endgame_pressure=pressure.dominant_pressure,
+        commercial_fragility=pressure.commercial_fragility,
+        capital_fragility=pressure.capital_fragility,
     )
     table = Table.grid(padding=(0, 1))
     table.add_row("Debt", format_money(state.finance.debt_principal))
@@ -3079,6 +3091,8 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Comm Risk", planner.commercial_financing_risk)
     table.add_row("Support Lane", planner.support_lane_signal)
     table.add_row("Channel Recovery", planner.channel_recovery_note)
+    table.add_row("Path Bias", planner.path_pressure_bias)
+    table.add_row("Rebalance", planner.capital_rebalance_note)
     table.add_row("Priority", planner.capital_priority)
     table.add_row("Funding Resilience", planner.funding_resilience)
     table.add_row("Capital Discipline", str(planner.capital_discipline_index))

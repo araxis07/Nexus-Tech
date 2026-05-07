@@ -46,6 +46,8 @@ class SupportProgramSummary:
     premium_queue_exposure_value: Decimal
     enterprise_queue_exposure_value: Decimal
     renewal_queue_exposure_value: Decimal
+    enterprise_queue_risk_accounts: int
+    renewal_queue_risk_accounts: int
     high_value_risk_accounts: int
     renewal_pressure_accounts: int
     renewal_pressure_value: Decimal
@@ -55,6 +57,7 @@ class SupportProgramSummary:
     severe_queue_accounts: int
     account_queue_risk_score: int
     lane_saturation_index: int
+    hotspot_lane: SupportLaneFocus
     recovery_ready_accounts: int
     sla_credit_cost: Decimal
     service_tier_pressure: int
@@ -86,9 +89,12 @@ class SupportQueueExposure:
     premium_queue_exposure_value: Decimal
     enterprise_queue_exposure_value: Decimal
     renewal_queue_exposure_value: Decimal
+    enterprise_queue_risk_accounts: int
+    renewal_queue_risk_accounts: int
     white_glove_queue_risk_accounts: int
     severe_queue_accounts: int
     lane_saturation_index: int
+    hotspot_lane: SupportLaneFocus
 
 
 @dataclass(frozen=True)
@@ -184,9 +190,18 @@ def calculate_support_queue_exposure(state: GameState) -> SupportQueueExposure:
     white_glove_queue_risk_accounts = sum(
         1 for account in severe_accounts if account.support_tier is SupportTier.WHITE_GLOVE
     )
-    lane_overflow_pressure = sum(
-        snapshot.overflow for snapshot in calculate_support_lane_snapshots(state).values()
+    enterprise_queue_risk_accounts = sum(
+        1 for account in severe_accounts if account.segment.value == "enterprise"
     )
+    renewal_queue_risk_accounts = sum(
+        1 for account in severe_accounts if _is_renewal_pressure_account(account)
+    )
+    lane_snapshots = calculate_support_lane_snapshots(state)
+    lane_overflow_pressure = sum(snapshot.overflow for snapshot in lane_snapshots.values())
+    hotspot_lane = max(
+        lane_snapshots.values(),
+        key=lambda snapshot: (snapshot.overflow, snapshot.pressure, snapshot.account_count),
+    ).lane
     lane_saturation_index = clamp_int(
         lane_overflow_pressure
         + state.support_program.escalation_queue
@@ -197,9 +212,12 @@ def calculate_support_queue_exposure(state: GameState) -> SupportQueueExposure:
         premium_queue_exposure_value=premium_queue_exposure_value,
         enterprise_queue_exposure_value=enterprise_queue_exposure_value,
         renewal_queue_exposure_value=renewal_queue_exposure_value,
+        enterprise_queue_risk_accounts=enterprise_queue_risk_accounts,
+        renewal_queue_risk_accounts=renewal_queue_risk_accounts,
         white_glove_queue_risk_accounts=white_glove_queue_risk_accounts,
         severe_queue_accounts=len(severe_accounts),
         lane_saturation_index=lane_saturation_index,
+        hotspot_lane=hotspot_lane,
     )
 
 
@@ -715,14 +733,19 @@ def apply_end_of_turn_support_program(
         >= BALANCE.support_program_high_value_contract_threshold
     ):
         summary = (
-            "Enterprise queue exposure is now large enough to threaten renewals and board trust."
+            "Enterprise queue exposure is now large enough to threaten renewals and board trust, "
+            f"with {queue_exposure.enterprise_queue_risk_accounts} critical account(s) "
+            "concentrated "
+            f"in {queue_exposure.hotspot_lane.value} support."
         )
     elif (
         queue_exposure.lane_saturation_index
         >= BALANCE.support_program_backlog_reputation_threshold // 2
     ):
         summary = (
-            "Support lanes are saturated enough that backlog relief now matters more than new load."
+            "Support lanes are saturated enough that backlog relief now matters more than new "
+            "load, "
+            f"especially in {queue_exposure.hotspot_lane.value} support."
         )
     elif state.support_program.backlog_queue == 0:
         summary = "Support tooling is keeping ticket flow under control."
@@ -775,6 +798,8 @@ def apply_end_of_turn_support_program(
         premium_queue_exposure_value=queue_exposure.premium_queue_exposure_value,
         enterprise_queue_exposure_value=queue_exposure.enterprise_queue_exposure_value,
         renewal_queue_exposure_value=queue_exposure.renewal_queue_exposure_value,
+        enterprise_queue_risk_accounts=queue_exposure.enterprise_queue_risk_accounts,
+        renewal_queue_risk_accounts=queue_exposure.renewal_queue_risk_accounts,
         high_value_risk_accounts=high_value_risk_accounts,
         renewal_pressure_accounts=renewal_pressure_accounts,
         renewal_pressure_value=renewal_pressure_value,
@@ -784,6 +809,7 @@ def apply_end_of_turn_support_program(
         severe_queue_accounts=queue_exposure.severe_queue_accounts,
         account_queue_risk_score=account_queue_risk_score,
         lane_saturation_index=queue_exposure.lane_saturation_index,
+        hotspot_lane=queue_exposure.hotspot_lane,
         recovery_ready_accounts=recovery_ready_accounts,
         sla_credit_cost=sla_credit_cost,
         service_tier_pressure=service_tier_pressure,

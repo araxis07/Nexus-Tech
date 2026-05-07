@@ -1254,6 +1254,33 @@ def test_resolve_turn_commercial_pressure_hits_direct_channel_conflict() -> None
     assert resolution.state.finance.board_portfolio_focus_score != starting_focus_score
 
 
+def test_resolve_turn_commercial_pressure_applies_path_specific_scrutiny() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="ipo_readiness_launchpad",
+    )
+    anchor = state.customer_accounts[0]
+    anchor.segment = MarketSegment.ENTERPRISE
+    anchor.support_tier = SupportTier.WHITE_GLOVE
+    anchor.contract_value = Decimal("3200.00")
+    anchor.open_tickets = 18
+    anchor.sla_breach_risk = 84
+    anchor.ticket_queue_age = 5
+    anchor.renewal_health = 44
+    anchor.churn_risk = 40
+    state.support_program.backlog_queue = max(state.support_program.backlog_queue, 18)
+    state.support_program.escalation_queue = max(state.support_program.escalation_queue, 6)
+    starting_governance_risk = state.finance.governance_risk
+    starting_board_pressure = state.finance.board_pressure
+
+    resolution = resolve_turn(state, FixedRandom(0))
+
+    assert "public-market scrutiny" in resolution.commercial_pressure_summary
+    assert resolution.state.finance.board_pressure > starting_board_pressure
+    assert resolution.state.finance.governance_risk > starting_governance_risk
+
+
 def test_long_run_late_game_progression_resolves_without_crashing() -> None:
     state = create_new_game(
         DEFAULT_COMPANY_NAME,
@@ -3592,6 +3619,8 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.premium_queue_exposure_value >= Decimal("1400.00")
     assert summary.enterprise_queue_exposure_value >= Decimal("1400.00")
     assert summary.renewal_queue_exposure_value >= Decimal("1400.00")
+    assert summary.enterprise_queue_risk_accounts >= 1
+    assert summary.renewal_queue_risk_accounts >= 1
     assert summary.high_value_risk_accounts >= 0
     assert summary.renewal_pressure_accounts >= 1
     assert summary.renewal_pressure_value >= Decimal("1400.00")
@@ -3600,6 +3629,7 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.severe_queue_accounts >= 1
     assert summary.account_queue_risk_score > 0
     assert summary.lane_saturation_index > 0
+    assert summary.hotspot_lane is SupportLaneFocus.ENTERPRISE
     assert summary.sla_credit_cost > Decimal("0.00")
     assert summary.service_tier_pressure >= 3
     assert summary.commercial_breach_pressure >= 2
@@ -5476,10 +5506,17 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
         volatile_revenue_share_percent=44,
         enterprise_queue_exposure_value=Decimal("3600.00"),
         renewal_queue_exposure_value=Decimal("2600.00"),
+        enterprise_queue_risk_accounts=2,
+        renewal_queue_risk_accounts=2,
         support_lane_saturation_index=16,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
         recovery_drag_score=38,
         paused_dependency_score=66,
         hotspot_revenue_share_percent=40,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=62,
+        capital_fragility=54,
     )
 
     assert planner.commercial_financing_risk in {
@@ -5505,8 +5542,11 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "reactivate_partnership" in planner.recommended_actions
     assert "review_partnerships" in planner.recommended_actions
     assert "run_retention_play" in planner.recommended_actions
+    assert "upgrade_support_program" in planner.recommended_actions
     assert planner.support_lane_signal
     assert planner.channel_recovery_note
+    assert "public-market" in planner.path_pressure_bias
+    assert planner.capital_rebalance_note
 
 
 def test_bridge_round_event_applies_cash_and_dilution() -> None:
@@ -6307,6 +6347,37 @@ def test_eighty_turn_channel_rebuild_progression_is_seed_stable() -> None:
         )
 
     assert run_once(377) == run_once(377)
+
+
+def test_ninety_turn_ipo_launchpad_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="ipo_readiness_launchpad",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(90):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            len(state.turn_history),
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(503) == run_once(503)
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:

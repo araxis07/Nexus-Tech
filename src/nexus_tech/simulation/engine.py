@@ -79,7 +79,11 @@ from nexus_tech.simulation.employee_progression import (
     run_comp_review,
     train_employee,
 )
-from nexus_tech.simulation.endgame import apply_exit_outcome
+from nexus_tech.simulation.endgame import (
+    apply_exit_outcome,
+    calculate_endgame_pressure,
+    calculate_endgame_readiness,
+)
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.finance import (
     FinanceTurnSummary,
@@ -1687,6 +1691,8 @@ def apply_end_of_turn_commercial_pressure(
     """Translate support and channel stress into company-level commercial pressure."""
 
     portfolio = calculate_partnership_portfolio(state)
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state, readiness)
     for account in state.customer_accounts:
         if account.status is CustomerAccountStatus.CHURNED:
             continue
@@ -1850,6 +1856,58 @@ def apply_end_of_turn_commercial_pressure(
     ):
         board_pressure_delta += BALANCE.commercial_pressure_channel_volatility_board_penalty
         board_confidence_loss += 1
+
+    path_specific_notes: list[str] = []
+    if readiness.strategic_outlook == "ipo_ready" and (
+        pressure.public_market_scrutiny >= BALANCE.event_public_market_scrutiny_pressure_threshold
+        or support_summary.enterprise_queue_risk_accounts > 0
+    ):
+        board_pressure_delta += min(3, 1 + support_summary.enterprise_queue_risk_accounts)
+        board_confidence_loss += min(
+            2,
+            1
+            + (
+                support_summary.white_glove_queue_risk_accounts
+                // max(1, BALANCE.commercial_pressure_white_glove_breach_confidence_loss)
+            ),
+        )
+        governance_risk_delta += min(
+            3,
+            1 + (pressure.public_market_scrutiny // BALANCE.exit_path_clarity_gap_threshold),
+        )
+        state.finance.board_reliability_score = clamp_int(state.finance.board_reliability_score - 1)
+        path_specific_notes.append("public-market scrutiny is amplifying reliability misses")
+    elif readiness.strategic_outlook == "strategic_acquisition" and (
+        pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
+        or portfolio.paused_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        board_pressure_delta += min(
+            3,
+            1
+            + (
+                portfolio.paused_dependency_score
+                // BALANCE.finance_planner_reactivate_dependency_threshold
+            ),
+        )
+        board_confidence_loss += min(3, 1 + (portfolio.hotspot_revenue_share_percent // 25))
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score - 1
+        )
+        path_specific_notes.append("acquirer diligence is magnifying channel concentration")
+    elif readiness.strategic_outlook == "profitable_independence" and (
+        pressure.independence_discipline >= BALANCE.event_independence_reckoning_pressure_threshold
+        or support_summary.renewal_queue_risk_accounts > 0
+    ):
+        governance_risk_delta += min(3, 1 + support_summary.renewal_queue_risk_accounts)
+        state.finance.covenant_risk = clamp_int(state.finance.covenant_risk + 1)
+        path_specific_notes.append("independence discipline is punishing renewal instability")
+    if (
+        pressure.board_reset_risk >= BALANCE.event_board_reckoning_pressure_threshold
+        and pressure.dominant_pressure == "restructure_heat"
+    ):
+        state.finance.restructuring_pressure = clamp_int(state.finance.restructuring_pressure + 1)
+        path_specific_notes.append("board reset risk is drifting toward forced restructuring")
 
     if board_pressure_delta > 0:
         state.finance.board_pressure = clamp_int(
@@ -2036,6 +2094,8 @@ def apply_end_of_turn_commercial_pressure(
         summary_parts.append(
             f"{portfolio.direct_sales_conflict_accounts} accounts are now in channel conflict"
         )
+    if path_specific_notes:
+        summary_parts.extend(path_specific_notes)
 
     if not summary_parts:
         return "Commercial pressure is under control."
