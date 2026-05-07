@@ -2181,6 +2181,11 @@ def _build_action_menu_panel() -> Panel:
         "Build backup leadership around one manager or lead.",
     )
     primary_actions.add_row("32", "route_support_escalation", "Escalate one fragile account.")
+    primary_actions.add_row(
+        "79",
+        "run_account_rescue",
+        "Stabilize one revenue-critical account with a heavier support play.",
+    )
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
     primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
@@ -2244,6 +2249,11 @@ def _build_action_menu_panel() -> Panel:
         "73",
         "set_capital_plan",
         "Change reserve posture and preferred capital source.",
+    )
+    primary_actions.add_row(
+        "80",
+        "rebalance_capital",
+        "Auto-tune capital allocation around current support and channel pressure.",
     )
     primary_actions.add_row(
         "74",

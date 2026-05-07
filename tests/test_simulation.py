@@ -3750,6 +3750,52 @@ def test_route_support_escalation_prioritizes_billing_lane_pressure() -> None:
     assert updated.renewal_health > account.renewal_health
 
 
+def test_run_account_rescue_stabilizes_revenue_critical_account() -> None:
+    product = make_product("Rescue Desk", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Revenue Shield",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=44,
+        onboarding_health=54,
+        support_load=28,
+        open_tickets=8,
+        sla_breach_risk=24,
+        invoice_risk=68,
+        failed_payment_risk=74,
+        dunning_steps=2,
+        escalation_count=2,
+        ticket_queue_age=4,
+        expansion_potential=42,
+        renewal_health=34,
+        renewal_turn=4,
+        churn_risk=57,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("5000.00"))
+    state.support_program.backlog_queue = 8
+    state.support_program.escalation_queue = 3
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ACCOUNT_RESCUE,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated = outcome.state.customer_accounts[0]
+    assert "rescue" in outcome.message
+    assert updated.open_tickets < account.open_tickets
+    assert updated.sla_breach_risk < account.sla_breach_risk
+    assert updated.invoice_risk < account.invoice_risk
+    assert updated.failed_payment_risk < account.failed_payment_risk
+    assert updated.renewal_health > account.renewal_health
+    assert updated.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < 8
+    assert outcome.state.support_program.escalation_queue < 3
+
+
 def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     product = make_product("Hiring Hub")
     state = make_state(product, cash_on_hand=Decimal("15000.00"))
@@ -5553,8 +5599,10 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "set_support_lane_focus" in planner.recommended_actions
     assert "invest_in_partner_enablement" in planner.recommended_actions
     assert "route_support_escalation" in planner.recommended_actions
+    assert "run_account_rescue" in planner.recommended_actions
     assert "reactivate_partnership" in planner.recommended_actions
     assert "review_partnerships" in planner.recommended_actions
+    assert "rebalance_capital" in planner.recommended_actions
     assert "run_retention_play" in planner.recommended_actions
     assert "upgrade_support_program" in planner.recommended_actions
     assert planner.support_lane_signal
@@ -6684,6 +6732,37 @@ def test_hundred_turn_independence_compounder_progression_is_seed_stable() -> No
     assert run_once(733) == run_once(733)
 
 
+def test_hundred_turn_board_recovery_crucible_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="board_recovery_crucible",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(100):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            state.finance.governance_risk,
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(809) == run_once(809)
+
+
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
     product = make_product("Paused Lane", market_fit=68, quality=72, bug_level=12)
     partnership = PartnershipDeal(
@@ -6839,6 +6918,73 @@ def test_set_capital_plan_action_accepts_custom_allocations() -> None:
     assert outcome.state.capital_plan.go_to_market_share == 28
     assert outcome.state.capital_plan.reserve_share == 30
     assert "Allocation P 42% / GTM 28% / Reserve 30%" in outcome.message
+
+
+def test_rebalance_capital_action_shifts_allocation_toward_resilience() -> None:
+    product = make_product("Capital Rebalance Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Hotspot Enterprise",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2400.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=48,
+        open_tickets=7,
+        sla_breach_risk=22,
+        ticket_queue_age=4,
+        expansion_potential=55,
+        renewal_health=40,
+        renewal_turn=5,
+        churn_risk=46,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Concentrated Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.RECOVERY,
+        quality=60,
+        risk=52,
+        conflict_pressure=44,
+        enablement_level=32,
+        sourced_revenue=Decimal("2400.00"),
+        rev_share_rate=Decimal("0.2200"),
+    )
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.DEBT,
+        planning_horizon_turns=7,
+        reserve_target=Decimal("4200.00"),
+        product_investment_share=30,
+        go_to_market_share=45,
+        reserve_share=25,
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        capital_plan=capital_plan,
+        cash_on_hand=Decimal("2600.00"),
+    )
+    state.finance.covenant_risk = 22
+    state.finance.board_pressure = 28
+    state.finance.active_board_ask = BoardAsk.RELIABILITY
+
+    outcome = apply_action(state, TurnAction.REBALANCE_CAPITAL, context=ActionContext())
+
+    updated_plan = outcome.state.capital_plan
+    assert updated_plan.mode is CapitalPlanMode.CONSERVE
+    assert updated_plan.reserve_target > capital_plan.reserve_target
+    assert updated_plan.product_investment_share >= capital_plan.product_investment_share
+    assert updated_plan.go_to_market_share < capital_plan.go_to_market_share
+    assert updated_plan.reserve_share > capital_plan.reserve_share
+    assert (
+        updated_plan.product_investment_share
+        + updated_plan.go_to_market_share
+        + updated_plan.reserve_share
+        == 100
+    )
+    assert "Capital was rebalanced" in outcome.message
 
 
 def test_finance_drift_penalizes_misaligned_capital_plan() -> None:

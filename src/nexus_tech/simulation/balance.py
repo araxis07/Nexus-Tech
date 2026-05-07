@@ -1872,6 +1872,21 @@ class BalanceConfig:
     support_program_route_billing_payment_relief: int = 16
     support_program_route_billing_dunning_relief: int = 1
     support_program_route_billing_renewal_health_gain: int = 6
+    support_program_account_rescue_cost: Decimal = Decimal("185.00")
+    support_program_account_rescue_backlog_relief: int = 2
+    support_program_account_rescue_escalation_relief: int = 1
+    support_program_account_rescue_ticket_relief: int = 6
+    support_program_account_rescue_sla_relief: int = 10
+    support_program_account_rescue_queue_age_relief: int = 3
+    support_program_account_rescue_support_load_relief: int = 4
+    support_program_account_rescue_renewal_health_gain: int = 8
+    support_program_account_rescue_satisfaction_gain: int = 6
+    support_program_account_rescue_churn_relief: int = 8
+    support_program_account_rescue_onboarding_health_gain: int = 10
+    support_program_account_rescue_billing_invoice_relief: int = 18
+    support_program_account_rescue_billing_payment_relief: int = 18
+    support_program_account_rescue_billing_dunning_relief: int = 1
+    support_program_account_rescue_lane_relief: int = 5
     support_program_triage_cost: Decimal = Decimal("150.00")
     support_program_triage_backlog_relief: int = 10
     support_program_triage_escalation_relief: int = 3
@@ -2202,6 +2217,11 @@ class BalanceConfig:
     capital_plan_venture_dilution_confidence_penalty: int = 2
     capital_plan_expand_execution_bonus: int = 1
     capital_plan_conserve_execution_bonus: int = 1
+    capital_plan_rebalance_reserve_target_step: Decimal = Decimal("600.00")
+    capital_plan_rebalance_horizon_gain: int = 1
+    capital_plan_rebalance_reserve_share_shift: int = 4
+    capital_plan_rebalance_product_share_shift: int = 3
+    capital_plan_rebalance_gtm_share_shift: int = 4
 
     finance_forecast_conservative_expand_extra_drag: Decimal = Decimal("0.0600")
     finance_forecast_conservative_conserve_relief: Decimal = Decimal("0.0300")

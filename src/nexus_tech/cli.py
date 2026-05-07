@@ -238,6 +238,7 @@ ACTION_KEYS = {
     "16": TurnAction.REPAY_DEBT,
     "17": TurnAction.REVIEW_FINANCE,
     "78": TurnAction.REFINANCE_DEBT,
+    "80": TurnAction.REBALANCE_CAPITAL,
     "18": TurnAction.HIRE_EMPLOYEE,
     "19": TurnAction.FIRE_EMPLOYEE,
     "20": TurnAction.ASSIGN_EMPLOYEE,
@@ -255,6 +256,7 @@ ACTION_KEYS = {
     "75": TurnAction.RUN_COMP_REVIEW,
     "76": TurnAction.RUN_SUCCESSION_REVIEW,
     "32": TurnAction.ROUTE_SUPPORT_ESCALATION,
+    "79": TurnAction.RUN_ACCOUNT_RESCUE,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -1495,6 +1497,9 @@ def collect_action_context(
     if action is TurnAction.TRIAGE_SUPPORT_BACKLOG:
         return ActionContext()
 
+    if action is TurnAction.REBALANCE_CAPITAL:
+        return ActionContext()
+
     if action is TurnAction.SET_SUPPORT_LANE_FOCUS:
         focus_key = ask_choice_input(
             "Support lane focus",
@@ -1595,6 +1600,14 @@ def collect_action_context(
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_ACCOUNT_RESCUE:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=True)
+        if customer_account_id is None:
+            customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+            if customer_account_id is None:
+                return None
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.CREATE_PARTNERSHIP:

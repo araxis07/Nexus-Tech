@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.48.0 - 2026-05-07
+
+- Added targeted recovery actions through `run_account_rescue`, letting the player spend directly on one revenue-critical account to cut queue, billing, renewal, and churn pressure in a single move
+- Added `rebalance_capital` as a real planning action that automatically retunes reserve, product, and GTM allocation around reserve stress, support hotspots, channel concentration, and the active board ask
+- Strengthened the finance planner so it now recommends account rescues and capital rebalances when support exposure, renewal pressure, queue hotspots, or partner dependency start distorting late-game execution
+- Extended regression coverage with dedicated action tests for account rescue and capital rebalance plus a seeded 100-turn board-recovery stability run
+- Promoted the package version to `0.48.0`
+
 ## 0.47.0 - 2026-05-07
 
 - Deepened support-lane realism by turning hotspot lane focus into a stronger immediate action, with targeted relief when the company shifts into the live enterprise, billing, or onboarding bottleneck

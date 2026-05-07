@@ -1247,6 +1247,128 @@ def route_support_escalation(
     )
 
 
+def run_account_rescue(
+    state: GameState,
+    account_id,
+) -> SupportOpsActionSummary:
+    """Run a heavier one-account rescue for the most commercially exposed support issue."""
+
+    account = _get_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if (
+        account.open_tickets <= 0
+        and account.sla_breach_risk <= 0
+        and account.ticket_queue_age <= 0
+        and account.failed_payment_risk <= 0
+        and account.invoice_risk <= 0
+        and account.churn_risk <= 4
+        and account.renewal_health >= 76
+    ):
+        raise ValueError("That account does not need a rescue play right now.")
+    if state.company.cash_on_hand < BALANCE.support_program_account_rescue_cost:
+        raise ValueError("Not enough cash to run an account rescue this turn.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_account_rescue_cost
+    )
+    lane = classify_account_support_lane(account)
+    lane_label = lane.value
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - BALANCE.support_program_account_rescue_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_account_rescue_escalation_relief,
+    )
+    account.open_tickets = max(
+        0,
+        account.open_tickets - BALANCE.support_program_account_rescue_ticket_relief,
+    )
+    account.sla_breach_risk = clamp_int(
+        account.sla_breach_risk - BALANCE.support_program_account_rescue_sla_relief
+    )
+    account.ticket_queue_age = max(
+        0,
+        account.ticket_queue_age - BALANCE.support_program_account_rescue_queue_age_relief,
+    )
+    account.support_load = clamp_int(
+        account.support_load - BALANCE.support_program_account_rescue_support_load_relief
+    )
+    account.renewal_health = clamp_int(
+        account.renewal_health + BALANCE.support_program_account_rescue_renewal_health_gain
+    )
+    account.satisfaction = clamp_int(
+        account.satisfaction + BALANCE.support_program_account_rescue_satisfaction_gain
+    )
+    account.churn_risk = clamp_int(
+        account.churn_risk - BALANCE.support_program_account_rescue_churn_relief
+    )
+    account.failed_payment_risk = clamp_int(
+        account.failed_payment_risk - (BALANCE.support_program_account_rescue_sla_relief // 2)
+    )
+    account.escalation_count = max(0, account.escalation_count - 1)
+
+    if lane is SupportLaneFocus.BILLING:
+        account.invoice_risk = clamp_int(
+            account.invoice_risk - BALANCE.support_program_account_rescue_billing_invoice_relief
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk
+            - BALANCE.support_program_account_rescue_billing_payment_relief
+        )
+        account.dunning_steps = max(
+            0,
+            account.dunning_steps - BALANCE.support_program_account_rescue_billing_dunning_relief,
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.support_program_route_billing_renewal_health_gain
+        )
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.BILLING,
+            BALANCE.support_program_account_rescue_lane_relief,
+        )
+    elif lane is SupportLaneFocus.ENTERPRISE:
+        if account.support_tier is SupportTier.STANDARD:
+            account.support_tier = SupportTier.PRIORITY
+        account.renewal_health = clamp_int(
+            account.renewal_health
+            + (BALANCE.support_program_account_rescue_renewal_health_gain // 2)
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_route_onboarding_satisfaction_gain
+        )
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.ENTERPRISE,
+            BALANCE.support_program_account_rescue_lane_relief,
+        )
+    elif lane is SupportLaneFocus.ONBOARDING:
+        account.onboarding_health = clamp_int(
+            account.onboarding_health
+            + BALANCE.support_program_account_rescue_onboarding_health_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_route_onboarding_satisfaction_gain
+        )
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.ONBOARDING,
+            BALANCE.support_program_account_rescue_lane_relief,
+        )
+
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a {lane_label} rescue for {account.name}. "
+            f"Cash -{BALANCE.support_program_account_rescue_cost}, "
+            f"tickets {account.open_tickets}, renewal health {account.renewal_health}."
+        )
+    )
+
+
 def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     """Return the number of accounts with severe support pressure."""
 

@@ -52,7 +52,10 @@ from nexus_tech.simulation.campaign_starts import (
     STANDARD_CAMPAIGN_START_ID,
     apply_campaign_start,
 )
-from nexus_tech.simulation.capital_planning import apply_set_capital_plan
+from nexus_tech.simulation.capital_planning import (
+    apply_rebalance_capital,
+    apply_set_capital_plan,
+)
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
 from nexus_tech.simulation.competitor_intel import record_competitor_intel
 from nexus_tech.simulation.customer_success import (
@@ -180,6 +183,7 @@ from nexus_tech.simulation.support_program import (
     apply_end_of_turn_support_program,
     invest_in_support_staffing,
     route_support_escalation,
+    run_account_rescue,
     set_support_lane_focus,
     triage_support_backlog,
     upgrade_support_program,
@@ -651,6 +655,11 @@ def apply_action(
         )
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.REBALANCE_CAPITAL:
+        summary = apply_rebalance_capital(next_state)
+        logger.debug("Rebalanced the capital plan.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.TAKE_LOAN:
         summary = apply_take_loan(
             next_state.company,
@@ -866,6 +875,20 @@ def apply_action(
         summary = route_support_escalation(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Routed support escalation for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ACCOUNT_RESCUE:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_account_rescue(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran account rescue for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

@@ -6,15 +6,19 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.models import (
+    BoardAsk,
     CapitalPlan,
     CapitalPlanMode,
     CapitalSourcePreference,
     Company,
     FinanceState,
     GameState,
+    SupportLaneFocus,
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
+from nexus_tech.simulation.support_program import calculate_support_queue_exposure
 
 
 @dataclass(frozen=True)
@@ -108,6 +112,125 @@ def apply_set_capital_plan(
             f"{capital_plan.planning_horizon_turns} turns. Allocation {allocation_summary}."
         ),
         capital_plan=capital_plan,
+    )
+
+
+def apply_rebalance_capital(state: GameState) -> CapitalPlanSummary:
+    """Auto-rebalance capital shares around the current reserve, support, and channel strain."""
+
+    queue_exposure = calculate_support_queue_exposure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    capital_plan = state.capital_plan
+
+    mode = capital_plan.mode
+    reserve_target = capital_plan.reserve_target
+    planning_horizon_turns = capital_plan.planning_horizon_turns
+    product_share = capital_plan.product_investment_share
+    go_to_market_share = capital_plan.go_to_market_share
+    reserve_share = capital_plan.reserve_share
+    notes: list[str] = []
+
+    if (
+        state.company.cash_on_hand < capital_plan.reserve_target
+        or state.finance.covenant_risk >= 16
+        or state.finance.board_pressure >= 26
+    ):
+        mode = CapitalPlanMode.CONSERVE
+        reserve_target = quantize_money(
+            reserve_target + BALANCE.capital_plan_rebalance_reserve_target_step
+        )
+        planning_horizon_turns = min(
+            12,
+            planning_horizon_turns + BALANCE.capital_plan_rebalance_horizon_gain,
+        )
+        reserve_share += BALANCE.capital_plan_rebalance_reserve_share_shift
+        go_to_market_share -= BALANCE.capital_plan_rebalance_reserve_share_shift
+        notes.append("reserve stress")
+    elif capital_plan.mode is CapitalPlanMode.EXPAND and (
+        queue_exposure.hotspot_lane_overflow > 0
+        or portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        mode = CapitalPlanMode.BALANCED
+        notes.append("execution drag")
+
+    if state.finance.active_board_ask is BoardAsk.RELIABILITY:
+        product_share += BALANCE.capital_plan_rebalance_product_share_shift
+        go_to_market_share -= BALANCE.capital_plan_rebalance_product_share_shift
+        notes.append("reliability mandate")
+    elif state.finance.active_board_ask is BoardAsk.PROFITABILITY:
+        reserve_share += 2
+        go_to_market_share -= 2
+        notes.append("profitability mandate")
+    elif state.finance.active_board_ask is BoardAsk.TEAM_HEALTH:
+        reserve_share += 2
+        product_share += 1
+        go_to_market_share -= 3
+        notes.append("team-health mandate")
+    elif state.finance.active_board_ask is BoardAsk.PORTFOLIO_FOCUS:
+        product_share += 2
+        go_to_market_share -= 2
+        notes.append("portfolio focus")
+
+    if queue_exposure.hotspot_lane_overflow > 0:
+        if queue_exposure.hotspot_lane is SupportLaneFocus.ENTERPRISE:
+            product_share += 2
+            go_to_market_share -= 2
+        elif queue_exposure.hotspot_lane is SupportLaneFocus.BILLING:
+            reserve_share += 2
+            go_to_market_share -= 2
+        elif queue_exposure.hotspot_lane is SupportLaneFocus.ONBOARDING:
+            reserve_share += 1
+            product_share += 1
+            go_to_market_share -= 2
+        notes.append(f"{queue_exposure.hotspot_lane.value} hotspot")
+
+    if queue_exposure.focus_alignment_gap > 0:
+        reserve_share += 1
+        go_to_market_share -= 1
+        notes.append("support focus mismatch")
+
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or portfolio.hotspot_revenue_share_percent
+        >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        reserve_share += 2
+        go_to_market_share -= 2
+        notes.append("channel concentration")
+
+    if portfolio.paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
+        reserve_share += 1
+        product_share += 1
+        go_to_market_share -= 2
+        notes.append("paused channel dependency")
+
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=mode,
+        source_preference=capital_plan.source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    note_summary = ", ".join(dict.fromkeys(notes)) if notes else "no major drift"
+    return CapitalPlanSummary(
+        message=(
+            f"Capital was rebalanced toward {state.capital_plan.mode.value}. "
+            f"Reserve target {format_money(state.capital_plan.reserve_target)} over "
+            f"{state.capital_plan.planning_horizon_turns} turns. Allocation "
+            f"P {state.capital_plan.product_investment_share}% / "
+            f"GTM {state.capital_plan.go_to_market_share}% / "
+            f"Reserve {state.capital_plan.reserve_share}% ({note_summary})."
+        ),
+        capital_plan=state.capital_plan,
     )
 
 
@@ -271,3 +394,27 @@ def evaluate_capital_plan(
         recommended_posture=recommended_posture,
         summary=summary,
     )
+
+
+def _normalize_capital_shares(
+    product_share: int,
+    go_to_market_share: int,
+    reserve_share: int,
+) -> tuple[int, int, int]:
+    shares = [
+        max(0, product_share),
+        max(0, go_to_market_share),
+        max(0, reserve_share),
+    ]
+    total_share = sum(shares)
+    if total_share > 100:
+        excess = total_share - 100
+        for index in (1, 0, 2):
+            reducible = min(excess, shares[index])
+            shares[index] -= reducible
+            excess -= reducible
+            if excess <= 0:
+                break
+    elif total_share < 100:
+        shares[2] += 100 - total_share
+    return shares[0], shares[1], shares[2]

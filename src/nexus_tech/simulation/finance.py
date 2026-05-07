@@ -708,6 +708,12 @@ def build_finance_planner(
         recommended_actions.append("invest_in_support_staffing")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
         recommended_actions.append("route_support_escalation")
+    if (
+        premium_queue_risk_accounts > 0
+        or enterprise_queue_risk_accounts > 0
+        or renewal_queue_risk_accounts > 0
+    ) and revenue_at_risk_value >= Decimal("1800.00"):
+        recommended_actions.append("run_account_rescue")
     if renewal_pressure_value >= Decimal("2200.00"):
         recommended_actions.append("run_retention_play")
     if (
@@ -757,6 +763,13 @@ def build_finance_planner(
         recommended_actions.append("repay_debt")
     if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
         recommended_actions.append("execute_board_response")
+    if (
+        reserve_gap < ZERO_MONEY
+        or focus_alignment_gap > 0
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or support_hotspot_lane_overflow > 0
+    ):
+        recommended_actions.append("rebalance_capital")
     if not recommended_actions:
         recommended_actions.append("review_finance")
     recommended_actions = list(dict.fromkeys(recommended_actions))
@@ -794,6 +807,14 @@ def build_finance_planner(
         action_sequence.append("reduce volatile channel revenue before leaning on outside capital")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
         action_sequence.append("route top-risk accounts before promising another growth step")
+    if (
+        premium_queue_risk_accounts > 0
+        or enterprise_queue_risk_accounts > 0
+        or renewal_queue_risk_accounts > 0
+    ) and revenue_at_risk_value >= Decimal("1800.00"):
+        action_sequence.append(
+            "run a focused account rescue before treating stressed revenue as durable"
+        )
     if support_hotspot_lane_overflow > 0:
         action_sequence.append(
             f"drain {support_hotspot_lane.value} lane overflow before "
@@ -802,6 +823,14 @@ def build_finance_planner(
     if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
         action_sequence.append(
             f"reduce {hotspot_channel} dependence before underwriting another late-game push"
+        )
+    if (
+        reserve_gap < ZERO_MONEY
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or focus_alignment_gap > 0
+    ):
+        action_sequence.append(
+            "rebalance capital around reserve and delivery pressure before taking another big swing"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(
