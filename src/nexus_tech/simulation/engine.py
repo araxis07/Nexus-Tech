@@ -1875,8 +1875,13 @@ def apply_end_of_turn_commercial_pressure(
             3,
             1 + (pressure.public_market_scrutiny // BALANCE.exit_path_clarity_gap_threshold),
         )
+        if support_summary.hotspot_lane.value == "enterprise":
+            board_pressure_delta += min(2, 1 + support_summary.hotspot_lane_overflow)
+            state.finance.board_score = clamp_int(state.finance.board_score - 1)
         state.finance.board_reliability_score = clamp_int(state.finance.board_reliability_score - 1)
-        path_specific_notes.append("public-market scrutiny is amplifying reliability misses")
+        path_specific_notes.append(
+            "public-market scrutiny is amplifying enterprise reliability misses"
+        )
     elif readiness.strategic_outlook == "strategic_acquisition" and (
         pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
         or portfolio.paused_dependency_score
@@ -1891,17 +1896,27 @@ def apply_end_of_turn_commercial_pressure(
             ),
         )
         board_confidence_loss += min(3, 1 + (portfolio.hotspot_revenue_share_percent // 25))
+        if portfolio.hotspot_revenue_share_percent >= 35:
+            state.finance.board_profitability_score = clamp_int(
+                state.finance.board_profitability_score - 1
+            )
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 1
         )
-        path_specific_notes.append("acquirer diligence is magnifying channel concentration")
+        path_specific_notes.append(
+            f"acquirer diligence is magnifying {portfolio.hotspot_channel} concentration"
+        )
     elif readiness.strategic_outlook == "profitable_independence" and (
         pressure.independence_discipline >= BALANCE.event_independence_reckoning_pressure_threshold
         or support_summary.renewal_queue_risk_accounts > 0
     ):
         governance_risk_delta += min(3, 1 + support_summary.renewal_queue_risk_accounts)
         state.finance.covenant_risk = clamp_int(state.finance.covenant_risk + 1)
-        path_specific_notes.append("independence discipline is punishing renewal instability")
+        if support_summary.hotspot_lane.value == "billing":
+            state.finance.investor_pressure = clamp_int(state.finance.investor_pressure + 1)
+        path_specific_notes.append(
+            "independence discipline is punishing billing and renewal instability"
+        )
     if (
         pressure.board_reset_risk >= BALANCE.event_board_reckoning_pressure_threshold
         and pressure.dominant_pressure == "restructure_heat"

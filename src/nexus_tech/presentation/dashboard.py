@@ -2924,9 +2924,11 @@ def _build_support_program_panel(state: GameState) -> Panel:
     )
     table.add_row("Service Cost", format_money(state.support_program.service_cost_last_turn))
     table.add_row("Escalations", str(escalating_accounts))
+    table.add_row("Premium Queue Accts", str(queue_exposure.premium_queue_risk_accounts))
     table.add_row("Ent Queue Accts", str(queue_exposure.enterprise_queue_risk_accounts))
     table.add_row("Ren Queue Accts", str(queue_exposure.renewal_queue_risk_accounts))
     table.add_row("Hotspot Lane", queue_exposure.hotspot_lane.value)
+    table.add_row("Hotspot Overflow", str(queue_exposure.hotspot_lane_overflow))
     return Panel(table, title="Support Program", border_style="green", expand=True)
 
 
@@ -3003,11 +3005,15 @@ def _build_finance_panel(state: GameState) -> Panel:
         renewal_queue_exposure_value=queue_exposure.renewal_queue_exposure_value,
         enterprise_queue_risk_accounts=queue_exposure.enterprise_queue_risk_accounts,
         renewal_queue_risk_accounts=queue_exposure.renewal_queue_risk_accounts,
+        premium_queue_risk_accounts=queue_exposure.premium_queue_risk_accounts,
         support_lane_saturation_index=queue_exposure.lane_saturation_index,
         support_hotspot_lane=queue_exposure.hotspot_lane,
+        support_hotspot_lane_overflow=queue_exposure.hotspot_lane_overflow,
         recovery_drag_score=portfolio.recovery_drag_score,
         paused_dependency_score=portfolio.paused_dependency_score,
+        paused_revenue_share_percent=portfolio.paused_revenue_share_percent,
         hotspot_revenue_share_percent=portfolio.hotspot_revenue_share_percent,
+        hotspot_channel=portfolio.hotspot_channel,
         strategic_outlook=readiness.strategic_outlook,
         dominant_endgame_pressure=pressure.dominant_pressure,
         commercial_fragility=pressure.commercial_fragility,
@@ -3091,6 +3097,8 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Comm Risk", planner.commercial_financing_risk)
     table.add_row("Support Lane", planner.support_lane_signal)
     table.add_row("Channel Recovery", planner.channel_recovery_note)
+    table.add_row("Queue Hotspot", planner.queue_hotspot_note)
+    table.add_row("Channel Hotspot", planner.channel_hotspot_note)
     table.add_row("Path Bias", planner.path_pressure_bias)
     table.add_row("Rebalance", planner.capital_rebalance_note)
     table.add_row("Priority", planner.capital_priority)

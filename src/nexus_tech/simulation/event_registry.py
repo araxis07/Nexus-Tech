@@ -25,6 +25,7 @@ from nexus_tech.simulation.finance import count_funding_rounds
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
 from nexus_tech.simulation.randomness import RandomLike
+from nexus_tech.simulation.support_program import calculate_support_queue_exposure
 from nexus_tech.simulation.team import calculate_effective_productivity
 
 
@@ -1763,12 +1764,21 @@ def _is_exit_interest_eligible(state: GameState) -> bool:
 def _is_public_market_scrutiny_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
         and any(product.is_active for product in state.products)
         and readiness.strategic_outlook == "ipo_ready"
         and pressure.public_market_scrutiny
         >= BALANCE.event_public_market_scrutiny_pressure_threshold
+        and (
+            pressure.dominant_pressure == "public_market_scrutiny"
+            or queue_exposure.enterprise_queue_risk_accounts > 0
+            or (
+                queue_exposure.hotspot_lane.value == "enterprise"
+                and queue_exposure.hotspot_lane_overflow > 0
+            )
+        )
         and not _has_recent_event(
             state,
             {"exit_interest", "strategic_crossroads"},
@@ -1819,12 +1829,19 @@ def _build_public_market_scrutiny_event(
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
         and any(product.is_active for product in state.products)
         and readiness.strategic_outlook == "strategic_acquisition"
         and pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
         and bool(state.customer_accounts)
+        and (
+            pressure.dominant_pressure == "acquirer_diligence"
+            or portfolio.hotspot_revenue_share_percent >= 35
+            or portfolio.paused_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+        )
         and not _has_recent_event(
             state,
             {"partner_breakdown", "partner_renegotiation"},
@@ -1875,6 +1892,7 @@ def _build_acquirer_diligence_event(
 def _is_independence_reckoning_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     return (
         state.company.current_turn >= BALANCE.event_exit_interest_turn_threshold
         and (
@@ -1885,6 +1903,8 @@ def _is_independence_reckoning_eligible(state: GameState) -> bool:
             pressure.independence_discipline
             >= BALANCE.event_independence_reckoning_pressure_threshold
             or pressure.capital_fragility >= BALANCE.event_independence_reckoning_pressure_threshold
+            or queue_exposure.renewal_queue_risk_accounts > 0
+            or queue_exposure.hotspot_lane.value == "billing"
         )
         and not _has_recent_event(
             state,
@@ -2019,6 +2039,7 @@ def _build_enterprise_procurement_delay_event(
 
 def _is_support_meltdown_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     premium_breach_accounts = any(
         account.status is not CustomerAccountStatus.CHURNED
         and account.support_tier.value in {"priority", "white_glove"}
@@ -2039,6 +2060,8 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         or pressure.support_fragility >= BALANCE.event_support_meltdown_fragility_threshold
         or pressure.commercial_fragility >= BALANCE.event_support_meltdown_fragility_threshold
         or premium_breach_accounts
+        or queue_exposure.hotspot_lane_overflow >= 2
+        or queue_exposure.premium_queue_risk_accounts > 0
     )
 
 
@@ -2198,6 +2221,8 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             or portfolio.commercial_dependency_score >= 68
             or portfolio.volatile_revenue_share_percent >= 40
             or portfolio.channel_volatility_index >= 58
+            or portfolio.hotspot_revenue_share_percent >= 45
+            or portfolio.recovery_drag_score >= 28
         )
         for partnership in state.partnerships
     )

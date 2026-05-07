@@ -83,6 +83,8 @@ class FinancePlannerSnapshot:
     commercial_financing_risk: str
     support_lane_signal: str
     channel_recovery_note: str
+    queue_hotspot_note: str
+    channel_hotspot_note: str
     path_pressure_bias: str
     capital_rebalance_note: str
     capital_priority: str
@@ -239,11 +241,15 @@ def build_finance_planner(
     renewal_queue_exposure_value: Decimal = ZERO_MONEY,
     enterprise_queue_risk_accounts: int = 0,
     renewal_queue_risk_accounts: int = 0,
+    premium_queue_risk_accounts: int = 0,
     support_lane_saturation_index: int = 0,
     support_hotspot_lane: SupportLaneFocus = SupportLaneFocus.BALANCED,
+    support_hotspot_lane_overflow: int = 0,
     recovery_drag_score: int = 0,
     paused_dependency_score: int = 0,
+    paused_revenue_share_percent: int = 0,
     hotspot_revenue_share_percent: int = 0,
+    hotspot_channel: str = "-",
     strategic_outlook: str = "profitable_independence",
     dominant_endgame_pressure: str = "independence_discipline",
     commercial_fragility: int = 0,
@@ -520,6 +526,35 @@ def build_finance_planner(
     else:
         channel_recovery_note = "channel recovery drag is present but not yet dominant."
 
+    if support_hotspot_lane is SupportLaneFocus.ENTERPRISE and support_hotspot_lane_overflow > 0:
+        queue_hotspot_note = (
+            f"enterprise is the current queue hotspot with {support_hotspot_lane_overflow} lane "
+            "overflow points."
+        )
+    elif support_hotspot_lane is SupportLaneFocus.BILLING and renewal_queue_risk_accounts > 0:
+        queue_hotspot_note = (
+            "billing is the current hotspot and is now putting renewals under extra stress."
+        )
+    elif premium_queue_risk_accounts > 0:
+        queue_hotspot_note = (
+            f"{premium_queue_risk_accounts} premium-support account(s) are still trapped in the "
+            f"{support_hotspot_lane.value} lane."
+        )
+    else:
+        queue_hotspot_note = "no single support lane is dominating capital planning yet."
+
+    if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
+        channel_hotspot_note = (
+            f"{hotspot_channel} is now the commercial hotspot at "
+            f"{hotspot_revenue_share_percent}% of partner revenue."
+        )
+    elif paused_revenue_share_percent >= 20:
+        channel_hotspot_note = (
+            f"{paused_revenue_share_percent}% of partner revenue is still trapped in paused lanes."
+        )
+    else:
+        channel_hotspot_note = "channel concentration is visible, but not yet singular."
+
     if strategic_outlook == "ipo_ready":
         path_pressure_bias = (
             "public-market proof now matters more than another loose expansion story."
@@ -627,6 +662,8 @@ def build_finance_planner(
         recommended_actions.append("set_support_lane_focus")
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
+    if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
+        recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
         recommended_actions.append("invest_in_support_staffing")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
@@ -656,6 +693,8 @@ def build_finance_planner(
     ):
         recommended_actions.append("reactivate_partnership")
     if hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold:
+        recommended_actions.append("review_partnerships")
+    if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
         recommended_actions.append("review_partnerships")
     if channel_conflict_index >= 30:
         recommended_actions.append("renegotiate_partnership")
@@ -701,6 +740,15 @@ def build_finance_planner(
         action_sequence.append("reduce volatile channel revenue before leaning on outside capital")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
         action_sequence.append("route top-risk accounts before promising another growth step")
+    if support_hotspot_lane_overflow > 0:
+        action_sequence.append(
+            f"drain {support_hotspot_lane.value} lane overflow before "
+            "counting this growth plan as durable"
+        )
+    if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
+        action_sequence.append(
+            f"reduce {hotspot_channel} dependence before underwriting another late-game push"
+        )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(
             "treat reliability proof as the gating item for the next growth step"
@@ -745,6 +793,8 @@ def build_finance_planner(
         commercial_financing_risk=commercial_financing_risk,
         support_lane_signal=support_lane_signal,
         channel_recovery_note=channel_recovery_note,
+        queue_hotspot_note=queue_hotspot_note,
+        channel_hotspot_note=channel_hotspot_note,
         path_pressure_bias=path_pressure_bias,
         capital_rebalance_note=capital_rebalance_note,
         capital_priority=capital_priority,

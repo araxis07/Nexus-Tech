@@ -73,7 +73,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.persistence.database import DatabaseManager
 from nexus_tech.persistence.errors import CorruptSaveError, SaveNotFoundError
 from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadCoordinator
-from nexus_tech.simulation.engine import resolve_turn
+from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
 
@@ -934,6 +934,50 @@ def test_save_then_load_round_trip_continues_under_commercial_pressure(tmp_path:
                 loaded_state.pending_event.options[0].id,
             ).state
         loaded_state_cursor = loaded_state
+        assert loaded_state_cursor.model_dump() == expected_state.model_dump()
+
+
+def test_save_then_load_round_trip_after_path_specific_late_game_pressure(tmp_path: Path) -> None:
+    db_path = tmp_path / "path-pressure-round-trip.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    state = create_new_game(
+        "Archive Systems",
+        "Flagship Core",
+        campaign_start_id="ipo_readiness_launchpad",
+    )
+    rng = RandomSource(seed=173)
+
+    for _ in range(12):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            state = resolve_pending_event(state, state.pending_event.options[0].id).state
+        if state.company.game_over or state.victory_achieved:
+            break
+
+    coordinator.save_game(DEFAULT_SAVE_SLOT, state, rng)
+    loaded = coordinator.load_game(DEFAULT_SAVE_SLOT)
+    expected_state = state
+    expected_rng = rng
+    loaded_state_cursor = loaded.state
+    loaded_rng = loaded.rng
+
+    for _ in range(4):
+        expected_resolution = resolve_turn(expected_state, expected_rng)
+        expected_state = expected_resolution.state
+        if expected_state.pending_event is not None:
+            expected_state = resolve_pending_event(
+                expected_state,
+                expected_state.pending_event.options[0].id,
+            ).state
+        loaded_resolution = resolve_turn(loaded_state_cursor, loaded_rng)
+        loaded_state_cursor = loaded_resolution.state
+        if loaded_state_cursor.pending_event is not None:
+            loaded_state_cursor = resolve_pending_event(
+                loaded_state_cursor,
+                loaded_state_cursor.pending_event.options[0].id,
+            ).state
+
         assert loaded_state_cursor.model_dump() == expected_state.model_dump()
 
 

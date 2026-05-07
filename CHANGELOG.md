@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.46.0 - 2026-05-07
+
+- Deepened late-game path pressure again so IPO, acquisition, and independence runs react more sharply to enterprise queue hotspots, billing renewal stress, and concentrated partner revenue
+- Expanded finance-planner guidance with explicit queue-hotspot and channel-hotspot notes plus stronger action sequencing around lane overflow and channel dependence
+- Tightened event gating for public-market scrutiny, acquirer diligence, independence reckoning, support meltdowns, and partner breakdowns so they trigger from more realistic support or channel pressure
+- Added new regression coverage for hotspot-triggered events, 100-turn acquisition-late-game stability, and save-load continuation under path-specific late-game pressure
+- Promoted the package version to `0.46.0`
+
 ## 0.45.0 - 2026-05-07
 
 - Deepened late-game branch pressure by letting IPO, acquisition, and independence outlooks amplify commercial stress differently once support or channel signals slip

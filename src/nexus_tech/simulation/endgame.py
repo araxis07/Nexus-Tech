@@ -259,6 +259,11 @@ def calculate_endgame_pressure(
         + state.support_program.sla_breaches_last_turn
         + (support_fragility // 4)
         + (queue_exposure.lane_saturation_index // BALANCE.support_program_queue_age_threshold)
+        + (
+            queue_exposure.hotspot_lane_overflow
+            if queue_exposure.hotspot_lane.value == "enterprise"
+            else 0
+        )
     )
     acquirer_diligence = _clamp_readiness(
         max(0, readiness.acquisition_interest_score - 35)
@@ -269,6 +274,10 @@ def calculate_endgame_pressure(
         + (channel_fragility // 4)
         + (
             portfolio.paused_dependency_score
+            // BALANCE.exit_channel_fragility_revenue_share_divisor
+        )
+        + (
+            portfolio.hotspot_revenue_share_percent
             // BALANCE.exit_channel_fragility_revenue_share_divisor
         )
     )
@@ -284,6 +293,11 @@ def calculate_endgame_pressure(
                 queue_exposure.renewal_queue_exposure_value
                 / BALANCE.exit_support_fragility_value_divisor
             ).to_integral_value()
+        )
+        + (
+            queue_exposure.hotspot_lane_overflow
+            if queue_exposure.hotspot_lane.value == "billing"
+            else 0
         )
     )
     restructure_heat = _clamp_readiness(
@@ -353,18 +367,36 @@ def calculate_endgame_pressure(
     )
     path_watchlist = (
         (
-            "IPO: tighten support and governance before inviting more scrutiny."
-            if public_market_scrutiny >= 56 or support_fragility >= 32
+            "IPO: tighten enterprise support and governance before inviting more scrutiny."
+            if (
+                public_market_scrutiny >= 56
+                or support_fragility >= 32
+                or queue_exposure.hotspot_lane.value == "enterprise"
+            )
             else "IPO: institutional controls currently look serviceable."
         ),
         (
-            "M&A: calm channel conflict and renewal risk before diligence deepens."
-            if acquirer_diligence >= 56 or channel_fragility >= 40
+            (
+                f"M&A: calm {portfolio.hotspot_channel} concentration "
+                "and renewal risk before diligence deepens."
+            )
+            if (
+                acquirer_diligence >= 56
+                or channel_fragility >= 40
+                or portfolio.hotspot_revenue_share_percent >= 35
+            )
             else "M&A: buyer diligence pressure is currently contained."
         ),
         (
-            "Independence: protect reserves and debt slack before compounding harder."
-            if independence_discipline >= 56 or capital_fragility >= 40
+            (
+                "Independence: protect reserves, debt slack, and billing renewals "
+                "before compounding harder."
+            )
+            if (
+                independence_discipline >= 56
+                or capital_fragility >= 40
+                or queue_exposure.hotspot_lane.value == "billing"
+            )
             else "Independence: capital discipline is currently holding."
         ),
         (
@@ -395,12 +427,14 @@ def calculate_endgame_pressure(
         summary = "Late-game pressure is now driven by cash discipline, debt, and board heat."
     elif dominant_pressure == "public_market_scrutiny":
         recommendation = (
-            "Tighten controls, reporting, and support quality before telling a bigger story."
+            "Tighten controls, reporting, and enterprise support quality "
+            "before telling a bigger story."
         )
         summary = "The run is leaning toward public-market scrutiny before it is fully ready."
     elif dominant_pressure == "acquirer_diligence":
         recommendation = (
-            "Calm partner conflict and customer risk before buyers price in execution drag."
+            "Calm partner conflict, hotspot concentration, and customer risk "
+            "before buyers price in execution drag."
         )
         summary = (
             "Acquirer interest is real, but diligence risk is climbing "
@@ -408,7 +442,8 @@ def calculate_endgame_pressure(
         )
     elif dominant_pressure == "independence_discipline":
         recommendation = (
-            "Protect reserves, manage debt, and prove the company can stay independent cleanly."
+            "Protect reserves, manage debt, and keep billing or renewal pressure "
+            "from breaking independence."
         )
         summary = "The independent path is viable only if capital discipline stays credible."
     else:

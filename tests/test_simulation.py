@@ -3619,6 +3619,7 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.premium_queue_exposure_value >= Decimal("1400.00")
     assert summary.enterprise_queue_exposure_value >= Decimal("1400.00")
     assert summary.renewal_queue_exposure_value >= Decimal("1400.00")
+    assert summary.premium_queue_risk_accounts >= 1
     assert summary.enterprise_queue_risk_accounts >= 1
     assert summary.renewal_queue_risk_accounts >= 1
     assert summary.high_value_risk_accounts >= 0
@@ -3630,6 +3631,7 @@ def test_support_program_surfaces_revenue_and_renewal_risk_counts() -> None:
     assert summary.account_queue_risk_score > 0
     assert summary.lane_saturation_index > 0
     assert summary.hotspot_lane is SupportLaneFocus.ENTERPRISE
+    assert summary.hotspot_lane_overflow >= 0
     assert summary.sla_credit_cost > Decimal("0.00")
     assert summary.service_tier_pressure >= 3
     assert summary.commercial_breach_pressure >= 2
@@ -5508,11 +5510,15 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
         renewal_queue_exposure_value=Decimal("2600.00"),
         enterprise_queue_risk_accounts=2,
         renewal_queue_risk_accounts=2,
+        premium_queue_risk_accounts=2,
         support_lane_saturation_index=16,
         support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=4,
         recovery_drag_score=38,
         paused_dependency_score=66,
+        paused_revenue_share_percent=22,
         hotspot_revenue_share_percent=40,
+        hotspot_channel="integration",
         strategic_outlook="ipo_ready",
         dominant_endgame_pressure="public_market_scrutiny",
         commercial_fragility=62,
@@ -5545,6 +5551,8 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "upgrade_support_program" in planner.recommended_actions
     assert planner.support_lane_signal
     assert planner.channel_recovery_note
+    assert planner.queue_hotspot_note
+    assert planner.channel_hotspot_note
     assert "public-market" in planner.path_pressure_bias
     assert planner.capital_rebalance_note
 
@@ -5716,6 +5724,38 @@ def test_public_market_scrutiny_event_requires_ipo_outlook() -> None:
         pressure.public_market_scrutiny >= BALANCE.event_public_market_scrutiny_pressure_threshold
     )
     assert definition.is_eligible(state) is False
+
+
+def test_support_meltdown_event_can_trigger_from_hotspot_lane_pressure() -> None:
+    product = make_product("Queue Hotspot Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Premium Queue Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2100.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=60,
+        onboarding_health=54,
+        support_load=38,
+        open_tickets=13,
+        sla_breach_risk=70,
+        renewal_health=52,
+        expansion_potential=60,
+        renewal_turn=12,
+        churn_risk=24,
+        ticket_queue_age=4,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("9500.00"))
+    state.support_program.backlog_queue = 2
+    state.support_program.escalation_queue = 1
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "support_meltdown"
+    )
+
+    assert definition.is_eligible(state) is True
 
 
 def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None:
@@ -5951,6 +5991,77 @@ def test_acquirer_diligence_event_requires_acquisition_outlook() -> None:
     assert readiness.strategic_outlook == "ipo_ready"
     assert pressure.acquirer_diligence >= BALANCE.event_acquirer_diligence_pressure_threshold
     assert definition.is_eligible(state) is False
+
+
+def test_acquirer_diligence_event_triggers_from_hotspot_channel_under_mna_outlook() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="acquisition_diligence_sprint",
+    )
+    product = state.products[0]
+    state.customer_accounts = [
+        CustomerAccount(
+            name="Buyer Anchor",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("2600.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=64,
+            onboarding_health=58,
+            support_load=34,
+            open_tickets=8,
+            sla_breach_risk=52,
+            renewal_health=62,
+            expansion_potential=68,
+            renewal_turn=14,
+            churn_risk=18,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    state.partnerships = [
+        PartnershipDeal(
+            name="Hotspot Integration",
+            product_id=product.id,
+            channel=PartnerChannel.INTEGRATION,
+            status=PartnershipStatus.RECOVERY,
+            quality=66,
+            risk=50,
+            conflict_pressure=52,
+            enablement_level=34,
+            sourced_revenue=Decimal("3200.00"),
+            rev_share_rate=Decimal("0.2300"),
+        ),
+        PartnershipDeal(
+            name="Second Integration",
+            product_id=product.id,
+            channel=PartnerChannel.INTEGRATION,
+            status=PartnershipStatus.STRAINED,
+            quality=62,
+            risk=54,
+            conflict_pressure=50,
+            enablement_level=30,
+            sourced_revenue=Decimal("1800.00"),
+            rev_share_rate=Decimal("0.2200"),
+        ),
+    ]
+    state.finance.board_confidence = 20
+    state.finance.board_score = 18
+    state.finance.governance_risk = 42
+    state.finance.restructuring_pressure = 9
+    state.finance.debt_principal = Decimal("9800.00")
+    state.finance.investor_pressure = 28
+    state.finance.missed_board_targets = 3
+    state.support_program.escalation_queue = 5
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "acquirer_diligence"
+    )
+    readiness = calculate_endgame_readiness(state)
+
+    assert readiness.strategic_outlook == "strategic_acquisition"
+    assert definition.is_eligible(state) is True
 
 
 def test_create_partnership_action_adds_channel_and_cost() -> None:
@@ -6378,6 +6489,37 @@ def test_ninety_turn_ipo_launchpad_progression_is_seed_stable() -> None:
         )
 
     assert run_once(503) == run_once(503)
+
+
+def test_hundred_turn_acquisition_diligence_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="acquisition_diligence_sprint",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(100):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            len(state.turn_history),
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(601) == run_once(601)
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
