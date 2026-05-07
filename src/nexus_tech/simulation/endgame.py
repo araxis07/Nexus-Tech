@@ -189,6 +189,7 @@ def calculate_endgame_pressure(
         (revenue_at_risk_accounts * 4)
         + (state.support_program.sla_breaches_last_turn * 3)
         + lane_overflow_pressure
+        + queue_exposure.focus_alignment_gap
         + (
             int(
                 (
@@ -213,6 +214,7 @@ def calculate_endgame_pressure(
             ).to_integral_value()
         )
         + queue_exposure.white_glove_queue_risk_accounts
+        + queue_exposure.hotspot_lane_account_count
         + (queue_exposure.lane_saturation_index // BALANCE.support_program_queue_age_threshold)
     )
     channel_fragility = _clamp_readiness(
@@ -280,7 +282,31 @@ def calculate_endgame_pressure(
             portfolio.hotspot_revenue_share_percent
             // BALANCE.exit_channel_fragility_revenue_share_divisor
         )
+        + (
+            portfolio.hotspot_dependency_score
+            // BALANCE.exit_channel_fragility_revenue_share_divisor
+        )
     )
+    if portfolio.hotspot_channel == "integration":
+        acquirer_diligence = _clamp_readiness(
+            acquirer_diligence
+            + (
+                portfolio.recovery_drag_score
+                // BALANCE.exit_channel_fragility_rev_share_pressure_divisor
+            )
+        )
+    elif portfolio.hotspot_channel == "reseller":
+        acquirer_diligence = _clamp_readiness(
+            acquirer_diligence + portfolio.direct_sales_conflict_accounts
+        )
+    elif portfolio.hotspot_channel == "marketplace":
+        acquirer_diligence = _clamp_readiness(
+            acquirer_diligence
+            + (
+                portfolio.rev_share_pressure
+                // BALANCE.exit_channel_fragility_rev_share_pressure_divisor
+            )
+        )
     independence_discipline = _clamp_readiness(
         max(0, readiness.independence_score - 35)
         + state.finance.covenant_risk
@@ -296,6 +322,11 @@ def calculate_endgame_pressure(
         )
         + (
             queue_exposure.hotspot_lane_overflow
+            if queue_exposure.hotspot_lane.value == "billing"
+            else 0
+        )
+        + (
+            queue_exposure.focus_alignment_gap
             if queue_exposure.hotspot_lane.value == "billing"
             else 0
         )
@@ -377,8 +408,8 @@ def calculate_endgame_pressure(
         ),
         (
             (
-                f"M&A: calm {portfolio.hotspot_channel} concentration "
-                "and renewal risk before diligence deepens."
+                f"M&A: calm {portfolio.hotspot_channel} concentration, "
+                "partner dependency, and renewal risk before diligence deepens."
             )
             if (
                 acquirer_diligence >= 56
@@ -430,12 +461,28 @@ def calculate_endgame_pressure(
             "Tighten controls, reporting, and enterprise support quality "
             "before telling a bigger story."
         )
+        if (
+            queue_exposure.focus_alignment_gap > 0
+            and queue_exposure.hotspot_lane.value == "enterprise"
+        ):
+            recommendation = (
+                "Move support focus into enterprise work, tighten controls, "
+                "and prove reliability before telling a bigger story."
+            )
         summary = "The run is leaning toward public-market scrutiny before it is fully ready."
     elif dominant_pressure == "acquirer_diligence":
         recommendation = (
             "Calm partner conflict, hotspot concentration, and customer risk "
             "before buyers price in execution drag."
         )
+        if (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+        ):
+            recommendation = (
+                "Stabilize the hotspot channel, deconcentrate partner revenue, "
+                "and calm customer risk before buyers price in execution drag."
+            )
         summary = (
             "Acquirer interest is real, but diligence risk is climbing "
             "with channel and support noise."
@@ -445,6 +492,14 @@ def calculate_endgame_pressure(
             "Protect reserves, manage debt, and keep billing or renewal pressure "
             "from breaking independence."
         )
+        if (
+            queue_exposure.hotspot_lane.value == "billing"
+            and queue_exposure.focus_alignment_gap > 0
+        ):
+            recommendation = (
+                "Move support focus into billing, protect reserves, and keep "
+                "renewal pressure from breaking independence."
+            )
         summary = "The independent path is viable only if capital discipline stays credible."
     else:
         recommendation = (
@@ -490,6 +545,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
     pressure = calculate_endgame_pressure(state, readiness)
     active_partnerships = [deal for deal in state.partnerships if deal.status.value != "paused"]
     portfolio = calculate_partnership_portfolio(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
         state
     )
@@ -533,6 +589,20 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
                 "while public expectations harden."
             )
             outcome_tags = ("ipo", "customer_trust", "enterprise")
+        elif (
+            queue_exposure.hotspot_lane.value == "enterprise"
+            and state.support_program.lane_focus.value == "enterprise"
+            and pressure.support_fragility <= 22
+            and queue_exposure.focus_alignment_gap == 0
+        ):
+            ending_variant = "Enterprise-Control Listing"
+            board_readout = (
+                "The board sees a listing story supported by disciplined enterprise operations."
+            )
+            next_chapter = (
+                "Hold enterprise reliability and support focus while scrutiny intensifies."
+            )
+            outcome_tags = ("ipo", "enterprise", "controls")
         elif (
             pressure.public_market_scrutiny >= 70
             and pressure.support_fragility <= 28
@@ -617,6 +687,19 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
                 "Calm partner fatigue and renewal stress before taking the company back to market."
             )
             outcome_tags = ("acquisition", "diligence", "discounted")
+        elif (
+            portfolio.hotspot_channel == "integration"
+            and portfolio.hotspot_dependency_score < 64
+            and pressure.channel_fragility <= 42
+        ):
+            ending_variant = "Integration-Leverage Acquisition"
+            board_readout = (
+                "Buyers would pay for integration depth because the hottest channel still held."
+            )
+            next_chapter = (
+                "Keep integration partners stable and reduce dependency before full diligence."
+            )
+            outcome_tags = ("acquisition", "integration", "leverage")
         elif (
             portfolio.hotspot_channel != "-"
             and portfolio.sourced_revenue >= Decimal("2500.00")
@@ -768,6 +851,20 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
                 "Compound the strongest customer motions without letting capital posture drift."
             )
             outcome_tags = ("independence", "capital", "clarity")
+        elif (
+            queue_exposure.hotspot_lane.value == "billing"
+            and queue_exposure.focus_alignment_gap == 0
+            and pressure.capital_fragility <= 22
+            and reserve_target_met
+        ):
+            ending_variant = "Collections-Disciplined Compounder"
+            board_readout = (
+                "Leadership earned independence by keeping billing and reserves under control."
+            )
+            next_chapter = (
+                "Keep billing discipline tight while compounding only the healthiest renewals."
+            )
+            outcome_tags = ("independence", "billing", "discipline")
         elif (
             pressure.operating_durability == "resilient"
             and pressure.commercial_fragility <= 22

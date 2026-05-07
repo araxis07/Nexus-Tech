@@ -2929,6 +2929,8 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Ren Queue Accts", str(queue_exposure.renewal_queue_risk_accounts))
     table.add_row("Hotspot Lane", queue_exposure.hotspot_lane.value)
     table.add_row("Hotspot Overflow", str(queue_exposure.hotspot_lane_overflow))
+    table.add_row("Hotspot Accts", str(queue_exposure.hotspot_lane_account_count))
+    table.add_row("Focus Gap", str(queue_exposure.focus_alignment_gap))
     return Panel(table, title="Support Program", border_style="green", expand=True)
 
 
@@ -3007,13 +3009,18 @@ def _build_finance_panel(state: GameState) -> Panel:
         renewal_queue_risk_accounts=queue_exposure.renewal_queue_risk_accounts,
         premium_queue_risk_accounts=queue_exposure.premium_queue_risk_accounts,
         support_lane_saturation_index=queue_exposure.lane_saturation_index,
+        support_lane_focus=state.support_program.lane_focus,
         support_hotspot_lane=queue_exposure.hotspot_lane,
         support_hotspot_lane_overflow=queue_exposure.hotspot_lane_overflow,
+        hotspot_lane_account_count=queue_exposure.hotspot_lane_account_count,
+        focus_alignment_gap=queue_exposure.focus_alignment_gap,
         recovery_drag_score=portfolio.recovery_drag_score,
         paused_dependency_score=portfolio.paused_dependency_score,
         paused_revenue_share_percent=portfolio.paused_revenue_share_percent,
+        hotspot_dependency_score=portfolio.hotspot_dependency_score,
         hotspot_revenue_share_percent=portfolio.hotspot_revenue_share_percent,
         hotspot_channel=portfolio.hotspot_channel,
+        hotspot_status_note=portfolio.hotspot_status_note,
         strategic_outlook=readiness.strategic_outlook,
         dominant_endgame_pressure=pressure.dominant_pressure,
         commercial_fragility=pressure.commercial_fragility,
@@ -3097,7 +3104,9 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Comm Risk", planner.commercial_financing_risk)
     table.add_row("Support Lane", planner.support_lane_signal)
     table.add_row("Channel Recovery", planner.channel_recovery_note)
+    table.add_row("Lane Focus Note", planner.lane_focus_note)
     table.add_row("Queue Hotspot", planner.queue_hotspot_note)
+    table.add_row("Dependency Hotspot", planner.dependency_hotspot_note)
     table.add_row("Channel Hotspot", planner.channel_hotspot_note)
     table.add_row("Path Bias", planner.path_pressure_bias)
     table.add_row("Rebalance", planner.capital_rebalance_note)
@@ -3208,8 +3217,10 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Fatigue Hotspots", str(portfolio.fatigue_hotspot_count))
         table.add_row("Hotspot", portfolio.hotspot_channel)
         table.add_row("Hotspot Share", f"{portfolio.hotspot_revenue_share_percent}%")
+        table.add_row("Hotspot Dep", str(portfolio.hotspot_dependency_score))
         table.add_row("Dependency Risk", str(portfolio.channel_dependency_risk))
         table.add_row("Comm Dependency", str(portfolio.commercial_dependency_score))
+        table.add_row("Hotspot Note", portfolio.hotspot_status_note)
         table.add_row("Mix Note", portfolio.channel_mix_note)
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)

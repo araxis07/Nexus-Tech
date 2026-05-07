@@ -60,6 +60,8 @@ class SupportProgramSummary:
     lane_saturation_index: int
     hotspot_lane: SupportLaneFocus
     hotspot_lane_overflow: int
+    hotspot_lane_account_count: int
+    focus_alignment_gap: int
     recovery_ready_accounts: int
     sla_credit_cost: Decimal
     service_tier_pressure: int
@@ -99,6 +101,8 @@ class SupportQueueExposure:
     lane_saturation_index: int
     hotspot_lane: SupportLaneFocus
     hotspot_lane_overflow: int
+    hotspot_lane_account_count: int
+    focus_alignment_gap: int
 
 
 @dataclass(frozen=True)
@@ -212,6 +216,10 @@ def calculate_support_queue_exposure(state: GameState) -> SupportQueueExposure:
         key=lambda snapshot: (snapshot.overflow, snapshot.pressure, snapshot.account_count),
     ).lane
     hotspot_lane_overflow = lane_snapshots[hotspot_lane].overflow
+    hotspot_lane_account_count = lane_snapshots[hotspot_lane].account_count
+    focus_alignment_gap = 0
+    if state.support_program.lane_focus is not hotspot_lane and hotspot_lane_overflow > 0:
+        focus_alignment_gap = clamp_int(hotspot_lane_overflow + max(0, hotspot_lane_account_count))
     lane_saturation_index = clamp_int(
         lane_overflow_pressure
         + state.support_program.escalation_queue
@@ -230,6 +238,8 @@ def calculate_support_queue_exposure(state: GameState) -> SupportQueueExposure:
         lane_saturation_index=lane_saturation_index,
         hotspot_lane=hotspot_lane,
         hotspot_lane_overflow=hotspot_lane_overflow,
+        hotspot_lane_account_count=hotspot_lane_account_count,
+        focus_alignment_gap=focus_alignment_gap,
     )
 
 
@@ -824,6 +834,8 @@ def apply_end_of_turn_support_program(
         lane_saturation_index=queue_exposure.lane_saturation_index,
         hotspot_lane=queue_exposure.hotspot_lane,
         hotspot_lane_overflow=queue_exposure.hotspot_lane_overflow,
+        hotspot_lane_account_count=queue_exposure.hotspot_lane_account_count,
+        focus_alignment_gap=queue_exposure.focus_alignment_gap,
         recovery_ready_accounts=recovery_ready_accounts,
         sla_credit_cost=sla_credit_cost,
         service_tier_pressure=service_tier_pressure,
@@ -1032,12 +1044,95 @@ def set_support_lane_focus(
 
     if state.support_program.lane_focus is focus:
         raise ValueError(f"Support is already focused on {focus.value}.")
+    queue_exposure = calculate_support_queue_exposure(state)
     state.support_program.lane_focus = focus
-    state.support_program.backlog_queue = max(0, state.support_program.backlog_queue - 1)
+    backlog_relief = 1
+    escalation_relief = 0
+    improved_accounts = 0
+    if queue_exposure.hotspot_lane is focus and queue_exposure.hotspot_lane_overflow > 0:
+        backlog_relief += min(2, queue_exposure.hotspot_lane_overflow)
+        escalation_relief = min(
+            2,
+            max(1, queue_exposure.hotspot_lane_overflow // 2),
+        )
+        target_accounts = [
+            account
+            for account in sorted(
+                state.customer_accounts,
+                key=lambda account: (
+                    classify_account_support_lane(account) is focus,
+                    _calculate_account_support_severity(account),
+                    account.ticket_queue_age,
+                    account.open_tickets,
+                ),
+                reverse=True,
+            )
+            if account.status is not CustomerAccountStatus.CHURNED
+            and classify_account_support_lane(account) is focus
+        ]
+        for account in target_accounts[:2]:
+            account.open_tickets = max(
+                0,
+                account.open_tickets - max(1, BALANCE.support_program_triage_ticket_relief // 2),
+            )
+            account.sla_breach_risk = clamp_int(
+                account.sla_breach_risk - max(2, BALANCE.support_program_triage_sla_relief // 2)
+            )
+            account.ticket_queue_age = max(
+                0,
+                account.ticket_queue_age - max(1, BALANCE.support_program_triage_queue_age_relief),
+            )
+            account.churn_risk = clamp_int(account.churn_risk - 1)
+            if focus is SupportLaneFocus.ENTERPRISE:
+                account.satisfaction = clamp_int(
+                    account.satisfaction
+                    + BALANCE.support_program_route_onboarding_satisfaction_gain
+                )
+                account.renewal_health = clamp_int(
+                    account.renewal_health + BALANCE.support_program_triage_renewal_health_gain
+                )
+            elif focus is SupportLaneFocus.BILLING:
+                account.invoice_risk = clamp_int(
+                    account.invoice_risk
+                    - max(4, BALANCE.support_program_route_billing_invoice_relief // 2)
+                )
+                account.failed_payment_risk = clamp_int(
+                    account.failed_payment_risk
+                    - max(4, BALANCE.support_program_route_billing_payment_relief // 2)
+                )
+                account.renewal_health = clamp_int(
+                    account.renewal_health
+                    + BALANCE.support_program_route_billing_renewal_health_gain
+                )
+            elif focus is SupportLaneFocus.ONBOARDING:
+                account.onboarding_health = clamp_int(
+                    account.onboarding_health + BALANCE.support_program_route_onboarding_health_gain
+                )
+                account.satisfaction = clamp_int(
+                    account.satisfaction
+                    + BALANCE.support_program_route_onboarding_satisfaction_gain
+                )
+            improved_accounts += 1
+        _apply_lane_program_relief(
+            state.support_program,
+            focus,
+            max(2, queue_exposure.hotspot_lane_overflow + improved_accounts),
+        )
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - backlog_relief,
+    )
+    if escalation_relief > 0:
+        state.support_program.escalation_queue = max(
+            0,
+            state.support_program.escalation_queue - escalation_relief,
+        )
     return SupportOpsActionSummary(
         message=(
             f"Support lane focus shifted to {focus.value}. "
-            f"Backlog now {state.support_program.backlog_queue}."
+            f"Backlog now {state.support_program.backlog_queue}, "
+            f"escalations {state.support_program.escalation_queue}, "
+            f"accounts stabilized {improved_accounts}."
         )
     )
 

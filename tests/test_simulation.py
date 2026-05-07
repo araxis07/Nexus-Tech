@@ -3694,6 +3694,7 @@ def test_set_support_lane_focus_updates_program_bias() -> None:
     )
     state = make_state(product, customer_accounts=[account])
     state.support_program.backlog_queue = 5
+    state.support_program.escalation_queue = 3
 
     outcome = apply_action(
         state,
@@ -3702,7 +3703,9 @@ def test_set_support_lane_focus_updates_program_bias() -> None:
     )
 
     assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
-    assert outcome.state.support_program.backlog_queue == 4
+    assert outcome.state.support_program.backlog_queue <= 4
+    assert outcome.state.support_program.escalation_queue <= 3
+    assert outcome.state.customer_accounts[0].open_tickets < 10
 
 
 def test_route_support_escalation_prioritizes_billing_lane_pressure() -> None:
@@ -5512,13 +5515,18 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
         renewal_queue_risk_accounts=2,
         premium_queue_risk_accounts=2,
         support_lane_saturation_index=16,
+        support_lane_focus=SupportLaneFocus.BALANCED,
         support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
         support_hotspot_lane_overflow=4,
+        hotspot_lane_account_count=3,
+        focus_alignment_gap=7,
         recovery_drag_score=38,
         paused_dependency_score=66,
         paused_revenue_share_percent=22,
+        hotspot_dependency_score=74,
         hotspot_revenue_share_percent=40,
         hotspot_channel="integration",
+        hotspot_status_note="integration is the hotspot and is still in recovery mode.",
         strategic_outlook="ipo_ready",
         dominant_endgame_pressure="public_market_scrutiny",
         commercial_fragility=62,
@@ -5551,7 +5559,9 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "upgrade_support_program" in planner.recommended_actions
     assert planner.support_lane_signal
     assert planner.channel_recovery_note
+    assert "misaligned" in planner.lane_focus_note
     assert planner.queue_hotspot_note
+    assert planner.dependency_hotspot_note
     assert planner.channel_hotspot_note
     assert "public-market" in planner.path_pressure_bias
     assert planner.capital_rebalance_note
@@ -5883,6 +5893,63 @@ def test_endgame_pressure_counts_queue_exposure_and_channel_recovery_drag() -> N
     assert pressure.operating_durability in {"stretched", "fragile"}
 
 
+def test_endgame_pressure_raises_ipo_scrutiny_on_enterprise_focus_mismatch() -> None:
+    product = make_product(
+        "Enterprise Listing Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=260,
+        quality=78,
+        market_fit=76,
+    )
+    account = CustomerAccount(
+        name="Enterprise Queue Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1600.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=60,
+        onboarding_health=54,
+        support_load=34,
+        open_tickets=10,
+        sla_breach_risk=58,
+        renewal_health=58,
+        expansion_potential=60,
+        renewal_turn=12,
+        churn_risk=28,
+        ticket_queue_age=3,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    mismatched = make_state(
+        product,
+        customer_accounts=[account.model_copy(deep=True)],
+        cash_on_hand=Decimal("18000.00"),
+        current_turn=15,
+    )
+    aligned = make_state(
+        product,
+        customer_accounts=[account.model_copy(deep=True)],
+        cash_on_hand=Decimal("18000.00"),
+        current_turn=15,
+    )
+    for state in (mismatched, aligned):
+        state.company.reputation = 82
+        state.finance.board_confidence = 76
+        state.finance.board_score = 72
+        state.finance.board_pressure = 14
+        state.support_program.backlog_queue = 8
+        state.support_program.escalation_queue = 2
+        state.support_program.queue_age_pressure = 3
+    mismatched.support_program.lane_focus = SupportLaneFocus.BILLING
+    aligned.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+
+    mismatch_pressure = calculate_endgame_pressure(mismatched)
+    aligned_pressure = calculate_endgame_pressure(aligned)
+
+    assert mismatch_pressure.public_market_scrutiny >= aligned_pressure.public_market_scrutiny
+    assert mismatch_pressure.support_fragility > aligned_pressure.support_fragility
+    assert "IPO:" in mismatch_pressure.path_watchlist[0]
+
+
 def test_independence_reckoning_event_can_take_bridge_flex() -> None:
     product = make_product(
         "Independent Core",
@@ -6061,6 +6128,70 @@ def test_acquirer_diligence_event_triggers_from_hotspot_channel_under_mna_outloo
     readiness = calculate_endgame_readiness(state)
 
     assert readiness.strategic_outlook == "strategic_acquisition"
+    assert definition.is_eligible(state) is True
+
+
+def test_partner_breakdown_event_can_trigger_from_hotspot_dependency_score() -> None:
+    product = make_product(
+        "Channel Fragility Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=210,
+        quality=72,
+        market_fit=70,
+    )
+    state = make_state(
+        product,
+        partnerships=[
+            PartnershipDeal(
+                name="Integration Hotspot",
+                product_id=product.id,
+                channel=PartnerChannel.INTEGRATION,
+                status=PartnershipStatus.RECOVERY,
+                quality=60,
+                risk=56,
+                conflict_pressure=54,
+                enablement_level=28,
+                sourced_revenue=Decimal("3400.00"),
+                rev_share_rate=Decimal("0.2400"),
+            ),
+            PartnershipDeal(
+                name="Integration Tail",
+                product_id=product.id,
+                channel=PartnerChannel.INTEGRATION,
+                status=PartnershipStatus.STRAINED,
+                quality=58,
+                risk=54,
+                conflict_pressure=52,
+                enablement_level=30,
+                sourced_revenue=Decimal("1800.00"),
+                rev_share_rate=Decimal("0.2300"),
+            ),
+        ],
+        event_history=[
+            EventHistoryEntry(
+                event_id="partner_qbr",
+                category=EventCategory.MARKET_OPPORTUNITY,
+                title="Channel Partner QBR",
+                triggered_turn=14,
+                resolved_turn=14,
+                selected_option_id="double_enablement",
+                selected_option_label="Double down on enablement",
+                result_text="Partner friction remained active despite more investment.",
+            )
+        ],
+        current_turn=16,
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "partner_breakdown"
+    )
+    portfolio = calculate_partnership_portfolio(state)
+
+    assert (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+    )
     assert definition.is_eligible(state) is True
 
 
@@ -6520,6 +6651,37 @@ def test_hundred_turn_acquisition_diligence_progression_is_seed_stable() -> None
         )
 
     assert run_once(601) == run_once(601)
+
+
+def test_hundred_turn_independence_compounder_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="independence_compounder",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(100):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.covenant_risk,
+            len(state.turn_history),
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(733) == run_once(733)
 
 
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:

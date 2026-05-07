@@ -83,7 +83,9 @@ class FinancePlannerSnapshot:
     commercial_financing_risk: str
     support_lane_signal: str
     channel_recovery_note: str
+    lane_focus_note: str
     queue_hotspot_note: str
+    dependency_hotspot_note: str
     channel_hotspot_note: str
     path_pressure_bias: str
     capital_rebalance_note: str
@@ -243,13 +245,18 @@ def build_finance_planner(
     renewal_queue_risk_accounts: int = 0,
     premium_queue_risk_accounts: int = 0,
     support_lane_saturation_index: int = 0,
+    support_lane_focus: SupportLaneFocus = SupportLaneFocus.BALANCED,
     support_hotspot_lane: SupportLaneFocus = SupportLaneFocus.BALANCED,
     support_hotspot_lane_overflow: int = 0,
+    hotspot_lane_account_count: int = 0,
+    focus_alignment_gap: int = 0,
     recovery_drag_score: int = 0,
     paused_dependency_score: int = 0,
     paused_revenue_share_percent: int = 0,
+    hotspot_dependency_score: int = 0,
     hotspot_revenue_share_percent: int = 0,
     hotspot_channel: str = "-",
+    hotspot_status_note: str = "",
     strategic_outlook: str = "profitable_independence",
     dominant_endgame_pressure: str = "independence_discipline",
     commercial_fragility: int = 0,
@@ -513,6 +520,25 @@ def build_finance_planner(
     else:
         support_lane_signal = "support lanes are not yet forcing a capital re-plan."
 
+    if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
+        lane_focus_note = (
+            f"{support_lane_focus.value} focus is misaligned with the "
+            f"{support_hotspot_lane.value} hotspot by {focus_alignment_gap} pressure points."
+        )
+    elif (
+        support_hotspot_lane is not SupportLaneFocus.BALANCED
+        and support_lane_focus is support_hotspot_lane
+        and support_hotspot_lane_overflow > 0
+    ):
+        lane_focus_note = (
+            f"{support_lane_focus.value} focus is aligned, but {hotspot_lane_account_count} "
+            "account(s) still need direct relief."
+        )
+    elif support_hotspot_lane is not SupportLaneFocus.BALANCED:
+        lane_focus_note = f"{support_lane_focus.value} focus is currently serviceable."
+    else:
+        lane_focus_note = "support focus is balanced enough for the current account mix."
+
     if paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
         channel_recovery_note = (
             "paused channel dependency is now large enough to distort planning confidence."
@@ -525,6 +551,17 @@ def build_finance_planner(
         )
     else:
         channel_recovery_note = "channel recovery drag is present but not yet dominant."
+
+    if hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
+        dependency_hotspot_note = hotspot_status_note or (
+            "one channel hotspot now carries enough dependency to bend the whole plan."
+        )
+    elif hotspot_channel != "-" and hotspot_revenue_share_percent >= 25:
+        dependency_hotspot_note = (
+            f"{hotspot_channel} carries meaningful late-game dependency, but is still manageable."
+        )
+    else:
+        dependency_hotspot_note = "no single channel hotspot is dominating the plan yet."
 
     if support_hotspot_lane is SupportLaneFocus.ENTERPRISE and support_hotspot_lane_overflow > 0:
         queue_hotspot_note = (
@@ -658,7 +695,10 @@ def build_finance_planner(
         recommended_actions.append("set_capital_plan")
     if support_backlog >= 12 or support_escalations >= 4:
         recommended_actions.append("triage_support_backlog")
-    if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
+    if (
+        support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2
+        or focus_alignment_gap > 0
+    ):
         recommended_actions.append("set_support_lane_focus")
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
@@ -690,13 +730,17 @@ def build_finance_planner(
         channel_dependency_risk >= BALANCE.finance_planner_reactivate_dependency_threshold
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
         or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
     ):
         recommended_actions.append("reactivate_partnership")
-    if hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold:
+    if (
+        hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
         recommended_actions.append("review_partnerships")
     if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
         recommended_actions.append("review_partnerships")
-    if channel_conflict_index >= 30:
+    if channel_conflict_index >= 30 or hotspot_dependency_score >= 72:
         recommended_actions.append("renegotiate_partnership")
     if (
         strategic_outlook == "strategic_acquisition"
@@ -715,6 +759,7 @@ def build_finance_planner(
         recommended_actions.append("execute_board_response")
     if not recommended_actions:
         recommended_actions.append("review_finance")
+    recommended_actions = list(dict.fromkeys(recommended_actions))
 
     action_sequence: list[str] = []
     if reserve_break_risk in {"critical", "high"}:
@@ -725,10 +770,19 @@ def build_finance_planner(
         action_sequence.append("stabilize support before leaning harder into expansion")
     if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
         action_sequence.append("rebalance support lanes before promising more high-touch growth")
+    if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
+        action_sequence.append(
+            f"move support focus from {support_lane_focus.value} to "
+            f"{support_hotspot_lane.value} before backing another growth promise"
+        )
     if channel_dependency_risk >= 55 or channel_conflict_index >= 28:
         action_sequence.append("de-risk channel mix before accelerating go-to-market")
     if paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
         action_sequence.append("recover paused channel dependency before counting it as durable")
+    if hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
+        action_sequence.append(
+            f"stabilize the {hotspot_channel} hotspot before treating partner revenue as durable"
+        )
     if finance.investor_pressure >= 28:
         action_sequence.append("prepare a board-facing capital response")
     if commercial_risk_score >= 10:
@@ -793,7 +847,9 @@ def build_finance_planner(
         commercial_financing_risk=commercial_financing_risk,
         support_lane_signal=support_lane_signal,
         channel_recovery_note=channel_recovery_note,
+        lane_focus_note=lane_focus_note,
         queue_hotspot_note=queue_hotspot_note,
+        dependency_hotspot_note=dependency_hotspot_note,
         channel_hotspot_note=channel_hotspot_note,
         path_pressure_bias=path_pressure_bias,
         capital_rebalance_note=capital_rebalance_note,

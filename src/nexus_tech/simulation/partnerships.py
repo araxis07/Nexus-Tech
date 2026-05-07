@@ -78,6 +78,8 @@ class PartnershipPortfolioSummary:
     paused_dependency_score: int
     hotspot_revenue_share_percent: int
     hotspot_channel: str
+    hotspot_dependency_score: int
+    hotspot_status_note: str
     channel_mix_note: str
     summary: str
 
@@ -264,19 +266,31 @@ def reactivate_partnership(
         and fatigue < BALANCE.partnership_fatigue_strained_threshold
     ):
         raise ValueError("This partnership does not currently need a recovery plan.")
+    portfolio = calculate_partnership_portfolio(state)
 
     state.company.cash_on_hand = quantize_money(
         state.company.cash_on_hand - BALANCE.partnership_reactivation_cost
     )
+    hotspot_bonus = int(
+        partnership.channel.value == portfolio.hotspot_channel
+        and portfolio.hotspot_revenue_share_percent
+        >= BALANCE.finance_planner_volatile_share_threshold
+    )
     partnership.enablement_level = clamp_int(
-        partnership.enablement_level + BALANCE.partnership_reactivation_enablement_gain
+        partnership.enablement_level
+        + BALANCE.partnership_reactivation_enablement_gain
+        + hotspot_bonus
     )
     partnership.quality = clamp_int(
-        partnership.quality + BALANCE.partnership_reactivation_quality_gain
+        partnership.quality + BALANCE.partnership_reactivation_quality_gain + hotspot_bonus
     )
-    partnership.risk = clamp_int(partnership.risk - BALANCE.partnership_reactivation_risk_relief)
+    partnership.risk = clamp_int(
+        partnership.risk - BALANCE.partnership_reactivation_risk_relief - hotspot_bonus
+    )
     partnership.conflict_pressure = clamp_int(
-        partnership.conflict_pressure - BALANCE.partnership_reactivation_conflict_relief
+        partnership.conflict_pressure
+        - BALANCE.partnership_reactivation_conflict_relief
+        - hotspot_bonus
     )
     partnership.last_review_turn = state.company.current_turn
     updated_fatigue = calculate_partnership_fatigue(state, partnership)
@@ -620,6 +634,8 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             paused_dependency_score=0,
             hotspot_revenue_share_percent=0,
             hotspot_channel="-",
+            hotspot_dependency_score=0,
+            hotspot_status_note="No hotspot channel yet.",
             channel_mix_note="No active channel portfolio yet.",
             summary="No active channel portfolio yet.",
         )
@@ -817,6 +833,24 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         if sourced_revenue > ZERO_MONEY
         else 0
     )
+    hotspot_strained_count = sum(
+        1
+        for partnership in state.partnerships
+        if partnership.channel.value == hotspot_channel
+        and partnership.status is PartnershipStatus.STRAINED
+    )
+    hotspot_recovery_count = sum(
+        1
+        for partnership in state.partnerships
+        if partnership.channel.value == hotspot_channel
+        and partnership.status is PartnershipStatus.RECOVERY
+    )
+    hotspot_paused_count = sum(
+        1
+        for partnership in state.partnerships
+        if partnership.channel.value == hotspot_channel
+        and partnership.status is PartnershipStatus.PAUSED
+    )
     channel_dependency_risk = clamp_int(
         (dominant_share_percent // 2)
         + (channel_conflict_index // 2)
@@ -878,6 +912,25 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         + (channel_dependency_risk // 2)
         + direct_sales_conflict_accounts
     )
+    hotspot_dependency_score = clamp_int(
+        hotspot_revenue_share_percent
+        + (hotspot_strained_count * BALANCE.partnership_dependency_risk_strained_bonus)
+        + (hotspot_recovery_count * BALANCE.partnership_dependency_risk_paused_bonus)
+        + (hotspot_paused_count * BALANCE.partnership_dependency_risk_paused_bonus)
+        + (direct_sales_conflict_accounts if hotspot_channel == "reseller" else 0)
+        + (recovery_drag_score // 2)
+        + (paused_dependency_score // 2)
+    )
+    if hotspot_paused_count > 0:
+        hotspot_status_note = (
+            f"{hotspot_channel} is the hotspot and still has paused channel revenue trapped."
+        )
+    elif hotspot_recovery_count > 0:
+        hotspot_status_note = f"{hotspot_channel} is the hotspot and is still in recovery mode."
+    elif hotspot_strained_count > 0:
+        hotspot_status_note = f"{hotspot_channel} is the hotspot and still running under strain."
+    else:
+        hotspot_status_note = f"{hotspot_channel} is the hotspot, but is still operable."
     if hotspot_channel == "marketplace":
         channel_mix_note = (
             "Marketplace exposure is the sharpest source of current channel friction."
@@ -942,6 +995,8 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         paused_dependency_score=paused_dependency_score,
         hotspot_revenue_share_percent=hotspot_revenue_share_percent,
         hotspot_channel=hotspot_channel,
+        hotspot_dependency_score=hotspot_dependency_score,
+        hotspot_status_note=hotspot_status_note,
         channel_mix_note=channel_mix_note,
         summary=summary,
     )

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.47.0 - 2026-05-07
+
+- Deepened support-lane realism by turning hotspot lane focus into a stronger immediate action, with targeted relief when the company shifts into the live enterprise, billing, or onboarding bottleneck
+- Expanded partnership analytics with hotspot dependency scoring and hotspot status notes so recovering or concentrated channels now surface more clearly in planning, endgame pressure, and reporting
+- Strengthened the finance planner with lane-focus and dependency-hotspot guidance plus more path-aware recommendations around support-lane focus, partnership recovery, and channel review
+- Tightened endgame and commercial pressure so IPO, acquisition, and independence runs react more sharply to support-focus mismatch and hotspot channel dependency
+- Added new regression coverage for support-focus relief, hotspot dependency-driven partner breakdowns, endgame mismatch pressure, and a seeded 100-turn independence-compounder stability run
+- Promoted the package version to `0.47.0`
+
 ## 0.46.0 - 2026-05-07
 
 - Deepened late-game path pressure again so IPO, acquisition, and independence runs react more sharply to enterprise queue hotspots, billing renewal stress, and concentrated partner revenue

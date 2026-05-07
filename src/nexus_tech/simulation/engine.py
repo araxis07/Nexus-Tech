@@ -1850,11 +1850,20 @@ def apply_end_of_turn_commercial_pressure(
         >= BALANCE.support_program_backlog_reputation_threshold // 2
     ):
         board_pressure_delta += 2
+    if support_summary.focus_alignment_gap > 0:
+        board_pressure_delta += min(2, support_summary.focus_alignment_gap // 2)
+        board_confidence_loss += 1
     if (
         portfolio.channel_volatility_index
         >= BALANCE.commercial_pressure_channel_volatility_threshold
     ):
         board_pressure_delta += BALANCE.commercial_pressure_channel_volatility_board_penalty
+        board_confidence_loss += 1
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        board_pressure_delta += 1
         board_confidence_loss += 1
 
     path_specific_notes: list[str] = []
@@ -1878,6 +1887,10 @@ def apply_end_of_turn_commercial_pressure(
         if support_summary.hotspot_lane.value == "enterprise":
             board_pressure_delta += min(2, 1 + support_summary.hotspot_lane_overflow)
             state.finance.board_score = clamp_int(state.finance.board_score - 1)
+        if support_summary.focus_alignment_gap > 0:
+            state.finance.board_reliability_score = clamp_int(
+                state.finance.board_reliability_score - 1
+            )
         state.finance.board_reliability_score = clamp_int(state.finance.board_reliability_score - 1)
         path_specific_notes.append(
             "public-market scrutiny is amplifying enterprise reliability misses"
@@ -1900,12 +1913,24 @@ def apply_end_of_turn_commercial_pressure(
             state.finance.board_profitability_score = clamp_int(
                 state.finance.board_profitability_score - 1
             )
+        if (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+        ):
+            state.finance.board_profitability_score = clamp_int(
+                state.finance.board_profitability_score - 1
+            )
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 1
         )
         path_specific_notes.append(
             f"acquirer diligence is magnifying {portfolio.hotspot_channel} concentration"
         )
+        if (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+        ):
+            path_specific_notes.append(portfolio.hotspot_status_note)
     elif readiness.strategic_outlook == "profitable_independence" and (
         pressure.independence_discipline >= BALANCE.event_independence_reckoning_pressure_threshold
         or support_summary.renewal_queue_risk_accounts > 0
@@ -1914,6 +1939,8 @@ def apply_end_of_turn_commercial_pressure(
         state.finance.covenant_risk = clamp_int(state.finance.covenant_risk + 1)
         if support_summary.hotspot_lane.value == "billing":
             state.finance.investor_pressure = clamp_int(state.finance.investor_pressure + 1)
+        if support_summary.focus_alignment_gap > 0:
+            state.finance.covenant_risk = clamp_int(state.finance.covenant_risk + 1)
         path_specific_notes.append(
             "independence discipline is punishing billing and renewal instability"
         )
@@ -1988,6 +2015,8 @@ def apply_end_of_turn_commercial_pressure(
         >= BALANCE.support_program_backlog_reputation_threshold // 2
     ):
         state.finance.board_team_health_score = clamp_int(state.finance.board_team_health_score - 1)
+    if support_summary.focus_alignment_gap > 0:
+        state.finance.board_team_health_score = clamp_int(state.finance.board_team_health_score - 1)
     if direct_sales_conflict_pressure:
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 2
@@ -2003,6 +2032,13 @@ def apply_end_of_turn_commercial_pressure(
     if (
         portfolio.channel_volatility_index
         >= BALANCE.commercial_pressure_channel_volatility_threshold
+    ):
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score - 1
+        )
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
     ):
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 1

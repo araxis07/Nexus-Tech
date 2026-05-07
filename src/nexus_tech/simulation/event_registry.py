@@ -1778,6 +1778,10 @@ def _is_public_market_scrutiny_eligible(state: GameState) -> bool:
                 queue_exposure.hotspot_lane.value == "enterprise"
                 and queue_exposure.hotspot_lane_overflow > 0
             )
+            or (
+                queue_exposure.hotspot_lane.value == "enterprise"
+                and queue_exposure.focus_alignment_gap > 0
+            )
         )
         and not _has_recent_event(
             state,
@@ -1840,6 +1844,8 @@ def _is_acquirer_diligence_eligible(state: GameState) -> bool:
             pressure.dominant_pressure == "acquirer_diligence"
             or portfolio.hotspot_revenue_share_percent >= 35
             or portfolio.paused_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.hotspot_dependency_score
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         )
         and not _has_recent_event(
@@ -1905,6 +1911,10 @@ def _is_independence_reckoning_eligible(state: GameState) -> bool:
             or pressure.capital_fragility >= BALANCE.event_independence_reckoning_pressure_threshold
             or queue_exposure.renewal_queue_risk_accounts > 0
             or queue_exposure.hotspot_lane.value == "billing"
+            or (
+                queue_exposure.hotspot_lane.value == "billing"
+                and queue_exposure.focus_alignment_gap > 0
+            )
         )
         and not _has_recent_event(
             state,
@@ -2062,6 +2072,7 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         or premium_breach_accounts
         or queue_exposure.hotspot_lane_overflow >= 2
         or queue_exposure.premium_queue_risk_accounts > 0
+        or queue_exposure.focus_alignment_gap > 0
     )
 
 
@@ -2223,6 +2234,8 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             or portfolio.channel_volatility_index >= 58
             or portfolio.hotspot_revenue_share_percent >= 45
             or portfolio.recovery_drag_score >= 28
+            or portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
         )
         for partnership in state.partnerships
     )
