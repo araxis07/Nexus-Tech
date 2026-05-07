@@ -15,6 +15,7 @@ from nexus_tech.simulation.support_program import (
     calculate_support_account_risk_counts,
     calculate_support_account_risk_values,
     calculate_support_lane_snapshots,
+    calculate_support_queue_exposure,
 )
 
 
@@ -159,6 +160,7 @@ def calculate_endgame_pressure(
     portfolio = calculate_partnership_portfolio(state)
     revenue_at_risk_accounts, _ = calculate_support_account_risk_counts(state)
     revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     lane_overflow_pressure = sum(
         snapshot.overflow for snapshot in calculate_support_lane_snapshots(state).values()
     )
@@ -204,6 +206,14 @@ def calculate_endgame_pressure(
             else 0
         )
         + (premium_breach_weight * BALANCE.exit_support_fragility_premium_breach_weight)
+        + int(
+            (
+                queue_exposure.enterprise_queue_exposure_value
+                / BALANCE.exit_support_fragility_value_divisor
+            ).to_integral_value()
+        )
+        + queue_exposure.white_glove_queue_risk_accounts
+        + (queue_exposure.lane_saturation_index // BALANCE.support_program_queue_age_threshold)
     )
     channel_fragility = _clamp_readiness(
         portfolio.average_fatigue
@@ -224,6 +234,15 @@ def calculate_endgame_pressure(
             portfolio.rev_share_pressure
             // BALANCE.exit_channel_fragility_rev_share_pressure_divisor
         )
+        + portfolio.recovery_drag_score
+        + (
+            portfolio.paused_dependency_score
+            // BALANCE.exit_channel_fragility_rev_share_pressure_divisor
+        )
+        + (
+            portfolio.hotspot_revenue_share_percent
+            // BALANCE.exit_channel_fragility_revenue_share_divisor
+        )
     )
     board_reset_risk = _clamp_readiness(
         (state.finance.restructuring_pressure * 4)
@@ -239,6 +258,7 @@ def calculate_endgame_pressure(
         + (state.finance.board_pressure // 2)
         + state.support_program.sla_breaches_last_turn
         + (support_fragility // 4)
+        + (queue_exposure.lane_saturation_index // BALANCE.support_program_queue_age_threshold)
     )
     acquirer_diligence = _clamp_readiness(
         max(0, readiness.acquisition_interest_score - 35)
@@ -247,6 +267,10 @@ def calculate_endgame_pressure(
         + (revenue_at_risk_accounts * 3)
         + (6 if state.finance.board_resolution_due else 0)
         + (channel_fragility // 4)
+        + (
+            portfolio.paused_dependency_score
+            // BALANCE.exit_channel_fragility_revenue_share_divisor
+        )
     )
     independence_discipline = _clamp_readiness(
         max(0, readiness.independence_score - 35)
@@ -255,6 +279,12 @@ def calculate_endgame_pressure(
         + reserve_gap_units
         + (4 if state.finance.debt_principal > Decimal("0.00") and reserve_gap_units > 0 else 0)
         + (support_fragility // 5)
+        + int(
+            (
+                queue_exposure.renewal_queue_exposure_value
+                / BALANCE.exit_support_fragility_value_divisor
+            ).to_integral_value()
+        )
     )
     restructure_heat = _clamp_readiness(
         (state.finance.restructuring_pressure * 4)
@@ -268,6 +298,13 @@ def calculate_endgame_pressure(
         + (channel_fragility // BALANCE.exit_commercial_fragility_channel_divisor)
         + (revenue_at_risk_accounts * 2)
         + (portfolio.volatile_revenue_share_percent // 6)
+        + int(
+            (
+                queue_exposure.renewal_queue_exposure_value
+                / BALANCE.exit_support_fragility_value_divisor
+            ).to_integral_value()
+        )
+        + (portfolio.recovery_drag_score // BALANCE.exit_commercial_fragility_channel_divisor)
     )
     capital_fragility = _clamp_readiness(
         independence_discipline

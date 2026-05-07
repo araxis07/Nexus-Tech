@@ -883,6 +883,60 @@ def test_save_then_load_round_trip_after_extended_late_game_progression(tmp_path
     assert loaded.rng.randint(1, 100) == expected_next_roll
 
 
+def test_save_then_load_round_trip_continues_under_commercial_pressure(tmp_path: Path) -> None:
+    db_path = tmp_path / "commercial-pressure-round-trip.db"
+    coordinator = SaveLoadCoordinator(db_path)
+    state = make_state()
+    state.company.current_turn = 14
+    state.support_program.backlog_queue = 18
+    state.support_program.escalation_queue = 6
+    state.support_program.queue_age_pressure = 5
+    state.customer_accounts[0].open_tickets = 14
+    state.customer_accounts[0].sla_breach_risk = 72
+    state.customer_accounts[0].ticket_queue_age = 4
+    state.customer_accounts[0].renewal_health = 44
+    state.partnerships[0].status = PartnershipStatus.RECOVERY
+    state.partnerships[0].risk = 50
+    state.partnerships[0].conflict_pressure = 48
+    state.partnerships[0].sourced_revenue = Decimal("2100.00")
+    state.finance.board_pressure = 26
+    state.finance.governance_risk = 22
+    rng = RandomSource(seed=131)
+
+    for _ in range(6):
+        resolution = resolve_turn(state, rng)
+        state = resolution.state
+        if state.pending_event is not None:
+            state = resolve_pending_event(state, state.pending_event.options[0].id).state
+        if state.company.game_over or state.victory_achieved:
+            break
+
+    coordinator.save_game(DEFAULT_SAVE_SLOT, state, rng)
+    loaded = coordinator.load_game(DEFAULT_SAVE_SLOT)
+    loaded_state_cursor = loaded.state
+    loaded_rng = loaded.rng
+
+    expected_state = state
+    expected_rng = rng
+    for _ in range(3):
+        expected_resolution = resolve_turn(expected_state, expected_rng)
+        expected_state = expected_resolution.state
+        if expected_state.pending_event is not None:
+            expected_state = resolve_pending_event(
+                expected_state,
+                expected_state.pending_event.options[0].id,
+            ).state
+        loaded_resolution = resolve_turn(loaded_state_cursor, loaded_rng)
+        loaded_state = loaded_resolution.state
+        if loaded_state.pending_event is not None:
+            loaded_state = resolve_pending_event(
+                loaded_state,
+                loaded_state.pending_event.options[0].id,
+            ).state
+        loaded_state_cursor = loaded_state
+        assert loaded_state_cursor.model_dump() == expected_state.model_dump()
+
+
 def test_save_then_load_round_trip_preserves_recovery_partnership_state(tmp_path: Path) -> None:
     db_path = tmp_path / "partnership-recovery.db"
     coordinator = SaveLoadCoordinator(db_path)

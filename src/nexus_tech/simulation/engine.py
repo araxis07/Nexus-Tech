@@ -1818,6 +1818,32 @@ def apply_end_of_turn_commercial_pressure(
             )
             + BALANCE.commercial_pressure_premium_queue_confidence_loss,
         )
+    if support_summary.enterprise_queue_exposure_value > Decimal("0.00"):
+        enterprise_queue_penalty = int(
+            (
+                support_summary.enterprise_queue_exposure_value
+                / BALANCE.commercial_pressure_revenue_at_risk_value_divisor
+            ).to_integral_value()
+        )
+        board_pressure_delta += min(4, enterprise_queue_penalty)
+        board_confidence_loss += min(3, enterprise_queue_penalty)
+    if support_summary.renewal_queue_exposure_value > Decimal("0.00"):
+        governance_risk_delta += min(
+            4,
+            int(
+                (
+                    support_summary.renewal_queue_exposure_value
+                    / BALANCE.commercial_pressure_renewal_pressure_value_divisor
+                ).to_integral_value()
+            ),
+        )
+    if support_summary.white_glove_queue_risk_accounts > 0:
+        board_confidence_loss += min(2, support_summary.white_glove_queue_risk_accounts)
+    if (
+        support_summary.lane_saturation_index
+        >= BALANCE.support_program_backlog_reputation_threshold // 2
+    ):
+        board_pressure_delta += 2
     if (
         portfolio.channel_volatility_index
         >= BALANCE.commercial_pressure_channel_volatility_threshold
@@ -1884,6 +1910,11 @@ def apply_end_of_turn_commercial_pressure(
                 // BALANCE.commercial_pressure_service_tier_team_health_divisor,
             )
         )
+    if (
+        support_summary.lane_saturation_index
+        >= BALANCE.support_program_backlog_reputation_threshold // 2
+    ):
+        state.finance.board_team_health_score = clamp_int(state.finance.board_team_health_score - 1)
     if direct_sales_conflict_pressure:
         state.finance.board_portfolio_focus_score = clamp_int(
             state.finance.board_portfolio_focus_score - 2
@@ -1950,10 +1981,25 @@ def apply_end_of_turn_commercial_pressure(
             "premium queue exposure now covers "
             f"{format_money(support_summary.premium_queue_exposure_value)}"
         )
+    if support_summary.enterprise_queue_exposure_value > Decimal("0.00"):
+        summary_parts.append(
+            "enterprise queue exposure now covers "
+            f"{format_money(support_summary.enterprise_queue_exposure_value)}"
+        )
+    if support_summary.renewal_queue_exposure_value > Decimal("0.00"):
+        summary_parts.append(
+            "renewal queue exposure now covers "
+            f"{format_money(support_summary.renewal_queue_exposure_value)}"
+        )
     if support_summary.lane_overflow_pressure > 0:
         summary_parts.append(
             f"support lanes overflowed by {support_summary.lane_overflow_pressure}"
         )
+    if (
+        support_summary.lane_saturation_index
+        >= BALANCE.support_program_backlog_reputation_threshold // 2
+    ):
+        summary_parts.append(f"lane saturation climbed to {support_summary.lane_saturation_index}")
     if dependency_pressure:
         summary_parts.append("channel dependency is elevated")
     if channel_fatigue_pressure:

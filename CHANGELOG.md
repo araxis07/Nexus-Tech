@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.44.0 - 2026-05-07
+
+- Deepened support-ops realism with enterprise queue exposure, renewal queue exposure, white-glove queue-risk counts, and lane saturation signals that now feed finance, governance, and late-game pressure
+- Expanded partnership analytics with recovery drag, paused dependency, and hotspot revenue share so channel fragility now reflects recovering or concentrated partner revenue more clearly
+- Strengthened the finance planner with support-lane and channel-recovery guidance plus more concrete recommended actions around lane focus, channel review, and recovery sequencing
+- Tightened late-game pressure scoring so support saturation and channel recovery drag shape path pressure, commercial fragility, and operating durability more directly
+- Added long-run and persistence hardening through seeded 80-turn progression coverage and a save-load continuation regression under commercial pressure
+- Fixed runway estimation under severe burn so forecast persistence no longer tries to write invalid negative runway turns
+- Promoted the package version to `0.44.0`
+
 ## 0.43.0 - 2026-05-07
 
 - Deepened endgame pressure with operating-durability scoring, path watchlists, and more path-aware late-game event eligibility so IPO, acquisition, and independence pressure trigger more distinctly

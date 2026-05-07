@@ -74,6 +74,9 @@ class PartnershipPortfolioSummary:
     fatigue_hotspot_count: int
     channel_volatility_index: int
     commercial_dependency_score: int
+    recovery_drag_score: int
+    paused_dependency_score: int
+    hotspot_revenue_share_percent: int
     hotspot_channel: str
     channel_mix_note: str
     summary: str
@@ -613,6 +616,9 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             fatigue_hotspot_count=0,
             channel_volatility_index=0,
             commercial_dependency_score=0,
+            recovery_drag_score=0,
+            paused_dependency_score=0,
+            hotspot_revenue_share_percent=0,
             hotspot_channel="-",
             channel_mix_note="No active channel portfolio yet.",
             summary="No active channel portfolio yet.",
@@ -796,6 +802,21 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             + int((partnership.rev_share_rate * Decimal("100")).to_integral_value())
         )
     hotspot_channel = max(channel_scores.items(), key=lambda item: item[1])[0]
+    hotspot_revenue = quantize_money(
+        sum(
+            (
+                partnership.sourced_revenue
+                for partnership in state.partnerships
+                if partnership.channel.value == hotspot_channel
+            ),
+            ZERO_MONEY,
+        )
+    )
+    hotspot_revenue_share_percent = (
+        int((hotspot_revenue / sourced_revenue * Decimal("100")).to_integral_value())
+        if sourced_revenue > ZERO_MONEY
+        else 0
+    )
     channel_dependency_risk = clamp_int(
         (dominant_share_percent // 2)
         + (channel_conflict_index // 2)
@@ -840,6 +861,22 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         + (concentration_risk // 2)
         + (rev_share_pressure // BALANCE.partnership_commercial_dependency_rev_share_divisor)
         + (channel_volatility_index // 5)
+    )
+    recovery_drag_score = clamp_int(
+        (recovery_revenue_share_percent // BALANCE.partnership_channel_volatility_share_divisor)
+        + (recovery_count * BALANCE.partnership_dependency_risk_paused_bonus)
+        + (
+            fatigue_hotspot_count
+            * max(1, BALANCE.partnership_channel_volatility_hotspot_bonus // 2)
+        )
+    )
+    paused_dependency_score = clamp_int(
+        (
+            paused_revenue_share_percent
+            // max(1, BALANCE.partnership_concentration_share_divisor // 2)
+        )
+        + (channel_dependency_risk // 2)
+        + direct_sales_conflict_accounts
     )
     if hotspot_channel == "marketplace":
         channel_mix_note = (
@@ -901,6 +938,9 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         fatigue_hotspot_count=fatigue_hotspot_count,
         channel_volatility_index=channel_volatility_index,
         commercial_dependency_score=commercial_dependency_score,
+        recovery_drag_score=recovery_drag_score,
+        paused_dependency_score=paused_dependency_score,
+        hotspot_revenue_share_percent=hotspot_revenue_share_percent,
         hotspot_channel=hotspot_channel,
         channel_mix_note=channel_mix_note,
         summary=summary,

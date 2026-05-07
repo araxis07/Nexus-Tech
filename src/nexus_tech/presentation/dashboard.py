@@ -91,6 +91,7 @@ from nexus_tech.simulation.support_program import (
     calculate_support_account_risk_values,
     calculate_support_lane_snapshots,
     calculate_support_lane_staffing_plan,
+    calculate_support_queue_exposure,
     calculate_support_staff_capacity,
     classify_account_support_lane,
     count_escalating_accounts,
@@ -2757,6 +2758,7 @@ def _build_support_program_panel(state: GameState) -> Panel:
     staffing_capacity = calculate_support_staff_capacity(state)
     lane_snapshots = calculate_support_lane_snapshots(state)
     staffing_plan = calculate_support_lane_staffing_plan(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
         state
     )
@@ -2786,17 +2788,6 @@ def _build_support_program_panel(state: GameState) -> Panel:
         for account in state.customer_accounts
         if account.support_tier.value == "white_glove"
         and account.sla_breach_risk >= state.support_program.sla_target
-    )
-    severe_queue_accounts = sum(
-        1
-        for account in state.customer_accounts
-        if account.status is not CustomerAccountStatus.CHURNED
-        and account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
-        and (
-            account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold + 1
-            or account.open_tickets >= BALANCE.support_program_escalation_ticket_threshold
-            or account.sla_breach_risk >= state.support_program.sla_target
-        )
     )
     lane_counts = {
         "onboarding": 0,
@@ -2829,26 +2820,18 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Billing Q", str(state.support_program.billing_ticket_pressure))
     table.add_row("Revenue at Risk", str(revenue_at_risk_accounts))
     table.add_row("Risk Value", format_money(revenue_at_risk_value))
+    table.add_row(
+        "Enterprise Queue $",
+        format_money(queue_exposure.enterprise_queue_exposure_value),
+    )
+    table.add_row(
+        "Renewal Queue $",
+        format_money(queue_exposure.renewal_queue_exposure_value),
+    )
     table.add_row("White-Glove Risk", format_money(white_glove_risk_value))
     table.add_row(
         "Premium Queue $",
-        format_money(
-            sum(
-                (
-                    account.contract_value
-                    for account in state.customer_accounts
-                    if account.status is not CustomerAccountStatus.CHURNED
-                    and account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
-                    and (
-                        account.ticket_queue_age >= BALANCE.support_program_queue_age_threshold + 1
-                        or account.open_tickets
-                        >= BALANCE.support_program_escalation_ticket_threshold
-                        or account.sla_breach_risk >= state.support_program.sla_target
-                    )
-                ),
-                Decimal("0.00"),
-            )
-        ),
+        format_money(queue_exposure.premium_queue_exposure_value),
     )
     table.add_row(
         "High-Value Risk",
@@ -2870,7 +2853,9 @@ def _build_support_program_panel(state: GameState) -> Panel:
     table.add_row("Renewal Value", format_money(renewal_pressure_value))
     table.add_row("Priority Breach", str(priority_breach_accounts))
     table.add_row("White-Glove Breach", str(white_glove_breach_accounts))
-    table.add_row("Severe Queue", str(severe_queue_accounts))
+    table.add_row("WG Queue Risk", str(queue_exposure.white_glove_queue_risk_accounts))
+    table.add_row("Severe Queue", str(queue_exposure.severe_queue_accounts))
+    table.add_row("Lane Saturation", str(queue_exposure.lane_saturation_index))
     table.add_row(
         "Recovery Ready",
         str(
@@ -2979,6 +2964,7 @@ def _build_late_game_panel(state: GameState) -> Panel:
 def _build_finance_panel(state: GameState) -> Panel:
     runway = estimate_runway(state.company.cash_on_hand, _latest_net_cash_flow(state))
     portfolio = calculate_partnership_portfolio(state)
+    queue_exposure = calculate_support_queue_exposure(state)
     revenue_at_risk_value, renewal_pressure_value = calculate_support_account_risk_values(state)
     base_forecast, conservative_forecast, aggressive_forecast = (
         calculate_cash_flow_forecast_scenarios(
@@ -3008,6 +2994,12 @@ def _build_finance_panel(state: GameState) -> Panel:
         channel_dependency_risk=portfolio.channel_dependency_risk,
         commercial_dependency_score=portfolio.commercial_dependency_score,
         volatile_revenue_share_percent=portfolio.volatile_revenue_share_percent,
+        enterprise_queue_exposure_value=queue_exposure.enterprise_queue_exposure_value,
+        renewal_queue_exposure_value=queue_exposure.renewal_queue_exposure_value,
+        support_lane_saturation_index=queue_exposure.lane_saturation_index,
+        recovery_drag_score=portfolio.recovery_drag_score,
+        paused_dependency_score=portfolio.paused_dependency_score,
+        hotspot_revenue_share_percent=portfolio.hotspot_revenue_share_percent,
     )
     table = Table.grid(padding=(0, 1))
     table.add_row("Debt", format_money(state.finance.debt_principal))
@@ -3085,6 +3077,8 @@ def _build_finance_panel(state: GameState) -> Panel:
     table.add_row("Liquidity Risk", planner.liquidity_risk)
     table.add_row("Exec Drag", planner.execution_drag)
     table.add_row("Comm Risk", planner.commercial_financing_risk)
+    table.add_row("Support Lane", planner.support_lane_signal)
+    table.add_row("Channel Recovery", planner.channel_recovery_note)
     table.add_row("Priority", planner.capital_priority)
     table.add_row("Funding Resilience", planner.funding_resilience)
     table.add_row("Capital Discipline", str(planner.capital_discipline_index))
@@ -3185,10 +3179,13 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Volatile Rev Share", f"{portfolio.volatile_revenue_share_percent}%")
         table.add_row("Volatility", str(portfolio.channel_volatility_index))
         table.add_row("Concentration", str(portfolio.concentration_risk))
+        table.add_row("Recovery Drag", str(portfolio.recovery_drag_score))
+        table.add_row("Paused Dependency", str(portfolio.paused_dependency_score))
         table.add_row("Renegotiate P", str(portfolio.renegotiation_pressure))
         table.add_row("Rev Share P", str(portfolio.rev_share_pressure))
         table.add_row("Fatigue Hotspots", str(portfolio.fatigue_hotspot_count))
         table.add_row("Hotspot", portfolio.hotspot_channel)
+        table.add_row("Hotspot Share", f"{portfolio.hotspot_revenue_share_percent}%")
         table.add_row("Dependency Risk", str(portfolio.channel_dependency_risk))
         table.add_row("Comm Dependency", str(portfolio.commercial_dependency_score))
         table.add_row("Mix Note", portfolio.channel_mix_note)

@@ -44,13 +44,17 @@ class SupportProgramSummary:
     premium_revenue_at_risk_value: Decimal
     white_glove_revenue_at_risk_value: Decimal
     premium_queue_exposure_value: Decimal
+    enterprise_queue_exposure_value: Decimal
+    renewal_queue_exposure_value: Decimal
     high_value_risk_accounts: int
     renewal_pressure_accounts: int
     renewal_pressure_value: Decimal
     priority_breach_accounts: int
     white_glove_breach_accounts: int
+    white_glove_queue_risk_accounts: int
     severe_queue_accounts: int
     account_queue_risk_score: int
+    lane_saturation_index: int
     recovery_ready_accounts: int
     sla_credit_cost: Decimal
     service_tier_pressure: int
@@ -73,6 +77,18 @@ class SupportLaneSnapshot:
     capacity: int
     overflow: int
     account_count: int
+
+
+@dataclass(frozen=True)
+class SupportQueueExposure:
+    """Account-level support exposure that matters to financing and governance."""
+
+    premium_queue_exposure_value: Decimal
+    enterprise_queue_exposure_value: Decimal
+    renewal_queue_exposure_value: Decimal
+    white_glove_queue_risk_accounts: int
+    severe_queue_accounts: int
+    lane_saturation_index: int
 
 
 @dataclass(frozen=True)
@@ -116,6 +132,75 @@ def calculate_support_account_risk_values(state: GameState) -> tuple[Decimal, De
         if _is_renewal_pressure_account(account):
             renewal_pressure_value += account.contract_value
     return quantize_money(revenue_at_risk_value), quantize_money(renewal_pressure_value)
+
+
+def calculate_support_queue_exposure(state: GameState) -> SupportQueueExposure:
+    """Return queue-exposure signals for higher-touch accounts and pressured lanes."""
+
+    active_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.status is not CustomerAccountStatus.CHURNED
+    ]
+    severe_accounts = [
+        account
+        for account in active_accounts
+        if _is_severe_queue_account(
+            account,
+            queue_age_threshold=BALANCE.support_program_queue_age_threshold,
+            sla_target=state.support_program.sla_target,
+        )
+    ]
+    premium_queue_exposure_value = quantize_money(
+        sum(
+            (
+                account.contract_value
+                for account in severe_accounts
+                if account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
+            ),
+            Decimal("0.00"),
+        )
+    )
+    enterprise_queue_exposure_value = quantize_money(
+        sum(
+            (
+                account.contract_value
+                for account in severe_accounts
+                if account.segment.value == "enterprise"
+            ),
+            Decimal("0.00"),
+        )
+    )
+    renewal_queue_exposure_value = quantize_money(
+        sum(
+            (
+                account.contract_value
+                for account in severe_accounts
+                if _is_renewal_pressure_account(account)
+            ),
+            Decimal("0.00"),
+        )
+    )
+    white_glove_queue_risk_accounts = sum(
+        1 for account in severe_accounts if account.support_tier is SupportTier.WHITE_GLOVE
+    )
+    lane_overflow_pressure = sum(
+        snapshot.overflow for snapshot in calculate_support_lane_snapshots(state).values()
+    )
+    lane_saturation_index = clamp_int(
+        lane_overflow_pressure
+        + state.support_program.escalation_queue
+        + (state.support_program.backlog_queue // BALANCE.support_program_focus_mismatch_divisor)
+        + (state.support_program.queue_age_pressure // BALANCE.support_program_queue_age_threshold)
+    )
+    return SupportQueueExposure(
+        premium_queue_exposure_value=premium_queue_exposure_value,
+        enterprise_queue_exposure_value=enterprise_queue_exposure_value,
+        renewal_queue_exposure_value=renewal_queue_exposure_value,
+        white_glove_queue_risk_accounts=white_glove_queue_risk_accounts,
+        severe_queue_accounts=len(severe_accounts),
+        lane_saturation_index=lane_saturation_index,
+    )
 
 
 def calculate_support_lane_staffing_plan(state: GameState) -> dict[SupportLaneFocus, int]:
@@ -475,21 +560,6 @@ def apply_end_of_turn_support_program(
             Decimal("0.00"),
         )
     )
-    premium_queue_exposure_value = quantize_money(
-        sum(
-            (
-                account.contract_value
-                for account in active_accounts
-                if account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
-                and _is_severe_queue_account(
-                    account,
-                    queue_age_threshold=BALANCE.support_program_queue_age_threshold,
-                    sla_target=state.support_program.sla_target,
-                )
-            ),
-            Decimal("0.00"),
-        )
-    )
     priority_breach_accounts = sum(
         1
         for account in active_accounts
@@ -502,19 +572,8 @@ def apply_end_of_turn_support_program(
         if account.support_tier is SupportTier.WHITE_GLOVE
         and account.sla_breach_risk >= state.support_program.sla_target
     )
-    severe_queue_accounts = sum(
-        1
-        for account in active_accounts
-        if _is_severe_queue_account(
-            account,
-            queue_age_threshold=BALANCE.support_program_queue_age_threshold,
-            sla_target=state.support_program.sla_target,
-        )
-    )
     recovery_ready_accounts = 0
-    service_tier_pressure = (
-        priority_breach_accounts + (white_glove_breach_accounts * 2) + severe_queue_accounts
-    )
+    service_tier_pressure = 0
     commercial_breach_pressure = (
         priority_breach_accounts * BALANCE.support_program_priority_breach_pressure_gain
         + white_glove_breach_accounts * BALANCE.support_program_white_glove_breach_pressure_gain
@@ -601,6 +660,12 @@ def apply_end_of_turn_support_program(
                 sla_target=state.support_program.sla_target,
             )
         )
+    queue_exposure = calculate_support_queue_exposure(state)
+    service_tier_pressure = (
+        priority_breach_accounts
+        + (white_glove_breach_accounts * 2)
+        + queue_exposure.severe_queue_accounts
+    )
     revenue_at_risk_accounts, renewal_pressure_accounts = calculate_support_account_risk_counts(
         state
     )
@@ -645,6 +710,20 @@ def apply_end_of_turn_support_program(
 
     if not active_accounts:
         summary = "Support tooling is idle."
+    elif (
+        queue_exposure.enterprise_queue_exposure_value
+        >= BALANCE.support_program_high_value_contract_threshold
+    ):
+        summary = (
+            "Enterprise queue exposure is now large enough to threaten renewals and board trust."
+        )
+    elif (
+        queue_exposure.lane_saturation_index
+        >= BALANCE.support_program_backlog_reputation_threshold // 2
+    ):
+        summary = (
+            "Support lanes are saturated enough that backlog relief now matters more than new load."
+        )
     elif state.support_program.backlog_queue == 0:
         summary = "Support tooling is keeping ticket flow under control."
     elif focus_mismatch_penalty > 0:
@@ -658,7 +737,7 @@ def apply_end_of_turn_support_program(
         summary = (
             f"Support recovery is rebuilding trust across {recovery_ready_accounts} account(s)."
         )
-    elif severe_queue_accounts > 0:
+    elif queue_exposure.severe_queue_accounts > 0:
         summary = (
             "High-touch accounts are waiting too long. Support promises are now "
             "creating visible commercial risk."
@@ -693,14 +772,18 @@ def apply_end_of_turn_support_program(
         enterprise_revenue_at_risk_value=enterprise_revenue_at_risk_value,
         premium_revenue_at_risk_value=premium_revenue_at_risk_value,
         white_glove_revenue_at_risk_value=white_glove_revenue_at_risk_value,
-        premium_queue_exposure_value=premium_queue_exposure_value,
+        premium_queue_exposure_value=queue_exposure.premium_queue_exposure_value,
+        enterprise_queue_exposure_value=queue_exposure.enterprise_queue_exposure_value,
+        renewal_queue_exposure_value=queue_exposure.renewal_queue_exposure_value,
         high_value_risk_accounts=high_value_risk_accounts,
         renewal_pressure_accounts=renewal_pressure_accounts,
         renewal_pressure_value=renewal_pressure_value,
         priority_breach_accounts=priority_breach_accounts,
         white_glove_breach_accounts=white_glove_breach_accounts,
-        severe_queue_accounts=severe_queue_accounts,
+        white_glove_queue_risk_accounts=queue_exposure.white_glove_queue_risk_accounts,
+        severe_queue_accounts=queue_exposure.severe_queue_accounts,
         account_queue_risk_score=account_queue_risk_score,
+        lane_saturation_index=queue_exposure.lane_saturation_index,
         recovery_ready_accounts=recovery_ready_accounts,
         sla_credit_cost=sla_credit_cost,
         service_tier_pressure=service_tier_pressure,

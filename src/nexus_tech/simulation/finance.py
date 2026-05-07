@@ -80,6 +80,8 @@ class FinancePlannerSnapshot:
     liquidity_risk: str
     execution_drag: str
     commercial_financing_risk: str
+    support_lane_signal: str
+    channel_recovery_note: str
     capital_priority: str
     funding_resilience: str
     capital_discipline_index: int
@@ -132,7 +134,7 @@ def estimate_runway(cash_on_hand: Decimal, net_cash_flow: Decimal) -> int | None
     burn = abs(net_cash_flow)
     if burn <= ZERO_MONEY:
         return None
-    return int(cash_on_hand / burn)
+    return max(0, int(cash_on_hand / burn))
 
 
 def calculate_cash_flow_forecast(
@@ -230,6 +232,12 @@ def build_finance_planner(
     channel_dependency_risk: int = 0,
     commercial_dependency_score: int = 0,
     volatile_revenue_share_percent: int = 0,
+    enterprise_queue_exposure_value: Decimal = ZERO_MONEY,
+    renewal_queue_exposure_value: Decimal = ZERO_MONEY,
+    support_lane_saturation_index: int = 0,
+    recovery_drag_score: int = 0,
+    paused_dependency_score: int = 0,
+    hotspot_revenue_share_percent: int = 0,
 ) -> FinancePlannerSnapshot:
     """Project end-cash and reserve stress over the active planning horizon."""
 
@@ -425,8 +433,12 @@ def build_finance_planner(
 
     if support_backlog >= 20 or support_escalations >= 6:
         execution_drag = "support operations are now shaping capital needs."
+    elif support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
+        execution_drag = "support lanes are saturated enough to bend capital timing."
     elif channel_conflict_index >= 32 or channel_dependency_risk >= 58:
         execution_drag = "channel conflict is turning capital planning into a commercial problem."
+    elif recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold:
+        execution_drag = "channel recovery drag is now slowing how fast capital can work."
     elif support_backlog >= 10 or channel_conflict_index >= 20:
         execution_drag = "execution drag is visible, but still recoverable."
     else:
@@ -443,8 +455,22 @@ def build_finance_planner(
                 renewal_pressure_value / BALANCE.finance_planner_commercial_risk_renewal_divisor
             ).to_integral_value()
         )
+        + int(
+            (
+                enterprise_queue_exposure_value
+                / BALANCE.finance_planner_commercial_risk_value_divisor
+            ).to_integral_value()
+        )
+        + int(
+            (
+                renewal_queue_exposure_value
+                / BALANCE.finance_planner_commercial_risk_renewal_divisor
+            ).to_integral_value()
+        )
         + (commercial_dependency_score // 4)
         + (volatile_revenue_share_percent // 10)
+        + (support_lane_saturation_index // BALANCE.support_program_queue_age_threshold)
+        + (recovery_drag_score // BALANCE.exit_commercial_fragility_channel_divisor)
     )
     if commercial_risk_score >= 18 or revenue_at_risk_value >= Decimal("5000.00"):
         commercial_financing_risk = (
@@ -459,6 +485,30 @@ def build_finance_planner(
         )
     else:
         commercial_financing_risk = "commercial exposure is not yet dominating financing options."
+
+    if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold:
+        support_lane_signal = "support lanes are saturated enough to demand immediate rebalancing."
+    elif enterprise_queue_exposure_value >= BALANCE.finance_planner_route_support_value_threshold:
+        support_lane_signal = (
+            "enterprise queue exposure is large enough to change capital sequencing."
+        )
+    elif renewal_queue_exposure_value >= BALANCE.finance_planner_commercial_risk_renewal_divisor:
+        support_lane_signal = "renewal queue pressure needs lane relief before another growth bet."
+    else:
+        support_lane_signal = "support lanes are not yet forcing a capital re-plan."
+
+    if paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
+        channel_recovery_note = (
+            "paused channel dependency is now large enough to distort planning confidence."
+        )
+    elif recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold:
+        channel_recovery_note = "recovering channels are still dragging execution quality."
+    elif hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold:
+        channel_recovery_note = (
+            "too much partner revenue sits inside one hotspot channel to treat as stable."
+        )
+    else:
+        channel_recovery_note = "channel recovery drag is present but not yet dominant."
 
     if reserve_break_risk in {"critical", "high"}:
         capital_priority = "protect reserve first"
@@ -528,6 +578,8 @@ def build_finance_planner(
         recommended_actions.append("set_capital_plan")
     if support_backlog >= 12 or support_escalations >= 4:
         recommended_actions.append("triage_support_backlog")
+    if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
+        recommended_actions.append("set_support_lane_focus")
     if revenue_at_risk_value >= Decimal("2400.00"):
         recommended_actions.append("invest_in_support_staffing")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
@@ -547,13 +599,17 @@ def build_finance_planner(
     if (
         commercial_dependency_score >= BALANCE.finance_planner_channel_volatility_threshold
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
     ):
         recommended_actions.append("invest_in_partner_enablement")
     if (
         channel_dependency_risk >= BALANCE.finance_planner_reactivate_dependency_threshold
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
     ):
         recommended_actions.append("reactivate_partnership")
+    if hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold:
+        recommended_actions.append("review_partnerships")
     if channel_conflict_index >= 30:
         recommended_actions.append("renegotiate_partnership")
     if finance.investor_pressure >= 28 and "refinance_debt" not in recommended_actions:
@@ -568,8 +624,12 @@ def build_finance_planner(
         action_sequence.append("refinance debt before adding new growth spend")
     if support_backlog >= 14 or support_escalations >= 4:
         action_sequence.append("stabilize support before leaning harder into expansion")
+    if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
+        action_sequence.append("rebalance support lanes before promising more high-touch growth")
     if channel_dependency_risk >= 55 or channel_conflict_index >= 28:
         action_sequence.append("de-risk channel mix before accelerating go-to-market")
+    if paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
+        action_sequence.append("recover paused channel dependency before counting it as durable")
     if finance.investor_pressure >= 28:
         action_sequence.append("prepare a board-facing capital response")
     if commercial_risk_score >= 10:
@@ -609,6 +669,8 @@ def build_finance_planner(
         liquidity_risk=liquidity_risk,
         execution_drag=execution_drag,
         commercial_financing_risk=commercial_financing_risk,
+        support_lane_signal=support_lane_signal,
+        channel_recovery_note=channel_recovery_note,
         capital_priority=capital_priority,
         funding_resilience=funding_resilience,
         capital_discipline_index=capital_discipline_index,
