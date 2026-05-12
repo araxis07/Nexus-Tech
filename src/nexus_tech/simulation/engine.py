@@ -53,6 +53,7 @@ from nexus_tech.simulation.campaign_starts import (
     apply_campaign_start,
 )
 from nexus_tech.simulation.capital_planning import (
+    apply_raise_reserve_target,
     apply_rebalance_capital,
     apply_set_capital_plan,
 )
@@ -126,6 +127,7 @@ from nexus_tech.simulation.partnerships import (
     create_partnership,
     get_partnership_by_id,
     invest_in_partner_enablement,
+    pause_partnership,
     reactivate_partnership,
     renegotiate_partnership,
 )
@@ -184,6 +186,7 @@ from nexus_tech.simulation.support_program import (
     invest_in_support_staffing,
     route_support_escalation,
     run_account_rescue,
+    run_lane_recovery,
     set_support_lane_focus,
     triage_support_backlog,
     upgrade_support_program,
@@ -660,6 +663,11 @@ def apply_action(
         logger.debug("Rebalanced the capital plan.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.RAISE_RESERVE_TARGET:
+        summary = apply_raise_reserve_target(next_state)
+        logger.debug("Raised the reserve target.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.TAKE_LOAN:
         summary = apply_take_loan(
             next_state.company,
@@ -895,6 +903,18 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_LANE_RECOVERY:
+        if context.support_lane_focus is None:
+            raise ValueError("Lane recovery requires choosing a support lane.")
+        summary = run_lane_recovery(next_state, context.support_lane_focus)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran support lane recovery for %s.", context.support_lane_focus.value)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         if context.target_product_id is None or context.partner_channel is None:
             raise ValueError("Creating a partnership requires selecting a product and channel.")
@@ -948,6 +968,19 @@ def apply_action(
         summary = reactivate_partnership(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel recovery for partnership %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.PAUSE_PARTNERSHIP:
+        if context.partnership_id is None:
+            raise ValueError("Pausing a partnership requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = pause_partnership(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Paused partnership %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

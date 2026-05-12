@@ -239,6 +239,7 @@ ACTION_KEYS = {
     "17": TurnAction.REVIEW_FINANCE,
     "78": TurnAction.REFINANCE_DEBT,
     "80": TurnAction.REBALANCE_CAPITAL,
+    "83": TurnAction.RAISE_RESERVE_TARGET,
     "18": TurnAction.HIRE_EMPLOYEE,
     "19": TurnAction.FIRE_EMPLOYEE,
     "20": TurnAction.ASSIGN_EMPLOYEE,
@@ -257,6 +258,7 @@ ACTION_KEYS = {
     "76": TurnAction.RUN_SUCCESSION_REVIEW,
     "32": TurnAction.ROUTE_SUPPORT_ESCALATION,
     "79": TurnAction.RUN_ACCOUNT_RESCUE,
+    "81": TurnAction.RUN_LANE_RECOVERY,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -295,6 +297,7 @@ ACTION_KEYS = {
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
+    "82": TurnAction.PAUSE_PARTNERSHIP,
 }
 UTILITY_ACTION_KEYS = {
     "65": "save_game",
@@ -1500,6 +1503,9 @@ def collect_action_context(
     if action is TurnAction.REBALANCE_CAPITAL:
         return ActionContext()
 
+    if action is TurnAction.RAISE_RESERVE_TARGET:
+        return ActionContext()
+
     if action is TurnAction.SET_SUPPORT_LANE_FOCUS:
         focus_key = ask_choice_input(
             "Support lane focus",
@@ -1610,6 +1616,18 @@ def collect_action_context(
                 return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_LANE_RECOVERY:
+        focus_key = ask_choice_input(
+            "Recovery lane",
+            choices=["onboarding", "enterprise", "billing"],
+            default=state.support_program.lane_focus.value
+            if state.support_program.lane_focus is not SupportLaneFocus.BALANCED
+            else "enterprise",
+            show_choices=False,
+            case_sensitive=False,
+        )
+        return ActionContext(support_lane_focus=SupportLaneFocus(focus_key))
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         product_id = choose_product_id(state, action)
         if product_id is None:
@@ -1639,6 +1657,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.REACTIVATE_PARTNERSHIP:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.PAUSE_PARTNERSHIP:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

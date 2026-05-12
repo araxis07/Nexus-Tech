@@ -1369,6 +1369,112 @@ def run_account_rescue(
     )
 
 
+def run_lane_recovery(
+    state: GameState,
+    focus: SupportLaneFocus,
+) -> SupportOpsActionSummary:
+    """Spend directly on one lane to relieve hotspot pressure and stabilize key accounts."""
+
+    if focus is SupportLaneFocus.BALANCED:
+        raise ValueError("Lane recovery requires choosing onboarding, enterprise, or billing.")
+    if state.company.cash_on_hand < BALANCE.support_program_lane_recovery_cost:
+        raise ValueError("Not enough cash to run a lane recovery plan this turn.")
+
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                classify_account_support_lane(account) is focus,
+                _calculate_account_support_severity(account),
+                account.ticket_queue_age,
+                account.open_tickets,
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and classify_account_support_lane(account) is focus
+    ]
+    if not accounts and state.support_program.lane_focus is focus:
+        raise ValueError(f"There is no immediate {focus.value} lane pressure to recover.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_lane_recovery_cost
+    )
+    state.support_program.lane_focus = focus
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - BALANCE.support_program_lane_recovery_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_lane_recovery_escalation_relief,
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[:3]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets - BALANCE.support_program_lane_recovery_ticket_relief,
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.support_program_lane_recovery_sla_relief
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age - BALANCE.support_program_lane_recovery_queue_age_relief,
+        )
+        account.support_load = clamp_int(
+            account.support_load - BALANCE.support_program_lane_recovery_support_load_relief
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.support_program_lane_recovery_renewal_health_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_lane_recovery_satisfaction_gain
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk - BALANCE.support_program_lane_recovery_churn_relief
+        )
+        if focus is SupportLaneFocus.BILLING:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk - BALANCE.support_program_lane_recovery_billing_invoice_relief
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk
+                - BALANCE.support_program_lane_recovery_billing_payment_relief
+            )
+            account.dunning_steps = max(
+                0,
+                account.dunning_steps
+                - BALANCE.support_program_lane_recovery_billing_dunning_relief,
+            )
+        elif focus is SupportLaneFocus.ONBOARDING:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health
+                + BALANCE.support_program_lane_recovery_onboarding_health_gain
+            )
+        elif focus is SupportLaneFocus.ENTERPRISE and account.support_tier is SupportTier.STANDARD:
+            account.support_tier = SupportTier.PRIORITY
+        stabilized_accounts += 1
+
+    _apply_lane_program_relief(
+        state.support_program,
+        focus,
+        BALANCE.support_program_lane_recovery_lane_relief + stabilized_accounts,
+    )
+
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a {focus.value} lane recovery. "
+            f"Cash -{BALANCE.support_program_lane_recovery_cost}, "
+            "accounts stabilized "
+            f"{stabilized_accounts}, backlog {state.support_program.backlog_queue}."
+        )
+    )
+
+
 def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     """Return the number of accounts with severe support pressure."""
 

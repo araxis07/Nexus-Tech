@@ -2186,6 +2186,11 @@ def _build_action_menu_panel() -> Panel:
         "run_account_rescue",
         "Stabilize one revenue-critical account with a heavier support play.",
     )
+    primary_actions.add_row(
+        "81",
+        "run_lane_recovery",
+        "Spend on one support lane to calm the current hotspot directly.",
+    )
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
     primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
@@ -2251,6 +2256,11 @@ def _build_action_menu_panel() -> Panel:
         "Change reserve posture and preferred capital source.",
     )
     primary_actions.add_row(
+        "83",
+        "raise_reserve_target",
+        "Raise reserve expectations and shift capital toward resilience.",
+    )
+    primary_actions.add_row(
         "80",
         "rebalance_capital",
         "Auto-tune capital allocation around current support and channel pressure.",
@@ -2264,6 +2274,11 @@ def _build_action_menu_panel() -> Panel:
         "77",
         "reactivate_partnership",
         "Spend directly to recover a paused or strained channel.",
+    )
+    primary_actions.add_row(
+        "82",
+        "pause_partnership",
+        "Deliberately pause one channel to cut dependency and conflict at a revenue cost.",
     )
 
     utility_actions = Table(box=box.SIMPLE_HEAVY, expand=True)

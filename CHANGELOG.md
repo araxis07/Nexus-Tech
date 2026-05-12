@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.49.0 - 2026-05-12
+
+- Added `run_lane_recovery`, `pause_partnership`, and `raise_reserve_target` as real state-changing actions so late-game runs can now target support hotspots, intentionally cool noisy channels, and harden reserve discipline directly from the turn menu
+- Deepened path-aware endgame pressure so IPO scrutiny now punishes enterprise support-focus mismatch harder, M&A diligence reacts more strongly to paused-channel dependency, and independence discipline now reflects underweight reserve allocation
+- Tightened endgame and event gating around public-market scrutiny, acquirer diligence, independence reckoning, and partner breakdowns so late-game chains reflect the new support, channel, and capital signals more coherently
+- Expanded regression coverage with dedicated action tests for lane recovery, partnership pause, and reserve-target raises plus new path-pressure assertions for paused-channel diligence and low-reserve independence stress
+- Promoted the package version to `0.49.0`
+
 ## 0.48.0 - 2026-05-07
 
 - Added targeted recovery actions through `run_account_rescue`, letting the player spend directly on one revenue-critical account to cut queue, billing, renewal, and churn pressure in a single move

@@ -700,6 +700,7 @@ def build_finance_planner(
         or focus_alignment_gap > 0
     ):
         recommended_actions.append("set_support_lane_focus")
+        recommended_actions.append("run_lane_recovery")
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
@@ -740,6 +741,12 @@ def build_finance_planner(
     ):
         recommended_actions.append("reactivate_partnership")
     if (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or hotspot_revenue_share_percent >= 42
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        recommended_actions.append("pause_partnership")
+    if (
         hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
         or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
     ):
@@ -770,6 +777,8 @@ def build_finance_planner(
         or support_hotspot_lane_overflow > 0
     ):
         recommended_actions.append("rebalance_capital")
+    if reserve_gap < ZERO_MONEY or capital_fragility >= 55 or finance.covenant_risk >= 18:
+        recommended_actions.append("raise_reserve_target")
     if not recommended_actions:
         recommended_actions.append("review_finance")
     recommended_actions = list(dict.fromkeys(recommended_actions))
@@ -788,6 +797,10 @@ def build_finance_planner(
             f"move support focus from {support_lane_focus.value} to "
             f"{support_hotspot_lane.value} before backing another growth promise"
         )
+        action_sequence.append(
+            f"run a {support_hotspot_lane.value} lane recovery before "
+            "treating the queue as contained"
+        )
     if channel_dependency_risk >= 55 or channel_conflict_index >= 28:
         action_sequence.append("de-risk channel mix before accelerating go-to-market")
     if paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
@@ -795,6 +808,9 @@ def build_finance_planner(
     if hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold:
         action_sequence.append(
             f"stabilize the {hotspot_channel} hotspot before treating partner revenue as durable"
+        )
+        action_sequence.append(
+            f"be ready to pause the {hotspot_channel} lane if concentration stays too high"
         )
     if finance.investor_pressure >= 28:
         action_sequence.append("prepare a board-facing capital response")
@@ -831,6 +847,10 @@ def build_finance_planner(
     ):
         action_sequence.append(
             "rebalance capital around reserve and delivery pressure before taking another big swing"
+        )
+    if reserve_gap < ZERO_MONEY or capital_fragility >= 55:
+        action_sequence.append(
+            "raise the reserve target before assuming the current capital posture is durable"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(

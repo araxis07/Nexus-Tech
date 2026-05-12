@@ -3796,6 +3796,52 @@ def test_run_account_rescue_stabilizes_revenue_critical_account() -> None:
     assert outcome.state.support_program.escalation_queue < 3
 
 
+def test_run_lane_recovery_stabilizes_hotspot_lane() -> None:
+    product = make_product("Enterprise Lane Core", target_segment=MarketSegment.ENTERPRISE)
+    enterprise_account = CustomerAccount(
+        name="Critical Enterprise",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2100.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=52,
+        onboarding_health=56,
+        support_load=30,
+        open_tickets=7,
+        sla_breach_risk=26,
+        ticket_queue_age=4,
+        expansion_potential=54,
+        renewal_health=42,
+        renewal_turn=5,
+        churn_risk=38,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(
+        product,
+        customer_accounts=[enterprise_account],
+        cash_on_hand=Decimal("5200.00"),
+    )
+    state.support_program.backlog_queue = 9
+    state.support_program.escalation_queue = 4
+    state.support_program.lane_focus = SupportLaneFocus.BALANCED
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_LANE_RECOVERY,
+        context=ActionContext(support_lane_focus=SupportLaneFocus.ENTERPRISE),
+    )
+
+    updated = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert updated.open_tickets < enterprise_account.open_tickets
+    assert updated.sla_breach_risk < enterprise_account.sla_breach_risk
+    assert updated.renewal_health > enterprise_account.renewal_health
+    assert updated.churn_risk < enterprise_account.churn_risk
+    assert outcome.state.support_program.backlog_queue < 9
+    assert outcome.state.support_program.escalation_queue < 4
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
 def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     product = make_product("Hiring Hub")
     state = make_state(product, cash_on_hand=Decimal("15000.00"))
@@ -5600,9 +5646,12 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "invest_in_partner_enablement" in planner.recommended_actions
     assert "route_support_escalation" in planner.recommended_actions
     assert "run_account_rescue" in planner.recommended_actions
+    assert "run_lane_recovery" in planner.recommended_actions
     assert "reactivate_partnership" in planner.recommended_actions
+    assert "pause_partnership" in planner.recommended_actions
     assert "review_partnerships" in planner.recommended_actions
     assert "rebalance_capital" in planner.recommended_actions
+    assert "raise_reserve_target" in planner.recommended_actions
     assert "run_retention_play" in planner.recommended_actions
     assert "upgrade_support_program" in planner.recommended_actions
     assert planner.support_lane_signal
@@ -6177,6 +6226,77 @@ def test_acquirer_diligence_event_triggers_from_hotspot_channel_under_mna_outloo
 
     assert readiness.strategic_outlook == "strategic_acquisition"
     assert definition.is_eligible(state) is True
+
+
+def test_acquirer_diligence_penalizes_paused_channel_dependency() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="acquisition_diligence_sprint",
+    )
+    product = state.products[0]
+    common_kwargs = dict(
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        quality=64,
+        risk=52,
+        conflict_pressure=48,
+        enablement_level=30,
+        sourced_revenue=Decimal("2400.00"),
+        rev_share_rate=Decimal("0.2200"),
+    )
+    active_state = state.model_copy(deep=True)
+    paused_state = state.model_copy(deep=True)
+    active_state.partnerships = [
+        PartnershipDeal(
+            name="Active Integration",
+            status=PartnershipStatus.STRAINED,
+            **common_kwargs,
+        ),
+    ]
+    paused_state.partnerships = [
+        PartnershipDeal(
+            name="Paused Integration",
+            status=PartnershipStatus.PAUSED,
+            **common_kwargs,
+        ),
+    ]
+
+    active_pressure = calculate_endgame_pressure(active_state)
+    paused_pressure = calculate_endgame_pressure(paused_state)
+
+    assert paused_pressure.acquirer_diligence >= active_pressure.acquirer_diligence
+    assert "M&A:" in paused_pressure.path_watchlist[1]
+
+
+def test_independence_discipline_penalizes_low_reserve_share() -> None:
+    product = make_product("Reserve Discipline Core", lifecycle_stage=LifecycleStage.MATURE)
+    high_reserve_state = make_state(product, cash_on_hand=Decimal("6200.00"), current_turn=14)
+    low_reserve_state = high_reserve_state.model_copy(deep=True)
+    high_reserve_state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.BOOTSTRAP,
+        planning_horizon_turns=8,
+        reserve_target=Decimal("4800.00"),
+        product_investment_share=34,
+        go_to_market_share=28,
+        reserve_share=38,
+    )
+    low_reserve_state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.DEBT,
+        planning_horizon_turns=5,
+        reserve_target=Decimal("2600.00"),
+        product_investment_share=45,
+        go_to_market_share=40,
+        reserve_share=15,
+    )
+
+    high_pressure = calculate_endgame_pressure(high_reserve_state)
+    low_pressure = calculate_endgame_pressure(low_reserve_state)
+
+    assert low_pressure.independence_discipline >= high_pressure.independence_discipline
+    assert "raise the reserve target" in low_pressure.path_watchlist[2]
 
 
 def test_partner_breakdown_event_can_trigger_from_hotspot_dependency_score() -> None:
@@ -6797,6 +6917,49 @@ def test_reactivate_partnership_action_recovers_paused_channel() -> None:
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
+def test_pause_partnership_action_reduces_conflict_and_dependency_pressure() -> None:
+    product = make_product("Channel Pause Core", user_count=140)
+    partnership = PartnershipDeal(
+        name="Noisy Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.STRAINED,
+        quality=62,
+        risk=54,
+        conflict_pressure=52,
+        enablement_level=30,
+        sourced_revenue=Decimal("2600.00"),
+        sourced_users=42,
+        rev_share_rate=Decimal("0.2200"),
+    )
+    state = make_state(
+        product,
+        partnerships=[partnership],
+        cash_on_hand=Decimal("7400.00"),
+        current_turn=8,
+    )
+    state.finance.board_pressure = 22
+    state.finance.investor_pressure = 18
+    state.company.reputation = 68
+
+    outcome = apply_action(
+        state,
+        TurnAction.PAUSE_PARTNERSHIP,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated = outcome.state.partnerships[0]
+    assert updated.status is PartnershipStatus.PAUSED
+    assert updated.risk < partnership.risk
+    assert updated.conflict_pressure < partnership.conflict_pressure
+    assert updated.sourced_revenue < partnership.sourced_revenue
+    assert updated.sourced_users < partnership.sourced_users
+    assert outcome.state.products[0].user_count < product.user_count
+    assert outcome.state.finance.board_pressure < 22
+    assert outcome.state.finance.investor_pressure < 18
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
 def test_partnership_neglect_and_channel_crowding_raise_conflict_pressure() -> None:
     product = make_product(
         "Channel Crowd",
@@ -6985,6 +7148,36 @@ def test_rebalance_capital_action_shifts_allocation_toward_resilience() -> None:
         == 100
     )
     assert "Capital was rebalanced" in outcome.message
+
+
+def test_raise_reserve_target_action_increases_target_and_reserve_share() -> None:
+    product = make_product("Reserve Raise Core")
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.VENTURE,
+        planning_horizon_turns=4,
+        reserve_target=Decimal("1800.00"),
+        product_investment_share=45,
+        go_to_market_share=40,
+        reserve_share=15,
+    )
+    state = make_state(product, capital_plan=capital_plan)
+
+    outcome = apply_action(state, TurnAction.RAISE_RESERVE_TARGET, context=ActionContext())
+
+    updated_plan = outcome.state.capital_plan
+    assert updated_plan.mode is CapitalPlanMode.BALANCED
+    assert updated_plan.reserve_target > capital_plan.reserve_target
+    assert updated_plan.planning_horizon_turns > capital_plan.planning_horizon_turns
+    assert updated_plan.reserve_share > capital_plan.reserve_share
+    assert updated_plan.go_to_market_share < capital_plan.go_to_market_share
+    assert (
+        updated_plan.product_investment_share
+        + updated_plan.go_to_market_share
+        + updated_plan.reserve_share
+        == 100
+    )
+    assert "Reserve target raised" in outcome.message
 
 
 def test_finance_drift_penalizes_misaligned_capital_plan() -> None:

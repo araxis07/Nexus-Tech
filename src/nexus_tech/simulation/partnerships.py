@@ -315,6 +315,61 @@ def reactivate_partnership(
     )
 
 
+def pause_partnership(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Intentionally pause one noisy channel to reduce conflict and dependency pressure."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if partnership.status is PartnershipStatus.PAUSED:
+        raise ValueError("That partnership is already paused.")
+    if state.company.cash_on_hand < BALANCE.partnership_pause_cost:
+        raise ValueError("Not enough cash to pause this partnership cleanly.")
+
+    product = _get_product_by_id(state.products, partnership.product_id)
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_pause_cost
+    )
+    partnership.status = PartnershipStatus.PAUSED
+    partnership.risk = clamp_int(partnership.risk - BALANCE.partnership_pause_risk_relief)
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure - BALANCE.partnership_pause_conflict_relief
+    )
+    partnership.sourced_revenue = quantize_money(
+        partnership.sourced_revenue * BALANCE.partnership_pause_revenue_retention_rate
+    )
+    partnership.sourced_users = max(
+        0,
+        (partnership.sourced_users * BALANCE.partnership_pause_user_retention_percent) // 100,
+    )
+    partnership.last_review_turn = state.company.current_turn
+    product.user_count = max(
+        0,
+        product.user_count - BALANCE.partnership_pause_user_loss[partnership.channel.value],
+    )
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure - BALANCE.partnership_pause_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure - BALANCE.partnership_pause_investor_pressure_relief
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation - BALANCE.partnership_pause_reputation_loss
+    )
+    partnership.summary = (
+        f"{partnership.name} was paused to reduce channel fragility. "
+        f"Risk {partnership.risk}, conflict {partnership.conflict_pressure}, "
+        f"sourced revenue {format_money(partnership.sourced_revenue)}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Paused {partnership.name}. Cash -{BALANCE.partnership_pause_cost}, "
+            f"user flow softened while conflict and dependency pressure eased."
+        )
+    )
+
+
 def apply_end_of_turn_partnerships(state: GameState) -> PartnershipTurnSummary:
     """Apply channel-driven user, support, and revenue effects."""
 

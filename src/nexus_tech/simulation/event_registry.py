@@ -1845,6 +1845,8 @@ def _is_acquirer_diligence_eligible(state: GameState) -> bool:
             or portfolio.hotspot_revenue_share_percent >= 35
             or portfolio.paused_dependency_score
             >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.paused_count > 0
+            or portfolio.recovery_count > 0
             or portfolio.hotspot_dependency_score
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         )
@@ -1909,6 +1911,7 @@ def _is_independence_reckoning_eligible(state: GameState) -> bool:
             pressure.independence_discipline
             >= BALANCE.event_independence_reckoning_pressure_threshold
             or pressure.capital_fragility >= BALANCE.event_independence_reckoning_pressure_threshold
+            or state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold
             or queue_exposure.renewal_queue_risk_accounts > 0
             or queue_exposure.hotspot_lane.value == "billing"
             or (
@@ -2234,6 +2237,7 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             or portfolio.channel_volatility_index >= 58
             or portfolio.hotspot_revenue_share_percent >= 45
             or portfolio.recovery_drag_score >= 28
+            or portfolio.paused_count > 0
             or portfolio.hotspot_dependency_score
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         )

@@ -1887,6 +1887,21 @@ class BalanceConfig:
     support_program_account_rescue_billing_payment_relief: int = 18
     support_program_account_rescue_billing_dunning_relief: int = 1
     support_program_account_rescue_lane_relief: int = 5
+    support_program_lane_recovery_cost: Decimal = Decimal("175.00")
+    support_program_lane_recovery_backlog_relief: int = 4
+    support_program_lane_recovery_escalation_relief: int = 2
+    support_program_lane_recovery_ticket_relief: int = 4
+    support_program_lane_recovery_sla_relief: int = 7
+    support_program_lane_recovery_queue_age_relief: int = 2
+    support_program_lane_recovery_support_load_relief: int = 3
+    support_program_lane_recovery_renewal_health_gain: int = 5
+    support_program_lane_recovery_satisfaction_gain: int = 4
+    support_program_lane_recovery_churn_relief: int = 5
+    support_program_lane_recovery_onboarding_health_gain: int = 8
+    support_program_lane_recovery_billing_invoice_relief: int = 12
+    support_program_lane_recovery_billing_payment_relief: int = 12
+    support_program_lane_recovery_billing_dunning_relief: int = 1
+    support_program_lane_recovery_lane_relief: int = 4
     support_program_triage_cost: Decimal = Decimal("150.00")
     support_program_triage_backlog_relief: int = 10
     support_program_triage_escalation_relief: int = 3
@@ -2084,6 +2099,21 @@ class BalanceConfig:
     partnership_reactivation_quality_gain: int = 2
     partnership_reactivation_risk_relief: int = 12
     partnership_reactivation_conflict_relief: int = 14
+    partnership_pause_cost: Decimal = Decimal("65.00")
+    partnership_pause_risk_relief: int = 6
+    partnership_pause_conflict_relief: int = 8
+    partnership_pause_board_pressure_relief: int = 2
+    partnership_pause_investor_pressure_relief: int = 1
+    partnership_pause_reputation_loss: int = 1
+    partnership_pause_revenue_retention_rate: Decimal = Decimal("0.7500")
+    partnership_pause_user_retention_percent: int = 80
+    partnership_pause_user_loss: dict[str, int] = field(
+        default_factory=lambda: {
+            "reseller": 7,
+            "integration": 5,
+            "marketplace": 6,
+        }
+    )
     partnership_renegotiation_ready_fatigue_threshold: int = 30
     partnership_dependency_risk_strained_bonus: int = 8
     partnership_dependency_risk_paused_bonus: int = 14
@@ -2222,6 +2252,9 @@ class BalanceConfig:
     capital_plan_rebalance_reserve_share_shift: int = 4
     capital_plan_rebalance_product_share_shift: int = 3
     capital_plan_rebalance_gtm_share_shift: int = 4
+    capital_plan_raise_reserve_target_step: Decimal = Decimal("700.00")
+    capital_plan_raise_reserve_horizon_gain: int = 1
+    capital_plan_raise_reserve_share_shift: int = 5
 
     finance_forecast_conservative_expand_extra_drag: Decimal = Decimal("0.0600")
     finance_forecast_conservative_conserve_relief: Decimal = Decimal("0.0300")
@@ -2325,6 +2358,9 @@ class BalanceConfig:
     exit_commercial_fragility_channel_divisor: int = 2
     exit_capital_fragility_debt_divisor: Decimal = Decimal("1600.00")
     exit_capital_fragility_pressure_divisor: int = 2
+    exit_public_market_focus_mismatch_divisor: int = 2
+    exit_acquirer_paused_channel_weight: int = 2
+    exit_independence_low_reserve_share_weight: int = 1
     exit_path_clarity_gap_threshold: int = 10
     exit_operating_durability_resilient_threshold: int = 28
     exit_operating_durability_stretched_threshold: int = 54

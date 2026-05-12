@@ -234,6 +234,51 @@ def apply_rebalance_capital(state: GameState) -> CapitalPlanSummary:
     )
 
 
+def apply_raise_reserve_target(state: GameState) -> CapitalPlanSummary:
+    """Raise reserve expectations and shift more allocation toward resilience."""
+
+    capital_plan = state.capital_plan
+    mode = capital_plan.mode
+    if capital_plan.mode is CapitalPlanMode.EXPAND:
+        mode = CapitalPlanMode.BALANCED
+
+    reserve_target = quantize_money(
+        capital_plan.reserve_target + BALANCE.capital_plan_raise_reserve_target_step
+    )
+    planning_horizon_turns = min(
+        12,
+        capital_plan.planning_horizon_turns + BALANCE.capital_plan_raise_reserve_horizon_gain,
+    )
+    reserve_share = capital_plan.reserve_share + BALANCE.capital_plan_raise_reserve_share_shift
+    go_to_market_share = max(
+        0,
+        capital_plan.go_to_market_share - BALANCE.capital_plan_raise_reserve_share_shift,
+    )
+    product_share = capital_plan.product_investment_share
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=mode,
+        source_preference=capital_plan.source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    return CapitalPlanSummary(
+        message=(
+            f"Reserve target raised to {format_money(reserve_target)} over "
+            f"{planning_horizon_turns} turns. Allocation now "
+            f"P {product_share}% / GTM {go_to_market_share}% / Reserve {reserve_share}%."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
 def evaluate_capital_plan(
     company: Company,
     finance: FinanceState,

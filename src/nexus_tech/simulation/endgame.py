@@ -185,6 +185,10 @@ def calculate_endgame_pressure(
             ).to_integral_value()
         ),
     )
+    reserve_share_shortfall = max(
+        0,
+        BALANCE.capital_plan_low_reserve_share_threshold - state.capital_plan.reserve_share,
+    )
     support_fragility = _clamp_readiness(
         (revenue_at_risk_accounts * 4)
         + (state.support_program.sla_breaches_last_turn * 3)
@@ -266,6 +270,11 @@ def calculate_endgame_pressure(
             if queue_exposure.hotspot_lane.value == "enterprise"
             else 0
         )
+        + (
+            queue_exposure.focus_alignment_gap // BALANCE.exit_public_market_focus_mismatch_divisor
+            if queue_exposure.hotspot_lane.value == "enterprise"
+            else 0
+        )
     )
     acquirer_diligence = _clamp_readiness(
         max(0, readiness.acquisition_interest_score - 35)
@@ -286,6 +295,7 @@ def calculate_endgame_pressure(
             portfolio.hotspot_dependency_score
             // BALANCE.exit_channel_fragility_revenue_share_divisor
         )
+        + (portfolio.paused_count * BALANCE.exit_acquirer_paused_channel_weight)
     )
     if portfolio.hotspot_channel == "integration":
         acquirer_diligence = _clamp_readiness(
@@ -312,6 +322,7 @@ def calculate_endgame_pressure(
         + state.finance.covenant_risk
         + state.finance.investor_pressure
         + reserve_gap_units
+        + (reserve_share_shortfall * BALANCE.exit_independence_low_reserve_share_weight)
         + (4 if state.finance.debt_principal > Decimal("0.00") and reserve_gap_units > 0 else 0)
         + (support_fragility // 5)
         + int(
@@ -398,7 +409,8 @@ def calculate_endgame_pressure(
     )
     path_watchlist = (
         (
-            "IPO: tighten enterprise support and governance before inviting more scrutiny."
+            "IPO: run lane recovery on enterprise work and tighten governance "
+            "before inviting more scrutiny."
             if (
                 public_market_scrutiny >= 56
                 or support_fragility >= 32
@@ -409,7 +421,8 @@ def calculate_endgame_pressure(
         (
             (
                 f"M&A: calm {portfolio.hotspot_channel} concentration, "
-                "partner dependency, and renewal risk before diligence deepens."
+                "pause or renegotiate weak channels, and calm renewal risk "
+                "before diligence deepens."
             )
             if (
                 acquirer_diligence >= 56
@@ -420,8 +433,8 @@ def calculate_endgame_pressure(
         ),
         (
             (
-                "Independence: protect reserves, debt slack, and billing renewals "
-                "before compounding harder."
+                "Independence: raise the reserve target, protect debt slack, "
+                "and stabilize billing renewals before compounding harder."
             )
             if (
                 independence_discipline >= 56
@@ -466,7 +479,7 @@ def calculate_endgame_pressure(
             and queue_exposure.hotspot_lane.value == "enterprise"
         ):
             recommendation = (
-                "Move support focus into enterprise work, tighten controls, "
+                "Run lane recovery in enterprise work, tighten controls, "
                 "and prove reliability before telling a bigger story."
             )
         summary = "The run is leaning toward public-market scrutiny before it is fully ready."
@@ -480,7 +493,7 @@ def calculate_endgame_pressure(
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         ):
             recommendation = (
-                "Stabilize the hotspot channel, deconcentrate partner revenue, "
+                "Pause or renegotiate the hotspot channel, deconcentrate partner revenue, "
                 "and calm customer risk before buyers price in execution drag."
             )
         summary = (
@@ -497,7 +510,7 @@ def calculate_endgame_pressure(
             and queue_exposure.focus_alignment_gap > 0
         ):
             recommendation = (
-                "Move support focus into billing, protect reserves, and keep "
+                "Move support focus into billing, raise the reserve target, and keep "
                 "renewal pressure from breaking independence."
             )
         summary = "The independent path is viable only if capital discipline stays credible."
