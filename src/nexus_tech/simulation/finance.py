@@ -389,6 +389,13 @@ def build_finance_planner(
 
     if finance.debt_principal >= BALANCE.finance_refinance_min_debt and finance.covenant_risk >= 16:
         debt_rollover_signal = "Debt should be refinanced before additional expansion spend."
+    elif (
+        finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        and finance.covenant_risk >= 12
+    ):
+        debt_rollover_signal = (
+            "Debt should be rolled forward before covenant heat starts compounding."
+        )
     elif finance.debt_principal > ZERO_MONEY and base_end_cash > capital_plan.reserve_target:
         debt_rollover_signal = "Debt is serviceable, but rollover timing now matters."
     else:
@@ -691,6 +698,11 @@ def build_finance_planner(
         recommended_actions.append("refinance_debt")
     if finance.debt_principal > ZERO_MONEY and company.cash_on_hand > capital_plan.reserve_target:
         recommended_actions.append("repay_debt")
+    if (
+        finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        and finance.covenant_risk >= 12
+    ):
+        recommended_actions.append("debt_rollover")
     if reserve_gap < ZERO_MONEY or conservative_hit_turn is not None:
         recommended_actions.append("set_capital_plan")
     if support_backlog >= 12 or support_escalations >= 4:
@@ -715,6 +727,8 @@ def build_finance_planner(
         or renewal_queue_risk_accounts > 0
     ) and revenue_at_risk_value >= Decimal("1800.00"):
         recommended_actions.append("run_account_rescue")
+    if renewal_queue_risk_accounts >= 2 or renewal_pressure_value >= Decimal("1800.00"):
+        recommended_actions.append("run_renewal_sweep")
     if renewal_pressure_value >= Decimal("2200.00"):
         recommended_actions.append("run_retention_play")
     if (
@@ -733,6 +747,12 @@ def build_finance_planner(
         or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
     ):
         recommended_actions.append("invest_in_partner_enablement")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 26
+    ):
+        recommended_actions.append("run_channel_qbr")
     if (
         channel_dependency_risk >= BALANCE.finance_planner_reactivate_dependency_threshold
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -788,6 +808,11 @@ def build_finance_planner(
         action_sequence.append("reset capital allocation immediately")
     if finance.debt_principal >= BALANCE.finance_refinance_min_debt and finance.covenant_risk >= 16:
         action_sequence.append("refinance debt before adding new growth spend")
+    elif (
+        finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        and finance.covenant_risk >= 12
+    ):
+        action_sequence.append("roll debt forward before covenant heat compounds further")
     if support_backlog >= 14 or support_escalations >= 4:
         action_sequence.append("stabilize support before leaning harder into expansion")
     if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
@@ -823,6 +848,8 @@ def build_finance_planner(
         action_sequence.append("reduce volatile channel revenue before leaning on outside capital")
     if revenue_at_risk_value >= BALANCE.finance_planner_route_support_value_threshold:
         action_sequence.append("route top-risk accounts before promising another growth step")
+    if renewal_queue_risk_accounts >= 2 or renewal_pressure_value >= Decimal("1800.00"):
+        action_sequence.append("run a renewal sweep before treating near-term revenue as durable")
     if (
         premium_queue_risk_accounts > 0
         or enterprise_queue_risk_accounts > 0
@@ -839,6 +866,13 @@ def build_finance_planner(
     if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
         action_sequence.append(
             f"reduce {hotspot_channel} dependence before underwriting another late-game push"
+        )
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+    ):
+        action_sequence.append(
+            f"run a {hotspot_channel} channel QBR before trusting that lane as durable revenue"
         )
     if (
         reserve_gap < ZERO_MONEY
@@ -1179,6 +1213,51 @@ def apply_refinance_debt(
             "Refinanced debt for "
             f"{BALANCE.finance_refinance_cash_infusion}. Interest is now "
             f"{finance.loan_interest_rate * Decimal('100')}% and covenant risk eased."
+        ),
+        history_entry=history_entry,
+    )
+
+
+def apply_debt_rollover(
+    company: Company,
+    finance: FinanceState,
+    *,
+    current_turn: int,
+) -> FinanceActionSummary:
+    """Push short-term debt pressure forward without taking a fresh cash infusion."""
+
+    if finance.debt_principal < BALANCE.finance_debt_rollover_min_debt:
+        raise ValueError("Debt rollover only makes sense once the company has real debt.")
+
+    finance.debt_principal = quantize_money(
+        finance.debt_principal + BALANCE.finance_debt_rollover_fee
+    )
+    finance.loan_interest_rate = min(
+        Decimal("0.1200"),
+        finance.loan_interest_rate + BALANCE.finance_debt_rollover_interest_rate_gain,
+    )
+    finance.covenant_risk = clamp_int(
+        finance.covenant_risk - BALANCE.finance_debt_rollover_covenant_relief
+    )
+    finance.investor_pressure = clamp_int(
+        finance.investor_pressure - BALANCE.finance_debt_rollover_pressure_relief
+    )
+    finance.board_confidence = clamp_int(
+        finance.board_confidence - BALANCE.finance_debt_rollover_board_confidence_loss
+    )
+    finance.last_funding_turn = current_turn
+    history_entry = FundingHistoryEntry(
+        funding_type=FundingType.LOAN,
+        turn=current_turn,
+        amount=Decimal("0.00"),
+        debt_added=BALANCE.finance_debt_rollover_fee,
+        summary="Rolled over debt to buy covenant slack without fresh cash.",
+    )
+    return FinanceActionSummary(
+        message=(
+            f"Rolled debt forward. Principal +{BALANCE.finance_debt_rollover_fee}, "
+            f"debt now {finance.debt_principal} at "
+            f"{finance.loan_interest_rate * Decimal('100')}% turn interest."
         ),
         history_entry=history_entry,
     )

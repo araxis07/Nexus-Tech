@@ -9,6 +9,7 @@ from uuid import UUID
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
     CapitalPlanMode,
+    CustomerAccountStatus,
     GameState,
     PartnerChannel,
     PartnershipDeal,
@@ -199,6 +200,98 @@ def invest_in_partner_enablement(
         message=(
             f"Invested in {partnership.name}. Cash -{BALANCE.partnership_enablement_cost}, "
             f"enablement +{BALANCE.partnership_enablement_gain}."
+        )
+    )
+
+
+def run_channel_qbr(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Run a targeted partner review to calm one hotspot channel."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if partnership.status is PartnershipStatus.PAUSED:
+        raise ValueError("Paused channels need reactivation before a QBR makes sense.")
+    if state.company.cash_on_hand < BALANCE.partnership_qbr_cost:
+        raise ValueError("Not enough cash to run a channel QBR.")
+
+    portfolio = calculate_partnership_portfolio(state)
+    hotspot_bonus = int(partnership.channel.value == portfolio.hotspot_channel) * (
+        BALANCE.partnership_qbr_hotspot_bonus
+    )
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_qbr_cost
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_qbr_enablement_gain + hotspot_bonus
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_qbr_quality_gain + hotspot_bonus
+    )
+    partnership.risk = clamp_int(
+        partnership.risk - BALANCE.partnership_qbr_risk_relief - hotspot_bonus
+    )
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure - BALANCE.partnership_qbr_conflict_relief - hotspot_bonus
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(partnership.rev_share_rate - BALANCE.partnership_qbr_rev_share_relief),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    if partnership.channel is PartnerChannel.RESELLER:
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.partnership_qbr_reseller_board_relief
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure - BALANCE.partnership_qbr_reseller_pressure_relief
+        )
+    elif partnership.channel is PartnerChannel.INTEGRATION:
+        for account in related_accounts[: BALANCE.partnership_qbr_account_limit]:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health + BALANCE.partnership_qbr_integration_onboarding_gain
+            )
+            account.support_load = clamp_int(
+                account.support_load - BALANCE.partnership_qbr_integration_support_load_relief
+            )
+    elif partnership.channel is PartnerChannel.MARKETPLACE:
+        for account in related_accounts[: BALANCE.partnership_qbr_account_limit]:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk - BALANCE.partnership_qbr_marketplace_invoice_relief
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk - BALANCE.partnership_qbr_marketplace_payment_relief
+            )
+            account.dunning_steps = max(
+                0,
+                account.dunning_steps - BALANCE.partnership_qbr_marketplace_dunning_relief,
+            )
+
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} completed a channel QBR. Risk {partnership.risk}, conflict "
+        f"{partnership.conflict_pressure}, rev-share {partnership.rev_share_rate:.2%}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran a {partnership.channel.value} QBR for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_qbr_cost}."
         )
     )
 

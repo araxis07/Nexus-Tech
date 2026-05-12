@@ -1847,6 +1847,7 @@ def _is_acquirer_diligence_eligible(state: GameState) -> bool:
             >= BALANCE.finance_planner_reactivate_dependency_threshold
             or portfolio.paused_count > 0
             or portfolio.recovery_count > 0
+            or portfolio.direct_sales_conflict_accounts > 0
             or portfolio.hotspot_dependency_score
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         )
@@ -1912,6 +1913,10 @@ def _is_independence_reckoning_eligible(state: GameState) -> bool:
             >= BALANCE.event_independence_reckoning_pressure_threshold
             or pressure.capital_fragility >= BALANCE.event_independence_reckoning_pressure_threshold
             or state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold
+            or (
+                state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+                and state.finance.covenant_risk >= 12
+            )
             or queue_exposure.renewal_queue_risk_accounts > 0
             or queue_exposure.hotspot_lane.value == "billing"
             or (
@@ -2075,6 +2080,7 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         or premium_breach_accounts
         or queue_exposure.hotspot_lane_overflow >= 2
         or queue_exposure.premium_queue_risk_accounts > 0
+        or queue_exposure.renewal_queue_risk_accounts >= 2
         or queue_exposure.focus_alignment_gap > 0
     )
 
@@ -2238,6 +2244,7 @@ def _is_partner_breakdown_eligible(state: GameState) -> bool:
             or portfolio.hotspot_revenue_share_percent >= 45
             or portfolio.recovery_drag_score >= 28
             or portfolio.paused_count > 0
+            or portfolio.direct_sales_conflict_accounts > 0
             or portfolio.hotspot_dependency_score
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         )

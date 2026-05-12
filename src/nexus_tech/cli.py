@@ -238,6 +238,7 @@ ACTION_KEYS = {
     "16": TurnAction.REPAY_DEBT,
     "17": TurnAction.REVIEW_FINANCE,
     "78": TurnAction.REFINANCE_DEBT,
+    "84": TurnAction.DEBT_ROLLOVER,
     "80": TurnAction.REBALANCE_CAPITAL,
     "83": TurnAction.RAISE_RESERVE_TARGET,
     "18": TurnAction.HIRE_EMPLOYEE,
@@ -259,6 +260,7 @@ ACTION_KEYS = {
     "32": TurnAction.ROUTE_SUPPORT_ESCALATION,
     "79": TurnAction.RUN_ACCOUNT_RESCUE,
     "81": TurnAction.RUN_LANE_RECOVERY,
+    "85": TurnAction.RUN_RENEWAL_SWEEP,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -293,6 +295,7 @@ ACTION_KEYS = {
     "64": TurnAction.SET_SUPPORT_LANE_FOCUS,
     "70": TurnAction.CREATE_PARTNERSHIP,
     "71": TurnAction.INVEST_IN_PARTNER_ENABLEMENT,
+    "86": TurnAction.RUN_CHANNEL_QBR,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
@@ -1229,6 +1232,8 @@ def collect_action_context(
         TurnAction.EXECUTE_RESTRUCTURE_PLAN,
         TurnAction.START_BOARD_RECOVERY_PLAN,
         TurnAction.INVEST_IN_SUPPORT_STAFFING,
+        TurnAction.RUN_RENEWAL_SWEEP,
+        TurnAction.DEBT_ROLLOVER,
     ):
         return ActionContext()
 
@@ -1645,6 +1650,12 @@ def collect_action_context(
         )
 
     if action is TurnAction.INVEST_IN_PARTNER_ENABLEMENT:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_QBR:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

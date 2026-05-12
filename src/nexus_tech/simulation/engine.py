@@ -91,6 +91,7 @@ from nexus_tech.simulation.endgame import (
 from nexus_tech.simulation.events import EventTurnOutcome, resolve_turn_event
 from nexus_tech.simulation.finance import (
     FinanceTurnSummary,
+    apply_debt_rollover,
     apply_end_of_turn_finance_drift,
     apply_raise_angel,
     apply_raise_vc,
@@ -130,6 +131,7 @@ from nexus_tech.simulation.partnerships import (
     pause_partnership,
     reactivate_partnership,
     renegotiate_partnership,
+    run_channel_qbr,
 )
 from nexus_tech.simulation.planning import (
     build_quarter_plan,
@@ -187,6 +189,7 @@ from nexus_tech.simulation.support_program import (
     route_support_escalation,
     run_account_rescue,
     run_lane_recovery,
+    run_renewal_sweep,
     set_support_lane_focus,
     triage_support_backlog,
     upgrade_support_program,
@@ -668,6 +671,16 @@ def apply_action(
         logger.debug("Raised the reserve target.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.DEBT_ROLLOVER:
+        summary = apply_debt_rollover(
+            next_state.company,
+            next_state.finance,
+            current_turn=next_state.company.current_turn,
+        )
+        next_state.funding_history.append(summary.history_entry)
+        logger.debug("Rolled debt forward on turn %s.", next_state.company.current_turn)
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.TAKE_LOAN:
         summary = apply_take_loan(
             next_state.company,
@@ -915,6 +928,16 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_RENEWAL_SWEEP:
+        summary = run_renewal_sweep(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran renewal sweep.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         if context.target_product_id is None or context.partner_channel is None:
             raise ValueError("Creating a partnership requires selecting a product and channel.")
@@ -942,6 +965,19 @@ def apply_action(
         summary = invest_in_partner_enablement(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Invested in partner enablement for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_QBR:
+        if context.partnership_id is None:
+            raise ValueError("Running a channel QBR requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_qbr(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel QBR for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

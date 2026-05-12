@@ -1475,6 +1475,106 @@ def run_lane_recovery(
     )
 
 
+def run_renewal_sweep(state: GameState) -> SupportOpsActionSummary:
+    """Stabilize the next renewal wave before support or billing issues compound."""
+
+    if state.company.cash_on_hand < BALANCE.support_program_renewal_sweep_cost:
+        raise ValueError("Not enough cash to run a renewal sweep this turn.")
+
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                _is_renewal_pressure_account(account),
+                account.renewal_turn <= BALANCE.renewal_offer_turn_window + 2,
+                account.contract_value,
+                _calculate_account_support_severity(account),
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and (
+            _is_renewal_pressure_account(account)
+            or account.renewal_turn <= BALANCE.renewal_offer_turn_window + 2
+        )
+    ]
+    if not accounts:
+        raise ValueError("No near-term renewals need a sweep right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_renewal_sweep_cost
+    )
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue - BALANCE.support_program_renewal_sweep_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_renewal_sweep_escalation_relief,
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[: BALANCE.support_program_renewal_sweep_account_limit]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets - BALANCE.support_program_renewal_sweep_ticket_relief,
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.support_program_renewal_sweep_sla_relief
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age - BALANCE.support_program_renewal_sweep_queue_age_relief,
+        )
+        account.support_load = clamp_int(
+            account.support_load - BALANCE.support_program_renewal_sweep_support_load_relief
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.support_program_renewal_sweep_renewal_health_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_renewal_sweep_satisfaction_gain
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk - BALANCE.support_program_renewal_sweep_churn_relief
+        )
+        lane = classify_account_support_lane(account)
+        if lane is SupportLaneFocus.BILLING:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk - BALANCE.support_program_renewal_sweep_billing_invoice_relief
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk
+                - BALANCE.support_program_renewal_sweep_billing_payment_relief
+            )
+            account.dunning_steps = max(
+                0,
+                account.dunning_steps
+                - BALANCE.support_program_renewal_sweep_billing_dunning_relief,
+            )
+        elif lane is SupportLaneFocus.ONBOARDING:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health
+                + BALANCE.support_program_renewal_sweep_onboarding_health_gain
+            )
+        _apply_lane_program_relief(
+            state.support_program,
+            lane,
+            BALANCE.support_program_renewal_sweep_lane_relief,
+        )
+        stabilized_accounts += 1
+
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a renewal sweep across {stabilized_accounts} accounts. "
+            f"Cash -{BALANCE.support_program_renewal_sweep_cost}, "
+            f"escalations now {state.support_program.escalation_queue}."
+        )
+    )
+
+
 def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     """Return the number of accounts with severe support pressure."""
 

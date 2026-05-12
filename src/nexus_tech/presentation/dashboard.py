@@ -2191,6 +2191,11 @@ def _build_action_menu_panel() -> Panel:
         "run_lane_recovery",
         "Spend on one support lane to calm the current hotspot directly.",
     )
+    primary_actions.add_row(
+        "85",
+        "run_renewal_sweep",
+        "Stabilize several near-term renewals before queue stress compounds.",
+    )
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
     primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
@@ -2261,6 +2266,11 @@ def _build_action_menu_panel() -> Panel:
         "Raise reserve expectations and shift capital toward resilience.",
     )
     primary_actions.add_row(
+        "84",
+        "debt_rollover",
+        "Push short-term debt pressure forward at a financing cost.",
+    )
+    primary_actions.add_row(
         "80",
         "rebalance_capital",
         "Auto-tune capital allocation around current support and channel pressure.",
@@ -2274,6 +2284,11 @@ def _build_action_menu_panel() -> Panel:
         "77",
         "reactivate_partnership",
         "Spend directly to recover a paused or strained channel.",
+    )
+    primary_actions.add_row(
+        "86",
+        "run_channel_qbr",
+        "Run a targeted channel review to reduce hotspot partner drag.",
     )
     primary_actions.add_row(
         "82",

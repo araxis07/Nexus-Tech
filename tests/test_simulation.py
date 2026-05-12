@@ -3842,6 +3842,70 @@ def test_run_lane_recovery_stabilizes_hotspot_lane() -> None:
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
+def test_run_renewal_sweep_stabilizes_imminent_renewals() -> None:
+    product = make_product("Renewal Sweep Core", target_segment=MarketSegment.ENTERPRISE)
+    billing_account = CustomerAccount(
+        name="Billing Renewal",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("920.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=48,
+        onboarding_health=54,
+        support_load=24,
+        open_tickets=4,
+        sla_breach_risk=18,
+        invoice_risk=72,
+        failed_payment_risk=70,
+        dunning_steps=2,
+        ticket_queue_age=4,
+        expansion_potential=40,
+        renewal_health=36,
+        renewal_turn=2,
+        churn_risk=44,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    enterprise_account = CustomerAccount(
+        name="Enterprise Renewal",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2100.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=56,
+        onboarding_health=58,
+        support_load=28,
+        open_tickets=5,
+        sla_breach_risk=20,
+        ticket_queue_age=3,
+        expansion_potential=56,
+        renewal_health=44,
+        renewal_turn=3,
+        churn_risk=36,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(
+        product,
+        customer_accounts=[billing_account, enterprise_account],
+        cash_on_hand=Decimal("5600.00"),
+    )
+    state.support_program.backlog_queue = 6
+    state.support_program.escalation_queue = 3
+
+    outcome = apply_action(state, TurnAction.RUN_RENEWAL_SWEEP, context=ActionContext())
+
+    updated_billing = outcome.state.customer_accounts[0]
+    updated_enterprise = outcome.state.customer_accounts[1]
+    assert updated_billing.renewal_health > billing_account.renewal_health
+    assert updated_billing.invoice_risk < billing_account.invoice_risk
+    assert updated_billing.failed_payment_risk < billing_account.failed_payment_risk
+    assert updated_billing.churn_risk < billing_account.churn_risk
+    assert updated_enterprise.renewal_health > enterprise_account.renewal_health
+    assert updated_enterprise.satisfaction > enterprise_account.satisfaction
+    assert outcome.state.support_program.backlog_queue < 6
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
 def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     product = make_product("Hiring Hub")
     state = make_state(product, cash_on_hand=Decimal("15000.00"))
@@ -5587,6 +5651,7 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
         ),
     )
     state.finance.covenant_risk = 18
+    state.finance.debt_principal = Decimal("2600.00")
     planner = build_finance_planner(
         state.company,
         state.finance,
@@ -5647,9 +5712,12 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "route_support_escalation" in planner.recommended_actions
     assert "run_account_rescue" in planner.recommended_actions
     assert "run_lane_recovery" in planner.recommended_actions
+    assert "run_renewal_sweep" in planner.recommended_actions
     assert "reactivate_partnership" in planner.recommended_actions
     assert "pause_partnership" in planner.recommended_actions
+    assert "run_channel_qbr" in planner.recommended_actions
     assert "review_partnerships" in planner.recommended_actions
+    assert "debt_rollover" in planner.recommended_actions
     assert "rebalance_capital" in planner.recommended_actions
     assert "raise_reserve_target" in planner.recommended_actions
     assert "run_retention_play" in planner.recommended_actions
@@ -6883,6 +6951,37 @@ def test_hundred_turn_board_recovery_crucible_progression_is_seed_stable() -> No
     assert run_once(809) == run_once(809)
 
 
+def test_hundred_ten_turn_channel_rebuild_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="channel_rebuild_marathon",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(110):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.support_program.backlog_queue,
+            len(state.partnerships),
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(911) == run_once(911)
+
+
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
     product = make_product("Paused Lane", market_fit=68, quality=72, bug_level=12)
     partnership = PartnershipDeal(
@@ -6957,6 +7056,61 @@ def test_pause_partnership_action_reduces_conflict_and_dependency_pressure() -> 
     assert outcome.state.products[0].user_count < product.user_count
     assert outcome.state.finance.board_pressure < 22
     assert outcome.state.finance.investor_pressure < 18
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_channel_qbr_reduces_hotspot_partner_drag() -> None:
+    product = make_product("Channel QBR Core")
+    account = CustomerAccount(
+        name="Integration Rollout",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("1800.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=60,
+        onboarding_health=48,
+        support_load=26,
+        open_tickets=3,
+        expansion_potential=54,
+        renewal_health=58,
+        renewal_turn=6,
+        churn_risk=22,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    partnership = PartnershipDeal(
+        name="Hotspot Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.RECOVERY,
+        quality=60,
+        risk=52,
+        conflict_pressure=49,
+        enablement_level=28,
+        sourced_revenue=Decimal("2400.00"),
+        rev_share_rate=Decimal("0.2000"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("8200.00"),
+        current_turn=8,
+    )
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_CHANNEL_QBR,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated_partnership = outcome.state.partnerships[0]
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_partnership.enablement_level > partnership.enablement_level
+    assert updated_partnership.risk < partnership.risk
+    assert updated_partnership.conflict_pressure < partnership.conflict_pressure
+    assert updated_partnership.rev_share_rate < partnership.rev_share_rate
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.support_load < account.support_load
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
@@ -7178,6 +7332,26 @@ def test_raise_reserve_target_action_increases_target_and_reserve_share() -> Non
         == 100
     )
     assert "Reserve target raised" in outcome.message
+
+
+def test_debt_rollover_action_reduces_covenant_pressure_without_new_cash() -> None:
+    product = make_product("Debt Rollover Core")
+    state = make_state(product, cash_on_hand=Decimal("4200.00"))
+    state.finance.debt_principal = Decimal("3200.00")
+    state.finance.loan_interest_rate = Decimal("0.0280")
+    state.finance.covenant_risk = 18
+    state.finance.investor_pressure = 16
+    state.finance.board_confidence = 68
+
+    outcome = apply_action(state, TurnAction.DEBT_ROLLOVER, context=ActionContext())
+
+    assert outcome.state.company.cash_on_hand == Decimal("4200.00")
+    assert outcome.state.finance.debt_principal > Decimal("3200.00")
+    assert outcome.state.finance.loan_interest_rate > Decimal("0.0280")
+    assert outcome.state.finance.covenant_risk < 18
+    assert outcome.state.finance.investor_pressure < 16
+    assert outcome.state.finance.board_confidence < 68
+    assert "Rolled debt forward" in outcome.message
 
 
 def test_finance_drift_penalizes_misaligned_capital_plan() -> None:

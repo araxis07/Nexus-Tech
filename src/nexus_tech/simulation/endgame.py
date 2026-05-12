@@ -296,6 +296,7 @@ def calculate_endgame_pressure(
             // BALANCE.exit_channel_fragility_revenue_share_divisor
         )
         + (portfolio.paused_count * BALANCE.exit_acquirer_paused_channel_weight)
+        + (portfolio.direct_sales_conflict_accounts // 2)
     )
     if portfolio.hotspot_channel == "integration":
         acquirer_diligence = _clamp_readiness(
@@ -324,6 +325,14 @@ def calculate_endgame_pressure(
         + reserve_gap_units
         + (reserve_share_shortfall * BALANCE.exit_independence_low_reserve_share_weight)
         + (4 if state.finance.debt_principal > Decimal("0.00") and reserve_gap_units > 0 else 0)
+        + (
+            3
+            if (
+                state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+                and state.finance.covenant_risk >= 12
+            )
+            else 0
+        )
         + (support_fragility // 5)
         + int(
             (
@@ -409,8 +418,8 @@ def calculate_endgame_pressure(
     )
     path_watchlist = (
         (
-            "IPO: run lane recovery on enterprise work and tighten governance "
-            "before inviting more scrutiny."
+            "IPO: run lane recovery and a renewal sweep on enterprise revenue, "
+            "then tighten governance before inviting more scrutiny."
             if (
                 public_market_scrutiny >= 56
                 or support_fragility >= 32
@@ -421,8 +430,7 @@ def calculate_endgame_pressure(
         (
             (
                 f"M&A: calm {portfolio.hotspot_channel} concentration, "
-                "pause or renegotiate weak channels, and calm renewal risk "
-                "before diligence deepens."
+                "run a channel QBR, and calm renewal risk before diligence deepens."
             )
             if (
                 acquirer_diligence >= 56
@@ -433,7 +441,7 @@ def calculate_endgame_pressure(
         ),
         (
             (
-                "Independence: raise the reserve target, protect debt slack, "
+                "Independence: raise the reserve target, roll debt if needed, "
                 "and stabilize billing renewals before compounding harder."
             )
             if (
@@ -458,7 +466,8 @@ def calculate_endgame_pressure(
     elif commercial_fragility >= 70:
         recommendation = (
             "Commercial fragility is now the main late-game constraint. "
-            "Fix support promises and de-risk channel revenue before scaling again."
+            "Run a renewal sweep, fix support promises, and de-risk channel revenue "
+            "before scaling again."
         )
         summary = (
             "Late-game pressure is now being driven by service and channel fragility together."
@@ -493,8 +502,8 @@ def calculate_endgame_pressure(
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         ):
             recommendation = (
-                "Pause or renegotiate the hotspot channel, deconcentrate partner revenue, "
-                "and calm customer risk before buyers price in execution drag."
+                "Run a channel QBR, then pause or renegotiate the hotspot channel "
+                "before buyers price in execution drag."
             )
         summary = (
             "Acquirer interest is real, but diligence risk is climbing "
@@ -510,8 +519,8 @@ def calculate_endgame_pressure(
             and queue_exposure.focus_alignment_gap > 0
         ):
             recommendation = (
-                "Move support focus into billing, raise the reserve target, and keep "
-                "renewal pressure from breaking independence."
+                "Move support focus into billing, raise the reserve target, roll "
+                "debt if needed, and keep renewal pressure from breaking independence."
             )
         summary = "The independent path is viable only if capital discipline stays credible."
     else:

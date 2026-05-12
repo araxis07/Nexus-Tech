@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.50.0 - 2026-05-13
+
+- Added three new state-changing actions: `run_renewal_sweep`, `run_channel_qbr`, and `debt_rollover`, so late-game runs can now stabilize renewal cohorts, calm hotspot channels, and manage covenant pressure without relying only on passive planner advice
+- Deepened finance-planner guidance with explicit recommendations and action sequencing around renewal sweeps, channel QBRs, and debt rollovers when support, channel concentration, and covenant pressure start interacting
+- Tightened endgame and event pressure so acquisition runs react more sharply to direct-sales conflict and paused-channel dependency, independence runs react more sharply to rollover-style debt stress, and support meltdowns can now surface from renewal-heavy queue pressure
+- Expanded regression coverage with new action tests for renewal sweeps, channel QBRs, and debt rollovers plus an additional seeded 110-turn channel-rebuild stability run
+- Promoted the package version to `0.50.0`
+
 ## 0.49.0 - 2026-05-12
 
 - Added `run_lane_recovery`, `pause_partnership`, and `raise_reserve_target` as real state-changing actions so late-game runs can now target support hotspots, intentionally cool noisy channels, and harden reserve discipline directly from the turn menu
