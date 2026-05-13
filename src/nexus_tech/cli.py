@@ -263,6 +263,7 @@ ACTION_KEYS = {
     "85": TurnAction.RUN_RENEWAL_SWEEP,
     "87": TurnAction.RUN_ENTERPRISE_ASSURANCE,
     "89": TurnAction.RUN_BILLING_STABILIZATION,
+    "91": TurnAction.RUN_ONBOARDING_RECOVERY,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -300,6 +301,7 @@ ACTION_KEYS = {
     "86": TurnAction.RUN_CHANNEL_QBR,
     "88": TurnAction.REBALANCE_CHANNEL_MIX,
     "90": TurnAction.RUN_PARTNER_RECOVERY_SPRINT,
+    "92": TurnAction.RUN_CHANNEL_FIREBREAK,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
@@ -1239,6 +1241,7 @@ def collect_action_context(
         TurnAction.RUN_RENEWAL_SWEEP,
         TurnAction.RUN_ENTERPRISE_ASSURANCE,
         TurnAction.RUN_BILLING_STABILIZATION,
+        TurnAction.RUN_ONBOARDING_RECOVERY,
         TurnAction.DEBT_ROLLOVER,
         TurnAction.REBALANCE_CHANNEL_MIX,
     ):
@@ -1669,6 +1672,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_PARTNER_RECOVERY_SPRINT:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_FIREBREAK:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

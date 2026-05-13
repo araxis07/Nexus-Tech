@@ -1796,6 +1796,163 @@ def _apply_partner_renegotiation(state: GameState, event: PendingEvent, option_i
     raise ValueError(f"Unsupported option {option_id} for partner renegotiation.")
 
 
+def _apply_channel_concentration_crackdown(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_concentrated_partnership(state, product.id)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "fund_firebreak":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand
+            - BALANCE.event_channel_concentration_crackdown_firebreak_cost
+        )
+        partnership.status = PartnershipStatus.RECOVERY
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_channel_concentration_crackdown_firebreak_risk_relief,
+            0,
+            100,
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            - BALANCE.event_channel_concentration_crackdown_firebreak_conflict_relief,
+            0,
+            100,
+        )
+        partnership.enablement_level = clamp_int(
+            partnership.enablement_level
+            + BALANCE.event_channel_concentration_crackdown_firebreak_enablement_gain,
+            0,
+            100,
+        )
+        partnership.sourced_revenue = quantize_money(
+            partnership.sourced_revenue
+            * BALANCE.event_channel_concentration_crackdown_firebreak_revenue_retention_rate
+        )
+        partnership.sourced_users = max(
+            0,
+            int(
+                partnership.sourced_users
+                * BALANCE.event_channel_concentration_crackdown_firebreak_user_retention_percent
+                / 100
+            ),
+        )
+        partnership.last_review_turn = state.company.current_turn
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_channel_concentration_crackdown_firebreak_board_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_channel_concentration_crackdown_firebreak_investor_relief,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            if partnership.channel is PartnerChannel.RESELLER:
+                account.satisfaction = clamp_int(
+                    account.satisfaction
+                    + BALANCE.partnership_channel_firebreak_reseller_satisfaction_gain,
+                    0,
+                    100,
+                )
+                account.churn_risk = clamp_int(
+                    account.churn_risk
+                    - BALANCE.partnership_channel_firebreak_reseller_churn_relief,
+                    0,
+                    100,
+                )
+            elif partnership.channel is PartnerChannel.INTEGRATION:
+                account.onboarding_health = clamp_int(
+                    account.onboarding_health
+                    + BALANCE.partnership_channel_firebreak_integration_onboarding_gain,
+                    0,
+                    100,
+                )
+                account.support_load = clamp_int(
+                    account.support_load
+                    - BALANCE.partnership_channel_firebreak_integration_support_relief,
+                    0,
+                    100,
+                )
+            elif partnership.channel is PartnerChannel.MARKETPLACE:
+                account.invoice_risk = clamp_int(
+                    account.invoice_risk
+                    - BALANCE.partnership_channel_firebreak_marketplace_invoice_relief,
+                    0,
+                    100,
+                )
+                account.failed_payment_risk = clamp_int(
+                    account.failed_payment_risk
+                    - BALANCE.partnership_channel_firebreak_marketplace_payment_relief,
+                    0,
+                    100,
+                )
+                account.dunning_steps = max(
+                    0,
+                    account.dunning_steps
+                    - BALANCE.partnership_channel_firebreak_marketplace_dunning_relief,
+                )
+                account.renewal_health = clamp_int(
+                    account.renewal_health
+                    + BALANCE.partnership_channel_firebreak_marketplace_renewal_gain,
+                    0,
+                    100,
+                )
+        return (
+            f"You funded a channel firebreak for {partnership.name}. Cash "
+            f"-{BALANCE.event_channel_concentration_crackdown_firebreak_cost}, risk "
+            f"-{BALANCE.event_channel_concentration_crackdown_firebreak_risk_relief}."
+        )
+
+    if option_id == "accept_drag":
+        partnership.status = PartnershipStatus.STRAINED
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            + BALANCE.event_channel_concentration_crackdown_drag_conflict_gain,
+            0,
+            100,
+        )
+        partnership.sourced_revenue = quantize_money(
+            partnership.sourced_revenue
+            * BALANCE.event_channel_concentration_crackdown_drag_revenue_retention_rate
+        )
+        partnership.sourced_users = max(
+            0,
+            int(
+                partnership.sourced_users
+                * BALANCE.event_channel_concentration_crackdown_drag_user_retention_percent
+                / 100
+            ),
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_channel_concentration_crackdown_drag_pressure_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            - BALANCE.event_channel_concentration_crackdown_drag_reputation_loss,
+            0,
+            100,
+        )
+        product.user_count = max(0, product.user_count - 4)
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You accepted more drag around {partnership.name}. Board pressure "
+            f"+{BALANCE.event_channel_concentration_crackdown_drag_pressure_gain}, reputation "
+            f"-{BALANCE.event_channel_concentration_crackdown_drag_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for channel concentration crackdown.")
+
+
 def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
     del event
 
@@ -1857,6 +2014,89 @@ def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_i
         )
 
     raise ValueError(f"Unsupported option {option_id} for board recovery window.")
+
+
+def _apply_board_reset_showdown(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "accept_reset_plan":
+        shift = min(
+            BALANCE.event_board_reset_showdown_reset_gtm_share_loss,
+            state.capital_plan.go_to_market_share,
+        )
+        state.capital_plan = state.capital_plan.model_copy(
+            update={
+                "go_to_market_share": state.capital_plan.go_to_market_share - shift,
+                "reserve_share": state.capital_plan.reserve_share + shift,
+                "mode": CapitalPlanMode.CONSERVE,
+            }
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_board_reset_showdown_reset_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk - BALANCE.event_board_reset_showdown_reset_risk_relief,
+            0,
+            100,
+        )
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score
+            + BALANCE.event_board_reset_showdown_reset_focus_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_board_reset_showdown_reset_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = False
+        state.finance.board_warning_level = max(0, state.finance.board_warning_level - 1)
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_board_reset_showdown_reset_reputation_loss,
+            0,
+            100,
+        )
+        return (
+            "You accepted a tighter reset plan. Board pressure "
+            f"-{BALANCE.event_board_reset_showdown_reset_pressure_relief}, reserve share +{shift}."
+        )
+
+    if option_id == "defy_reset":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_board_reset_showdown_defy_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.board_warning_level = clamp_int(
+            state.finance.board_warning_level
+            + BALANCE.event_board_reset_showdown_defy_warning_gain,
+            0,
+            4,
+        )
+        state.finance.governance_crisis_level = clamp_int(
+            state.finance.governance_crisis_level
+            + BALANCE.event_board_reset_showdown_defy_crisis_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            - BALANCE.event_board_reset_showdown_defy_confidence_loss,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = True
+        return (
+            "You defied the reset. Board pressure "
+            f"+{BALANCE.event_board_reset_showdown_defy_pressure_gain}, confidence "
+            f"-{BALANCE.event_board_reset_showdown_defy_confidence_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for board reset showdown.")
 
 
 def _apply_capital_market_freeze(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -2550,6 +2790,23 @@ def _get_most_stressed_partnership(state: GameState, product_id: UUID):
     )
 
 
+def _get_most_concentrated_partnership(state: GameState, product_id: UUID):
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.product_id == product_id and partnership.status.value != "paused"
+    ]
+    if not partnerships:
+        raise ValueError("This event expected an active partnership.")
+    return max(
+        partnerships,
+        key=lambda partnership: (
+            partnership.sourced_revenue,
+            partnership.conflict_pressure + partnership.risk,
+        ),
+    )
+
+
 def _get_best_active_account_for_product(state: GameState, product_id: UUID) -> CustomerAccount:
     accounts = _get_active_accounts_for_product(state, product_id)
     if not accounts:
@@ -2630,7 +2887,9 @@ EVENT_EFFECT_HANDLERS = {
     "partner_qbr": _apply_partner_qbr,
     "partner_breakdown": _apply_partner_breakdown,
     "partner_renegotiation": _apply_partner_renegotiation,
+    "channel_concentration_crackdown": _apply_channel_concentration_crackdown,
     "board_recovery_window": _apply_board_recovery_window,
+    "board_reset_showdown": _apply_board_reset_showdown,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,

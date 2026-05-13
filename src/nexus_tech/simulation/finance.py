@@ -716,6 +716,8 @@ def build_finance_planner(
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
         recommended_actions.append("run_enterprise_assurance")
+    if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
+        recommended_actions.append("run_onboarding_recovery")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
@@ -761,6 +763,12 @@ def build_finance_planner(
         or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
     ):
         recommended_actions.append("run_partner_recovery_sprint")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score
+        >= BALANCE.event_channel_concentration_crackdown_dependency_threshold
+        or hotspot_revenue_share_percent >= 40
+    ):
+        recommended_actions.append("run_channel_firebreak")
     if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -834,6 +842,10 @@ def build_finance_planner(
         action_sequence.append(
             "run enterprise assurance before public-market accounts absorb more queue damage"
         )
+    if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
+        action_sequence.append(
+            "run onboarding recovery before implementation drag compounds into churn and board heat"
+        )
     if (
         support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0
     ) and strategic_outlook == "profitable_independence":
@@ -903,6 +915,15 @@ def build_finance_planner(
     if recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold:
         action_sequence.append(
             "fund a partner recovery sprint before treating the hotspot lane as reliable again"
+        )
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score
+        >= BALANCE.event_channel_concentration_crackdown_dependency_threshold
+        or hotspot_revenue_share_percent >= 40
+    ):
+        action_sequence.append(
+            f"run a {hotspot_channel} channel firebreak before concentration hardens into "
+            "late-game drag"
         )
     if (
         reserve_gap < ZERO_MONEY

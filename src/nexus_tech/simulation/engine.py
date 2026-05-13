@@ -132,6 +132,7 @@ from nexus_tech.simulation.partnerships import (
     reactivate_partnership,
     rebalance_channel_mix,
     renegotiate_partnership,
+    run_channel_firebreak,
     run_channel_qbr,
     run_partner_recovery_sprint,
 )
@@ -193,6 +194,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_stabilization,
     run_enterprise_assurance,
     run_lane_recovery,
+    run_onboarding_recovery,
     run_renewal_sweep,
     set_support_lane_focus,
     triage_support_backlog,
@@ -962,6 +964,16 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ONBOARDING_RECOVERY:
+        summary = run_onboarding_recovery(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding recovery.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         if context.target_product_id is None or context.partner_channel is None:
             raise ValueError("Creating a partnership requires selecting a product and channel.")
@@ -1025,6 +1037,19 @@ def apply_action(
         summary = run_partner_recovery_sprint(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran partner recovery sprint for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_FIREBREAK:
+        if context.partnership_id is None:
+            raise ValueError("Running a channel firebreak requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_firebreak(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel firebreak for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

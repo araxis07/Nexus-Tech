@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.0 - 2026-05-13
+
+- Added `run_onboarding_recovery` and `run_channel_firebreak` as deeper late-game recovery actions for support and channel hotspots
+- Added path-depth events `board_reset_showdown` and `channel_concentration_crackdown` for governance-reset and channel-fragility chains
+- Expanded planner and endgame guidance to react to onboarding hotspots, channel firebreaks, and board-reset escalation
+- Added regression coverage for the new actions/events plus a seeded 140-turn board-recovery stability run
+- Promoted the package version to `0.53.0`
+
 ## 0.52.0 - 2026-05-13
 
 - Added two new late-game operating actions: `run_billing_stabilization` to cool renewal-heavy billing hotspots and `run_partner_recovery_sprint` to rescue one strained or recovering channel before dependence hardens

@@ -366,12 +366,28 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_partner_renegotiation_event,
         ),
         EventDefinition(
+            event_id="channel_concentration_crackdown",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_channel_concentration_crackdown_weight,
+            cooldown_turns=BALANCE.event_channel_concentration_crackdown_cooldown,
+            is_eligible=_is_channel_concentration_crackdown_eligible,
+            build_pending_event=_build_channel_concentration_crackdown_event,
+        ),
+        EventDefinition(
             event_id="board_recovery_window",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_board_recovery_window_weight,
             cooldown_turns=BALANCE.event_board_recovery_window_cooldown,
             is_eligible=_is_board_recovery_window_eligible,
             build_pending_event=_build_board_recovery_window_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_showdown",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_showdown_weight,
+            cooldown_turns=BALANCE.event_board_reset_showdown_cooldown,
+            is_eligible=_is_board_reset_showdown_eligible,
+            build_pending_event=_build_board_reset_showdown_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -2555,6 +2571,96 @@ def _build_partner_renegotiation_event(
     )
 
 
+def _is_channel_concentration_crackdown_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        portfolio.hotspot_channel != "-"
+        and (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.event_channel_concentration_crackdown_dependency_threshold
+            or portfolio.hotspot_revenue_share_percent >= 42
+        )
+        and _has_recent_event(
+            state,
+            {"partner_breakdown", "partner_renegotiation", "buyer_reference_check"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+    )
+
+
+def _build_channel_concentration_crackdown_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    portfolio = calculate_partnership_portfolio(state)
+    candidates = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == portfolio.hotspot_channel
+    ]
+    if not candidates:
+        candidates = [
+            partnership
+            for partnership in state.partnerships
+            if partnership.status is not PartnershipStatus.PAUSED
+        ]
+    partnership = max(
+        candidates,
+        key=lambda deal: (
+            int(deal.sourced_revenue) + deal.conflict_pressure + deal.risk,
+            deal.enablement_level,
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    if partnership.channel.value == "reseller":
+        title = "Reseller Concentration Crackdown"
+        description = (
+            f"{partnership.name} now drives too much of the reseller story around {target.name}. "
+            "You can fund a firebreak to de-risk the lane or accept more commercial drag."
+        )
+    elif partnership.channel.value == "integration":
+        title = "Integration Concentration Crackdown"
+        description = (
+            f"{partnership.name} is now concentrating too much integration risk around "
+            f"{target.name}. "
+            "You can fund a firebreak to de-risk implementations or absorb more drag."
+        )
+    else:
+        title = "Marketplace Concentration Crackdown"
+        description = (
+            f"{partnership.name} now dominates marketplace throughput around {target.name}. "
+            "You can fund a firebreak to de-risk billing exposure or accept more drag."
+        )
+    return PendingEvent(
+        event_id="channel_concentration_crackdown",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title=title,
+        description=description,
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=4,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_firebreak",
+                label="Fund a channel firebreak",
+                description="Spend cash to cool dependency before concentration hardens.",
+            ),
+            EventOption(
+                id="accept_drag",
+                label="Accept the commercial drag",
+                description="Protect cash now, but let concentration keep distorting execution.",
+            ),
+        ],
+    )
+
+
 def _is_board_recovery_window_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
@@ -2596,6 +2702,57 @@ def _build_board_recovery_window_event(
                 id="narrow_scope",
                 label="Narrow scope",
                 description="Reduce pressure by cutting scope and leaning into board focus.",
+            ),
+        ],
+    )
+
+
+def _is_board_reset_showdown_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"board_recovery_window", "board_reckoning"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.board_reset_risk >= BALANCE.event_board_reset_showdown_pressure_threshold
+        and (
+            state.finance.governance_crisis_active
+            or state.finance.board_warning_level >= 2
+            or pressure.restructure_heat >= 60
+            or state.finance.board_resolution_due
+        )
+    )
+
+
+def _build_board_reset_showdown_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_reset_showdown",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Reset Showdown",
+        description=(
+            "Directors are now close to forcing a harder reset. You can accept a tighter reset "
+            "plan and protect resilience, or defy the reset and absorb more governance heat."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="governance_chain",
+        chain_stage=4,
+        options=[
+            EventOption(
+                id="accept_reset_plan",
+                label="Accept the reset plan",
+                description="Shift toward resilience and calm governance risk at a brand cost.",
+            ),
+            EventOption(
+                id="defy_reset",
+                label="Defy the reset",
+                description="Protect the current plan now, but board heat compounds sharply.",
             ),
         ],
     )

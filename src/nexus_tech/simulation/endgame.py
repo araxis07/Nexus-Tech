@@ -420,7 +420,8 @@ def calculate_endgame_pressure(
     path_watchlist = (
         (
             "IPO: run enterprise assurance, lane recovery, and a renewal sweep on "
-            "enterprise revenue, then tighten governance before inviting more scrutiny."
+            "enterprise revenue, use onboarding recovery if implementation drag is the hotspot, "
+            "then tighten governance before inviting more scrutiny."
             if (
                 public_market_scrutiny >= 56
                 or support_fragility >= 32
@@ -431,8 +432,8 @@ def calculate_endgame_pressure(
         (
             (
                 f"M&A: calm {portfolio.hotspot_channel} concentration, "
-                "run a channel QBR, recovery sprint, or rebalance the mix, and calm renewal risk "
-                "before diligence deepens."
+                "run a channel QBR, firebreak, recovery sprint, or rebalance the mix, and calm "
+                "renewal risk before diligence deepens."
             )
             if (
                 acquirer_diligence >= 56
@@ -454,7 +455,7 @@ def calculate_endgame_pressure(
             else "Independence: capital discipline is currently holding."
         ),
         (
-            "Reset: board pressure is close to forcing a company-wide reset."
+            "Reset: board pressure is close to forcing a company-wide reset showdown."
             if board_reset_risk >= 60 or restructure_heat >= 56
             else "Reset: restructure pressure is real, but not yet dominant."
         ),
@@ -462,14 +463,14 @@ def calculate_endgame_pressure(
     if board_reset_risk >= 70:
         recommendation = (
             "Board reset risk is high. Narrow scope, stabilize support, "
-            "and rebuild conviction fast."
+            "and prepare to accept a reset plan before the board forces one."
         )
         summary = "Governance and operating strain are now close to forcing a board-led reset."
     elif commercial_fragility >= 70:
         recommendation = (
             "Commercial fragility is now the main late-game constraint. "
-            "Run a renewal sweep, fix support promises, and de-risk channel revenue "
-            "before scaling again."
+            "Run a renewal sweep, use onboarding or billing recovery where needed, and de-risk "
+            "channel revenue with a firebreak before scaling again."
         )
         summary = (
             "Late-game pressure is now being driven by service and channel fragility together."
@@ -504,7 +505,7 @@ def calculate_endgame_pressure(
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         ):
             recommendation = (
-                "Run a channel QBR or rebalance channel mix, then pause or renegotiate "
+                "Run a channel QBR or firebreak, then rebalance, pause, or renegotiate "
                 "the hotspot channel before buyers price in execution drag."
             )
         summary = (
