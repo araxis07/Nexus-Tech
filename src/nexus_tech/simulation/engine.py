@@ -130,6 +130,7 @@ from nexus_tech.simulation.partnerships import (
     invest_in_partner_enablement,
     pause_partnership,
     reactivate_partnership,
+    rebalance_channel_mix,
     renegotiate_partnership,
     run_channel_qbr,
 )
@@ -188,6 +189,7 @@ from nexus_tech.simulation.support_program import (
     invest_in_support_staffing,
     route_support_escalation,
     run_account_rescue,
+    run_enterprise_assurance,
     run_lane_recovery,
     run_renewal_sweep,
     set_support_lane_focus,
@@ -938,6 +940,16 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_ASSURANCE:
+        summary = run_enterprise_assurance(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise assurance.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         if context.target_product_id is None or context.partner_channel is None:
             raise ValueError("Creating a partnership requires selecting a product and channel.")
@@ -978,6 +990,16 @@ def apply_action(
         summary = run_channel_qbr(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel QBR for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.REBALANCE_CHANNEL_MIX:
+        summary = rebalance_channel_mix(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Rebalanced the channel mix.")
         return ActionOutcome(
             state=next_state,
             message=summary.message,

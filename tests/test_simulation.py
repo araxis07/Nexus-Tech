@@ -3906,6 +3906,44 @@ def test_run_renewal_sweep_stabilizes_imminent_renewals() -> None:
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
+def test_run_enterprise_assurance_stabilizes_ipo_accounts() -> None:
+    product = make_product("Enterprise Assurance Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Assurance Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("3200.00"),
+        support_tier=SupportTier.STANDARD,
+        satisfaction=52,
+        onboarding_health=62,
+        support_load=30,
+        open_tickets=6,
+        sla_breach_risk=28,
+        ticket_queue_age=4,
+        expansion_potential=58,
+        renewal_health=42,
+        renewal_turn=4,
+        churn_risk=40,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("6400.00"))
+    state.support_program.backlog_queue = 7
+    state.support_program.escalation_queue = 4
+    state.finance.board_pressure = 18
+
+    outcome = apply_action(state, TurnAction.RUN_ENTERPRISE_ASSURANCE, context=ActionContext())
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_account.support_tier is SupportTier.PRIORITY
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert outcome.state.support_program.backlog_queue < 7
+    assert outcome.state.finance.board_pressure < 18
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
 def test_hiring_pipeline_can_source_interview_and_close_offer() -> None:
     product = make_product("Hiring Hub")
     state = make_state(product, cash_on_hand=Decimal("15000.00"))
@@ -5713,9 +5751,11 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
     assert "run_account_rescue" in planner.recommended_actions
     assert "run_lane_recovery" in planner.recommended_actions
     assert "run_renewal_sweep" in planner.recommended_actions
+    assert "run_enterprise_assurance" in planner.recommended_actions
     assert "reactivate_partnership" in planner.recommended_actions
     assert "pause_partnership" in planner.recommended_actions
     assert "run_channel_qbr" in planner.recommended_actions
+    assert "rebalance_channel_mix" in planner.recommended_actions
     assert "review_partnerships" in planner.recommended_actions
     assert "debt_rollover" in planner.recommended_actions
     assert "rebalance_capital" in planner.recommended_actions
@@ -6982,6 +7022,37 @@ def test_hundred_ten_turn_channel_rebuild_progression_is_seed_stable() -> None:
     assert run_once(911) == run_once(911)
 
 
+def test_hundred_twenty_turn_ipo_launchpad_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="ipo_readiness_launchpad",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(120):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.support_program.backlog_queue,
+            state.finance.board_pressure,
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(1007) == run_once(1007)
+
+
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
     product = make_product("Paused Lane", market_fit=68, quality=72, bug_level=12)
     partnership = PartnershipDeal(
@@ -7111,6 +7182,75 @@ def test_run_channel_qbr_reduces_hotspot_partner_drag() -> None:
     assert updated_partnership.rev_share_rate < partnership.rev_share_rate
     assert updated_account.onboarding_health > account.onboarding_health
     assert updated_account.support_load < account.support_load
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_rebalance_channel_mix_reduces_hotspot_dependency() -> None:
+    product = make_product("Channel Mix Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Channel Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2200.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=60,
+        onboarding_health=54,
+        support_load=24,
+        open_tickets=3,
+        expansion_potential=52,
+        renewal_health=56,
+        renewal_turn=5,
+        churn_risk=20,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    hotspot = PartnershipDeal(
+        name="Hotspot Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.ACTIVE,
+        quality=64,
+        risk=46,
+        conflict_pressure=42,
+        enablement_level=36,
+        sourced_revenue=Decimal("2600.00"),
+        sourced_users=28,
+        rev_share_rate=Decimal("0.1600"),
+    )
+    supporting = PartnershipDeal(
+        name="Supporting Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.ACTIVE,
+        quality=58,
+        risk=18,
+        conflict_pressure=16,
+        enablement_level=24,
+        sourced_revenue=Decimal("900.00"),
+        sourced_users=12,
+        rev_share_rate=Decimal("0.1400"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[hotspot, supporting],
+        cash_on_hand=Decimal("7600.00"),
+        current_turn=9,
+    )
+    starting_portfolio = calculate_partnership_portfolio(state)
+
+    outcome = apply_action(
+        state,
+        TurnAction.REBALANCE_CHANNEL_MIX,
+        context=ActionContext(),
+    )
+
+    updated_portfolio = calculate_partnership_portfolio(outcome.state)
+    assert (
+        updated_portfolio.hotspot_revenue_share_percent
+        < starting_portfolio.hotspot_revenue_share_percent
+    )
+    assert outcome.state.partnerships[0].risk < hotspot.risk
+    assert outcome.state.partnerships[1].enablement_level > supporting.enablement_level
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 

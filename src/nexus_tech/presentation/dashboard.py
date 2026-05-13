@@ -2196,6 +2196,11 @@ def _build_action_menu_panel() -> Panel:
         "run_renewal_sweep",
         "Stabilize several near-term renewals before queue stress compounds.",
     )
+    primary_actions.add_row(
+        "87",
+        "run_enterprise_assurance",
+        "Calm enterprise hotspot accounts before public-market scrutiny compounds.",
+    )
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
     primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
@@ -2289,6 +2294,11 @@ def _build_action_menu_panel() -> Panel:
         "86",
         "run_channel_qbr",
         "Run a targeted channel review to reduce hotspot partner drag.",
+    )
+    primary_actions.add_row(
+        "88",
+        "rebalance_channel_mix",
+        "Reduce concentration in the live hotspot channel before dependence hardens.",
     )
     primary_actions.add_row(
         "82",

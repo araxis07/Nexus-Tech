@@ -275,6 +275,7 @@ def calculate_endgame_pressure(
             if queue_exposure.hotspot_lane.value == "enterprise"
             else 0
         )
+        + (queue_exposure.enterprise_queue_risk_accounts * 2)
     )
     acquirer_diligence = _clamp_readiness(
         max(0, readiness.acquisition_interest_score - 35)
@@ -418,8 +419,8 @@ def calculate_endgame_pressure(
     )
     path_watchlist = (
         (
-            "IPO: run lane recovery and a renewal sweep on enterprise revenue, "
-            "then tighten governance before inviting more scrutiny."
+            "IPO: run enterprise assurance, lane recovery, and a renewal sweep on "
+            "enterprise revenue, then tighten governance before inviting more scrutiny."
             if (
                 public_market_scrutiny >= 56
                 or support_fragility >= 32
@@ -430,7 +431,8 @@ def calculate_endgame_pressure(
         (
             (
                 f"M&A: calm {portfolio.hotspot_channel} concentration, "
-                "run a channel QBR, and calm renewal risk before diligence deepens."
+                "run a channel QBR or rebalance the mix, and calm renewal risk "
+                "before diligence deepens."
             )
             if (
                 acquirer_diligence >= 56
@@ -441,7 +443,7 @@ def calculate_endgame_pressure(
         ),
         (
             (
-                "Independence: raise the reserve target, roll debt if needed, "
+                "Independence: raise the reserve target, roll debt forward if needed, "
                 "and stabilize billing renewals before compounding harder."
             )
             if (
@@ -488,7 +490,7 @@ def calculate_endgame_pressure(
             and queue_exposure.hotspot_lane.value == "enterprise"
         ):
             recommendation = (
-                "Run lane recovery in enterprise work, tighten controls, "
+                "Run enterprise assurance or lane recovery in enterprise work, tighten controls, "
                 "and prove reliability before telling a bigger story."
             )
         summary = "The run is leaning toward public-market scrutiny before it is fully ready."
@@ -502,8 +504,8 @@ def calculate_endgame_pressure(
             >= BALANCE.finance_planner_reactivate_dependency_threshold
         ):
             recommendation = (
-                "Run a channel QBR, then pause or renegotiate the hotspot channel "
-                "before buyers price in execution drag."
+                "Run a channel QBR or rebalance channel mix, then pause or renegotiate "
+                "the hotspot channel before buyers price in execution drag."
             )
         summary = (
             "Acquirer interest is real, but diligence risk is climbing "
@@ -520,7 +522,7 @@ def calculate_endgame_pressure(
         ):
             recommendation = (
                 "Move support focus into billing, raise the reserve target, roll "
-                "debt if needed, and keep renewal pressure from breaking independence."
+                "debt forward if needed, and keep renewal pressure from breaking independence."
             )
         summary = "The independent path is viable only if capital discipline stays credible."
     else:

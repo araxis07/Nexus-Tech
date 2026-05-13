@@ -296,6 +296,96 @@ def run_channel_qbr(
     )
 
 
+def rebalance_channel_mix(state: GameState) -> PartnershipActionSummary:
+    """Reduce concentration in the hottest partner channel."""
+
+    if state.company.cash_on_hand < BALANCE.partnership_channel_rebalance_cost:
+        raise ValueError("Not enough cash to rebalance the channel mix this turn.")
+
+    portfolio = calculate_partnership_portfolio(state)
+    if portfolio.hotspot_channel == "-":
+        raise ValueError("No channel hotspot needs rebalancing right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_channel_rebalance_cost
+    )
+    hotspot_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == portfolio.hotspot_channel
+    ]
+    supporting_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is PartnershipStatus.ACTIVE
+        and partnership.channel.value != portfolio.hotspot_channel
+    ]
+
+    for partnership in hotspot_partnerships:
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.partnership_channel_rebalance_hotspot_risk_relief
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            - BALANCE.partnership_channel_rebalance_hotspot_conflict_relief
+        )
+        partnership.sourced_revenue = quantize_money(
+            partnership.sourced_revenue
+            * BALANCE.partnership_channel_rebalance_hotspot_revenue_retention_rate
+        )
+        partnership.sourced_users = max(
+            0,
+            int(
+                partnership.sourced_users
+                * BALANCE.partnership_channel_rebalance_hotspot_user_retention_percent
+                / 100
+            ),
+        )
+        partnership.last_review_turn = state.company.current_turn
+
+    for partnership in supporting_partnerships[:2]:
+        partnership.enablement_level = clamp_int(
+            partnership.enablement_level
+            + BALANCE.partnership_channel_rebalance_supporting_enablement_gain
+        )
+        partnership.quality = clamp_int(
+            partnership.quality + BALANCE.partnership_channel_rebalance_supporting_quality_gain
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.partnership_channel_rebalance_supporting_risk_relief
+        )
+        partnership.last_review_turn = state.company.current_turn
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure - BALANCE.partnership_channel_rebalance_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.partnership_channel_rebalance_investor_pressure_relief
+    )
+
+    related_product_ids = {partnership.product_id for partnership in hotspot_partnerships}
+    stabilized_accounts = 0
+    for account in state.customer_accounts:
+        if (
+            account.status is CustomerAccountStatus.CHURNED
+            or account.product_id not in related_product_ids
+            or stabilized_accounts >= 2
+        ):
+            continue
+        account.support_load = clamp_int(account.support_load - 2)
+        account.satisfaction = clamp_int(account.satisfaction + 2)
+        stabilized_accounts += 1
+
+    return PartnershipActionSummary(
+        message=(
+            f"Rebalanced the {portfolio.hotspot_channel} channel mix. "
+            f"Cash -{BALANCE.partnership_channel_rebalance_cost}."
+        )
+    )
+
+
 def renegotiate_partnership(
     state: GameState,
     partnership_id: UUID,

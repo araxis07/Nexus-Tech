@@ -261,6 +261,7 @@ ACTION_KEYS = {
     "79": TurnAction.RUN_ACCOUNT_RESCUE,
     "81": TurnAction.RUN_LANE_RECOVERY,
     "85": TurnAction.RUN_RENEWAL_SWEEP,
+    "87": TurnAction.RUN_ENTERPRISE_ASSURANCE,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -296,6 +297,7 @@ ACTION_KEYS = {
     "70": TurnAction.CREATE_PARTNERSHIP,
     "71": TurnAction.INVEST_IN_PARTNER_ENABLEMENT,
     "86": TurnAction.RUN_CHANNEL_QBR,
+    "88": TurnAction.REBALANCE_CHANNEL_MIX,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
@@ -1233,7 +1235,9 @@ def collect_action_context(
         TurnAction.START_BOARD_RECOVERY_PLAN,
         TurnAction.INVEST_IN_SUPPORT_STAFFING,
         TurnAction.RUN_RENEWAL_SWEEP,
+        TurnAction.RUN_ENTERPRISE_ASSURANCE,
         TurnAction.DEBT_ROLLOVER,
+        TurnAction.REBALANCE_CHANNEL_MIX,
     ):
         return ActionContext()
 

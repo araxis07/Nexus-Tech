@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.51.0 - 2026-05-13
+
+- Added two new late-game state-changing actions: `run_enterprise_assurance` to harden enterprise-support accounts ahead of IPO-style scrutiny, and `rebalance_channel_mix` to deconcentrate hotspot partner revenue before channel dependence distorts execution
+- Deepened finance-planner guidance with explicit recommendations and sequencing around enterprise assurance and channel-mix rebalancing once queue hotspots, channel concentration, or paused dependency start shaping capital quality
+- Tightened endgame and event pressure so IPO runs react more sharply to enterprise queue-risk cohorts, acquisition paths react more clearly to direct-sales and hotspot-channel dependence, and independence paths now surface rollover-style debt strain more coherently
+- Expanded regression coverage with dedicated action tests for enterprise assurance and channel-mix rebalancing plus an additional seeded 120-turn IPO-launchpad stability run
+- Promoted the package version to `0.51.0`
+
 ## 0.50.0 - 2026-05-13
 
 - Added three new state-changing actions: `run_renewal_sweep`, `run_channel_qbr`, and `debt_rollover`, so late-game runs can now stabilize renewal cohorts, calm hotspot channels, and manage covenant pressure without relying only on passive planner advice

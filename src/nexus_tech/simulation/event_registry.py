@@ -1774,6 +1774,7 @@ def _is_public_market_scrutiny_eligible(state: GameState) -> bool:
         and (
             pressure.dominant_pressure == "public_market_scrutiny"
             or queue_exposure.enterprise_queue_risk_accounts > 0
+            or queue_exposure.enterprise_queue_risk_accounts >= 2
             or (
                 queue_exposure.hotspot_lane.value == "enterprise"
                 and queue_exposure.hotspot_lane_overflow > 0
@@ -2080,6 +2081,7 @@ def _is_support_meltdown_eligible(state: GameState) -> bool:
         or premium_breach_accounts
         or queue_exposure.hotspot_lane_overflow >= 2
         or queue_exposure.premium_queue_risk_accounts > 0
+        or queue_exposure.enterprise_queue_risk_accounts > 1
         or queue_exposure.renewal_queue_risk_accounts >= 2
         or queue_exposure.focus_alignment_gap > 0
     )

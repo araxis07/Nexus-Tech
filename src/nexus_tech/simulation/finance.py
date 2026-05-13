@@ -715,6 +715,7 @@ def build_finance_planner(
         recommended_actions.append("run_lane_recovery")
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
+        recommended_actions.append("run_enterprise_assurance")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -753,6 +754,11 @@ def build_finance_planner(
         or channel_conflict_index >= 26
     ):
         recommended_actions.append("run_channel_qbr")
+    if (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        recommended_actions.append("rebalance_channel_mix")
     if (
         channel_dependency_risk >= BALANCE.finance_planner_reactivate_dependency_threshold
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -817,6 +823,10 @@ def build_finance_planner(
         action_sequence.append("stabilize support before leaning harder into expansion")
     if support_lane_saturation_index >= BALANCE.support_program_backlog_reputation_threshold // 2:
         action_sequence.append("rebalance support lanes before promising more high-touch growth")
+    if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
+        action_sequence.append(
+            "run enterprise assurance before public-market accounts absorb more queue damage"
+        )
     if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
         action_sequence.append(
             f"move support focus from {support_lane_focus.value} to "
@@ -866,6 +876,9 @@ def build_finance_planner(
     if hotspot_channel != "-" and hotspot_revenue_share_percent >= 35:
         action_sequence.append(
             f"reduce {hotspot_channel} dependence before underwriting another late-game push"
+        )
+        action_sequence.append(
+            "rebalance channel mix before concentration defines the commercial narrative"
         )
     if hotspot_channel != "-" and (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
