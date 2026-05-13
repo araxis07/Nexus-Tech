@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.52.0 - 2026-05-13
+
+- Added two new late-game operating actions: `run_billing_stabilization` to cool renewal-heavy billing hotspots and `run_partner_recovery_sprint` to rescue one strained or recovering channel before dependence hardens
+- Added three path-specific late-game follow-up events: `ipo_audit_committee`, `buyer_reference_check`, and `independence_cash_crunch`, so IPO, acquisition, and independence runs now branch more distinctly after the first major pressure spike
+- Deepened finance-planner guidance, event gating, and endgame watchlists around billing stability, partner recovery, and path-specific operating pressure
+- Expanded regression coverage with targeted action and event tests plus a seeded 130-turn independence-compounder stability run
+- Promoted the package version to `0.52.0`
+
 ## 0.51.0 - 2026-05-13
 
 - Added two new late-game state-changing actions: `run_enterprise_assurance` to harden enterprise-support accounts ahead of IPO-style scrutiny, and `rebalance_channel_mix` to deconcentrate hotspot partner revenue before channel dependence distorts execution

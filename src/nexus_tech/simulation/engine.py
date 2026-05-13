@@ -133,6 +133,7 @@ from nexus_tech.simulation.partnerships import (
     rebalance_channel_mix,
     renegotiate_partnership,
     run_channel_qbr,
+    run_partner_recovery_sprint,
 )
 from nexus_tech.simulation.planning import (
     build_quarter_plan,
@@ -189,6 +190,7 @@ from nexus_tech.simulation.support_program import (
     invest_in_support_staffing,
     route_support_escalation,
     run_account_rescue,
+    run_billing_stabilization,
     run_enterprise_assurance,
     run_lane_recovery,
     run_renewal_sweep,
@@ -950,6 +952,16 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_BILLING_STABILIZATION:
+        summary = run_billing_stabilization(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing stabilization.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         if context.target_product_id is None or context.partner_channel is None:
             raise ValueError("Creating a partnership requires selecting a product and channel.")
@@ -1000,6 +1012,19 @@ def apply_action(
         summary = rebalance_channel_mix(next_state)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Rebalanced the channel mix.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_PARTNER_RECOVERY_SPRINT:
+        if context.partnership_id is None:
+            raise ValueError("Running a partner recovery sprint requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_partner_recovery_sprint(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran partner recovery sprint for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

@@ -1661,6 +1661,109 @@ def run_enterprise_assurance(state: GameState) -> SupportOpsActionSummary:
     )
 
 
+def run_billing_stabilization(state: GameState) -> SupportOpsActionSummary:
+    """Cool the billing lane before renewals and covenant stress compound."""
+
+    if state.company.cash_on_hand < BALANCE.support_program_billing_stabilization_cost:
+        raise ValueError("Not enough cash to run billing stabilization this turn.")
+
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                _is_renewal_pressure_account(account),
+                account.failed_payment_risk + account.invoice_risk,
+                account.contract_value,
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and (
+            classify_account_support_lane(account) is SupportLaneFocus.BILLING
+            or _is_renewal_pressure_account(account)
+        )
+    ]
+    if not accounts:
+        raise ValueError("No billing-heavy accounts need stabilization right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_billing_stabilization_cost
+    )
+    state.support_program.lane_focus = SupportLaneFocus.BILLING
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - BALANCE.support_program_billing_stabilization_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_billing_stabilization_escalation_relief,
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[: BALANCE.support_program_billing_stabilization_account_limit]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets - BALANCE.support_program_billing_stabilization_ticket_relief,
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.support_program_billing_stabilization_sla_relief
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age
+            - BALANCE.support_program_billing_stabilization_queue_age_relief,
+        )
+        account.support_load = clamp_int(
+            account.support_load - BALANCE.support_program_billing_stabilization_support_load_relief
+        )
+        account.invoice_risk = clamp_int(
+            account.invoice_risk - BALANCE.support_program_billing_stabilization_invoice_relief
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk
+            - BALANCE.support_program_billing_stabilization_payment_relief
+        )
+        account.dunning_steps = max(
+            0,
+            account.dunning_steps - BALANCE.support_program_billing_stabilization_dunning_relief,
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health
+            + BALANCE.support_program_billing_stabilization_renewal_health_gain
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.support_program_billing_stabilization_satisfaction_gain
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk - BALANCE.support_program_billing_stabilization_churn_relief
+        )
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.BILLING,
+            BALANCE.support_program_billing_stabilization_lane_relief,
+        )
+        stabilized_accounts += 1
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.support_program_billing_stabilization_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.support_program_billing_stabilization_investor_pressure_relief
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran billing stabilization across {stabilized_accounts} account(s). "
+            f"Cash -{BALANCE.support_program_billing_stabilization_cost}, "
+            f"billing queue now {state.support_program.escalation_queue}."
+        )
+    )
+
+
 def count_escalating_accounts(accounts: list[CustomerAccount]) -> int:
     """Return the number of accounts with severe support pressure."""
 

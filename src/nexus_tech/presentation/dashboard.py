@@ -2201,6 +2201,11 @@ def _build_action_menu_panel() -> Panel:
         "run_enterprise_assurance",
         "Calm enterprise hotspot accounts before public-market scrutiny compounds.",
     )
+    primary_actions.add_row(
+        "89",
+        "run_billing_stabilization",
+        "Calm billing and renewal hotspots before independence pressure compounds.",
+    )
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
     primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
@@ -2299,6 +2304,11 @@ def _build_action_menu_panel() -> Panel:
         "88",
         "rebalance_channel_mix",
         "Reduce concentration in the live hotspot channel before dependence hardens.",
+    )
+    primary_actions.add_row(
+        "90",
+        "run_partner_recovery_sprint",
+        "Fund one strained channel to reduce dependency and restore execution quality.",
     )
     primary_actions.add_row(
         "82",

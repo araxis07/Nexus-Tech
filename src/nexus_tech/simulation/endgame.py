@@ -431,7 +431,7 @@ def calculate_endgame_pressure(
         (
             (
                 f"M&A: calm {portfolio.hotspot_channel} concentration, "
-                "run a channel QBR or rebalance the mix, and calm renewal risk "
+                "run a channel QBR, recovery sprint, or rebalance the mix, and calm renewal risk "
                 "before diligence deepens."
             )
             if (
@@ -444,7 +444,7 @@ def calculate_endgame_pressure(
         (
             (
                 "Independence: raise the reserve target, roll debt forward if needed, "
-                "and stabilize billing renewals before compounding harder."
+                "and run billing stabilization before compounding harder."
             )
             if (
                 independence_discipline >= 56
@@ -522,7 +522,8 @@ def calculate_endgame_pressure(
         ):
             recommendation = (
                 "Move support focus into billing, raise the reserve target, roll "
-                "debt forward if needed, and keep renewal pressure from breaking independence."
+                "debt forward if needed, and keep renewal pressure from breaking independence "
+                "with billing stabilization."
             )
         summary = "The independent path is viable only if capital discipline stays credible."
     else:

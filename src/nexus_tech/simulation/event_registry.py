@@ -278,6 +278,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_public_market_scrutiny_event,
         ),
         EventDefinition(
+            event_id="ipo_audit_committee",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_audit_committee_weight,
+            cooldown_turns=BALANCE.event_ipo_audit_committee_cooldown,
+            is_eligible=_is_ipo_audit_committee_eligible,
+            build_pending_event=_build_ipo_audit_committee_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -286,12 +294,28 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_acquirer_diligence_event,
         ),
         EventDefinition(
+            event_id="buyer_reference_check",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_reference_check_weight,
+            cooldown_turns=BALANCE.event_buyer_reference_check_cooldown,
+            is_eligible=_is_buyer_reference_check_eligible,
+            build_pending_event=_build_buyer_reference_check_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
             cooldown_turns=BALANCE.event_independence_reckoning_cooldown,
             is_eligible=_is_independence_reckoning_eligible,
             build_pending_event=_build_independence_reckoning_event,
+        ),
+        EventDefinition(
+            event_id="independence_cash_crunch",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_cash_crunch_weight,
+            cooldown_turns=BALANCE.event_independence_cash_crunch_cooldown,
+            is_eligible=_is_independence_cash_crunch_eligible,
+            build_pending_event=_build_independence_cash_crunch_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -1831,6 +1855,64 @@ def _build_public_market_scrutiny_event(
     )
 
 
+def _is_ipo_audit_committee_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"public_market_scrutiny"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "ipo_ready"
+        and pressure.public_market_scrutiny >= BALANCE.event_ipo_audit_committee_pressure_threshold
+        and (
+            state.finance.board_resolution_due
+            or queue_exposure.enterprise_queue_risk_accounts > 0
+            or queue_exposure.hotspot_lane.value == "enterprise"
+        )
+    )
+
+
+def _build_ipo_audit_committee_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="ipo_audit_committee",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="IPO Audit Committee",
+        description=(
+            f"Directors want a formal audit-readiness pass around {target.name}. "
+            "You can fund the control work now or delay and accept more scrutiny."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=3,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_audit_readiness",
+                label="Fund audit readiness",
+                description="Spend cash to improve controls, confidence, and queue discipline.",
+            ),
+            EventOption(
+                id="delay_committee",
+                label="Delay the committee",
+                description="Protect cash now, but governance and queue pressure worsen.",
+            ),
+        ],
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -1899,6 +1981,67 @@ def _build_acquirer_diligence_event(
     )
 
 
+def _is_buyer_reference_check_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        _has_recent_event(
+            state,
+            {"acquirer_diligence"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "strategic_acquisition"
+        and pressure.acquirer_diligence >= BALANCE.event_buyer_reference_check_pressure_threshold
+        and (
+            portfolio.direct_sales_conflict_accounts > 0
+            or portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.recovery_count > 0
+        )
+    )
+
+
+def _build_buyer_reference_check_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="buyer_reference_check",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Buyer Reference Check",
+        description=(
+            f"Potential acquirers want customer references around {target.name}. "
+            "You can fund the reference program or keep optionality open and accept more noise."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=3,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_reference_program",
+                label="Fund the reference program",
+                description=(
+                    "Spend cash to calm customers and partner friction before diligence deepens."
+                ),
+            ),
+            EventOption(
+                id="protect_optionality",
+                label="Protect optionality",
+                description="Hold cash, keep the process open, and accept extra conflict pressure.",
+            ),
+        ],
+    )
+
+
 def _is_independence_reckoning_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -1961,6 +2104,63 @@ def _build_independence_reckoning_event(
                 id="take_bridge_flex",
                 label="Take a small flexibility bridge",
                 description="Add cash now, but debt and outside pressure rise again.",
+            ),
+        ],
+    )
+
+
+def _is_independence_cash_crunch_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"independence_reckoning"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "profitable_independence"
+        and pressure.independence_discipline
+        >= BALANCE.event_independence_cash_crunch_pressure_threshold
+        and (
+            state.company.cash_on_hand < state.capital_plan.reserve_target
+            or (
+                state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+                and state.finance.covenant_risk >= 12
+            )
+            or queue_exposure.renewal_queue_risk_accounts > 0
+        )
+    )
+
+
+def _build_independence_cash_crunch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_cash_crunch",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Cash Crunch",
+        description=(
+            "The independent story is under cash pressure. You can shift harder toward reserves "
+            "or roll forward another financing step and accept more outside pressure."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=4,
+        options=[
+            EventOption(
+                id="cut_to_reserve",
+                label="Cut to reserve",
+                description="Lean harder into reserve discipline and accept some growth drag.",
+            ),
+            EventOption(
+                id="roll_forward",
+                label="Roll forward",
+                description="Take another debt-like step to protect cash now and pay later.",
             ),
         ],
     )

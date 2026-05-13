@@ -2114,6 +2114,64 @@ def _apply_public_market_scrutiny(state: GameState, event: PendingEvent, option_
     raise ValueError(f"Unsupported option {option_id} for public market scrutiny.")
 
 
+def _apply_ipo_audit_committee(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "fund_audit_readiness":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_ipo_audit_committee_fund_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_ipo_audit_committee_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_ipo_audit_committee_score_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk - BALANCE.event_ipo_audit_committee_risk_relief,
+            0,
+            100,
+        )
+        state.support_program.backlog_queue = max(
+            0,
+            state.support_program.backlog_queue - BALANCE.event_ipo_audit_committee_backlog_relief,
+        )
+        for account in _get_active_accounts_for_product(state, product.id):
+            if account.segment.value != "enterprise":
+                continue
+            account.sla_breach_risk = clamp_int(account.sla_breach_risk - 4, 0, 100)
+            account.ticket_queue_age = max(0, account.ticket_queue_age - 1)
+        return (
+            f"You funded audit readiness around {product.name}. Cash "
+            f"-{BALANCE.event_ipo_audit_committee_fund_cost}, board confidence "
+            f"+{BALANCE.event_ipo_audit_committee_confidence_gain}."
+        )
+
+    if option_id == "delay_committee":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_ipo_audit_committee_delay_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk + BALANCE.event_ipo_audit_committee_delay_risk_gain,
+            0,
+            100,
+        )
+        state.support_program.backlog_queue += BALANCE.event_ipo_audit_committee_delay_queue_gain
+        return (
+            "You delayed the audit committee. Board pressure "
+            f"+{BALANCE.event_ipo_audit_committee_delay_pressure_gain}, governance risk "
+            f"+{BALANCE.event_ipo_audit_committee_delay_risk_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for IPO audit committee.")
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -2171,6 +2229,74 @@ def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: 
         )
 
     raise ValueError(f"Unsupported option {option_id} for acquirer diligence.")
+
+
+def _apply_buyer_reference_check(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "fund_reference_program":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_buyer_reference_check_fund_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_buyer_reference_check_confidence_gain,
+            0,
+            100,
+        )
+        for partnership in state.partnerships:
+            if partnership.product_id != product.id:
+                continue
+            partnership.risk = clamp_int(
+                partnership.risk - BALANCE.event_buyer_reference_check_partner_risk_relief,
+                0,
+                100,
+            )
+            partnership.conflict_pressure = clamp_int(
+                partnership.conflict_pressure
+                - BALANCE.event_buyer_reference_check_partner_conflict_relief,
+                0,
+                100,
+            )
+        for account in _get_active_accounts_for_product(state, product.id)[:2]:
+            account.renewal_health = clamp_int(
+                account.renewal_health + BALANCE.event_buyer_reference_check_account_health_gain,
+                0,
+                100,
+            )
+            account.satisfaction = clamp_int(
+                account.satisfaction + BALANCE.event_buyer_reference_check_account_health_gain,
+                0,
+                100,
+            )
+        return (
+            f"You funded buyer references around {product.name}. Cash "
+            f"-{BALANCE.event_buyer_reference_check_fund_cost}, board confidence "
+            f"+{BALANCE.event_buyer_reference_check_confidence_gain}."
+        )
+
+    if option_id == "protect_optionality":
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            + BALANCE.event_buyer_reference_check_optionality_reputation_gain,
+            0,
+            100,
+        )
+        for partnership in state.partnerships:
+            if partnership.product_id != product.id:
+                continue
+            partnership.conflict_pressure = clamp_int(
+                partnership.conflict_pressure
+                + BALANCE.event_buyer_reference_check_optionality_conflict_gain,
+                0,
+                100,
+            )
+        return (
+            f"You protected optionality around {product.name}. Reputation "
+            f"+{BALANCE.event_buyer_reference_check_optionality_reputation_gain}, "
+            "but partner friction rose."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for buyer reference check.")
 
 
 def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -2236,6 +2362,71 @@ def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_
         )
 
     raise ValueError(f"Unsupported option {option_id} for independence reckoning.")
+
+
+def _apply_independence_cash_crunch(state: GameState, event: PendingEvent, option_id: str) -> str:
+    del event
+
+    if option_id == "cut_to_reserve":
+        shift = min(
+            BALANCE.event_independence_cash_crunch_reserve_share_gain,
+            state.capital_plan.go_to_market_share,
+        )
+        state.capital_plan = state.capital_plan.model_copy(
+            update={
+                "go_to_market_share": state.capital_plan.go_to_market_share - shift,
+                "reserve_share": state.capital_plan.reserve_share + shift,
+                "mode": CapitalPlanMode.CONSERVE,
+            }
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_independence_cash_crunch_cut_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_independence_cash_crunch_cut_investor_relief,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_independence_cash_crunch_cut_reputation_loss,
+            0,
+            100,
+        )
+        return (
+            "You cut harder to reserve discipline. Reserve share "
+            "+"
+            f"{shift}, board pressure "
+            f"-{BALANCE.event_independence_cash_crunch_cut_pressure_relief}."
+        )
+
+    if option_id == "roll_forward":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_independence_cash_crunch_roll_cash_gain
+        )
+        state.finance.debt_principal = quantize_money(
+            state.finance.debt_principal + BALANCE.event_independence_cash_crunch_roll_debt_gain
+        )
+        state.finance.loan_interest_rate = clamp_rate(
+            state.finance.loan_interest_rate
+            + BALANCE.event_independence_cash_crunch_roll_interest_gain
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            + BALANCE.event_independence_cash_crunch_roll_pressure_gain,
+            0,
+            100,
+        )
+        return (
+            "You rolled the cash crunch forward. Cash "
+            f"+{BALANCE.event_independence_cash_crunch_roll_cash_gain}, debt "
+            f"+{BALANCE.event_independence_cash_crunch_roll_debt_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for independence cash crunch.")
 
 
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -2428,8 +2619,11 @@ EVENT_EFFECT_HANDLERS = {
     "launch_aftershock": _apply_launch_aftershock,
     "exit_interest": _apply_exit_interest,
     "public_market_scrutiny": _apply_public_market_scrutiny,
+    "ipo_audit_committee": _apply_ipo_audit_committee,
     "acquirer_diligence": _apply_acquirer_diligence,
+    "buyer_reference_check": _apply_buyer_reference_check,
     "independence_reckoning": _apply_independence_reckoning,
+    "independence_cash_crunch": _apply_independence_cash_crunch,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,

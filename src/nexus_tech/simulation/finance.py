@@ -716,6 +716,8 @@ def build_finance_planner(
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
         recommended_actions.append("run_enterprise_assurance")
+    if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
+        recommended_actions.append("run_billing_stabilization")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -754,6 +756,11 @@ def build_finance_planner(
         or channel_conflict_index >= 26
     ):
         recommended_actions.append("run_channel_qbr")
+    if (
+        recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        recommended_actions.append("run_partner_recovery_sprint")
     if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -827,6 +834,12 @@ def build_finance_planner(
         action_sequence.append(
             "run enterprise assurance before public-market accounts absorb more queue damage"
         )
+    if (
+        support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0
+    ) and strategic_outlook == "profitable_independence":
+        action_sequence.append(
+            "run billing stabilization before renewal friction starts reshaping independence"
+        )
     if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
         action_sequence.append(
             f"move support focus from {support_lane_focus.value} to "
@@ -886,6 +899,10 @@ def build_finance_planner(
     ):
         action_sequence.append(
             f"run a {hotspot_channel} channel QBR before trusting that lane as durable revenue"
+        )
+    if recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold:
+        action_sequence.append(
+            "fund a partner recovery sprint before treating the hotspot lane as reliable again"
         )
     if (
         reserve_gap < ZERO_MONEY

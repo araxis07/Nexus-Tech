@@ -386,6 +386,110 @@ def rebalance_channel_mix(state: GameState) -> PartnershipActionSummary:
     )
 
 
+def run_partner_recovery_sprint(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Invest directly in one strained or recovering partner lane."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if state.company.cash_on_hand < BALANCE.partnership_recovery_sprint_cost:
+        raise ValueError("Not enough cash to run a partner recovery sprint.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_recovery_sprint_cost
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_recovery_sprint_enablement_gain
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_recovery_sprint_quality_gain
+    )
+    partnership.risk = clamp_int(partnership.risk - BALANCE.partnership_recovery_sprint_risk_relief)
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure - BALANCE.partnership_recovery_sprint_conflict_relief
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(
+            partnership.rev_share_rate - BALANCE.partnership_recovery_sprint_rev_share_relief
+        ),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    if partnership.channel is PartnerChannel.RESELLER:
+        for account in related_accounts[:2]:
+            account.satisfaction = clamp_int(
+                account.satisfaction
+                + BALANCE.partnership_recovery_sprint_reseller_satisfaction_gain
+            )
+            account.churn_risk = clamp_int(
+                account.churn_risk - BALANCE.partnership_recovery_sprint_reseller_churn_relief
+            )
+    elif partnership.channel is PartnerChannel.INTEGRATION:
+        for account in related_accounts[:2]:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health
+                + BALANCE.partnership_recovery_sprint_integration_onboarding_gain
+            )
+            account.support_load = clamp_int(
+                account.support_load
+                - BALANCE.partnership_recovery_sprint_integration_support_relief
+            )
+    elif partnership.channel is PartnerChannel.MARKETPLACE:
+        for account in related_accounts[:2]:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk
+                - BALANCE.partnership_recovery_sprint_marketplace_invoice_relief
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk
+                - BALANCE.partnership_recovery_sprint_marketplace_payment_relief
+            )
+            account.dunning_steps = max(
+                0,
+                account.dunning_steps
+                - BALANCE.partnership_recovery_sprint_marketplace_dunning_relief,
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health
+                + BALANCE.partnership_recovery_sprint_marketplace_renewal_gain
+            )
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure - BALANCE.partnership_recovery_sprint_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.partnership_recovery_sprint_investor_pressure_relief
+    )
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} completed a recovery sprint. Risk {partnership.risk}, conflict "
+        f"{partnership.conflict_pressure}, rev-share {partnership.rev_share_rate:.2%}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran a {partnership.channel.value} recovery sprint for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_recovery_sprint_cost}."
+        )
+    )
+
+
 def renegotiate_partnership(
     state: GameState,
     partnership_id: UUID,
