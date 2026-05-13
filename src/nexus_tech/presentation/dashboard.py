@@ -2211,6 +2211,11 @@ def _build_action_menu_panel() -> Panel:
         "run_onboarding_recovery",
         "Rebuild onboarding-heavy accounts before implementation drag reshapes growth.",
     )
+    primary_actions.add_row(
+        "93",
+        "run_reference_rescue",
+        "Protect one flagship account reference before diligence or IPO pressure compounds.",
+    )
     primary_actions.add_row("33", "run_add_on_campaign", "Push add-on expansion on one product.")
     primary_actions.add_row("34", "run_package_migration", "Align accounts to current packaging.")
     primary_actions.add_row("35", "execute_restructure_plan", "Run a board-backed reset.")
@@ -2319,6 +2324,11 @@ def _build_action_menu_panel() -> Panel:
         "92",
         "run_channel_firebreak",
         "Spend directly to cool one hotspot partner before concentration hardens further.",
+    )
+    primary_actions.add_row(
+        "94",
+        "run_channel_conflict_reset",
+        "Reset one channel conflict before direct-sales friction poisons the revenue mix.",
     )
     primary_actions.add_row(
         "82",

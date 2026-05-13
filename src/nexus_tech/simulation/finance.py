@@ -716,6 +716,12 @@ def build_finance_planner(
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         recommended_actions.append("upgrade_support_program")
         recommended_actions.append("run_enterprise_assurance")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and revenue_at_risk_value >= Decimal("1800.00")
+    ):
+        recommended_actions.append("run_reference_rescue")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
@@ -769,6 +775,12 @@ def build_finance_planner(
         or hotspot_revenue_share_percent >= 40
     ):
         recommended_actions.append("run_channel_firebreak")
+    if strategic_outlook == "strategic_acquisition" and (
+        channel_conflict_index >= 28
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        recommended_actions.append("run_channel_conflict_reset")
     if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -841,6 +853,14 @@ def build_finance_planner(
     if enterprise_queue_risk_accounts > 0 and strategic_outlook == "ipo_ready":
         action_sequence.append(
             "run enterprise assurance before public-market accounts absorb more queue damage"
+        )
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and revenue_at_risk_value >= Decimal("1800.00")
+    ):
+        action_sequence.append(
+            "run a reference rescue before a flagship account turns into a diligence liability"
         )
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         action_sequence.append(
@@ -924,6 +944,14 @@ def build_finance_planner(
         action_sequence.append(
             f"run a {hotspot_channel} channel firebreak before concentration hardens into "
             "late-game drag"
+        )
+    if strategic_outlook == "strategic_acquisition" and (
+        channel_conflict_index >= 28
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        action_sequence.append(
+            "reset direct-sales channel conflict before buyers price the overlap into diligence"
         )
     if (
         reserve_gap < ZERO_MONEY

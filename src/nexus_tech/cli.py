@@ -264,6 +264,7 @@ ACTION_KEYS = {
     "87": TurnAction.RUN_ENTERPRISE_ASSURANCE,
     "89": TurnAction.RUN_BILLING_STABILIZATION,
     "91": TurnAction.RUN_ONBOARDING_RECOVERY,
+    "93": TurnAction.RUN_REFERENCE_RESCUE,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -302,6 +303,7 @@ ACTION_KEYS = {
     "88": TurnAction.REBALANCE_CHANNEL_MIX,
     "90": TurnAction.RUN_PARTNER_RECOVERY_SPRINT,
     "92": TurnAction.RUN_CHANNEL_FIREBREAK,
+    "94": TurnAction.RUN_CHANNEL_CONFLICT_RESET,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
@@ -1631,6 +1633,12 @@ def collect_action_context(
                 return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_REFERENCE_RESCUE:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_LANE_RECOVERY:
         focus_key = ask_choice_input(
             "Recovery lane",
@@ -1678,6 +1686,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_CHANNEL_FIREBREAK:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_CONFLICT_RESET:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

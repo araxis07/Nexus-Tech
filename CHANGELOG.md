@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.54.0 - 2026-05-14
+
+- Added `run_reference_rescue` and `run_channel_conflict_reset` as deeper late-game recovery actions for flagship accounts and noisy channel relationships
+- Added path-specific follow-up events `ipo_reference_crack`, `buyer_channel_conflict_review`, and `independence_refinancing_wall` so IPO, acquisition, and independence runs branch more sharply under stress
+- Expanded finance-planner and endgame guidance to recommend the new recovery actions when enterprise references, channel conflict, and refinancing strain become the dominant late-game bottlenecks
+- Added regression coverage for the new actions and event chains plus a seeded 150-turn IPO-launchpad stability run
+- Promoted the package version to `0.54.0`
+
 ## 0.53.0 - 2026-05-13
 
 - Added `run_onboarding_recovery` and `run_channel_firebreak` as deeper late-game recovery actions for support and channel hotspots

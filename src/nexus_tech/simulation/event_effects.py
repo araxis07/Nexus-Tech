@@ -16,6 +16,7 @@ from nexus_tech.domain.models import (
     PartnershipStatus,
     PendingEvent,
     Product,
+    SupportTier,
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
@@ -2412,6 +2413,93 @@ def _apply_ipo_audit_committee(state: GameState, event: PendingEvent, option_id:
     raise ValueError(f"Unsupported option {option_id} for IPO audit committee.")
 
 
+def _apply_ipo_reference_crack(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    accounts = sorted(
+        _get_active_accounts_for_product(state, product.id),
+        key=lambda account: (
+            account.contract_value,
+            account.sla_breach_risk + account.ticket_queue_age + account.support_load,
+        ),
+        reverse=True,
+    )
+    if not accounts:
+        raise ValueError("This event expected at least one active reference account.")
+    account = accounts[0]
+
+    if option_id == "fund_reference_reset":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_ipo_reference_crack_fund_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_ipo_reference_crack_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_ipo_reference_crack_score_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_ipo_reference_crack_pressure_relief,
+            0,
+            100,
+        )
+        account.support_tier = SupportTier.WHITE_GLOVE
+        account.open_tickets = max(0, account.open_tickets - 2)
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk - BALANCE.event_ipo_reference_crack_account_health_gain,
+            0,
+            100,
+        )
+        account.ticket_queue_age = max(0, account.ticket_queue_age - 1)
+        account.support_load = clamp_int(account.support_load - 4, 0, 100)
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.event_ipo_reference_crack_account_health_gain,
+            0,
+            100,
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.event_ipo_reference_crack_account_satisfaction_gain,
+            0,
+            100,
+        )
+        account.churn_risk = clamp_int(account.churn_risk - 5, 0, 100)
+        state.support_program.backlog_queue = max(0, state.support_program.backlog_queue - 1)
+        return (
+            f"You funded a reference reset for {account.name}. Cash "
+            f"-{BALANCE.event_ipo_reference_crack_fund_cost}, board confidence "
+            f"+{BALANCE.event_ipo_reference_crack_confidence_gain}."
+        )
+
+    if option_id == "accept_delay":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure + BALANCE.event_ipo_reference_crack_delay_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk + BALANCE.event_ipo_reference_crack_delay_risk_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_ipo_reference_crack_delay_reputation_loss,
+            0,
+            100,
+        )
+        account.churn_risk = clamp_int(account.churn_risk + 4, 0, 100)
+        state.support_program.escalation_queue += 1
+        return (
+            "You accepted an IPO-reference delay. Board pressure "
+            f"+{BALANCE.event_ipo_reference_crack_delay_pressure_gain}, governance risk "
+            f"+{BALANCE.event_ipo_reference_crack_delay_risk_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for IPO reference crack.")
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -2537,6 +2625,96 @@ def _apply_buyer_reference_check(state: GameState, event: PendingEvent, option_i
         )
 
     raise ValueError(f"Unsupported option {option_id} for buyer reference check.")
+
+
+def _apply_buyer_channel_conflict_review(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_conflicted_partnership(state, product.id)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "separate_partner_terms":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_buyer_channel_conflict_review_terms_cost
+        )
+        partnership.rev_share_rate = clamp_rate(
+            partnership.rev_share_rate
+            + BALANCE.event_buyer_channel_conflict_review_rev_share_penalty
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            - BALANCE.event_buyer_channel_conflict_review_conflict_relief,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_buyer_channel_conflict_review_risk_relief,
+            0,
+            100,
+        )
+        partnership.enablement_level = clamp_int(
+            partnership.enablement_level
+            + BALANCE.event_buyer_channel_conflict_review_enablement_gain,
+            0,
+            100,
+        )
+        partnership.status = PartnershipStatus.RECOVERY
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_buyer_channel_conflict_review_board_pressure_relief,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            if partnership.channel is PartnerChannel.RESELLER:
+                account.satisfaction = clamp_int(account.satisfaction + 4, 0, 100)
+                account.churn_risk = clamp_int(account.churn_risk - 4, 0, 100)
+            elif partnership.channel is PartnerChannel.INTEGRATION:
+                account.onboarding_health = clamp_int(account.onboarding_health + 6, 0, 100)
+                account.support_load = clamp_int(account.support_load - 3, 0, 100)
+            elif partnership.channel is PartnerChannel.MARKETPLACE:
+                account.invoice_risk = clamp_int(account.invoice_risk - 6, 0, 100)
+                account.failed_payment_risk = clamp_int(account.failed_payment_risk - 6, 0, 100)
+        return (
+            f"You separated terms around {partnership.name}. Cash "
+            f"-{BALANCE.event_buyer_channel_conflict_review_terms_cost}, conflict "
+            f"-{BALANCE.event_buyer_channel_conflict_review_conflict_relief}."
+        )
+
+    if option_id == "press_forward":
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            + BALANCE.event_buyer_channel_conflict_review_press_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_buyer_channel_conflict_review_press_pressure_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            - BALANCE.event_buyer_channel_conflict_review_press_reputation_loss,
+            0,
+            100,
+        )
+        product.user_count = max(
+            0,
+            product.user_count - BALANCE.event_buyer_channel_conflict_review_press_user_loss,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            f"You pressed forward through {partnership.name}. Board pressure "
+            f"+{BALANCE.event_buyer_channel_conflict_review_press_pressure_gain}, users "
+            f"-{BALANCE.event_buyer_channel_conflict_review_press_user_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for buyer channel conflict review.")
 
 
 def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -2667,6 +2845,85 @@ def _apply_independence_cash_crunch(state: GameState, event: PendingEvent, optio
         )
 
     raise ValueError(f"Unsupported option {option_id} for independence cash crunch.")
+
+
+def _apply_independence_refinancing_wall(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    del event
+
+    if option_id == "lock_reserve_discipline":
+        shift = min(
+            BALANCE.event_independence_refinancing_wall_gtm_share_loss,
+            state.capital_plan.go_to_market_share,
+        )
+        state.capital_plan = state.capital_plan.model_copy(
+            update={
+                "go_to_market_share": state.capital_plan.go_to_market_share - shift,
+                "reserve_share": state.capital_plan.reserve_share + shift,
+                "mode": CapitalPlanMode.CONSERVE,
+            }
+        )
+        state.finance.covenant_risk = clamp_int(
+            state.finance.covenant_risk
+            - BALANCE.event_independence_refinancing_wall_covenant_relief,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_independence_refinancing_wall_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_independence_refinancing_wall_investor_relief,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_independence_refinancing_wall_reputation_loss,
+            0,
+            100,
+        )
+        return (
+            "You locked into reserve discipline. Reserve share "
+            f"+{shift}, covenant risk "
+            f"-{BALANCE.event_independence_refinancing_wall_covenant_relief}."
+        )
+
+    if option_id == "stretch_rollover":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_independence_refinancing_wall_cash_gain
+        )
+        state.finance.debt_principal = quantize_money(
+            state.finance.debt_principal + BALANCE.event_independence_refinancing_wall_debt_gain
+        )
+        state.finance.loan_interest_rate = clamp_rate(
+            state.finance.loan_interest_rate
+            + BALANCE.event_independence_refinancing_wall_interest_gain
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_independence_refinancing_wall_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.covenant_risk = clamp_int(
+            state.finance.covenant_risk + BALANCE.event_independence_refinancing_wall_covenant_gain,
+            0,
+            100,
+        )
+        return (
+            "You stretched the refinancing wall. Cash "
+            f"+{BALANCE.event_independence_refinancing_wall_cash_gain}, debt "
+            f"+{BALANCE.event_independence_refinancing_wall_debt_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for independence refinancing wall.")
 
 
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -2877,10 +3134,13 @@ EVENT_EFFECT_HANDLERS = {
     "exit_interest": _apply_exit_interest,
     "public_market_scrutiny": _apply_public_market_scrutiny,
     "ipo_audit_committee": _apply_ipo_audit_committee,
+    "ipo_reference_crack": _apply_ipo_reference_crack,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
+    "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
+    "independence_refinancing_wall": _apply_independence_refinancing_wall,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
