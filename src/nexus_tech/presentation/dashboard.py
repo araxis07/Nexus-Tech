@@ -2227,6 +2227,11 @@ def _build_action_menu_panel() -> Panel:
         "Stabilize one premium account before high-touch support pressure defines the run.",
     )
     primary_actions.add_row(
+        "108",
+        "run_white_glove_backstop",
+        "Lock down one white-glove account before premium queue risk turns into board pressure.",
+    )
+    primary_actions.add_row(
         "104",
         "run_enterprise_reference_cycle",
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
@@ -2327,6 +2332,11 @@ def _build_action_menu_panel() -> Panel:
         "before pressure compounds.",
     )
     primary_actions.add_row(
+        "111",
+        "set_covenant_firewall",
+        "Build a harder reserve and covenant buffer before debt and board heat converge.",
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2396,6 +2406,16 @@ def _build_action_menu_panel() -> Panel:
         "run_channel_stability_reset",
         "Fund one hotspot channel to calm fatigue, conflict, and dependency "
         "before late-game drag compounds.",
+    )
+    primary_actions.add_row(
+        "109",
+        "run_reseller_enablement_reset",
+        "Reset one reseller lane before enablement drift hardens into revenue drag.",
+    )
+    primary_actions.add_row(
+        "110",
+        "run_marketplace_chargeback_reset",
+        "Reset one marketplace lane before chargeback pressure poisons renewals.",
     )
     primary_actions.add_row(
         "82",

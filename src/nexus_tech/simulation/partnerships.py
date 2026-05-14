@@ -1198,6 +1198,234 @@ def run_channel_stability_reset(
     )
 
 
+def run_reseller_enablement_reset(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Restore one reseller lane before enablement drift hardens into revenue drag."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if partnership.channel is not PartnerChannel.RESELLER:
+        raise ValueError("This action only applies to reseller partnerships.")
+    if partnership.status is PartnershipStatus.PAUSED:
+        raise ValueError("Paused reseller lanes need reactivation before an enablement reset.")
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if state.company.cash_on_hand < BALANCE.partnership_reseller_enablement_reset_cost:
+        raise ValueError("Not enough cash to run a reseller enablement reset.")
+    if (
+        fatigue < BALANCE.partnership_recovery_resume_threshold
+        and partnership.risk < BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
+        and partnership.enablement_level >= 56
+    ):
+        raise ValueError("That reseller lane does not need an enablement reset right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_reseller_enablement_reset_cost
+    )
+    partnership.sourced_revenue = quantize_money(
+        partnership.sourced_revenue
+        * BALANCE.partnership_reseller_enablement_reset_revenue_retention_rate
+    )
+    partnership.sourced_users = max(
+        0,
+        int(
+            partnership.sourced_users
+            * BALANCE.partnership_reseller_enablement_reset_user_retention_percent
+            / 100
+        ),
+    )
+    partnership.risk = clamp_int(
+        partnership.risk - BALANCE.partnership_reseller_enablement_reset_risk_relief
+    )
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure
+        - BALANCE.partnership_reseller_enablement_reset_conflict_relief
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_reseller_enablement_reset_enablement_gain
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_reseller_enablement_reset_quality_gain
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(
+            partnership.rev_share_rate
+            - BALANCE.partnership_reseller_enablement_reset_rev_share_relief
+        ),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    for account in related_accounts[:2]:
+        account.satisfaction = clamp_int(
+            account.satisfaction + BALANCE.partnership_reseller_enablement_reset_satisfaction_gain
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.partnership_reseller_enablement_reset_renewal_gain
+        )
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.partnership_reseller_enablement_reset_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.partnership_reseller_enablement_reset_investor_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.partnership_reseller_enablement_reset_board_confidence_gain
+    )
+
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} completed a reseller enablement reset. Revenue "
+        f"{format_money(partnership.sourced_revenue)}, risk {partnership.risk}, "
+        f"conflict {partnership.conflict_pressure}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran a reseller enablement reset for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_reseller_enablement_reset_cost}."
+        )
+    )
+
+
+def run_marketplace_chargeback_reset(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Reset one marketplace lane before chargeback pressure poisons renewal quality."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if partnership.channel is not PartnerChannel.MARKETPLACE:
+        raise ValueError("This action only applies to marketplace partnerships.")
+    if partnership.status is PartnershipStatus.PAUSED:
+        raise ValueError("Paused marketplace lanes need reactivation before a chargeback reset.")
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if state.company.cash_on_hand < BALANCE.partnership_marketplace_chargeback_reset_cost:
+        raise ValueError("Not enough cash to run a marketplace chargeback reset.")
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    if (
+        fatigue < BALANCE.partnership_recovery_resume_threshold
+        and partnership.risk < BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
+        and not any(
+            account.invoice_risk > 8 or account.failed_payment_risk > 8 or account.dunning_steps > 0
+            for account in related_accounts
+        )
+    ):
+        raise ValueError("That marketplace lane does not need a chargeback reset right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_marketplace_chargeback_reset_cost
+    )
+    partnership.sourced_revenue = quantize_money(
+        partnership.sourced_revenue
+        * BALANCE.partnership_marketplace_chargeback_reset_revenue_retention_rate
+    )
+    partnership.sourced_users = max(
+        0,
+        int(
+            partnership.sourced_users
+            * BALANCE.partnership_marketplace_chargeback_reset_user_retention_percent
+            / 100
+        ),
+    )
+    partnership.risk = clamp_int(
+        partnership.risk - BALANCE.partnership_marketplace_chargeback_reset_risk_relief
+    )
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure
+        - BALANCE.partnership_marketplace_chargeback_reset_conflict_relief
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level
+        + BALANCE.partnership_marketplace_chargeback_reset_enablement_gain
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_marketplace_chargeback_reset_quality_gain
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(
+            partnership.rev_share_rate
+            - BALANCE.partnership_marketplace_chargeback_reset_rev_share_relief
+        ),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    for account in related_accounts[:2]:
+        account.invoice_risk = clamp_int(
+            account.invoice_risk - BALANCE.partnership_marketplace_chargeback_reset_invoice_relief
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk
+            - BALANCE.partnership_marketplace_chargeback_reset_payment_relief
+        )
+        account.dunning_steps = max(
+            0,
+            account.dunning_steps - BALANCE.partnership_marketplace_chargeback_reset_dunning_relief,
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.partnership_marketplace_chargeback_reset_renewal_gain
+        )
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.partnership_marketplace_chargeback_reset_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.partnership_marketplace_chargeback_reset_investor_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.partnership_marketplace_chargeback_reset_board_confidence_gain
+    )
+
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} completed a marketplace chargeback reset. Revenue "
+        f"{format_money(partnership.sourced_revenue)}, risk {partnership.risk}, "
+        f"conflict {partnership.conflict_pressure}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran a marketplace chargeback reset for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_marketplace_chargeback_reset_cost}."
+        )
+    )
+
+
 def renegotiate_partnership(
     state: GameState,
     partnership_id: UUID,

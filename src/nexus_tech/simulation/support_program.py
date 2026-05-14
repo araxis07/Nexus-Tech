@@ -2231,6 +2231,97 @@ def run_reference_rescue(
     )
 
 
+def run_white_glove_backstop(
+    state: GameState,
+    account_id,
+) -> SupportOpsActionSummary:
+    """Run a higher-cost premium recovery pass for one flagship high-touch account."""
+
+    account = _get_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if state.company.cash_on_hand < BALANCE.support_program_white_glove_backstop_cost:
+        raise ValueError("Not enough cash to run a white-glove backstop this turn.")
+    if (
+        account.support_tier is SupportTier.STANDARD
+        and account.contract_value < Decimal("2200.00")
+        and account.segment is not MarketSegment.ENTERPRISE
+    ):
+        raise ValueError("That account is not exposed enough for a white-glove backstop.")
+    if (
+        account.open_tickets <= 1
+        and account.sla_breach_risk <= 10
+        and account.ticket_queue_age <= 0
+        and account.support_load <= 18
+        and account.renewal_health >= 76
+        and account.satisfaction >= 78
+    ):
+        raise ValueError("That account does not need a white-glove backstop right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_white_glove_backstop_cost
+    )
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - BALANCE.support_program_white_glove_backstop_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_white_glove_backstop_escalation_relief,
+    )
+    account.open_tickets = max(
+        0,
+        account.open_tickets - BALANCE.support_program_white_glove_backstop_ticket_relief,
+    )
+    account.sla_breach_risk = clamp_int(
+        account.sla_breach_risk - BALANCE.support_program_white_glove_backstop_sla_relief
+    )
+    account.ticket_queue_age = max(
+        0,
+        account.ticket_queue_age - BALANCE.support_program_white_glove_backstop_queue_age_relief,
+    )
+    account.support_load = clamp_int(
+        account.support_load - BALANCE.support_program_white_glove_backstop_support_load_relief
+    )
+    account.renewal_health = clamp_int(
+        account.renewal_health + BALANCE.support_program_white_glove_backstop_renewal_health_gain
+    )
+    account.satisfaction = clamp_int(
+        account.satisfaction + BALANCE.support_program_white_glove_backstop_satisfaction_gain
+    )
+    account.churn_risk = clamp_int(
+        account.churn_risk - BALANCE.support_program_white_glove_backstop_churn_relief
+    )
+    account.escalation_count = max(0, account.escalation_count - 1)
+    account.support_tier = SupportTier.WHITE_GLOVE
+    _apply_lane_program_relief(
+        state.support_program,
+        SupportLaneFocus.ENTERPRISE,
+        BALANCE.support_program_white_glove_backstop_lane_relief,
+    )
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.support_program_white_glove_backstop_board_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.support_program_white_glove_backstop_board_confidence_gain
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.support_program_white_glove_backstop_reputation_gain
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a white-glove backstop for {account.name}. "
+            f"Cash -{BALANCE.support_program_white_glove_backstop_cost}, "
+            f"renewal health now {account.renewal_health}."
+        )
+    )
+
+
 def run_enterprise_reference_cycle(
     state: GameState,
     account_id,

@@ -755,6 +755,20 @@ def build_finance_planner(
         >= BALANCE.finance_planner_white_glove_recovery_value_threshold
     ):
         recommended_actions.append("run_white_glove_recovery")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and (
+            white_glove_queue_risk_accounts > 0
+            or premium_revenue_at_risk_value
+            >= BALANCE.finance_planner_white_glove_recovery_value_threshold
+        )
+        and (
+            support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            or focus_alignment_gap > 0
+            or premium_revenue_at_risk_value >= Decimal("2400.00")
+        )
+    ):
+        recommended_actions.append("run_white_glove_backstop")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -859,6 +873,18 @@ def build_finance_planner(
         or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
     ):
         recommended_actions.append("run_channel_stability_reset")
+    if hotspot_channel == "reseller" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 24
+    ):
+        recommended_actions.append("run_reseller_enablement_reset")
+    if hotspot_channel == "marketplace" and (
+        volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+        or renewal_pressure_value >= Decimal("2000.00")
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        recommended_actions.append("run_marketplace_chargeback_reset")
     if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -925,6 +951,14 @@ def build_finance_planner(
         finance.covenant_risk >= 14 or reserve_gap < ZERO_MONEY or capital_fragility >= 55
     ):
         recommended_actions.append("set_refinancing_posture")
+    if finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt and (
+        finance.covenant_risk >= 18
+        or capital_fragility >= 60
+        or finance.board_pressure >= 28
+        or finance.governance_risk >= 50
+        or reserve_gap < ZERO_MONEY
+    ):
+        recommended_actions.append("set_covenant_firewall")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -996,6 +1030,15 @@ def build_finance_planner(
             "run a white-glove recovery before premium queue exposure becomes the next board "
             "conversation"
         )
+        if (
+            support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            or focus_alignment_gap > 0
+            or premium_revenue_at_risk_value >= Decimal("2400.00")
+        ):
+            action_sequence.append(
+                "run a white-glove backstop before premium queue drag becomes the next "
+                "reference and diligence fracture"
+            )
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         action_sequence.append(
             "run onboarding recovery before implementation drag compounds into churn and board heat"
@@ -1145,6 +1188,22 @@ def build_finance_planner(
             f"run a {hotspot_channel} channel stability reset before dependency and fatigue "
             "define the commercial story"
         )
+    if hotspot_channel == "reseller" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 24
+    ):
+        action_sequence.append(
+            "run a reseller enablement reset before partner drift hardens into revenue drag"
+        )
+    if hotspot_channel == "marketplace" and (
+        volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+        or renewal_pressure_value >= Decimal("2000.00")
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        action_sequence.append(
+            "run a marketplace chargeback reset before billing friction reshapes renewal quality"
+        )
     if (
         reserve_gap < ZERO_MONEY
         or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
@@ -1179,6 +1238,17 @@ def build_finance_planner(
         action_sequence.append(
             "set a refinancing posture before covenant heat and rollover pressure narrow the "
             "capital window further"
+        )
+    if finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt and (
+        finance.covenant_risk >= 18
+        or capital_fragility >= 60
+        or finance.board_pressure >= 28
+        or finance.governance_risk >= 50
+        or reserve_gap < ZERO_MONEY
+    ):
+        action_sequence.append(
+            "set a covenant firewall before debt heat and board pressure converge into a forced "
+            "capital reset"
         )
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62

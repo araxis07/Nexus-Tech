@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.59.0 - 2026-05-14
+
+- Added `run_white_glove_backstop`, `run_reseller_enablement_reset`, `run_marketplace_chargeback_reset`, and `set_covenant_firewall` as deeper late-game follow-up actions for flagship support rescue, reseller recovery, marketplace billing cleanup, and covenant defense
+- Added path-specific follow-up events `ipo_reference_committee`, `buyer_signing_committee`, `independence_treasury_compact`, and `board_reset_execution_plan` so IPO, acquisition, independence, and board-reset runs each gain another decisive late-game branch
+- Expanded finance-planner guidance to recommend the new support, channel, and covenant actions once premium queue drag, reseller or marketplace hotspot pressure, and covenant heat become the main bottlenecks
+- Added regression coverage for the new actions and event chains plus a seeded 200-turn board-recovery stability run
+- Promoted the package version to `0.59.0`
+
 ## 0.58.0 - 2026-05-14
 
 - Added `run_enterprise_reference_cycle`, `run_billing_retention_reset`, `run_channel_stability_reset`, and `set_refinancing_posture` as deeper late-game follow-up actions for flagship support recovery, billing retention, hotspot channel durability, and debt-aware capital control

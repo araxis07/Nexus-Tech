@@ -326,6 +326,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_pricing_committee_event,
         ),
         EventDefinition(
+            event_id="ipo_reference_committee",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_reference_committee_weight,
+            cooldown_turns=BALANCE.event_ipo_reference_committee_cooldown,
+            is_eligible=_is_ipo_reference_committee_eligible,
+            build_pending_event=_build_ipo_reference_committee_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -382,6 +390,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_operating_memo_event,
         ),
         EventDefinition(
+            event_id="buyer_signing_committee",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_signing_committee_weight,
+            cooldown_turns=BALANCE.event_buyer_signing_committee_cooldown,
+            is_eligible=_is_buyer_signing_committee_eligible,
+            build_pending_event=_build_buyer_signing_committee_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -436,6 +452,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_cash_yield_pact_cooldown,
             is_eligible=_is_independence_cash_yield_pact_eligible,
             build_pending_event=_build_independence_cash_yield_pact_event,
+        ),
+        EventDefinition(
+            event_id="independence_treasury_compact",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_treasury_compact_weight,
+            cooldown_turns=BALANCE.event_independence_treasury_compact_cooldown,
+            is_eligible=_is_independence_treasury_compact_eligible,
+            build_pending_event=_build_independence_treasury_compact_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -532,6 +556,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_board_reset_showdown_cooldown,
             is_eligible=_is_board_reset_showdown_eligible,
             build_pending_event=_build_board_reset_showdown_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_execution_plan",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_execution_plan_weight,
+            cooldown_turns=BALANCE.event_board_reset_execution_plan_cooldown,
+            is_eligible=_is_board_reset_execution_plan_eligible,
+            build_pending_event=_build_board_reset_execution_plan_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -2273,7 +2305,7 @@ def _is_ipo_syndicate_commitment_eligible(state: GameState) -> bool:
             state.finance.board_confidence >= 56
             or state.finance.board_score >= 54
             or queue_exposure.enterprise_queue_risk_accounts > 0
-            or queue_exposure.high_value_risk_accounts > 0
+            or queue_exposure.white_glove_queue_risk_accounts > 0
         )
     )
 
@@ -2333,7 +2365,7 @@ def _is_ipo_pricing_committee_eligible(state: GameState) -> bool:
         and (
             state.finance.board_confidence >= 58
             or state.finance.board_score >= 56
-            or queue_exposure.high_value_risk_accounts > 0
+            or queue_exposure.white_glove_queue_risk_accounts > 0
             or queue_exposure.enterprise_queue_risk_accounts > 0
         )
     )
@@ -2373,6 +2405,65 @@ def _build_ipo_pricing_committee_event(
                 id="defend_rich_range",
                 label="Defend a richer range",
                 description="Protect upside and reputation, but accept more IPO heat now.",
+            ),
+        ],
+    )
+
+
+def _is_ipo_reference_committee_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"ipo_pricing_committee"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.public_market_scrutiny
+        >= BALANCE.event_ipo_reference_committee_pressure_threshold
+        and (
+            queue_exposure.white_glove_queue_risk_accounts > 0
+            or queue_exposure.enterprise_queue_risk_accounts > 0
+            or queue_exposure.premium_queue_risk_accounts > 0
+            or state.finance.board_warning_level >= 2
+        )
+    )
+
+
+def _build_ipo_reference_committee_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="ipo_reference_committee",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="IPO Reference Committee",
+        description=(
+            f"Bankers now want a tighter reference committee around {target.name}. "
+            "You can fund the committee and calm premium-account fragility or defer it and "
+            "accept more scrutiny."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=10,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_reference_committee",
+                label="Fund the reference committee",
+                description="Spend cash to calm flagship-account strain before the listing push.",
+            ),
+            EventOption(
+                id="defer_committee",
+                label="Defer the committee",
+                description="Protect cash now, but let scrutiny and governance heat keep rising.",
             ),
         ],
     )
@@ -2820,6 +2911,67 @@ def _build_buyer_operating_memo_event(
                 id="preserve_optionality",
                 label="Preserve optionality",
                 description="Keep more negotiating room, but absorb more acquisition drag.",
+            ),
+        ],
+    )
+
+
+def _is_buyer_signing_committee_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        _has_recent_event(
+            state,
+            {"buyer_operating_memo"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.acquirer_diligence >= BALANCE.event_buyer_signing_committee_pressure_threshold
+        and (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.channel_conflict_index >= 28
+            or portfolio.recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+            or portfolio.direct_sales_conflict_accounts > 0
+        )
+    )
+
+
+def _build_buyer_signing_committee_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    portfolio = calculate_partnership_portfolio(state)
+    channel_label = portfolio.hotspot_channel if portfolio.hotspot_channel != "-" else "channel"
+    return PendingEvent(
+        event_id="buyer_signing_committee",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Buyer Signing Committee",
+        description=(
+            f"Buyers want a tighter signing committee around {target.name}, especially the "
+            f"{channel_label} motion. You can staff the committee now or keep optionality and "
+            "accept more execution discount."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=10,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="staff_signing_committee",
+                label="Staff the signing committee",
+                description="Spend cash to reduce conflict before the process hardens further.",
+            ),
+            EventOption(
+                id="hold_optionality",
+                label="Hold optionality",
+                description="Protect economics now, but let diligence friction keep rising.",
             ),
         ],
     )
@@ -3703,6 +3855,59 @@ def _build_channel_concentration_crackdown_event(
     )
 
 
+def _is_independence_treasury_compact_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"independence_cash_yield_pact"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.independence_discipline
+        >= BALANCE.event_independence_treasury_compact_pressure_threshold
+        and (
+            state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold + 10
+            or state.finance.covenant_risk >= 12
+            or state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            or state.company.cash_on_hand < state.capital_plan.reserve_target
+        )
+    )
+
+
+def _build_independence_treasury_compact_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_treasury_compact",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Treasury Compact",
+        description=(
+            "The company can keep the independence story coherent only if reserve and covenant "
+            "discipline move together again. You can ratify the treasury compact now or bridge "
+            "the gap and accept more financing heat."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=10,
+        options=[
+            EventOption(
+                id="ratify_treasury_compact",
+                label="Ratify the treasury compact",
+                description="Shift harder into reserve discipline and calmer covenant posture.",
+            ),
+            EventOption(
+                id="bridge_treasury_gap",
+                label="Bridge the treasury gap",
+                description="Add cash now, but compound debt and covenant heat again.",
+            ),
+        ],
+    )
+
+
 def _is_reseller_enablement_gap_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     reseller_partnerships = [
@@ -4022,6 +4227,58 @@ def _build_board_reset_showdown_event(
                 id="defy_reset",
                 label="Defy the reset",
                 description="Protect the current plan now, but board heat compounds sharply.",
+            ),
+        ],
+    )
+
+
+def _is_board_reset_execution_plan_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"board_reset_showdown"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.board_reset_risk >= BALANCE.event_board_reset_execution_plan_pressure_threshold
+        and (
+            state.finance.governance_crisis_active
+            or state.finance.board_warning_level >= 2
+            or state.finance.board_resolution_due
+            or pressure.restructure_heat >= 60
+        )
+    )
+
+
+def _build_board_reset_execution_plan_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_reset_execution_plan",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Reset Execution Plan",
+        description=(
+            "Directors now want proof that the reset will be executed, not just announced. "
+            "You can codify the operating reset now or fight for more optionality and absorb "
+            "another round of governance heat."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="governance_chain",
+        chain_stage=5,
+        options=[
+            EventOption(
+                id="codify_operating_reset",
+                label="Codify the operating reset",
+                description="Shift further into resilience and calm the board again.",
+            ),
+            EventOption(
+                id="fight_for_optionality",
+                label="Fight for optionality",
+                description="Protect room to maneuver, but let reset pressure rise again.",
             ),
         ],
     )
