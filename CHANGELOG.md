@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.57.0 - 2026-05-14
+
+- Added `run_white_glove_recovery`, `run_partner_margin_reset`, and `lock_capital_buffer` as deeper late-game rescue actions for premium accounts, acquisition-channel economics, and independence durability
+- Added path-specific follow-up events `ipo_syndicate_commitment`, `buyer_integration_blueprint`, and `independence_buffer_ratchet` so IPO, acquisition, and independence runs diverge further under late-game operating pressure
+- Expanded finance-planner and endgame guidance to recommend the new actions when premium queue drag, channel hotspot economics, and capital fragility become the main path bottlenecks
+- Added regression coverage for the new actions and event chains plus a seeded 170-turn board-recovery stability run
+- Promoted the package version to `0.57.0`
+
 ## 0.56.0 - 2026-05-14
 
 - Added `run_enterprise_queue_reset`, `run_channel_synergy_reset`, and `harden_financing_posture` as deeper late-game follow-up actions for enterprise queue hotspots, partner dependency cleanup, and capital resilience

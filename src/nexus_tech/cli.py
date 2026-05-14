@@ -243,6 +243,7 @@ ACTION_KEYS = {
     "83": TurnAction.RAISE_RESERVE_TARGET,
     "97": TurnAction.STEP_UP_RESERVE_DISCIPLINE,
     "100": TurnAction.HARDEN_FINANCING_POSTURE,
+    "103": TurnAction.LOCK_CAPITAL_BUFFER,
     "18": TurnAction.HIRE_EMPLOYEE,
     "19": TurnAction.FIRE_EMPLOYEE,
     "20": TurnAction.ASSIGN_EMPLOYEE,
@@ -269,6 +270,7 @@ ACTION_KEYS = {
     "93": TurnAction.RUN_REFERENCE_RESCUE,
     "95": TurnAction.RUN_ONBOARDING_FAST_TRACK,
     "98": TurnAction.RUN_ENTERPRISE_QUEUE_RESET,
+    "101": TurnAction.RUN_WHITE_GLOVE_RECOVERY,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -310,6 +312,7 @@ ACTION_KEYS = {
     "94": TurnAction.RUN_CHANNEL_CONFLICT_RESET,
     "96": TurnAction.RUN_CHANNEL_REALIGNMENT,
     "99": TurnAction.RUN_CHANNEL_SYNERGY_RESET,
+    "102": TurnAction.RUN_PARTNER_MARGIN_RESET,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
@@ -1253,6 +1256,7 @@ def collect_action_context(
         TurnAction.DEBT_ROLLOVER,
         TurnAction.STEP_UP_RESERVE_DISCIPLINE,
         TurnAction.HARDEN_FINANCING_POSTURE,
+        TurnAction.LOCK_CAPITAL_BUFFER,
         TurnAction.REBALANCE_CHANNEL_MIX,
     ):
         return ActionContext()
@@ -1659,6 +1663,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_WHITE_GLOVE_RECOVERY:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_LANE_RECOVERY:
         focus_key = ask_choice_input(
             "Recovery lane",
@@ -1724,6 +1734,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_CHANNEL_SYNERGY_RESET:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_PARTNER_MARGIN_RESET:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

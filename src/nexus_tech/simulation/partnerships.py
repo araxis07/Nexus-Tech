@@ -944,6 +944,129 @@ def run_channel_synergy_reset(
     )
 
 
+def run_partner_margin_reset(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Repair one partner's economics before rev-share creep hardens into a late-game drag."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if partnership.status is PartnershipStatus.PAUSED:
+        raise ValueError("Paused channels need reactivation before a margin reset.")
+    if state.company.cash_on_hand < BALANCE.partnership_partner_margin_reset_cost:
+        raise ValueError("Not enough cash to run a partner margin reset.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_partner_margin_reset_cost
+    )
+    partnership.sourced_revenue = quantize_money(
+        partnership.sourced_revenue
+        * BALANCE.partnership_partner_margin_reset_revenue_retention_rate
+    )
+    partnership.sourced_users = max(
+        0,
+        int(
+            partnership.sourced_users
+            * BALANCE.partnership_partner_margin_reset_user_retention_percent
+            / 100
+        ),
+    )
+    partnership.risk = clamp_int(
+        partnership.risk - BALANCE.partnership_partner_margin_reset_risk_relief
+    )
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure - BALANCE.partnership_partner_margin_reset_conflict_relief
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_partner_margin_reset_enablement_gain
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_partner_margin_reset_quality_gain
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(
+            partnership.rev_share_rate - BALANCE.partnership_partner_margin_reset_rev_share_relief
+        ),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    if partnership.channel is PartnerChannel.RESELLER:
+        for account in related_accounts[:2]:
+            account.satisfaction = clamp_int(
+                account.satisfaction
+                + BALANCE.partnership_partner_margin_reset_reseller_satisfaction_gain
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health
+                + BALANCE.partnership_partner_margin_reset_reseller_renewal_gain
+            )
+    elif partnership.channel is PartnerChannel.INTEGRATION:
+        for account in related_accounts[:2]:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health
+                + BALANCE.partnership_partner_margin_reset_integration_onboarding_gain
+            )
+            account.support_load = clamp_int(
+                account.support_load
+                - BALANCE.partnership_partner_margin_reset_integration_support_relief
+            )
+    elif partnership.channel is PartnerChannel.MARKETPLACE:
+        for account in related_accounts[:2]:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk
+                - BALANCE.partnership_partner_margin_reset_marketplace_invoice_relief
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk
+                - BALANCE.partnership_partner_margin_reset_marketplace_payment_relief
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health
+                + BALANCE.partnership_partner_margin_reset_marketplace_renewal_gain
+            )
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.partnership_partner_margin_reset_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.partnership_partner_margin_reset_investor_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.partnership_partner_margin_reset_board_confidence_gain
+    )
+
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} completed a margin reset. Revenue "
+        f"{format_money(partnership.sourced_revenue)}, "
+        f"risk {partnership.risk}, conflict {partnership.conflict_pressure}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran a partner margin reset for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_partner_margin_reset_cost}."
+        )
+    )
+
+
 def renegotiate_partnership(
     state: GameState,
     partnership_id: UUID,

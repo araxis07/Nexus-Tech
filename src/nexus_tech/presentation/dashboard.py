@@ -2222,6 +2222,11 @@ def _build_action_menu_panel() -> Panel:
         "Reset one enterprise queue hotspot before IPO-style scrutiny compounds further.",
     )
     primary_actions.add_row(
+        "101",
+        "run_white_glove_recovery",
+        "Stabilize one premium account before high-touch support pressure defines the run.",
+    )
+    primary_actions.add_row(
         "93",
         "run_reference_rescue",
         "Protect one flagship account reference before diligence or IPO pressure compounds.",
@@ -2306,6 +2311,11 @@ def _build_action_menu_panel() -> Panel:
         "Pay a small financing tax now to de-risk debt, reserve, and investor posture.",
     )
     primary_actions.add_row(
+        "103",
+        "lock_capital_buffer",
+        "Force the capital plan deeper into reserve protection before fragility compounds.",
+    )
+    primary_actions.add_row(
         "84",
         "debt_rollover",
         "Push short-term debt pressure forward at a financing cost.",
@@ -2359,6 +2369,11 @@ def _build_action_menu_panel() -> Panel:
         "99",
         "run_channel_synergy_reset",
         "Reset one hotspot channel toward cleaner economics before late-game diligence deepens.",
+    )
+    primary_actions.add_row(
+        "102",
+        "run_partner_margin_reset",
+        "Repair one hotspot partner's economics before rev-share creep hardens into drag.",
     )
     primary_actions.add_row(
         "82",

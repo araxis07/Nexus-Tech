@@ -310,6 +310,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_governance_lockstep_event,
         ),
         EventDefinition(
+            event_id="ipo_syndicate_commitment",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_syndicate_commitment_weight,
+            cooldown_turns=BALANCE.event_ipo_syndicate_commitment_cooldown,
+            is_eligible=_is_ipo_syndicate_commitment_eligible,
+            build_pending_event=_build_ipo_syndicate_commitment_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -350,6 +358,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_synergy_map_event,
         ),
         EventDefinition(
+            event_id="buyer_integration_blueprint",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_integration_blueprint_weight,
+            cooldown_turns=BALANCE.event_buyer_integration_blueprint_cooldown,
+            is_eligible=_is_buyer_integration_blueprint_eligible,
+            build_pending_event=_build_buyer_integration_blueprint_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -388,6 +404,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_operating_covenant_cooldown,
             is_eligible=_is_independence_operating_covenant_eligible,
             build_pending_event=_build_independence_operating_covenant_event,
+        ),
+        EventDefinition(
+            event_id="independence_buffer_ratchet",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_buffer_ratchet_weight,
+            cooldown_turns=BALANCE.event_independence_buffer_ratchet_cooldown,
+            is_eligible=_is_independence_buffer_ratchet_eligible,
+            build_pending_event=_build_independence_buffer_ratchet_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -2184,6 +2208,67 @@ def _build_ipo_governance_lockstep_event(
     )
 
 
+def _is_ipo_syndicate_commitment_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"ipo_governance_lockstep"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "ipo_ready"
+        and pressure.public_market_scrutiny
+        >= BALANCE.event_ipo_syndicate_commitment_pressure_threshold
+        and (
+            state.finance.board_confidence >= 56
+            or state.finance.board_score >= 54
+            or queue_exposure.enterprise_queue_risk_accounts > 0
+            or queue_exposure.high_value_risk_accounts > 0
+        )
+    )
+
+
+def _build_ipo_syndicate_commitment_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="ipo_syndicate_commitment",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="IPO Syndicate Commitment",
+        description=(
+            f"The banks want a firmer syndicate around {target.name}. You can anchor the book "
+            "now to calm late-stage scrutiny or trim the range and protect cash while "
+            "credibility softens."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=7,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="anchor_book",
+                label="Anchor the syndicate",
+                description="Spend cash to lock in stronger late-stage conviction.",
+            ),
+            EventOption(
+                id="trim_range",
+                label="Trim the range",
+                description="Reduce scrutiny pressure now, but weaken the IPO narrative.",
+            ),
+        ],
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -2508,6 +2593,69 @@ def _build_buyer_synergy_map_event(
     )
 
 
+def _is_buyer_integration_blueprint_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        _has_recent_event(
+            state,
+            {"buyer_synergy_map"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "strategic_acquisition"
+        and pressure.acquirer_diligence
+        >= BALANCE.event_buyer_integration_blueprint_pressure_threshold
+        and (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.direct_sales_conflict_accounts > 0
+            or portfolio.hotspot_revenue_share_percent >= 35
+        )
+    )
+
+
+def _build_buyer_integration_blueprint_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    portfolio = calculate_partnership_portfolio(state)
+    channel_label = portfolio.hotspot_channel if portfolio.hotspot_channel != "-" else "channel"
+    return PendingEvent(
+        event_id="buyer_integration_blueprint",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Buyer Integration Blueprint",
+        description=(
+            f"Buyers want a cleaner integration blueprint for the {channel_label} lane around "
+            f"{target.name}. You can fund the clean-room work now or keep optionality and "
+            "accept more acquisition drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=8,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_clean_room",
+                label="Fund the clean room",
+                description="Spend cash now to reduce channel overlap and buyer friction.",
+            ),
+            EventOption(
+                id="hold_optionality",
+                label="Hold optionality",
+                description="Keep leverage for later and accept higher diligence drag now.",
+            ),
+        ],
+    )
+
+
 def _is_independence_reckoning_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -2794,6 +2942,61 @@ def _build_independence_operating_covenant_event(
                 id="stretch_liquidity_bridge",
                 label="Stretch a liquidity bridge",
                 description="Add more cash now and accept higher future financing heat.",
+            ),
+        ],
+    )
+
+
+def _is_independence_buffer_ratchet_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"independence_operating_covenant"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "profitable_independence"
+        and pressure.independence_discipline
+        >= BALANCE.event_independence_buffer_ratchet_pressure_threshold
+        and (
+            state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold + 6
+            or state.finance.covenant_risk >= 10
+            or state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            or state.company.cash_on_hand < state.capital_plan.reserve_target
+        )
+    )
+
+
+def _build_independence_buffer_ratchet_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_buffer_ratchet",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Buffer Ratchet",
+        description=(
+            "The company can keep compounding independently only if the reserve buffer ratchets "
+            "up again. You can harden the buffer now or stretch vendor float and accept more "
+            "covenant heat."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=8,
+        options=[
+            EventOption(
+                id="ratchet_buffer",
+                label="Ratchet the buffer",
+                description="Shift harder into reserve durability and calm covenant pressure.",
+            ),
+            EventOption(
+                id="stretch_vendor_float",
+                label="Stretch vendor float",
+                description="Protect cash now, but make the next covenant turn harsher.",
             ),
         ],
     )

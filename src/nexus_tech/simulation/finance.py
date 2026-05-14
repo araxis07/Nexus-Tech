@@ -235,6 +235,7 @@ def build_finance_planner(
     support_escalations: int = 0,
     revenue_at_risk_value: Decimal = ZERO_MONEY,
     renewal_pressure_value: Decimal = ZERO_MONEY,
+    premium_revenue_at_risk_value: Decimal = ZERO_MONEY,
     channel_conflict_index: int = 0,
     channel_dependency_risk: int = 0,
     commercial_dependency_score: int = 0,
@@ -244,6 +245,7 @@ def build_finance_planner(
     enterprise_queue_risk_accounts: int = 0,
     renewal_queue_risk_accounts: int = 0,
     premium_queue_risk_accounts: int = 0,
+    high_value_risk_accounts: int = 0,
     support_lane_saturation_index: int = 0,
     support_lane_focus: SupportLaneFocus = SupportLaneFocus.BALANCED,
     support_hotspot_lane: SupportLaneFocus = SupportLaneFocus.BALANCED,
@@ -263,6 +265,10 @@ def build_finance_planner(
     capital_fragility: int = 0,
 ) -> FinancePlannerSnapshot:
     """Project end-cash and reserve stress over the active planning horizon."""
+
+    white_glove_queue_risk_accounts = max(0, high_value_risk_accounts)
+    if premium_revenue_at_risk_value <= ZERO_MONEY and white_glove_queue_risk_accounts > 0:
+        premium_revenue_at_risk_value = revenue_at_risk_value
 
     base, conservative, aggressive = calculate_cash_flow_forecast_scenarios(
         company.cash_on_hand,
@@ -732,6 +738,13 @@ def build_finance_planner(
         and revenue_at_risk_value >= Decimal("1800.00")
     ):
         recommended_actions.append("run_reference_rescue")
+    if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
+        white_glove_queue_risk_accounts > 0
+        or premium_queue_risk_accounts > 0
+        or premium_revenue_at_risk_value
+        >= BALANCE.finance_planner_white_glove_recovery_value_threshold
+    ):
+        recommended_actions.append("run_white_glove_recovery")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -814,6 +827,16 @@ def build_finance_planner(
     ):
         recommended_actions.append("run_channel_synergy_reset")
     if (
+        strategic_outlook == "strategic_acquisition"
+        and hotspot_channel != "-"
+        and (
+            hotspot_revenue_share_percent >= 38
+            or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+            or channel_conflict_index >= 30
+        )
+    ):
+        recommended_actions.append("run_partner_margin_reset")
+    if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
     ):
@@ -875,6 +898,15 @@ def build_finance_planner(
         or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
     ):
         recommended_actions.append("harden_financing_posture")
+    if strategic_outlook == "profitable_independence" and (
+        capital_fragility >= 62
+        or reserve_gap < ZERO_MONEY
+        or (
+            finance.covenant_risk >= 16
+            and finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        )
+    ):
+        recommended_actions.append("lock_capital_buffer")
     if not recommended_actions:
         recommended_actions.append("review_finance")
     recommended_actions = list(dict.fromkeys(recommended_actions))
@@ -913,6 +945,16 @@ def build_finance_planner(
     ):
         action_sequence.append(
             "run a reference rescue before a flagship account turns into a diligence liability"
+        )
+    if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
+        white_glove_queue_risk_accounts > 0
+        or premium_queue_risk_accounts > 0
+        or premium_revenue_at_risk_value
+        >= BALANCE.finance_planner_white_glove_recovery_value_threshold
+    ):
+        action_sequence.append(
+            "run a white-glove recovery before premium queue exposure becomes the next board "
+            "conversation"
         )
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         action_sequence.append(
@@ -1033,6 +1075,19 @@ def build_finance_planner(
             "lasting execution discount"
         )
     if (
+        strategic_outlook == "strategic_acquisition"
+        and hotspot_channel != "-"
+        and (
+            hotspot_revenue_share_percent >= 38
+            or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+            or channel_conflict_index >= 30
+        )
+    ):
+        action_sequence.append(
+            f"reset {hotspot_channel} partner margins before rev-share creep hardens into the "
+            "buyer discount"
+        )
+    if (
         reserve_gap < ZERO_MONEY
         or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or focus_alignment_gap > 0
@@ -1059,6 +1114,18 @@ def build_finance_planner(
         action_sequence.append(
             "harden financing posture before debt heat and reserve fragility redefine the "
             "independence path"
+        )
+    if strategic_outlook == "profitable_independence" and (
+        capital_fragility >= 62
+        or reserve_gap < ZERO_MONEY
+        or (
+            finance.covenant_risk >= 16
+            and finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        )
+    ):
+        action_sequence.append(
+            "lock a capital buffer before reserve stress and covenant heat start dictating every "
+            "independence choice"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(
