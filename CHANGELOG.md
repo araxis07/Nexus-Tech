@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.55.0 - 2026-05-14
+
+- Added `run_onboarding_fast_track`, `run_channel_realignment`, and `step_up_reserve_discipline` as deeper late-game follow-up actions for hotspot accounts, channel mix, and independence capital control
+- Added path-specific follow-up events `ipo_listing_window`, `buyer_term_sheet`, and `independence_profit_floor` so IPO, acquisition, and independence runs diverge more sharply late in the chain
+- Expanded finance-planner and endgame guidance to recommend the new follow-up actions when onboarding drag, channel dependence, and reserve fragility become the main path bottlenecks
+- Added regression coverage for the new actions and event chains plus a seeded 160-turn acquisition-diligence stability run
+- Promoted the package version to `0.55.0`
+
 ## 0.54.0 - 2026-05-14
 
 - Added `run_reference_rescue` and `run_channel_conflict_reset` as deeper late-game recovery actions for flagship accounts and noisy channel relationships

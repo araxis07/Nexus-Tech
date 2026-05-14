@@ -56,6 +56,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_raise_reserve_target,
     apply_rebalance_capital,
     apply_set_capital_plan,
+    apply_step_up_reserve_discipline,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
 from nexus_tech.simulation.competitor_intel import record_competitor_intel
@@ -135,6 +136,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_conflict_reset,
     run_channel_firebreak,
     run_channel_qbr,
+    run_channel_realignment,
     run_partner_recovery_sprint,
 )
 from nexus_tech.simulation.planning import (
@@ -195,6 +197,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_stabilization,
     run_enterprise_assurance,
     run_lane_recovery,
+    run_onboarding_fast_track,
     run_onboarding_recovery,
     run_reference_rescue,
     run_renewal_sweep,
@@ -679,6 +682,11 @@ def apply_action(
         logger.debug("Raised the reserve target.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.STEP_UP_RESERVE_DISCIPLINE:
+        summary = apply_step_up_reserve_discipline(next_state)
+        logger.debug("Stepped up reserve discipline.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.DEBT_ROLLOVER:
         summary = apply_debt_rollover(
             next_state.company,
@@ -976,6 +984,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ONBOARDING_FAST_TRACK:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_fast_track(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding fast track for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_REFERENCE_RESCUE:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1079,6 +1101,19 @@ def apply_action(
         summary = run_channel_conflict_reset(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel conflict reset for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_REALIGNMENT:
+        if context.partnership_id is None:
+            raise ValueError("Running a channel realignment requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_realignment(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel realignment for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

@@ -2212,6 +2212,11 @@ def _build_action_menu_panel() -> Panel:
         "Rebuild onboarding-heavy accounts before implementation drag reshapes growth.",
     )
     primary_actions.add_row(
+        "95",
+        "run_onboarding_fast_track",
+        "Force one implementation-heavy account through a tighter onboarding recovery sprint.",
+    )
+    primary_actions.add_row(
         "93",
         "run_reference_rescue",
         "Protect one flagship account reference before diligence or IPO pressure compounds.",
@@ -2286,6 +2291,11 @@ def _build_action_menu_panel() -> Panel:
         "Raise reserve expectations and shift capital toward resilience.",
     )
     primary_actions.add_row(
+        "97",
+        "step_up_reserve_discipline",
+        "Force the capital plan deeper into reserve protection and lighter late-game burn.",
+    )
+    primary_actions.add_row(
         "84",
         "debt_rollover",
         "Push short-term debt pressure forward at a financing cost.",
@@ -2329,6 +2339,11 @@ def _build_action_menu_panel() -> Panel:
         "94",
         "run_channel_conflict_reset",
         "Reset one channel conflict before direct-sales friction poisons the revenue mix.",
+    )
+    primary_actions.add_row(
+        "96",
+        "run_channel_realignment",
+        "Realign one hotspot channel before concentration and rev-share creep harden further.",
     )
     primary_actions.add_row(
         "82",

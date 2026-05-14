@@ -294,6 +294,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_reference_crack_event,
         ),
         EventDefinition(
+            event_id="ipo_listing_window",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_listing_window_weight,
+            cooldown_turns=BALANCE.event_ipo_listing_window_cooldown,
+            is_eligible=_is_ipo_listing_window_eligible,
+            build_pending_event=_build_ipo_listing_window_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -318,6 +326,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_channel_conflict_review_event,
         ),
         EventDefinition(
+            event_id="buyer_term_sheet",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_term_sheet_weight,
+            cooldown_turns=BALANCE.event_buyer_term_sheet_cooldown,
+            is_eligible=_is_buyer_term_sheet_eligible,
+            build_pending_event=_build_buyer_term_sheet_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -340,6 +356,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_refinancing_wall_cooldown,
             is_eligible=_is_independence_refinancing_wall_eligible,
             build_pending_event=_build_independence_refinancing_wall_event,
+        ),
+        EventDefinition(
+            event_id="independence_profit_floor",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_profit_floor_weight,
+            cooldown_turns=BALANCE.event_independence_profit_floor_cooldown,
+            is_eligible=_is_independence_profit_floor_eligible,
+            build_pending_event=_build_independence_profit_floor_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -2015,6 +2039,68 @@ def _build_ipo_reference_crack_event(
     )
 
 
+def _is_ipo_listing_window_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"ipo_reference_crack"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "ipo_ready"
+        and pressure.public_market_scrutiny >= BALANCE.event_ipo_listing_window_pressure_threshold
+        and (
+            state.finance.board_confidence >= 55
+            or state.finance.board_score >= 55
+            or queue_exposure.enterprise_queue_risk_accounts > 0
+            or queue_exposure.hotspot_lane.value == "enterprise"
+        )
+    )
+
+
+def _build_ipo_listing_window_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="ipo_listing_window",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="IPO Listing Window",
+        description=(
+            f"Bankers think {target.name} has a narrow window to look listing-ready. "
+            "You can slow down and certify the operating story or accelerate the roadshow and "
+            "accept more fragility."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=5,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="slow_and_certify",
+                label="Slow down and certify",
+                description=(
+                    "Spend cash to harden controls and calm scrutiny before the window moves."
+                ),
+            ),
+            EventOption(
+                id="accelerate_roadshow",
+                label="Accelerate the roadshow",
+                description="Push the narrative forward now and absorb more late-game pressure.",
+            ),
+        ],
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -2211,6 +2297,72 @@ def _build_buyer_channel_conflict_review_event(
     )
 
 
+def _is_buyer_term_sheet_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        _has_recent_event(
+            state,
+            {"buyer_channel_conflict_review"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "strategic_acquisition"
+        and pressure.acquirer_diligence >= BALANCE.event_buyer_term_sheet_pressure_threshold
+        and (
+            portfolio.direct_sales_conflict_accounts > 0
+            or portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.paused_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.hotspot_revenue_share_percent >= 35
+        )
+    )
+
+
+def _build_buyer_term_sheet_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    portfolio = calculate_partnership_portfolio(state)
+    channel_label = portfolio.hotspot_channel if portfolio.hotspot_channel != "-" else "channel"
+    return PendingEvent(
+        event_id="buyer_term_sheet",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Buyer Term Sheet",
+        description=(
+            f"Acquirers are ready to float terms around {target.name}, but they want cleaner "
+            f"{channel_label} economics and less channel overlap. You can sign cleaner terms now "
+            "or hold out for a richer story."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=5,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="sign_clean_terms",
+                label="Sign cleaner terms",
+                description=(
+                    "Spend cash and margin now to reduce conflict before buyers harden terms."
+                ),
+            ),
+            EventOption(
+                id="hold_out_premium",
+                label="Hold out for a premium",
+                description="Protect economics now, but accept more diligence and customer noise.",
+            ),
+        ],
+    )
+
+
 def _is_independence_reckoning_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -2387,6 +2539,61 @@ def _build_independence_refinancing_wall_event(
                 id="stretch_rollover",
                 label="Stretch the rollover",
                 description="Add cash now, but compound debt and financing pressure again.",
+            ),
+        ],
+    )
+
+
+def _is_independence_profit_floor_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"independence_refinancing_wall"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "profitable_independence"
+        and pressure.independence_discipline
+        >= BALANCE.event_independence_profit_floor_pressure_threshold
+        and (
+            state.company.cash_on_hand < state.capital_plan.reserve_target
+            or state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold
+            or state.finance.covenant_risk >= 12
+            or state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        )
+    )
+
+
+def _build_independence_profit_floor_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_profit_floor",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Profit Floor",
+        description=(
+            "The company can keep compounding independently, but only if the next turn locks in "
+            "a believable profit floor. You can tighten reserve discipline again or stretch for "
+            "one more growth-biased move."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=6,
+        options=[
+            EventOption(
+                id="lock_profit_floor",
+                label="Lock the profit floor",
+                description="Shift harder into reserve durability and accept some commercial drag.",
+            ),
+            EventOption(
+                id="stretch_growth_once_more",
+                label="Stretch growth once more",
+                description="Buy time with another financing step and accept higher future heat.",
             ),
         ],
     )

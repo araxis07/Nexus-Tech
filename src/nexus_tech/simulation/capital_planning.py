@@ -279,6 +279,67 @@ def apply_raise_reserve_target(state: GameState) -> CapitalPlanSummary:
     )
 
 
+def apply_step_up_reserve_discipline(state: GameState) -> CapitalPlanSummary:
+    """Tighten the capital plan around reserve durability and lighter late-game burn."""
+
+    capital_plan = state.capital_plan
+    reserve_target = quantize_money(
+        capital_plan.reserve_target + BALANCE.capital_plan_step_up_reserve_target_step
+    )
+    planning_horizon_turns = min(
+        12,
+        capital_plan.planning_horizon_turns + BALANCE.capital_plan_step_up_reserve_horizon_gain,
+    )
+    reserve_share = capital_plan.reserve_share + BALANCE.capital_plan_step_up_reserve_share_shift
+    go_to_market_share = max(
+        0,
+        capital_plan.go_to_market_share - BALANCE.capital_plan_step_up_reserve_share_shift,
+    )
+    product_share = max(
+        0,
+        capital_plan.product_investment_share - BALANCE.capital_plan_step_up_product_share_shift,
+    )
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.CONSERVE,
+        source_preference=capital_plan.source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    state.finance.board_pressure = max(
+        0,
+        state.finance.board_pressure - BALANCE.capital_plan_step_up_board_pressure_relief,
+    )
+    state.finance.covenant_risk = max(
+        0,
+        state.finance.covenant_risk - BALANCE.capital_plan_step_up_covenant_relief,
+    )
+    state.finance.investor_pressure = max(
+        0,
+        state.finance.investor_pressure - BALANCE.capital_plan_step_up_investor_pressure_relief,
+    )
+    state.finance.board_confidence = min(
+        100,
+        state.finance.board_confidence + BALANCE.capital_plan_step_up_board_confidence_gain,
+    )
+    return CapitalPlanSummary(
+        message=(
+            "Stepped up reserve discipline. "
+            f"Reserve target {format_money(reserve_target)} over {planning_horizon_turns} turns. "
+            f"Allocation now P {product_share}% / GTM {go_to_market_share}% / "
+            f"Reserve {reserve_share}%."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
 def evaluate_capital_plan(
     company: Company,
     finance: FinanceState,

@@ -724,6 +724,12 @@ def build_finance_planner(
         recommended_actions.append("run_reference_rescue")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
+    if (
+        support_hotspot_lane is SupportLaneFocus.ONBOARDING
+        and hotspot_lane_account_count > 0
+        and (focus_alignment_gap > 0 or support_backlog >= 10)
+    ):
+        recommended_actions.append("run_onboarding_fast_track")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
@@ -781,6 +787,12 @@ def build_finance_planner(
         or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
     ):
         recommended_actions.append("run_channel_conflict_reset")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or hotspot_revenue_share_percent >= 40
+    ):
+        recommended_actions.append("run_channel_realignment")
     if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -832,6 +844,10 @@ def build_finance_planner(
         recommended_actions.append("rebalance_capital")
     if reserve_gap < ZERO_MONEY or capital_fragility >= 55 or finance.covenant_risk >= 18:
         recommended_actions.append("raise_reserve_target")
+    if strategic_outlook == "profitable_independence" and (
+        capital_fragility >= 55 or reserve_gap < ZERO_MONEY or finance.covenant_risk >= 14
+    ):
+        recommended_actions.append("step_up_reserve_discipline")
     if not recommended_actions:
         recommended_actions.append("review_finance")
     recommended_actions = list(dict.fromkeys(recommended_actions))
@@ -866,6 +882,11 @@ def build_finance_planner(
         action_sequence.append(
             "run onboarding recovery before implementation drag compounds into churn and board heat"
         )
+        if focus_alignment_gap > 0 or support_backlog >= 10:
+            action_sequence.append(
+                "fast-track the most exposed onboarding account before implementation drag hardens "
+                "into late-game narrative damage"
+            )
     if (
         support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0
     ) and strategic_outlook == "profitable_independence":
@@ -953,6 +974,15 @@ def build_finance_planner(
         action_sequence.append(
             "reset direct-sales channel conflict before buyers price the overlap into diligence"
         )
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or hotspot_revenue_share_percent >= 40
+    ):
+        action_sequence.append(
+            f"realign the {hotspot_channel} hotspot before channel concentration becomes the "
+            "dominant diligence story"
+        )
     if (
         reserve_gap < ZERO_MONEY
         or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
@@ -964,6 +994,12 @@ def build_finance_planner(
     if reserve_gap < ZERO_MONEY or capital_fragility >= 55:
         action_sequence.append(
             "raise the reserve target before assuming the current capital posture is durable"
+        )
+    if strategic_outlook == "profitable_independence" and (
+        capital_fragility >= 55 or reserve_gap < ZERO_MONEY or finance.covenant_risk >= 14
+    ):
+        action_sequence.append(
+            "step up reserve discipline before independence credibility depends on another stretch"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(

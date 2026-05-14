@@ -1852,6 +1852,87 @@ def run_onboarding_recovery(state: GameState) -> SupportOpsActionSummary:
     )
 
 
+def run_onboarding_fast_track(
+    state: GameState,
+    account_id,
+) -> SupportOpsActionSummary:
+    """Push one onboarding-heavy account through a more aggressive recovery lane."""
+
+    account = _get_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if state.company.cash_on_hand < BALANCE.support_program_onboarding_fast_track_cost:
+        raise ValueError("Not enough cash to run an onboarding fast track this turn.")
+    if (
+        classify_account_support_lane(account) is not SupportLaneFocus.ONBOARDING
+        and account.onboarding_health >= 60
+        and account.support_load <= 18
+        and account.open_tickets <= 1
+    ):
+        raise ValueError("That account does not need an onboarding fast track right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_onboarding_fast_track_cost
+    )
+    state.support_program.lane_focus = SupportLaneFocus.ONBOARDING
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - BALANCE.support_program_onboarding_fast_track_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_onboarding_fast_track_escalation_relief,
+    )
+    account.open_tickets = max(
+        0,
+        account.open_tickets - BALANCE.support_program_onboarding_fast_track_ticket_relief,
+    )
+    account.sla_breach_risk = clamp_int(
+        account.sla_breach_risk - BALANCE.support_program_onboarding_fast_track_sla_relief
+    )
+    account.ticket_queue_age = max(
+        0,
+        account.ticket_queue_age - BALANCE.support_program_onboarding_fast_track_queue_age_relief,
+    )
+    account.support_load = clamp_int(
+        account.support_load - BALANCE.support_program_onboarding_fast_track_support_load_relief
+    )
+    account.onboarding_health = clamp_int(
+        account.onboarding_health
+        + BALANCE.support_program_onboarding_fast_track_onboarding_health_gain
+    )
+    account.satisfaction = clamp_int(
+        account.satisfaction + BALANCE.support_program_onboarding_fast_track_satisfaction_gain
+    )
+    account.renewal_health = clamp_int(
+        account.renewal_health + BALANCE.support_program_onboarding_fast_track_renewal_health_gain
+    )
+    account.churn_risk = clamp_int(
+        account.churn_risk - BALANCE.support_program_onboarding_fast_track_churn_relief
+    )
+    account.escalation_count = max(0, account.escalation_count - 1)
+    if account.support_tier is SupportTier.STANDARD:
+        account.support_tier = SupportTier.PRIORITY
+    _apply_lane_program_relief(
+        state.support_program,
+        SupportLaneFocus.ONBOARDING,
+        BALANCE.support_program_onboarding_fast_track_lane_relief,
+    )
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.support_program_onboarding_fast_track_board_pressure_relief
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran an onboarding fast track for {account.name}. "
+            f"Cash -{BALANCE.support_program_onboarding_fast_track_cost}, "
+            f"onboarding health now {account.onboarding_health}."
+        )
+    )
+
+
 def run_reference_rescue(
     state: GameState,
     account_id,
