@@ -2560,6 +2560,78 @@ def _apply_ipo_listing_window(state: GameState, event: PendingEvent, option_id: 
     raise ValueError(f"Unsupported option {option_id} for IPO listing window.")
 
 
+def _apply_ipo_governance_lockstep(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+
+    if option_id == "lock_governance_path":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_ipo_governance_lockstep_lock_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_ipo_governance_lockstep_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_ipo_governance_lockstep_score_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_ipo_governance_lockstep_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk - BALANCE.event_ipo_governance_lockstep_risk_relief,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = False
+        state.finance.board_warning_level = max(
+            0,
+            state.finance.board_warning_level
+            - BALANCE.event_ipo_governance_lockstep_warning_relief,
+        )
+        state.finance.board_warning_active = state.finance.board_warning_level > 0
+        return (
+            f"You locked the governance path around {product.name}. Cash "
+            f"-{BALANCE.event_ipo_governance_lockstep_lock_cost}, board confidence "
+            f"+{BALANCE.event_ipo_governance_lockstep_confidence_gain}."
+        )
+
+    if option_id == "stretch_compliance":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_ipo_governance_lockstep_stretch_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk + BALANCE.event_ipo_governance_lockstep_stretch_risk_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            + BALANCE.event_ipo_governance_lockstep_stretch_reputation_gain,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = True
+        return (
+            "You stretched compliance again. Board pressure "
+            f"+{BALANCE.event_ipo_governance_lockstep_stretch_pressure_gain}, governance risk "
+            f"+{BALANCE.event_ipo_governance_lockstep_stretch_risk_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for IPO governance lockstep.")
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -2854,6 +2926,89 @@ def _apply_buyer_term_sheet(state: GameState, event: PendingEvent, option_id: st
     raise ValueError(f"Unsupported option {option_id} for buyer term sheet.")
 
 
+def _apply_buyer_synergy_map(state: GameState, event: PendingEvent, option_id: str) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_conflicted_partnership(state, product.id)
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "publish_synergy_map":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_buyer_synergy_map_publish_cost
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence + BALANCE.event_buyer_synergy_map_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score + BALANCE.event_buyer_synergy_map_score_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure - BALANCE.event_buyer_synergy_map_pressure_relief,
+            0,
+            100,
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure - BALANCE.event_buyer_synergy_map_conflict_relief,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_buyer_synergy_map_risk_relief,
+            0,
+            100,
+        )
+        partnership.enablement_level = clamp_int(
+            partnership.enablement_level + BALANCE.event_buyer_synergy_map_enablement_gain,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            account.support_load = clamp_int(
+                account.support_load - BALANCE.event_buyer_synergy_map_support_relief,
+                0,
+                100,
+            )
+            account.renewal_health = clamp_int(account.renewal_health + 3, 0, 100)
+        return (
+            f"You published a cleaner synergy map around {partnership.name}. Cash "
+            f"-{BALANCE.event_buyer_synergy_map_publish_cost}, conflict "
+            f"-{BALANCE.event_buyer_synergy_map_conflict_relief}."
+        )
+
+    if option_id == "protect_optionality":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_buyer_synergy_map_optionality_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk + BALANCE.event_buyer_synergy_map_optionality_risk_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation - BALANCE.event_buyer_synergy_map_optionality_reputation_loss,
+            0,
+            100,
+        )
+        product.user_count = max(
+            0,
+            product.user_count - BALANCE.event_buyer_synergy_map_optionality_user_loss,
+        )
+        product.lifecycle_stage = infer_lifecycle_stage(product)
+        return (
+            "You protected optionality again. Board pressure "
+            f"+{BALANCE.event_buyer_synergy_map_optionality_pressure_gain}, users "
+            f"-{BALANCE.event_buyer_synergy_map_optionality_user_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for buyer synergy map.")
+
+
 def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_id: str) -> str:
     del event
 
@@ -3144,6 +3299,96 @@ def _apply_independence_profit_floor(
     raise ValueError(f"Unsupported option {option_id} for independence profit floor.")
 
 
+def _apply_independence_operating_covenant(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    del event
+
+    if option_id == "commit_operating_floor":
+        shift = min(
+            BALANCE.event_independence_operating_covenant_gtm_share_loss,
+            state.capital_plan.go_to_market_share,
+        )
+        state.capital_plan = state.capital_plan.model_copy(
+            update={
+                "go_to_market_share": state.capital_plan.go_to_market_share - shift,
+                "reserve_share": (
+                    state.capital_plan.reserve_share
+                    + BALANCE.event_independence_operating_covenant_reserve_share_gain
+                ),
+                "mode": CapitalPlanMode.CONSERVE,
+            }
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_independence_operating_covenant_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.covenant_risk = clamp_int(
+            state.finance.covenant_risk
+            - BALANCE.event_independence_operating_covenant_covenant_relief,
+            0,
+            100,
+        )
+        state.finance.investor_pressure = clamp_int(
+            state.finance.investor_pressure
+            - BALANCE.event_independence_operating_covenant_investor_relief,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_independence_operating_covenant_confidence_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            - BALANCE.event_independence_operating_covenant_reputation_loss,
+            0,
+            100,
+        )
+        return (
+            "You committed to an operating floor. Reserve share "
+            f"+{BALANCE.event_independence_operating_covenant_reserve_share_gain}, covenant risk "
+            f"-{BALANCE.event_independence_operating_covenant_covenant_relief}."
+        )
+
+    if option_id == "stretch_liquidity_bridge":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand + BALANCE.event_independence_operating_covenant_cash_gain
+        )
+        state.finance.debt_principal = quantize_money(
+            state.finance.debt_principal + BALANCE.event_independence_operating_covenant_debt_gain
+        )
+        state.finance.loan_interest_rate = clamp_rate(
+            state.finance.loan_interest_rate
+            + BALANCE.event_independence_operating_covenant_interest_gain
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_independence_operating_covenant_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.covenant_risk = clamp_int(
+            state.finance.covenant_risk
+            + BALANCE.event_independence_operating_covenant_covenant_gain,
+            0,
+            100,
+        )
+        return (
+            "You stretched another liquidity bridge. Cash "
+            f"+{BALANCE.event_independence_operating_covenant_cash_gain}, debt "
+            f"+{BALANCE.event_independence_operating_covenant_debt_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for independence operating covenant.")
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -3354,14 +3599,17 @@ EVENT_EFFECT_HANDLERS = {
     "ipo_audit_committee": _apply_ipo_audit_committee,
     "ipo_reference_crack": _apply_ipo_reference_crack,
     "ipo_listing_window": _apply_ipo_listing_window,
+    "ipo_governance_lockstep": _apply_ipo_governance_lockstep,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
     "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
     "buyer_term_sheet": _apply_buyer_term_sheet,
+    "buyer_synergy_map": _apply_buyer_synergy_map,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
     "independence_refinancing_wall": _apply_independence_refinancing_wall,
     "independence_profit_floor": _apply_independence_profit_floor,
+    "independence_operating_covenant": _apply_independence_operating_covenant,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,

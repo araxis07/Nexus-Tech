@@ -717,6 +717,16 @@ def build_finance_planner(
         recommended_actions.append("upgrade_support_program")
         recommended_actions.append("run_enterprise_assurance")
     if (
+        strategic_outlook == "ipo_ready"
+        and enterprise_queue_risk_accounts > 0
+        and (
+            support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            or focus_alignment_gap > 0
+            or revenue_at_risk_value >= Decimal("2200.00")
+        )
+    ):
+        recommended_actions.append("run_enterprise_queue_reset")
+    if (
         strategic_outlook in {"ipo_ready", "strategic_acquisition"}
         and enterprise_queue_risk_accounts > 0
         and revenue_at_risk_value >= Decimal("1800.00")
@@ -794,6 +804,16 @@ def build_finance_planner(
     ):
         recommended_actions.append("run_channel_realignment")
     if (
+        strategic_outlook == "strategic_acquisition"
+        and hotspot_channel != "-"
+        and (
+            hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or channel_conflict_index >= 28
+            or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        )
+    ):
+        recommended_actions.append("run_channel_synergy_reset")
+    if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
     ):
@@ -848,6 +868,13 @@ def build_finance_planner(
         capital_fragility >= 55 or reserve_gap < ZERO_MONEY or finance.covenant_risk >= 14
     ):
         recommended_actions.append("step_up_reserve_discipline")
+    if strategic_outlook == "profitable_independence" and (
+        capital_fragility >= 60
+        or reserve_gap < ZERO_MONEY
+        or finance.covenant_risk >= 16
+        or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+    ):
+        recommended_actions.append("harden_financing_posture")
     if not recommended_actions:
         recommended_actions.append("review_finance")
     recommended_actions = list(dict.fromkeys(recommended_actions))
@@ -870,6 +897,15 @@ def build_finance_planner(
         action_sequence.append(
             "run enterprise assurance before public-market accounts absorb more queue damage"
         )
+        if (
+            support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            or focus_alignment_gap > 0
+            or revenue_at_risk_value >= Decimal("2200.00")
+        ):
+            action_sequence.append(
+                "run an enterprise queue reset on the flagship lane before queue drag becomes the "
+                "core IPO story"
+            )
     if (
         strategic_outlook in {"ipo_ready", "strategic_acquisition"}
         and enterprise_queue_risk_accounts > 0
@@ -984,6 +1020,19 @@ def build_finance_planner(
             "dominant diligence story"
         )
     if (
+        strategic_outlook == "strategic_acquisition"
+        and hotspot_channel != "-"
+        and (
+            hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or channel_conflict_index >= 28
+            or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        )
+    ):
+        action_sequence.append(
+            f"run a {hotspot_channel} synergy reset before buyers treat channel overlap as the "
+            "lasting execution discount"
+        )
+    if (
         reserve_gap < ZERO_MONEY
         or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or focus_alignment_gap > 0
@@ -1000,6 +1049,16 @@ def build_finance_planner(
     ):
         action_sequence.append(
             "step up reserve discipline before independence credibility depends on another stretch"
+        )
+    if strategic_outlook == "profitable_independence" and (
+        capital_fragility >= 60
+        or reserve_gap < ZERO_MONEY
+        or finance.covenant_risk >= 16
+        or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+    ):
+        action_sequence.append(
+            "harden financing posture before debt heat and reserve fragility redefine the "
+            "independence path"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(

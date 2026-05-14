@@ -302,6 +302,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_listing_window_event,
         ),
         EventDefinition(
+            event_id="ipo_governance_lockstep",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_governance_lockstep_weight,
+            cooldown_turns=BALANCE.event_ipo_governance_lockstep_cooldown,
+            is_eligible=_is_ipo_governance_lockstep_eligible,
+            build_pending_event=_build_ipo_governance_lockstep_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -334,6 +342,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_term_sheet_event,
         ),
         EventDefinition(
+            event_id="buyer_synergy_map",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_synergy_map_weight,
+            cooldown_turns=BALANCE.event_buyer_synergy_map_cooldown,
+            is_eligible=_is_buyer_synergy_map_eligible,
+            build_pending_event=_build_buyer_synergy_map_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -364,6 +380,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_profit_floor_cooldown,
             is_eligible=_is_independence_profit_floor_eligible,
             build_pending_event=_build_independence_profit_floor_event,
+        ),
+        EventDefinition(
+            event_id="independence_operating_covenant",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_operating_covenant_weight,
+            cooldown_turns=BALANCE.event_independence_operating_covenant_cooldown,
+            is_eligible=_is_independence_operating_covenant_eligible,
+            build_pending_event=_build_independence_operating_covenant_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -2101,6 +2125,65 @@ def _build_ipo_listing_window_event(
     )
 
 
+def _is_ipo_governance_lockstep_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"ipo_listing_window"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "ipo_ready"
+        and pressure.public_market_scrutiny
+        >= BALANCE.event_ipo_governance_lockstep_pressure_threshold
+        and (
+            state.finance.board_resolution_due
+            or state.finance.board_warning_level >= 2
+            or state.finance.governance_risk >= 50
+        )
+    )
+
+
+def _build_ipo_governance_lockstep_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="ipo_governance_lockstep",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="IPO Governance Lockstep",
+        description=(
+            f"Bankers want {target.name} to move in tighter governance lockstep before the next "
+            "listing push. You can formalize the governance path now or stretch the window and "
+            "accept more pressure."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=6,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="lock_governance_path",
+                label="Lock the governance path",
+                description="Spend cash now to reduce governance heat before the next IPO step.",
+            ),
+            EventOption(
+                id="stretch_compliance",
+                label="Stretch compliance",
+                description="Protect cash for one more turn and accept more scrutiny.",
+            ),
+        ],
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -2363,6 +2446,68 @@ def _build_buyer_term_sheet_event(
     )
 
 
+def _is_buyer_synergy_map_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        _has_recent_event(
+            state,
+            {"buyer_term_sheet"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "strategic_acquisition"
+        and pressure.acquirer_diligence >= BALANCE.event_buyer_synergy_map_pressure_threshold
+        and (
+            portfolio.direct_sales_conflict_accounts > 0
+            or portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.hotspot_revenue_share_percent >= 35
+        )
+    )
+
+
+def _build_buyer_synergy_map_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    portfolio = calculate_partnership_portfolio(state)
+    channel_label = portfolio.hotspot_channel if portfolio.hotspot_channel != "-" else "channel"
+    return PendingEvent(
+        event_id="buyer_synergy_map",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Buyer Synergy Map",
+        description=(
+            f"Buyers now want a cleaner synergy map around {target.name}, especially the "
+            f"{channel_label} lane. You can publish a cleaner integration plan or keep more "
+            "optionality and accept higher diligence friction."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=6,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="publish_synergy_map",
+                label="Publish the synergy map",
+                description="Spend cash now to reduce overlap and make buyer integration easier.",
+            ),
+            EventOption(
+                id="protect_optionality",
+                label="Protect optionality",
+                description="Keep more room to negotiate later and absorb extra diligence heat.",
+            ),
+        ],
+    )
+
+
 def _is_independence_reckoning_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -2594,6 +2739,61 @@ def _build_independence_profit_floor_event(
                 id="stretch_growth_once_more",
                 label="Stretch growth once more",
                 description="Buy time with another financing step and accept higher future heat.",
+            ),
+        ],
+    )
+
+
+def _is_independence_operating_covenant_eligible(state: GameState) -> bool:
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"independence_profit_floor"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and readiness.strategic_outlook == "profitable_independence"
+        and pressure.independence_discipline
+        >= BALANCE.event_independence_operating_covenant_pressure_threshold
+        and (
+            state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold + 4
+            or state.finance.covenant_risk >= 12
+            or state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            or state.company.cash_on_hand < state.capital_plan.reserve_target
+        )
+    )
+
+
+def _build_independence_operating_covenant_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_operating_covenant",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Operating Covenant",
+        description=(
+            "The company now needs an operating covenant that proves it can stay independent "
+            "without another financial wobble. You can commit to a harder operating floor or "
+            "bridge liquidity one more time."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=7,
+        options=[
+            EventOption(
+                id="commit_operating_floor",
+                label="Commit the operating floor",
+                description="Shift harder into reserve durability and calmer financing posture.",
+            ),
+            EventOption(
+                id="stretch_liquidity_bridge",
+                label="Stretch a liquidity bridge",
+                description="Add more cash now and accept higher future financing heat.",
             ),
         ],
     )

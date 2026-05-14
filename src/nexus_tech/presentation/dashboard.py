@@ -2217,6 +2217,11 @@ def _build_action_menu_panel() -> Panel:
         "Force one implementation-heavy account through a tighter onboarding recovery sprint.",
     )
     primary_actions.add_row(
+        "98",
+        "run_enterprise_queue_reset",
+        "Reset one enterprise queue hotspot before IPO-style scrutiny compounds further.",
+    )
+    primary_actions.add_row(
         "93",
         "run_reference_rescue",
         "Protect one flagship account reference before diligence or IPO pressure compounds.",
@@ -2296,6 +2301,11 @@ def _build_action_menu_panel() -> Panel:
         "Force the capital plan deeper into reserve protection and lighter late-game burn.",
     )
     primary_actions.add_row(
+        "100",
+        "harden_financing_posture",
+        "Pay a small financing tax now to de-risk debt, reserve, and investor posture.",
+    )
+    primary_actions.add_row(
         "84",
         "debt_rollover",
         "Push short-term debt pressure forward at a financing cost.",
@@ -2344,6 +2354,11 @@ def _build_action_menu_panel() -> Panel:
         "96",
         "run_channel_realignment",
         "Realign one hotspot channel before concentration and rev-share creep harden further.",
+    )
+    primary_actions.add_row(
+        "99",
+        "run_channel_synergy_reset",
+        "Reset one hotspot channel toward cleaner economics before late-game diligence deepens.",
     )
     primary_actions.add_row(
         "82",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.0 - 2026-05-14
+
+- Added `run_enterprise_queue_reset`, `run_channel_synergy_reset`, and `harden_financing_posture` as deeper late-game follow-up actions for enterprise queue hotspots, partner dependency cleanup, and capital resilience
+- Added path-specific follow-up events `ipo_governance_lockstep`, `buyer_synergy_map`, and `independence_operating_covenant` so IPO, acquisition, and independence runs diverge further after the new late-game window events
+- Expanded finance-planner and endgame guidance to recommend the new actions when enterprise queue drag, channel overlap, and financing fragility become the main path bottlenecks
+- Added regression coverage for the new actions and event chains plus a seeded 180-turn IPO-launchpad stability run
+- Promoted the package version to `0.56.0`
+
 ## 0.55.0 - 2026-05-14
 
 - Added `run_onboarding_fast_track`, `run_channel_realignment`, and `step_up_reserve_discipline` as deeper late-game follow-up actions for hotspot accounts, channel mix, and independence capital control

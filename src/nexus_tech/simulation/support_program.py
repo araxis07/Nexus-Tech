@@ -10,6 +10,7 @@ from nexus_tech.domain.models import (
     CustomerAccountStatus,
     EmployeeRole,
     GameState,
+    MarketSegment,
     SupportInvestmentFocus,
     SupportLaneFocus,
     SupportProgram,
@@ -1929,6 +1930,99 @@ def run_onboarding_fast_track(
             f"Ran an onboarding fast track for {account.name}. "
             f"Cash -{BALANCE.support_program_onboarding_fast_track_cost}, "
             f"onboarding health now {account.onboarding_health}."
+        )
+    )
+
+
+def run_enterprise_queue_reset(
+    state: GameState,
+    account_id,
+) -> SupportOpsActionSummary:
+    """Run a heavier queue reset for one enterprise-facing hotspot account."""
+
+    account = _get_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if state.company.cash_on_hand < BALANCE.support_program_enterprise_queue_reset_cost:
+        raise ValueError("Not enough cash to run an enterprise queue reset this turn.")
+    if (
+        account.segment is not MarketSegment.ENTERPRISE
+        and account.support_tier is SupportTier.STANDARD
+        and account.contract_value < Decimal("1800.00")
+    ):
+        raise ValueError("That account is not enterprise-exposed enough for a queue reset.")
+    if (
+        account.open_tickets <= 1
+        and account.sla_breach_risk <= 18
+        and account.ticket_queue_age <= 1
+        and account.support_load <= 18
+    ):
+        raise ValueError("That account does not need an enterprise queue reset right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_enterprise_queue_reset_cost
+    )
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - BALANCE.support_program_enterprise_queue_reset_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_enterprise_queue_reset_escalation_relief,
+    )
+    account.open_tickets = max(
+        0,
+        account.open_tickets - BALANCE.support_program_enterprise_queue_reset_ticket_relief,
+    )
+    account.sla_breach_risk = clamp_int(
+        account.sla_breach_risk - BALANCE.support_program_enterprise_queue_reset_sla_relief
+    )
+    account.ticket_queue_age = max(
+        0,
+        account.ticket_queue_age - BALANCE.support_program_enterprise_queue_reset_queue_age_relief,
+    )
+    account.support_load = clamp_int(
+        account.support_load - BALANCE.support_program_enterprise_queue_reset_support_load_relief
+    )
+    account.onboarding_health = clamp_int(
+        account.onboarding_health
+        + BALANCE.support_program_enterprise_queue_reset_onboarding_health_gain
+    )
+    account.renewal_health = clamp_int(
+        account.renewal_health + BALANCE.support_program_enterprise_queue_reset_renewal_health_gain
+    )
+    account.satisfaction = clamp_int(
+        account.satisfaction + BALANCE.support_program_enterprise_queue_reset_satisfaction_gain
+    )
+    account.churn_risk = clamp_int(
+        account.churn_risk - BALANCE.support_program_enterprise_queue_reset_churn_relief
+    )
+    account.escalation_count = max(0, account.escalation_count - 1)
+    if account.support_tier is SupportTier.STANDARD:
+        account.support_tier = SupportTier.PRIORITY
+    else:
+        account.support_tier = SupportTier.WHITE_GLOVE
+    _apply_lane_program_relief(
+        state.support_program,
+        SupportLaneFocus.ENTERPRISE,
+        BALANCE.support_program_enterprise_queue_reset_lane_relief,
+    )
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.support_program_enterprise_queue_reset_board_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.support_program_enterprise_queue_reset_board_confidence_gain
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran an enterprise queue reset for {account.name}. "
+            f"Cash -{BALANCE.support_program_enterprise_queue_reset_cost}, "
+            f"SLA risk now {account.sla_breach_risk}."
         )
     )
 
