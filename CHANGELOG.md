@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.58.0 - 2026-05-14
+
+- Added `run_enterprise_reference_cycle`, `run_billing_retention_reset`, `run_channel_stability_reset`, and `set_refinancing_posture` as deeper late-game follow-up actions for flagship support recovery, billing retention, hotspot channel durability, and debt-aware capital control
+- Added path-specific follow-up events `ipo_pricing_committee`, `buyer_operating_memo`, and `independence_cash_yield_pact` so IPO, acquisition, and independence runs diverge more clearly after the previous late-game chain
+- Added channel-specific event pressure through `reseller_enablement_gap`, `integration_cutover_risk`, and `marketplace_chargeback_wave` so reseller, integration, and marketplace lanes no longer fail in the same way
+- Expanded finance-planner guidance to recommend the new support, channel, and refinancing actions when flagship queue risk, billing retention drag, hotspot dependency, and covenant heat become the main bottlenecks
+- Added regression coverage for the new actions and event chains plus a seeded 190-turn channel-rebuild stability run
+- Promoted the package version to `0.58.0`
+
 ## 0.57.0 - 2026-05-14
 
 - Added `run_white_glove_recovery`, `run_partner_margin_reset`, and `lock_capital_buffer` as deeper late-game rescue actions for premium accounts, acquisition-channel economics, and independence durability

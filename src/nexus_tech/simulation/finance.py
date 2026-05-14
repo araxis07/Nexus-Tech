@@ -738,6 +738,16 @@ def build_finance_planner(
         and revenue_at_risk_value >= Decimal("1800.00")
     ):
         recommended_actions.append("run_reference_rescue")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and (
+            high_value_risk_accounts > 0
+            or revenue_at_risk_value >= Decimal("2400.00")
+            or support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+        )
+    ):
+        recommended_actions.append("run_enterprise_reference_cycle")
     if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
         white_glove_queue_risk_accounts > 0
         or premium_queue_risk_accounts > 0
@@ -755,6 +765,12 @@ def build_finance_planner(
         recommended_actions.append("run_onboarding_fast_track")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
+    if (
+        support_hotspot_lane is SupportLaneFocus.BILLING
+        or renewal_queue_risk_accounts >= 2
+        or renewal_pressure_value >= Decimal("2100.00")
+    ):
+        recommended_actions.append("run_billing_retention_reset")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -836,6 +852,13 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_partner_margin_reset")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 28
+        or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        recommended_actions.append("run_channel_stability_reset")
     if (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or hotspot_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
@@ -898,6 +921,10 @@ def build_finance_planner(
         or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
     ):
         recommended_actions.append("harden_financing_posture")
+    if finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt and (
+        finance.covenant_risk >= 14 or reserve_gap < ZERO_MONEY or capital_fragility >= 55
+    ):
+        recommended_actions.append("set_refinancing_posture")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -946,6 +973,19 @@ def build_finance_planner(
         action_sequence.append(
             "run a reference rescue before a flagship account turns into a diligence liability"
         )
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and (
+            high_value_risk_accounts > 0
+            or revenue_at_risk_value >= Decimal("2400.00")
+            or support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+        )
+    ):
+        action_sequence.append(
+            "run an enterprise reference cycle before flagship accounts become the next board "
+            "or diligence weak spot"
+        )
     if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
         white_glove_queue_risk_accounts > 0
         or premium_queue_risk_accounts > 0
@@ -970,6 +1010,14 @@ def build_finance_planner(
     ) and strategic_outlook == "profitable_independence":
         action_sequence.append(
             "run billing stabilization before renewal friction starts reshaping independence"
+        )
+    if (
+        support_hotspot_lane is SupportLaneFocus.BILLING
+        or renewal_queue_risk_accounts >= 2
+        or renewal_pressure_value >= Decimal("2100.00")
+    ):
+        action_sequence.append(
+            "run a billing retention reset before payment friction turns into a renewal story"
         )
     if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
         action_sequence.append(
@@ -1087,6 +1135,16 @@ def build_finance_planner(
             f"reset {hotspot_channel} partner margins before rev-share creep hardens into the "
             "buyer discount"
         )
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 28
+        or volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
+    ):
+        action_sequence.append(
+            f"run a {hotspot_channel} channel stability reset before dependency and fatigue "
+            "define the commercial story"
+        )
     if (
         reserve_gap < ZERO_MONEY
         or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
@@ -1114,6 +1172,13 @@ def build_finance_planner(
         action_sequence.append(
             "harden financing posture before debt heat and reserve fragility redefine the "
             "independence path"
+        )
+    if finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt and (
+        finance.covenant_risk >= 14 or reserve_gap < ZERO_MONEY or capital_fragility >= 55
+    ):
+        action_sequence.append(
+            "set a refinancing posture before covenant heat and rollover pressure narrow the "
+            "capital window further"
         )
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62

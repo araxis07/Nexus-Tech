@@ -271,6 +271,8 @@ ACTION_KEYS = {
     "95": TurnAction.RUN_ONBOARDING_FAST_TRACK,
     "98": TurnAction.RUN_ENTERPRISE_QUEUE_RESET,
     "101": TurnAction.RUN_WHITE_GLOVE_RECOVERY,
+    "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
+    "105": TurnAction.RUN_BILLING_RETENTION_RESET,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -313,8 +315,10 @@ ACTION_KEYS = {
     "96": TurnAction.RUN_CHANNEL_REALIGNMENT,
     "99": TurnAction.RUN_CHANNEL_SYNERGY_RESET,
     "102": TurnAction.RUN_PARTNER_MARGIN_RESET,
+    "106": TurnAction.RUN_CHANNEL_STABILITY_RESET,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
+    "107": TurnAction.SET_REFINANCING_POSTURE,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1651,6 +1655,18 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_BILLING_RETENTION_RESET:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_ONBOARDING_FAST_TRACK:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1740,6 +1756,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_PARTNER_MARGIN_RESET:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_STABILITY_RESET:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

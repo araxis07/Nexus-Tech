@@ -57,6 +57,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_lock_capital_buffer,
     apply_raise_reserve_target,
     apply_rebalance_capital,
+    apply_refinancing_posture,
     apply_set_capital_plan,
     apply_step_up_reserve_discipline,
 )
@@ -139,6 +140,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_firebreak,
     run_channel_qbr,
     run_channel_realignment,
+    run_channel_stability_reset,
     run_channel_synergy_reset,
     run_partner_margin_reset,
     run_partner_recovery_sprint,
@@ -198,9 +200,11 @@ from nexus_tech.simulation.support_program import (
     invest_in_support_staffing,
     route_support_escalation,
     run_account_rescue,
+    run_billing_retention_reset,
     run_billing_stabilization,
     run_enterprise_assurance,
     run_enterprise_queue_reset,
+    run_enterprise_reference_cycle,
     run_lane_recovery,
     run_onboarding_fast_track,
     run_onboarding_recovery,
@@ -698,6 +702,11 @@ def apply_action(
         logger.debug("Hardened financing posture.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_REFINANCING_POSTURE:
+        summary = apply_refinancing_posture(next_state)
+        logger.debug("Set refinancing posture.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1056,6 +1065,34 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_reference_cycle(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise reference cycle for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_BILLING_RETENTION_RESET:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_retention_reset(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing retention reset for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.CREATE_PARTNERSHIP:
         if context.target_product_id is None or context.partner_channel is None:
             raise ValueError("Creating a partnership requires selecting a product and channel.")
@@ -1184,6 +1221,19 @@ def apply_action(
         summary = run_partner_margin_reset(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran partner margin reset for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_STABILITY_RESET:
+        if context.partnership_id is None:
+            raise ValueError("Running a channel stability reset requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_stability_reset(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel stability reset for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

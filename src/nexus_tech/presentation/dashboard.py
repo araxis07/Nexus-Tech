@@ -2227,6 +2227,16 @@ def _build_action_menu_panel() -> Panel:
         "Stabilize one premium account before high-touch support pressure defines the run.",
     )
     primary_actions.add_row(
+        "104",
+        "run_enterprise_reference_cycle",
+        "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
+    )
+    primary_actions.add_row(
+        "105",
+        "run_billing_retention_reset",
+        "Reset one billing-heavy account before renewal drag hardens into churn.",
+    )
+    primary_actions.add_row(
         "93",
         "run_reference_rescue",
         "Protect one flagship account reference before diligence or IPO pressure compounds.",
@@ -2311,6 +2321,12 @@ def _build_action_menu_panel() -> Panel:
         "Pay a small financing tax now to de-risk debt, reserve, and investor posture.",
     )
     primary_actions.add_row(
+        "107",
+        "set_refinancing_posture",
+        "Bias the capital plan toward calmer rollover and covenant posture "
+        "before pressure compounds.",
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2374,6 +2390,12 @@ def _build_action_menu_panel() -> Panel:
         "102",
         "run_partner_margin_reset",
         "Repair one hotspot partner's economics before rev-share creep hardens into drag.",
+    )
+    primary_actions.add_row(
+        "106",
+        "run_channel_stability_reset",
+        "Fund one hotspot channel to calm fatigue, conflict, and dependency "
+        "before late-game drag compounds.",
     )
     primary_actions.add_row(
         "82",
