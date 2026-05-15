@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.61.0 - 2026-05-15
+
+- Added `run_enterprise_renewal_cabinet` and `set_growth_firebreak` as deeper late-game follow-up actions for flagship enterprise renewal repair and growth-to-resilience capital discipline
+- Added follow-up events `reseller_commitment_review`, `integration_release_cutline`, `marketplace_refund_charter`, and `board_reset_governance_table` so reseller, integration, marketplace, and board-reset runs each gain another late-game decision layer
+- Expanded finance-planner and endgame guidance to recommend the new enterprise-renewal and growth-firebreak actions once queue drag, board heat, governance risk, and capital fragility start converging
+- Added regression coverage for the new actions and event handlers plus a seeded 240-turn board-recovery stability run
+- Promoted the package version to `0.61.0`
+
 ## 0.60.0 - 2026-05-15
 
 - Added `run_white_glove_renewal_guard`, `run_integration_cutover_reset`, and `set_debt_strategy` as deeper late-game follow-up actions for premium renewals, integration-channel cutovers, and debt-aware capital discipline

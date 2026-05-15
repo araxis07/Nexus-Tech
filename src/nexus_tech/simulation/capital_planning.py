@@ -780,6 +780,101 @@ def apply_set_debt_strategy(state: GameState) -> CapitalPlanSummary:
     )
 
 
+def apply_set_growth_firebreak(state: GameState) -> CapitalPlanSummary:
+    """Shift the capital plan toward resilience when growth pressure is outrunning control."""
+
+    if (
+        state.finance.board_pressure < 22
+        and state.finance.governance_risk < 46
+        and state.support_program.backlog_queue < 10
+        and state.support_program.escalation_queue < 4
+    ):
+        raise ValueError("There is not enough capital or governance stress for a growth firebreak.")
+    if state.company.cash_on_hand < BALANCE.capital_plan_growth_firebreak_cost:
+        raise ValueError("Not enough cash to set a growth firebreak this turn.")
+
+    capital_plan = state.capital_plan
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.capital_plan_growth_firebreak_cost
+    )
+    reserve_target = quantize_money(
+        capital_plan.reserve_target + BALANCE.capital_plan_growth_firebreak_target_step
+    )
+    planning_horizon_turns = min(
+        12,
+        capital_plan.planning_horizon_turns + BALANCE.capital_plan_growth_firebreak_horizon_gain,
+    )
+    reserve_share = (
+        capital_plan.reserve_share + BALANCE.capital_plan_growth_firebreak_reserve_share_shift
+    )
+    go_to_market_share = max(
+        0,
+        capital_plan.go_to_market_share - BALANCE.capital_plan_growth_firebreak_gtm_share_shift,
+    )
+    product_share = max(
+        0,
+        capital_plan.product_investment_share
+        - BALANCE.capital_plan_growth_firebreak_product_share_shift,
+    )
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+
+    if capital_plan.source_preference is CapitalSourcePreference.DEBT:
+        source_preference = CapitalSourcePreference.BOOTSTRAP
+    elif capital_plan.source_preference is CapitalSourcePreference.VENTURE:
+        source_preference = CapitalSourcePreference.ANGEL
+    else:
+        source_preference = capital_plan.source_preference
+
+    mode = (
+        CapitalPlanMode.CONSERVE
+        if capital_plan.mode is CapitalPlanMode.EXPAND
+        or state.finance.board_pressure >= 28
+        or state.finance.governance_risk >= 50
+        else CapitalPlanMode.BALANCED
+    )
+    state.capital_plan = CapitalPlan(
+        mode=mode,
+        source_preference=source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    state.finance.board_pressure = max(
+        0,
+        state.finance.board_pressure - BALANCE.capital_plan_growth_firebreak_board_pressure_relief,
+    )
+    state.finance.governance_risk = max(
+        0,
+        state.finance.governance_risk
+        - BALANCE.capital_plan_growth_firebreak_governance_risk_relief,
+    )
+    state.finance.investor_pressure = max(
+        0,
+        state.finance.investor_pressure
+        - BALANCE.capital_plan_growth_firebreak_investor_pressure_relief,
+    )
+    state.finance.board_confidence = min(
+        100,
+        state.finance.board_confidence
+        + BALANCE.capital_plan_growth_firebreak_board_confidence_gain,
+    )
+    return CapitalPlanSummary(
+        message=(
+            "Set a growth firebreak. "
+            f"Reserve target {format_money(reserve_target)} over {planning_horizon_turns} turns. "
+            f"Allocation now P {product_share}% / GTM {go_to_market_share}% / "
+            f"Reserve {reserve_share}% with {source_preference.value} capital."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
 def evaluate_capital_plan(
     company: Company,
     finance: FinanceState,

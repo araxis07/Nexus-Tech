@@ -61,6 +61,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_capital_plan,
     apply_set_covenant_firewall,
     apply_set_debt_strategy,
+    apply_set_growth_firebreak,
     apply_step_up_reserve_discipline,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
@@ -210,6 +211,7 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_assurance,
     run_enterprise_queue_reset,
     run_enterprise_reference_cycle,
+    run_enterprise_renewal_cabinet,
     run_lane_recovery,
     run_onboarding_fast_track,
     run_onboarding_recovery,
@@ -724,6 +726,11 @@ def apply_action(
         logger.debug("Set debt strategy.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_GROWTH_FIREBREAK:
+        summary = apply_set_growth_firebreak(next_state)
+        logger.debug("Set growth firebreak.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1118,6 +1125,20 @@ def apply_action(
         summary = run_enterprise_reference_cycle(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran enterprise reference cycle for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ENTERPRISE_RENEWAL_CABINET:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_renewal_cabinet(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise renewal cabinet for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

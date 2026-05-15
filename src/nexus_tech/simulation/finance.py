@@ -748,6 +748,17 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_enterprise_reference_cycle")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and renewal_queue_risk_accounts > 0
+        and (
+            renewal_pressure_value >= Decimal("2000.00")
+            or revenue_at_risk_value >= Decimal("2200.00")
+            or high_value_risk_accounts > 0
+        )
+    ):
+        recommended_actions.append("run_enterprise_renewal_cabinet")
     if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
         white_glove_queue_risk_accounts > 0
         or premium_queue_risk_accounts > 0
@@ -982,6 +993,10 @@ def build_finance_planner(
         or reserve_gap < ZERO_MONEY
     ):
         recommended_actions.append("set_debt_strategy")
+    if capital_fragility >= 62 and (
+        finance.board_pressure >= 28 or finance.governance_risk >= 48 or reserve_gap < ZERO_MONEY
+    ):
+        recommended_actions.append("set_growth_firebreak")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1042,6 +1057,20 @@ def build_finance_planner(
         action_sequence.append(
             "run an enterprise reference cycle before flagship accounts become the next board "
             "or diligence weak spot"
+        )
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and renewal_queue_risk_accounts > 0
+        and (
+            renewal_pressure_value >= Decimal("2000.00")
+            or revenue_at_risk_value >= Decimal("2200.00")
+            or high_value_risk_accounts > 0
+        )
+    ):
+        action_sequence.append(
+            "run an enterprise renewal cabinet before flagship renewals become the next IPO or "
+            "diligence fracture"
         )
     if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
         white_glove_queue_risk_accounts > 0
@@ -1116,6 +1145,13 @@ def build_finance_planner(
         )
     if finance.investor_pressure >= 28:
         action_sequence.append("prepare a board-facing capital response")
+    if capital_fragility >= 62 and (
+        finance.board_pressure >= 28 or finance.governance_risk >= 48 or reserve_gap < ZERO_MONEY
+    ):
+        action_sequence.append(
+            "set a growth firebreak before governance heat turns the capital plan into the next "
+            "operating failure"
+        )
     if commercial_risk_score >= 10:
         action_sequence.append("treat renewals and support stability as a capital prerequisite")
     if (

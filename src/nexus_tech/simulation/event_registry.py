@@ -550,6 +550,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_reseller_reference_summit_event,
         ),
         EventDefinition(
+            event_id="reseller_commitment_review",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_reseller_commitment_review_weight,
+            cooldown_turns=BALANCE.event_reseller_commitment_review_cooldown,
+            is_eligible=_is_reseller_commitment_review_eligible,
+            build_pending_event=_build_reseller_commitment_review_event,
+        ),
+        EventDefinition(
             event_id="integration_cutover_board",
             category=EventCategory.PRODUCT_INCIDENT,
             weight=BALANCE.event_integration_cutover_board_weight,
@@ -558,12 +566,28 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_integration_cutover_board_event,
         ),
         EventDefinition(
+            event_id="integration_release_cutline",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_integration_release_cutline_weight,
+            cooldown_turns=BALANCE.event_integration_release_cutline_cooldown,
+            is_eligible=_is_integration_release_cutline_eligible,
+            build_pending_event=_build_integration_release_cutline_event,
+        ),
+        EventDefinition(
             event_id="marketplace_dispute_program",
             category=EventCategory.REPUTATION_INCIDENT,
             weight=BALANCE.event_marketplace_dispute_program_weight,
             cooldown_turns=BALANCE.event_marketplace_dispute_program_cooldown,
             is_eligible=_is_marketplace_dispute_program_eligible,
             build_pending_event=_build_marketplace_dispute_program_event,
+        ),
+        EventDefinition(
+            event_id="marketplace_refund_charter",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_marketplace_refund_charter_weight,
+            cooldown_turns=BALANCE.event_marketplace_refund_charter_cooldown,
+            is_eligible=_is_marketplace_refund_charter_eligible,
+            build_pending_event=_build_marketplace_refund_charter_event,
         ),
         EventDefinition(
             event_id="board_recovery_window",
@@ -596,6 +620,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_board_reset_operating_cadence_cooldown,
             is_eligible=_is_board_reset_operating_cadence_eligible,
             build_pending_event=_build_board_reset_operating_cadence_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_governance_table",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_governance_table_weight,
+            cooldown_turns=BALANCE.event_board_reset_governance_table_cooldown,
+            is_eligible=_is_board_reset_governance_table_eligible,
+            build_pending_event=_build_board_reset_governance_table_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -4243,6 +4275,82 @@ def _build_reseller_reference_summit_event(
     )
 
 
+def _is_reseller_commitment_review_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    reseller_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "reseller"
+    ]
+    return bool(reseller_partnerships) and (
+        _has_recent_event(
+            state,
+            {"reseller_reference_summit"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        or (
+            portfolio.hotspot_channel == "reseller"
+            and portfolio.hotspot_dependency_score
+            >= BALANCE.event_reseller_commitment_review_dependency_threshold
+        )
+        or any(
+            partnership.conflict_pressure >= 52 or partnership.risk >= 54
+            for partnership in reseller_partnerships
+        )
+    )
+
+
+def _build_reseller_commitment_review_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "reseller"
+    ]
+    partnership = max(
+        partnerships,
+        key=lambda deal: (
+            deal.conflict_pressure + deal.risk - deal.enablement_level,
+            int(deal.sourced_revenue),
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    return PendingEvent(
+        event_id="reseller_commitment_review",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Reseller Commitment Review",
+        description=(
+            f"{partnership.name} now needs a harder commitment review around {target.name}. "
+            "You can fund the review now or protect cash and let dependency drag keep rising."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=7,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_commitment_review",
+                label="Fund the commitment review",
+                description="Spend cash to reduce reseller dependency and calm late-game drag.",
+            ),
+            EventOption(
+                id="let_commitment_drift",
+                label="Let commitment drift",
+                description="Protect cash now, but let reseller conflict and dependency spread.",
+            ),
+        ],
+    )
+
+
 def _is_integration_cutover_board_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     integration_partnerships = [
@@ -4315,6 +4423,83 @@ def _build_integration_cutover_board_event(
                 id="accept_cutover_drag",
                 label="Accept cutover drag",
                 description="Protect cash now, but let implementation friction keep spreading.",
+            ),
+        ],
+    )
+
+
+def _is_integration_release_cutline_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    integration_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "integration"
+    ]
+    return bool(integration_partnerships) and (
+        _has_recent_event(
+            state,
+            {"integration_cutover_board"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        or (
+            portfolio.hotspot_channel == "integration"
+            and portfolio.hotspot_dependency_score
+            >= BALANCE.event_integration_release_cutline_pressure_threshold
+        )
+        or any(
+            partnership.risk >= BALANCE.event_integration_release_cutline_pressure_threshold
+            or partnership.conflict_pressure >= 54
+            for partnership in integration_partnerships
+        )
+    )
+
+
+def _build_integration_release_cutline_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "integration"
+    ]
+    partnership = max(
+        partnerships,
+        key=lambda deal: (
+            deal.risk + deal.conflict_pressure,
+            int(deal.sourced_revenue),
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    return PendingEvent(
+        event_id="integration_release_cutline",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Integration Release Cutline",
+        description=(
+            f"{partnership.name} now needs a harder release cutline around {target.name}. "
+            "You can staff the cutline now or accept more implementation drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=7,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="staff_release_cutline",
+                label="Staff the release cutline",
+                description="Spend cash to protect onboarding quality and cut integration risk.",
+            ),
+            EventOption(
+                id="accept_release_drag",
+                label="Accept release drag",
+                description="Protect cash now, but let release friction and risk rise again.",
             ),
         ],
     )
@@ -4393,6 +4578,82 @@ def _build_marketplace_dispute_program_event(
                 description=(
                     "Protect cash now, but let payment friction and trust drag keep rising."
                 ),
+            ),
+        ],
+    )
+
+
+def _is_marketplace_refund_charter_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    marketplace_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "marketplace"
+    ]
+    return bool(marketplace_partnerships) and (
+        _has_recent_event(
+            state,
+            {"marketplace_dispute_program"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        or portfolio.hotspot_channel == "marketplace"
+        or any(
+            account.status is not CustomerAccountStatus.CHURNED
+            and (
+                account.invoice_risk >= BALANCE.event_marketplace_refund_charter_payment_threshold
+                or account.failed_payment_risk
+                >= BALANCE.event_marketplace_refund_charter_payment_threshold
+            )
+            for account in state.customer_accounts
+        )
+    )
+
+
+def _build_marketplace_refund_charter_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "marketplace"
+    ]
+    partnership = max(
+        partnerships,
+        key=lambda deal: (
+            int(deal.sourced_revenue) + deal.risk + deal.conflict_pressure,
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    return PendingEvent(
+        event_id="marketplace_refund_charter",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Marketplace Refund Charter",
+        description=(
+            f"{partnership.name} now needs a harder refund charter around {target.name}. "
+            "You can fund the charter now or absorb another round of billing and renewal drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=7,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_refund_charter",
+                label="Fund the refund charter",
+                description="Spend cash to reduce payment friction and calm renewal pressure.",
+            ),
+            EventOption(
+                id="absorb_refund_drag",
+                label="Absorb the refund drag",
+                description="Protect cash now, but let refund pressure keep hurting trust.",
             ),
         ],
     )
@@ -4597,6 +4858,58 @@ def _build_board_reset_operating_cadence_event(
                 description=(
                     "Protect optionality now, but let board pressure and restructure heat rise."
                 ),
+            ),
+        ],
+    )
+
+
+def _is_board_reset_governance_table_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"board_reset_operating_cadence"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.board_reset_risk
+        >= BALANCE.event_board_reset_governance_table_pressure_threshold
+        and (
+            state.finance.board_warning_level >= 1
+            or state.finance.governance_crisis_active
+            or pressure.restructure_heat >= 58
+            or state.finance.board_resolution_due
+        )
+    )
+
+
+def _build_board_reset_governance_table_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_reset_governance_table",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board Reset Governance Table",
+        description=(
+            "Directors now want a formal governance table behind the reset. You can ratify a "
+            "tighter reset table now or stretch it and absorb another round of board heat."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="governance_chain",
+        chain_stage=7,
+        options=[
+            EventOption(
+                id="ratify_reset_table",
+                label="Ratify the reset table",
+                description="Lean harder into resilience and calm governance pressure again.",
+            ),
+            EventOption(
+                id="stretch_reset_table",
+                label="Stretch the reset table",
+                description="Protect some flexibility now, but let reset pressure compound.",
             ),
         ],
     )

@@ -2151,6 +2151,109 @@ def _apply_reseller_reference_summit(
     raise ValueError(f"Unsupported option {option_id} for reseller reference summit.")
 
 
+def _apply_reseller_commitment_review(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_stressed_partnership_for_channel(
+        state,
+        product.id,
+        PartnerChannel.RESELLER,
+    )
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "fund_commitment_review":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_reseller_commitment_review_fund_cost
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_reseller_commitment_review_risk_relief,
+            0,
+            100,
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            - BALANCE.event_reseller_commitment_review_conflict_relief,
+            0,
+            100,
+        )
+        partnership.enablement_level = clamp_int(
+            partnership.enablement_level + BALANCE.event_reseller_commitment_review_enablement_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_reseller_commitment_review_board_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_reseller_commitment_review_confidence_gain,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            account.satisfaction = clamp_int(
+                account.satisfaction + BALANCE.event_reseller_commitment_review_satisfaction_gain,
+                0,
+                100,
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health + BALANCE.event_reseller_commitment_review_renewal_gain,
+                0,
+                100,
+            )
+        partnership.status = PartnershipStatus.RECOVERY
+        return (
+            f"You funded a reseller commitment review for {partnership.name}. Cash "
+            f"-{BALANCE.event_reseller_commitment_review_fund_cost}, conflict "
+            f"-{BALANCE.event_reseller_commitment_review_conflict_relief}."
+        )
+
+    if option_id == "let_commitment_drift":
+        partnership.sourced_revenue = quantize_money(
+            partnership.sourced_revenue
+            * BALANCE.event_reseller_commitment_review_defer_revenue_retention_rate
+        )
+        partnership.sourced_users = max(
+            0,
+            int(
+                partnership.sourced_users
+                * BALANCE.event_reseller_commitment_review_defer_user_retention_percent
+                / 100
+            ),
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            + BALANCE.event_reseller_commitment_review_defer_conflict_gain,
+            0,
+            100,
+        )
+        partnership.risk = clamp_int(
+            partnership.risk + BALANCE.event_reseller_commitment_review_defer_risk_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_reseller_commitment_review_defer_pressure_gain,
+            0,
+            100,
+        )
+        partnership.status = PartnershipStatus.STRAINED
+        return (
+            f"You let the reseller commitment review drift for {partnership.name}. Board "
+            f"pressure +{BALANCE.event_reseller_commitment_review_defer_pressure_gain}, conflict "
+            f"+{BALANCE.event_reseller_commitment_review_defer_conflict_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for reseller commitment review.")
+
+
 def _apply_integration_cutover_risk(
     state: GameState,
     event: PendingEvent,
@@ -2320,6 +2423,101 @@ def _apply_integration_cutover_board(
         )
 
     raise ValueError(f"Unsupported option {option_id} for integration cutover board.")
+
+
+def _apply_integration_release_cutline(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_stressed_partnership_for_channel(
+        state,
+        product.id,
+        PartnerChannel.INTEGRATION,
+    )
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "staff_release_cutline":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_integration_release_cutline_fund_cost
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_integration_release_cutline_risk_relief,
+            0,
+            100,
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            - BALANCE.event_integration_release_cutline_conflict_relief,
+            0,
+            100,
+        )
+        partnership.enablement_level = clamp_int(
+            partnership.enablement_level
+            + BALANCE.event_integration_release_cutline_enablement_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_integration_release_cutline_board_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_integration_release_cutline_confidence_gain,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health
+                + BALANCE.event_integration_release_cutline_onboarding_gain,
+                0,
+                100,
+            )
+            account.support_load = clamp_int(
+                account.support_load - BALANCE.event_integration_release_cutline_support_relief,
+                0,
+                100,
+            )
+        partnership.status = PartnershipStatus.RECOVERY
+        return (
+            f"You staffed an integration release cutline for {partnership.name}. Cash "
+            f"-{BALANCE.event_integration_release_cutline_fund_cost}, risk "
+            f"-{BALANCE.event_integration_release_cutline_risk_relief}."
+        )
+
+    if option_id == "accept_release_drag":
+        partnership.risk = clamp_int(
+            partnership.risk + BALANCE.event_integration_release_cutline_accept_risk_gain,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_integration_release_cutline_accept_pressure_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            - BALANCE.event_integration_release_cutline_accept_reputation_loss,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            account.support_load = clamp_int(account.support_load + 2, 0, 100)
+        partnership.status = PartnershipStatus.STRAINED
+        return (
+            f"You accepted more integration release drag for {partnership.name}. Board pressure "
+            f"+{BALANCE.event_integration_release_cutline_accept_pressure_gain}, risk "
+            f"+{BALANCE.event_integration_release_cutline_accept_risk_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for integration release cutline.")
 
 
 def _apply_marketplace_chargeback_wave(
@@ -2496,6 +2694,100 @@ def _apply_marketplace_dispute_program(
         )
 
     raise ValueError(f"Unsupported option {option_id} for marketplace dispute program.")
+
+
+def _apply_marketplace_refund_charter(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    product = _get_target_product(state, event)
+    partnership = _get_most_stressed_partnership_for_channel(
+        state,
+        product.id,
+        PartnerChannel.MARKETPLACE,
+    )
+    accounts = _get_active_accounts_for_product(state, product.id)
+
+    if option_id == "fund_refund_charter":
+        state.company.cash_on_hand = quantize_money(
+            state.company.cash_on_hand - BALANCE.event_marketplace_refund_charter_fund_cost
+        )
+        partnership.risk = clamp_int(
+            partnership.risk - BALANCE.event_marketplace_refund_charter_risk_relief,
+            0,
+            100,
+        )
+        partnership.conflict_pressure = clamp_int(
+            partnership.conflict_pressure
+            - BALANCE.event_marketplace_refund_charter_conflict_relief,
+            0,
+            100,
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_marketplace_refund_charter_board_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_marketplace_refund_charter_confidence_gain,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk - BALANCE.event_marketplace_refund_charter_invoice_relief,
+                0,
+                100,
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk
+                - BALANCE.event_marketplace_refund_charter_payment_relief,
+                0,
+                100,
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health + BALANCE.event_marketplace_refund_charter_renewal_gain,
+                0,
+                100,
+            )
+        partnership.status = PartnershipStatus.RECOVERY
+        return (
+            f"You funded a marketplace refund charter for {partnership.name}. Cash "
+            f"-{BALANCE.event_marketplace_refund_charter_fund_cost}, invoice risk "
+            f"-{BALANCE.event_marketplace_refund_charter_invoice_relief}."
+        )
+
+    if option_id == "absorb_refund_drag":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_marketplace_refund_charter_absorb_pressure_gain,
+            0,
+            100,
+        )
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            - BALANCE.event_marketplace_refund_charter_absorb_reputation_loss,
+            0,
+            100,
+        )
+        for account in accounts[:2]:
+            account.renewal_health = clamp_int(
+                account.renewal_health
+                - BALANCE.event_marketplace_refund_charter_absorb_renewal_loss,
+                0,
+                100,
+            )
+        partnership.status = PartnershipStatus.STRAINED
+        return (
+            f"You absorbed more marketplace refund drag around {partnership.name}. Board "
+            f"pressure +{BALANCE.event_marketplace_refund_charter_absorb_pressure_gain}, "
+            f"reputation -{BALANCE.event_marketplace_refund_charter_absorb_reputation_loss}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for marketplace refund charter.")
 
 
 def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -2813,6 +3105,12 @@ def _apply_board_reset_operating_cadence(
             0,
             4,
         )
+        state.finance.governance_crisis_level = clamp_int(
+            state.finance.governance_crisis_level
+            + BALANCE.event_board_reset_operating_cadence_slip_crisis_gain,
+            0,
+            100,
+        )
         state.finance.restructuring_pressure = clamp_int(
             state.finance.restructuring_pressure
             + BALANCE.event_board_reset_operating_cadence_slip_restructuring_gain,
@@ -2833,6 +3131,112 @@ def _apply_board_reset_operating_cadence(
         )
 
     raise ValueError(f"Unsupported option {option_id} for board reset operating cadence.")
+
+
+def _apply_board_reset_governance_table(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    del event
+
+    if option_id == "ratify_reset_table":
+        shift = min(
+            BALANCE.event_board_reset_governance_table_ratify_gtm_share_loss,
+            BALANCE.event_board_reset_governance_table_ratify_reserve_share_gain,
+            state.capital_plan.go_to_market_share,
+        )
+        state.capital_plan = state.capital_plan.model_copy(
+            update={
+                "go_to_market_share": state.capital_plan.go_to_market_share - shift,
+                "reserve_share": state.capital_plan.reserve_share + shift,
+                "mode": CapitalPlanMode.CONSERVE,
+            }
+        )
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            - BALANCE.event_board_reset_governance_table_ratify_pressure_relief,
+            0,
+            100,
+        )
+        state.finance.governance_risk = clamp_int(
+            state.finance.governance_risk
+            - BALANCE.event_board_reset_governance_table_ratify_risk_relief,
+            0,
+            100,
+        )
+        state.finance.board_portfolio_focus_score = clamp_int(
+            state.finance.board_portfolio_focus_score
+            + BALANCE.event_board_reset_governance_table_ratify_focus_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            + BALANCE.event_board_reset_governance_table_ratify_confidence_gain,
+            0,
+            100,
+        )
+        state.finance.board_score = clamp_int(
+            state.finance.board_score
+            + BALANCE.event_board_reset_governance_table_ratify_score_gain,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = False
+        state.finance.board_warning_level = max(0, state.finance.board_warning_level - 1)
+        state.company.reputation = clamp_int(
+            state.company.reputation
+            - BALANCE.event_board_reset_governance_table_ratify_reputation_loss,
+            0,
+            100,
+        )
+        return (
+            "You ratified a harder board-reset governance table. Board pressure "
+            f"-{BALANCE.event_board_reset_governance_table_ratify_pressure_relief}, reserve "
+            f"share +{shift}."
+        )
+
+    if option_id == "stretch_reset_table":
+        state.finance.board_pressure = clamp_int(
+            state.finance.board_pressure
+            + BALANCE.event_board_reset_governance_table_stretch_pressure_gain,
+            0,
+            100,
+        )
+        state.finance.board_warning_level = clamp_int(
+            state.finance.board_warning_level
+            + BALANCE.event_board_reset_governance_table_stretch_warning_gain,
+            0,
+            4,
+        )
+        state.finance.governance_crisis_level = clamp_int(
+            state.finance.governance_crisis_level
+            + BALANCE.event_board_reset_governance_table_stretch_crisis_gain,
+            0,
+            100,
+        )
+        state.finance.restructuring_pressure = clamp_int(
+            state.finance.restructuring_pressure
+            + BALANCE.event_board_reset_governance_table_stretch_restructuring_gain,
+            0,
+            100,
+        )
+        state.finance.board_confidence = clamp_int(
+            state.finance.board_confidence
+            - BALANCE.event_board_reset_governance_table_stretch_confidence_loss,
+            0,
+            100,
+        )
+        state.finance.board_resolution_due = True
+        return (
+            "You stretched the board-reset governance table. Board pressure "
+            f"+{BALANCE.event_board_reset_governance_table_stretch_pressure_gain}, "
+            f"restructuring pressure "
+            f"+{BALANCE.event_board_reset_governance_table_stretch_restructuring_gain}."
+        )
+
+    raise ValueError(f"Unsupported option {option_id} for board reset governance table.")
 
 
 def _apply_capital_market_freeze(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -5106,14 +5510,18 @@ EVENT_EFFECT_HANDLERS = {
     "channel_concentration_crackdown": _apply_channel_concentration_crackdown,
     "reseller_enablement_gap": _apply_reseller_enablement_gap,
     "reseller_reference_summit": _apply_reseller_reference_summit,
+    "reseller_commitment_review": _apply_reseller_commitment_review,
     "integration_cutover_risk": _apply_integration_cutover_risk,
     "integration_cutover_board": _apply_integration_cutover_board,
+    "integration_release_cutline": _apply_integration_release_cutline,
     "marketplace_chargeback_wave": _apply_marketplace_chargeback_wave,
     "marketplace_dispute_program": _apply_marketplace_dispute_program,
+    "marketplace_refund_charter": _apply_marketplace_refund_charter,
     "board_recovery_window": _apply_board_recovery_window,
     "board_reset_showdown": _apply_board_reset_showdown,
     "board_reset_execution_plan": _apply_board_reset_execution_plan,
     "board_reset_operating_cadence": _apply_board_reset_operating_cadence,
+    "board_reset_governance_table": _apply_board_reset_governance_table,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,

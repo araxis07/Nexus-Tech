@@ -2245,6 +2245,14 @@ def _build_action_menu_panel() -> Panel:
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
     )
     primary_actions.add_row(
+        "115",
+        "run_enterprise_renewal_cabinet",
+        (
+            "Stabilize one enterprise renewal account before board, IPO, or diligence "
+            "pressure compounds."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2348,6 +2356,14 @@ def _build_action_menu_panel() -> Panel:
         "114",
         "set_debt_strategy",
         "Deliberately shrink debt exposure before covenant drag hardens the capital story.",
+    )
+    primary_actions.add_row(
+        "116",
+        "set_growth_firebreak",
+        (
+            "Shift capital away from fragile growth and toward reserve resilience before "
+            "governance heat compounds."
+        ),
     )
     primary_actions.add_row(
         "103",

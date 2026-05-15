@@ -2531,6 +2531,115 @@ def run_enterprise_reference_cycle(
     )
 
 
+def run_enterprise_renewal_cabinet(
+    state: GameState,
+    account_id,
+) -> SupportOpsActionSummary:
+    """Stabilize one exposed enterprise renewal before IPO or diligence pressure compounds."""
+
+    account = _get_account_by_id(state.customer_accounts, account_id)
+    if account.status is CustomerAccountStatus.CHURNED:
+        raise ValueError("That account has already churned.")
+    if state.company.cash_on_hand < BALANCE.support_program_enterprise_renewal_cabinet_cost:
+        raise ValueError("Not enough cash to run an enterprise renewal cabinet this turn.")
+    if (
+        account.segment is not MarketSegment.ENTERPRISE
+        and account.support_tier is SupportTier.STANDARD
+        and account.contract_value < Decimal("2400.00")
+    ):
+        raise ValueError("That account is not exposed enough for an enterprise renewal cabinet.")
+    if (
+        account.renewal_health >= 80
+        and account.churn_risk <= 16
+        and account.support_load <= 16
+        and account.sla_breach_risk <= 10
+        and account.open_tickets <= 1
+    ):
+        raise ValueError("That account does not need an enterprise renewal cabinet right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.support_program_enterprise_renewal_cabinet_cost
+    )
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - BALANCE.support_program_enterprise_renewal_cabinet_backlog_relief,
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - BALANCE.support_program_enterprise_renewal_cabinet_escalation_relief,
+    )
+    account.open_tickets = max(
+        0,
+        account.open_tickets - BALANCE.support_program_enterprise_renewal_cabinet_ticket_relief,
+    )
+    account.sla_breach_risk = clamp_int(
+        account.sla_breach_risk - BALANCE.support_program_enterprise_renewal_cabinet_sla_relief
+    )
+    account.ticket_queue_age = max(
+        0,
+        account.ticket_queue_age
+        - BALANCE.support_program_enterprise_renewal_cabinet_queue_age_relief,
+    )
+    account.support_load = clamp_int(
+        account.support_load
+        - BALANCE.support_program_enterprise_renewal_cabinet_support_load_relief
+    )
+    account.onboarding_health = clamp_int(
+        account.onboarding_health
+        + BALANCE.support_program_enterprise_renewal_cabinet_onboarding_health_gain
+    )
+    account.renewal_health = clamp_int(
+        account.renewal_health
+        + BALANCE.support_program_enterprise_renewal_cabinet_renewal_health_gain
+    )
+    account.satisfaction = clamp_int(
+        account.satisfaction + BALANCE.support_program_enterprise_renewal_cabinet_satisfaction_gain
+    )
+    account.expansion_potential = clamp_int(
+        account.expansion_potential
+        + BALANCE.support_program_enterprise_renewal_cabinet_expansion_gain
+    )
+    account.churn_risk = clamp_int(
+        account.churn_risk - BALANCE.support_program_enterprise_renewal_cabinet_churn_relief
+    )
+    account.escalation_count = max(0, account.escalation_count - 1)
+    if account.support_tier is SupportTier.STANDARD:
+        account.support_tier = SupportTier.PRIORITY
+    else:
+        account.support_tier = SupportTier.WHITE_GLOVE
+    _apply_lane_program_relief(
+        state.support_program,
+        SupportLaneFocus.ENTERPRISE,
+        BALANCE.support_program_enterprise_renewal_cabinet_lane_relief,
+    )
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.support_program_enterprise_renewal_cabinet_board_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.support_program_enterprise_renewal_cabinet_board_confidence_gain
+    )
+    state.finance.board_score = clamp_int(
+        state.finance.board_score
+        + BALANCE.support_program_enterprise_renewal_cabinet_board_score_gain
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation
+        + BALANCE.support_program_enterprise_renewal_cabinet_reputation_gain
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran an enterprise renewal cabinet for {account.name}. "
+            f"Cash -{BALANCE.support_program_enterprise_renewal_cabinet_cost}, "
+            f"renewal health now {account.renewal_health}."
+        )
+    )
+
+
 def run_billing_retention_reset(
     state: GameState,
     account_id,
