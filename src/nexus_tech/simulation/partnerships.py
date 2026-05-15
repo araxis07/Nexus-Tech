@@ -1306,6 +1306,118 @@ def run_reseller_enablement_reset(
     )
 
 
+def run_integration_cutover_reset(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Reset one integration lane before cutover drag hardens into diligence damage."""
+
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    if partnership.channel is not PartnerChannel.INTEGRATION:
+        raise ValueError("This action only applies to integration partnerships.")
+    if partnership.status is PartnershipStatus.PAUSED:
+        raise ValueError("Paused integration lanes need reactivation before a cutover reset.")
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if state.company.cash_on_hand < BALANCE.partnership_integration_cutover_reset_cost:
+        raise ValueError("Not enough cash to run an integration cutover reset.")
+    if (
+        fatigue < BALANCE.partnership_recovery_resume_threshold
+        and partnership.risk < BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure < BALANCE.partnership_resume_threshold
+        and partnership.enablement_level >= 56
+    ):
+        raise ValueError("That integration lane does not need a cutover reset right now.")
+
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.partnership_integration_cutover_reset_cost
+    )
+    partnership.sourced_revenue = quantize_money(
+        partnership.sourced_revenue
+        * BALANCE.partnership_integration_cutover_reset_revenue_retention_rate
+    )
+    partnership.sourced_users = max(
+        0,
+        int(
+            partnership.sourced_users
+            * BALANCE.partnership_integration_cutover_reset_user_retention_percent
+            / 100
+        ),
+    )
+    partnership.risk = clamp_int(
+        partnership.risk - BALANCE.partnership_integration_cutover_reset_risk_relief
+    )
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure
+        - BALANCE.partnership_integration_cutover_reset_conflict_relief
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level + BALANCE.partnership_integration_cutover_reset_enablement_gain
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_integration_cutover_reset_quality_gain
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(
+            partnership.rev_share_rate
+            - BALANCE.partnership_integration_cutover_reset_rev_share_relief
+        ),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    for account in related_accounts[:2]:
+        account.onboarding_health = clamp_int(
+            account.onboarding_health
+            + BALANCE.partnership_integration_cutover_reset_onboarding_gain
+        )
+        account.support_load = clamp_int(
+            account.support_load - BALANCE.partnership_integration_cutover_reset_support_relief
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health + BALANCE.partnership_integration_cutover_reset_renewal_gain
+        )
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - BALANCE.partnership_integration_cutover_reset_board_pressure_relief
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.partnership_integration_cutover_reset_investor_pressure_relief
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.partnership_integration_cutover_reset_board_confidence_gain
+    )
+
+    fatigue = calculate_partnership_fatigue(state, partnership)
+    if fatigue <= BALANCE.partnership_recovery_resume_threshold and (
+        partnership.risk <= BALANCE.partnership_resume_threshold
+        and partnership.conflict_pressure <= BALANCE.partnership_resume_threshold
+    ):
+        partnership.status = PartnershipStatus.ACTIVE
+    else:
+        partnership.status = PartnershipStatus.RECOVERY
+    partnership.summary = (
+        f"{partnership.name} completed an integration cutover reset. Revenue "
+        f"{format_money(partnership.sourced_revenue)}, risk {partnership.risk}, "
+        f"conflict {partnership.conflict_pressure}."
+    )
+    return PartnershipActionSummary(
+        message=(
+            f"Ran an integration cutover reset for {partnership.name}. "
+            f"Cash -{BALANCE.partnership_integration_cutover_reset_cost}."
+        )
+    )
+
+
 def run_marketplace_chargeback_reset(
     state: GameState,
     partnership_id: UUID,

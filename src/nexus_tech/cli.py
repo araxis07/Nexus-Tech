@@ -272,6 +272,7 @@ ACTION_KEYS = {
     "98": TurnAction.RUN_ENTERPRISE_QUEUE_RESET,
     "101": TurnAction.RUN_WHITE_GLOVE_RECOVERY,
     "108": TurnAction.RUN_WHITE_GLOVE_BACKSTOP,
+    "112": TurnAction.RUN_WHITE_GLOVE_RENEWAL_GUARD,
     "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
     "105": TurnAction.RUN_BILLING_RETENTION_RESET,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
@@ -318,11 +319,13 @@ ACTION_KEYS = {
     "102": TurnAction.RUN_PARTNER_MARGIN_RESET,
     "106": TurnAction.RUN_CHANNEL_STABILITY_RESET,
     "109": TurnAction.RUN_RESELLER_ENABLEMENT_RESET,
+    "113": TurnAction.RUN_INTEGRATION_CUTOVER_RESET,
     "110": TurnAction.RUN_MARKETPLACE_CHARGEBACK_RESET,
     "72": TurnAction.REVIEW_PARTNERSHIPS,
     "73": TurnAction.SET_CAPITAL_PLAN,
     "107": TurnAction.SET_REFINANCING_POSTURE,
     "111": TurnAction.SET_COVENANT_FIREWALL,
+    "114": TurnAction.SET_DEBT_STRATEGY,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1695,6 +1698,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_WHITE_GLOVE_RENEWAL_GUARD:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_LANE_RECOVERY:
         focus_key = ask_choice_input(
             "Recovery lane",
@@ -1778,6 +1787,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_RESELLER_ENABLEMENT_RESET:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_INTEGRATION_CUTOVER_RESET:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

@@ -60,6 +60,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_refinancing_posture,
     apply_set_capital_plan,
     apply_set_covenant_firewall,
+    apply_set_debt_strategy,
     apply_step_up_reserve_discipline,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
@@ -143,6 +144,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_realignment,
     run_channel_stability_reset,
     run_channel_synergy_reset,
+    run_integration_cutover_reset,
     run_marketplace_chargeback_reset,
     run_partner_margin_reset,
     run_partner_recovery_sprint,
@@ -215,6 +217,7 @@ from nexus_tech.simulation.support_program import (
     run_renewal_sweep,
     run_white_glove_backstop,
     run_white_glove_recovery,
+    run_white_glove_renewal_guard,
     set_support_lane_focus,
     triage_support_backlog,
     upgrade_support_program,
@@ -716,6 +719,11 @@ def apply_action(
         logger.debug("Set covenant firewall.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_DEBT_STRATEGY:
+        summary = apply_set_debt_strategy(next_state)
+        logger.debug("Set debt strategy.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1074,6 +1082,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_WHITE_GLOVE_RENEWAL_GUARD:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_white_glove_renewal_guard(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran white-glove renewal guard for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_REFERENCE_RESCUE:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1272,6 +1294,21 @@ def apply_action(
         summary = run_reseller_enablement_reset(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran reseller enablement reset for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_INTEGRATION_CUTOVER_RESET:
+        if context.partnership_id is None:
+            raise ValueError(
+                "Running an integration cutover reset requires selecting a partnership."
+            )
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_integration_cutover_reset(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran integration cutover reset for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.60.0 - 2026-05-15
+
+- Added `run_white_glove_renewal_guard`, `run_integration_cutover_reset`, and `set_debt_strategy` as deeper late-game follow-up actions for premium renewals, integration-channel cutovers, and debt-aware capital discipline
+- Added follow-up events `reseller_reference_summit`, `integration_cutover_board`, `marketplace_dispute_program`, and `board_reset_operating_cadence` so reseller, integration, marketplace, and board-reset paths each gain another late-game branch
+- Expanded finance-planner guidance to recommend the new support, channel, and debt actions once premium renewal stress, integration hotspot drag, and covenant heat become the main bottlenecks
+- Added regression coverage for the new actions and event handlers plus a seeded 220-turn board-recovery stability run
+- Promoted the package version to `0.60.0`
+
 ## 0.59.0 - 2026-05-14
 
 - Added `run_white_glove_backstop`, `run_reseller_enablement_reset`, `run_marketplace_chargeback_reset`, and `set_covenant_firewall` as deeper late-game follow-up actions for flagship support rescue, reseller recovery, marketplace billing cleanup, and covenant defense

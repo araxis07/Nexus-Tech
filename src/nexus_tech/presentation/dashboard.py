@@ -2232,6 +2232,14 @@ def _build_action_menu_panel() -> Panel:
         "Lock down one white-glove account before premium queue risk turns into board pressure.",
     )
     primary_actions.add_row(
+        "112",
+        "run_white_glove_renewal_guard",
+        (
+            "Target one flagship renewal before white-glove queue drag turns into churn and "
+            "board heat."
+        ),
+    )
+    primary_actions.add_row(
         "104",
         "run_enterprise_reference_cycle",
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
@@ -2337,6 +2345,11 @@ def _build_action_menu_panel() -> Panel:
         "Build a harder reserve and covenant buffer before debt and board heat converge.",
     )
     primary_actions.add_row(
+        "114",
+        "set_debt_strategy",
+        "Deliberately shrink debt exposure before covenant drag hardens the capital story.",
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2411,6 +2424,11 @@ def _build_action_menu_panel() -> Panel:
         "109",
         "run_reseller_enablement_reset",
         "Reset one reseller lane before enablement drift hardens into revenue drag.",
+    )
+    primary_actions.add_row(
+        "113",
+        "run_integration_cutover_reset",
+        "Reset one integration lane before cutover drag hardens into diligence damage.",
     )
     primary_actions.add_row(
         "110",

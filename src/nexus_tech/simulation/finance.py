@@ -769,6 +769,16 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_white_glove_backstop")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and white_glove_queue_risk_accounts > 0
+        and (
+            renewal_queue_risk_accounts > 0
+            or renewal_pressure_value >= Decimal("1800.00")
+            or premium_revenue_at_risk_value >= Decimal("2200.00")
+        )
+    ):
+        recommended_actions.append("run_white_glove_renewal_guard")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -879,6 +889,12 @@ def build_finance_planner(
         or channel_conflict_index >= 24
     ):
         recommended_actions.append("run_reseller_enablement_reset")
+    if hotspot_channel == "integration" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 26
+    ):
+        recommended_actions.append("run_integration_cutover_reset")
     if hotspot_channel == "marketplace" and (
         volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
         or renewal_pressure_value >= Decimal("2000.00")
@@ -959,6 +975,13 @@ def build_finance_planner(
         or reserve_gap < ZERO_MONEY
     ):
         recommended_actions.append("set_covenant_firewall")
+    if finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt and (
+        finance.covenant_risk >= 20
+        or finance.board_pressure >= 30
+        or capital_fragility >= 65
+        or reserve_gap < ZERO_MONEY
+    ):
+        recommended_actions.append("set_debt_strategy")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1038,6 +1061,15 @@ def build_finance_planner(
             action_sequence.append(
                 "run a white-glove backstop before premium queue drag becomes the next "
                 "reference and diligence fracture"
+            )
+        if (
+            renewal_queue_risk_accounts > 0
+            or renewal_pressure_value >= Decimal("1800.00")
+            or premium_revenue_at_risk_value >= Decimal("2200.00")
+        ):
+            action_sequence.append(
+                "run a white-glove renewal guard before premium renewals turn into the next "
+                "board and diligence leak"
             )
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         action_sequence.append(
@@ -1196,6 +1228,15 @@ def build_finance_planner(
         action_sequence.append(
             "run a reseller enablement reset before partner drift hardens into revenue drag"
         )
+    if hotspot_channel == "integration" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+        or channel_conflict_index >= 26
+    ):
+        action_sequence.append(
+            "run an integration cutover reset before implementation drag hardens into the "
+            "next diligence discount"
+        )
     if hotspot_channel == "marketplace" and (
         volatile_revenue_share_percent >= BALANCE.finance_planner_volatile_share_threshold
         or renewal_pressure_value >= Decimal("2000.00")
@@ -1249,6 +1290,16 @@ def build_finance_planner(
         action_sequence.append(
             "set a covenant firewall before debt heat and board pressure converge into a forced "
             "capital reset"
+        )
+    if finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt and (
+        finance.covenant_risk >= 20
+        or finance.board_pressure >= 30
+        or capital_fragility >= 65
+        or reserve_gap < ZERO_MONEY
+    ):
+        action_sequence.append(
+            "set a debt strategy before covenant drag and rollover stress define the capital "
+            "story for the rest of the run"
         )
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
