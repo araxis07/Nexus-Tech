@@ -62,6 +62,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_covenant_firewall,
     apply_set_debt_strategy,
     apply_set_growth_firebreak,
+    apply_set_path_capital_posture,
     apply_step_up_reserve_discipline,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
@@ -219,6 +220,7 @@ from nexus_tech.simulation.support_program import (
     run_renewal_sweep,
     run_white_glove_backstop,
     run_white_glove_recovery,
+    run_white_glove_reference_ring,
     run_white_glove_renewal_guard,
     set_support_lane_focus,
     triage_support_backlog,
@@ -731,6 +733,11 @@ def apply_action(
         logger.debug("Set growth firebreak.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_PATH_CAPITAL_POSTURE:
+        summary = apply_set_path_capital_posture(next_state)
+        logger.debug("Set path capital posture.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1097,6 +1104,20 @@ def apply_action(
         summary = run_white_glove_renewal_guard(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran white-glove renewal guard for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_RING:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_white_glove_reference_ring(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran white-glove reference ring for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

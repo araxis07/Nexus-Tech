@@ -2240,6 +2240,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "117",
+        "run_white_glove_reference_ring",
+        (
+            "Rebuild one flagship premium reference before white-glove fragility "
+            "becomes the next IPO or diligence fracture."
+        ),
+    )
+    primary_actions.add_row(
         "104",
         "run_enterprise_reference_cycle",
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
@@ -2363,6 +2371,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Shift capital away from fragile growth and toward reserve resilience before "
             "governance heat compounds."
+        ),
+    )
+    primary_actions.add_row(
+        "118",
+        "set_path_capital_posture",
+        (
+            "Align capital allocation to the current endgame path before board, "
+            "queue, or channel pressure hardens the wrong story."
         ),
     )
     primary_actions.add_row(

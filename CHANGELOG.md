@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.62.0 - 2026-05-18
+
+- Added `run_white_glove_reference_ring` and `set_path_capital_posture` as deeper late-game follow-up actions for flagship premium-account recovery and route-aware capital control
+- Added path-specific follow-up events `ipo_roadshow_lock`, `buyer_close_readiness`, `independence_cash_command`, and `board_reset_balance_sheet_treaty` so IPO, acquisition, independence, and board-reset runs each gain another distinct late-game branch
+- Added channel-specific events `reseller_margin_council`, `integration_support_bridge`, and `marketplace_trust_reset` so reseller, integration, and marketplace lanes now create different late-game commercial failures and recoveries
+- Expanded finance-planner and endgame guidance to recommend the new support and capital actions once white-glove queue drag, hotspot dependency, governance heat, and reserve fragility start converging
+- Added regression coverage for the new actions and event chains plus a seeded 260-turn board-recovery stability run
+- Promoted the package version to `0.62.0`
+
 ## 0.61.0 - 2026-05-15
 
 - Added `run_enterprise_renewal_cabinet` and `set_growth_firebreak` as deeper late-game follow-up actions for flagship enterprise renewal repair and growth-to-resilience capital discipline

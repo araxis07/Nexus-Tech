@@ -273,6 +273,7 @@ ACTION_KEYS = {
     "101": TurnAction.RUN_WHITE_GLOVE_RECOVERY,
     "108": TurnAction.RUN_WHITE_GLOVE_BACKSTOP,
     "112": TurnAction.RUN_WHITE_GLOVE_RENEWAL_GUARD,
+    "117": TurnAction.RUN_WHITE_GLOVE_REFERENCE_RING,
     "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
     "115": TurnAction.RUN_ENTERPRISE_RENEWAL_CABINET,
     "105": TurnAction.RUN_BILLING_RETENTION_RESET,
@@ -328,6 +329,7 @@ ACTION_KEYS = {
     "111": TurnAction.SET_COVENANT_FIREWALL,
     "114": TurnAction.SET_DEBT_STRATEGY,
     "116": TurnAction.SET_GROWTH_FIREBREAK,
+    "118": TurnAction.SET_PATH_CAPITAL_POSTURE,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1707,6 +1709,12 @@ def collect_action_context(
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_WHITE_GLOVE_RENEWAL_GUARD:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_RING:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None

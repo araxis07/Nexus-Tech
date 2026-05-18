@@ -245,6 +245,7 @@ def build_finance_planner(
     enterprise_queue_risk_accounts: int = 0,
     renewal_queue_risk_accounts: int = 0,
     premium_queue_risk_accounts: int = 0,
+    white_glove_queue_risk_accounts: int | None = None,
     high_value_risk_accounts: int = 0,
     support_lane_saturation_index: int = 0,
     support_lane_focus: SupportLaneFocus = SupportLaneFocus.BALANCED,
@@ -266,7 +267,10 @@ def build_finance_planner(
 ) -> FinancePlannerSnapshot:
     """Project end-cash and reserve stress over the active planning horizon."""
 
-    white_glove_queue_risk_accounts = max(0, high_value_risk_accounts)
+    if white_glove_queue_risk_accounts is None:
+        white_glove_queue_risk_accounts = max(0, high_value_risk_accounts)
+    else:
+        white_glove_queue_risk_accounts = max(0, white_glove_queue_risk_accounts)
     if premium_revenue_at_risk_value <= ZERO_MONEY and white_glove_queue_risk_accounts > 0:
         premium_revenue_at_risk_value = revenue_at_risk_value
 
@@ -790,6 +794,16 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_white_glove_renewal_guard")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and white_glove_queue_risk_accounts > 0
+        and (
+            premium_revenue_at_risk_value >= Decimal("2200.00")
+            or renewal_pressure_value >= Decimal("1800.00")
+            or high_value_risk_accounts > 0
+        )
+    ):
+        recommended_actions.append("run_white_glove_reference_ring")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -997,6 +1011,19 @@ def build_finance_planner(
         finance.board_pressure >= 28 or finance.governance_risk >= 48 or reserve_gap < ZERO_MONEY
     ):
         recommended_actions.append("set_growth_firebreak")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and (
+            finance.board_pressure >= 24
+            or finance.governance_risk >= 44
+            or enterprise_queue_risk_accounts > 0
+            or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        )
+    ) or (
+        strategic_outlook == "profitable_independence"
+        and (capital_fragility >= 58 or reserve_gap < ZERO_MONEY or finance.covenant_risk >= 14)
+    ):
+        recommended_actions.append("set_path_capital_posture")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1099,6 +1126,15 @@ def build_finance_planner(
             action_sequence.append(
                 "run a white-glove renewal guard before premium renewals turn into the next "
                 "board and diligence leak"
+            )
+        if (
+            premium_revenue_at_risk_value >= Decimal("2200.00")
+            or renewal_pressure_value >= Decimal("1800.00")
+            or high_value_risk_accounts > 0
+        ):
+            action_sequence.append(
+                "run a white-glove reference ring before premium reference accounts become the "
+                "next public-market or diligence crack"
             )
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         action_sequence.append(
@@ -1348,6 +1384,22 @@ def build_finance_planner(
         action_sequence.append(
             "lock a capital buffer before reserve stress and covenant heat start dictating every "
             "independence choice"
+        )
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and (
+            finance.board_pressure >= 24
+            or finance.governance_risk >= 44
+            or enterprise_queue_risk_accounts > 0
+            or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
+        )
+    ) or (
+        strategic_outlook == "profitable_independence"
+        and (capital_fragility >= 58 or reserve_gap < ZERO_MONEY or finance.covenant_risk >= 14)
+    ):
+        action_sequence.append(
+            "set a path capital posture before the current exit route drifts into the wrong "
+            "operating story"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(

@@ -17,6 +17,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.endgame import calculate_endgame_readiness
 from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
 from nexus_tech.simulation.support_program import calculate_support_queue_exposure
 
@@ -870,6 +871,139 @@ def apply_set_growth_firebreak(state: GameState) -> CapitalPlanSummary:
             f"Reserve target {format_money(reserve_target)} over {planning_horizon_turns} turns. "
             f"Allocation now P {product_share}% / GTM {go_to_market_share}% / "
             f"Reserve {reserve_share}% with {source_preference.value} capital."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
+def apply_set_path_capital_posture(state: GameState) -> CapitalPlanSummary:
+    """Set a path-aware capital posture that matches the current late-game route."""
+
+    readiness = calculate_endgame_readiness(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    reserve_gap = state.capital_plan.reserve_target - state.company.cash_on_hand
+
+    if (
+        state.finance.board_pressure < 18
+        and state.finance.governance_risk < 40
+        and state.finance.covenant_risk < 12
+        and reserve_gap <= Decimal("0.00")
+        and queue_exposure.enterprise_queue_risk_accounts <= 0
+        and queue_exposure.white_glove_queue_risk_accounts <= 0
+        and portfolio.hotspot_dependency_score
+        < BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        raise ValueError("There is not enough path pressure to justify a path capital posture.")
+    if state.company.cash_on_hand < BALANCE.capital_plan_path_capital_posture_cost:
+        raise ValueError("Not enough cash to set a path capital posture this turn.")
+
+    capital_plan = state.capital_plan
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.capital_plan_path_capital_posture_cost
+    )
+    reserve_target = quantize_money(
+        capital_plan.reserve_target + BALANCE.capital_plan_path_capital_posture_target_step
+    )
+    planning_horizon_turns = min(
+        12,
+        capital_plan.planning_horizon_turns
+        + BALANCE.capital_plan_path_capital_posture_horizon_gain,
+    )
+    reserve_share = (
+        capital_plan.reserve_share + BALANCE.capital_plan_path_capital_posture_reserve_share_shift
+    )
+    go_to_market_share = max(
+        0,
+        capital_plan.go_to_market_share - BALANCE.capital_plan_path_capital_posture_gtm_share_shift,
+    )
+    product_share = max(
+        0,
+        capital_plan.product_investment_share
+        - BALANCE.capital_plan_path_capital_posture_product_share_shift,
+    )
+    source_preference = capital_plan.source_preference
+    mode = CapitalPlanMode.BALANCED
+    posture_note = readiness.strategic_outlook.replace("_", " ")
+
+    if readiness.strategic_outlook == "ipo_ready":
+        if source_preference is CapitalSourcePreference.DEBT:
+            source_preference = CapitalSourcePreference.BOOTSTRAP
+        elif source_preference is CapitalSourcePreference.VENTURE:
+            source_preference = CapitalSourcePreference.ANGEL
+        product_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    elif readiness.strategic_outlook == "strategic_acquisition":
+        if source_preference is CapitalSourcePreference.DEBT:
+            source_preference = CapitalSourcePreference.ANGEL
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    else:
+        source_preference = CapitalSourcePreference.BOOTSTRAP
+        reserve_share += 2
+        go_to_market_share = max(0, go_to_market_share - 2)
+        mode = CapitalPlanMode.CONSERVE
+
+    if queue_exposure.enterprise_queue_risk_accounts > 0:
+        product_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if queue_exposure.white_glove_queue_risk_accounts > 0:
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+
+    if (
+        capital_plan.mode is CapitalPlanMode.EXPAND
+        or state.finance.board_pressure >= 28
+        or state.finance.governance_risk >= 50
+    ):
+        mode = CapitalPlanMode.CONSERVE
+
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=mode,
+        source_preference=source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    state.finance.board_pressure = max(
+        0,
+        state.finance.board_pressure
+        - BALANCE.capital_plan_path_capital_posture_board_pressure_relief,
+    )
+    state.finance.governance_risk = max(
+        0,
+        state.finance.governance_risk
+        - BALANCE.capital_plan_path_capital_posture_governance_risk_relief,
+    )
+    state.finance.investor_pressure = max(
+        0,
+        state.finance.investor_pressure
+        - BALANCE.capital_plan_path_capital_posture_investor_pressure_relief,
+    )
+    state.finance.board_confidence = min(
+        100,
+        state.finance.board_confidence
+        + BALANCE.capital_plan_path_capital_posture_board_confidence_gain,
+    )
+    return CapitalPlanSummary(
+        message=(
+            f"Set a {posture_note} capital posture. Reserve target "
+            f"{format_money(reserve_target)} over {planning_horizon_turns} turns. Allocation now "
+            f"P {product_share}% / GTM {go_to_market_share}% / Reserve {reserve_share}% with "
+            f"{source_preference.value} capital."
         ),
         capital_plan=state.capital_plan,
     )
