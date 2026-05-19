@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.64.0 - 2026-05-19
+
+- Added `run_white_glove_escalation_cell`, `run_billing_dispute_desk`, `run_onboarding_control_tower`, and `set_exit_readiness_buffer` as deeper account-level rescue and path-control actions for premium support hotspots, billing/covenant stress, onboarding drag, and exit-readiness capital posture
+- Added path-chain follow-up events `ipo_allocation_lock`, `buyer_close_cadence`, `independence_margin_charter`, and `board_reset_cash_charter` so each late-game route gains another concrete recovery-or-penalty branch
+- Added channel-specific follow-up events `reseller_recovery_compact`, `integration_cutover_command`, and `marketplace_penalty_panel` so reseller, integration, and marketplace runs continue diverging under late-game pressure
+- Expanded finance-planner recommendations and action sequencing to surface the new support rescues and exit-readiness capital move when premium queue heat, billing pressure, onboarding drag, or route-specific fragility spikes
+- Added regression coverage for the new actions and event handlers plus a seeded 300-turn board-recovery stability run
+- Promoted the package version to `0.64.0`
+
 ## 0.63.0 - 2026-05-19
 
 - Added `run_white_glove_reference_committee`, `run_billing_covenant_reset`, and `set_endgame_capital_map` as deeper late-game follow-up actions for flagship support rescue, billing/covenant cleanup, and path-aware capital control

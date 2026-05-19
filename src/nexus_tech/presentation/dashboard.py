@@ -2256,6 +2256,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "122",
+        "run_white_glove_escalation_cell",
+        (
+            "Run the deepest premium-account rescue pass before white-glove backlog and "
+            "renewal risk become the defining late-game fracture."
+        ),
+    )
+    primary_actions.add_row(
         "104",
         "run_enterprise_reference_cycle",
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
@@ -2279,6 +2287,22 @@ def _build_action_menu_panel() -> Panel:
         (
             "Reset one billing-heavy account before payment drag starts feeding "
             "covenant and capital stress."
+        ),
+    )
+    primary_actions.add_row(
+        "123",
+        "run_billing_dispute_desk",
+        (
+            "Run a deeper billing desk reset before disputes, dunning, and renewals start "
+            "driving the capital story."
+        ),
+    )
+    primary_actions.add_row(
+        "124",
+        "run_onboarding_control_tower",
+        (
+            "Run a deeper onboarding control tower before implementation drag starts "
+            "poisoning renewals and board confidence."
         ),
     )
     primary_actions.add_row(
@@ -2403,6 +2427,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Aggressively remap reserve, GTM, and product allocation to the "
             "current late-game path and its active fragilities."
+        ),
+    )
+    primary_actions.add_row(
+        "125",
+        "set_exit_readiness_buffer",
+        (
+            "Build a path-aware reserve and liquidity buffer before exit pressure locks "
+            "the run into the wrong capital posture."
         ),
     )
     primary_actions.add_row(

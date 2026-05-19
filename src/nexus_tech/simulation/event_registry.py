@@ -350,6 +350,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_bookbuild_corridor_event,
         ),
         EventDefinition(
+            event_id="ipo_allocation_lock",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_bookbuild_corridor_weight,
+            cooldown_turns=BALANCE.event_ipo_bookbuild_corridor_cooldown,
+            is_eligible=_is_ipo_allocation_lock_eligible,
+            build_pending_event=_build_ipo_allocation_lock_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -430,6 +438,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_board_alignment_event,
         ),
         EventDefinition(
+            event_id="buyer_close_cadence",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_board_alignment_weight,
+            cooldown_turns=BALANCE.event_buyer_board_alignment_cooldown,
+            is_eligible=_is_buyer_close_cadence_eligible,
+            build_pending_event=_build_buyer_close_cadence_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -508,6 +524,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
             is_eligible=_is_independence_liquidity_charter_eligible,
             build_pending_event=_build_independence_liquidity_charter_event,
+        ),
+        EventDefinition(
+            event_id="independence_margin_charter",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_liquidity_charter_weight,
+            cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
+            is_eligible=_is_independence_margin_charter_eligible,
+            build_pending_event=_build_independence_margin_charter_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -622,6 +646,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_reseller_pipeline_cadence_event,
         ),
         EventDefinition(
+            event_id="reseller_recovery_compact",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_reseller_pipeline_cadence_weight,
+            cooldown_turns=BALANCE.event_reseller_pipeline_cadence_cooldown,
+            is_eligible=_is_reseller_recovery_compact_eligible,
+            build_pending_event=_build_reseller_recovery_compact_event,
+        ),
+        EventDefinition(
             event_id="integration_cutover_board",
             category=EventCategory.PRODUCT_INCIDENT,
             weight=BALANCE.event_integration_cutover_board_weight,
@@ -654,6 +686,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_integration_go_live_shield_event,
         ),
         EventDefinition(
+            event_id="integration_cutover_command",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_integration_go_live_shield_weight,
+            cooldown_turns=BALANCE.event_integration_go_live_shield_cooldown,
+            is_eligible=_is_integration_cutover_command_eligible,
+            build_pending_event=_build_integration_cutover_command_event,
+        ),
+        EventDefinition(
             event_id="marketplace_dispute_program",
             category=EventCategory.REPUTATION_INCIDENT,
             weight=BALANCE.event_marketplace_dispute_program_weight,
@@ -684,6 +724,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
             is_eligible=_is_marketplace_policy_appeal_eligible,
             build_pending_event=_build_marketplace_policy_appeal_event,
+        ),
+        EventDefinition(
+            event_id="marketplace_penalty_panel",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_marketplace_policy_appeal_weight,
+            cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
+            is_eligible=_is_marketplace_penalty_panel_eligible,
+            build_pending_event=_build_marketplace_penalty_panel_event,
         ),
         EventDefinition(
             event_id="board_recovery_window",
@@ -740,6 +788,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
             is_eligible=_is_board_reset_trust_vote_eligible,
             build_pending_event=_build_board_reset_trust_vote_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_cash_charter",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_trust_vote_weight,
+            cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
+            is_eligible=_is_board_reset_cash_charter_eligible,
+            build_pending_event=_build_board_reset_cash_charter_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -2764,6 +2820,65 @@ def _build_ipo_bookbuild_corridor_event(
     )
 
 
+def _is_ipo_allocation_lock_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"ipo_bookbuild_corridor"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.public_market_scrutiny
+        >= BALANCE.event_ipo_bookbuild_corridor_pressure_threshold
+        and (
+            queue_exposure.white_glove_queue_risk_accounts > 0
+            or queue_exposure.enterprise_queue_risk_accounts > 0
+            or state.finance.board_warning_level >= 2
+            or state.finance.governance_risk >= 18
+        )
+    )
+
+
+def _build_ipo_allocation_lock_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    return PendingEvent(
+        event_id="ipo_allocation_lock",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="IPO Allocation Lock",
+        description=(
+            f"The listing path around {target.name} now depends on a tighter allocation lock "
+            "across flagship references, service quality, and board discipline. You can fund "
+            "the lock now or defer it and accept another round of pricing drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=13,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_allocation_lock",
+                label="Fund the allocation lock",
+                description="Spend cash to steady the final IPO corridor before pricing tightens.",
+            ),
+            EventOption(
+                id="defer_allocation_lock",
+                label="Defer the allocation lock",
+                description="Protect cash now, but let scrutiny and governance heat build again.",
+            ),
+        ],
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -3393,6 +3508,67 @@ def _build_buyer_board_alignment_event(
                 description=(
                     "Protect economics now, but let conflict and diligence drag keep rising."
                 ),
+            ),
+        ],
+    )
+
+
+def _is_buyer_close_cadence_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    return (
+        _has_recent_event(
+            state,
+            {"buyer_board_alignment"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.acquirer_diligence >= BALANCE.event_buyer_board_alignment_pressure_threshold
+        and (
+            portfolio.hotspot_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or portfolio.channel_conflict_index >= 30
+            or portfolio.recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
+            or portfolio.direct_sales_conflict_accounts > 0
+        )
+    )
+
+
+def _build_buyer_close_cadence_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    target = _pick_best_product(
+        [product for product in state.products if product.is_active],
+        rng,
+        score=lambda product: product.user_count + product.market_fit + product.quality,
+    )
+    portfolio = calculate_partnership_portfolio(state)
+    channel_label = portfolio.hotspot_channel if portfolio.hotspot_channel != "-" else "channel"
+    return PendingEvent(
+        event_id="buyer_close_cadence",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Buyer Close Cadence",
+        description=(
+            f"The close path around {target.name} now depends on a harder cadence across the "
+            f"{channel_label} motion, premium references, and board alignment. You can staff the "
+            "cadence now or hold cash and let execution drag keep compounding."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="endgame_chain",
+        chain_stage=13,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="staff_close_cadence",
+                label="Staff close cadence",
+                description="Spend cash to calm buyer friction before the closing window narrows.",
+            ),
+            EventOption(
+                id="hold_close_cadence",
+                label="Hold close cadence",
+                description="Protect economics now, but let diligence drag keep building.",
             ),
         ],
     )
@@ -4455,6 +4631,70 @@ def _build_independence_liquidity_charter_event(
     )
 
 
+def _is_independence_margin_charter_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    severe_cash_stress = (
+        state.finance.covenant_risk >= 18
+        and state.company.cash_on_hand < state.capital_plan.reserve_target
+        and (
+            state.finance.board_pressure >= 18
+            or state.finance.investor_pressure >= 14
+            or state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        )
+    )
+    return (
+        _has_recent_event(
+            state,
+            {"independence_liquidity_charter"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and (
+            pressure.independence_discipline
+            >= BALANCE.event_independence_liquidity_charter_pressure_threshold
+            or severe_cash_stress
+        )
+        and (
+            state.capital_plan.reserve_share < BALANCE.capital_plan_low_reserve_share_threshold + 14
+            or state.finance.covenant_risk >= 14
+            or state.finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            or state.company.cash_on_hand < state.capital_plan.reserve_target
+        )
+    )
+
+
+def _build_independence_margin_charter_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="independence_margin_charter",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Independence Margin Charter",
+        description=(
+            "The independence case now depends on a tighter margin charter. You can ratify it "
+            "now or bridge the gap and accept another round of covenant and reserve stress."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="capital_chain",
+        chain_stage=13,
+        options=[
+            EventOption(
+                id="ratify_margin_charter",
+                label="Ratify the margin charter",
+                description="Shift harder into reserves and calmer covenant posture again.",
+            ),
+            EventOption(
+                id="bridge_margin_gap",
+                label="Bridge the margin gap",
+                description="Add cash now, but compound debt and covenant heat again.",
+            ),
+        ],
+    )
+
+
 def _is_reseller_enablement_gap_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     reseller_partnerships = [
@@ -4986,6 +5226,82 @@ def _build_reseller_pipeline_cadence_event(
     )
 
 
+def _is_reseller_recovery_compact_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    reseller_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "reseller"
+    ]
+    return bool(reseller_partnerships) and (
+        _has_recent_event(
+            state,
+            {"reseller_pipeline_cadence"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and (
+            portfolio.hotspot_channel == "reseller"
+            or portfolio.hotspot_dependency_score
+            >= BALANCE.event_reseller_pipeline_cadence_dependency_threshold
+            or any(
+                partnership.conflict_pressure >= 50 or partnership.risk >= 52
+                for partnership in reseller_partnerships
+            )
+        )
+    )
+
+
+def _build_reseller_recovery_compact_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "reseller"
+    ]
+    partnership = max(
+        partnerships,
+        key=lambda deal: (
+            deal.conflict_pressure + deal.risk - deal.enablement_level,
+            int(deal.sourced_revenue),
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    return PendingEvent(
+        event_id="reseller_recovery_compact",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Reseller Recovery Compact",
+        description=(
+            f"{partnership.name} now needs a harder recovery compact around {target.name}. You "
+            "can fund the compact now or let reseller friction and dependency keep compounding."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=10,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_recovery_compact",
+                label="Fund the recovery compact",
+                description="Spend cash to steady reseller trust, quality, and renewal posture.",
+            ),
+            EventOption(
+                id="stretch_recovery_compact",
+                label="Stretch the compact",
+                description="Protect cash now, but let reseller dependency and drag rise again.",
+            ),
+        ],
+    )
+
+
 def _is_integration_cutover_board_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     integration_partnerships = [
@@ -5294,6 +5610,83 @@ def _build_integration_go_live_shield_event(
     )
 
 
+def _is_integration_cutover_command_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    integration_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "integration"
+    ]
+    return bool(integration_partnerships) and (
+        _has_recent_event(
+            state,
+            {"integration_go_live_shield"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and (
+            portfolio.hotspot_channel == "integration"
+            or portfolio.hotspot_dependency_score
+            >= BALANCE.event_integration_go_live_shield_pressure_threshold
+            or any(
+                partnership.risk >= BALANCE.event_integration_go_live_shield_pressure_threshold
+                or partnership.conflict_pressure >= 50
+                for partnership in integration_partnerships
+            )
+        )
+    )
+
+
+def _build_integration_cutover_command_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "integration"
+    ]
+    partnership = max(
+        partnerships,
+        key=lambda deal: (
+            deal.risk + deal.conflict_pressure - deal.enablement_level,
+            int(deal.sourced_revenue),
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    return PendingEvent(
+        event_id="integration_cutover_command",
+        category=EventCategory.PRODUCT_INCIDENT,
+        title="Integration Cutover Command",
+        description=(
+            f"{partnership.name} now needs a harder cutover command around {target.name}. You "
+            "can fund the command now or absorb more go-live drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=10,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_cutover_command",
+                label="Fund the cutover command",
+                description="Spend cash to steady integration quality and onboarding trust.",
+            ),
+            EventOption(
+                id="stretch_cutover_command",
+                label="Stretch the command",
+                description="Protect cash now, but let cutover drag keep rising.",
+            ),
+        ],
+    )
+
+
 def _is_marketplace_dispute_program_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     marketplace_partnerships = [
@@ -5597,6 +5990,86 @@ def _build_marketplace_policy_appeal_event(
                 id="absorb_policy_drag",
                 label="Absorb the policy drag",
                 description="Protect cash now, but let billing friction keep hurting trust.",
+            ),
+        ],
+    )
+
+
+def _is_marketplace_penalty_panel_eligible(state: GameState) -> bool:
+    portfolio = calculate_partnership_portfolio(state)
+    marketplace_partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "marketplace"
+    ]
+    return bool(marketplace_partnerships) and (
+        _has_recent_event(
+            state,
+            {"marketplace_policy_appeal"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and (
+            portfolio.hotspot_channel == "marketplace"
+            or portfolio.paused_dependency_score
+            >= BALANCE.finance_planner_reactivate_dependency_threshold
+            or any(
+                account.status is not CustomerAccountStatus.CHURNED
+                and (
+                    account.invoice_risk >= 14
+                    or account.failed_payment_risk >= 14
+                    or account.dunning_steps > 0
+                )
+                for account in state.customer_accounts
+            )
+        )
+    )
+
+
+def _build_marketplace_penalty_panel_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    partnerships = [
+        partnership
+        for partnership in state.partnerships
+        if partnership.status is not PartnershipStatus.PAUSED
+        and partnership.channel.value == "marketplace"
+    ]
+    partnership = max(
+        partnerships,
+        key=lambda deal: (
+            int(deal.sourced_revenue) + deal.risk + deal.conflict_pressure,
+            rng.randint(0, 10),
+        ),
+    )
+    target = _get_product_by_id(state.products, partnership.product_id)
+    if target is None:
+        raise ValueError("This event expected a product target.")
+    return PendingEvent(
+        event_id="marketplace_penalty_panel",
+        category=EventCategory.REPUTATION_INCIDENT,
+        title="Marketplace Penalty Panel",
+        description=(
+            f"{partnership.name} now needs a harder penalty panel around {target.name}. You can "
+            "fund the panel now or absorb another round of billing and trust drag."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="channel_chain",
+        chain_stage=10,
+        target_product_id=target.id,
+        options=[
+            EventOption(
+                id="fund_penalty_panel",
+                label="Fund the penalty panel",
+                description="Spend cash to calm billing friction and protect renewal quality.",
+            ),
+            EventOption(
+                id="absorb_penalty_drag",
+                label="Absorb the penalty drag",
+                description="Protect cash now, but let trust and payment drag rise again.",
             ),
         ],
     )
@@ -5955,6 +6428,57 @@ def _build_board_reset_trust_vote_event(
             EventOption(
                 id="defer_trust_vote",
                 label="Defer the trust vote",
+                description="Protect flexibility now, but let reset pressure compound again.",
+            ),
+        ],
+    )
+
+
+def _is_board_reset_cash_charter_eligible(state: GameState) -> bool:
+    pressure = calculate_endgame_pressure(state)
+    return (
+        _has_recent_event(
+            state,
+            {"board_reset_trust_vote"},
+            BALANCE.event_chain_recent_window_turns,
+        )
+        and pressure.board_reset_risk >= BALANCE.event_board_reset_trust_vote_pressure_threshold
+        and (
+            state.finance.board_warning_level >= 1
+            or state.finance.governance_crisis_active
+            or pressure.restructure_heat >= 60
+            or state.finance.board_resolution_due
+        )
+    )
+
+
+def _build_board_reset_cash_charter_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    del rng
+    return PendingEvent(
+        event_id="board_reset_cash_charter",
+        category=EventCategory.FUNDING_OPPORTUNITY,
+        title="Board-Reset Cash Charter",
+        description=(
+            "Directors now want a cash charter that proves the reset can survive another cycle. "
+            "You can ratify the charter now or stretch it and absorb another round of reset heat."
+        ),
+        triggered_turn=state.company.current_turn,
+        cooldown_turns=cooldown_turns,
+        chain_id="governance_chain",
+        chain_stage=10,
+        options=[
+            EventOption(
+                id="ratify_cash_charter",
+                label="Ratify the cash charter",
+                description="Lean harder into resilience and buy more governance trust back.",
+            ),
+            EventOption(
+                id="stretch_cash_charter",
+                label="Stretch the cash charter",
                 description="Protect flexibility now, but let reset pressure compound again.",
             ),
         ],

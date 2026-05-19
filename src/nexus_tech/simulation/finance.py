@@ -814,6 +814,17 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_white_glove_reference_committee")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and white_glove_queue_risk_accounts > 0
+        and (
+            premium_revenue_at_risk_value >= Decimal("2800.00")
+            or finance.board_pressure >= 26
+            or renewal_pressure_value >= Decimal("2000.00")
+            or high_value_risk_accounts > 0
+        )
+    ):
+        recommended_actions.append("run_white_glove_escalation_cell")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -822,6 +833,16 @@ def build_finance_planner(
         and (focus_alignment_gap > 0 or support_backlog >= 10)
     ):
         recommended_actions.append("run_onboarding_fast_track")
+    if (
+        support_hotspot_lane is SupportLaneFocus.ONBOARDING
+        and hotspot_lane_account_count > 1
+        and (
+            focus_alignment_gap > 0
+            or support_backlog >= 12
+            or revenue_at_risk_value >= Decimal("1800.00")
+        )
+    ):
+        recommended_actions.append("run_onboarding_control_tower")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
     if (
@@ -843,6 +864,13 @@ def build_finance_planner(
         and (finance.covenant_risk >= 14 or capital_fragility >= 58)
     ):
         recommended_actions.append("run_billing_covenant_reset")
+    if support_hotspot_lane is SupportLaneFocus.BILLING and (
+        renewal_pressure_value >= Decimal("2400.00")
+        or finance.covenant_risk >= 16
+        or capital_fragility >= 60
+        or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+    ):
+        recommended_actions.append("run_billing_dispute_desk")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -1072,6 +1100,19 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("set_endgame_capital_map")
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 26
+        or finance.governance_risk >= 46
+        or finance.covenant_risk >= 14
+        or capital_fragility >= 60
+        or reserve_gap < ZERO_MONEY
+    ):
+        recommended_actions.append("set_exit_readiness_buffer")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1193,6 +1234,16 @@ def build_finance_planner(
                 "run a white-glove reference committee before flagship premium accounts become "
                 "the next roadshow or diligence weak point"
             )
+        if (
+            premium_revenue_at_risk_value >= Decimal("2800.00")
+            or finance.board_pressure >= 26
+            or renewal_pressure_value >= Decimal("2000.00")
+            or high_value_risk_accounts > 0
+        ):
+            action_sequence.append(
+                "run a white-glove escalation cell before premium backlog and renewal drag "
+                "become the defining late-game fracture"
+            )
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         action_sequence.append(
             "run onboarding recovery before implementation drag compounds into churn and board heat"
@@ -1201,6 +1252,15 @@ def build_finance_planner(
             action_sequence.append(
                 "fast-track the most exposed onboarding account before implementation drag hardens "
                 "into late-game narrative damage"
+            )
+        if hotspot_lane_account_count > 1 and (
+            focus_alignment_gap > 0
+            or support_backlog >= 12
+            or revenue_at_risk_value >= Decimal("1800.00")
+        ):
+            action_sequence.append(
+                "run an onboarding control tower before implementation drag turns into a "
+                "multi-account renewal problem"
             )
     if (
         support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0
@@ -1225,6 +1285,16 @@ def build_finance_planner(
             action_sequence.append(
                 "run a billing covenant reset before payment drag spreads into covenant and "
                 "capital stress"
+            )
+        if (
+            renewal_pressure_value >= Decimal("2400.00")
+            or finance.covenant_risk >= 16
+            or capital_fragility >= 60
+            or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+        ):
+            action_sequence.append(
+                "run a billing dispute desk before billing friction becomes the capital and "
+                "renewal story"
             )
     if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
         action_sequence.append(
@@ -1495,6 +1565,22 @@ def build_finance_planner(
         action_sequence.append(
             "set an endgame capital map before late-game pressure locks the company into the "
             "wrong capital story"
+        )
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 26
+        or finance.governance_risk >= 46
+        or finance.covenant_risk >= 14
+        or capital_fragility >= 60
+        or reserve_gap < ZERO_MONEY
+    ):
+        action_sequence.append(
+            "set an exit-readiness buffer before path-specific pressure forces the company into "
+            "a weaker liquidity posture"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(

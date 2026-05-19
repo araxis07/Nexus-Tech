@@ -62,6 +62,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_covenant_firewall,
     apply_set_debt_strategy,
     apply_set_endgame_capital_map,
+    apply_set_exit_readiness_buffer,
     apply_set_growth_firebreak,
     apply_set_path_capital_posture,
     apply_step_up_reserve_discipline,
@@ -209,6 +210,7 @@ from nexus_tech.simulation.support_program import (
     route_support_escalation,
     run_account_rescue,
     run_billing_covenant_reset,
+    run_billing_dispute_desk,
     run_billing_retention_reset,
     run_billing_stabilization,
     run_enterprise_assurance,
@@ -216,11 +218,13 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_reference_cycle,
     run_enterprise_renewal_cabinet,
     run_lane_recovery,
+    run_onboarding_control_tower,
     run_onboarding_fast_track,
     run_onboarding_recovery,
     run_reference_rescue,
     run_renewal_sweep,
     run_white_glove_backstop,
+    run_white_glove_escalation_cell,
     run_white_glove_recovery,
     run_white_glove_reference_committee,
     run_white_glove_reference_ring,
@@ -746,6 +750,11 @@ def apply_action(
         logger.debug("Set endgame capital map.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_EXIT_READINESS_BUFFER:
+        summary = apply_set_exit_readiness_buffer(next_state)
+        logger.debug("Set exit-readiness buffer.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1146,6 +1155,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_WHITE_GLOVE_ESCALATION_CELL:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_white_glove_escalation_cell(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran white-glove escalation cell for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_REFERENCE_RESCUE:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1210,6 +1233,34 @@ def apply_action(
         summary = run_billing_covenant_reset(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran billing covenant reset for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_BILLING_DISPUTE_DESK:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_dispute_desk(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing dispute desk for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_control_tower(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding control tower for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

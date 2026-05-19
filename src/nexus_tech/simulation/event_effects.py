@@ -2457,6 +2457,25 @@ def _apply_reseller_pipeline_cadence(
     raise ValueError(f"Unsupported option {option_id} for reseller pipeline cadence.")
 
 
+def _apply_reseller_recovery_compact(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_recovery_compact": "fund_pipeline_cadence",
+        "stretch_recovery_compact": "let_pipeline_churn",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for reseller recovery compact.")
+    result = _apply_reseller_pipeline_cadence(state, event, mapped_option)
+    return result.replace("reseller pipeline cadence", "reseller recovery compact").replace(
+        "pipeline cadence",
+        "recovery compact",
+    )
+
+
 def _apply_integration_cutover_risk(
     state: GameState,
     event: PendingEvent,
@@ -2911,6 +2930,25 @@ def _apply_integration_go_live_shield(
     raise ValueError(f"Unsupported option {option_id} for integration go-live shield.")
 
 
+def _apply_integration_cutover_command(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_cutover_command": "fund_go_live_shield",
+        "stretch_cutover_command": "accept_go_live_drag",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for integration cutover command.")
+    result = _apply_integration_go_live_shield(state, event, mapped_option)
+    return result.replace("integration go-live shield", "integration cutover command").replace(
+        "go-live shield",
+        "cutover command",
+    )
+
+
 def _apply_marketplace_chargeback_wave(
     state: GameState,
     event: PendingEvent,
@@ -3361,6 +3399,29 @@ def _apply_marketplace_policy_appeal(
         )
 
     raise ValueError(f"Unsupported option {option_id} for marketplace policy appeal.")
+
+
+def _apply_marketplace_penalty_panel(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_penalty_panel": "fund_policy_appeal",
+        "absorb_penalty_drag": "absorb_policy_drag",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for marketplace penalty panel.")
+    result = _apply_marketplace_policy_appeal(state, event, mapped_option)
+    return (
+        result.replace("marketplace policy appeal", "marketplace penalty panel")
+        .replace(
+            "marketplace policy drag",
+            "marketplace penalty drag",
+        )
+        .replace("policy appeal", "penalty panel")
+    )
 
 
 def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -4023,6 +4084,25 @@ def _apply_board_reset_trust_vote(
         )
 
     raise ValueError(f"Unsupported option {option_id} for board-reset trust vote.")
+
+
+def _apply_board_reset_cash_charter(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_cash_charter": "ratify_trust_vote",
+        "stretch_cash_charter": "defer_trust_vote",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for board-reset cash charter.")
+    result = _apply_board_reset_trust_vote(state, event, mapped_option)
+    return result.replace("board-reset trust vote", "board-reset cash charter").replace(
+        "trust vote",
+        "cash charter",
+    )
 
 
 def _apply_capital_market_freeze(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -4951,6 +5031,22 @@ def _apply_ipo_bookbuild_corridor(
     raise ValueError(f"Unsupported option {option_id} for IPO bookbuild corridor.")
 
 
+def _apply_ipo_allocation_lock(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_allocation_lock": "fund_bookbuild_corridor",
+        "defer_allocation_lock": "defer_bookbuild_corridor",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for IPO allocation lock.")
+    result = _apply_ipo_bookbuild_corridor(state, event, mapped_option)
+    return result.replace("bookbuild corridor", "allocation lock")
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -5741,6 +5837,22 @@ def _apply_buyer_board_alignment(
         )
 
     raise ValueError(f"Unsupported option {option_id} for buyer board alignment.")
+
+
+def _apply_buyer_close_cadence(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "staff_close_cadence": "staff_board_alignment",
+        "hold_close_cadence": "hold_alignment_gap",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for buyer close cadence.")
+    result = _apply_buyer_board_alignment(state, event, mapped_option)
+    return result.replace("buyer board alignment", "buyer close cadence")
 
 
 def _apply_independence_reckoning(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -6535,6 +6647,22 @@ def _apply_independence_liquidity_charter(
     raise ValueError(f"Unsupported option {option_id} for independence liquidity charter.")
 
 
+def _apply_independence_margin_charter(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_margin_charter": "ratify_liquidity_charter",
+        "bridge_margin_gap": "bridge_liquidity_gap",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for independence margin charter.")
+    result = _apply_independence_liquidity_charter(state, event, mapped_option)
+    return result.replace("independence liquidity charter", "independence margin charter")
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -6774,6 +6902,7 @@ EVENT_EFFECT_HANDLERS = {
     "ipo_reference_committee": _apply_ipo_reference_committee,
     "ipo_roadshow_lock": _apply_ipo_roadshow_lock,
     "ipo_bookbuild_corridor": _apply_ipo_bookbuild_corridor,
+    "ipo_allocation_lock": _apply_ipo_allocation_lock,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
     "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
@@ -6784,6 +6913,7 @@ EVENT_EFFECT_HANDLERS = {
     "buyer_signing_committee": _apply_buyer_signing_committee,
     "buyer_close_readiness": _apply_buyer_close_readiness,
     "buyer_board_alignment": _apply_buyer_board_alignment,
+    "buyer_close_cadence": _apply_buyer_close_cadence,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
     "independence_refinancing_wall": _apply_independence_refinancing_wall,
@@ -6794,6 +6924,7 @@ EVENT_EFFECT_HANDLERS = {
     "independence_treasury_compact": _apply_independence_treasury_compact,
     "independence_cash_command": _apply_independence_cash_command,
     "independence_liquidity_charter": _apply_independence_liquidity_charter,
+    "independence_margin_charter": _apply_independence_margin_charter,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
@@ -6806,16 +6937,19 @@ EVENT_EFFECT_HANDLERS = {
     "reseller_commitment_review": _apply_reseller_commitment_review,
     "reseller_margin_council": _apply_reseller_margin_council,
     "reseller_pipeline_cadence": _apply_reseller_pipeline_cadence,
+    "reseller_recovery_compact": _apply_reseller_recovery_compact,
     "integration_cutover_risk": _apply_integration_cutover_risk,
     "integration_cutover_board": _apply_integration_cutover_board,
     "integration_release_cutline": _apply_integration_release_cutline,
     "integration_support_bridge": _apply_integration_support_bridge,
     "integration_go_live_shield": _apply_integration_go_live_shield,
+    "integration_cutover_command": _apply_integration_cutover_command,
     "marketplace_chargeback_wave": _apply_marketplace_chargeback_wave,
     "marketplace_dispute_program": _apply_marketplace_dispute_program,
     "marketplace_refund_charter": _apply_marketplace_refund_charter,
     "marketplace_trust_reset": _apply_marketplace_trust_reset,
     "marketplace_policy_appeal": _apply_marketplace_policy_appeal,
+    "marketplace_penalty_panel": _apply_marketplace_penalty_panel,
     "board_recovery_window": _apply_board_recovery_window,
     "board_reset_showdown": _apply_board_reset_showdown,
     "board_reset_execution_plan": _apply_board_reset_execution_plan,
@@ -6823,6 +6957,7 @@ EVENT_EFFECT_HANDLERS = {
     "board_reset_governance_table": _apply_board_reset_governance_table,
     "board_reset_balance_sheet_treaty": _apply_board_reset_balance_sheet_treaty,
     "board_reset_trust_vote": _apply_board_reset_trust_vote,
+    "board_reset_cash_charter": _apply_board_reset_cash_charter,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,
