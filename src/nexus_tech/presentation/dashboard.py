@@ -2264,6 +2264,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "126",
+        "run_white_glove_reference_bureau",
+        (
+            "Run a flagship premium reference bureau when white-glove queue strain, board heat, "
+            "and exit pressure are all colliding."
+        ),
+    )
+    primary_actions.add_row(
         "104",
         "run_enterprise_reference_cycle",
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
@@ -2298,11 +2306,27 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "127",
+        "run_billing_dispute_cabinet",
+        (
+            "Run a full billing dispute cabinet before payment drag, covenant heat, and renewal "
+            "loss become the late-game financing story."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
             "Run a deeper onboarding control tower before implementation drag starts "
             "poisoning renewals and board confidence."
+        ),
+    )
+    primary_actions.add_row(
+        "128",
+        "run_onboarding_launch_cell",
+        (
+            "Run a launch-cell follow-up when onboarding backlog, account drag, and renewal "
+            "pressure are compounding together."
         ),
     )
     primary_actions.add_row(
@@ -2435,6 +2459,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Build a path-aware reserve and liquidity buffer before exit pressure locks "
             "the run into the wrong capital posture."
+        ),
+    )
+    primary_actions.add_row(
+        "129",
+        "set_terminal_liquidity_controls",
+        (
+            "Force a harder path-aware liquidity and reserve posture when late-game fragility is "
+            "starting to dictate the whole company."
         ),
     )
     primary_actions.add_row(
