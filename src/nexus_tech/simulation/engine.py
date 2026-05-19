@@ -61,6 +61,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_capital_plan,
     apply_set_covenant_firewall,
     apply_set_debt_strategy,
+    apply_set_endgame_capital_map,
     apply_set_growth_firebreak,
     apply_set_path_capital_posture,
     apply_step_up_reserve_discipline,
@@ -207,6 +208,7 @@ from nexus_tech.simulation.support_program import (
     invest_in_support_staffing,
     route_support_escalation,
     run_account_rescue,
+    run_billing_covenant_reset,
     run_billing_retention_reset,
     run_billing_stabilization,
     run_enterprise_assurance,
@@ -220,6 +222,7 @@ from nexus_tech.simulation.support_program import (
     run_renewal_sweep,
     run_white_glove_backstop,
     run_white_glove_recovery,
+    run_white_glove_reference_committee,
     run_white_glove_reference_ring,
     run_white_glove_renewal_guard,
     set_support_lane_focus,
@@ -738,6 +741,11 @@ def apply_action(
         logger.debug("Set path capital posture.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_ENDGAME_CAPITAL_MAP:
+        summary = apply_set_endgame_capital_map(next_state)
+        logger.debug("Set endgame capital map.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1124,6 +1132,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_COMMITTEE:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_white_glove_reference_committee(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran white-glove reference committee for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_REFERENCE_RESCUE:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1174,6 +1196,20 @@ def apply_action(
         summary = run_billing_retention_reset(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran billing retention reset for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_BILLING_COVENANT_RESET:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_covenant_reset(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing covenant reset for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

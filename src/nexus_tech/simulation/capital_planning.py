@@ -17,7 +17,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.endgame import calculate_endgame_readiness
+from nexus_tech.simulation.endgame import calculate_endgame_pressure, calculate_endgame_readiness
 from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
 from nexus_tech.simulation.support_program import calculate_support_queue_exposure
 
@@ -1001,6 +1001,168 @@ def apply_set_path_capital_posture(state: GameState) -> CapitalPlanSummary:
     return CapitalPlanSummary(
         message=(
             f"Set a {posture_note} capital posture. Reserve target "
+            f"{format_money(reserve_target)} over {planning_horizon_turns} turns. Allocation now "
+            f"P {product_share}% / GTM {go_to_market_share}% / Reserve {reserve_share}% with "
+            f"{source_preference.value} capital."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
+def apply_set_endgame_capital_map(state: GameState) -> CapitalPlanSummary:
+    """Aggressively remap capital to the current late-game path and its active fragilities."""
+
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    reserve_gap = state.capital_plan.reserve_target - state.company.cash_on_hand
+
+    if (
+        pressure.board_reset_risk < 60
+        and pressure.public_market_scrutiny < 62
+        and pressure.acquirer_diligence < 62
+        and pressure.independence_discipline < 62
+        and state.finance.governance_risk < 46
+        and state.finance.covenant_risk < 14
+        and reserve_gap <= Decimal("0.00")
+        and queue_exposure.hotspot_lane_overflow <= 0
+        and portfolio.hotspot_dependency_score
+        < BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        raise ValueError("There is not enough late-game strain to justify an endgame capital map.")
+    if state.company.cash_on_hand < BALANCE.capital_plan_endgame_capital_map_cost:
+        raise ValueError("Not enough cash to set an endgame capital map this turn.")
+
+    capital_plan = state.capital_plan
+    state.company.cash_on_hand = quantize_money(
+        state.company.cash_on_hand - BALANCE.capital_plan_endgame_capital_map_cost
+    )
+    reserve_target = quantize_money(
+        capital_plan.reserve_target + BALANCE.capital_plan_endgame_capital_map_target_step
+    )
+    planning_horizon_turns = min(
+        12,
+        capital_plan.planning_horizon_turns + BALANCE.capital_plan_endgame_capital_map_horizon_gain,
+    )
+    reserve_share = (
+        capital_plan.reserve_share + BALANCE.capital_plan_endgame_capital_map_reserve_share_shift
+    )
+    go_to_market_share = max(
+        0,
+        capital_plan.go_to_market_share - BALANCE.capital_plan_endgame_capital_map_gtm_share_shift,
+    )
+    product_share = max(
+        0,
+        capital_plan.product_investment_share
+        - BALANCE.capital_plan_endgame_capital_map_product_share_shift,
+    )
+    source_preference = capital_plan.source_preference
+    mode = CapitalPlanMode.BALANCED
+    map_note = readiness.strategic_outlook.replace("_", " ")
+
+    if (
+        pressure.board_reset_risk >= 64
+        or state.finance.governance_risk >= 52
+        or state.finance.restructuring_pressure >= 44
+    ):
+        source_preference = CapitalSourcePreference.BOOTSTRAP
+        reserve_share += 3
+        go_to_market_share = max(0, go_to_market_share - 2)
+        mode = CapitalPlanMode.CONSERVE
+        map_note = "board reset"
+    elif readiness.strategic_outlook == "ipo_ready":
+        if source_preference in {
+            CapitalSourcePreference.DEBT,
+            CapitalSourcePreference.VENTURE,
+        }:
+            source_preference = CapitalSourcePreference.ANGEL
+        product_share += 2
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 3)
+    elif readiness.strategic_outlook == "strategic_acquisition":
+        if source_preference is CapitalSourcePreference.DEBT:
+            source_preference = CapitalSourcePreference.ANGEL
+        reserve_share += 2
+        product_share += 1
+        go_to_market_share = max(0, go_to_market_share - 3)
+    else:
+        source_preference = CapitalSourcePreference.BOOTSTRAP
+        reserve_share += 3
+        go_to_market_share = max(0, go_to_market_share - 3)
+        mode = CapitalPlanMode.CONSERVE
+
+    if queue_exposure.hotspot_lane_overflow > 0:
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if queue_exposure.white_glove_queue_risk_accounts > 0:
+        product_share += 1
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if (
+        queue_exposure.renewal_queue_risk_accounts > 0
+        and readiness.strategic_outlook != "ipo_ready"
+    ):
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold
+    ):
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if reserve_gap > Decimal("0.00") or state.finance.covenant_risk >= 16:
+        reserve_share += 1
+
+    if (
+        capital_plan.mode is CapitalPlanMode.EXPAND
+        or state.finance.board_pressure >= 28
+        or state.finance.governance_risk >= 50
+        or pressure.board_reset_risk >= 64
+    ):
+        mode = CapitalPlanMode.CONSERVE
+
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=mode,
+        source_preference=source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    state.finance.board_pressure = max(
+        0,
+        state.finance.board_pressure
+        - BALANCE.capital_plan_endgame_capital_map_board_pressure_relief,
+    )
+    state.finance.governance_risk = max(
+        0,
+        state.finance.governance_risk
+        - BALANCE.capital_plan_endgame_capital_map_governance_risk_relief,
+    )
+    state.finance.investor_pressure = max(
+        0,
+        state.finance.investor_pressure
+        - BALANCE.capital_plan_endgame_capital_map_investor_pressure_relief,
+    )
+    state.finance.covenant_risk = max(
+        0,
+        state.finance.covenant_risk - BALANCE.capital_plan_endgame_capital_map_covenant_relief,
+    )
+    state.finance.board_confidence = min(
+        100,
+        state.finance.board_confidence
+        + BALANCE.capital_plan_endgame_capital_map_board_confidence_gain,
+    )
+    return CapitalPlanSummary(
+        message=(
+            f"Set an endgame capital map for the {map_note} story. Reserve target "
             f"{format_money(reserve_target)} over {planning_horizon_turns} turns. Allocation now "
             f"P {product_share}% / GTM {go_to_market_share}% / Reserve {reserve_share}% with "
             f"{source_preference.value} capital."

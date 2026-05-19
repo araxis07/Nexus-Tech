@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.0 - 2026-05-19
+
+- Added `run_white_glove_reference_committee`, `run_billing_covenant_reset`, and `set_endgame_capital_map` as deeper late-game follow-up actions for flagship support rescue, billing/covenant cleanup, and path-aware capital control
+- Added path-specific follow-up events `ipo_bookbuild_corridor`, `buyer_board_alignment`, `independence_liquidity_charter`, and `board_reset_trust_vote` so IPO, acquisition, independence, and board-reset runs each gain another distinct late-game branch
+- Added channel-specific follow-up events `reseller_pipeline_cadence`, `integration_go_live_shield`, and `marketplace_policy_appeal` so reseller, integration, and marketplace lanes continue diverging under late-game pressure
+- Expanded finance-planner and endgame guidance to recommend the new support and capital actions once premium queue strain, billing heat, governance stress, and hotspot channel dependency start converging
+- Added regression coverage for the new actions and event handlers plus a seeded 280-turn board-recovery stability run
+- Promoted the package version to `0.63.0`
+
 ## 0.62.0 - 2026-05-18
 
 - Added `run_white_glove_reference_ring` and `set_path_capital_posture` as deeper late-game follow-up actions for flagship premium-account recovery and route-aware capital control

@@ -274,9 +274,11 @@ ACTION_KEYS = {
     "108": TurnAction.RUN_WHITE_GLOVE_BACKSTOP,
     "112": TurnAction.RUN_WHITE_GLOVE_RENEWAL_GUARD,
     "117": TurnAction.RUN_WHITE_GLOVE_REFERENCE_RING,
+    "119": TurnAction.RUN_WHITE_GLOVE_REFERENCE_COMMITTEE,
     "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
     "115": TurnAction.RUN_ENTERPRISE_RENEWAL_CABINET,
     "105": TurnAction.RUN_BILLING_RETENTION_RESET,
+    "120": TurnAction.RUN_BILLING_COVENANT_RESET,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -330,6 +332,7 @@ ACTION_KEYS = {
     "114": TurnAction.SET_DEBT_STRATEGY,
     "116": TurnAction.SET_GROWTH_FIREBREAK,
     "118": TurnAction.SET_PATH_CAPITAL_POSTURE,
+    "121": TurnAction.SET_ENDGAME_CAPITAL_MAP,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1684,6 +1687,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_BILLING_COVENANT_RESET:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_ONBOARDING_FAST_TRACK:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1715,6 +1724,12 @@ def collect_action_context(
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_RING:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_COMMITTEE:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None

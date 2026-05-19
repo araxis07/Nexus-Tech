@@ -2248,6 +2248,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "119",
+        "run_white_glove_reference_committee",
+        (
+            "Run a final flagship premium-account recovery pass before reference "
+            "fragility hardens the late-game path."
+        ),
+    )
+    primary_actions.add_row(
         "104",
         "run_enterprise_reference_cycle",
         "Rebuild one flagship enterprise account before IPO or diligence stories harden.",
@@ -2264,6 +2272,14 @@ def _build_action_menu_panel() -> Panel:
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
+    )
+    primary_actions.add_row(
+        "120",
+        "run_billing_covenant_reset",
+        (
+            "Reset one billing-heavy account before payment drag starts feeding "
+            "covenant and capital stress."
+        ),
     )
     primary_actions.add_row(
         "93",
@@ -2379,6 +2395,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Align capital allocation to the current endgame path before board, "
             "queue, or channel pressure hardens the wrong story."
+        ),
+    )
+    primary_actions.add_row(
+        "121",
+        "set_endgame_capital_map",
+        (
+            "Aggressively remap reserve, GTM, and product allocation to the "
+            "current late-game path and its active fragilities."
         ),
     )
     primary_actions.add_row(
