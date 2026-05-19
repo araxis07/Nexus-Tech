@@ -2744,6 +2744,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "ipo_bookbuild_corridor" in registry_ids
     assert "ipo_allocation_lock" in registry_ids
     assert "ipo_pricing_guardrail" in registry_ids
+    assert "ipo_order_book_covenant" in registry_ids
     assert "acquirer_diligence" in registry_ids
     assert "buyer_reference_check" in registry_ids
     assert "buyer_channel_conflict_review" in registry_ids
@@ -2756,6 +2757,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "buyer_board_alignment" in registry_ids
     assert "buyer_close_cadence" in registry_ids
     assert "buyer_close_committee" in registry_ids
+    assert "buyer_close_signoff" in registry_ids
     assert "independence_reckoning" in registry_ids
     assert "independence_cash_crunch" in registry_ids
     assert "independence_refinancing_wall" in registry_ids
@@ -2768,6 +2770,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "independence_liquidity_charter" in registry_ids
     assert "independence_margin_charter" in registry_ids
     assert "independence_liquidity_grid" in registry_ids
+    assert "independence_reserve_compact" in registry_ids
     assert "reseller_enablement_gap" in registry_ids
     assert "reseller_reference_summit" in registry_ids
     assert "reseller_commitment_review" in registry_ids
@@ -2775,6 +2778,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "reseller_pipeline_cadence" in registry_ids
     assert "reseller_recovery_compact" in registry_ids
     assert "reseller_service_council" in registry_ids
+    assert "reseller_service_charter" in registry_ids
     assert "integration_cutover_risk" in registry_ids
     assert "integration_cutover_board" in registry_ids
     assert "integration_release_cutline" in registry_ids
@@ -2782,6 +2786,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "integration_go_live_shield" in registry_ids
     assert "integration_cutover_command" in registry_ids
     assert "integration_hypercare_grid" in registry_ids
+    assert "integration_hypercare_board" in registry_ids
     assert "marketplace_chargeback_wave" in registry_ids
     assert "marketplace_dispute_program" in registry_ids
     assert "marketplace_refund_charter" in registry_ids
@@ -2789,6 +2794,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "marketplace_policy_appeal" in registry_ids
     assert "marketplace_penalty_panel" in registry_ids
     assert "marketplace_refund_bench" in registry_ids
+    assert "marketplace_refund_appeal" in registry_ids
     assert "board_reset_execution_plan" in registry_ids
     assert "board_reset_operating_cadence" in registry_ids
     assert "board_reset_governance_table" in registry_ids
@@ -2796,6 +2802,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "board_reset_trust_vote" in registry_ids
     assert "board_reset_cash_charter" in registry_ids
     assert "board_reset_runway_table" in registry_ids
+    assert "board_reset_operating_charter" in registry_ids
 
 
 def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
@@ -5024,6 +5031,169 @@ def test_run_onboarding_control_tower_stabilizes_implementation_hotspot() -> Non
     assert updated_account.churn_risk < account.churn_risk
     assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
     assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_enterprise_commitment_board_hardens_flagship_exit_story() -> None:
+    product = make_product(
+        "Enterprise Commitment Board Core",
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Commitment Board Flagship",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("6400.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=50,
+        onboarding_health=46,
+        support_load=36,
+        open_tickets=8,
+        sla_breach_risk=56,
+        ticket_queue_age=3,
+        expansion_potential=58,
+        renewal_health=38,
+        renewal_turn=5,
+        churn_risk=34,
+        escalation_count=3,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("11600.00"))
+    state.support_program.backlog_queue = 12
+    state.support_program.escalation_queue = 5
+    state.finance.board_pressure = 30
+    state.finance.board_confidence = 34
+    state.finance.board_score = 32
+    state.finance.investor_pressure = 18
+    state.company.reputation = 70
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ENTERPRISE_COMMITMENT_BOARD,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert updated_account.support_tier is SupportTier.WHITE_GLOVE
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.expansion_potential > account.expansion_potential
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_billing_collection_bridge_cools_extreme_collections_heat() -> None:
+    product = make_product("Billing Collection Bridge Core", target_segment=MarketSegment.SMB)
+    account = CustomerAccount(
+        name="Collection Bridge Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("3000.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=44,
+        onboarding_health=56,
+        support_load=34,
+        open_tickets=8,
+        sla_breach_risk=38,
+        ticket_queue_age=3,
+        expansion_potential=46,
+        renewal_health=38,
+        renewal_turn=4,
+        churn_risk=36,
+        invoice_risk=54,
+        failed_payment_risk=48,
+        dunning_steps=4,
+        escalation_count=3,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("11200.00"))
+    state.support_program.backlog_queue = 9
+    state.support_program.escalation_queue = 4
+    state.finance.board_pressure = 28
+    state.finance.investor_pressure = 22
+    state.finance.covenant_risk = 20
+    state.finance.board_confidence = 38
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_BILLING_COLLECTION_BRIDGE,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.BILLING
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.invoice_risk < account.invoice_risk
+    assert updated_account.failed_payment_risk < account.failed_payment_risk
+    assert updated_account.dunning_steps < account.dunning_steps
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_onboarding_adoption_hub_stabilizes_extreme_implementation_drag() -> None:
+    product = make_product("Onboarding Adoption Hub Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Adoption Hub Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("3200.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=48,
+        onboarding_health=28,
+        support_load=34,
+        open_tickets=7,
+        sla_breach_risk=38,
+        ticket_queue_age=3,
+        expansion_potential=50,
+        renewal_health=38,
+        renewal_turn=6,
+        churn_risk=30,
+        escalation_count=2,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("9800.00"))
+    state.support_program.backlog_queue = 10
+    state.support_program.escalation_queue = 4
+    state.finance.board_pressure = 24
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ONBOARDING_ADOPTION_HUB,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ONBOARDING
+    assert updated_account.support_tier is SupportTier.WHITE_GLOVE
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
     assert outcome.state.finance.board_pressure < state.finance.board_pressure
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
@@ -7446,6 +7616,47 @@ def test_finance_planner_recommends_enterprise_renewal_cabinet_for_flagship_rene
     assert any("enterprise renewal cabinet" in step for step in planner.action_sequence)
 
 
+def test_finance_planner_recommends_enterprise_commitment_board_for_extreme_exit_heat() -> None:
+    state = make_state(
+        make_product("Enterprise Commitment Planning Core"),
+        cash_on_hand=Decimal("5000.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.BALANCED,
+            source_preference=CapitalSourcePreference.ANGEL,
+            reserve_target=Decimal("5200.00"),
+            product_investment_share=34,
+            go_to_market_share=38,
+            reserve_share=28,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-640.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=12,
+        support_escalations=4,
+        revenue_at_risk_value=Decimal("2800.00"),
+        renewal_pressure_value=Decimal("2500.00"),
+        high_value_risk_accounts=1,
+        enterprise_queue_risk_accounts=1,
+        renewal_queue_risk_accounts=1,
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=2,
+        hotspot_lane_account_count=2,
+        focus_alignment_gap=1,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=70,
+        capital_fragility=56,
+    )
+
+    assert "run_enterprise_commitment_board" in planner.recommended_actions
+    assert any("enterprise commitment board" in step for step in planner.action_sequence)
+
+
 def test_finance_planner_recommends_partner_margin_reset_for_acquisition_hotspot() -> None:
     state = make_state(
         make_product("Partner Margin Planning Core"),
@@ -7528,6 +7739,126 @@ def test_finance_planner_recommends_channel_stability_reset_for_hotspot_dependen
 
     assert "run_channel_stability_reset" in planner.recommended_actions
     assert any("channel stability reset" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_channel_dependency_reset_for_extreme_hotspot_drag() -> None:
+    state = make_state(
+        make_product("Channel Dependency Planning Core"),
+        cash_on_hand=Decimal("5000.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("5400.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-760.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=12,
+        support_escalations=4,
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=2,
+        hotspot_lane_account_count=2,
+        focus_alignment_gap=2,
+        channel_conflict_index=31,
+        paused_dependency_score=60,
+        hotspot_dependency_score=84,
+        hotspot_revenue_share_percent=44,
+        volatile_revenue_share_percent=27,
+        hotspot_channel="integration",
+        strategic_outlook="strategic_acquisition",
+        dominant_endgame_pressure="acquirer_diligence",
+        commercial_fragility=70,
+        capital_fragility=58,
+    )
+
+    assert "run_channel_dependency_reset" in planner.recommended_actions
+    assert any("channel dependency reset" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_billing_collection_bridge_for_extreme_covenant_heat() -> None:
+    state = make_state(
+        make_product("Billing Collection Planning Core"),
+        cash_on_hand=Decimal("4200.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("5200.00"),
+            product_investment_share=36,
+            go_to_market_share=40,
+            reserve_share=24,
+        ),
+    )
+    state.finance.debt_principal = Decimal("3600.00")
+    state.finance.covenant_risk = 20
+    state.finance.board_pressure = 30
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-820.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=11,
+        support_escalations=4,
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.BILLING,
+        support_hotspot_lane_overflow=2,
+        hotspot_lane_account_count=2,
+        renewal_queue_risk_accounts=2,
+        renewal_pressure_value=Decimal("3300.00"),
+        strategic_outlook="profitable_independence",
+        dominant_endgame_pressure="independence_discipline",
+        commercial_fragility=64,
+        capital_fragility=70,
+    )
+
+    assert "run_billing_collection_bridge" in planner.recommended_actions
+    assert any("billing collection bridge" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_onboarding_adoption_hub_for_lane_overflow() -> None:
+    state = make_state(
+        make_product("Onboarding Adoption Planning Core"),
+        cash_on_hand=Decimal("4700.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.BALANCED,
+            source_preference=CapitalSourcePreference.ANGEL,
+            reserve_target=Decimal("5000.00"),
+            product_investment_share=35,
+            go_to_market_share=39,
+            reserve_share=26,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-540.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=16,
+        support_escalations=5,
+        revenue_at_risk_value=Decimal("2700.00"),
+        renewal_pressure_value=Decimal("2300.00"),
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane_overflow=2,
+        hotspot_lane_account_count=3,
+        focus_alignment_gap=2,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=62,
+        capital_fragility=50,
+    )
+
+    assert "run_onboarding_adoption_hub" in planner.recommended_actions
+    assert any("onboarding adoption hub" in step for step in planner.action_sequence)
 
 
 def test_finance_planner_recommends_lock_capital_buffer_for_independence_fragility() -> None:
@@ -8137,6 +8468,53 @@ def test_finance_planner_recommends_endgame_capital_map_for_board_reset_heat() -
     )
 
     assert "set_endgame_capital_map" in planner.recommended_actions
+
+
+def test_finance_planner_recommends_capital_reallocation_grid_for_reset_heat() -> None:
+    state = make_state(
+        make_product("Capital Reallocation Grid Planning Core"),
+        cash_on_hand=Decimal("5000.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("5600.00"),
+            product_investment_share=36,
+            go_to_market_share=42,
+            reserve_share=22,
+        ),
+    )
+    state.finance.board_pressure = 34
+    state.finance.governance_risk = 54
+    state.finance.covenant_risk = 18
+    state.finance.restructuring_pressure = 18
+    state.finance.board_warning_level = 2
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-860.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=15,
+        support_escalations=5,
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=4,
+        hotspot_lane_account_count=3,
+        focus_alignment_gap=3,
+        channel_conflict_index=32,
+        paused_dependency_score=48,
+        hotspot_dependency_score=82,
+        hotspot_revenue_share_percent=42,
+        volatile_revenue_share_percent=28,
+        hotspot_channel="reseller",
+        strategic_outlook="board_reset",
+        dominant_endgame_pressure="board_reset_risk",
+        commercial_fragility=74,
+        capital_fragility=76,
+    )
+
+    assert "set_capital_reallocation_grid" in planner.recommended_actions
+    assert any("capital reallocation grid" in step for step in planner.action_sequence)
 
 
 def test_finance_planner_recommends_exit_readiness_buffer_for_path_heat() -> None:
@@ -14440,6 +14818,37 @@ def test_three_hundred_twenty_turn_board_recovery_crucible_progression_is_seed_s
     assert run_once(3201) == run_once(3201)
 
 
+def test_three_hundred_forty_turn_board_recovery_crucible_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="board_recovery_crucible",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(340):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            state.finance.governance_risk,
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(3401) == run_once(3401)
+
+
 def test_reactivate_partnership_action_recovers_paused_channel() -> None:
     product = make_product("Paused Lane", market_fit=68, quality=72, bug_level=12)
     partnership = PartnershipDeal(
@@ -15128,6 +15537,72 @@ def test_run_channel_stability_reset_cools_hotspot_lane() -> None:
     assert updated_partnership.rev_share_rate < partnership.rev_share_rate
     assert updated_account.satisfaction > account.satisfaction
     assert updated_account.renewal_health > account.renewal_health
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_channel_dependency_reset_cools_hotspot_dependency_lane() -> None:
+    product = make_product("Channel Dependency Reset Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Integration Dependency Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2800.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=56,
+        onboarding_health=42,
+        support_load=30,
+        open_tickets=4,
+        renewal_health=46,
+        expansion_potential=60,
+        renewal_turn=7,
+        churn_risk=24,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Integration Dependency Hotspot",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.STRAINED,
+        quality=58,
+        risk=58,
+        conflict_pressure=56,
+        enablement_level=22,
+        sourced_revenue=Decimal("3600.00"),
+        sourced_users=46,
+        rev_share_rate=Decimal("0.2200"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("7800.00"),
+        current_turn=13,
+    )
+    state.finance.board_pressure = 22
+    state.finance.investor_pressure = 18
+    state.finance.board_confidence = 40
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_CHANNEL_DEPENDENCY_RESET,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated_partnership = outcome.state.partnerships[0]
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_partnership.status in {PartnershipStatus.RECOVERY, PartnershipStatus.ACTIVE}
+    assert updated_partnership.sourced_revenue < partnership.sourced_revenue
+    assert updated_partnership.sourced_users < partnership.sourced_users
+    assert updated_partnership.risk < partnership.risk
+    assert updated_partnership.conflict_pressure < partnership.conflict_pressure
+    assert updated_partnership.enablement_level > partnership.enablement_level
+    assert updated_partnership.quality > partnership.quality
+    assert updated_partnership.rev_share_rate < partnership.rev_share_rate
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.support_load < account.support_load
     assert outcome.state.finance.board_pressure < state.finance.board_pressure
     assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
     assert outcome.state.finance.board_confidence > state.finance.board_confidence
@@ -15961,6 +16436,86 @@ def test_set_endgame_capital_map_realigns_plan_for_board_reset_heat() -> None:
     assert outcome.state.finance.board_confidence > state.finance.board_confidence
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
     assert "endgame capital map" in outcome.message
+
+
+def test_set_capital_reallocation_grid_realigns_plan_for_multi_system_heat() -> None:
+    product = make_product("Capital Reallocation Grid Core")
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.EXPAND,
+        source_preference=CapitalSourcePreference.DEBT,
+        planning_horizon_turns=6,
+        reserve_target=Decimal("3900.00"),
+        product_investment_share=36,
+        go_to_market_share=41,
+        reserve_share=23,
+    )
+    account = CustomerAccount(
+        name="Reallocation Queue Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("3800.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=52,
+        onboarding_health=48,
+        support_load=36,
+        open_tickets=9,
+        sla_breach_risk=60,
+        renewal_health=46,
+        expansion_potential=62,
+        renewal_turn=7,
+        churn_risk=30,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Reallocation Hotspot Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=58,
+        risk=56,
+        conflict_pressure=52,
+        enablement_level=26,
+        sourced_revenue=Decimal("3400.00"),
+        sourced_users=44,
+        rev_share_rate=Decimal("0.2100"),
+    )
+    state = make_state(
+        product,
+        capital_plan=capital_plan,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6000.00"),
+    )
+    state.finance.board_pressure = 34
+    state.finance.governance_risk = 58
+    state.finance.investor_pressure = 20
+    state.finance.covenant_risk = 18
+    state.finance.board_confidence = 32
+    state.finance.board_warning_level = 2
+    state.finance.restructuring_pressure = 18
+    state.support_program.backlog_queue = 14
+    state.support_program.escalation_queue = 5
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_CAPITAL_REALLOCATION_GRID,
+        context=ActionContext(),
+    )
+
+    updated_plan = outcome.state.capital_plan
+    assert updated_plan.mode is CapitalPlanMode.CONSERVE
+    assert updated_plan.source_preference is CapitalSourcePreference.BOOTSTRAP
+    assert updated_plan.reserve_target > capital_plan.reserve_target
+    assert updated_plan.planning_horizon_turns > capital_plan.planning_horizon_turns
+    assert updated_plan.reserve_share > capital_plan.reserve_share
+    assert updated_plan.go_to_market_share < capital_plan.go_to_market_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert "capital reallocation grid" in outcome.message
 
 
 def test_set_exit_readiness_buffer_realigns_plan_for_board_reset_heat() -> None:

@@ -59,6 +59,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_rebalance_capital,
     apply_refinancing_posture,
     apply_set_capital_plan,
+    apply_set_capital_reallocation_grid,
     apply_set_covenant_firewall,
     apply_set_debt_strategy,
     apply_set_endgame_capital_map,
@@ -144,6 +145,7 @@ from nexus_tech.simulation.partnerships import (
     rebalance_channel_mix,
     renegotiate_partnership,
     run_channel_conflict_reset,
+    run_channel_dependency_reset,
     run_channel_firebreak,
     run_channel_qbr,
     run_channel_realignment,
@@ -210,16 +212,19 @@ from nexus_tech.simulation.support_program import (
     invest_in_support_staffing,
     route_support_escalation,
     run_account_rescue,
+    run_billing_collection_bridge,
     run_billing_covenant_reset,
     run_billing_dispute_cabinet,
     run_billing_dispute_desk,
     run_billing_retention_reset,
     run_billing_stabilization,
     run_enterprise_assurance,
+    run_enterprise_commitment_board,
     run_enterprise_queue_reset,
     run_enterprise_reference_cycle,
     run_enterprise_renewal_cabinet,
     run_lane_recovery,
+    run_onboarding_adoption_hub,
     run_onboarding_control_tower,
     run_onboarding_fast_track,
     run_onboarding_launch_cell,
@@ -764,6 +769,11 @@ def apply_action(
         logger.debug("Set terminal liquidity controls.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_CAPITAL_REALLOCATION_GRID:
+        summary = apply_set_capital_reallocation_grid(next_state)
+        logger.debug("Set capital reallocation grid.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1234,6 +1244,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_COMMITMENT_BOARD:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_commitment_board(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise commitment board for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_BILLING_RETENTION_RESET:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1290,6 +1314,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_BILLING_COLLECTION_BRIDGE:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_collection_bridge(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing collection bridge for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1312,6 +1350,20 @@ def apply_action(
         summary = run_onboarding_launch_cell(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran onboarding launch cell for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_ADOPTION_HUB:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_adoption_hub(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding adoption hub for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -1459,6 +1511,19 @@ def apply_action(
         summary = run_channel_stability_reset(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel stability reset for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_DEPENDENCY_RESET:
+        if context.partnership_id is None:
+            raise ValueError("Running a channel dependency reset requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_dependency_reset(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel dependency reset for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

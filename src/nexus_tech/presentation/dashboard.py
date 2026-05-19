@@ -2285,6 +2285,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "130",
+        "run_enterprise_commitment_board",
+        (
+            "Run the deepest enterprise follow-up when renewal heat, board pressure, and "
+            "reference fragility are all colliding."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2314,6 +2322,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "131",
+        "run_billing_collection_bridge",
+        (
+            "Run the deepest billing recovery pass when disputes, dunning, covenant heat, and "
+            "renewal stress are converging."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2327,6 +2343,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run a launch-cell follow-up when onboarding backlog, account drag, and renewal "
             "pressure are compounding together."
+        ),
+    )
+    primary_actions.add_row(
+        "132",
+        "run_onboarding_adoption_hub",
+        (
+            "Run the deepest onboarding recovery pass when implementation drag is starting to "
+            "bleed into renewals and board confidence."
         ),
     )
     primary_actions.add_row(
@@ -2470,6 +2494,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "134",
+        "set_capital_reallocation_grid",
+        (
+            "Force a deeper endgame capital reallocation grid when queue heat, channel drag, and "
+            "path fragility all need one control move."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2539,6 +2571,14 @@ def _build_action_menu_panel() -> Panel:
         "run_channel_stability_reset",
         "Fund one hotspot channel to calm fatigue, conflict, and dependency "
         "before late-game drag compounds.",
+    )
+    primary_actions.add_row(
+        "133",
+        "run_channel_dependency_reset",
+        (
+            "Run the deepest hotspot-channel reset when dependency, rev-share drag, and fatigue "
+            "are all hardening into a late-game threat."
+        ),
     )
     primary_actions.add_row(
         "109",

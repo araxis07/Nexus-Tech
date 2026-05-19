@@ -277,14 +277,17 @@ ACTION_KEYS = {
     "119": TurnAction.RUN_WHITE_GLOVE_REFERENCE_COMMITTEE,
     "122": TurnAction.RUN_WHITE_GLOVE_ESCALATION_CELL,
     "126": TurnAction.RUN_WHITE_GLOVE_REFERENCE_BUREAU,
+    "130": TurnAction.RUN_ENTERPRISE_COMMITMENT_BOARD,
     "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
     "115": TurnAction.RUN_ENTERPRISE_RENEWAL_CABINET,
     "105": TurnAction.RUN_BILLING_RETENTION_RESET,
     "120": TurnAction.RUN_BILLING_COVENANT_RESET,
     "123": TurnAction.RUN_BILLING_DISPUTE_DESK,
     "127": TurnAction.RUN_BILLING_DISPUTE_CABINET,
+    "131": TurnAction.RUN_BILLING_COLLECTION_BRIDGE,
     "124": TurnAction.RUN_ONBOARDING_CONTROL_TOWER,
     "128": TurnAction.RUN_ONBOARDING_LAUNCH_CELL,
+    "132": TurnAction.RUN_ONBOARDING_ADOPTION_HUB,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -328,6 +331,7 @@ ACTION_KEYS = {
     "99": TurnAction.RUN_CHANNEL_SYNERGY_RESET,
     "102": TurnAction.RUN_PARTNER_MARGIN_RESET,
     "106": TurnAction.RUN_CHANNEL_STABILITY_RESET,
+    "133": TurnAction.RUN_CHANNEL_DEPENDENCY_RESET,
     "109": TurnAction.RUN_RESELLER_ENABLEMENT_RESET,
     "113": TurnAction.RUN_INTEGRATION_CUTOVER_RESET,
     "110": TurnAction.RUN_MARKETPLACE_CHARGEBACK_RESET,
@@ -341,6 +345,7 @@ ACTION_KEYS = {
     "121": TurnAction.SET_ENDGAME_CAPITAL_MAP,
     "125": TurnAction.SET_EXIT_READINESS_BUFFER,
     "129": TurnAction.SET_TERMINAL_LIQUIDITY_CONTROLS,
+    "134": TurnAction.SET_CAPITAL_REALLOCATION_GRID,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1755,6 +1760,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_ENTERPRISE_COMMITMENT_BOARD:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_BILLING_DISPUTE_DESK:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1767,6 +1778,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_BILLING_COLLECTION_BRIDGE:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1774,6 +1791,12 @@ def collect_action_context(
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_ONBOARDING_LAUNCH_CELL:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_ONBOARDING_ADOPTION_HUB:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None
@@ -1856,6 +1879,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_CHANNEL_STABILITY_RESET:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_DEPENDENCY_RESET:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None
