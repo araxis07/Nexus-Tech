@@ -2293,6 +2293,22 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "135",
+        "run_enterprise_reference_chamber",
+        (
+            "Run a flagship enterprise reference chamber when renewal, board heat, and exit-story "
+            "fragility all need a final service proof point."
+        ),
+    )
+    primary_actions.add_row(
+        "140",
+        "run_enterprise_reference_forum",
+        (
+            "Run the hardest flagship enterprise reference forum when one account now carries "
+            "IPO or diligence proof, renewal trust, and board confidence at once."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2330,6 +2346,22 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "136",
+        "run_billing_collection_office",
+        (
+            "Run a billing collection office when disputes, dunning, covenant heat, and renewal "
+            "drag have all become the capital story."
+        ),
+    )
+    primary_actions.add_row(
+        "141",
+        "run_billing_settlement_board",
+        (
+            "Run the hardest billing settlement board when collections, covenant heat, and "
+            "renewal credibility all need one final reset."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2351,6 +2383,22 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the deepest onboarding recovery pass when implementation drag is starting to "
             "bleed into renewals and board confidence."
+        ),
+    )
+    primary_actions.add_row(
+        "137",
+        "run_onboarding_stability_board",
+        (
+            "Run an onboarding stability board when implementation drag, queue heat, and renewal "
+            "bleed all need a final coordinated reset."
+        ),
+    )
+    primary_actions.add_row(
+        "142",
+        "run_onboarding_retention_mesh",
+        (
+            "Run the hardest onboarding retention mesh when implementation drag is now feeding "
+            "renewal loss, churn pressure, and board concern directly."
         ),
     )
     primary_actions.add_row(
@@ -2502,6 +2550,22 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "139",
+        "set_path_control_matrix",
+        (
+            "Force the deepest path-control matrix when exit pressure, reserve fragility, and "
+            "channel/support hotspots all need one capital posture reset."
+        ),
+    )
+    primary_actions.add_row(
+        "144",
+        "set_path_resilience_grid",
+        (
+            "Force the hardest path-resilience grid when one endgame route already dominates "
+            "capital, support, and channel control decisions."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2578,6 +2642,22 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the deepest hotspot-channel reset when dependency, rev-share drag, and fatigue "
             "are all hardening into a late-game threat."
+        ),
+    )
+    primary_actions.add_row(
+        "138",
+        "run_channel_confidence_firewall",
+        (
+            "Run the deepest hotspot-channel firewall when dependency, fatigue, and rev-share "
+            "drag all need one de-risking move."
+        ),
+    )
+    primary_actions.add_row(
+        "143",
+        "run_channel_durability_mesh",
+        (
+            "Run the hardest hotspot-channel durability mesh when dependency, conflict, and "
+            "channel recovery drag all need one late-game control move."
         ),
     )
     primary_actions.add_row(

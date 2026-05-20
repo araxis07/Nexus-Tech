@@ -775,6 +775,31 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_enterprise_commitment_board")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and (
+            renewal_pressure_value >= Decimal("2800.00")
+            or revenue_at_risk_value >= Decimal("3000.00")
+            or finance.board_pressure >= 30
+            or finance.governance_risk >= 52
+            or high_value_risk_accounts > 0
+            or white_glove_queue_risk_accounts > 0
+        )
+    ):
+        recommended_actions.append("run_enterprise_reference_chamber")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and (
+            renewal_pressure_value >= Decimal("3200.00")
+            or revenue_at_risk_value >= Decimal("3400.00")
+            or finance.board_pressure >= 32
+            or finance.governance_risk >= 54
+            or (high_value_risk_accounts > 0 and white_glove_queue_risk_accounts > 0)
+        )
+    ):
+        recommended_actions.append("run_enterprise_reference_forum")
     if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
         white_glove_queue_risk_accounts > 0
         or premium_queue_risk_accounts > 0
@@ -888,6 +913,28 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_onboarding_adoption_hub")
+    if (
+        support_hotspot_lane is SupportLaneFocus.ONBOARDING
+        and hotspot_lane_account_count > 1
+        and (
+            support_backlog >= 18
+            or support_hotspot_lane_overflow > 2
+            or revenue_at_risk_value >= Decimal("3000.00")
+            or renewal_pressure_value >= Decimal("2400.00")
+        )
+    ):
+        recommended_actions.append("run_onboarding_stability_board")
+    if (
+        support_hotspot_lane is SupportLaneFocus.ONBOARDING
+        and hotspot_lane_account_count > 2
+        and (
+            support_backlog >= 20
+            or support_hotspot_lane_overflow > 3
+            or revenue_at_risk_value >= Decimal("3400.00")
+            or renewal_pressure_value >= Decimal("2600.00")
+        )
+    ):
+        recommended_actions.append("run_onboarding_retention_mesh")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
     if (
@@ -931,6 +978,26 @@ def build_finance_planner(
         or finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
     ):
         recommended_actions.append("run_billing_collection_bridge")
+    if support_hotspot_lane is SupportLaneFocus.BILLING and (
+        renewal_pressure_value >= Decimal("3600.00")
+        or finance.covenant_risk >= 22
+        or capital_fragility >= 70
+        or (
+            finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            and finance.board_pressure >= 28
+        )
+    ):
+        recommended_actions.append("run_billing_collection_office")
+    if support_hotspot_lane is SupportLaneFocus.BILLING and (
+        renewal_pressure_value >= Decimal("4000.00")
+        or finance.covenant_risk >= 24
+        or capital_fragility >= 72
+        or (
+            finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            and finance.board_pressure >= 30
+        )
+    ):
+        recommended_actions.append("run_billing_settlement_board")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -1026,6 +1093,21 @@ def build_finance_planner(
         or hotspot_revenue_share_percent >= 42
     ):
         recommended_actions.append("run_channel_dependency_reset")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 8
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold + 6
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 2
+        or hotspot_revenue_share_percent >= 44
+    ):
+        recommended_actions.append("run_channel_confidence_firewall")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 10
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold + 8
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+        or hotspot_revenue_share_percent >= 46
+        or channel_conflict_index >= 34
+    ):
+        recommended_actions.append("run_channel_durability_mesh")
     if hotspot_channel == "reseller" and (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
@@ -1208,6 +1290,36 @@ def build_finance_planner(
         or support_hotspot_lane_overflow > 0
     ):
         recommended_actions.append("set_capital_reallocation_grid")
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 34
+        or finance.governance_risk >= 54
+        or finance.covenant_risk >= 20
+        or capital_fragility >= 70
+        or reserve_gap < ZERO_MONEY
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+        or support_hotspot_lane_overflow > 1
+    ):
+        recommended_actions.append("set_path_control_matrix")
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 36
+        or finance.governance_risk >= 56
+        or finance.covenant_risk >= 22
+        or capital_fragility >= 72
+        or reserve_gap < ZERO_MONEY
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 8
+        or support_hotspot_lane_overflow > 2
+    ):
+        recommended_actions.append("set_path_resilience_grid")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1297,6 +1409,37 @@ def build_finance_planner(
         action_sequence.append(
             "run an enterprise commitment board before flagship renewal and reference strain "
             "become the whole exit story"
+        )
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and (
+            renewal_pressure_value >= Decimal("2800.00")
+            or revenue_at_risk_value >= Decimal("3000.00")
+            or finance.board_pressure >= 30
+            or finance.governance_risk >= 52
+            or high_value_risk_accounts > 0
+            or white_glove_queue_risk_accounts > 0
+        )
+    ):
+        action_sequence.append(
+            "run an enterprise reference chamber before flagship proof, renewal heat, and board "
+            "scrutiny collapse into the same IPO or diligence gap"
+        )
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 0
+        and (
+            renewal_pressure_value >= Decimal("3200.00")
+            or revenue_at_risk_value >= Decimal("3400.00")
+            or finance.board_pressure >= 32
+            or finance.governance_risk >= 54
+            or (high_value_risk_accounts > 0 and white_glove_queue_risk_accounts > 0)
+        )
+    ):
+        action_sequence.append(
+            "run an enterprise reference forum before one flagship account becomes the entire IPO "
+            "or diligence proof burden"
         )
     if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
         white_glove_queue_risk_accounts > 0
@@ -1401,6 +1544,26 @@ def build_finance_planner(
                 "run an onboarding adoption hub before implementation drag becomes the dominant "
                 "renewal and board-confidence tax"
             )
+        if hotspot_lane_account_count > 1 and (
+            support_backlog >= 18
+            or support_hotspot_lane_overflow > 2
+            or revenue_at_risk_value >= Decimal("3000.00")
+            or renewal_pressure_value >= Decimal("2400.00")
+        ):
+            action_sequence.append(
+                "run an onboarding stability board before implementation drag turns into the "
+                "main board-confidence and renewal-control problem"
+            )
+        if hotspot_lane_account_count > 2 and (
+            support_backlog >= 20
+            or support_hotspot_lane_overflow > 3
+            or revenue_at_risk_value >= Decimal("3400.00")
+            or renewal_pressure_value >= Decimal("2600.00")
+        ):
+            action_sequence.append(
+                "run an onboarding retention mesh before implementation drag starts dictating "
+                "renewal outcomes and churn directly"
+            )
     if (
         support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0
     ) and strategic_outlook == "profitable_independence":
@@ -1455,6 +1618,32 @@ def build_finance_planner(
             action_sequence.append(
                 "run a billing collection bridge before disputes, dunning, and covenant heat "
                 "collapse into one capital failure"
+            )
+        if (
+            renewal_pressure_value >= Decimal("3600.00")
+            or finance.covenant_risk >= 22
+            or capital_fragility >= 70
+            or (
+                finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+                and finance.board_pressure >= 28
+            )
+        ):
+            action_sequence.append(
+                "run a billing collection office before payment drag, covenant heat, and renewal "
+                "risk collapse into the same capital-control crisis"
+            )
+        if (
+            renewal_pressure_value >= Decimal("4000.00")
+            or finance.covenant_risk >= 24
+            or capital_fragility >= 72
+            or (
+                finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+                and finance.board_pressure >= 30
+            )
+        ):
+            action_sequence.append(
+                "run a billing settlement board before collections drag, covenant heat, and "
+                "renewal credibility become the whole late-game capital story"
             )
     if focus_alignment_gap > 0 and support_lane_focus is not support_hotspot_lane:
         action_sequence.append(
@@ -1598,6 +1787,27 @@ def build_finance_planner(
         action_sequence.append(
             f"run a {hotspot_channel} channel dependency reset before revenue concentration and "
             "fatigue harden into the next late-game drag"
+        )
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 8
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold + 6
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 2
+        or hotspot_revenue_share_percent >= 44
+    ):
+        action_sequence.append(
+            f"run a {hotspot_channel} channel confidence firewall before hotspot dependency and "
+            "commercial fatigue become the whole board and diligence story"
+        )
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 10
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold + 8
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+        or hotspot_revenue_share_percent >= 46
+        or channel_conflict_index >= 34
+    ):
+        action_sequence.append(
+            f"run a {hotspot_channel} channel durability mesh before dependency, conflict, and "
+            "recovery drag harden into the entire late-game commercial posture"
         )
     if hotspot_channel == "reseller" and (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
@@ -1785,6 +1995,42 @@ def build_finance_planner(
         action_sequence.append(
             "set a capital reallocation grid before queue heat, channel drag, and path fragility "
             "all start dictating the same capital response"
+        )
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 34
+        or finance.governance_risk >= 54
+        or finance.covenant_risk >= 20
+        or capital_fragility >= 70
+        or reserve_gap < ZERO_MONEY
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+        or support_hotspot_lane_overflow > 1
+    ):
+        action_sequence.append(
+            "set a path control matrix before late-game queue heat, hotspot dependency, and "
+            "capital fragility collapse into the wrong exit posture"
+        )
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 36
+        or finance.governance_risk >= 56
+        or finance.covenant_risk >= 22
+        or capital_fragility >= 72
+        or reserve_gap < ZERO_MONEY
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 8
+        or support_hotspot_lane_overflow > 2
+    ):
+        action_sequence.append(
+            "set a path resilience grid before one endgame route dictates capital, support, and "
+            "channel control at the same time"
         )
     if strategic_outlook == "ipo_ready" and dominant_endgame_pressure == "public_market_scrutiny":
         action_sequence.append(

@@ -2514,6 +2514,44 @@ def _apply_reseller_service_charter(
     )
 
 
+def _apply_reseller_reference_scorecard(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_reference_scorecard": "fund_service_charter",
+        "stretch_reference_scorecard": "stretch_service_charter",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for reseller reference scorecard.")
+    result = _apply_reseller_service_charter(state, event, mapped_option)
+    return result.replace("reseller service charter", "reseller reference scorecard").replace(
+        "service charter",
+        "reference scorecard",
+    )
+
+
+def _apply_reseller_margin_reconciliation(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_margin_reconciliation": "fund_reference_scorecard",
+        "defer_margin_reconciliation": "stretch_reference_scorecard",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for reseller margin reconciliation.")
+    result = _apply_reseller_reference_scorecard(state, event, mapped_option)
+    return result.replace("reseller reference scorecard", "reseller margin reconciliation").replace(
+        "reference scorecard",
+        "margin reconciliation",
+    )
+
+
 def _apply_integration_cutover_risk(
     state: GameState,
     event: PendingEvent,
@@ -3022,6 +3060,44 @@ def _apply_integration_hypercare_board(
     return result.replace("integration hypercare grid", "integration hypercare board").replace(
         "hypercare grid",
         "hypercare board",
+    )
+
+
+def _apply_integration_hypercare_sla(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_hypercare_sla": "fund_hypercare_board",
+        "stretch_hypercare_sla": "stretch_hypercare_board",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for integration hypercare SLA.")
+    result = _apply_integration_hypercare_board(state, event, mapped_option)
+    return result.replace("integration hypercare board", "integration hypercare SLA").replace(
+        "hypercare board",
+        "hypercare SLA",
+    )
+
+
+def _apply_integration_reliability_bridge(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_reliability_bridge": "fund_hypercare_sla",
+        "defer_reliability_bridge": "stretch_hypercare_sla",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for integration reliability bridge.")
+    result = _apply_integration_hypercare_sla(state, event, mapped_option)
+    return result.replace("integration hypercare SLA", "integration reliability bridge").replace(
+        "hypercare SLA",
+        "reliability bridge",
     )
 
 
@@ -3539,6 +3615,44 @@ def _apply_marketplace_refund_appeal(
     return result.replace("marketplace refund bench", "marketplace refund appeal").replace(
         "refund bench",
         "refund appeal",
+    )
+
+
+def _apply_marketplace_refund_arbitration(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_refund_arbitration": "fund_refund_appeal",
+        "absorb_refund_arbitration": "stretch_refund_appeal",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for marketplace refund arbitration.")
+    result = _apply_marketplace_refund_appeal(state, event, mapped_option)
+    return result.replace("marketplace refund appeal", "marketplace refund arbitration").replace(
+        "refund appeal",
+        "refund arbitration",
+    )
+
+
+def _apply_marketplace_dispute_escrow(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_dispute_escrow": "fund_refund_arbitration",
+        "defer_dispute_escrow": "absorb_refund_arbitration",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for marketplace dispute escrow.")
+    result = _apply_marketplace_refund_arbitration(state, event, mapped_option)
+    return result.replace("marketplace refund arbitration", "marketplace dispute escrow").replace(
+        "refund arbitration",
+        "dispute escrow",
     )
 
 
@@ -4258,6 +4372,46 @@ def _apply_board_reset_operating_charter(
     return result.replace("board-reset runway table", "board-reset operating charter").replace(
         "runway table",
         "operating charter",
+    )
+
+
+def _apply_board_reset_execution_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_execution_council": "ratify_operating_charter",
+        "stretch_execution_council": "stretch_operating_charter",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for board-reset execution council.")
+    result = _apply_board_reset_operating_charter(state, event, mapped_option)
+    return result.replace("board-reset operating charter", "board-reset execution council").replace(
+        "operating charter",
+        "execution council",
+    )
+
+
+def _apply_board_reset_resilience_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_resilience_statute": "ratify_execution_council",
+        "stretch_resilience_statute": "stretch_execution_council",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for board-reset resilience statute.")
+    result = _apply_board_reset_execution_council(state, event, mapped_option)
+    return result.replace(
+        "board-reset execution council", "board-reset resilience statute"
+    ).replace(
+        "execution council",
+        "resilience statute",
     )
 
 
@@ -5235,6 +5389,44 @@ def _apply_ipo_order_book_covenant(
     return result.replace("pricing guardrail", "order-book covenant")
 
 
+def _apply_ipo_book_stability_panel(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_book_stability_panel": "fund_order_book_covenant",
+        "defer_book_stability_panel": "defer_order_book_covenant",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for IPO book-stability panel.")
+    result = _apply_ipo_order_book_covenant(state, event, mapped_option)
+    return result.replace("order-book covenant", "book-stability panel").replace(
+        "order-book",
+        "book-stability",
+    )
+
+
+def _apply_ipo_demand_floor(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_demand_floor": "fund_book_stability_panel",
+        "defer_demand_floor": "defer_book_stability_panel",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for IPO demand floor.")
+    result = _apply_ipo_book_stability_panel(state, event, mapped_option)
+    return result.replace("book-stability panel", "demand floor").replace(
+        "book-stability",
+        "demand",
+    )
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -6078,6 +6270,44 @@ def _apply_buyer_close_signoff(
     return result.replace("buyer close committee", "buyer close signoff").replace(
         "close committee",
         "close signoff",
+    )
+
+
+def _apply_buyer_close_war_room(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "staff_close_war_room": "staff_close_signoff",
+        "hold_close_war_room": "hold_close_signoff",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for buyer close war room.")
+    result = _apply_buyer_close_signoff(state, event, mapped_option)
+    return result.replace("buyer close signoff", "buyer close war room").replace(
+        "close signoff",
+        "close war room",
+    )
+
+
+def _apply_buyer_synergy_holdback(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_synergy_holdback": "staff_close_war_room",
+        "carry_synergy_holdback": "hold_close_war_room",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for buyer synergy holdback.")
+    result = _apply_buyer_close_war_room(state, event, mapped_option)
+    return result.replace("buyer close war room", "buyer synergy holdback").replace(
+        "close war room",
+        "synergy holdback",
     )
 
 
@@ -6927,6 +7157,47 @@ def _apply_independence_reserve_compact(
     )
 
 
+def _apply_independence_treasury_lattice(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_treasury_lattice": "ratify_reserve_compact",
+        "bridge_treasury_lattice": "bridge_reserve_compact",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for independence treasury lattice.")
+    result = _apply_independence_reserve_compact(state, event, mapped_option)
+    return result.replace("independence reserve compact", "independence treasury lattice").replace(
+        "reserve compact",
+        "treasury lattice",
+    )
+
+
+def _apply_independence_cash_conversion_pact(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_cash_conversion_pact": "ratify_treasury_lattice",
+        "bridge_cash_conversion_pact": "bridge_treasury_lattice",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for independence cash-conversion pact.")
+    result = _apply_independence_treasury_lattice(state, event, mapped_option)
+    return result.replace(
+        "independence treasury lattice",
+        "independence cash-conversion pact",
+    ).replace(
+        "treasury lattice",
+        "cash-conversion pact",
+    )
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -7169,6 +7440,8 @@ EVENT_EFFECT_HANDLERS = {
     "ipo_allocation_lock": _apply_ipo_allocation_lock,
     "ipo_pricing_guardrail": _apply_ipo_pricing_guardrail,
     "ipo_order_book_covenant": _apply_ipo_order_book_covenant,
+    "ipo_book_stability_panel": _apply_ipo_book_stability_panel,
+    "ipo_demand_floor": _apply_ipo_demand_floor,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
     "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
@@ -7182,6 +7455,8 @@ EVENT_EFFECT_HANDLERS = {
     "buyer_close_cadence": _apply_buyer_close_cadence,
     "buyer_close_committee": _apply_buyer_close_committee,
     "buyer_close_signoff": _apply_buyer_close_signoff,
+    "buyer_close_war_room": _apply_buyer_close_war_room,
+    "buyer_synergy_holdback": _apply_buyer_synergy_holdback,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
     "independence_refinancing_wall": _apply_independence_refinancing_wall,
@@ -7195,6 +7470,8 @@ EVENT_EFFECT_HANDLERS = {
     "independence_margin_charter": _apply_independence_margin_charter,
     "independence_liquidity_grid": _apply_independence_liquidity_grid,
     "independence_reserve_compact": _apply_independence_reserve_compact,
+    "independence_treasury_lattice": _apply_independence_treasury_lattice,
+    "independence_cash_conversion_pact": _apply_independence_cash_conversion_pact,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
@@ -7210,6 +7487,8 @@ EVENT_EFFECT_HANDLERS = {
     "reseller_recovery_compact": _apply_reseller_recovery_compact,
     "reseller_service_council": _apply_reseller_service_council,
     "reseller_service_charter": _apply_reseller_service_charter,
+    "reseller_reference_scorecard": _apply_reseller_reference_scorecard,
+    "reseller_margin_reconciliation": _apply_reseller_margin_reconciliation,
     "integration_cutover_risk": _apply_integration_cutover_risk,
     "integration_cutover_board": _apply_integration_cutover_board,
     "integration_release_cutline": _apply_integration_release_cutline,
@@ -7218,6 +7497,8 @@ EVENT_EFFECT_HANDLERS = {
     "integration_cutover_command": _apply_integration_cutover_command,
     "integration_hypercare_grid": _apply_integration_hypercare_grid,
     "integration_hypercare_board": _apply_integration_hypercare_board,
+    "integration_hypercare_sla": _apply_integration_hypercare_sla,
+    "integration_reliability_bridge": _apply_integration_reliability_bridge,
     "marketplace_chargeback_wave": _apply_marketplace_chargeback_wave,
     "marketplace_dispute_program": _apply_marketplace_dispute_program,
     "marketplace_refund_charter": _apply_marketplace_refund_charter,
@@ -7226,6 +7507,8 @@ EVENT_EFFECT_HANDLERS = {
     "marketplace_penalty_panel": _apply_marketplace_penalty_panel,
     "marketplace_refund_bench": _apply_marketplace_refund_bench,
     "marketplace_refund_appeal": _apply_marketplace_refund_appeal,
+    "marketplace_refund_arbitration": _apply_marketplace_refund_arbitration,
+    "marketplace_dispute_escrow": _apply_marketplace_dispute_escrow,
     "board_recovery_window": _apply_board_recovery_window,
     "board_reset_showdown": _apply_board_reset_showdown,
     "board_reset_execution_plan": _apply_board_reset_execution_plan,
@@ -7236,6 +7519,8 @@ EVENT_EFFECT_HANDLERS = {
     "board_reset_cash_charter": _apply_board_reset_cash_charter,
     "board_reset_runway_table": _apply_board_reset_runway_table,
     "board_reset_operating_charter": _apply_board_reset_operating_charter,
+    "board_reset_execution_council": _apply_board_reset_execution_council,
+    "board_reset_resilience_statute": _apply_board_reset_resilience_statute,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,

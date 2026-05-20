@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.67.0 - 2026-05-21
+
+- Added `run_enterprise_reference_forum`, `run_billing_settlement_board`, `run_onboarding_retention_mesh`, `run_channel_durability_mesh`, and `set_path_resilience_grid` as deeper late-game follow-up controls for flagship references, collections recovery, onboarding retention, hotspot channel stabilization, and path-specific capital defense
+- Added path-chain follow-up events `ipo_demand_floor`, `buyer_synergy_holdback`, `independence_cash_conversion_pact`, and `board_reset_resilience_statute` so the four main endgame routes gain another concrete recovery-or-penalty branch
+- Added channel-chain follow-up events `reseller_margin_reconciliation`, `integration_reliability_bridge`, and `marketplace_dispute_escrow` so reseller, integration, and marketplace runs continue diverging under late-game commercial pressure
+- Expanded finance-planner recommendations and action sequencing to surface the new support, channel, and capital-control actions when flagship queue heat, collections drag, onboarding overflow, hotspot dependency, and path-specific fragility converge
+- Added regression coverage for the new actions and event handlers plus a seeded 360-turn board-recovery stability run
+- Promoted the package version to `0.67.0`
+
 ## 0.66.0 - 2026-05-20
 
 - Added `run_enterprise_commitment_board`, `run_billing_collection_bridge`, `run_onboarding_adoption_hub`, `run_channel_dependency_reset`, and `set_capital_reallocation_grid` as deeper late-game follow-up actions for flagship account rescue, billing collections cleanup, onboarding stabilization, channel dependency relief, and path-aware capital control
