@@ -280,6 +280,7 @@ ACTION_KEYS = {
     "130": TurnAction.RUN_ENTERPRISE_COMMITMENT_BOARD,
     "135": TurnAction.RUN_ENTERPRISE_REFERENCE_CHAMBER,
     "140": TurnAction.RUN_ENTERPRISE_REFERENCE_FORUM,
+    "145": TurnAction.RUN_WHITE_GLOVE_REFERENCE_EXCHANGE,
     "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
     "115": TurnAction.RUN_ENTERPRISE_RENEWAL_CABINET,
     "105": TurnAction.RUN_BILLING_RETENTION_RESET,
@@ -289,11 +290,13 @@ ACTION_KEYS = {
     "131": TurnAction.RUN_BILLING_COLLECTION_BRIDGE,
     "136": TurnAction.RUN_BILLING_COLLECTION_OFFICE,
     "141": TurnAction.RUN_BILLING_SETTLEMENT_BOARD,
+    "146": TurnAction.RUN_BILLING_CASH_WAR_ROOM,
     "124": TurnAction.RUN_ONBOARDING_CONTROL_TOWER,
     "128": TurnAction.RUN_ONBOARDING_LAUNCH_CELL,
     "132": TurnAction.RUN_ONBOARDING_ADOPTION_HUB,
     "137": TurnAction.RUN_ONBOARDING_STABILITY_BOARD,
     "142": TurnAction.RUN_ONBOARDING_RETENTION_MESH,
+    "147": TurnAction.RUN_ONBOARDING_ASSURANCE_GRID,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -340,6 +343,7 @@ ACTION_KEYS = {
     "133": TurnAction.RUN_CHANNEL_DEPENDENCY_RESET,
     "138": TurnAction.RUN_CHANNEL_CONFIDENCE_FIREWALL,
     "143": TurnAction.RUN_CHANNEL_DURABILITY_MESH,
+    "148": TurnAction.RUN_CHANNEL_CONFLICT_LATTICE,
     "109": TurnAction.RUN_RESELLER_ENABLEMENT_RESET,
     "113": TurnAction.RUN_INTEGRATION_CUTOVER_RESET,
     "110": TurnAction.RUN_MARKETPLACE_CHARGEBACK_RESET,
@@ -356,6 +360,7 @@ ACTION_KEYS = {
     "134": TurnAction.SET_CAPITAL_REALLOCATION_GRID,
     "139": TurnAction.SET_PATH_CONTROL_MATRIX,
     "144": TurnAction.SET_PATH_RESILIENCE_GRID,
+    "149": TurnAction.SET_BALANCE_SHEET_RECOVERY_MESH,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1788,6 +1793,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_EXCHANGE:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_BILLING_DISPUTE_DESK:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1818,6 +1829,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_BILLING_CASH_WAR_ROOM:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1843,6 +1860,12 @@ def collect_action_context(
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_ONBOARDING_RETENTION_MESH:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_ONBOARDING_ASSURANCE_GRID:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None
@@ -1943,6 +1966,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_CHANNEL_DURABILITY_MESH:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_CONFLICT_LATTICE:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

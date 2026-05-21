@@ -2309,6 +2309,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "145",
+        "run_white_glove_reference_exchange",
+        (
+            "Run the final premium reference exchange when one flagship white-glove account now "
+            "carries proof, renewal trust, and pricing confidence at the same time."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2362,6 +2370,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "146",
+        "run_billing_cash_war_room",
+        (
+            "Run the final billing cash war room when disputes, collections, covenant heat, and "
+            "renewal trust have become one financing problem."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2399,6 +2415,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the hardest onboarding retention mesh when implementation drag is now feeding "
             "renewal loss, churn pressure, and board concern directly."
+        ),
+    )
+    primary_actions.add_row(
+        "147",
+        "run_onboarding_assurance_grid",
+        (
+            "Run the final onboarding assurance grid when implementation drag now threatens "
+            "renewal quality, board confidence, and exit credibility together."
         ),
     )
     primary_actions.add_row(
@@ -2566,6 +2590,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "149",
+        "set_balance_sheet_recovery_mesh",
+        (
+            "Force the final balance-sheet recovery mesh when reserve, covenant, and path "
+            "pressure all need one last capital-control move."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2658,6 +2690,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the hardest hotspot-channel durability mesh when dependency, conflict, and "
             "channel recovery drag all need one late-game control move."
+        ),
+    )
+    primary_actions.add_row(
+        "148",
+        "run_channel_conflict_lattice",
+        (
+            "Run the final hotspot-channel conflict lattice when dependency, rev-share drag, "
+            "and partner fatigue all threaten late-game commercial durability."
         ),
     )
     primary_actions.add_row(
