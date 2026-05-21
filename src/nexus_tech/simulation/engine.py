@@ -70,6 +70,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_path_control_matrix,
     apply_set_path_resilience_grid,
     apply_set_terminal_liquidity_controls,
+    apply_set_terminal_recovery_lattice,
     apply_step_up_reserve_discipline,
 )
 from nexus_tech.simulation.competition import advance_competitors, summarize_competitor_moves
@@ -155,6 +156,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_firebreak,
     run_channel_qbr,
     run_channel_realignment,
+    run_channel_resilience_grid,
     run_channel_stability_reset,
     run_channel_synergy_reset,
     run_integration_cutover_reset,
@@ -224,6 +226,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_covenant_reset,
     run_billing_dispute_cabinet,
     run_billing_dispute_desk,
+    run_billing_liquidity_command,
     run_billing_retention_reset,
     run_billing_settlement_board,
     run_billing_stabilization,
@@ -233,11 +236,13 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_reference_chamber,
     run_enterprise_reference_cycle,
     run_enterprise_reference_forum,
+    run_enterprise_reference_lattice,
     run_enterprise_renewal_cabinet,
     run_lane_recovery,
     run_onboarding_adoption_hub,
     run_onboarding_assurance_grid,
     run_onboarding_control_tower,
+    run_onboarding_durability_mesh,
     run_onboarding_fast_track,
     run_onboarding_launch_cell,
     run_onboarding_recovery,
@@ -804,6 +809,11 @@ def apply_action(
         logger.debug("Set balance-sheet recovery mesh.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_TERMINAL_RECOVERY_LATTICE:
+        summary = apply_set_terminal_recovery_lattice(next_state)
+        logger.debug("Set terminal recovery lattice.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1330,6 +1340,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_LATTICE:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_reference_lattice(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise reference lattice for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_BILLING_RETENTION_RESET:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1442,6 +1466,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_BILLING_LIQUIDITY_COMMAND:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_liquidity_command(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing liquidity command for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1520,6 +1558,20 @@ def apply_action(
         summary = run_onboarding_assurance_grid(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran onboarding assurance grid for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_DURABILITY_MESH:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_durability_mesh(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding durability mesh for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -1721,6 +1773,19 @@ def apply_action(
         summary = run_channel_conflict_lattice(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel conflict lattice for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_RESILIENCE_GRID:
+        if context.partnership_id is None:
+            raise ValueError("Running a channel resilience grid requires selecting a partnership.")
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_resilience_grid(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel resilience grid for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

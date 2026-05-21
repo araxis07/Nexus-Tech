@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.69.0 - 2026-05-21
+
+- Added `run_enterprise_reference_lattice`, `run_billing_liquidity_command`, `run_onboarding_durability_mesh`, `run_channel_resilience_grid`, and `set_terminal_recovery_lattice` as deeper terminal follow-up loops for flagship proof, billing/covenant containment, onboarding durability, hotspot-channel stabilization, and path-level capital recovery
+- Added path-chain follow-up events `ipo_price_band_committee`, `buyer_close_warranty`, `independence_cash_conversion_charter`, and `board_reset_execution_lattice` so IPO, acquisition, independence, and board-reset routes each gain another concrete late-game recovery-or-penalty branch
+- Added channel-chain follow-up events `reseller_service_escrow`, `integration_cutover_warranty`, and `marketplace_refund_backstop` so reseller, integration, and marketplace runs continue diverging under deeper commercial pressure
+- Expanded finance-planner recommendations and action sequencing to surface the new terminal recovery actions once flagship queue heat, collections strain, onboarding drag, hotspot dependency, and path fragility converge
+- Added regression coverage for the new actions and event handlers plus a seeded 400-turn board-recovery stability run
+- Promoted the package version to `0.69.0`
+
 ## 0.68.0 - 2026-05-21
 
 - Added `run_white_glove_reference_exchange`, `run_billing_cash_war_room`, `run_onboarding_assurance_grid`, `run_channel_conflict_lattice`, and `set_balance_sheet_recovery_mesh` as deeper late-game control loops for flagship proof, billing/covenant recovery, onboarding assurance, hotspot channel conflict reset, and balance-sheet defense

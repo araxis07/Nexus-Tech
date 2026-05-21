@@ -2317,6 +2317,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "150",
+        "run_enterprise_reference_lattice",
+        (
+            "Run the final enterprise reference lattice when one flagship account still carries "
+            "renewal proof, diligence trust, and board confidence at once."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2378,6 +2386,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "151",
+        "run_billing_liquidity_command",
+        (
+            "Run the final billing liquidity command when collections drag, covenant heat, and "
+            "renewal trust still dominate the capital story."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2423,6 +2439,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the final onboarding assurance grid when implementation drag now threatens "
             "renewal quality, board confidence, and exit credibility together."
+        ),
+    )
+    primary_actions.add_row(
+        "152",
+        "run_onboarding_durability_mesh",
+        (
+            "Run the final onboarding durability mesh when implementation drag still threatens "
+            "renewal quality, board confidence, and flagship trust together."
         ),
     )
     primary_actions.add_row(
@@ -2598,6 +2622,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "154",
+        "set_terminal_recovery_lattice",
+        (
+            "Force the deepest terminal recovery lattice when reserve, governance, support, and "
+            "channel fragility all need one final capital-control reset."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2698,6 +2730,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the final hotspot-channel conflict lattice when dependency, rev-share drag, "
             "and partner fatigue all threaten late-game commercial durability."
+        ),
+    )
+    primary_actions.add_row(
+        "153",
+        "run_channel_resilience_grid",
+        (
+            "Run the final hotspot-channel resilience grid when dependency, rev-share drag, and "
+            "commercial fragility still need one last de-risking move."
         ),
     )
     primary_actions.add_row(
