@@ -2628,6 +2628,25 @@ def _apply_reseller_service_backstop(
     )
 
 
+def _apply_reseller_service_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_service_statute": "fund_service_backstop",
+        "stretch_service_statute": "stretch_service_backstop",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for reseller service statute.")
+    result = _apply_reseller_service_backstop(state, event, mapped_option)
+    return result.replace("reseller service backstop", "reseller service statute").replace(
+        "service backstop",
+        "service statute",
+    )
+
+
 def _apply_integration_cutover_risk(
     state: GameState,
     event: PendingEvent,
@@ -3251,6 +3270,25 @@ def _apply_integration_cutover_backstop(
         "integration cutover surety",
         "integration cutover backstop",
     ).replace("cutover surety", "cutover backstop")
+
+
+def _apply_integration_cutover_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_cutover_statute": "fund_cutover_backstop",
+        "stretch_cutover_statute": "stretch_cutover_backstop",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for integration cutover statute.")
+    result = _apply_integration_cutover_backstop(state, event, mapped_option)
+    return result.replace(
+        "integration cutover backstop",
+        "integration cutover statute",
+    ).replace("cutover backstop", "cutover statute")
 
 
 def _apply_marketplace_chargeback_wave(
@@ -3881,6 +3919,25 @@ def _apply_marketplace_refund_covenant(
     return result.replace("marketplace refund lattice", "marketplace refund covenant").replace(
         "refund lattice",
         "refund covenant",
+    )
+
+
+def _apply_marketplace_refund_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_refund_statute": "fund_refund_covenant",
+        "stretch_refund_statute": "stretch_refund_covenant",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for marketplace refund statute.")
+    result = _apply_marketplace_refund_covenant(state, event, mapped_option)
+    return result.replace("marketplace refund covenant", "marketplace refund statute").replace(
+        "refund covenant",
+        "refund statute",
     )
 
 
@@ -4728,6 +4785,28 @@ def _apply_board_reset_execution_compact(
     ).replace(
         "continuity covenant",
         "execution compact",
+    )
+
+
+def _apply_board_reset_operating_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_operating_statute": "ratify_execution_compact",
+        "stretch_operating_statute": "stretch_execution_compact",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for board-reset operating statute.")
+    result = _apply_board_reset_execution_compact(state, event, mapped_option)
+    return result.replace(
+        "board-reset execution compact",
+        "board-reset operating statute",
+    ).replace(
+        "execution compact",
+        "operating statute",
     )
 
 
@@ -5819,6 +5898,25 @@ def _apply_ipo_book_integrity_covenant(
     )
 
 
+def _apply_ipo_book_anchor_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_book_anchor_statute": "fund_book_integrity_covenant",
+        "defer_book_anchor_statute": "defer_book_integrity_covenant",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for IPO book-anchor statute.")
+    result = _apply_ipo_book_integrity_covenant(state, event, mapped_option)
+    return result.replace("book-integrity covenant", "book-anchor statute").replace(
+        "book-integrity",
+        "book-anchor",
+    )
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -6776,6 +6874,28 @@ def _apply_buyer_close_integrity_covenant(
     return result.replace("buyer close-assurance panel", "buyer close-integrity covenant").replace(
         "close-assurance panel",
         "close-integrity covenant",
+    )
+
+
+def _apply_buyer_close_anchor_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_close_anchor_statute": "fund_close_integrity_covenant",
+        "carry_close_anchor_statute": "carry_close_integrity_covenant",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for buyer close-anchor statute.")
+    result = _apply_buyer_close_integrity_covenant(state, event, mapped_option)
+    return result.replace(
+        "buyer close-integrity covenant",
+        "buyer close-anchor statute",
+    ).replace(
+        "close-integrity covenant",
+        "close-anchor statute",
     )
 
 
@@ -7758,6 +7878,28 @@ def _apply_independence_cash_backstop_covenant(
     )
 
 
+def _apply_independence_cash_solvency_statute(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_cash_solvency_statute": "ratify_cash_backstop_covenant",
+        "bridge_cash_solvency_statute": "bridge_cash_backstop_covenant",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for independence cash-solvency statute.")
+    result = _apply_independence_cash_backstop_covenant(state, event, mapped_option)
+    return result.replace(
+        "independence cash-backstop covenant",
+        "independence cash-solvency statute",
+    ).replace(
+        "cash-backstop covenant",
+        "cash-solvency statute",
+    )
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -8006,6 +8148,7 @@ EVENT_EFFECT_HANDLERS = {
     "ipo_price_band_committee": _apply_ipo_price_band_committee,
     "ipo_book_support_panel": _apply_ipo_book_support_panel,
     "ipo_book_integrity_covenant": _apply_ipo_book_integrity_covenant,
+    "ipo_book_anchor_statute": _apply_ipo_book_anchor_statute,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
     "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
@@ -8025,6 +8168,7 @@ EVENT_EFFECT_HANDLERS = {
     "buyer_close_warranty": _apply_buyer_close_warranty,
     "buyer_close_assurance_panel": _apply_buyer_close_assurance_panel,
     "buyer_close_integrity_covenant": _apply_buyer_close_integrity_covenant,
+    "buyer_close_anchor_statute": _apply_buyer_close_anchor_statute,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
     "independence_refinancing_wall": _apply_independence_refinancing_wall,
@@ -8044,6 +8188,7 @@ EVENT_EFFECT_HANDLERS = {
     "independence_cash_conversion_charter": _apply_independence_cash_conversion_charter,
     "independence_cash_surety_charter": _apply_independence_cash_surety_charter,
     "independence_cash_backstop_covenant": _apply_independence_cash_backstop_covenant,
+    "independence_cash_solvency_statute": _apply_independence_cash_solvency_statute,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
@@ -8065,6 +8210,7 @@ EVENT_EFFECT_HANDLERS = {
     "reseller_service_escrow": _apply_reseller_service_escrow,
     "reseller_service_surety": _apply_reseller_service_surety,
     "reseller_service_backstop": _apply_reseller_service_backstop,
+    "reseller_service_statute": _apply_reseller_service_statute,
     "integration_cutover_risk": _apply_integration_cutover_risk,
     "integration_cutover_board": _apply_integration_cutover_board,
     "integration_release_cutline": _apply_integration_release_cutline,
@@ -8079,6 +8225,7 @@ EVENT_EFFECT_HANDLERS = {
     "integration_cutover_warranty": _apply_integration_cutover_warranty,
     "integration_cutover_surety": _apply_integration_cutover_surety,
     "integration_cutover_backstop": _apply_integration_cutover_backstop,
+    "integration_cutover_statute": _apply_integration_cutover_statute,
     "marketplace_chargeback_wave": _apply_marketplace_chargeback_wave,
     "marketplace_dispute_program": _apply_marketplace_dispute_program,
     "marketplace_refund_charter": _apply_marketplace_refund_charter,
@@ -8093,6 +8240,7 @@ EVENT_EFFECT_HANDLERS = {
     "marketplace_refund_backstop": _apply_marketplace_refund_backstop,
     "marketplace_refund_lattice": _apply_marketplace_refund_lattice,
     "marketplace_refund_covenant": _apply_marketplace_refund_covenant,
+    "marketplace_refund_statute": _apply_marketplace_refund_statute,
     "board_recovery_window": _apply_board_recovery_window,
     "board_reset_showdown": _apply_board_reset_showdown,
     "board_reset_execution_plan": _apply_board_reset_execution_plan,
@@ -8109,6 +8257,7 @@ EVENT_EFFECT_HANDLERS = {
     "board_reset_execution_lattice": _apply_board_reset_execution_lattice,
     "board_reset_continuity_covenant": _apply_board_reset_continuity_covenant,
     "board_reset_execution_compact": _apply_board_reset_execution_compact,
+    "board_reset_operating_statute": _apply_board_reset_operating_statute,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,

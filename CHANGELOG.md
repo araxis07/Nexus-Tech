@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.72.0 - 2026-05-22
+
+- Added `run_enterprise_reference_secretariat`, `run_billing_liquidity_secretariat`, `run_onboarding_continuity_secretariat`, `run_channel_durability_statute`, and `set_terminal_solvency_statute` as one-more-turn terminal controls above the current directorate/covenant/resilience tier
+- Added path-chain follow-up events `ipo_book_anchor_statute`, `buyer_close_anchor_statute`, `independence_cash_solvency_statute`, and `board_reset_operating_statute` so all four late-game routes gain another concrete recovery-or-penalty branch
+- Added channel-chain follow-up events `reseller_service_statute`, `integration_cutover_statute`, and `marketplace_refund_statute` so reseller, integration, and marketplace lanes keep diverging under deeper terminal commercial pressure
+- Expanded planner recommendations, action sequencing, dashboard surfacing, and CLI wiring so the new actions appear only once flagship proof, billing liquidity, onboarding drag, hotspot dependency, and terminal fragility move past the current covenant tier
+- Added regression coverage for the new actions and event handlers plus a seeded 500-turn board-recovery stability run
+- Promoted the package version to `0.72.0`
+
 ## 0.71.0 - 2026-05-22
 
 - Added `run_enterprise_reference_directorate`, `run_billing_liquidity_directorate`, `run_onboarding_continuity_bureau`, `run_channel_assurance_covenant`, and `set_terminal_resilience_covenant` as one-more-turn convergence controls above the current summit/lattice/continuity tier
