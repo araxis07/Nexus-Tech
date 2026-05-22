@@ -2325,6 +2325,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "155",
+        "run_enterprise_reference_summit",
+        (
+            "Run the last enterprise reference summit when flagship trust is still too fragile "
+            "for the current lattice tier."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2394,6 +2402,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "156",
+        "run_billing_liquidity_summit",
+        (
+            "Run the last billing liquidity summit when collections pressure is still outrunning "
+            "the current command loop."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2447,6 +2463,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the final onboarding durability mesh when implementation drag still threatens "
             "renewal quality, board confidence, and flagship trust together."
+        ),
+    )
+    primary_actions.add_row(
+        "157",
+        "run_onboarding_continuity_lattice",
+        (
+            "Run the last onboarding continuity lattice when implementation recovery is still too "
+            "fragile for the current durability tier."
         ),
     )
     primary_actions.add_row(
@@ -2630,6 +2654,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "159",
+        "set_terminal_continuity_matrix",
+        (
+            "Force the last terminal continuity matrix when multi-path fragility is still too hot "
+            "for the current recovery lattice."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2738,6 +2770,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the final hotspot-channel resilience grid when dependency, rev-share drag, and "
             "commercial fragility still need one last de-risking move."
+        ),
+    )
+    primary_actions.add_row(
+        "158",
+        "run_channel_continuity_matrix",
+        (
+            "Run the last hotspot-channel continuity matrix when dependency and recovery drag are "
+            "still too strong for the current resilience grid."
         ),
     )
     primary_actions.add_row(

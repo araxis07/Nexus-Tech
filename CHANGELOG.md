@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.70.0 - 2026-05-22
+
+- Added `run_enterprise_reference_summit`, `run_billing_liquidity_summit`, `run_onboarding_continuity_lattice`, `run_channel_continuity_matrix`, and `set_terminal_continuity_matrix` as one-more-turn late-game control loops above the existing lattice/grid/command tier
+- Added path-chain follow-up events `ipo_book_support_panel`, `buyer_close_assurance_panel`, `independence_cash_surety_charter`, and `board_reset_continuity_covenant` so each late-game route gains another concrete recovery-or-penalty branch
+- Added channel-chain follow-up events `reseller_service_surety`, `integration_cutover_surety`, and `marketplace_refund_lattice` so reseller, integration, and marketplace lanes keep diverging under deeper commercial pressure
+- Expanded planner recommendations, action sequencing, dashboard surfacing, and CLI wiring so the new control loops only appear once flagship proof, billing liquidity, onboarding drag, hotspot dependency, and terminal fragility move past the previous lattice tier
+- Added regression coverage for the new actions and event handlers plus a seeded 420-turn board-recovery stability run
+- Promoted the package version to `0.70.0`
+
 ## 0.69.0 - 2026-05-21
 
 - Added `run_enterprise_reference_lattice`, `run_billing_liquidity_command`, `run_onboarding_durability_mesh`, `run_channel_resilience_grid`, and `set_terminal_recovery_lattice` as deeper terminal follow-up loops for flagship proof, billing/covenant containment, onboarding durability, hotspot-channel stabilization, and path-level capital recovery
