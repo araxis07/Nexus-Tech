@@ -73,6 +73,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_terminal_liquidity_controls,
     apply_set_terminal_recovery_lattice,
     apply_set_terminal_resilience_covenant,
+    apply_set_terminal_solvency_mandate,
     apply_set_terminal_solvency_statute,
     apply_step_up_reserve_discipline,
 )
@@ -157,6 +158,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_conflict_reset,
     run_channel_continuity_matrix,
     run_channel_dependency_reset,
+    run_channel_durability_mandate,
     run_channel_durability_mesh,
     run_channel_durability_statute,
     run_channel_firebreak,
@@ -232,6 +234,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_covenant_reset,
     run_billing_dispute_cabinet,
     run_billing_dispute_desk,
+    run_billing_liquidity_authority,
     run_billing_liquidity_command,
     run_billing_liquidity_directorate,
     run_billing_liquidity_secretariat,
@@ -242,6 +245,7 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_assurance,
     run_enterprise_commitment_board,
     run_enterprise_queue_reset,
+    run_enterprise_reference_authority,
     run_enterprise_reference_chamber,
     run_enterprise_reference_cycle,
     run_enterprise_reference_directorate,
@@ -253,6 +257,7 @@ from nexus_tech.simulation.support_program import (
     run_lane_recovery,
     run_onboarding_adoption_hub,
     run_onboarding_assurance_grid,
+    run_onboarding_continuity_authority,
     run_onboarding_continuity_bureau,
     run_onboarding_continuity_lattice,
     run_onboarding_continuity_secretariat,
@@ -844,6 +849,11 @@ def apply_action(
         logger.debug("Set terminal solvency statute.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_TERMINAL_SOLVENCY_MANDATE:
+        summary = apply_set_terminal_solvency_mandate(next_state)
+        logger.debug("Set terminal solvency mandate.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
         summary = apply_lock_capital_buffer(next_state)
         logger.debug("Locked capital buffer.")
@@ -1426,6 +1436,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_AUTHORITY:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_reference_authority(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise reference authority for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_BILLING_RETENTION_RESET:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1594,6 +1618,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_BILLING_LIQUIDITY_AUTHORITY:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_liquidity_authority(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing liquidity authority for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1728,6 +1766,20 @@ def apply_action(
         summary = run_onboarding_continuity_secretariat(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran onboarding continuity secretariat for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_CONTINUITY_AUTHORITY:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_continuity_authority(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding continuity authority for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -1987,6 +2039,21 @@ def apply_action(
         summary = run_channel_durability_statute(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel durability statute for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_DURABILITY_MANDATE:
+        if context.partnership_id is None:
+            raise ValueError(
+                "Running a channel durability mandate requires selecting a partnership."
+            )
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_durability_mandate(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel durability mandate for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

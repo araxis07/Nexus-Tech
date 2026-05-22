@@ -285,6 +285,7 @@ ACTION_KEYS = {
     "155": TurnAction.RUN_ENTERPRISE_REFERENCE_SUMMIT,
     "160": TurnAction.RUN_ENTERPRISE_REFERENCE_DIRECTORATE,
     "165": TurnAction.RUN_ENTERPRISE_REFERENCE_SECRETARIAT,
+    "170": TurnAction.RUN_ENTERPRISE_REFERENCE_AUTHORITY,
     "104": TurnAction.RUN_ENTERPRISE_REFERENCE_CYCLE,
     "115": TurnAction.RUN_ENTERPRISE_RENEWAL_CABINET,
     "105": TurnAction.RUN_BILLING_RETENTION_RESET,
@@ -299,6 +300,7 @@ ACTION_KEYS = {
     "156": TurnAction.RUN_BILLING_LIQUIDITY_SUMMIT,
     "161": TurnAction.RUN_BILLING_LIQUIDITY_DIRECTORATE,
     "166": TurnAction.RUN_BILLING_LIQUIDITY_SECRETARIAT,
+    "171": TurnAction.RUN_BILLING_LIQUIDITY_AUTHORITY,
     "124": TurnAction.RUN_ONBOARDING_CONTROL_TOWER,
     "128": TurnAction.RUN_ONBOARDING_LAUNCH_CELL,
     "132": TurnAction.RUN_ONBOARDING_ADOPTION_HUB,
@@ -309,6 +311,7 @@ ACTION_KEYS = {
     "157": TurnAction.RUN_ONBOARDING_CONTINUITY_LATTICE,
     "162": TurnAction.RUN_ONBOARDING_CONTINUITY_BUREAU,
     "167": TurnAction.RUN_ONBOARDING_CONTINUITY_SECRETARIAT,
+    "172": TurnAction.RUN_ONBOARDING_CONTINUITY_AUTHORITY,
     "33": TurnAction.RUN_ADD_ON_CAMPAIGN,
     "34": TurnAction.RUN_PACKAGE_MIGRATION,
     "35": TurnAction.EXECUTE_RESTRUCTURE_PLAN,
@@ -360,6 +363,7 @@ ACTION_KEYS = {
     "158": TurnAction.RUN_CHANNEL_CONTINUITY_MATRIX,
     "163": TurnAction.RUN_CHANNEL_ASSURANCE_COVENANT,
     "168": TurnAction.RUN_CHANNEL_DURABILITY_STATUTE,
+    "173": TurnAction.RUN_CHANNEL_DURABILITY_MANDATE,
     "109": TurnAction.RUN_RESELLER_ENABLEMENT_RESET,
     "113": TurnAction.RUN_INTEGRATION_CUTOVER_RESET,
     "110": TurnAction.RUN_MARKETPLACE_CHARGEBACK_RESET,
@@ -381,6 +385,7 @@ ACTION_KEYS = {
     "159": TurnAction.SET_TERMINAL_CONTINUITY_MATRIX,
     "164": TurnAction.SET_TERMINAL_RESILIENCE_COVENANT,
     "169": TurnAction.SET_TERMINAL_SOLVENCY_STATUTE,
+    "174": TurnAction.SET_TERMINAL_SOLVENCY_MANDATE,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1837,6 +1842,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_AUTHORITY:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_EXCHANGE:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1903,6 +1914,12 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
 
+    if action is TurnAction.RUN_BILLING_LIQUIDITY_AUTHORITY:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
@@ -1958,6 +1975,12 @@ def collect_action_context(
         return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_ONBOARDING_CONTINUITY_SECRETARIAT:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_ONBOARDING_CONTINUITY_AUTHORITY:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None
@@ -2088,6 +2111,12 @@ def collect_action_context(
         return ActionContext(partnership_id=partnership_id)
 
     if action is TurnAction.RUN_CHANNEL_DURABILITY_STATUTE:
+        partnership_id = choose_partnership_id(state)
+        if partnership_id is None:
+            return None
+        return ActionContext(partnership_id=partnership_id)
+
+    if action is TurnAction.RUN_CHANNEL_DURABILITY_MANDATE:
         partnership_id = choose_partnership_id(state)
         if partnership_id is None:
             return None

@@ -931,6 +931,18 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_enterprise_reference_secretariat")
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition"}
+        and enterprise_queue_risk_accounts > 1
+        and (
+            premium_revenue_at_risk_value >= Decimal("5800.00")
+            or finance.board_pressure >= 42
+            or finance.governance_risk >= 68
+            or (high_value_risk_accounts > 1 and hotspot_lane_account_count > 5)
+            or (white_glove_queue_risk_accounts > 0 and support_hotspot_lane_overflow > 7)
+        )
+    ):
+        recommended_actions.append("run_enterprise_reference_authority")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -1048,6 +1060,17 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_onboarding_continuity_secretariat")
+    if (
+        support_hotspot_lane is SupportLaneFocus.ONBOARDING
+        and hotspot_lane_account_count > 2
+        and (
+            support_backlog >= 32
+            or support_hotspot_lane_overflow > 9
+            or revenue_at_risk_value >= Decimal("5800.00")
+            or renewal_pressure_value >= Decimal("4800.00")
+        )
+    ):
+        recommended_actions.append("run_onboarding_continuity_authority")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
     if (
@@ -1161,6 +1184,16 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_billing_liquidity_secretariat")
+    if support_hotspot_lane is SupportLaneFocus.BILLING and (
+        renewal_pressure_value >= Decimal("6400.00")
+        or finance.covenant_risk >= 36
+        or capital_fragility >= 90
+        or (
+            finance.debt_principal >= BALANCE.finance_debt_rollover_min_debt
+            and finance.board_pressure >= 42
+        )
+    ):
+        recommended_actions.append("run_billing_liquidity_authority")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -1311,6 +1344,14 @@ def build_finance_planner(
         or channel_conflict_index >= 44
     ):
         recommended_actions.append("run_channel_durability_statute")
+    if hotspot_channel != "-" and (
+        hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 24
+        or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold + 20
+        or paused_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 16
+        or hotspot_revenue_share_percent >= 60
+        or channel_conflict_index >= 46
+    ):
+        recommended_actions.append("run_channel_durability_mandate")
     if hotspot_channel == "reseller" and (
         hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold
         or recovery_drag_score >= BALANCE.finance_planner_channel_volatility_threshold
@@ -1598,6 +1639,21 @@ def build_finance_planner(
         or support_hotspot_lane_overflow > 7
     ):
         recommended_actions.append("set_terminal_solvency_statute")
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        finance.board_pressure >= 48
+        or finance.governance_risk >= 68
+        or finance.covenant_risk >= 34
+        or capital_fragility >= 88
+        or reserve_gap < ZERO_MONEY
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 22
+        or support_hotspot_lane_overflow > 8
+    ):
+        recommended_actions.append("set_terminal_solvency_mandate")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1632,6 +1688,11 @@ def build_finance_planner(
             "run an enterprise reference secretariat before flagship proof slips past the "
             "directorate tier"
         )
+    if "run_enterprise_reference_authority" in recommended_actions:
+        action_sequence.append(
+            "run an enterprise reference authority before flagship proof slips past the "
+            "secretariat tier"
+        )
     if "run_billing_liquidity_command" in recommended_actions:
         action_sequence.append(
             "open a billing liquidity command before covenant heat hardens further"
@@ -1650,6 +1711,11 @@ def build_finance_planner(
         action_sequence.append(
             "open a billing liquidity secretariat before collections pressure outruns the "
             "directorate tier"
+        )
+    if "run_billing_liquidity_authority" in recommended_actions:
+        action_sequence.append(
+            "open a billing liquidity authority before collections pressure outruns the "
+            "secretariat tier"
         )
     if "run_onboarding_durability_mesh" in recommended_actions:
         action_sequence.append(
@@ -1670,6 +1736,11 @@ def build_finance_planner(
             "run an onboarding continuity secretariat before implementation recovery slips past "
             "the bureau tier"
         )
+    if "run_onboarding_continuity_authority" in recommended_actions:
+        action_sequence.append(
+            "run an onboarding continuity authority before implementation recovery slips past "
+            "the secretariat tier"
+        )
     if "run_channel_resilience_grid" in recommended_actions:
         action_sequence.append(
             "deploy a channel resilience grid before dependency becomes the main commercial story"
@@ -1689,6 +1760,11 @@ def build_finance_planner(
             "deploy a channel durability statute before hotspot dependency hardens past the "
             "assurance covenant tier"
         )
+    if "run_channel_durability_mandate" in recommended_actions:
+        action_sequence.append(
+            "deploy a channel durability mandate before hotspot dependency hardens past the "
+            "statute tier"
+        )
     if "set_terminal_recovery_lattice" in recommended_actions:
         action_sequence.append(
             "force a terminal recovery lattice before the path locks into fragile capital"
@@ -1707,6 +1783,11 @@ def build_finance_planner(
         action_sequence.append(
             "force a terminal solvency statute before multi-path fragility outruns the "
             "resilience covenant"
+        )
+    if "set_terminal_solvency_mandate" in recommended_actions:
+        action_sequence.append(
+            "force a terminal solvency mandate before multi-path fragility outruns the "
+            "solvency statute"
         )
     if finance.debt_principal >= BALANCE.finance_refinance_min_debt and finance.covenant_risk >= 16:
         action_sequence.append("refinance debt before adding new growth spend")

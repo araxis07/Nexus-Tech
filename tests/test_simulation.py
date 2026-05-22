@@ -2752,6 +2752,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "ipo_book_support_panel" in registry_ids
     assert "ipo_book_integrity_covenant" in registry_ids
     assert "ipo_book_anchor_statute" in registry_ids
+    assert "ipo_book_anchor_mandate" in registry_ids
     assert "acquirer_diligence" in registry_ids
     assert "buyer_reference_check" in registry_ids
     assert "buyer_channel_conflict_review" in registry_ids
@@ -2772,6 +2773,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "buyer_close_assurance_panel" in registry_ids
     assert "buyer_close_integrity_covenant" in registry_ids
     assert "buyer_close_anchor_statute" in registry_ids
+    assert "buyer_close_anchor_mandate" in registry_ids
     assert "independence_reckoning" in registry_ids
     assert "independence_cash_crunch" in registry_ids
     assert "independence_refinancing_wall" in registry_ids
@@ -2792,6 +2794,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "independence_cash_surety_charter" in registry_ids
     assert "independence_cash_backstop_covenant" in registry_ids
     assert "independence_cash_solvency_statute" in registry_ids
+    assert "independence_cash_solvency_mandate" in registry_ids
     assert "reseller_enablement_gap" in registry_ids
     assert "reseller_reference_summit" in registry_ids
     assert "reseller_commitment_review" in registry_ids
@@ -2807,6 +2810,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "reseller_service_surety" in registry_ids
     assert "reseller_service_backstop" in registry_ids
     assert "reseller_service_statute" in registry_ids
+    assert "reseller_service_mandate" in registry_ids
     assert "integration_cutover_risk" in registry_ids
     assert "integration_cutover_board" in registry_ids
     assert "integration_release_cutline" in registry_ids
@@ -2822,6 +2826,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "integration_cutover_surety" in registry_ids
     assert "integration_cutover_backstop" in registry_ids
     assert "integration_cutover_statute" in registry_ids
+    assert "integration_cutover_mandate" in registry_ids
     assert "marketplace_chargeback_wave" in registry_ids
     assert "marketplace_dispute_program" in registry_ids
     assert "marketplace_refund_charter" in registry_ids
@@ -2837,6 +2842,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "marketplace_refund_lattice" in registry_ids
     assert "marketplace_refund_covenant" in registry_ids
     assert "marketplace_refund_statute" in registry_ids
+    assert "marketplace_refund_mandate" in registry_ids
     assert "board_reset_execution_plan" in registry_ids
     assert "board_reset_operating_cadence" in registry_ids
     assert "board_reset_governance_table" in registry_ids
@@ -2852,6 +2858,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "board_reset_continuity_covenant" in registry_ids
     assert "board_reset_execution_compact" in registry_ids
     assert "board_reset_operating_statute" in registry_ids
+    assert "board_reset_operating_mandate" in registry_ids
 
 
 def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
@@ -23626,3 +23633,1016 @@ def test_five_hundred_turn_board_recovery_crucible_progression_is_seed_stable() 
         )
 
     assert run_once(5001) == run_once(5001)
+
+
+def test_run_enterprise_reference_authority_rebuilds_terminal_flagship_trust() -> None:
+    product = make_product("Reference Authority Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Reference Authority Flagship",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("13200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=24,
+        onboarding_health=18,
+        support_load=66,
+        open_tickets=18,
+        sla_breach_risk=84,
+        ticket_queue_age=9,
+        expansion_potential=78,
+        renewal_health=14,
+        renewal_turn=4,
+        churn_risk=58,
+        invoice_risk=42,
+        failed_payment_risk=36,
+        escalation_count=10,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("52000.00"))
+    state.support_program.backlog_queue = 30
+    state.support_program.escalation_queue = 15
+    state.finance.board_pressure = 48
+    state.finance.board_confidence = 18
+    state.finance.board_score = 18
+    state.finance.investor_pressure = 34
+    state.company.reputation = 52
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ENTERPRISE_REFERENCE_AUTHORITY,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert updated_account.support_tier is SupportTier.WHITE_GLOVE
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.expansion_potential > account.expansion_potential
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_billing_liquidity_authority_cools_terminal_collections_extreme_heat() -> None:
+    product = make_product("Billing Authority Core", target_segment=MarketSegment.SMB)
+    account = CustomerAccount(
+        name="Liquidity Authority Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("6100.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=22,
+        onboarding_health=40,
+        support_load=64,
+        open_tickets=18,
+        sla_breach_risk=74,
+        ticket_queue_age=9,
+        expansion_potential=34,
+        renewal_health=14,
+        renewal_turn=4,
+        churn_risk=58,
+        invoice_risk=86,
+        failed_payment_risk=80,
+        dunning_steps=13,
+        escalation_count=10,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("47000.00"))
+    state.support_program.backlog_queue = 26
+    state.support_program.escalation_queue = 13
+    state.finance.board_pressure = 46
+    state.finance.investor_pressure = 40
+    state.finance.covenant_risk = 38
+    state.finance.board_confidence = 18
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_BILLING_LIQUIDITY_AUTHORITY,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.BILLING
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.invoice_risk < account.invoice_risk
+    assert updated_account.failed_payment_risk < account.failed_payment_risk
+    assert updated_account.dunning_steps < account.dunning_steps
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_onboarding_continuity_authority_stabilizes_terminal_drag() -> None:
+    product = make_product(
+        "Onboarding Continuity Authority Core",
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Continuity Authority Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("6400.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=28,
+        onboarding_health=6,
+        support_load=62,
+        open_tickets=17,
+        sla_breach_risk=70,
+        ticket_queue_age=9,
+        expansion_potential=42,
+        renewal_health=16,
+        renewal_turn=5,
+        churn_risk=50,
+        escalation_count=10,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("43800.00"))
+    state.support_program.backlog_queue = 28
+    state.support_program.escalation_queue = 13
+    state.finance.board_pressure = 42
+    state.finance.board_confidence = 24
+    state.company.reputation = 50
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ONBOARDING_CONTINUITY_AUTHORITY,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ONBOARDING
+    assert updated_account.support_tier is SupportTier.WHITE_GLOVE
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_channel_durability_mandate_recovers_terminal_hotspot_channel() -> None:
+    product = make_product(
+        "Channel Durability Mandate Core",
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Durability Mandate Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("3600.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=44,
+        onboarding_health=48,
+        support_load=38,
+        open_tickets=8,
+        renewal_health=42,
+        expansion_potential=60,
+        renewal_turn=8,
+        churn_risk=38,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Durability Mandate Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.STRAINED,
+        quality=40,
+        risk=86,
+        conflict_pressure=82,
+        enablement_level=6,
+        sourced_revenue=Decimal("8100.00"),
+        sourced_users=94,
+        rev_share_rate=Decimal("0.2950"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("46800.00"),
+        current_turn=26,
+    )
+    state.finance.board_pressure = 46
+    state.finance.investor_pressure = 40
+    state.finance.board_confidence = 18
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_CHANNEL_DURABILITY_MANDATE,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated_partnership = outcome.state.partnerships[0]
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_partnership.status in {PartnershipStatus.RECOVERY, PartnershipStatus.ACTIVE}
+    assert updated_partnership.sourced_revenue < partnership.sourced_revenue
+    assert updated_partnership.sourced_users < partnership.sourced_users
+    assert updated_partnership.risk < partnership.risk
+    assert updated_partnership.conflict_pressure < partnership.conflict_pressure
+    assert updated_partnership.enablement_level > partnership.enablement_level
+    assert updated_partnership.quality > partnership.quality
+    assert updated_partnership.rev_share_rate < partnership.rev_share_rate
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_set_terminal_solvency_mandate_shifts_to_deepest_terminal_controls() -> None:
+    product = make_product(
+        "Terminal Solvency Mandate Core", target_segment=MarketSegment.ENTERPRISE
+    )
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.VENTURE,
+        planning_horizon_turns=8,
+        reserve_target=Decimal("6600.00"),
+        product_investment_share=34,
+        go_to_market_share=40,
+        reserve_share=26,
+    )
+    account = CustomerAccount(
+        name="Terminal Solvency Mandate Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("5800.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=40,
+        onboarding_health=30,
+        support_load=58,
+        open_tickets=16,
+        sla_breach_risk=78,
+        renewal_health=18,
+        expansion_potential=56,
+        renewal_turn=7,
+        churn_risk=48,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Terminal Solvency Mandate Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=44,
+        risk=78,
+        conflict_pressure=72,
+        enablement_level=12,
+        sourced_revenue=Decimal("6200.00"),
+        sourced_users=78,
+        rev_share_rate=Decimal("0.2780"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        capital_plan=capital_plan,
+        cash_on_hand=Decimal("10400.00"),
+        current_turn=29,
+    )
+    state.finance.board_pressure = 50
+    state.finance.governance_risk = 70
+    state.finance.covenant_risk = 36
+    state.finance.board_confidence = 20
+    state.finance.investor_pressure = 18
+    state.finance.board_warning_level = 2
+    state.finance.restructuring_pressure = 34
+    state.support_program.backlog_queue = 26
+    state.support_program.escalation_queue = 12
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_TERMINAL_SOLVENCY_MANDATE,
+        context=ActionContext(),
+    )
+
+    updated_plan = outcome.state.capital_plan
+    assert updated_plan.mode is CapitalPlanMode.CONSERVE
+    assert updated_plan.reserve_target > capital_plan.reserve_target
+    assert updated_plan.planning_horizon_turns > capital_plan.planning_horizon_turns
+    assert updated_plan.reserve_share > capital_plan.reserve_share
+    assert updated_plan.go_to_market_share < capital_plan.go_to_market_share
+    assert updated_plan.product_investment_share <= capital_plan.product_investment_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert "terminal solvency mandate" in outcome.message
+
+
+def test_finance_planner_recommends_enterprise_reference_authority_for_flagship_heat() -> None:
+    state = make_state(
+        make_product("Enterprise Reference Authority Planning Core"),
+        cash_on_hand=Decimal("4200.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("6800.00"),
+            product_investment_share=34,
+            go_to_market_share=40,
+            reserve_share=26,
+        ),
+    )
+    state.finance.board_pressure = 44
+    state.finance.governance_risk = 70
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1040.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=24,
+        support_escalations=9,
+        premium_revenue_at_risk_value=Decimal("6200.00"),
+        enterprise_queue_risk_accounts=3,
+        high_value_risk_accounts=2,
+        white_glove_queue_risk_accounts=1,
+        revenue_at_risk_value=Decimal("5600.00"),
+        renewal_queue_risk_accounts=2,
+        renewal_pressure_value=Decimal("3200.00"),
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=8,
+        hotspot_lane_account_count=5,
+        focus_alignment_gap=4,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=84,
+        capital_fragility=60,
+    )
+
+    assert "run_enterprise_reference_authority" in planner.recommended_actions
+    assert any("enterprise reference authority" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_billing_liquidity_authority_for_terminal_covenant_heat() -> (
+    None
+):
+    state = make_state(
+        make_product("Billing Liquidity Authority Planning Core"),
+        cash_on_hand=Decimal("3400.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7000.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    state.finance.covenant_risk = 38
+    state.finance.board_pressure = 44
+    state.finance.debt_principal = Decimal("5200.00")
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1260.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=26,
+        support_escalations=10,
+        revenue_at_risk_value=Decimal("5200.00"),
+        renewal_queue_risk_accounts=3,
+        renewal_pressure_value=Decimal("6800.00"),
+        support_lane_focus=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane=SupportLaneFocus.BILLING,
+        support_hotspot_lane_overflow=7,
+        hotspot_lane_account_count=4,
+        focus_alignment_gap=3,
+        strategic_outlook="profitable_independence",
+        dominant_endgame_pressure="independence_discipline",
+        commercial_fragility=88,
+        capital_fragility=92,
+    )
+
+    assert "run_billing_liquidity_authority" in planner.recommended_actions
+    assert any("billing liquidity authority" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_onboarding_continuity_authority_for_terminal_drag() -> None:
+    state = make_state(
+        make_product("Onboarding Continuity Authority Planning Core"),
+        cash_on_hand=Decimal("3900.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.ANGEL,
+            reserve_target=Decimal("6400.00"),
+            product_investment_share=34,
+            go_to_market_share=40,
+            reserve_share=26,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-980.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=34,
+        support_escalations=11,
+        revenue_at_risk_value=Decimal("6000.00"),
+        renewal_pressure_value=Decimal("5000.00"),
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane_overflow=10,
+        hotspot_lane_account_count=6,
+        focus_alignment_gap=4,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=90,
+        capital_fragility=72,
+    )
+
+    assert "run_onboarding_continuity_authority" in planner.recommended_actions
+    assert any("onboarding continuity authority" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_channel_durability_mandate_for_terminal_dependency_heat() -> (
+    None
+):
+    state = make_state(
+        make_product("Channel Durability Mandate Planning Core"),
+        cash_on_hand=Decimal("3600.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("6800.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1180.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=24,
+        support_escalations=9,
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=7,
+        hotspot_lane_account_count=4,
+        focus_alignment_gap=3,
+        channel_conflict_index=48,
+        paused_dependency_score=96,
+        hotspot_dependency_score=136,
+        recovery_drag_score=122,
+        hotspot_revenue_share_percent=62,
+        hotspot_channel="reseller",
+        strategic_outlook="strategic_acquisition",
+        dominant_endgame_pressure="acquirer_diligence",
+        commercial_fragility=92,
+        capital_fragility=84,
+    )
+
+    assert "run_channel_durability_mandate" in planner.recommended_actions
+    assert any("channel durability mandate" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_terminal_solvency_mandate_for_board_reset_heat() -> None:
+    state = make_state(
+        make_product("Terminal Solvency Mandate Planning Core"),
+        cash_on_hand=Decimal("3200.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("6200.00"),
+            product_investment_share=36,
+            go_to_market_share=42,
+            reserve_share=22,
+        ),
+    )
+    state.finance.board_pressure = 50
+    state.finance.governance_risk = 70
+    state.finance.covenant_risk = 36
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1320.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=26,
+        support_escalations=10,
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=9,
+        hotspot_lane_account_count=5,
+        focus_alignment_gap=4,
+        hotspot_dependency_score=132,
+        strategic_outlook="board_reset",
+        dominant_endgame_pressure="board_reset_risk",
+        commercial_fragility=94,
+        capital_fragility=92,
+    )
+
+    assert "set_terminal_solvency_mandate" in planner.recommended_actions
+    assert any("terminal solvency mandate" in step for step in planner.action_sequence)
+
+
+def test_ipo_book_anchor_mandate_event_can_fund_mandate() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="ipo_readiness_launchpad",
+    )
+    product = state.products[0]
+    state.company.current_turn = 39
+    state.company.cash_on_hand = Decimal("7600.00")
+    state.finance.board_confidence = 54
+    state.finance.board_score = 50
+    state.finance.board_pressure = 38
+    state.finance.governance_risk = 34
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="ipo_book_anchor_statute",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="IPO Book-Anchor Statute",
+            triggered_turn=38,
+            resolved_turn=38,
+            selected_option_id="fund_book_anchor_statute",
+            selected_option_label="Fund the book-anchor statute",
+            result_text="Book-anchor statute funded.",
+        )
+    )
+    state.customer_accounts = [
+        CustomerAccount(
+            name="IPO Mandate Account",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("4800.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=60,
+            onboarding_health=56,
+            support_load=34,
+            open_tickets=8,
+            sla_breach_risk=50,
+            renewal_health=56,
+            expansion_potential=76,
+            renewal_turn=10,
+            churn_risk=22,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "ipo_book_anchor_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_book_anchor_mandate")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.history_entry.event_id == "ipo_book_anchor_mandate"
+
+
+def test_buyer_close_anchor_mandate_event_can_fund_mandate() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="acquisition_diligence_sprint",
+    )
+    product = state.products[0]
+    state.company.current_turn = 39
+    state.company.cash_on_hand = Decimal("7200.00")
+    state.finance.board_confidence = 54
+    state.finance.board_score = 50
+    state.finance.board_pressure = 40
+    state.finance.governance_risk = 34
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="buyer_close_anchor_statute",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="Buyer Close-Anchor Statute",
+            triggered_turn=38,
+            resolved_turn=38,
+            selected_option_id="fund_close_anchor_statute",
+            selected_option_label="Fund the close-anchor statute",
+            result_text="Close-anchor statute funded.",
+        )
+    )
+    state.customer_accounts = [
+        CustomerAccount(
+            name="Close Mandate Account",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("4700.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=58,
+            onboarding_health=54,
+            support_load=36,
+            open_tickets=8,
+            sla_breach_risk=50,
+            renewal_health=54,
+            expansion_potential=74,
+            renewal_turn=10,
+            churn_risk=24,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    state.partnerships = [
+        PartnershipDeal(
+            name="Close Mandate Integration",
+            product_id=product.id,
+            channel=PartnerChannel.INTEGRATION,
+            status=PartnershipStatus.STRAINED,
+            quality=56,
+            risk=76,
+            conflict_pressure=72,
+            enablement_level=18,
+            sourced_revenue=Decimal("5200.00"),
+            rev_share_rate=Decimal("0.2480"),
+        )
+    ]
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "buyer_close_anchor_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_close_anchor_mandate")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.history_entry.event_id == "buyer_close_anchor_mandate"
+
+
+def test_independence_cash_solvency_mandate_event_can_ratify_mandate() -> None:
+    product = make_product("Cash Solvency Mandate Core", lifecycle_stage=LifecycleStage.MATURE)
+    state = make_state(
+        product,
+        cash_on_hand=Decimal("2300.00"),
+        current_turn=36,
+        finance=FinanceState(
+            debt_principal=Decimal("5200.00"),
+            loan_interest_rate=Decimal("0.0310"),
+            investor_pressure=36,
+            covenant_risk=34,
+            board_confidence=46,
+            board_pressure=40,
+        ),
+        event_history=[
+            EventHistoryEntry(
+                event_id="independence_cash_solvency_statute",
+                category=EventCategory.FUNDING_OPPORTUNITY,
+                title="Independence Cash-Solvency Statute",
+                triggered_turn=35,
+                resolved_turn=35,
+                selected_option_id="ratify_cash_solvency_statute",
+                selected_option_label="Ratify the cash-solvency statute",
+                result_text="Cash-solvency statute ratified.",
+            )
+        ],
+    )
+    state.capital_plan.reserve_target = Decimal("7600.00")
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "independence_cash_solvency_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "ratify_cash_solvency_mandate")
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.CONSERVE
+    assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.history_entry.event_id == "independence_cash_solvency_mandate"
+
+
+def test_reseller_service_mandate_event_can_fund_mandate() -> None:
+    product = make_product("Service Mandate Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Service Mandate Account",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("2400.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=54,
+        onboarding_health=58,
+        support_load=24,
+        open_tickets=4,
+        renewal_health=46,
+        expansion_potential=60,
+        renewal_turn=8,
+        churn_risk=26,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Service Mandate Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=58,
+        risk=76,
+        conflict_pressure=72,
+        enablement_level=22,
+        sourced_revenue=Decimal("4400.00"),
+        rev_share_rate=Decimal("0.2240"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("5600.00"),
+        current_turn=27,
+        event_history=[
+            EventHistoryEntry(
+                event_id="reseller_service_statute",
+                category=EventCategory.MARKET_OPPORTUNITY,
+                title="Reseller Service Statute",
+                triggered_turn=26,
+                resolved_turn=26,
+                selected_option_id="fund_service_statute",
+                selected_option_label="Fund the service statute",
+                result_text="Service statute funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "reseller_service_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_service_mandate")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].enablement_level > state.partnerships[0].enablement_level
+    assert outcome.history_entry.event_id == "reseller_service_mandate"
+
+
+def test_integration_cutover_mandate_event_can_fund_mandate() -> None:
+    product = make_product("Cutover Mandate Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Cutover Mandate Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("3800.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=52,
+        onboarding_health=46,
+        support_load=28,
+        open_tickets=5,
+        renewal_health=48,
+        expansion_potential=64,
+        renewal_turn=9,
+        churn_risk=24,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Cutover Mandate Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.RECOVERY,
+        quality=58,
+        risk=78,
+        conflict_pressure=74,
+        enablement_level=20,
+        sourced_revenue=Decimal("4800.00"),
+        rev_share_rate=Decimal("0.2280"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("5800.00"),
+        current_turn=28,
+        event_history=[
+            EventHistoryEntry(
+                event_id="integration_cutover_statute",
+                category=EventCategory.PRODUCT_INCIDENT,
+                title="Integration Cutover Statute",
+                triggered_turn=27,
+                resolved_turn=27,
+                selected_option_id="fund_cutover_statute",
+                selected_option_label="Fund the cutover statute",
+                result_text="Cutover statute funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "integration_cutover_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_cutover_mandate")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].enablement_level > state.partnerships[0].enablement_level
+    assert outcome.history_entry.event_id == "integration_cutover_mandate"
+
+
+def test_marketplace_refund_mandate_event_can_fund_mandate() -> None:
+    product = make_product("Refund Mandate Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Refund Mandate Account",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("2500.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=50,
+        onboarding_health=54,
+        support_load=24,
+        open_tickets=5,
+        renewal_health=44,
+        invoice_risk=58,
+        failed_payment_risk=54,
+        expansion_potential=58,
+        renewal_turn=8,
+        churn_risk=28,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Refund Mandate Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.RECOVERY,
+        quality=56,
+        risk=76,
+        conflict_pressure=70,
+        enablement_level=18,
+        sourced_revenue=Decimal("4500.00"),
+        rev_share_rate=Decimal("0.2340"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6000.00"),
+        current_turn=29,
+        event_history=[
+            EventHistoryEntry(
+                event_id="marketplace_refund_statute",
+                category=EventCategory.REPUTATION_INCIDENT,
+                title="Marketplace Refund Statute",
+                triggered_turn=28,
+                resolved_turn=28,
+                selected_option_id="fund_refund_statute",
+                selected_option_label="Fund the refund statute",
+                result_text="Refund statute funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "marketplace_refund_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_refund_mandate")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.history_entry.event_id == "marketplace_refund_mandate"
+
+
+def test_board_reset_operating_mandate_event_can_ratify_mandate() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="board_recovery_crucible",
+    )
+    state.company.current_turn = 37
+    state.company.cash_on_hand = Decimal("5200.00")
+    state.finance.board_pressure = 42
+    state.finance.board_confidence = 32
+    state.finance.board_score = 38
+    state.finance.governance_risk = 62
+    state.finance.board_warning_level = 2
+    state.finance.governance_crisis_active = True
+    state.finance.restructuring_pressure = 22
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="board_reset_operating_statute",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="Board-Reset Operating Statute",
+            triggered_turn=36,
+            resolved_turn=36,
+            selected_option_id="ratify_operating_statute",
+            selected_option_label="Ratify the operating statute",
+            result_text="Operating statute ratified.",
+        )
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "board_reset_operating_mandate"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "ratify_operating_mandate")
+
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.history_entry.event_id == "board_reset_operating_mandate"
+
+
+def test_five_hundred_forty_turn_board_recovery_crucible_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="board_recovery_crucible",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(540):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            state.finance.governance_risk,
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(5401) == run_once(5401)
