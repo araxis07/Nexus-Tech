@@ -2444,6 +2444,136 @@ def apply_set_terminal_continuity_matrix(state: GameState) -> CapitalPlanSummary
     )
 
 
+def apply_set_terminal_resilience_covenant(state: GameState) -> CapitalPlanSummary:
+    """Apply the final covenant-level capital control move when continuity still is not enough."""
+
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state)
+    queue_exposure = calculate_support_queue_exposure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    reserve_gap = state.capital_plan.reserve_target - state.company.cash_on_hand
+    base_cost = quantize_money(
+        BALANCE.capital_plan_endgame_capital_map_cost * 2
+        + BALANCE.capital_plan_path_capital_posture_cost * 6
+        + BALANCE.capital_plan_growth_firebreak_cost * 6
+    )
+    extra_cost = quantize_money(
+        BALANCE.capital_plan_growth_firebreak_cost * 2
+        + BALANCE.capital_plan_path_capital_posture_cost * 2
+    )
+    total_cost = quantize_money(base_cost + extra_cost)
+
+    if (
+        pressure.board_reset_risk < 96
+        and pressure.public_market_scrutiny < 96
+        and pressure.acquirer_diligence < 96
+        and pressure.independence_discipline < 96
+        and state.finance.governance_risk < 64
+        and state.finance.covenant_risk < 30
+        and reserve_gap <= Decimal("0.00")
+        and queue_exposure.hotspot_lane_overflow <= 6
+        and portfolio.hotspot_dependency_score
+        < BALANCE.finance_planner_reactivate_dependency_threshold + 20
+    ):
+        raise ValueError(
+            "There is not enough terminal multi-path fragility to justify a resilience covenant."
+        )
+    if state.company.cash_on_hand < total_cost:
+        raise ValueError("Not enough cash to set a terminal resilience covenant this turn.")
+
+    apply_set_terminal_continuity_matrix(state)
+    capital_plan = state.capital_plan
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - extra_cost)
+    reserve_target = quantize_money(
+        capital_plan.reserve_target + BALANCE.capital_plan_growth_firebreak_target_step
+    )
+    planning_horizon_turns = min(12, capital_plan.planning_horizon_turns + 1)
+    product_share = max(0, capital_plan.product_investment_share - 1)
+    go_to_market_share = max(0, capital_plan.go_to_market_share - 2)
+    reserve_share = capital_plan.reserve_share + 3
+    source_preference = capital_plan.source_preference
+    control_note = readiness.strategic_outlook.replace("_", " ")
+
+    if (
+        pressure.board_reset_risk >= 96
+        or pressure.dominant_pressure == "board_reset_risk"
+        or state.finance.governance_risk >= 64
+    ):
+        source_preference = CapitalSourcePreference.BOOTSTRAP
+        reserve_share += 2
+        go_to_market_share = max(0, go_to_market_share - 1)
+        control_note = "board reset"
+    elif readiness.strategic_outlook == "ipo_ready":
+        if source_preference in {
+            CapitalSourcePreference.DEBT,
+            CapitalSourcePreference.VENTURE,
+        }:
+            source_preference = CapitalSourcePreference.ANGEL
+        reserve_share += 1
+        product_share += 1
+        control_note = "IPO readiness"
+    elif readiness.strategic_outlook == "strategic_acquisition":
+        if source_preference is CapitalSourcePreference.DEBT:
+            source_preference = CapitalSourcePreference.ANGEL
+        reserve_share += 1
+        product_share += 1
+        control_note = "buyer close"
+    else:
+        source_preference = CapitalSourcePreference.BOOTSTRAP
+        reserve_share += 2
+        go_to_market_share = max(0, go_to_market_share - 1)
+        control_note = "independence"
+
+    if queue_exposure.hotspot_lane_overflow > 4:
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if queue_exposure.enterprise_queue_risk_accounts > 1:
+        reserve_share += 1
+        product_share += 1
+    if queue_exposure.white_glove_queue_risk_accounts > 0:
+        reserve_share += 1
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold + 12
+        or portfolio.paused_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold + 8
+    ):
+        reserve_share += 2
+        go_to_market_share = max(0, go_to_market_share - 1)
+        product_share = max(0, product_share - 1)
+
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.CONSERVE,
+        source_preference=source_preference,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    state.finance.investor_pressure = clamp_int(state.finance.investor_pressure - 1)
+    state.finance.covenant_risk = clamp_int(state.finance.covenant_risk - 1)
+    state.finance.board_confidence = min(
+        100,
+        state.finance.board_confidence
+        + BALANCE.capital_plan_growth_firebreak_board_confidence_gain,
+    )
+    return CapitalPlanSummary(
+        message=(
+            f"Set a terminal resilience covenant for the {control_note} path. Reserve target "
+            f"{format_money(reserve_target)} over {planning_horizon_turns} turns. Allocation now "
+            f"P {product_share}% / GTM {go_to_market_share}% / Reserve {reserve_share}% with "
+            f"{source_preference.value} capital."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
 def evaluate_capital_plan(
     company: Company,
     finance: FinanceState,

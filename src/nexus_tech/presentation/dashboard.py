@@ -2333,6 +2333,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "160",
+        "run_enterprise_reference_directorate",
+        (
+            "Run the final enterprise reference directorate when flagship proof, renewal trust, "
+            "and board credibility still outrun the summit tier."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2410,6 +2418,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "161",
+        "run_billing_liquidity_directorate",
+        (
+            "Run the final billing liquidity directorate when collections drag, covenant heat, "
+            "and renewal trust still outrun the summit tier."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2471,6 +2487,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the last onboarding continuity lattice when implementation recovery is still too "
             "fragile for the current durability tier."
+        ),
+    )
+    primary_actions.add_row(
+        "162",
+        "run_onboarding_continuity_bureau",
+        (
+            "Run the final onboarding continuity bureau when implementation recovery, renewal "
+            "credibility, and board trust still outrun the continuity tier."
         ),
     )
     primary_actions.add_row(
@@ -2662,6 +2686,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "164",
+        "set_terminal_resilience_covenant",
+        (
+            "Force the final terminal resilience covenant when reserve, governance, support, and "
+            "channel fragility still outrun the continuity tier."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2778,6 +2810,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the last hotspot-channel continuity matrix when dependency and recovery drag are "
             "still too strong for the current resilience grid."
+        ),
+    )
+    primary_actions.add_row(
+        "163",
+        "run_channel_assurance_covenant",
+        (
+            "Run the final hotspot-channel assurance covenant when dependency, rev-share drag, "
+            "and recovery drag still outrun the continuity tier."
         ),
     )
     primary_actions.add_row(
