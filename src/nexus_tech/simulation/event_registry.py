@@ -438,6 +438,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_book_anchor_mandate_event,
         ),
         EventDefinition(
+            event_id="ipo_book_anchor_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_bookbuild_corridor_weight,
+            cooldown_turns=BALANCE.event_ipo_bookbuild_corridor_cooldown,
+            is_eligible=_is_ipo_book_anchor_commission_eligible,
+            build_pending_event=_build_ipo_book_anchor_commission_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -606,6 +614,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_close_anchor_mandate_event,
         ),
         EventDefinition(
+            event_id="buyer_close_anchor_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_board_alignment_weight,
+            cooldown_turns=BALANCE.event_buyer_board_alignment_cooldown,
+            is_eligible=_is_buyer_close_anchor_commission_eligible,
+            build_pending_event=_build_buyer_close_anchor_commission_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -772,6 +788,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
             is_eligible=_is_independence_cash_solvency_mandate_eligible,
             build_pending_event=_build_independence_cash_solvency_mandate_event,
+        ),
+        EventDefinition(
+            event_id="independence_cash_solvency_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_liquidity_charter_weight,
+            cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
+            is_eligible=_is_independence_cash_solvency_commission_eligible,
+            build_pending_event=_build_independence_cash_solvency_commission_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -974,6 +998,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_reseller_service_mandate_event,
         ),
         EventDefinition(
+            event_id="reseller_service_commission",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_reseller_pipeline_cadence_weight,
+            cooldown_turns=BALANCE.event_reseller_pipeline_cadence_cooldown,
+            is_eligible=_is_reseller_service_commission_eligible,
+            build_pending_event=_build_reseller_service_commission_event,
+        ),
+        EventDefinition(
             event_id="integration_cutover_board",
             category=EventCategory.PRODUCT_INCIDENT,
             weight=BALANCE.event_integration_cutover_board_weight,
@@ -1094,6 +1126,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_integration_cutover_mandate_event,
         ),
         EventDefinition(
+            event_id="integration_cutover_commission",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_integration_go_live_shield_weight,
+            cooldown_turns=BALANCE.event_integration_go_live_shield_cooldown,
+            is_eligible=_is_integration_cutover_commission_eligible,
+            build_pending_event=_build_integration_cutover_commission_event,
+        ),
+        EventDefinition(
             event_id="marketplace_dispute_program",
             category=EventCategory.REPUTATION_INCIDENT,
             weight=BALANCE.event_marketplace_dispute_program_weight,
@@ -1212,6 +1252,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
             is_eligible=_is_marketplace_refund_mandate_eligible,
             build_pending_event=_build_marketplace_refund_mandate_event,
+        ),
+        EventDefinition(
+            event_id="marketplace_refund_commission",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_marketplace_policy_appeal_weight,
+            cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
+            is_eligible=_is_marketplace_refund_commission_eligible,
+            build_pending_event=_build_marketplace_refund_commission_event,
         ),
         EventDefinition(
             event_id="board_recovery_window",
@@ -1356,6 +1404,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
             is_eligible=_is_board_reset_operating_mandate_eligible,
             build_pending_event=_build_board_reset_operating_mandate_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_operating_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_trust_vote_weight,
+            cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
+            is_eligible=_is_board_reset_operating_commission_eligible,
+            build_pending_event=_build_board_reset_operating_commission_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -4011,6 +4067,46 @@ def _build_ipo_book_anchor_mandate_event(
     )
 
 
+def _is_ipo_book_anchor_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"ipo_book_anchor_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_ipo_book_anchor_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_ipo_book_anchor_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "ipo_book_anchor_commission",
+            "title": "IPO Book-Anchor Commission",
+            "description": (
+                "The listing path now needs a book-anchor commission across final references, "
+                "service quality, and governance discipline. You can fund the commission now "
+                "or defer it and accept one more round of order-book fragility."
+            ),
+            "chain_stage": 30,
+            "options": [
+                EventOption(
+                    id="fund_book_anchor_commission",
+                    label="Fund the book-anchor commission",
+                    description="Spend cash to lock the final IPO book-support story in place.",
+                ),
+                EventOption(
+                    id="defer_book_anchor_commission",
+                    label="Defer the book-anchor commission",
+                    description="Protect cash now, but let one more round of fragility build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -5282,6 +5378,46 @@ def _build_buyer_close_anchor_mandate_event(
                 EventOption(
                     id="carry_close_anchor_mandate",
                     label="Carry the close-anchor mandate",
+                    description="Protect economics now, but let another drag round build.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_buyer_close_anchor_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"buyer_close_anchor_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_buyer_close_anchor_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_buyer_close_anchor_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "buyer_close_anchor_commission",
+            "title": "Buyer Close-Anchor Commission",
+            "description": (
+                "The buyer path now needs a close-anchor commission across channel dependency, "
+                "service proof, and executive coordination. You can fund the commission now or "
+                "absorb one more diligence discount."
+            ),
+            "chain_stage": 30,
+            "options": [
+                EventOption(
+                    id="fund_close_anchor_commission",
+                    label="Fund the close-anchor commission",
+                    description="Spend cash to lock final close certainty and overlap control.",
+                ),
+                EventOption(
+                    id="carry_close_anchor_commission",
+                    label="Carry the close-anchor commission",
                     description="Protect economics now, but let another drag round build.",
                 ),
             ],
@@ -6962,6 +7098,46 @@ def _build_independence_cash_solvency_mandate_event(
     )
 
 
+def _is_independence_cash_solvency_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"independence_cash_solvency_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_independence_cash_solvency_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_independence_cash_solvency_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "independence_cash_solvency_commission",
+            "title": "Independence Cash-Solvency Commission",
+            "description": (
+                "The independence path now needs a cash-solvency commission across reserves, "
+                "covenant control, and margin discipline. You can ratify the commission now or "
+                "bridge it and accept one more round of capital fragility."
+            ),
+            "chain_stage": 30,
+            "options": [
+                EventOption(
+                    id="ratify_cash_solvency_commission",
+                    label="Ratify the cash-solvency commission",
+                    description="Spend cash and lock the hardest liquidity backstop in place.",
+                ),
+                EventOption(
+                    id="bridge_cash_solvency_commission",
+                    label="Bridge the cash-solvency commission",
+                    description="Protect flexibility now, but let another fragility round build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_reseller_enablement_gap_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     reseller_partnerships = [
@@ -8225,6 +8401,46 @@ def _build_reseller_service_mandate_event(
     )
 
 
+def _is_reseller_service_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"reseller_service_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_reseller_service_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_reseller_service_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "reseller_service_commission",
+            "title": "Reseller Service Commission",
+            "description": (
+                "The reseller lane now needs a service commission that proves support quality "
+                "and margin discipline can survive one more cycle. You can fund the commission "
+                "now or let partner fragility deepen again."
+            ),
+            "chain_stage": 17,
+            "options": [
+                EventOption(
+                    id="fund_service_commission",
+                    label="Fund the service commission",
+                    description="Spend cash to lock reseller confidence for one more cycle.",
+                ),
+                EventOption(
+                    id="stretch_service_commission",
+                    label="Stretch the service commission",
+                    description="Protect cash now, but let trust and dependency slip again.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_integration_cutover_board_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     integration_partnerships = [
@@ -9273,6 +9489,46 @@ def _build_integration_cutover_mandate_event(
                 EventOption(
                     id="stretch_cutover_mandate",
                     label="Stretch the cutover mandate",
+                    description="Protect cash now, but let cutover drag compound again.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_integration_cutover_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"integration_cutover_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_integration_cutover_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_integration_cutover_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "integration_cutover_commission",
+            "title": "Integration Cutover Commission",
+            "description": (
+                "The integration lane now needs a cutover commission that proves reliability, "
+                "hypercare, and support coverage can survive one more cycle. You can fund the "
+                "commission now or absorb another cutover scare."
+            ),
+            "chain_stage": 17,
+            "options": [
+                EventOption(
+                    id="fund_cutover_commission",
+                    label="Fund the cutover commission",
+                    description="Spend cash to keep integration confidence intact one more cycle.",
+                ),
+                EventOption(
+                    id="stretch_cutover_commission",
+                    label="Stretch the cutover commission",
                     description="Protect cash now, but let cutover drag compound again.",
                 ),
             ],
@@ -10336,6 +10592,46 @@ def _build_marketplace_refund_mandate_event(
     )
 
 
+def _is_marketplace_refund_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"marketplace_refund_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_marketplace_refund_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_marketplace_refund_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "marketplace_refund_commission",
+            "title": "Marketplace Refund Commission",
+            "description": (
+                "The marketplace lane now needs a refund commission that proves disputes, "
+                "refunds, and policy appeals can stay contained one more cycle. You can fund "
+                "the commission now or absorb another penalty wave."
+            ),
+            "chain_stage": 17,
+            "options": [
+                EventOption(
+                    id="fund_refund_commission",
+                    label="Fund the refund commission",
+                    description="Spend cash to keep refunds, disputes, and trust contained.",
+                ),
+                EventOption(
+                    id="stretch_refund_commission",
+                    label="Stretch the refund commission",
+                    description="Protect cash now, but let another penalty wave build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_board_recovery_window_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
@@ -11256,6 +11552,46 @@ def _build_board_reset_operating_mandate_event(
                 EventOption(
                     id="stretch_operating_mandate",
                     label="Stretch the operating mandate",
+                    description="Protect flexibility now, but let reset pressure compound again.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_board_reset_operating_commission_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"board_reset_operating_mandate"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_board_reset_operating_commission_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_board_reset_operating_mandate_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "board_reset_operating_commission",
+            "title": "Board-Reset Operating Commission",
+            "description": (
+                "Directors now want an operating commission that proves the reset can hold "
+                "through one more cycle without another governance break. You can ratify the "
+                "commission now or stretch it and absorb another round of reset heat."
+            ),
+            "chain_stage": 26,
+            "options": [
+                EventOption(
+                    id="ratify_operating_commission",
+                    label="Ratify the operating commission",
+                    description="Lean even harder into resilience and buy more trust back.",
+                ),
+                EventOption(
+                    id="stretch_operating_commission",
+                    label="Stretch the operating commission",
                     description="Protect flexibility now, but let reset pressure compound again.",
                 ),
             ],

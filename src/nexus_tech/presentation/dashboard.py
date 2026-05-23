@@ -2357,6 +2357,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "175",
+        "run_enterprise_reference_commission",
+        (
+            "Run the terminal enterprise reference commission when flagship proof, renewal "
+            "trust, and board credibility still outrun the authority tier."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2458,6 +2466,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "176",
+        "run_billing_liquidity_commission",
+        (
+            "Run the terminal billing liquidity commission when collections drag, covenant "
+            "heat, and renewal trust still outrun the authority tier."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2543,6 +2559,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the terminal onboarding continuity authority when implementation recovery, "
             "renewal credibility, and board trust still outrun the secretariat tier."
+        ),
+    )
+    primary_actions.add_row(
+        "177",
+        "run_onboarding_continuity_commission",
+        (
+            "Run the terminal onboarding continuity commission when implementation recovery, "
+            "renewal credibility, and board trust still outrun the authority tier."
         ),
     )
     primary_actions.add_row(
@@ -2758,6 +2782,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "179",
+        "set_terminal_solvency_commission",
+        (
+            "Force the terminal solvency commission when reserve, governance, support, and "
+            "channel fragility still outrun the solvency-mandate tier."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -2898,6 +2930,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the terminal hotspot-channel durability mandate when dependency, rev-share "
             "drag, and recovery drag still outrun the statute tier."
+        ),
+    )
+    primary_actions.add_row(
+        "178",
+        "run_channel_durability_commission",
+        (
+            "Run the terminal hotspot-channel durability commission when dependency, rev-share "
+            "drag, and recovery drag still outrun the mandate tier."
         ),
     )
     primary_actions.add_row(
