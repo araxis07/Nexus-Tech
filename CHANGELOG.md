@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.75.0 - 2026-05-24
+
+- Added `run_enterprise_reference_oversight`, `run_billing_liquidity_oversight`, `run_onboarding_continuity_oversight`, `run_channel_durability_oversight`, and `set_terminal_solvency_oversight` as one-more-turn controls above the current commission tier
+- Added path-chain follow-up events `ipo_book_anchor_oversight`, `buyer_close_anchor_oversight`, `independence_cash_solvency_oversight`, and `board_reset_operating_oversight` so all four late-game routes gain another concrete recovery-or-penalty branch
+- Added channel-chain follow-up events `reseller_service_oversight`, `integration_cutover_oversight`, and `marketplace_refund_oversight` so reseller, integration, and marketplace lanes keep diverging under deeper terminal commercial pressure
+- Expanded planner recommendations, action sequencing, dashboard surfacing, and CLI wiring so the new actions appear only once flagship proof, billing liquidity, onboarding drag, hotspot dependency, and terminal fragility move past the current commission tier
+- Added regression coverage for the new actions and event handlers plus a seeded 620-turn board-recovery stability run
+- Promoted the package version to `0.75.0`
+
 ## 0.74.0 - 2026-05-23
 
 - Added `run_enterprise_reference_commission`, `run_billing_liquidity_commission`, `run_onboarding_continuity_commission`, `run_channel_durability_commission`, and `set_terminal_solvency_commission` as one-more-turn commission controls above the current authority and mandate tier

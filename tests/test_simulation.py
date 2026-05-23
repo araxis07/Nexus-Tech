@@ -2754,6 +2754,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "ipo_book_anchor_statute" in registry_ids
     assert "ipo_book_anchor_mandate" in registry_ids
     assert "ipo_book_anchor_commission" in registry_ids
+    assert "ipo_book_anchor_oversight" in registry_ids
     assert "acquirer_diligence" in registry_ids
     assert "buyer_reference_check" in registry_ids
     assert "buyer_channel_conflict_review" in registry_ids
@@ -2776,6 +2777,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "buyer_close_anchor_statute" in registry_ids
     assert "buyer_close_anchor_mandate" in registry_ids
     assert "buyer_close_anchor_commission" in registry_ids
+    assert "buyer_close_anchor_oversight" in registry_ids
     assert "independence_reckoning" in registry_ids
     assert "independence_cash_crunch" in registry_ids
     assert "independence_refinancing_wall" in registry_ids
@@ -2798,6 +2800,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "independence_cash_solvency_statute" in registry_ids
     assert "independence_cash_solvency_mandate" in registry_ids
     assert "independence_cash_solvency_commission" in registry_ids
+    assert "independence_cash_solvency_oversight" in registry_ids
     assert "reseller_enablement_gap" in registry_ids
     assert "reseller_reference_summit" in registry_ids
     assert "reseller_commitment_review" in registry_ids
@@ -2815,6 +2818,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "reseller_service_statute" in registry_ids
     assert "reseller_service_mandate" in registry_ids
     assert "reseller_service_commission" in registry_ids
+    assert "reseller_service_oversight" in registry_ids
     assert "integration_cutover_risk" in registry_ids
     assert "integration_cutover_board" in registry_ids
     assert "integration_release_cutline" in registry_ids
@@ -2832,6 +2836,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "integration_cutover_statute" in registry_ids
     assert "integration_cutover_mandate" in registry_ids
     assert "integration_cutover_commission" in registry_ids
+    assert "integration_cutover_oversight" in registry_ids
     assert "marketplace_chargeback_wave" in registry_ids
     assert "marketplace_dispute_program" in registry_ids
     assert "marketplace_refund_charter" in registry_ids
@@ -2849,6 +2854,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "marketplace_refund_statute" in registry_ids
     assert "marketplace_refund_mandate" in registry_ids
     assert "marketplace_refund_commission" in registry_ids
+    assert "marketplace_refund_oversight" in registry_ids
     assert "board_reset_execution_plan" in registry_ids
     assert "board_reset_operating_cadence" in registry_ids
     assert "board_reset_governance_table" in registry_ids
@@ -2866,6 +2872,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "board_reset_operating_statute" in registry_ids
     assert "board_reset_operating_mandate" in registry_ids
     assert "board_reset_operating_commission" in registry_ids
+    assert "board_reset_operating_oversight" in registry_ids
 
 
 def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
@@ -25662,3 +25669,1012 @@ def test_five_hundred_eighty_turn_board_recovery_crucible_progression_is_seed_st
         )
 
     assert run_once(5801) == run_once(5801)
+
+
+def test_run_enterprise_reference_oversight_rebuilds_terminal_flagship_trust() -> None:
+    product = make_product("Reference Oversight Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Reference Oversight Flagship",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("14400.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=20,
+        onboarding_health=14,
+        support_load=70,
+        open_tickets=20,
+        sla_breach_risk=88,
+        ticket_queue_age=11,
+        expansion_potential=82,
+        renewal_health=10,
+        renewal_turn=4,
+        churn_risk=62,
+        invoice_risk=46,
+        failed_payment_risk=40,
+        escalation_count=12,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("62000.00"))
+    state.support_program.backlog_queue = 34
+    state.support_program.escalation_queue = 17
+    state.finance.board_pressure = 52
+    state.finance.board_confidence = 14
+    state.finance.board_score = 14
+    state.finance.investor_pressure = 38
+    state.company.reputation = 48
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ENTERPRISE_REFERENCE_OVERSIGHT,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.expansion_potential > account.expansion_potential
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_billing_liquidity_oversight_cools_terminal_collections_extreme_heat() -> None:
+    product = make_product("Billing Oversight Core", target_segment=MarketSegment.SMB)
+    account = CustomerAccount(
+        name="Liquidity Oversight Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("7000.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=18,
+        onboarding_health=36,
+        support_load=68,
+        open_tickets=20,
+        sla_breach_risk=78,
+        ticket_queue_age=11,
+        expansion_potential=30,
+        renewal_health=10,
+        renewal_turn=4,
+        churn_risk=62,
+        invoice_risk=90,
+        failed_payment_risk=84,
+        dunning_steps=15,
+        escalation_count=12,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("56000.00"))
+    state.support_program.backlog_queue = 30
+    state.support_program.escalation_queue = 15
+    state.finance.board_pressure = 50
+    state.finance.investor_pressure = 44
+    state.finance.covenant_risk = 42
+    state.finance.board_confidence = 14
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_BILLING_LIQUIDITY_OVERSIGHT,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.BILLING
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.invoice_risk < account.invoice_risk
+    assert updated_account.failed_payment_risk < account.failed_payment_risk
+    assert updated_account.dunning_steps < account.dunning_steps
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_onboarding_continuity_oversight_stabilizes_terminal_drag() -> None:
+    product = make_product(
+        "Onboarding Continuity Oversight Core",
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Continuity Oversight Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("7200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=24,
+        onboarding_health=2,
+        support_load=66,
+        open_tickets=19,
+        sla_breach_risk=74,
+        ticket_queue_age=11,
+        expansion_potential=38,
+        renewal_health=12,
+        renewal_turn=5,
+        churn_risk=54,
+        escalation_count=12,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("50000.00"))
+    state.support_program.backlog_queue = 32
+    state.support_program.escalation_queue = 15
+    state.finance.board_pressure = 46
+    state.finance.board_confidence = 20
+    state.company.reputation = 46
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ONBOARDING_CONTINUITY_OVERSIGHT,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ONBOARDING
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_channel_durability_oversight_recovers_terminal_hotspot_channel() -> None:
+    product = make_product(
+        "Channel Durability Oversight Core",
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Durability Oversight Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("4200.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=40,
+        onboarding_health=44,
+        support_load=42,
+        open_tickets=10,
+        renewal_health=38,
+        expansion_potential=64,
+        renewal_turn=8,
+        churn_risk=42,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Durability Oversight Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.STRAINED,
+        quality=36,
+        risk=90,
+        conflict_pressure=86,
+        enablement_level=2,
+        sourced_revenue=Decimal("9200.00"),
+        sourced_users=104,
+        rev_share_rate=Decimal("0.3120"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("54000.00"),
+        current_turn=28,
+    )
+    state.finance.board_pressure = 50
+    state.finance.investor_pressure = 44
+    state.finance.board_confidence = 14
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_CHANNEL_DURABILITY_OVERSIGHT,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated_partnership = outcome.state.partnerships[0]
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_partnership.status in {PartnershipStatus.RECOVERY, PartnershipStatus.ACTIVE}
+    assert updated_partnership.sourced_revenue < partnership.sourced_revenue
+    assert updated_partnership.sourced_users < partnership.sourced_users
+    assert updated_partnership.risk < partnership.risk
+    assert updated_partnership.conflict_pressure < partnership.conflict_pressure
+    assert updated_partnership.enablement_level > partnership.enablement_level
+    assert updated_partnership.quality > partnership.quality
+    assert updated_partnership.rev_share_rate < partnership.rev_share_rate
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_set_terminal_solvency_oversight_shifts_to_deepest_terminal_controls() -> None:
+    product = make_product(
+        "Terminal Solvency Oversight Core", target_segment=MarketSegment.ENTERPRISE
+    )
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.VENTURE,
+        planning_horizon_turns=8,
+        reserve_target=Decimal("7000.00"),
+        product_investment_share=34,
+        go_to_market_share=40,
+        reserve_share=26,
+    )
+    account = CustomerAccount(
+        name="Terminal Solvency Oversight Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("6600.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=36,
+        onboarding_health=26,
+        support_load=62,
+        open_tickets=18,
+        sla_breach_risk=82,
+        renewal_health=14,
+        expansion_potential=52,
+        renewal_turn=7,
+        churn_risk=52,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Terminal Solvency Oversight Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=40,
+        risk=82,
+        conflict_pressure=76,
+        enablement_level=8,
+        sourced_revenue=Decimal("7000.00"),
+        sourced_users=86,
+        rev_share_rate=Decimal("0.2860"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        capital_plan=capital_plan,
+        cash_on_hand=Decimal("11600.00"),
+        current_turn=31,
+    )
+    state.finance.board_pressure = 54
+    state.finance.governance_risk = 74
+    state.finance.covenant_risk = 40
+    state.finance.board_confidence = 16
+    state.finance.investor_pressure = 22
+    state.finance.board_warning_level = 2
+    state.finance.restructuring_pressure = 38
+    state.support_program.backlog_queue = 30
+    state.support_program.escalation_queue = 14
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_TERMINAL_SOLVENCY_OVERSIGHT,
+        context=ActionContext(),
+    )
+
+    updated_plan = outcome.state.capital_plan
+    assert updated_plan.mode is CapitalPlanMode.CONSERVE
+    assert updated_plan.reserve_target > capital_plan.reserve_target
+    assert updated_plan.planning_horizon_turns > capital_plan.planning_horizon_turns
+    assert updated_plan.reserve_share > capital_plan.reserve_share
+    assert updated_plan.go_to_market_share < capital_plan.go_to_market_share
+    assert updated_plan.product_investment_share <= capital_plan.product_investment_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert "terminal solvency oversight" in outcome.message
+
+
+def test_finance_planner_recommends_enterprise_reference_oversight_for_flagship_heat() -> None:
+    state = make_state(
+        make_product("Enterprise Reference Oversight Planning Core"),
+        cash_on_hand=Decimal("3600.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7200.00"),
+            product_investment_share=34,
+            go_to_market_share=40,
+            reserve_share=26,
+        ),
+    )
+    state.finance.board_pressure = 48
+    state.finance.governance_risk = 74
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1120.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=28,
+        support_escalations=11,
+        premium_revenue_at_risk_value=Decimal("7000.00"),
+        enterprise_queue_risk_accounts=3,
+        high_value_risk_accounts=2,
+        white_glove_queue_risk_accounts=1,
+        revenue_at_risk_value=Decimal("6000.00"),
+        renewal_queue_risk_accounts=2,
+        renewal_pressure_value=Decimal("3600.00"),
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=10,
+        hotspot_lane_account_count=7,
+        focus_alignment_gap=4,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=88,
+        capital_fragility=64,
+    )
+
+    assert "run_enterprise_reference_oversight" in planner.recommended_actions
+    assert any("enterprise reference oversight" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_billing_liquidity_oversight_for_terminal_covenant_heat() -> (
+    None
+):
+    state = make_state(
+        make_product("Billing Liquidity Oversight Planning Core"),
+        cash_on_hand=Decimal("2900.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7400.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    state.finance.covenant_risk = 42
+    state.finance.board_pressure = 48
+    state.finance.debt_principal = Decimal("6000.00")
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1340.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=30,
+        support_escalations=12,
+        revenue_at_risk_value=Decimal("5600.00"),
+        renewal_queue_risk_accounts=3,
+        renewal_pressure_value=Decimal("7400.00"),
+        support_lane_focus=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane=SupportLaneFocus.BILLING,
+        support_hotspot_lane_overflow=9,
+        hotspot_lane_account_count=4,
+        focus_alignment_gap=3,
+        strategic_outlook="profitable_independence",
+        dominant_endgame_pressure="independence_discipline",
+        commercial_fragility=92,
+        capital_fragility=96,
+    )
+
+    assert "run_billing_liquidity_oversight" in planner.recommended_actions
+    assert any("billing liquidity oversight" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_onboarding_continuity_oversight_for_terminal_drag() -> None:
+    state = make_state(
+        make_product("Onboarding Continuity Oversight Planning Core"),
+        cash_on_hand=Decimal("3300.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.ANGEL,
+            reserve_target=Decimal("6800.00"),
+            product_investment_share=34,
+            go_to_market_share=40,
+            reserve_share=26,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1060.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=38,
+        support_escalations=13,
+        revenue_at_risk_value=Decimal("6800.00"),
+        renewal_pressure_value=Decimal("5800.00"),
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane_overflow=12,
+        hotspot_lane_account_count=6,
+        focus_alignment_gap=4,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=94,
+        capital_fragility=76,
+    )
+
+    assert "run_onboarding_continuity_oversight" in planner.recommended_actions
+    assert any("onboarding continuity oversight" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_channel_oversight_for_dependency_heat() -> None:
+    state = make_state(
+        make_product("Channel Durability Oversight Planning Core"),
+        cash_on_hand=Decimal("3000.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7200.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1260.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=28,
+        support_escalations=11,
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=10,
+        hotspot_lane_account_count=5,
+        focus_alignment_gap=3,
+        channel_conflict_index=54,
+        paused_dependency_score=104,
+        hotspot_dependency_score=144,
+        recovery_drag_score=130,
+        hotspot_revenue_share_percent=70,
+        hotspot_channel="reseller",
+        strategic_outlook="strategic_acquisition",
+        dominant_endgame_pressure="acquirer_diligence",
+        commercial_fragility=96,
+        capital_fragility=88,
+    )
+
+    assert "run_channel_durability_oversight" in planner.recommended_actions
+    assert any("channel durability oversight" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_terminal_solvency_oversight_for_board_reset_heat() -> None:
+    state = make_state(
+        make_product("Terminal Solvency Oversight Planning Core"),
+        cash_on_hand=Decimal("2700.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("6600.00"),
+            product_investment_share=36,
+            go_to_market_share=42,
+            reserve_share=22,
+        ),
+    )
+    state.finance.board_pressure = 54
+    state.finance.governance_risk = 74
+    state.finance.covenant_risk = 40
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1400.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=30,
+        support_escalations=12,
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=11,
+        hotspot_lane_account_count=5,
+        focus_alignment_gap=4,
+        hotspot_dependency_score=140,
+        strategic_outlook="board_reset",
+        dominant_endgame_pressure="board_reset_risk",
+        commercial_fragility=98,
+        capital_fragility=96,
+    )
+
+    assert "set_terminal_solvency_oversight" in planner.recommended_actions
+    assert any("terminal solvency oversight" in step for step in planner.action_sequence)
+
+
+def test_ipo_book_anchor_oversight_event_can_fund_oversight() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="ipo_readiness_launchpad",
+    )
+    product = state.products[0]
+    state.company.current_turn = 41
+    state.company.cash_on_hand = Decimal("8000.00")
+    state.finance.board_confidence = 58
+    state.finance.board_score = 54
+    state.finance.board_pressure = 34
+    state.finance.governance_risk = 30
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="ipo_book_anchor_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="IPO Book-Anchor Commission",
+            triggered_turn=40,
+            resolved_turn=40,
+            selected_option_id="fund_book_anchor_commission",
+            selected_option_label="Fund the book-anchor commission",
+            result_text="Book-anchor commission funded.",
+        )
+    )
+    state.customer_accounts = [
+        CustomerAccount(
+            name="IPO Oversight Account",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("5200.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=64,
+            onboarding_health=60,
+            support_load=32,
+            open_tickets=8,
+            sla_breach_risk=46,
+            renewal_health=60,
+            expansion_potential=80,
+            renewal_turn=10,
+            churn_risk=18,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "ipo_book_anchor_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_book_anchor_oversight")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.history_entry.event_id == "ipo_book_anchor_oversight"
+
+
+def test_buyer_close_anchor_oversight_event_can_fund_oversight() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="acquisition_diligence_sprint",
+    )
+    product = state.products[0]
+    state.company.current_turn = 41
+    state.company.cash_on_hand = Decimal("7600.00")
+    state.finance.board_confidence = 58
+    state.finance.board_score = 54
+    state.finance.board_pressure = 36
+    state.finance.governance_risk = 30
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="buyer_close_anchor_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="Buyer Close-Anchor Commission",
+            triggered_turn=40,
+            resolved_turn=40,
+            selected_option_id="fund_close_anchor_commission",
+            selected_option_label="Fund the close-anchor commission",
+            result_text="Close-anchor commission funded.",
+        )
+    )
+    state.customer_accounts = [
+        CustomerAccount(
+            name="Close Oversight Account",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("5000.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=62,
+            onboarding_health=58,
+            support_load=34,
+            open_tickets=8,
+            sla_breach_risk=46,
+            renewal_health=58,
+            expansion_potential=78,
+            renewal_turn=10,
+            churn_risk=20,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    state.partnerships = [
+        PartnershipDeal(
+            name="Close Oversight Integration",
+            product_id=product.id,
+            channel=PartnerChannel.INTEGRATION,
+            status=PartnershipStatus.STRAINED,
+            quality=58,
+            risk=80,
+            conflict_pressure=76,
+            enablement_level=18,
+            sourced_revenue=Decimal("5600.00"),
+            rev_share_rate=Decimal("0.2520"),
+        )
+    ]
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "buyer_close_anchor_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_close_anchor_oversight")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.history_entry.event_id == "buyer_close_anchor_oversight"
+
+
+def test_independence_cash_solvency_oversight_event_can_ratify_oversight() -> None:
+    product = make_product("Cash Solvency Oversight Core", lifecycle_stage=LifecycleStage.MATURE)
+    state = make_state(
+        product,
+        cash_on_hand=Decimal("2100.00"),
+        current_turn=38,
+        finance=FinanceState(
+            debt_principal=Decimal("6000.00"),
+            loan_interest_rate=Decimal("0.0320"),
+            investor_pressure=40,
+            covenant_risk=38,
+            board_confidence=42,
+            board_pressure=44,
+        ),
+        event_history=[
+            EventHistoryEntry(
+                event_id="independence_cash_solvency_commission",
+                category=EventCategory.FUNDING_OPPORTUNITY,
+                title="Independence Cash-Solvency Commission",
+                triggered_turn=37,
+                resolved_turn=37,
+                selected_option_id="ratify_cash_solvency_commission",
+                selected_option_label="Ratify the cash-solvency commission",
+                result_text="Cash-solvency commission ratified.",
+            )
+        ],
+    )
+    state.capital_plan.reserve_target = Decimal("8200.00")
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "independence_cash_solvency_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "ratify_cash_solvency_oversight")
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.CONSERVE
+    assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.history_entry.event_id == "independence_cash_solvency_oversight"
+
+
+def test_reseller_service_oversight_event_can_fund_oversight() -> None:
+    product = make_product("Service Oversight Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Service Oversight Account",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("2600.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=56,
+        onboarding_health=60,
+        support_load=24,
+        open_tickets=4,
+        renewal_health=48,
+        expansion_potential=62,
+        renewal_turn=8,
+        churn_risk=24,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Service Oversight Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=60,
+        risk=76,
+        conflict_pressure=72,
+        enablement_level=24,
+        sourced_revenue=Decimal("4800.00"),
+        rev_share_rate=Decimal("0.2260"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6000.00"),
+        current_turn=29,
+        event_history=[
+            EventHistoryEntry(
+                event_id="reseller_service_commission",
+                category=EventCategory.MARKET_OPPORTUNITY,
+                title="Reseller Service Commission",
+                triggered_turn=28,
+                resolved_turn=28,
+                selected_option_id="fund_service_commission",
+                selected_option_label="Fund the service commission",
+                result_text="Service commission funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "reseller_service_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_service_oversight")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].enablement_level > state.partnerships[0].enablement_level
+    assert outcome.history_entry.event_id == "reseller_service_oversight"
+
+
+def test_integration_cutover_oversight_event_can_fund_oversight() -> None:
+    product = make_product("Cutover Oversight Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Cutover Oversight Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("4200.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=54,
+        onboarding_health=48,
+        support_load=28,
+        open_tickets=5,
+        renewal_health=50,
+        expansion_potential=66,
+        renewal_turn=9,
+        churn_risk=22,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Cutover Oversight Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.RECOVERY,
+        quality=60,
+        risk=78,
+        conflict_pressure=74,
+        enablement_level=20,
+        sourced_revenue=Decimal("5200.00"),
+        rev_share_rate=Decimal("0.2300"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6200.00"),
+        current_turn=30,
+        event_history=[
+            EventHistoryEntry(
+                event_id="integration_cutover_commission",
+                category=EventCategory.PRODUCT_INCIDENT,
+                title="Integration Cutover Commission",
+                triggered_turn=29,
+                resolved_turn=29,
+                selected_option_id="fund_cutover_commission",
+                selected_option_label="Fund the cutover commission",
+                result_text="Cutover commission funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "integration_cutover_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_cutover_oversight")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].enablement_level > state.partnerships[0].enablement_level
+    assert outcome.history_entry.event_id == "integration_cutover_oversight"
+
+
+def test_marketplace_refund_oversight_event_can_fund_oversight() -> None:
+    product = make_product("Refund Oversight Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Refund Oversight Account",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("2800.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=52,
+        onboarding_health=56,
+        support_load=24,
+        open_tickets=5,
+        renewal_health=46,
+        invoice_risk=60,
+        failed_payment_risk=56,
+        expansion_potential=60,
+        renewal_turn=8,
+        churn_risk=26,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Refund Oversight Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.RECOVERY,
+        quality=58,
+        risk=76,
+        conflict_pressure=70,
+        enablement_level=18,
+        sourced_revenue=Decimal("4900.00"),
+        rev_share_rate=Decimal("0.2360"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6400.00"),
+        current_turn=31,
+        event_history=[
+            EventHistoryEntry(
+                event_id="marketplace_refund_commission",
+                category=EventCategory.REPUTATION_INCIDENT,
+                title="Marketplace Refund Commission",
+                triggered_turn=30,
+                resolved_turn=30,
+                selected_option_id="fund_refund_commission",
+                selected_option_label="Fund the refund commission",
+                result_text="Refund commission funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "marketplace_refund_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_refund_oversight")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.history_entry.event_id == "marketplace_refund_oversight"
+
+
+def test_board_reset_operating_oversight_event_can_ratify_oversight() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="board_recovery_crucible",
+    )
+    state.company.current_turn = 39
+    state.company.cash_on_hand = Decimal("5000.00")
+    state.finance.board_pressure = 46
+    state.finance.board_confidence = 28
+    state.finance.board_score = 34
+    state.finance.governance_risk = 66
+    state.finance.board_warning_level = 2
+    state.finance.governance_crisis_active = True
+    state.finance.restructuring_pressure = 26
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="board_reset_operating_commission",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="Board-Reset Operating Commission",
+            triggered_turn=38,
+            resolved_turn=38,
+            selected_option_id="ratify_operating_commission",
+            selected_option_label="Ratify the operating commission",
+            result_text="Operating commission ratified.",
+        )
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "board_reset_operating_oversight"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "ratify_operating_oversight")
+
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.history_entry.event_id == "board_reset_operating_oversight"
+
+
+def test_six_hundred_twenty_turn_board_recovery_crucible_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="board_recovery_crucible",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(620):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            state.finance.governance_risk,
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(6201) == run_once(6201)

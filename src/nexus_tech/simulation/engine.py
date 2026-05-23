@@ -75,6 +75,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_terminal_resilience_covenant,
     apply_set_terminal_solvency_commission,
     apply_set_terminal_solvency_mandate,
+    apply_set_terminal_solvency_oversight,
     apply_set_terminal_solvency_statute,
     apply_step_up_reserve_discipline,
 )
@@ -162,6 +163,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_durability_commission,
     run_channel_durability_mandate,
     run_channel_durability_mesh,
+    run_channel_durability_oversight,
     run_channel_durability_statute,
     run_channel_firebreak,
     run_channel_qbr,
@@ -240,6 +242,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_liquidity_command,
     run_billing_liquidity_commission,
     run_billing_liquidity_directorate,
+    run_billing_liquidity_oversight,
     run_billing_liquidity_secretariat,
     run_billing_liquidity_summit,
     run_billing_retention_reset,
@@ -255,6 +258,7 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_reference_directorate,
     run_enterprise_reference_forum,
     run_enterprise_reference_lattice,
+    run_enterprise_reference_oversight,
     run_enterprise_reference_secretariat,
     run_enterprise_reference_summit,
     run_enterprise_renewal_cabinet,
@@ -265,6 +269,7 @@ from nexus_tech.simulation.support_program import (
     run_onboarding_continuity_bureau,
     run_onboarding_continuity_commission,
     run_onboarding_continuity_lattice,
+    run_onboarding_continuity_oversight,
     run_onboarding_continuity_secretariat,
     run_onboarding_control_tower,
     run_onboarding_durability_mesh,
@@ -862,6 +867,11 @@ def apply_action(
     if action is TurnAction.SET_TERMINAL_SOLVENCY_COMMISSION:
         summary = apply_set_terminal_solvency_commission(next_state)
         logger.debug("Set terminal solvency commission.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.SET_TERMINAL_SOLVENCY_OVERSIGHT:
+        summary = apply_set_terminal_solvency_oversight(next_state)
+        logger.debug("Set terminal solvency oversight.")
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
@@ -1474,6 +1484,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_OVERSIGHT:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_reference_oversight(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise reference oversight for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_BILLING_RETENTION_RESET:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1670,6 +1694,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_BILLING_LIQUIDITY_OVERSIGHT:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_liquidity_oversight(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing liquidity oversight for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1832,6 +1870,20 @@ def apply_action(
         summary = run_onboarding_continuity_commission(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran onboarding continuity commission for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_CONTINUITY_OVERSIGHT:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_continuity_oversight(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding continuity oversight for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -2121,6 +2173,21 @@ def apply_action(
         summary = run_channel_durability_commission(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel durability commission for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_DURABILITY_OVERSIGHT:
+        if context.partnership_id is None:
+            raise ValueError(
+                "Running a channel durability oversight requires selecting a partnership."
+            )
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_durability_oversight(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel durability oversight for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
