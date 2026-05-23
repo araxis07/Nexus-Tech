@@ -2967,6 +2967,174 @@ def run_channel_durability_oversight(
     )
 
 
+def run_channel_durability_council(
+    state: GameState,
+    partnership_id: UUID,
+) -> PartnershipActionSummary:
+    """Run the council-tier hotspot-channel loop after the oversight tier saturates."""
+
+    base_cost = quantize_money(
+        BALANCE.partnership_channel_realignment_cost
+        + BALANCE.partnership_channel_stability_reset_cost * 14
+        + BALANCE.partnership_channel_firebreak_cost * 10
+    )
+    extra_cost = quantize_money(
+        BALANCE.partnership_channel_stability_reset_cost * 3
+        + BALANCE.partnership_channel_firebreak_cost * 3
+    )
+    total_cost = quantize_money(base_cost + extra_cost)
+    if state.company.cash_on_hand < total_cost:
+        raise ValueError("Not enough cash to run a channel durability council.")
+
+    run_channel_durability_oversight(state, partnership_id)
+    partnership = get_partnership_by_id(state.partnerships, partnership_id)
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - extra_cost)
+    partnership.sourced_revenue = quantize_money(
+        partnership.sourced_revenue
+        * BALANCE.partnership_channel_stability_reset_revenue_retention_rate
+    )
+    partnership.sourced_users = max(
+        0,
+        int(
+            partnership.sourced_users
+            * BALANCE.partnership_channel_stability_reset_user_retention_percent
+            / 100
+        ),
+    )
+    partnership.risk = clamp_int(
+        partnership.risk
+        - (
+            BALANCE.partnership_channel_stability_reset_risk_relief * 3
+            + BALANCE.partnership_channel_firebreak_risk_relief * 3
+        )
+    )
+    partnership.conflict_pressure = clamp_int(
+        partnership.conflict_pressure
+        - (
+            BALANCE.partnership_channel_stability_reset_conflict_relief * 3
+            + BALANCE.partnership_channel_firebreak_conflict_relief * 3
+        )
+    )
+    partnership.enablement_level = clamp_int(
+        partnership.enablement_level
+        + (
+            BALANCE.partnership_channel_stability_reset_enablement_gain * 3
+            + BALANCE.partnership_channel_firebreak_enablement_gain * 3
+        )
+    )
+    partnership.quality = clamp_int(
+        partnership.quality + BALANCE.partnership_channel_stability_reset_quality_gain * 3
+    )
+    minimum_rev_share = BALANCE.partnership_min_rev_share_by_channel[partnership.channel.value]
+    partnership.rev_share_rate = max(
+        minimum_rev_share,
+        quantize_rate(
+            partnership.rev_share_rate
+            - (
+                BALANCE.partnership_channel_stability_reset_rev_share_relief * 3
+                + BALANCE.partnership_partner_margin_reset_rev_share_relief * 3
+            )
+        ),
+    )
+    partnership.last_review_turn = state.company.current_turn
+
+    related_accounts = [
+        account
+        for account in state.customer_accounts
+        if account.product_id == partnership.product_id
+        and account.status is not CustomerAccountStatus.CHURNED
+    ]
+    if partnership.channel is PartnerChannel.RESELLER:
+        for account in related_accounts[:2]:
+            account.satisfaction = clamp_int(
+                account.satisfaction
+                + (
+                    BALANCE.partnership_reseller_enablement_reset_satisfaction_gain * 2
+                    + BALANCE.partnership_channel_firebreak_reseller_satisfaction_gain * 2
+                )
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health
+                + BALANCE.partnership_reseller_enablement_reset_renewal_gain * 3
+            )
+            account.churn_risk = clamp_int(
+                account.churn_risk - BALANCE.partnership_channel_firebreak_reseller_churn_relief * 2
+            )
+    elif partnership.channel is PartnerChannel.INTEGRATION:
+        for account in related_accounts[:2]:
+            account.onboarding_health = clamp_int(
+                account.onboarding_health
+                + (
+                    BALANCE.partnership_channel_firebreak_integration_onboarding_gain * 2
+                    + BALANCE.partnership_integration_cutover_reset_onboarding_gain * 2
+                )
+            )
+            account.support_load = clamp_int(
+                account.support_load
+                - (
+                    BALANCE.partnership_channel_firebreak_integration_support_relief * 2
+                    + BALANCE.partnership_integration_cutover_reset_support_relief * 2
+                )
+            )
+            account.sla_breach_risk = clamp_int(
+                account.sla_breach_risk
+                - BALANCE.partnership_integration_cutover_reset_sla_relief * 2
+            )
+    elif partnership.channel is PartnerChannel.MARKETPLACE:
+        for account in related_accounts[:2]:
+            account.invoice_risk = clamp_int(
+                account.invoice_risk
+                - (
+                    BALANCE.partnership_channel_firebreak_marketplace_invoice_relief * 2
+                    + BALANCE.partnership_marketplace_chargeback_reset_invoice_relief * 2
+                )
+            )
+            account.failed_payment_risk = clamp_int(
+                account.failed_payment_risk
+                - (
+                    BALANCE.partnership_channel_firebreak_marketplace_payment_relief * 2
+                    + BALANCE.partnership_marketplace_chargeback_reset_payment_relief * 2
+                )
+            )
+            account.dunning_steps = max(
+                0,
+                account.dunning_steps
+                - BALANCE.partnership_channel_firebreak_marketplace_dunning_relief * 2,
+            )
+            account.renewal_health = clamp_int(
+                account.renewal_health
+                + (
+                    BALANCE.partnership_channel_firebreak_marketplace_renewal_gain * 2
+                    + BALANCE.partnership_marketplace_chargeback_reset_renewal_gain * 2
+                )
+            )
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - (
+            BALANCE.partnership_channel_stability_reset_board_pressure_relief * 2
+            + BALANCE.partnership_channel_firebreak_board_pressure_relief * 2
+        )
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - (
+            BALANCE.partnership_channel_stability_reset_investor_pressure_relief * 2
+            + BALANCE.partnership_channel_firebreak_investor_pressure_relief * 2
+        )
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + (
+            BALANCE.partnership_channel_stability_reset_board_confidence_gain * 2
+            + BALANCE.partnership_partner_margin_reset_board_confidence_gain * 2
+        )
+    )
+    return PartnershipActionSummary(
+        message=(f"Ran a channel durability council for {partnership.name}. Cash -{total_cost}.")
+    )
+
+
 def run_reseller_enablement_reset(
     state: GameState,
     partnership_id: UUID,

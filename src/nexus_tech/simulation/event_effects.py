@@ -2704,6 +2704,22 @@ def _apply_reseller_service_oversight(
     )
 
 
+def _apply_reseller_service_oversight_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_service_council": "fund_service_oversight",
+        "stretch_service_council": "stretch_service_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for reseller service oversight council.")
+    result = _apply_reseller_service_oversight(state, event, mapped_option)
+    return result.replace("service oversight", "service oversight council")
+
+
 def _apply_integration_cutover_risk(
     state: GameState,
     event: PendingEvent,
@@ -3403,6 +3419,25 @@ def _apply_integration_cutover_oversight(
         "integration cutover commission",
         "integration cutover oversight",
     ).replace("cutover commission", "cutover oversight")
+
+
+def _apply_integration_cutover_oversight_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_cutover_council": "fund_cutover_oversight",
+        "stretch_cutover_council": "stretch_cutover_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for integration cutover council.")
+    result = _apply_integration_cutover_oversight(state, event, mapped_option)
+    return result.replace(
+        "integration cutover oversight",
+        "integration cutover council",
+    ).replace("cutover oversight", "cutover council")
 
 
 def _apply_marketplace_chargeback_wave(
@@ -4110,6 +4145,25 @@ def _apply_marketplace_refund_oversight(
         "marketplace refund commission",
         "marketplace refund oversight",
     ).replace("refund commission", "refund oversight")
+
+
+def _apply_marketplace_refund_oversight_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_refund_council": "fund_refund_oversight",
+        "stretch_refund_council": "stretch_refund_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for marketplace refund council.")
+    result = _apply_marketplace_refund_oversight(state, event, mapped_option)
+    return result.replace(
+        "marketplace refund oversight",
+        "marketplace refund council",
+    ).replace("refund oversight", "refund council")
 
 
 def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -5044,6 +5098,28 @@ def _apply_board_reset_operating_oversight(
     ).replace(
         "operating commission",
         "operating oversight",
+    )
+
+
+def _apply_board_reset_operating_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_operating_council": "ratify_operating_oversight",
+        "stretch_operating_council": "stretch_operating_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for board-reset operating council.")
+    result = _apply_board_reset_operating_oversight(state, event, mapped_option)
+    return result.replace(
+        "board-reset operating oversight",
+        "board-reset operating council",
+    ).replace(
+        "operating oversight",
+        "operating council",
     )
 
 
@@ -6211,6 +6287,25 @@ def _apply_ipo_book_anchor_oversight(
     )
 
 
+def _apply_ipo_book_anchor_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_book_anchor_council": "fund_book_anchor_oversight",
+        "defer_book_anchor_council": "defer_book_anchor_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for IPO book-anchor council.")
+    result = _apply_ipo_book_anchor_oversight(state, event, mapped_option)
+    return result.replace("book-anchor oversight", "book-anchor council").replace(
+        "anchor oversight",
+        "anchor council",
+    )
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -7256,6 +7351,28 @@ def _apply_buyer_close_anchor_oversight(
     ).replace(
         "close-anchor commission",
         "close-anchor oversight",
+    )
+
+
+def _apply_buyer_close_anchor_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_close_anchor_council": "fund_close_anchor_oversight",
+        "carry_close_anchor_council": "carry_close_anchor_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for buyer close-anchor council.")
+    result = _apply_buyer_close_anchor_oversight(state, event, mapped_option)
+    return result.replace(
+        "buyer close-anchor oversight",
+        "buyer close-anchor council",
+    ).replace(
+        "close-anchor oversight",
+        "close-anchor council",
     )
 
 
@@ -8330,6 +8447,28 @@ def _apply_independence_cash_solvency_oversight(
     )
 
 
+def _apply_independence_cash_solvency_council(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_cash_solvency_council": "ratify_cash_solvency_oversight",
+        "bridge_cash_solvency_council": "bridge_cash_solvency_oversight",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for independence cash-solvency council.")
+    result = _apply_independence_cash_solvency_oversight(state, event, mapped_option)
+    return result.replace(
+        "independence cash-solvency oversight",
+        "independence cash-solvency council",
+    ).replace(
+        "cash-solvency oversight",
+        "cash-solvency council",
+    )
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -8582,6 +8721,7 @@ EVENT_EFFECT_HANDLERS = {
     "ipo_book_anchor_mandate": _apply_ipo_book_anchor_mandate,
     "ipo_book_anchor_commission": _apply_ipo_book_anchor_commission,
     "ipo_book_anchor_oversight": _apply_ipo_book_anchor_oversight,
+    "ipo_book_anchor_council": _apply_ipo_book_anchor_council,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
     "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
@@ -8605,6 +8745,7 @@ EVENT_EFFECT_HANDLERS = {
     "buyer_close_anchor_mandate": _apply_buyer_close_anchor_mandate,
     "buyer_close_anchor_commission": _apply_buyer_close_anchor_commission,
     "buyer_close_anchor_oversight": _apply_buyer_close_anchor_oversight,
+    "buyer_close_anchor_council": _apply_buyer_close_anchor_council,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
     "independence_refinancing_wall": _apply_independence_refinancing_wall,
@@ -8628,6 +8769,7 @@ EVENT_EFFECT_HANDLERS = {
     "independence_cash_solvency_mandate": _apply_independence_cash_solvency_mandate,
     "independence_cash_solvency_commission": _apply_independence_cash_solvency_commission,
     "independence_cash_solvency_oversight": _apply_independence_cash_solvency_oversight,
+    "independence_cash_solvency_council": _apply_independence_cash_solvency_council,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
@@ -8641,7 +8783,7 @@ EVENT_EFFECT_HANDLERS = {
     "reseller_margin_council": _apply_reseller_margin_council,
     "reseller_pipeline_cadence": _apply_reseller_pipeline_cadence,
     "reseller_recovery_compact": _apply_reseller_recovery_compact,
-    "reseller_service_council": _apply_reseller_service_council,
+    "reseller_service_oversight_council": _apply_reseller_service_oversight_council,
     "reseller_service_charter": _apply_reseller_service_charter,
     "reseller_reference_scorecard": _apply_reseller_reference_scorecard,
     "reseller_margin_reconciliation": _apply_reseller_margin_reconciliation,
@@ -8653,6 +8795,7 @@ EVENT_EFFECT_HANDLERS = {
     "reseller_service_mandate": _apply_reseller_service_mandate,
     "reseller_service_commission": _apply_reseller_service_commission,
     "reseller_service_oversight": _apply_reseller_service_oversight,
+    "reseller_service_council": _apply_reseller_service_council,
     "integration_cutover_risk": _apply_integration_cutover_risk,
     "integration_cutover_board": _apply_integration_cutover_board,
     "integration_release_cutline": _apply_integration_release_cutline,
@@ -8671,6 +8814,7 @@ EVENT_EFFECT_HANDLERS = {
     "integration_cutover_mandate": _apply_integration_cutover_mandate,
     "integration_cutover_commission": _apply_integration_cutover_commission,
     "integration_cutover_oversight": _apply_integration_cutover_oversight,
+    "integration_cutover_oversight_council": _apply_integration_cutover_oversight_council,
     "marketplace_chargeback_wave": _apply_marketplace_chargeback_wave,
     "marketplace_dispute_program": _apply_marketplace_dispute_program,
     "marketplace_refund_charter": _apply_marketplace_refund_charter,
@@ -8689,6 +8833,7 @@ EVENT_EFFECT_HANDLERS = {
     "marketplace_refund_mandate": _apply_marketplace_refund_mandate,
     "marketplace_refund_commission": _apply_marketplace_refund_commission,
     "marketplace_refund_oversight": _apply_marketplace_refund_oversight,
+    "marketplace_refund_oversight_council": _apply_marketplace_refund_oversight_council,
     "board_recovery_window": _apply_board_recovery_window,
     "board_reset_showdown": _apply_board_reset_showdown,
     "board_reset_execution_plan": _apply_board_reset_execution_plan,
@@ -8709,6 +8854,7 @@ EVENT_EFFECT_HANDLERS = {
     "board_reset_operating_mandate": _apply_board_reset_operating_mandate,
     "board_reset_operating_commission": _apply_board_reset_operating_commission,
     "board_reset_operating_oversight": _apply_board_reset_operating_oversight,
+    "board_reset_operating_council": _apply_board_reset_operating_council,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,

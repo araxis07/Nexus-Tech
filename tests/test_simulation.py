@@ -2755,6 +2755,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "ipo_book_anchor_mandate" in registry_ids
     assert "ipo_book_anchor_commission" in registry_ids
     assert "ipo_book_anchor_oversight" in registry_ids
+    assert "ipo_book_anchor_council" in registry_ids
     assert "acquirer_diligence" in registry_ids
     assert "buyer_reference_check" in registry_ids
     assert "buyer_channel_conflict_review" in registry_ids
@@ -2778,6 +2779,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "buyer_close_anchor_mandate" in registry_ids
     assert "buyer_close_anchor_commission" in registry_ids
     assert "buyer_close_anchor_oversight" in registry_ids
+    assert "buyer_close_anchor_council" in registry_ids
     assert "independence_reckoning" in registry_ids
     assert "independence_cash_crunch" in registry_ids
     assert "independence_refinancing_wall" in registry_ids
@@ -2801,13 +2803,14 @@ def test_new_event_ids_are_registered() -> None:
     assert "independence_cash_solvency_mandate" in registry_ids
     assert "independence_cash_solvency_commission" in registry_ids
     assert "independence_cash_solvency_oversight" in registry_ids
+    assert "independence_cash_solvency_council" in registry_ids
     assert "reseller_enablement_gap" in registry_ids
     assert "reseller_reference_summit" in registry_ids
     assert "reseller_commitment_review" in registry_ids
     assert "reseller_margin_council" in registry_ids
     assert "reseller_pipeline_cadence" in registry_ids
     assert "reseller_recovery_compact" in registry_ids
-    assert "reseller_service_council" in registry_ids
+    assert "reseller_service_oversight_council" in registry_ids
     assert "reseller_service_charter" in registry_ids
     assert "reseller_reference_scorecard" in registry_ids
     assert "reseller_margin_reconciliation" in registry_ids
@@ -2819,6 +2822,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "reseller_service_mandate" in registry_ids
     assert "reseller_service_commission" in registry_ids
     assert "reseller_service_oversight" in registry_ids
+    assert "reseller_service_council" in registry_ids
     assert "integration_cutover_risk" in registry_ids
     assert "integration_cutover_board" in registry_ids
     assert "integration_release_cutline" in registry_ids
@@ -2837,6 +2841,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "integration_cutover_mandate" in registry_ids
     assert "integration_cutover_commission" in registry_ids
     assert "integration_cutover_oversight" in registry_ids
+    assert "integration_cutover_oversight_council" in registry_ids
     assert "marketplace_chargeback_wave" in registry_ids
     assert "marketplace_dispute_program" in registry_ids
     assert "marketplace_refund_charter" in registry_ids
@@ -2855,6 +2860,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "marketplace_refund_mandate" in registry_ids
     assert "marketplace_refund_commission" in registry_ids
     assert "marketplace_refund_oversight" in registry_ids
+    assert "marketplace_refund_oversight_council" in registry_ids
     assert "board_reset_execution_plan" in registry_ids
     assert "board_reset_operating_cadence" in registry_ids
     assert "board_reset_governance_table" in registry_ids
@@ -2873,6 +2879,7 @@ def test_new_event_ids_are_registered() -> None:
     assert "board_reset_operating_mandate" in registry_ids
     assert "board_reset_operating_commission" in registry_ids
     assert "board_reset_operating_oversight" in registry_ids
+    assert "board_reset_operating_council" in registry_ids
 
 
 def test_board_reckoning_event_can_shift_capital_plan_to_conserve() -> None:
@@ -26647,6 +26654,1012 @@ def test_board_reset_operating_oversight_event_can_ratify_oversight() -> None:
     assert outcome.state.finance.governance_risk < state.finance.governance_risk
     assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
     assert outcome.history_entry.event_id == "board_reset_operating_oversight"
+
+
+def test_run_enterprise_reference_council_rebuilds_terminal_flagship_trust() -> None:
+    product = make_product("Reference Council Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Reference Council Flagship",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("16800.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=14,
+        onboarding_health=10,
+        support_load=78,
+        open_tickets=24,
+        sla_breach_risk=94,
+        ticket_queue_age=13,
+        expansion_potential=86,
+        renewal_health=6,
+        renewal_turn=4,
+        churn_risk=70,
+        invoice_risk=52,
+        failed_payment_risk=46,
+        escalation_count=14,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("98000.00"))
+    state.support_program.backlog_queue = 40
+    state.support_program.escalation_queue = 20
+    state.finance.board_pressure = 58
+    state.finance.board_confidence = 10
+    state.finance.board_score = 10
+    state.finance.investor_pressure = 42
+    state.company.reputation = 42
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ENTERPRISE_REFERENCE_COUNCIL,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.expansion_potential > account.expansion_potential
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_billing_liquidity_council_cools_terminal_collections_extreme_heat() -> None:
+    product = make_product("Billing Council Core", target_segment=MarketSegment.SMB)
+    account = CustomerAccount(
+        name="Liquidity Council Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("8200.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=14,
+        onboarding_health=34,
+        support_load=76,
+        open_tickets=24,
+        sla_breach_risk=86,
+        ticket_queue_age=13,
+        expansion_potential=30,
+        renewal_health=6,
+        renewal_turn=4,
+        churn_risk=68,
+        invoice_risk=96,
+        failed_payment_risk=92,
+        dunning_steps=17,
+        escalation_count=14,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("92000.00"))
+    state.support_program.backlog_queue = 36
+    state.support_program.escalation_queue = 18
+    state.finance.board_pressure = 56
+    state.finance.investor_pressure = 48
+    state.finance.covenant_risk = 46
+    state.finance.board_confidence = 10
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_BILLING_LIQUIDITY_COUNCIL,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.BILLING
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.invoice_risk < account.invoice_risk
+    assert updated_account.failed_payment_risk < account.failed_payment_risk
+    assert updated_account.dunning_steps < account.dunning_steps
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_onboarding_continuity_council_stabilizes_terminal_drag() -> None:
+    product = make_product(
+        "Onboarding Continuity Council Core", target_segment=MarketSegment.ENTERPRISE
+    )
+    account = CustomerAccount(
+        name="Continuity Council Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("7800.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=18,
+        onboarding_health=0,
+        support_load=74,
+        open_tickets=23,
+        sla_breach_risk=80,
+        ticket_queue_age=13,
+        expansion_potential=38,
+        renewal_health=8,
+        renewal_turn=5,
+        churn_risk=62,
+        escalation_count=14,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("86000.00"))
+    state.support_program.backlog_queue = 38
+    state.support_program.escalation_queue = 18
+    state.finance.board_pressure = 52
+    state.finance.board_confidence = 14
+    state.company.reputation = 42
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ONBOARDING_CONTINUITY_COUNCIL,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    updated_account = outcome.state.customer_accounts[0]
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ONBOARDING
+    assert updated_account.open_tickets < account.open_tickets
+    assert updated_account.sla_breach_risk < account.sla_breach_risk
+    assert updated_account.ticket_queue_age < account.ticket_queue_age
+    assert updated_account.support_load < account.support_load
+    assert updated_account.onboarding_health > account.onboarding_health
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.support_program.backlog_queue < state.support_program.backlog_queue
+    assert outcome.state.support_program.escalation_queue < state.support_program.escalation_queue
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.reputation > state.company.reputation
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_run_channel_durability_council_recovers_terminal_hotspot_channel() -> None:
+    product = make_product(
+        "Channel Durability Council Core", target_segment=MarketSegment.ENTERPRISE
+    )
+    account = CustomerAccount(
+        name="Durability Council Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("4600.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=36,
+        onboarding_health=42,
+        support_load=44,
+        open_tickets=12,
+        renewal_health=34,
+        expansion_potential=64,
+        renewal_turn=8,
+        churn_risk=46,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Durability Council Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.STRAINED,
+        quality=32,
+        risk=94,
+        conflict_pressure=90,
+        enablement_level=0,
+        sourced_revenue=Decimal("9800.00"),
+        sourced_users=112,
+        rev_share_rate=Decimal("0.3240"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("94000.00"),
+        current_turn=30,
+    )
+    state.finance.board_pressure = 56
+    state.finance.investor_pressure = 48
+    state.finance.board_confidence = 10
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_CHANNEL_DURABILITY_COUNCIL,
+        context=ActionContext(partnership_id=partnership.id),
+    )
+
+    updated_partnership = outcome.state.partnerships[0]
+    updated_account = outcome.state.customer_accounts[0]
+    assert updated_partnership.status in {PartnershipStatus.RECOVERY, PartnershipStatus.ACTIVE}
+    assert updated_partnership.sourced_revenue < partnership.sourced_revenue
+    assert updated_partnership.sourced_users < partnership.sourced_users
+    assert updated_partnership.risk < partnership.risk
+    assert updated_partnership.conflict_pressure < partnership.conflict_pressure
+    assert updated_partnership.enablement_level > partnership.enablement_level
+    assert updated_partnership.quality > partnership.quality
+    assert updated_partnership.rev_share_rate < partnership.rev_share_rate
+    assert updated_account.satisfaction > account.satisfaction
+    assert updated_account.renewal_health > account.renewal_health
+    assert updated_account.churn_risk < account.churn_risk
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+
+
+def test_set_terminal_solvency_council_shifts_to_deepest_terminal_controls() -> None:
+    product = make_product(
+        "Terminal Solvency Council Core", target_segment=MarketSegment.ENTERPRISE
+    )
+    capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.BALANCED,
+        source_preference=CapitalSourcePreference.VENTURE,
+        planning_horizon_turns=8,
+        reserve_target=Decimal("7600.00"),
+        product_investment_share=34,
+        go_to_market_share=40,
+        reserve_share=26,
+    )
+    account = CustomerAccount(
+        name="Terminal Solvency Council Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("7200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=32,
+        onboarding_health=22,
+        support_load=68,
+        open_tickets=22,
+        sla_breach_risk=88,
+        renewal_health=10,
+        expansion_potential=52,
+        renewal_turn=7,
+        churn_risk=58,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Terminal Solvency Council Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=36,
+        risk=86,
+        conflict_pressure=80,
+        enablement_level=6,
+        sourced_revenue=Decimal("7600.00"),
+        sourced_users=90,
+        rev_share_rate=Decimal("0.2940"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        capital_plan=capital_plan,
+        cash_on_hand=Decimal("14800.00"),
+        current_turn=33,
+    )
+    state.finance.board_pressure = 60
+    state.finance.governance_risk = 80
+    state.finance.covenant_risk = 44
+    state.finance.board_confidence = 12
+    state.finance.investor_pressure = 24
+    state.finance.board_warning_level = 2
+    state.finance.restructuring_pressure = 40
+    state.support_program.backlog_queue = 36
+    state.support_program.escalation_queue = 16
+
+    outcome = apply_action(
+        state,
+        TurnAction.SET_TERMINAL_SOLVENCY_COUNCIL,
+        context=ActionContext(),
+    )
+
+    updated_plan = outcome.state.capital_plan
+    assert updated_plan.mode is CapitalPlanMode.CONSERVE
+    assert updated_plan.reserve_target > capital_plan.reserve_target
+    assert updated_plan.planning_horizon_turns > capital_plan.planning_horizon_turns
+    assert updated_plan.reserve_share > capital_plan.reserve_share
+    assert updated_plan.go_to_market_share < capital_plan.go_to_market_share
+    assert updated_plan.product_investment_share <= capital_plan.product_investment_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert "terminal solvency council" in outcome.message
+
+
+def test_finance_planner_recommends_enterprise_reference_council_for_flagship_heat() -> None:
+    state = make_state(
+        make_product("Enterprise Reference Council Planning Core"),
+        cash_on_hand=Decimal("4200.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7600.00"),
+            product_investment_share=34,
+            go_to_market_share=40,
+            reserve_share=26,
+        ),
+    )
+    state.finance.board_pressure = 54
+    state.finance.governance_risk = 80
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1280.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=32,
+        support_escalations=13,
+        premium_revenue_at_risk_value=Decimal("7800.00"),
+        enterprise_queue_risk_accounts=3,
+        high_value_risk_accounts=3,
+        white_glove_queue_risk_accounts=2,
+        revenue_at_risk_value=Decimal("7200.00"),
+        renewal_queue_risk_accounts=2,
+        renewal_pressure_value=Decimal("4200.00"),
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=11,
+        hotspot_lane_account_count=8,
+        focus_alignment_gap=5,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=94,
+        capital_fragility=72,
+    )
+
+    assert "run_enterprise_reference_council" in planner.recommended_actions
+    assert any("enterprise reference council" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_billing_liquidity_council_for_terminal_covenant_heat() -> None:
+    state = make_state(
+        make_product("Billing Liquidity Council Planning Core"),
+        cash_on_hand=Decimal("3400.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7800.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    state.finance.covenant_risk = 46
+    state.finance.board_pressure = 50
+    state.finance.debt_principal = Decimal("7200.00")
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1480.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=34,
+        support_escalations=13,
+        revenue_at_risk_value=Decimal("6200.00"),
+        renewal_queue_risk_accounts=3,
+        renewal_pressure_value=Decimal("8400.00"),
+        support_lane_focus=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane=SupportLaneFocus.BILLING,
+        support_hotspot_lane_overflow=10,
+        hotspot_lane_account_count=5,
+        focus_alignment_gap=4,
+        strategic_outlook="profitable_independence",
+        dominant_endgame_pressure="independence_discipline",
+        commercial_fragility=96,
+        capital_fragility=100,
+    )
+
+    assert "run_billing_liquidity_council" in planner.recommended_actions
+    assert any("billing liquidity council" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_onboarding_continuity_council_for_terminal_drag() -> None:
+    state = make_state(
+        make_product("Onboarding Continuity Council Planning Core"),
+        cash_on_hand=Decimal("3600.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.ANGEL,
+            reserve_target=Decimal("7200.00"),
+            product_investment_share=34,
+            go_to_market_share=40,
+            reserve_share=26,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1220.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=44,
+        support_escalations=15,
+        revenue_at_risk_value=Decimal("7800.00"),
+        renewal_pressure_value=Decimal("6400.00"),
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ONBOARDING,
+        support_hotspot_lane_overflow=14,
+        hotspot_lane_account_count=7,
+        focus_alignment_gap=5,
+        strategic_outlook="ipo_ready",
+        dominant_endgame_pressure="public_market_scrutiny",
+        commercial_fragility=98,
+        capital_fragility=82,
+    )
+
+    assert "run_onboarding_continuity_council" in planner.recommended_actions
+    assert any("onboarding continuity council" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_channel_council_for_dependency_heat() -> None:
+    state = make_state(
+        make_product("Channel Durability Council Planning Core"),
+        cash_on_hand=Decimal("3300.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7600.00"),
+            product_investment_share=34,
+            go_to_market_share=42,
+            reserve_share=24,
+        ),
+    )
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1420.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=30,
+        support_escalations=11,
+        hotspot_dependency_score=178,
+        paused_dependency_score=166,
+        recovery_drag_score=96,
+        hotspot_channel="reseller",
+        hotspot_revenue_share_percent=76,
+        channel_conflict_index=60,
+        volatile_revenue_share_percent=58,
+        support_lane_focus=SupportLaneFocus.BALANCED,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=9,
+        hotspot_lane_account_count=4,
+        focus_alignment_gap=4,
+        strategic_outlook="strategic_acquisition",
+        dominant_endgame_pressure="acquirer_diligence",
+        commercial_fragility=98,
+        capital_fragility=86,
+    )
+
+    assert "run_channel_durability_council" in planner.recommended_actions
+    assert any("channel durability council" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_terminal_solvency_council_for_board_reset_heat() -> None:
+    state = make_state(
+        make_product("Terminal Solvency Council Planning Core"),
+        cash_on_hand=Decimal("3000.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.EXPAND,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("7000.00"),
+            product_investment_share=36,
+            go_to_market_share=42,
+            reserve_share=22,
+        ),
+    )
+    state.finance.board_pressure = 60
+    state.finance.governance_risk = 80
+    state.finance.covenant_risk = 44
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1540.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=34,
+        support_escalations=14,
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=13,
+        hotspot_lane_account_count=6,
+        focus_alignment_gap=5,
+        hotspot_dependency_score=170,
+        strategic_outlook="board_reset",
+        dominant_endgame_pressure="board_reset_risk",
+        commercial_fragility=100,
+        capital_fragility=100,
+    )
+
+    assert "set_terminal_solvency_council" in planner.recommended_actions
+    assert any("terminal solvency council" in step for step in planner.action_sequence)
+
+
+def test_ipo_book_anchor_council_event_can_fund_council() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="ipo_readiness_launchpad",
+    )
+    product = state.products[0]
+    state.company.current_turn = 43
+    state.company.cash_on_hand = Decimal("8600.00")
+    state.finance.board_confidence = 60
+    state.finance.board_score = 56
+    state.finance.board_pressure = 32
+    state.finance.governance_risk = 28
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="ipo_book_anchor_oversight",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="IPO Book-Anchor Oversight",
+            triggered_turn=42,
+            resolved_turn=42,
+            selected_option_id="fund_book_anchor_oversight",
+            selected_option_label="Fund the book-anchor oversight",
+            result_text="Book-anchor oversight funded.",
+        )
+    )
+    state.customer_accounts = [
+        CustomerAccount(
+            name="IPO Council Account",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("5400.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=66,
+            onboarding_health=62,
+            support_load=30,
+            open_tickets=7,
+            sla_breach_risk=42,
+            renewal_health=62,
+            expansion_potential=82,
+            renewal_turn=10,
+            churn_risk=16,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "ipo_book_anchor_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_book_anchor_council")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.history_entry.event_id == "ipo_book_anchor_council"
+
+
+def test_buyer_close_anchor_council_event_can_fund_council() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="acquisition_diligence_sprint",
+    )
+    product = state.products[0]
+    state.company.current_turn = 43
+    state.company.cash_on_hand = Decimal("8200.00")
+    state.finance.board_confidence = 60
+    state.finance.board_score = 56
+    state.finance.board_pressure = 34
+    state.finance.governance_risk = 28
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="buyer_close_anchor_oversight",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="Buyer Close-Anchor Oversight",
+            triggered_turn=42,
+            resolved_turn=42,
+            selected_option_id="fund_close_anchor_oversight",
+            selected_option_label="Fund the close-anchor oversight",
+            result_text="Close-anchor oversight funded.",
+        )
+    )
+    state.customer_accounts = [
+        CustomerAccount(
+            name="Close Council Account",
+            product_id=product.id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("5200.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=64,
+            onboarding_health=60,
+            support_load=32,
+            open_tickets=7,
+            sla_breach_risk=42,
+            renewal_health=60,
+            expansion_potential=80,
+            renewal_turn=10,
+            churn_risk=18,
+            status=CustomerAccountStatus.ACTIVE,
+        )
+    ]
+    state.partnerships = [
+        PartnershipDeal(
+            name="Close Council Integration",
+            product_id=product.id,
+            channel=PartnerChannel.INTEGRATION,
+            status=PartnershipStatus.STRAINED,
+            quality=56,
+            risk=82,
+            conflict_pressure=78,
+            enablement_level=16,
+            sourced_revenue=Decimal("5800.00"),
+            rev_share_rate=Decimal("0.2580"),
+        )
+    ]
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "buyer_close_anchor_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_close_anchor_council")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.history_entry.event_id == "buyer_close_anchor_council"
+
+
+def test_independence_cash_solvency_council_event_can_ratify_council() -> None:
+    product = make_product("Cash Solvency Council Core", lifecycle_stage=LifecycleStage.MATURE)
+    state = make_state(
+        product,
+        cash_on_hand=Decimal("2400.00"),
+        current_turn=40,
+        finance=FinanceState(
+            debt_principal=Decimal("6400.00"),
+            loan_interest_rate=Decimal("0.0340"),
+            investor_pressure=42,
+            covenant_risk=40,
+            board_confidence=40,
+            board_pressure=46,
+        ),
+        event_history=[
+            EventHistoryEntry(
+                event_id="independence_cash_solvency_oversight",
+                category=EventCategory.FUNDING_OPPORTUNITY,
+                title="Independence Cash-Solvency Oversight",
+                triggered_turn=39,
+                resolved_turn=39,
+                selected_option_id="ratify_cash_solvency_oversight",
+                selected_option_label="Ratify the cash-solvency oversight",
+                result_text="Cash-solvency oversight ratified.",
+            )
+        ],
+    )
+    state.capital_plan.reserve_target = Decimal("8600.00")
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "independence_cash_solvency_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "ratify_cash_solvency_council")
+
+    assert outcome.state.capital_plan.mode is CapitalPlanMode.CONSERVE
+    assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.covenant_risk < state.finance.covenant_risk
+    assert outcome.state.finance.investor_pressure < state.finance.investor_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.history_entry.event_id == "independence_cash_solvency_council"
+
+
+def test_reseller_service_oversight_council_event_can_fund_council() -> None:
+    product = make_product("Service Council Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Service Council Account",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("2800.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=58,
+        onboarding_health=62,
+        support_load=22,
+        open_tickets=4,
+        renewal_health=50,
+        expansion_potential=64,
+        renewal_turn=8,
+        churn_risk=22,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Service Council Reseller",
+        product_id=product.id,
+        channel=PartnerChannel.RESELLER,
+        status=PartnershipStatus.RECOVERY,
+        quality=62,
+        risk=74,
+        conflict_pressure=70,
+        enablement_level=26,
+        sourced_revenue=Decimal("5000.00"),
+        rev_share_rate=Decimal("0.2220"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6400.00"),
+        current_turn=31,
+        event_history=[
+            EventHistoryEntry(
+                event_id="reseller_service_oversight",
+                category=EventCategory.MARKET_OPPORTUNITY,
+                title="Reseller Service Oversight",
+                triggered_turn=30,
+                resolved_turn=30,
+                selected_option_id="fund_service_oversight",
+                selected_option_label="Fund the service oversight",
+                result_text="Service oversight funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "reseller_service_oversight_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_service_council")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].enablement_level > state.partnerships[0].enablement_level
+    assert outcome.history_entry.event_id == "reseller_service_oversight_council"
+
+
+def test_integration_cutover_oversight_council_event_can_fund_council() -> None:
+    product = make_product("Cutover Council Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Cutover Council Account",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("4400.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=56,
+        onboarding_health=50,
+        support_load=26,
+        open_tickets=5,
+        renewal_health=52,
+        expansion_potential=68,
+        renewal_turn=9,
+        churn_risk=20,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Cutover Council Integration",
+        product_id=product.id,
+        channel=PartnerChannel.INTEGRATION,
+        status=PartnershipStatus.RECOVERY,
+        quality=62,
+        risk=76,
+        conflict_pressure=72,
+        enablement_level=22,
+        sourced_revenue=Decimal("5400.00"),
+        rev_share_rate=Decimal("0.2280"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6600.00"),
+        current_turn=32,
+        event_history=[
+            EventHistoryEntry(
+                event_id="integration_cutover_oversight",
+                category=EventCategory.PRODUCT_INCIDENT,
+                title="Integration Cutover Oversight",
+                triggered_turn=31,
+                resolved_turn=31,
+                selected_option_id="fund_cutover_oversight",
+                selected_option_label="Fund the cutover oversight",
+                result_text="Cutover oversight funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "integration_cutover_oversight_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_cutover_council")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.state.partnerships[0].enablement_level > state.partnerships[0].enablement_level
+    assert outcome.history_entry.event_id == "integration_cutover_oversight_council"
+
+
+def test_marketplace_refund_oversight_council_event_can_fund_council() -> None:
+    product = make_product("Refund Council Core", lifecycle_stage=LifecycleStage.MATURE)
+    account = CustomerAccount(
+        name="Refund Council Account",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("3000.00"),
+        support_tier=SupportTier.PRIORITY,
+        satisfaction=54,
+        onboarding_health=58,
+        support_load=22,
+        open_tickets=5,
+        renewal_health=48,
+        invoice_risk=62,
+        failed_payment_risk=58,
+        expansion_potential=62,
+        renewal_turn=8,
+        churn_risk=24,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Refund Council Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.RECOVERY,
+        quality=60,
+        risk=74,
+        conflict_pressure=68,
+        enablement_level=20,
+        sourced_revenue=Decimal("5100.00"),
+        rev_share_rate=Decimal("0.2340"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("6800.00"),
+        current_turn=33,
+        event_history=[
+            EventHistoryEntry(
+                event_id="marketplace_refund_oversight",
+                category=EventCategory.REPUTATION_INCIDENT,
+                title="Marketplace Refund Oversight",
+                triggered_turn=32,
+                resolved_turn=32,
+                selected_option_id="fund_refund_oversight",
+                selected_option_label="Fund the refund oversight",
+                result_text="Refund oversight funded.",
+            )
+        ],
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "marketplace_refund_oversight_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "fund_refund_council")
+
+    assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
+    assert outcome.state.partnerships[0].risk < state.partnerships[0].risk
+    assert outcome.state.partnerships[0].conflict_pressure < state.partnerships[0].conflict_pressure
+    assert outcome.history_entry.event_id == "marketplace_refund_oversight_council"
+
+
+def test_board_reset_operating_council_event_can_ratify_council() -> None:
+    state = create_new_game(
+        DEFAULT_COMPANY_NAME,
+        DEFAULT_PRODUCT_NAME,
+        campaign_start_id="board_recovery_crucible",
+    )
+    state.company.current_turn = 41
+    state.company.cash_on_hand = Decimal("5400.00")
+    state.finance.board_pressure = 48
+    state.finance.board_confidence = 26
+    state.finance.board_score = 32
+    state.finance.governance_risk = 68
+    state.finance.board_warning_level = 2
+    state.finance.governance_crisis_active = True
+    state.finance.restructuring_pressure = 28
+    state.event_history.append(
+        EventHistoryEntry(
+            event_id="board_reset_operating_oversight",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            title="Board-Reset Operating Oversight",
+            triggered_turn=40,
+            resolved_turn=40,
+            selected_option_id="ratify_operating_oversight",
+            selected_option_label="Ratify the operating oversight",
+            result_text="Operating oversight ratified.",
+        )
+    )
+    definition = next(
+        event_definition
+        for event_definition in get_event_registry()
+        if event_definition.event_id == "board_reset_operating_council"
+    )
+
+    assert definition.is_eligible(state) is True
+    state.pending_event = definition.build_pending_event(
+        state, FixedRandom(0), definition.cooldown_turns
+    )
+    outcome = resolve_pending_event(state, "ratify_operating_council")
+
+    assert outcome.state.finance.board_pressure < state.finance.board_pressure
+    assert outcome.state.finance.board_confidence > state.finance.board_confidence
+    assert outcome.state.finance.board_score > state.finance.board_score
+    assert outcome.state.finance.governance_risk < state.finance.governance_risk
+    assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.history_entry.event_id == "board_reset_operating_council"
+
+
+def test_six_hundred_sixty_turn_board_recovery_crucible_progression_is_seed_stable() -> None:
+    def run_once(seed: int) -> tuple[Decimal, int, int, bool, bool, int, int, str | None]:
+        state = create_new_game(
+            DEFAULT_COMPANY_NAME,
+            DEFAULT_PRODUCT_NAME,
+            campaign_start_id="board_recovery_crucible",
+        )
+        rng = RandomSource(seed=seed)
+
+        for _ in range(660):
+            resolution = resolve_turn(state, rng)
+            state = resolution.state
+            if state.pending_event is not None:
+                state = resolve_pending_event(state, state.pending_event.options[0].id).state
+            if state.company.game_over or state.victory_achieved:
+                break
+
+        return (
+            state.company.cash_on_hand,
+            state.company.reputation,
+            state.company.current_turn,
+            state.victory_achieved,
+            state.company.game_over,
+            state.finance.board_pressure,
+            state.finance.governance_risk,
+            state.exit_outcome.value if state.exit_outcome is not None else None,
+        )
+
+    assert run_once(6601) == run_once(6601)
 
 
 def test_six_hundred_twenty_turn_board_recovery_crucible_progression_is_seed_stable() -> None:

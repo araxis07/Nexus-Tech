@@ -74,6 +74,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_terminal_recovery_lattice,
     apply_set_terminal_resilience_covenant,
     apply_set_terminal_solvency_commission,
+    apply_set_terminal_solvency_council,
     apply_set_terminal_solvency_mandate,
     apply_set_terminal_solvency_oversight,
     apply_set_terminal_solvency_statute,
@@ -161,6 +162,7 @@ from nexus_tech.simulation.partnerships import (
     run_channel_continuity_matrix,
     run_channel_dependency_reset,
     run_channel_durability_commission,
+    run_channel_durability_council,
     run_channel_durability_mandate,
     run_channel_durability_mesh,
     run_channel_durability_oversight,
@@ -241,6 +243,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_liquidity_authority,
     run_billing_liquidity_command,
     run_billing_liquidity_commission,
+    run_billing_liquidity_council,
     run_billing_liquidity_directorate,
     run_billing_liquidity_oversight,
     run_billing_liquidity_secretariat,
@@ -254,6 +257,7 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_reference_authority,
     run_enterprise_reference_chamber,
     run_enterprise_reference_commission,
+    run_enterprise_reference_council,
     run_enterprise_reference_cycle,
     run_enterprise_reference_directorate,
     run_enterprise_reference_forum,
@@ -268,6 +272,7 @@ from nexus_tech.simulation.support_program import (
     run_onboarding_continuity_authority,
     run_onboarding_continuity_bureau,
     run_onboarding_continuity_commission,
+    run_onboarding_continuity_council,
     run_onboarding_continuity_lattice,
     run_onboarding_continuity_oversight,
     run_onboarding_continuity_secretariat,
@@ -872,6 +877,11 @@ def apply_action(
     if action is TurnAction.SET_TERMINAL_SOLVENCY_OVERSIGHT:
         summary = apply_set_terminal_solvency_oversight(next_state)
         logger.debug("Set terminal solvency oversight.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
+    if action is TurnAction.SET_TERMINAL_SOLVENCY_COUNCIL:
+        summary = apply_set_terminal_solvency_council(next_state)
+        logger.debug("Set terminal solvency council.")
         return ActionOutcome(state=next_state, message=summary.message)
 
     if action is TurnAction.LOCK_CAPITAL_BUFFER:
@@ -1498,6 +1508,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_COUNCIL:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_reference_council(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise reference council for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_BILLING_RETENTION_RESET:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1708,6 +1732,20 @@ def apply_action(
             turn_should_end=next_state.company.game_over,
         )
 
+    if action is TurnAction.RUN_BILLING_LIQUIDITY_COUNCIL:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_liquidity_council(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing liquidity council for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         account = get_customer_account_by_id(
             next_state.customer_accounts,
@@ -1884,6 +1922,20 @@ def apply_action(
         summary = run_onboarding_continuity_oversight(next_state, account.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran onboarding continuity oversight for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_CONTINUITY_COUNCIL:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_continuity_council(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding continuity council for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
@@ -2188,6 +2240,21 @@ def apply_action(
         summary = run_channel_durability_oversight(next_state, partnership.id)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran channel durability oversight for %s.", partnership.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_CHANNEL_DURABILITY_COUNCIL:
+        if context.partnership_id is None:
+            raise ValueError(
+                "Running a channel durability council requires selecting a partnership."
+            )
+        partnership = get_partnership_by_id(next_state.partnerships, context.partnership_id)
+        summary = run_channel_durability_council(next_state, partnership.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran channel durability council for %s.", partnership.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,
