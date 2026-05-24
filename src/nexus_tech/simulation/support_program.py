@@ -1476,6 +1476,676 @@ def run_lane_recovery(
     )
 
 
+def run_enterprise_lane_mesh(state: GameState) -> SupportOpsActionSummary:
+    """Stabilize the top enterprise accounts together when flagship proof is slipping."""
+
+    cost = quantize_money(
+        BALANCE.support_program_enterprise_assurance_cost
+        + BALANCE.support_program_lane_recovery_cost
+        + BALANCE.support_program_enterprise_renewal_cabinet_cost
+    )
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                account.segment is MarketSegment.ENTERPRISE,
+                account.contract_value,
+                _calculate_account_support_severity(account),
+                100 - account.renewal_health,
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and account.segment is MarketSegment.ENTERPRISE
+    ]
+    if not accounts:
+        raise ValueError("No enterprise accounts need a lane mesh right now.")
+    if state.company.cash_on_hand < cost:
+        raise ValueError("Not enough cash to run an enterprise lane mesh this turn.")
+
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - cost)
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - (
+            BALANCE.support_program_enterprise_assurance_backlog_relief
+            + BALANCE.support_program_lane_recovery_backlog_relief
+            + BALANCE.support_program_enterprise_renewal_cabinet_backlog_relief
+        ),
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - (
+            BALANCE.support_program_enterprise_assurance_escalation_relief
+            + BALANCE.support_program_lane_recovery_escalation_relief
+            + BALANCE.support_program_enterprise_renewal_cabinet_escalation_relief
+        ),
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[:3]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets
+            - (
+                BALANCE.support_program_enterprise_assurance_ticket_relief
+                + BALANCE.support_program_lane_recovery_ticket_relief
+                + BALANCE.support_program_enterprise_renewal_cabinet_ticket_relief
+            ),
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk
+            - (
+                BALANCE.support_program_enterprise_assurance_sla_relief
+                + BALANCE.support_program_lane_recovery_sla_relief
+                + BALANCE.support_program_enterprise_renewal_cabinet_sla_relief
+            )
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age
+            - (
+                BALANCE.support_program_enterprise_assurance_queue_age_relief
+                + BALANCE.support_program_lane_recovery_queue_age_relief
+                + BALANCE.support_program_enterprise_renewal_cabinet_queue_age_relief
+            ),
+        )
+        account.support_load = clamp_int(
+            account.support_load
+            - (
+                BALANCE.support_program_enterprise_assurance_support_load_relief
+                + BALANCE.support_program_lane_recovery_support_load_relief
+                + BALANCE.support_program_enterprise_renewal_cabinet_support_load_relief
+            )
+        )
+        account.onboarding_health = clamp_int(
+            account.onboarding_health
+            + BALANCE.support_program_enterprise_renewal_cabinet_onboarding_health_gain
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health
+            + (
+                BALANCE.support_program_enterprise_assurance_renewal_health_gain
+                + BALANCE.support_program_lane_recovery_renewal_health_gain
+                + BALANCE.support_program_enterprise_renewal_cabinet_renewal_health_gain
+            )
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction
+            + (
+                BALANCE.support_program_enterprise_assurance_satisfaction_gain
+                + BALANCE.support_program_lane_recovery_satisfaction_gain
+                + BALANCE.support_program_enterprise_renewal_cabinet_satisfaction_gain
+            )
+        )
+        account.expansion_potential = clamp_int(
+            account.expansion_potential
+            + BALANCE.support_program_enterprise_renewal_cabinet_expansion_gain
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk
+            - (
+                BALANCE.support_program_enterprise_assurance_churn_relief
+                + BALANCE.support_program_lane_recovery_churn_relief
+                + BALANCE.support_program_enterprise_renewal_cabinet_churn_relief
+            )
+        )
+        account.escalation_count = max(0, account.escalation_count - 2)
+        if account.support_tier is SupportTier.STANDARD:
+            account.support_tier = SupportTier.PRIORITY
+        else:
+            account.support_tier = SupportTier.WHITE_GLOVE
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.ENTERPRISE,
+            BALANCE.support_program_enterprise_assurance_lane_relief
+            + BALANCE.support_program_lane_recovery_lane_relief
+            + BALANCE.support_program_enterprise_renewal_cabinet_lane_relief,
+        )
+        stabilized_accounts += 1
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - (
+            BALANCE.support_program_enterprise_assurance_board_pressure_relief
+            + BALANCE.support_program_enterprise_renewal_cabinet_board_pressure_relief
+        )
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.support_program_enterprise_renewal_cabinet_board_confidence_gain
+    )
+    state.finance.board_score = clamp_int(
+        state.finance.board_score
+        + BALANCE.support_program_enterprise_renewal_cabinet_board_score_gain
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation
+        + BALANCE.support_program_enterprise_renewal_cabinet_reputation_gain
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran an enterprise lane mesh across {stabilized_accounts} account(s). "
+            f"Cash -{cost}, backlog now {state.support_program.backlog_queue}."
+        )
+    )
+
+
+def run_billing_lane_mesh(state: GameState) -> SupportOpsActionSummary:
+    """Stabilize the highest-risk billing accounts together under one collections push."""
+
+    cost = quantize_money(
+        BALANCE.support_program_billing_stabilization_cost
+        + BALANCE.support_program_renewal_sweep_cost
+        + BALANCE.support_program_account_rescue_cost
+    )
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                classify_account_support_lane(account) is SupportLaneFocus.BILLING
+                or _is_renewal_pressure_account(account),
+                account.failed_payment_risk + account.invoice_risk,
+                account.contract_value,
+                _calculate_account_support_severity(account),
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and (
+            classify_account_support_lane(account) is SupportLaneFocus.BILLING
+            or _is_renewal_pressure_account(account)
+        )
+    ]
+    if not accounts:
+        raise ValueError("No billing accounts need a lane mesh right now.")
+    if state.company.cash_on_hand < cost:
+        raise ValueError("Not enough cash to run a billing lane mesh this turn.")
+
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - cost)
+    state.support_program.lane_focus = SupportLaneFocus.BILLING
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - (
+            BALANCE.support_program_billing_stabilization_backlog_relief
+            + BALANCE.support_program_renewal_sweep_backlog_relief
+            + BALANCE.support_program_account_rescue_backlog_relief
+        ),
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - (
+            BALANCE.support_program_billing_stabilization_escalation_relief
+            + BALANCE.support_program_renewal_sweep_escalation_relief
+            + BALANCE.support_program_account_rescue_escalation_relief
+        ),
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[:3]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets
+            - (
+                BALANCE.support_program_billing_stabilization_ticket_relief
+                + BALANCE.support_program_renewal_sweep_ticket_relief
+                + BALANCE.support_program_account_rescue_ticket_relief
+            ),
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk
+            - (
+                BALANCE.support_program_billing_stabilization_sla_relief
+                + BALANCE.support_program_renewal_sweep_sla_relief
+                + BALANCE.support_program_account_rescue_sla_relief
+            )
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age
+            - (
+                BALANCE.support_program_billing_stabilization_queue_age_relief
+                + BALANCE.support_program_renewal_sweep_queue_age_relief
+                + BALANCE.support_program_account_rescue_queue_age_relief
+            ),
+        )
+        account.support_load = clamp_int(
+            account.support_load
+            - (
+                BALANCE.support_program_billing_stabilization_support_load_relief
+                + BALANCE.support_program_renewal_sweep_support_load_relief
+                + BALANCE.support_program_account_rescue_support_load_relief
+            )
+        )
+        account.invoice_risk = clamp_int(
+            account.invoice_risk
+            - (
+                BALANCE.support_program_billing_stabilization_invoice_relief
+                + BALANCE.support_program_renewal_sweep_billing_invoice_relief
+                + BALANCE.support_program_account_rescue_billing_invoice_relief
+            )
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk
+            - (
+                BALANCE.support_program_billing_stabilization_payment_relief
+                + BALANCE.support_program_renewal_sweep_billing_payment_relief
+                + BALANCE.support_program_account_rescue_billing_payment_relief
+            )
+        )
+        account.dunning_steps = max(
+            0,
+            account.dunning_steps
+            - (
+                BALANCE.support_program_billing_stabilization_dunning_relief
+                + BALANCE.support_program_renewal_sweep_billing_dunning_relief
+                + BALANCE.support_program_account_rescue_billing_dunning_relief
+            ),
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health
+            + (
+                BALANCE.support_program_billing_stabilization_renewal_health_gain
+                + BALANCE.support_program_renewal_sweep_renewal_health_gain
+                + BALANCE.support_program_route_billing_renewal_health_gain
+            )
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction
+            + (
+                BALANCE.support_program_billing_stabilization_satisfaction_gain
+                + BALANCE.support_program_renewal_sweep_satisfaction_gain
+                + BALANCE.support_program_account_rescue_satisfaction_gain
+            )
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk
+            - (
+                BALANCE.support_program_billing_stabilization_churn_relief
+                + BALANCE.support_program_renewal_sweep_churn_relief
+                + BALANCE.support_program_account_rescue_churn_relief
+            )
+        )
+        account.escalation_count = max(0, account.escalation_count - 2)
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.BILLING,
+            BALANCE.support_program_billing_stabilization_lane_relief
+            + BALANCE.support_program_renewal_sweep_lane_relief
+            + BALANCE.support_program_account_rescue_lane_relief,
+        )
+        stabilized_accounts += 1
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - (
+            BALANCE.support_program_billing_stabilization_board_pressure_relief
+            + BALANCE.support_program_billing_stabilization_investor_pressure_relief
+        )
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.support_program_enterprise_renewal_cabinet_board_confidence_gain
+    )
+    state.finance.covenant_risk = clamp_int(
+        state.finance.covenant_risk
+        - (
+            BALANCE.support_program_billing_stabilization_board_pressure_relief
+            + BALANCE.support_program_billing_stabilization_investor_pressure_relief
+        )
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.support_program_billing_stabilization_investor_pressure_relief
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation
+        + BALANCE.support_program_billing_stabilization_board_pressure_relief
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a billing lane mesh across {stabilized_accounts} account(s). "
+            f"Cash -{cost}, covenant risk now {state.finance.covenant_risk}."
+        )
+    )
+
+
+def run_onboarding_lane_mesh(state: GameState) -> SupportOpsActionSummary:
+    """Stabilize onboarding drag across the lane before implementation debt compounds."""
+
+    cost = quantize_money(
+        BALANCE.support_program_onboarding_recovery_cost
+        + BALANCE.support_program_onboarding_fast_track_cost
+        + BALANCE.support_program_lane_recovery_cost
+    )
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                classify_account_support_lane(account) is SupportLaneFocus.ONBOARDING,
+                100 - account.onboarding_health,
+                _calculate_account_support_severity(account),
+                account.contract_value,
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and classify_account_support_lane(account) is SupportLaneFocus.ONBOARDING
+    ]
+    if not accounts:
+        raise ValueError("No onboarding accounts need a lane mesh right now.")
+    if state.company.cash_on_hand < cost:
+        raise ValueError("Not enough cash to run an onboarding lane mesh this turn.")
+
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - cost)
+    state.support_program.lane_focus = SupportLaneFocus.ONBOARDING
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - (
+            BALANCE.support_program_onboarding_recovery_backlog_relief
+            + BALANCE.support_program_onboarding_fast_track_backlog_relief
+            + BALANCE.support_program_lane_recovery_backlog_relief
+        ),
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - (
+            BALANCE.support_program_onboarding_recovery_escalation_relief
+            + BALANCE.support_program_onboarding_fast_track_escalation_relief
+            + BALANCE.support_program_lane_recovery_escalation_relief
+        ),
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[:3]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets
+            - (
+                BALANCE.support_program_onboarding_recovery_ticket_relief
+                + BALANCE.support_program_onboarding_fast_track_ticket_relief
+                + BALANCE.support_program_lane_recovery_ticket_relief
+            ),
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk
+            - (
+                BALANCE.support_program_onboarding_recovery_sla_relief
+                + BALANCE.support_program_onboarding_fast_track_sla_relief
+                + BALANCE.support_program_lane_recovery_sla_relief
+            )
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age
+            - (
+                BALANCE.support_program_onboarding_recovery_queue_age_relief
+                + BALANCE.support_program_onboarding_fast_track_queue_age_relief
+                + BALANCE.support_program_lane_recovery_queue_age_relief
+            ),
+        )
+        account.support_load = clamp_int(
+            account.support_load
+            - (
+                BALANCE.support_program_onboarding_recovery_support_load_relief
+                + BALANCE.support_program_onboarding_fast_track_support_load_relief
+                + BALANCE.support_program_lane_recovery_support_load_relief
+            )
+        )
+        account.onboarding_health = clamp_int(
+            account.onboarding_health
+            + (
+                BALANCE.support_program_onboarding_recovery_onboarding_health_gain
+                + BALANCE.support_program_onboarding_fast_track_onboarding_health_gain
+                + BALANCE.support_program_lane_recovery_onboarding_health_gain
+            )
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health
+            + (
+                BALANCE.support_program_onboarding_recovery_renewal_health_gain
+                + BALANCE.support_program_onboarding_fast_track_renewal_health_gain
+                + BALANCE.support_program_lane_recovery_renewal_health_gain
+            )
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction
+            + (
+                BALANCE.support_program_onboarding_recovery_satisfaction_gain
+                + BALANCE.support_program_onboarding_fast_track_satisfaction_gain
+                + BALANCE.support_program_lane_recovery_satisfaction_gain
+            )
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk
+            - (
+                BALANCE.support_program_onboarding_recovery_churn_relief
+                + BALANCE.support_program_onboarding_fast_track_churn_relief
+                + BALANCE.support_program_lane_recovery_churn_relief
+            )
+        )
+        if account.support_tier is SupportTier.STANDARD:
+            account.support_tier = SupportTier.PRIORITY
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.ONBOARDING,
+            BALANCE.support_program_onboarding_recovery_lane_relief
+            + BALANCE.support_program_onboarding_fast_track_lane_relief
+            + BALANCE.support_program_lane_recovery_lane_relief,
+        )
+        stabilized_accounts += 1
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - (
+            BALANCE.support_program_onboarding_recovery_board_pressure_relief
+            + BALANCE.support_program_onboarding_fast_track_board_pressure_relief
+        )
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + BALANCE.support_program_billing_stabilization_board_pressure_relief
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation + BALANCE.support_program_onboarding_recovery_board_pressure_relief
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran an onboarding lane mesh across {stabilized_accounts} account(s). "
+            f"Cash -{cost}, onboarding queue now {state.support_program.backlog_queue}."
+        )
+    )
+
+
+def run_white_glove_lane_mesh(state: GameState) -> SupportOpsActionSummary:
+    """Stabilize the highest-touch accounts together before premium drag spreads."""
+
+    cost = quantize_money(
+        BALANCE.support_program_white_glove_recovery_cost
+        + BALANCE.support_program_white_glove_renewal_guard_cost
+        + BALANCE.support_program_white_glove_reference_committee_cost
+    )
+    accounts = [
+        account
+        for account in sorted(
+            state.customer_accounts,
+            key=lambda account: (
+                account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE},
+                account.contract_value,
+                _calculate_account_support_severity(account),
+                100 - account.renewal_health,
+            ),
+            reverse=True,
+        )
+        if account.status is not CustomerAccountStatus.CHURNED
+        and (
+            account.support_tier in {SupportTier.PRIORITY, SupportTier.WHITE_GLOVE}
+            or account.contract_value >= Decimal("3200.00")
+        )
+    ]
+    if not accounts:
+        raise ValueError("No premium accounts need a white-glove lane mesh right now.")
+    if state.company.cash_on_hand < cost:
+        raise ValueError("Not enough cash to run a white-glove lane mesh this turn.")
+
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - cost)
+    state.support_program.lane_focus = SupportLaneFocus.ENTERPRISE
+    state.support_program.backlog_queue = max(
+        0,
+        state.support_program.backlog_queue
+        - (
+            BALANCE.support_program_white_glove_recovery_backlog_relief
+            + BALANCE.support_program_white_glove_renewal_guard_backlog_relief
+            + BALANCE.support_program_white_glove_reference_committee_backlog_relief
+        ),
+    )
+    state.support_program.escalation_queue = max(
+        0,
+        state.support_program.escalation_queue
+        - (
+            BALANCE.support_program_white_glove_recovery_escalation_relief
+            + BALANCE.support_program_white_glove_renewal_guard_escalation_relief
+            + BALANCE.support_program_white_glove_reference_committee_escalation_relief
+        ),
+    )
+
+    stabilized_accounts = 0
+    for account in accounts[:3]:
+        account.open_tickets = max(
+            0,
+            account.open_tickets
+            - (
+                BALANCE.support_program_white_glove_recovery_ticket_relief
+                + BALANCE.support_program_white_glove_renewal_guard_ticket_relief
+                + BALANCE.support_program_white_glove_reference_committee_ticket_relief
+            ),
+        )
+        account.sla_breach_risk = clamp_int(
+            account.sla_breach_risk
+            - (
+                BALANCE.support_program_white_glove_recovery_sla_relief
+                + BALANCE.support_program_white_glove_renewal_guard_sla_relief
+                + BALANCE.support_program_white_glove_reference_committee_sla_relief
+            )
+        )
+        account.ticket_queue_age = max(
+            0,
+            account.ticket_queue_age
+            - (
+                BALANCE.support_program_white_glove_recovery_queue_age_relief
+                + BALANCE.support_program_white_glove_renewal_guard_queue_age_relief
+                + BALANCE.support_program_white_glove_reference_committee_queue_age_relief
+            ),
+        )
+        account.support_load = clamp_int(
+            account.support_load
+            - (
+                BALANCE.support_program_white_glove_recovery_support_load_relief
+                + BALANCE.support_program_white_glove_renewal_guard_support_load_relief
+                + BALANCE.support_program_white_glove_reference_committee_support_load_relief
+            )
+        )
+        account.invoice_risk = clamp_int(
+            account.invoice_risk
+            - (
+                BALANCE.support_program_white_glove_recovery_invoice_relief
+                + BALANCE.support_program_white_glove_renewal_guard_invoice_relief
+            )
+        )
+        account.failed_payment_risk = clamp_int(
+            account.failed_payment_risk
+            - (
+                BALANCE.support_program_white_glove_recovery_payment_relief
+                + BALANCE.support_program_white_glove_renewal_guard_payment_relief
+            )
+        )
+        account.renewal_health = clamp_int(
+            account.renewal_health
+            + (
+                BALANCE.support_program_white_glove_recovery_renewal_health_gain
+                + BALANCE.support_program_white_glove_renewal_guard_renewal_health_gain
+                + BALANCE.support_program_white_glove_reference_committee_renewal_health_gain
+            )
+        )
+        account.satisfaction = clamp_int(
+            account.satisfaction
+            + (
+                BALANCE.support_program_white_glove_recovery_satisfaction_gain
+                + BALANCE.support_program_white_glove_renewal_guard_satisfaction_gain
+                + BALANCE.support_program_white_glove_reference_committee_satisfaction_gain
+            )
+        )
+        account.expansion_potential = clamp_int(
+            account.expansion_potential
+            + BALANCE.support_program_white_glove_reference_committee_expansion_gain
+        )
+        account.churn_risk = clamp_int(
+            account.churn_risk
+            - (
+                BALANCE.support_program_white_glove_recovery_churn_relief
+                + BALANCE.support_program_white_glove_renewal_guard_churn_relief
+                + BALANCE.support_program_white_glove_reference_committee_churn_relief
+            )
+        )
+        account.escalation_count = max(0, account.escalation_count - 2)
+        account.support_tier = SupportTier.WHITE_GLOVE
+        _apply_lane_program_relief(
+            state.support_program,
+            SupportLaneFocus.ENTERPRISE,
+            BALANCE.support_program_white_glove_recovery_lane_relief
+            + BALANCE.support_program_white_glove_renewal_guard_lane_relief
+            + BALANCE.support_program_white_glove_reference_committee_lane_relief,
+        )
+        stabilized_accounts += 1
+
+    state.finance.board_pressure = clamp_int(
+        state.finance.board_pressure
+        - (
+            BALANCE.support_program_white_glove_recovery_board_pressure_relief
+            + BALANCE.support_program_white_glove_renewal_guard_board_pressure_relief
+            + BALANCE.support_program_white_glove_reference_committee_board_pressure_relief
+        )
+    )
+    state.finance.board_confidence = clamp_int(
+        state.finance.board_confidence
+        + (
+            BALANCE.support_program_white_glove_recovery_board_confidence_gain
+            + BALANCE.support_program_white_glove_renewal_guard_board_confidence_gain
+            + BALANCE.support_program_white_glove_reference_committee_board_confidence_gain
+        )
+    )
+    state.finance.board_score = clamp_int(
+        state.finance.board_score
+        + BALANCE.support_program_white_glove_reference_committee_board_score_gain
+    )
+    state.finance.investor_pressure = clamp_int(
+        state.finance.investor_pressure
+        - BALANCE.support_program_white_glove_reference_committee_investor_pressure_relief
+    )
+    state.company.reputation = clamp_int(
+        state.company.reputation
+        + (
+            BALANCE.support_program_white_glove_renewal_guard_reputation_gain
+            + BALANCE.support_program_white_glove_reference_committee_reputation_gain
+        )
+    )
+    return SupportOpsActionSummary(
+        message=(
+            f"Ran a white-glove lane mesh across {stabilized_accounts} account(s). "
+            f"Cash -{cost}, board confidence now {state.finance.board_confidence}."
+        )
+    )
+
+
 def run_renewal_sweep(state: GameState) -> SupportOpsActionSummary:
     """Stabilize the next renewal wave before support or billing issues compound."""
 

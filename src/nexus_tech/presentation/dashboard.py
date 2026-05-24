@@ -2381,6 +2381,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "190",
+        "run_enterprise_lane_mesh",
+        (
+            "Stabilize the top enterprise accounts together when flagship proof and renewal "
+            "credibility are both slipping at the portfolio level."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2506,6 +2514,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "191",
+        "run_billing_lane_mesh",
+        (
+            "Reset the hottest billing accounts together when collections, renewal, and "
+            "covenant pressure are compounding across the lane."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2615,6 +2631,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the terminal onboarding continuity council when implementation recovery, "
             "renewal credibility, and board trust still outrun the oversight tier."
+        ),
+    )
+    primary_actions.add_row(
+        "192",
+        "run_onboarding_lane_mesh",
+        (
+            "Stabilize the onboarding hotspot across multiple accounts when implementation "
+            "drag is spreading faster than one-account recovery can catch."
         ),
     )
     primary_actions.add_row(
@@ -2854,6 +2878,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "194",
+        "set_path_cash_waterfall",
+        (
+            "Reset capital allocation around the active endgame path before reserve, support, "
+            "or channel pressure turns the current strategy incoherent."
+        ),
+    )
+    primary_actions.add_row(
         "103",
         "lock_capital_buffer",
         "Force the capital plan deeper into reserve protection before fragility compounds.",
@@ -3018,6 +3050,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Run the terminal hotspot-channel durability council when dependency, rev-share "
             "drag, and recovery drag still outrun the oversight tier."
+        ),
+    )
+    primary_actions.add_row(
+        "193",
+        "run_white_glove_lane_mesh",
+        (
+            "Protect the highest-touch accounts together when premium queue heat is spreading "
+            "across more than one flagship relationship."
         ),
     )
     primary_actions.add_row(

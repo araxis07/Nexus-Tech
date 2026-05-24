@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.77.0 - 2026-05-24
+
+- Added `run_enterprise_lane_mesh`, `run_billing_lane_mesh`, `run_onboarding_lane_mesh`, `run_white_glove_lane_mesh`, and `set_path_cash_waterfall` so late-game recovery stops being another naming tier and becomes a broader account/lane and path-control loop
+- Added ledger-stage path follow-up events `ipo_book_anchor_ledger`, `buyer_close_anchor_ledger`, `independence_cash_solvency_ledger`, and `board_reset_operating_ledger` so all four endgame routes gain one more concrete recovery-or-penalty branch
+- Added ledger-stage channel follow-up events `reseller_service_oversight_ledger`, `integration_cutover_oversight_ledger`, and `marketplace_refund_oversight_ledger` so reseller, integration, and marketplace pressure keeps diverging under deeper commercial strain
+- Expanded planner recommendations, action sequencing, dashboard surfacing, CLI wiring, and event handlers so the new lane meshes and path cash waterfall only surface once queue hotspots, dependency pressure, and path fragility are materially present
+- Added regression coverage for the new actions and event handlers plus a seeded 720-turn board-recovery stability run
+- Promoted the package version to `0.77.0`
+
 ## 0.76.0 - 2026-05-24
 
 - Added `run_enterprise_reference_council`, `run_billing_liquidity_council`, `run_onboarding_continuity_council`, `run_channel_durability_council`, and `set_terminal_solvency_council` as one-more-turn controls above the current oversight tier

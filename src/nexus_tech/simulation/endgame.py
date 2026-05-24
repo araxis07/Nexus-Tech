@@ -464,8 +464,9 @@ def calculate_endgame_pressure(
     )
     if board_reset_risk >= 70:
         recommendation = (
-            "Board reset risk is high. Narrow scope, stabilize support, "
-            "and prepare to accept a reset plan before the board forces one."
+            "Board reset risk is high. Run enterprise or billing lane meshes where pressure is "
+            "broad, force a path cash waterfall, de-risk the hotspot channel, and prepare to "
+            "accept a tighter reset plan before the board forces one."
         )
         summary = "Governance and operating strain are now close to forcing a board-led reset."
     elif commercial_fragility >= 70:
@@ -494,10 +495,10 @@ def calculate_endgame_pressure(
             and queue_exposure.hotspot_lane.value == "enterprise"
         ):
             recommendation = (
-                "Run enterprise assurance, white-glove recovery, a reference rescue, or "
-                "onboarding fast track and lane recovery in enterprise work, add an enterprise "
-                "queue reset if the flagship lane is still clogged, tighten controls, and prove "
-                "reliability before telling a bigger story."
+                "Run enterprise assurance, an enterprise lane mesh, white-glove recovery, or a "
+                "white-glove lane mesh, add a reference rescue or enterprise queue reset if the "
+                "flagship lane is still clogged, tighten controls, and prove reliability before "
+                "telling a bigger story."
             )
         summary = "The run is leaning toward public-market scrutiny before it is fully ready."
     elif dominant_pressure == "acquirer_diligence":
@@ -528,10 +529,10 @@ def calculate_endgame_pressure(
             and queue_exposure.focus_alignment_gap > 0
         ):
             recommendation = (
-                "Move support focus into billing, raise the reserve target, step up reserve "
-                "discipline, harden financing posture, lock a capital buffer, roll debt forward "
-                "if needed, and keep renewal pressure from breaking independence with billing "
-                "stabilization."
+                "Move support focus into billing, run a billing lane mesh, raise the reserve "
+                "target, step up reserve discipline, harden financing posture, lock a capital "
+                "buffer, roll debt forward if needed, and keep renewal pressure from breaking "
+                "independence."
             )
         summary = "The independent path is viable only if capital discipline stays credible."
     else:
@@ -539,11 +540,25 @@ def calculate_endgame_pressure(
             "Narrow scope, stabilize operations, and reduce governance heat before scaling again."
         )
         summary = "Operating complexity is now creating visible restructure pressure."
+    if board_reset_risk >= 60 or restructure_heat >= 56:
+        path_watchlist = (
+            path_watchlist[0],
+            path_watchlist[1],
+            path_watchlist[2],
+            (
+                "Reset: force a path cash waterfall, run enterprise or billing lane meshes on "
+                "broad account pressure, cool hotspot channel dependency, and ratify reset "
+                "controls before another board cycle hardens the reset."
+            ),
+        )
     path_scorecard = (
         f"IPO {readiness.ipo_readiness_score} / scrutiny {public_market_scrutiny}",
         f"M&A {readiness.acquisition_interest_score} / diligence {acquirer_diligence}",
         f"Ind {readiness.independence_score} / discipline {independence_discipline}",
-        f"Reset {restructure_heat} / board risk {board_reset_risk}",
+        (
+            f"Reset {restructure_heat} / board risk {board_reset_risk} / governance "
+            f"{state.finance.governance_risk}"
+        ),
     )
     return EndgamePressureSummary(
         public_market_scrutiny=public_market_scrutiny,

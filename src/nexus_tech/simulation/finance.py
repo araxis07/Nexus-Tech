@@ -979,6 +979,34 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_enterprise_reference_council")
+    if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
+        enterprise_queue_risk_accounts > 2
+        or (
+            high_value_risk_accounts > 1
+            and support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            and support_hotspot_lane_overflow > 8
+        )
+        or (
+            white_glove_queue_risk_accounts > 1
+            and premium_revenue_at_risk_value >= Decimal("6800.00")
+        )
+        or (
+            support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            and focus_alignment_gap > 2
+            and hotspot_lane_account_count > 4
+        )
+    ):
+        recommended_actions.append("run_enterprise_lane_mesh")
+    if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
+        white_glove_queue_risk_accounts > 1
+        or (premium_queue_risk_accounts > 1 and premium_revenue_at_risk_value >= Decimal("6200.00"))
+        or (
+            support_hotspot_lane is SupportLaneFocus.ENTERPRISE
+            and support_hotspot_lane_overflow > 9
+            and high_value_risk_accounts > 1
+        )
+    ):
+        recommended_actions.append("run_white_glove_lane_mesh")
     if support_hotspot_lane is SupportLaneFocus.ONBOARDING and hotspot_lane_account_count > 0:
         recommended_actions.append("run_onboarding_recovery")
     if (
@@ -1140,6 +1168,16 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_onboarding_continuity_council")
+    if support_hotspot_lane is SupportLaneFocus.ONBOARDING and (
+        hotspot_lane_account_count > 2
+        and (
+            support_backlog >= 30
+            or support_hotspot_lane_overflow > 8
+            or revenue_at_risk_value >= Decimal("5200.00")
+            or renewal_pressure_value >= Decimal("4200.00")
+        )
+    ):
+        recommended_actions.append("run_onboarding_lane_mesh")
     if support_hotspot_lane is SupportLaneFocus.BILLING or renewal_queue_risk_accounts > 0:
         recommended_actions.append("run_billing_stabilization")
     if (
@@ -1293,6 +1331,25 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_billing_liquidity_council")
+    if (
+        support_hotspot_lane is SupportLaneFocus.BILLING
+        and (
+            hotspot_lane_account_count > 2
+            or renewal_queue_risk_accounts > 2
+            or support_hotspot_lane_overflow > 8
+            or renewal_pressure_value >= Decimal("6400.00")
+            or finance.covenant_risk >= 32
+            or capital_fragility >= 86
+        )
+    ) or (
+        renewal_queue_risk_accounts > 2
+        and (
+            finance.covenant_risk >= 28
+            or renewal_pressure_value >= Decimal("6200.00")
+            or support_hotspot_lane_overflow > 6
+        )
+    ):
+        recommended_actions.append("run_billing_lane_mesh")
     if support_hotspot_lane_overflow > 0 and "triage_support_backlog" not in recommended_actions:
         recommended_actions.append("triage_support_backlog")
     if revenue_at_risk_value >= Decimal("2400.00"):
@@ -1822,6 +1879,21 @@ def build_finance_planner(
         or support_hotspot_lane_overflow > 12
     ):
         recommended_actions.append("set_terminal_solvency_council")
+    if dominant_endgame_pressure in {
+        "board_reset_risk",
+        "public_market_scrutiny",
+        "acquirer_diligence",
+        "independence_discipline",
+    } and (
+        commercial_fragility >= 78
+        or capital_fragility >= 88
+        or reserve_gap < ZERO_MONEY
+        or support_hotspot_lane_overflow > 6
+        or hotspot_dependency_score >= BALANCE.finance_planner_reactivate_dependency_threshold + 8
+        or finance.governance_risk >= 54
+        or finance.board_pressure >= 34
+    ):
+        recommended_actions.append("set_path_cash_waterfall")
     if strategic_outlook == "profitable_independence" and (
         capital_fragility >= 62
         or reserve_gap < ZERO_MONEY
@@ -1876,6 +1948,16 @@ def build_finance_planner(
             "run an enterprise reference council before flagship proof slips past the "
             "oversight tier"
         )
+    if "run_enterprise_lane_mesh" in recommended_actions:
+        action_sequence.append(
+            "run an enterprise lane mesh before flagship pressure spreads past one account and "
+            "starts dragging the whole enterprise lane"
+        )
+    if "run_white_glove_lane_mesh" in recommended_actions:
+        action_sequence.append(
+            "run a white-glove lane mesh before premium service drag spreads across multiple "
+            "reference accounts"
+        )
     if "run_billing_liquidity_command" in recommended_actions:
         action_sequence.append(
             "open a billing liquidity command before covenant heat hardens further"
@@ -1915,6 +1997,11 @@ def build_finance_planner(
             "open a billing liquidity council before collections pressure outruns the "
             "oversight tier"
         )
+    if "run_billing_lane_mesh" in recommended_actions:
+        action_sequence.append(
+            "run a billing lane mesh before covenant heat and renewal drag spread across the "
+            "whole collections lane"
+        )
     if "run_onboarding_durability_mesh" in recommended_actions:
         action_sequence.append(
             "run an onboarding durability mesh before implementation drag compounds again"
@@ -1953,6 +2040,11 @@ def build_finance_planner(
         action_sequence.append(
             "run an onboarding continuity council before implementation recovery slips past "
             "the oversight tier"
+        )
+    if "run_onboarding_lane_mesh" in recommended_actions:
+        action_sequence.append(
+            "run an onboarding lane mesh before implementation drag spreads across the whole "
+            "activation lane"
         )
     if "run_channel_resilience_grid" in recommended_actions:
         action_sequence.append(
@@ -2031,6 +2123,11 @@ def build_finance_planner(
         action_sequence.append(
             "force a terminal solvency council before multi-path fragility outruns the "
             "solvency oversight"
+        )
+    if "set_path_cash_waterfall" in recommended_actions:
+        action_sequence.append(
+            "set a path cash waterfall before support, channel, and reserve strain all start "
+            "pulling the late-game story in different directions"
         )
     if finance.debt_principal >= BALANCE.finance_refinance_min_debt and finance.covenant_risk >= 16:
         action_sequence.append("refinance debt before adding new growth spend")

@@ -67,6 +67,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_set_exit_readiness_buffer,
     apply_set_growth_firebreak,
     apply_set_path_capital_posture,
+    apply_set_path_cash_waterfall,
     apply_set_path_control_matrix,
     apply_set_path_resilience_grid,
     apply_set_terminal_continuity_matrix,
@@ -240,6 +241,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_covenant_reset,
     run_billing_dispute_cabinet,
     run_billing_dispute_desk,
+    run_billing_lane_mesh,
     run_billing_liquidity_authority,
     run_billing_liquidity_command,
     run_billing_liquidity_commission,
@@ -253,6 +255,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_stabilization,
     run_enterprise_assurance,
     run_enterprise_commitment_board,
+    run_enterprise_lane_mesh,
     run_enterprise_queue_reset,
     run_enterprise_reference_authority,
     run_enterprise_reference_chamber,
@@ -279,6 +282,7 @@ from nexus_tech.simulation.support_program import (
     run_onboarding_control_tower,
     run_onboarding_durability_mesh,
     run_onboarding_fast_track,
+    run_onboarding_lane_mesh,
     run_onboarding_launch_cell,
     run_onboarding_recovery,
     run_onboarding_retention_mesh,
@@ -287,6 +291,7 @@ from nexus_tech.simulation.support_program import (
     run_renewal_sweep,
     run_white_glove_backstop,
     run_white_glove_escalation_cell,
+    run_white_glove_lane_mesh,
     run_white_glove_recovery,
     run_white_glove_reference_bureau,
     run_white_glove_reference_committee,
@@ -809,6 +814,11 @@ def apply_action(
         logger.debug("Set path capital posture.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_PATH_CASH_WATERFALL:
+        summary = apply_set_path_cash_waterfall(next_state)
+        logger.debug("Set path cash waterfall.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.SET_ENDGAME_CAPITAL_MAP:
         summary = apply_set_endgame_capital_map(next_state)
         logger.debug("Set endgame capital map.")
@@ -1140,6 +1150,46 @@ def apply_action(
         summary = run_lane_recovery(next_state, context.support_lane_focus)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran support lane recovery for %s.", context.support_lane_focus.value)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ENTERPRISE_LANE_MESH:
+        summary = run_enterprise_lane_mesh(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise lane mesh.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_BILLING_LANE_MESH:
+        summary = run_billing_lane_mesh(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing lane mesh.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_LANE_MESH:
+        summary = run_onboarding_lane_mesh(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding lane mesh.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_WHITE_GLOVE_LANE_MESH:
+        summary = run_white_glove_lane_mesh(next_state)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran white-glove lane mesh.")
         return ActionOutcome(
             state=next_state,
             message=summary.message,

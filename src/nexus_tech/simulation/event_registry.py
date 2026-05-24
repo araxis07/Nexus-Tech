@@ -462,6 +462,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_book_anchor_council_event,
         ),
         EventDefinition(
+            event_id="ipo_book_anchor_ledger",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_bookbuild_corridor_weight,
+            cooldown_turns=BALANCE.event_ipo_bookbuild_corridor_cooldown,
+            is_eligible=_is_ipo_book_anchor_ledger_eligible,
+            build_pending_event=_build_ipo_book_anchor_ledger_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -654,6 +662,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_close_anchor_council_event,
         ),
         EventDefinition(
+            event_id="buyer_close_anchor_ledger",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_board_alignment_weight,
+            cooldown_turns=BALANCE.event_buyer_board_alignment_cooldown,
+            is_eligible=_is_buyer_close_anchor_ledger_eligible,
+            build_pending_event=_build_buyer_close_anchor_ledger_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -844,6 +860,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
             is_eligible=_is_independence_cash_solvency_council_eligible,
             build_pending_event=_build_independence_cash_solvency_council_event,
+        ),
+        EventDefinition(
+            event_id="independence_cash_solvency_ledger",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_liquidity_charter_weight,
+            cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
+            is_eligible=_is_independence_cash_solvency_ledger_eligible,
+            build_pending_event=_build_independence_cash_solvency_ledger_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -1070,6 +1094,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_reseller_service_oversight_council_event,
         ),
         EventDefinition(
+            event_id="reseller_service_oversight_ledger",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_reseller_pipeline_cadence_weight,
+            cooldown_turns=BALANCE.event_reseller_pipeline_cadence_cooldown,
+            is_eligible=_is_reseller_service_oversight_ledger_eligible,
+            build_pending_event=_build_reseller_service_oversight_ledger_event,
+        ),
+        EventDefinition(
             event_id="integration_cutover_board",
             category=EventCategory.PRODUCT_INCIDENT,
             weight=BALANCE.event_integration_cutover_board_weight,
@@ -1214,6 +1246,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_integration_cutover_oversight_council_event,
         ),
         EventDefinition(
+            event_id="integration_cutover_oversight_ledger",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_integration_go_live_shield_weight,
+            cooldown_turns=BALANCE.event_integration_go_live_shield_cooldown,
+            is_eligible=_is_integration_cutover_oversight_ledger_eligible,
+            build_pending_event=_build_integration_cutover_oversight_ledger_event,
+        ),
+        EventDefinition(
             event_id="marketplace_dispute_program",
             category=EventCategory.REPUTATION_INCIDENT,
             weight=BALANCE.event_marketplace_dispute_program_weight,
@@ -1356,6 +1396,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
             is_eligible=_is_marketplace_refund_oversight_council_eligible,
             build_pending_event=_build_marketplace_refund_oversight_council_event,
+        ),
+        EventDefinition(
+            event_id="marketplace_refund_oversight_ledger",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_marketplace_policy_appeal_weight,
+            cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
+            is_eligible=_is_marketplace_refund_oversight_ledger_eligible,
+            build_pending_event=_build_marketplace_refund_oversight_ledger_event,
         ),
         EventDefinition(
             event_id="board_recovery_window",
@@ -1524,6 +1572,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
             is_eligible=_is_board_reset_operating_council_eligible,
             build_pending_event=_build_board_reset_operating_council_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_operating_ledger",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_trust_vote_weight,
+            cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
+            is_eligible=_is_board_reset_operating_ledger_eligible,
+            build_pending_event=_build_board_reset_operating_ledger_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -4299,6 +4355,46 @@ def _build_ipo_book_anchor_council_event(
     )
 
 
+def _is_ipo_book_anchor_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"ipo_book_anchor_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_ipo_book_anchor_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_ipo_book_anchor_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "ipo_book_anchor_ledger",
+            "title": "IPO Book-Anchor Ledger",
+            "description": (
+                "The listing path now needs a book-anchor ledger that proves final references, "
+                "service quality, and governance discipline can survive one more cycle. You can "
+                "fund the ledger now or defer it and accept one more round of order-book fragility."
+            ),
+            "chain_stage": 34,
+            "options": [
+                EventOption(
+                    id="fund_book_anchor_ledger",
+                    label="Fund the book-anchor ledger",
+                    description="Spend cash to lock the final IPO book-support ledger in place.",
+                ),
+                EventOption(
+                    id="defer_book_anchor_ledger",
+                    label="Defer the book-anchor ledger",
+                    description="Protect cash now, but let one more round of fragility build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -5690,6 +5786,46 @@ def _build_buyer_close_anchor_council_event(
                 EventOption(
                     id="carry_close_anchor_council",
                     label="Carry the close-anchor council",
+                    description="Protect economics now, but let another drag round build.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_buyer_close_anchor_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"buyer_close_anchor_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_buyer_close_anchor_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_buyer_close_anchor_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "buyer_close_anchor_ledger",
+            "title": "Buyer Close-Anchor Ledger",
+            "description": (
+                "The buyer path now needs a close-anchor ledger across channel dependency, "
+                "service proof, and executive coordination. You can fund the ledger now or "
+                "carry it and absorb one more diligence discount."
+            ),
+            "chain_stage": 34,
+            "options": [
+                EventOption(
+                    id="fund_close_anchor_ledger",
+                    label="Fund the close-anchor ledger",
+                    description="Spend cash to lock final close certainty and overlap control.",
+                ),
+                EventOption(
+                    id="carry_close_anchor_ledger",
+                    label="Carry the close-anchor ledger",
                     description="Protect economics now, but let another drag round build.",
                 ),
             ],
@@ -7490,6 +7626,46 @@ def _build_independence_cash_solvency_council_event(
     )
 
 
+def _is_independence_cash_solvency_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"independence_cash_solvency_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_independence_cash_solvency_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_independence_cash_solvency_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "independence_cash_solvency_ledger",
+            "title": "Independence Cash-Solvency Ledger",
+            "description": (
+                "The independence path now needs a cash-solvency ledger across reserves, "
+                "covenant control, and margin discipline. You can ratify the ledger now or "
+                "bridge it and accept one more round of capital fragility."
+            ),
+            "chain_stage": 34,
+            "options": [
+                EventOption(
+                    id="ratify_cash_solvency_ledger",
+                    label="Ratify the cash-solvency ledger",
+                    description="Spend cash and lock the hardest liquidity backstop in place.",
+                ),
+                EventOption(
+                    id="bridge_cash_solvency_ledger",
+                    label="Bridge the cash-solvency ledger",
+                    description="Protect flexibility now, but let another fragility round build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_reseller_enablement_gap_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     reseller_partnerships = [
@@ -8874,6 +9050,48 @@ def _build_reseller_service_oversight_council_event(
     )
 
 
+def _is_reseller_service_oversight_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"reseller_service_oversight_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_reseller_service_oversight_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_reseller_service_oversight_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "reseller_service_oversight_ledger",
+            "title": "Reseller Service Oversight Ledger",
+            "description": (
+                "The reseller lane now needs a service-oversight ledger that proves coverage, "
+                "enablement, and renewal trust can survive one more cycle. You can fund the "
+                "ledger now or stretch it and absorb another service slip."
+            ),
+            "chain_stage": 22,
+            "options": [
+                EventOption(
+                    id="fund_service_ledger",
+                    label="Fund the service ledger",
+                    description=(
+                        "Spend cash to keep reseller service confidence intact one more cycle."
+                    ),
+                ),
+                EventOption(
+                    id="stretch_service_ledger",
+                    label="Stretch the service ledger",
+                    description="Protect cash now, but let service drag compound again.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_integration_cutover_board_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     integration_partnerships = [
@@ -10043,6 +10261,46 @@ def _build_integration_cutover_oversight_council_event(
                 EventOption(
                     id="stretch_cutover_council",
                     label="Stretch the cutover council",
+                    description="Protect cash now, but let cutover drag compound again.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_integration_cutover_oversight_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"integration_cutover_oversight_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_integration_cutover_oversight_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_integration_cutover_oversight_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "integration_cutover_oversight_ledger",
+            "title": "Integration Cutover Oversight Ledger",
+            "description": (
+                "The integration lane now needs a cutover-oversight ledger that proves "
+                "reliability, hypercare, and support coverage can survive one more cycle. "
+                "You can fund the ledger now or stretch it and absorb another cutover scare."
+            ),
+            "chain_stage": 21,
+            "options": [
+                EventOption(
+                    id="fund_cutover_ledger",
+                    label="Fund the cutover ledger",
+                    description="Spend cash to keep integration confidence intact one more cycle.",
+                ),
+                EventOption(
+                    id="stretch_cutover_ledger",
+                    label="Stretch the cutover ledger",
                     description="Protect cash now, but let cutover drag compound again.",
                 ),
             ],
@@ -11227,6 +11485,46 @@ def _build_marketplace_refund_oversight_council_event(
     )
 
 
+def _is_marketplace_refund_oversight_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"marketplace_refund_oversight_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_marketplace_refund_oversight_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_marketplace_refund_oversight_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "marketplace_refund_oversight_ledger",
+            "title": "Marketplace Refund Oversight Ledger",
+            "description": (
+                "The marketplace lane now needs a refund-oversight ledger that proves payment "
+                "trust, renewal quality, and dispute handling can survive one more cycle. You "
+                "can fund the ledger now or stretch it and absorb another refund scare."
+            ),
+            "chain_stage": 21,
+            "options": [
+                EventOption(
+                    id="fund_refund_ledger",
+                    label="Fund the refund ledger",
+                    description="Spend cash to keep refund confidence intact one more cycle.",
+                ),
+                EventOption(
+                    id="stretch_refund_ledger",
+                    label="Stretch the refund ledger",
+                    description="Protect cash now, but let refund drag compound again.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_board_recovery_window_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
@@ -12267,6 +12565,46 @@ def _build_board_reset_operating_council_event(
                 EventOption(
                     id="stretch_operating_council",
                     label="Stretch the operating council",
+                    description="Protect flexibility now, but let reset pressure compound again.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_board_reset_operating_ledger_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"board_reset_operating_council"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_board_reset_operating_ledger_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_board_reset_operating_council_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "board_reset_operating_ledger",
+            "title": "Board-Reset Operating Ledger",
+            "description": (
+                "Directors now want an operating ledger that proves the reset can hold through "
+                "one more cycle without another governance break. You can ratify the ledger now "
+                "or stretch it and absorb another round of reset heat."
+            ),
+            "chain_stage": 30,
+            "options": [
+                EventOption(
+                    id="ratify_operating_ledger",
+                    label="Ratify the operating ledger",
+                    description="Lean even harder into resilience and buy more trust back.",
+                ),
+                EventOption(
+                    id="stretch_operating_ledger",
+                    label="Stretch the operating ledger",
                     description="Protect flexibility now, but let reset pressure compound again.",
                 ),
             ],
