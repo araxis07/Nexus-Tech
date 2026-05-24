@@ -470,6 +470,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_ipo_book_anchor_ledger_event,
         ),
         EventDefinition(
+            event_id="ipo_book_anchor_watch",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_ipo_bookbuild_corridor_weight,
+            cooldown_turns=BALANCE.event_ipo_bookbuild_corridor_cooldown,
+            is_eligible=_is_ipo_book_anchor_watch_eligible,
+            build_pending_event=_build_ipo_book_anchor_watch_event,
+        ),
+        EventDefinition(
             event_id="acquirer_diligence",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_acquirer_diligence_weight,
@@ -670,6 +678,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_buyer_close_anchor_ledger_event,
         ),
         EventDefinition(
+            event_id="buyer_close_anchor_watch",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_buyer_board_alignment_weight,
+            cooldown_turns=BALANCE.event_buyer_board_alignment_cooldown,
+            is_eligible=_is_buyer_close_anchor_watch_eligible,
+            build_pending_event=_build_buyer_close_anchor_watch_event,
+        ),
+        EventDefinition(
             event_id="independence_reckoning",
             category=EventCategory.FUNDING_OPPORTUNITY,
             weight=BALANCE.event_independence_reckoning_weight,
@@ -868,6 +884,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
             is_eligible=_is_independence_cash_solvency_ledger_eligible,
             build_pending_event=_build_independence_cash_solvency_ledger_event,
+        ),
+        EventDefinition(
+            event_id="independence_cash_solvency_watch",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_independence_liquidity_charter_weight,
+            cooldown_turns=BALANCE.event_independence_liquidity_charter_cooldown,
+            is_eligible=_is_independence_cash_solvency_watch_eligible,
+            build_pending_event=_build_independence_cash_solvency_watch_event,
         ),
         EventDefinition(
             event_id="enterprise_procurement_delay",
@@ -1102,6 +1126,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_reseller_service_oversight_ledger_event,
         ),
         EventDefinition(
+            event_id="reseller_service_oversight_watch",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            weight=BALANCE.event_reseller_pipeline_cadence_weight,
+            cooldown_turns=BALANCE.event_reseller_pipeline_cadence_cooldown,
+            is_eligible=_is_reseller_service_oversight_watch_eligible,
+            build_pending_event=_build_reseller_service_oversight_watch_event,
+        ),
+        EventDefinition(
             event_id="integration_cutover_board",
             category=EventCategory.PRODUCT_INCIDENT,
             weight=BALANCE.event_integration_cutover_board_weight,
@@ -1254,6 +1286,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             build_pending_event=_build_integration_cutover_oversight_ledger_event,
         ),
         EventDefinition(
+            event_id="integration_cutover_oversight_watch",
+            category=EventCategory.PRODUCT_INCIDENT,
+            weight=BALANCE.event_integration_go_live_shield_weight,
+            cooldown_turns=BALANCE.event_integration_go_live_shield_cooldown,
+            is_eligible=_is_integration_cutover_oversight_watch_eligible,
+            build_pending_event=_build_integration_cutover_oversight_watch_event,
+        ),
+        EventDefinition(
             event_id="marketplace_dispute_program",
             category=EventCategory.REPUTATION_INCIDENT,
             weight=BALANCE.event_marketplace_dispute_program_weight,
@@ -1404,6 +1444,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
             is_eligible=_is_marketplace_refund_oversight_ledger_eligible,
             build_pending_event=_build_marketplace_refund_oversight_ledger_event,
+        ),
+        EventDefinition(
+            event_id="marketplace_refund_oversight_watch",
+            category=EventCategory.REPUTATION_INCIDENT,
+            weight=BALANCE.event_marketplace_policy_appeal_weight,
+            cooldown_turns=BALANCE.event_marketplace_policy_appeal_cooldown,
+            is_eligible=_is_marketplace_refund_oversight_watch_eligible,
+            build_pending_event=_build_marketplace_refund_oversight_watch_event,
         ),
         EventDefinition(
             event_id="board_recovery_window",
@@ -1580,6 +1628,14 @@ def get_event_registry() -> tuple[EventDefinition, ...]:
             cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
             is_eligible=_is_board_reset_operating_ledger_eligible,
             build_pending_event=_build_board_reset_operating_ledger_event,
+        ),
+        EventDefinition(
+            event_id="board_reset_operating_watch",
+            category=EventCategory.FUNDING_OPPORTUNITY,
+            weight=BALANCE.event_board_reset_trust_vote_weight,
+            cooldown_turns=BALANCE.event_board_reset_trust_vote_cooldown,
+            is_eligible=_is_board_reset_operating_watch_eligible,
+            build_pending_event=_build_board_reset_operating_watch_event,
         ),
         EventDefinition(
             event_id="capital_market_freeze",
@@ -4395,6 +4451,47 @@ def _build_ipo_book_anchor_ledger_event(
     )
 
 
+def _is_ipo_book_anchor_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"ipo_book_anchor_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_ipo_book_anchor_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_ipo_book_anchor_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "ipo_book_anchor_watch",
+            "title": "IPO Book-Anchor Watch",
+            "description": (
+                "The listing path now needs a final book-anchor watch that proves final "
+                "references, support quality, and governance discipline can hold through one "
+                "more cycle of scrutiny. You can fund the watch now or defer it and accept one "
+                "more round of order-book fragility."
+            ),
+            "chain_stage": 35,
+            "options": [
+                EventOption(
+                    id="fund_book_anchor_watch",
+                    label="Fund the book-anchor watch",
+                    description="Spend cash to lock the final IPO book-support watch in place.",
+                ),
+                EventOption(
+                    id="defer_book_anchor_watch",
+                    label="Defer the book-anchor watch",
+                    description="Protect cash now, but let one more round of fragility build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_acquirer_diligence_eligible(state: GameState) -> bool:
     readiness = calculate_endgame_readiness(state)
     pressure = calculate_endgame_pressure(state)
@@ -5826,6 +5923,46 @@ def _build_buyer_close_anchor_ledger_event(
                 EventOption(
                     id="carry_close_anchor_ledger",
                     label="Carry the close-anchor ledger",
+                    description="Protect economics now, but let another drag round build.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_buyer_close_anchor_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"buyer_close_anchor_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_buyer_close_anchor_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_buyer_close_anchor_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "buyer_close_anchor_watch",
+            "title": "Buyer Close-Anchor Watch",
+            "description": (
+                "The buyer path now needs a final close-anchor watch across diligence, service "
+                "proof, and partner stability. You can fund the watch now or carry it and "
+                "accept one more round of close fragility."
+            ),
+            "chain_stage": 35,
+            "options": [
+                EventOption(
+                    id="fund_close_anchor_watch",
+                    label="Fund the close-anchor watch",
+                    description="Spend cash to lock the final buyer close watch in place.",
+                ),
+                EventOption(
+                    id="carry_close_anchor_watch",
+                    label="Carry the close-anchor watch",
                     description="Protect economics now, but let another drag round build.",
                 ),
             ],
@@ -7666,6 +7803,46 @@ def _build_independence_cash_solvency_ledger_event(
     )
 
 
+def _is_independence_cash_solvency_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"independence_cash_solvency_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_independence_cash_solvency_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_independence_cash_solvency_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "independence_cash_solvency_watch",
+            "title": "Independence Cash-Solvency Watch",
+            "description": (
+                "The independence path now needs a final cash-solvency watch across reserve "
+                "discipline, covenant control, and margin yield. You can ratify the watch now "
+                "or bridge it and accept one more round of solvency strain."
+            ),
+            "chain_stage": 35,
+            "options": [
+                EventOption(
+                    id="ratify_cash_solvency_watch",
+                    label="Ratify the cash-solvency watch",
+                    description="Lock in the final independence cash watch now.",
+                ),
+                EventOption(
+                    id="bridge_cash_solvency_watch",
+                    label="Bridge the cash-solvency watch",
+                    description="Protect flexibility now, but let another solvency gap build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_reseller_enablement_gap_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     reseller_partnerships = [
@@ -9092,6 +9269,48 @@ def _build_reseller_service_oversight_ledger_event(
     )
 
 
+def _is_reseller_service_oversight_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"reseller_service_oversight_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_reseller_service_oversight_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_reseller_service_oversight_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "reseller_service_oversight_watch",
+            "title": "Reseller Service Oversight Watch",
+            "description": (
+                "The reseller lane now needs a final service-oversight watch that proves "
+                "coverage, enablement, and renewal trust can hold through one more channel "
+                "cycle. You can fund the watch now or stretch it and absorb another service slip."
+            ),
+            "chain_stage": 23,
+            "options": [
+                EventOption(
+                    id="fund_service_watch",
+                    label="Fund the service watch",
+                    description=(
+                        "Spend cash to keep reseller service confidence intact one more cycle."
+                    ),
+                ),
+                EventOption(
+                    id="stretch_service_watch",
+                    label="Stretch the service watch",
+                    description="Protect cash now, but let service drag compound again.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_integration_cutover_board_eligible(state: GameState) -> bool:
     portfolio = calculate_partnership_portfolio(state)
     integration_partnerships = [
@@ -10301,6 +10520,48 @@ def _build_integration_cutover_oversight_ledger_event(
                 EventOption(
                     id="stretch_cutover_ledger",
                     label="Stretch the cutover ledger",
+                    description="Protect cash now, but let cutover drag compound again.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_integration_cutover_oversight_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"integration_cutover_oversight_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_integration_cutover_oversight_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_integration_cutover_oversight_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "integration_cutover_oversight_watch",
+            "title": "Integration Cutover Oversight Watch",
+            "description": (
+                "The integration lane now needs a final cutover-oversight watch that proves "
+                "go-live reliability can hold through one more partner cycle. You can fund the "
+                "watch now or stretch it and absorb another cutover scare."
+            ),
+            "chain_stage": 23,
+            "options": [
+                EventOption(
+                    id="fund_cutover_watch",
+                    label="Fund the cutover watch",
+                    description=(
+                        "Spend cash to keep integration confidence intact one more cycle."
+                    ),
+                ),
+                EventOption(
+                    id="stretch_cutover_watch",
+                    label="Stretch the cutover watch",
                     description="Protect cash now, but let cutover drag compound again.",
                 ),
             ],
@@ -11525,6 +11786,46 @@ def _build_marketplace_refund_oversight_ledger_event(
     )
 
 
+def _is_marketplace_refund_oversight_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"marketplace_refund_oversight_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_marketplace_refund_oversight_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_marketplace_refund_oversight_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "marketplace_refund_oversight_watch",
+            "title": "Marketplace Refund Oversight Watch",
+            "description": (
+                "The marketplace lane now needs a final refund-oversight watch that proves "
+                "payment trust can hold through one more marketplace cycle. You can fund the "
+                "watch now or stretch it and absorb another refund scare."
+            ),
+            "chain_stage": 23,
+            "options": [
+                EventOption(
+                    id="fund_refund_watch",
+                    label="Fund the refund watch",
+                    description="Spend cash to keep refunds, disputes, and trust contained.",
+                ),
+                EventOption(
+                    id="stretch_refund_watch",
+                    label="Stretch the refund watch",
+                    description="Protect cash now, but let another penalty wave build.",
+                ),
+            ],
+        }
+    )
+
+
 def _is_board_recovery_window_eligible(state: GameState) -> bool:
     pressure = calculate_endgame_pressure(state)
     return _has_recent_event(
@@ -12605,6 +12906,46 @@ def _build_board_reset_operating_ledger_event(
                 EventOption(
                     id="stretch_operating_ledger",
                     label="Stretch the operating ledger",
+                    description="Protect flexibility now, but let reset pressure compound again.",
+                ),
+            ],
+        }
+    )
+
+
+def _is_board_reset_operating_watch_eligible(state: GameState) -> bool:
+    return _has_recent_event(
+        state,
+        {"board_reset_operating_ledger"},
+        BALANCE.event_chain_recent_window_turns,
+    )
+
+
+def _build_board_reset_operating_watch_event(
+    state: GameState,
+    rng: RandomLike,
+    cooldown_turns: int,
+) -> PendingEvent:
+    base_event = _build_board_reset_operating_ledger_event(state, rng, cooldown_turns)
+    return base_event.model_copy(
+        update={
+            "event_id": "board_reset_operating_watch",
+            "title": "Board-Reset Operating Watch",
+            "description": (
+                "Directors now want one final operating watch that proves the reset can hold "
+                "through another governance cycle. You can ratify the watch now or stretch it "
+                "and absorb another round of reset heat."
+            ),
+            "chain_stage": 31,
+            "options": [
+                EventOption(
+                    id="ratify_operating_watch",
+                    label="Ratify the operating watch",
+                    description="Lean even harder into resilience and buy more trust back.",
+                ),
+                EventOption(
+                    id="stretch_operating_watch",
+                    label="Stretch the operating watch",
                     description="Protect flexibility now, but let reset pressure compound again.",
                 ),
             ],

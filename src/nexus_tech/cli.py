@@ -406,6 +406,11 @@ ACTION_KEYS = {
     "184": TurnAction.SET_TERMINAL_SOLVENCY_OVERSIGHT,
     "189": TurnAction.SET_TERMINAL_SOLVENCY_COUNCIL,
     "194": TurnAction.SET_PATH_CASH_WATERFALL,
+    "195": TurnAction.RUN_ENTERPRISE_REFERENCE_WATCH,
+    "196": TurnAction.RUN_BILLING_RENEWAL_WATCH,
+    "197": TurnAction.RUN_ONBOARDING_GO_LIVE_WATCH,
+    "198": TurnAction.RUN_WHITE_GLOVE_RETENTION_WATCH,
+    "199": TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER,
     "74": TurnAction.RENEGOTIATE_PARTNERSHIP,
     "77": TurnAction.REACTIVATE_PARTNERSHIP,
     "82": TurnAction.PAUSE_PARTNERSHIP,
@@ -1883,6 +1888,11 @@ def collect_action_context(
         if customer_account_id is None:
             return None
         return ActionContext(customer_account_id=customer_account_id)
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_WATCH:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_WHITE_GLOVE_REFERENCE_EXCHANGE:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
@@ -1971,6 +1981,11 @@ def collect_action_context(
         if customer_account_id is None:
             return None
         return ActionContext(customer_account_id=customer_account_id)
+    if action is TurnAction.RUN_BILLING_RENEWAL_WATCH:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
 
     if action is TurnAction.RUN_ONBOARDING_CONTROL_TOWER:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
@@ -2049,6 +2064,17 @@ def collect_action_context(
             return None
         return ActionContext(customer_account_id=customer_account_id)
     if action is TurnAction.RUN_ONBOARDING_CONTINUITY_COUNCIL:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+    if action is TurnAction.RUN_ONBOARDING_GO_LIVE_WATCH:
+        customer_account_id = choose_customer_account_id(state, at_risk_only=False)
+        if customer_account_id is None:
+            return None
+        return ActionContext(customer_account_id=customer_account_id)
+
+    if action is TurnAction.RUN_WHITE_GLOVE_RETENTION_WATCH:
         customer_account_id = choose_customer_account_id(state, at_risk_only=False)
         if customer_account_id is None:
             return None

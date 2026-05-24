@@ -2389,6 +2389,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "195",
+        "run_enterprise_reference_watch",
+        (
+            "Run one more flagship enterprise follow-up on a single account when the broad lane "
+            "mesh is no longer enough to protect IPO or diligence proof."
+        ),
+    )
+    primary_actions.add_row(
         "105",
         "run_billing_retention_reset",
         "Reset one billing-heavy account before renewal drag hardens into churn.",
@@ -2522,6 +2530,14 @@ def _build_action_menu_panel() -> Panel:
         ),
     )
     primary_actions.add_row(
+        "196",
+        "run_billing_renewal_watch",
+        (
+            "Run one more billing follow-up on a single account when the lane is calmer but one "
+            "renewal-risk account is still dictating covenant and collections pressure."
+        ),
+    )
+    primary_actions.add_row(
         "124",
         "run_onboarding_control_tower",
         (
@@ -2639,6 +2655,14 @@ def _build_action_menu_panel() -> Panel:
         (
             "Stabilize the onboarding hotspot across multiple accounts when implementation "
             "drag is spreading faster than one-account recovery can catch."
+        ),
+    )
+    primary_actions.add_row(
+        "197",
+        "run_onboarding_go_live_watch",
+        (
+            "Run one more onboarding follow-up on a single account when the lane has cooled but "
+            "one activation still threatens renewals and board trust."
         ),
     )
     primary_actions.add_row(
@@ -2883,6 +2907,22 @@ def _build_action_menu_panel() -> Panel:
         (
             "Reset capital allocation around the active endgame path before reserve, support, "
             "or channel pressure turns the current strategy incoherent."
+        ),
+    )
+    primary_actions.add_row(
+        "198",
+        "run_white_glove_retention_watch",
+        (
+            "Run one more premium-account retention pass when a single white-glove account still "
+            "drives renewal, reference, and board pressure after the lane mesh."
+        ),
+    )
+    primary_actions.add_row(
+        "199",
+        "set_board_reset_contingency_buffer",
+        (
+            "Force a reserve-first board-reset capital buffer when the reset path is becoming "
+            "the dominant late-game story even after a path cash waterfall."
         ),
     )
     primary_actions.add_row(

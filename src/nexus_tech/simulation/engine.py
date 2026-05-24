@@ -59,6 +59,7 @@ from nexus_tech.simulation.capital_planning import (
     apply_rebalance_capital,
     apply_refinancing_posture,
     apply_set_balance_sheet_recovery_mesh,
+    apply_set_board_reset_contingency_buffer,
     apply_set_capital_plan,
     apply_set_capital_reallocation_grid,
     apply_set_covenant_firewall,
@@ -250,6 +251,7 @@ from nexus_tech.simulation.support_program import (
     run_billing_liquidity_oversight,
     run_billing_liquidity_secretariat,
     run_billing_liquidity_summit,
+    run_billing_renewal_watch,
     run_billing_retention_reset,
     run_billing_settlement_board,
     run_billing_stabilization,
@@ -268,6 +270,7 @@ from nexus_tech.simulation.support_program import (
     run_enterprise_reference_oversight,
     run_enterprise_reference_secretariat,
     run_enterprise_reference_summit,
+    run_enterprise_reference_watch,
     run_enterprise_renewal_cabinet,
     run_lane_recovery,
     run_onboarding_adoption_hub,
@@ -282,6 +285,7 @@ from nexus_tech.simulation.support_program import (
     run_onboarding_control_tower,
     run_onboarding_durability_mesh,
     run_onboarding_fast_track,
+    run_onboarding_go_live_watch,
     run_onboarding_lane_mesh,
     run_onboarding_launch_cell,
     run_onboarding_recovery,
@@ -298,6 +302,7 @@ from nexus_tech.simulation.support_program import (
     run_white_glove_reference_exchange,
     run_white_glove_reference_ring,
     run_white_glove_renewal_guard,
+    run_white_glove_retention_watch,
     set_support_lane_focus,
     triage_support_backlog,
     upgrade_support_program,
@@ -819,6 +824,11 @@ def apply_action(
         logger.debug("Set path cash waterfall.")
         return ActionOutcome(state=next_state, message=summary.message)
 
+    if action is TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER:
+        summary = apply_set_board_reset_contingency_buffer(next_state)
+        logger.debug("Set board-reset contingency buffer.")
+        return ActionOutcome(state=next_state, message=summary.message)
+
     if action is TurnAction.SET_ENDGAME_CAPITAL_MAP:
         summary = apply_set_endgame_capital_map(next_state)
         logger.debug("Set endgame capital map.")
@@ -1190,6 +1200,62 @@ def apply_action(
         summary = run_white_glove_lane_mesh(next_state)
         next_state.company.game_over = is_game_over(next_state.company)
         logger.debug("Ran white-glove lane mesh.")
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ENTERPRISE_REFERENCE_WATCH:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_enterprise_reference_watch(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran enterprise reference watch for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_BILLING_RENEWAL_WATCH:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_billing_renewal_watch(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran billing renewal watch for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_ONBOARDING_GO_LIVE_WATCH:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_onboarding_go_live_watch(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran onboarding go-live watch for %s.", account.name)
+        return ActionOutcome(
+            state=next_state,
+            message=summary.message,
+            turn_should_end=next_state.company.game_over,
+        )
+
+    if action is TurnAction.RUN_WHITE_GLOVE_RETENTION_WATCH:
+        account = get_customer_account_by_id(
+            next_state.customer_accounts,
+            context.customer_account_id,
+        )
+        summary = run_white_glove_retention_watch(next_state, account.id)
+        next_state.company.game_over = is_game_over(next_state.company)
+        logger.debug("Ran white-glove retention watch for %s.", account.name)
         return ActionOutcome(
             state=next_state,
             message=summary.message,

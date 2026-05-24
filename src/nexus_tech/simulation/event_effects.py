@@ -2739,6 +2739,25 @@ def _apply_reseller_service_oversight_ledger(
     ).replace("service oversight council", "service oversight ledger")
 
 
+def _apply_reseller_service_oversight_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_service_watch": "fund_service_ledger",
+        "stretch_service_watch": "stretch_service_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for reseller service oversight watch.")
+    result = _apply_reseller_service_oversight_ledger(state, event, mapped_option)
+    return result.replace(
+        "reseller service oversight ledger",
+        "reseller service oversight watch",
+    ).replace("service oversight ledger", "service oversight watch")
+
+
 def _apply_integration_cutover_risk(
     state: GameState,
     event: PendingEvent,
@@ -3476,6 +3495,25 @@ def _apply_integration_cutover_oversight_ledger(
         "integration cutover council",
         "integration cutover oversight ledger",
     ).replace("cutover council", "cutover ledger")
+
+
+def _apply_integration_cutover_oversight_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_cutover_watch": "fund_cutover_ledger",
+        "stretch_cutover_watch": "stretch_cutover_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for integration cutover oversight watch.")
+    result = _apply_integration_cutover_oversight_ledger(state, event, mapped_option)
+    return result.replace(
+        "integration cutover oversight ledger",
+        "integration cutover oversight watch",
+    ).replace("cutover ledger", "cutover watch")
 
 
 def _apply_marketplace_chargeback_wave(
@@ -4221,6 +4259,25 @@ def _apply_marketplace_refund_oversight_ledger(
         "marketplace refund council",
         "marketplace refund oversight ledger",
     ).replace("refund council", "refund ledger")
+
+
+def _apply_marketplace_refund_oversight_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_refund_watch": "fund_refund_ledger",
+        "stretch_refund_watch": "stretch_refund_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for marketplace refund oversight watch.")
+    result = _apply_marketplace_refund_oversight_ledger(state, event, mapped_option)
+    return result.replace(
+        "marketplace refund oversight ledger",
+        "marketplace refund oversight watch",
+    ).replace("refund ledger", "refund watch")
 
 
 def _apply_board_recovery_window(state: GameState, event: PendingEvent, option_id: str) -> str:
@@ -5199,6 +5256,28 @@ def _apply_board_reset_operating_ledger(
     ).replace(
         "operating council",
         "operating ledger",
+    )
+
+
+def _apply_board_reset_operating_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_operating_watch": "ratify_operating_ledger",
+        "stretch_operating_watch": "stretch_operating_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for board-reset operating watch.")
+    result = _apply_board_reset_operating_ledger(state, event, mapped_option)
+    return result.replace(
+        "board-reset operating ledger",
+        "board-reset operating watch",
+    ).replace(
+        "operating ledger",
+        "operating watch",
     )
 
 
@@ -6404,6 +6483,25 @@ def _apply_ipo_book_anchor_ledger(
     )
 
 
+def _apply_ipo_book_anchor_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_book_anchor_watch": "fund_book_anchor_ledger",
+        "defer_book_anchor_watch": "defer_book_anchor_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for IPO book-anchor watch.")
+    result = _apply_ipo_book_anchor_ledger(state, event, mapped_option)
+    return result.replace("book-anchor ledger", "book-anchor watch").replace(
+        "anchor ledger",
+        "anchor watch",
+    )
+
+
 def _apply_acquirer_diligence(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -7493,6 +7591,28 @@ def _apply_buyer_close_anchor_ledger(
     ).replace(
         "close-anchor council",
         "close-anchor ledger",
+    )
+
+
+def _apply_buyer_close_anchor_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "fund_close_anchor_watch": "fund_close_anchor_ledger",
+        "carry_close_anchor_watch": "carry_close_anchor_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for buyer close-anchor watch.")
+    result = _apply_buyer_close_anchor_ledger(state, event, mapped_option)
+    return result.replace(
+        "buyer close-anchor ledger",
+        "buyer close-anchor watch",
+    ).replace(
+        "close-anchor ledger",
+        "close-anchor watch",
     )
 
 
@@ -8611,6 +8731,28 @@ def _apply_independence_cash_solvency_ledger(
     )
 
 
+def _apply_independence_cash_solvency_watch(
+    state: GameState,
+    event: PendingEvent,
+    option_id: str,
+) -> str:
+    option_map = {
+        "ratify_cash_solvency_watch": "ratify_cash_solvency_ledger",
+        "bridge_cash_solvency_watch": "bridge_cash_solvency_ledger",
+    }
+    mapped_option = option_map.get(option_id)
+    if mapped_option is None:
+        raise ValueError(f"Unsupported option {option_id} for independence cash-solvency watch.")
+    result = _apply_independence_cash_solvency_ledger(state, event, mapped_option)
+    return result.replace(
+        "independence cash-solvency ledger",
+        "independence cash-solvency watch",
+    ).replace(
+        "cash-solvency ledger",
+        "cash-solvency watch",
+    )
+
+
 def _apply_strategic_crossroads(state: GameState, event: PendingEvent, option_id: str) -> str:
     product = _get_target_product(state, event)
 
@@ -8865,6 +9007,7 @@ EVENT_EFFECT_HANDLERS = {
     "ipo_book_anchor_oversight": _apply_ipo_book_anchor_oversight,
     "ipo_book_anchor_council": _apply_ipo_book_anchor_council,
     "ipo_book_anchor_ledger": _apply_ipo_book_anchor_ledger,
+    "ipo_book_anchor_watch": _apply_ipo_book_anchor_watch,
     "acquirer_diligence": _apply_acquirer_diligence,
     "buyer_reference_check": _apply_buyer_reference_check,
     "buyer_channel_conflict_review": _apply_buyer_channel_conflict_review,
@@ -8890,6 +9033,7 @@ EVENT_EFFECT_HANDLERS = {
     "buyer_close_anchor_oversight": _apply_buyer_close_anchor_oversight,
     "buyer_close_anchor_council": _apply_buyer_close_anchor_council,
     "buyer_close_anchor_ledger": _apply_buyer_close_anchor_ledger,
+    "buyer_close_anchor_watch": _apply_buyer_close_anchor_watch,
     "independence_reckoning": _apply_independence_reckoning,
     "independence_cash_crunch": _apply_independence_cash_crunch,
     "independence_refinancing_wall": _apply_independence_refinancing_wall,
@@ -8915,6 +9059,7 @@ EVENT_EFFECT_HANDLERS = {
     "independence_cash_solvency_oversight": _apply_independence_cash_solvency_oversight,
     "independence_cash_solvency_council": _apply_independence_cash_solvency_council,
     "independence_cash_solvency_ledger": _apply_independence_cash_solvency_ledger,
+    "independence_cash_solvency_watch": _apply_independence_cash_solvency_watch,
     "enterprise_procurement_delay": _apply_enterprise_procurement_delay,
     "support_meltdown": _apply_support_meltdown,
     "board_reckoning": _apply_board_reckoning,
@@ -8942,6 +9087,7 @@ EVENT_EFFECT_HANDLERS = {
     "reseller_service_oversight": _apply_reseller_service_oversight,
     "reseller_service_council": _apply_reseller_service_council,
     "reseller_service_oversight_ledger": _apply_reseller_service_oversight_ledger,
+    "reseller_service_oversight_watch": _apply_reseller_service_oversight_watch,
     "integration_cutover_risk": _apply_integration_cutover_risk,
     "integration_cutover_board": _apply_integration_cutover_board,
     "integration_release_cutline": _apply_integration_release_cutline,
@@ -8962,6 +9108,7 @@ EVENT_EFFECT_HANDLERS = {
     "integration_cutover_oversight": _apply_integration_cutover_oversight,
     "integration_cutover_oversight_council": _apply_integration_cutover_oversight_council,
     "integration_cutover_oversight_ledger": _apply_integration_cutover_oversight_ledger,
+    "integration_cutover_oversight_watch": _apply_integration_cutover_oversight_watch,
     "marketplace_chargeback_wave": _apply_marketplace_chargeback_wave,
     "marketplace_dispute_program": _apply_marketplace_dispute_program,
     "marketplace_refund_charter": _apply_marketplace_refund_charter,
@@ -8982,6 +9129,7 @@ EVENT_EFFECT_HANDLERS = {
     "marketplace_refund_oversight": _apply_marketplace_refund_oversight,
     "marketplace_refund_oversight_council": _apply_marketplace_refund_oversight_council,
     "marketplace_refund_oversight_ledger": _apply_marketplace_refund_oversight_ledger,
+    "marketplace_refund_oversight_watch": _apply_marketplace_refund_oversight_watch,
     "board_recovery_window": _apply_board_recovery_window,
     "board_reset_showdown": _apply_board_reset_showdown,
     "board_reset_execution_plan": _apply_board_reset_execution_plan,
@@ -9004,6 +9152,7 @@ EVENT_EFFECT_HANDLERS = {
     "board_reset_operating_oversight": _apply_board_reset_operating_oversight,
     "board_reset_operating_council": _apply_board_reset_operating_council,
     "board_reset_operating_ledger": _apply_board_reset_operating_ledger,
+    "board_reset_operating_watch": _apply_board_reset_operating_watch,
     "capital_market_freeze": _apply_capital_market_freeze,
     "succession_gap": _apply_succession_gap,
     "strategic_crossroads": _apply_strategic_crossroads,

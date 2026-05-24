@@ -1361,6 +1361,117 @@ def apply_set_path_cash_waterfall(state: GameState) -> CapitalPlanSummary:
     )
 
 
+def apply_set_board_reset_contingency_buffer(state: GameState) -> CapitalPlanSummary:
+    """Force a tighter reserve-first board-reset control posture after the path waterfall."""
+
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state, readiness)
+    queue_exposure = calculate_support_queue_exposure(state)
+    portfolio = calculate_partnership_portfolio(state)
+    reserve_gap = state.capital_plan.reserve_target - state.company.cash_on_hand
+
+    if (
+        pressure.board_reset_risk < 68
+        and pressure.dominant_pressure != "board_reset_risk"
+        and state.finance.governance_risk < 54
+        and state.finance.board_pressure < 28
+        and state.finance.covenant_risk < 16
+        and reserve_gap <= Decimal("0.00")
+        and queue_exposure.hotspot_lane_overflow <= 4
+        and portfolio.hotspot_dependency_score
+        < BALANCE.finance_planner_reactivate_dependency_threshold + 6
+    ):
+        raise ValueError("There is not enough board-reset strain to justify a contingency buffer.")
+
+    waterfall_cost = quantize_money(
+        BALANCE.capital_plan_endgame_capital_map_cost
+        + BALANCE.capital_plan_path_capital_posture_cost
+        + BALANCE.capital_plan_growth_firebreak_cost
+    )
+    extra_cost = quantize_money(
+        BALANCE.capital_plan_growth_firebreak_cost + BALANCE.capital_plan_path_capital_posture_cost
+    )
+    total_cost = quantize_money(waterfall_cost + extra_cost)
+    if state.company.cash_on_hand < total_cost:
+        raise ValueError("Not enough cash to set a board-reset contingency buffer this turn.")
+
+    apply_set_path_cash_waterfall(state)
+    capital_plan = state.capital_plan
+    state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - extra_cost)
+    reserve_target = quantize_money(
+        capital_plan.reserve_target
+        + BALANCE.capital_plan_growth_firebreak_target_step
+        + BALANCE.capital_plan_path_capital_posture_target_step
+    )
+    planning_horizon_turns = min(12, capital_plan.planning_horizon_turns + 1)
+    product_share = max(0, capital_plan.product_investment_share - 1)
+    go_to_market_share = max(0, capital_plan.go_to_market_share - 2)
+    reserve_share = capital_plan.reserve_share + 3
+
+    if queue_exposure.hotspot_lane is SupportLaneFocus.ENTERPRISE:
+        product_share += 1
+        reserve_share += 1
+    elif queue_exposure.hotspot_lane is SupportLaneFocus.BILLING:
+        reserve_share += 2
+    elif queue_exposure.hotspot_lane is SupportLaneFocus.ONBOARDING:
+        reserve_share += 1
+        product_share += 1
+
+    if queue_exposure.hotspot_lane_overflow > 6:
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if queue_exposure.renewal_queue_risk_accounts > 1:
+        reserve_share += 1
+        go_to_market_share = max(0, go_to_market_share - 1)
+    if queue_exposure.white_glove_queue_risk_accounts > 0:
+        reserve_share += 1
+    if (
+        portfolio.hotspot_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold + 6
+        or portfolio.paused_dependency_score
+        >= BALANCE.finance_planner_reactivate_dependency_threshold + 4
+    ):
+        reserve_share += 2
+        go_to_market_share = max(0, go_to_market_share - 1)
+        product_share = max(0, product_share - 1)
+    if reserve_gap > Decimal("0.00") or state.finance.covenant_risk >= 16:
+        reserve_share += 1
+        product_share = max(0, product_share - 1)
+
+    product_share, go_to_market_share, reserve_share = _normalize_capital_shares(
+        product_share,
+        go_to_market_share,
+        reserve_share,
+    )
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.CONSERVE,
+        source_preference=CapitalSourcePreference.BOOTSTRAP,
+        planning_horizon_turns=planning_horizon_turns,
+        reserve_target=reserve_target,
+        product_investment_share=product_share,
+        go_to_market_share=go_to_market_share,
+        reserve_share=reserve_share,
+    )
+    state.finance.board_pressure = max(0, state.finance.board_pressure - 1)
+    state.finance.governance_risk = max(0, state.finance.governance_risk - 2)
+    state.finance.covenant_risk = max(0, state.finance.covenant_risk - 1)
+    state.finance.investor_pressure = max(0, state.finance.investor_pressure - 1)
+    state.finance.board_confidence = min(
+        100,
+        state.finance.board_confidence
+        + BALANCE.capital_plan_growth_firebreak_board_confidence_gain,
+    )
+    return CapitalPlanSummary(
+        message=(
+            "Set a board-reset contingency buffer. Reserve target "
+            f"{format_money(reserve_target)} over {planning_horizon_turns} turns. Allocation now "
+            f"P {product_share}% / GTM {go_to_market_share}% / Reserve {reserve_share}% with "
+            "bootstrap capital."
+        ),
+        capital_plan=state.capital_plan,
+    )
+
+
 def apply_set_exit_readiness_buffer(state: GameState) -> CapitalPlanSummary:
     """Build a tighter path-aware liquidity buffer before late-game pressure hardens."""
 

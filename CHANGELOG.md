@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.78.0 - 2026-05-25
+
+- Added account-targeted watch actions `run_enterprise_reference_watch`, `run_billing_renewal_watch`, `run_onboarding_go_live_watch`, and `run_white_glove_retention_watch` so late-game support recovery can focus on individual at-risk accounts instead of only broad lane programs
+- Added `set_board_reset_contingency_buffer` to push reserve-heavy board-reset posture changes deeper into endgame capital planning
+- Added watch-stage path events `ipo_book_anchor_watch`, `buyer_close_anchor_watch`, `independence_cash_solvency_watch`, and `board_reset_operating_watch` so all four endgame routes gain another concrete recovery-or-penalty branch
+- Added watch-stage channel events `reseller_service_oversight_watch`, `integration_cutover_oversight_watch`, and `marketplace_refund_oversight_watch` so reseller, integration, and marketplace pressure keeps diverging under deeper commercial strain
+- Expanded planner recommendations, action sequencing, dashboard surfacing, CLI wiring, and event handlers so the new watch-stage controls only surface once account heat, path fragility, and channel strain are materially present
+- Added regression coverage for the new actions and event handlers plus seeded long-run stability checks across IPO, acquisition, independence, and board-reset campaign starts
+- Promoted the package version to `0.78.0`
+
 ## 0.77.0 - 2026-05-24
 
 - Added `run_enterprise_lane_mesh`, `run_billing_lane_mesh`, `run_onboarding_lane_mesh`, `run_white_glove_lane_mesh`, and `set_path_cash_waterfall` so late-game recovery stops being another naming tier and becomes a broader account/lane and path-control loop
