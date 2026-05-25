@@ -101,6 +101,7 @@ from nexus_tech.simulation.team import (
     calculate_effective_productivity,
     calculate_team_condition,
 )
+from nexus_tech.simulation.turn_coach import build_turn_coach
 
 
 def render_intro(
@@ -1022,6 +1023,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
     """Render the main per-turn dashboard."""
 
     console.print(_build_turn_header_panel(state))
+    console.print(_build_turn_coach_panel(state))
     console.print(
         Columns(
             [
@@ -1179,6 +1181,7 @@ def render_report(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_report_overview_panel(state, run_score.total_score, run_score.score_tier),
+                _build_turn_coach_panel(state),
                 _build_report_score_panel(state),
                 _build_report_quarter_plan_panel(state),
                 _build_objective_panel(state),
@@ -1633,6 +1636,36 @@ def _build_turn_header_panel(state: GameState) -> Panel:
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
     return Panel.fit(body, title="Turn Control", border_style="blue")
+
+
+def _build_turn_coach_panel(state: GameState) -> Panel:
+    coach = build_turn_coach(state)
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("#", justify="right", style="bold cyan")
+    table.add_column("Command", style="bold green")
+    table.add_column("Source")
+    table.add_column("Why")
+    for recommendation in coach.recommendations:
+        table.add_row(
+            str(recommendation.rank),
+            recommendation.command,
+            recommendation.source,
+            recommendation.rationale,
+        )
+    footer = Table.grid(padding=(0, 1))
+    footer.add_row("Primary", coach.primary_command)
+    footer.add_row("Focus", coach.focus)
+    footer.add_row("Gate", coach.gate_command)
+    footer.add_row("Finance", coach.finance_command)
+    footer.add_row("Support", coach.support_command)
+    footer.add_row("Channel", coach.channel_command)
+    return Panel(
+        Group(table, footer),
+        title="Turn Coach",
+        subtitle=coach.summary,
+        border_style="bright_blue",
+        expand=True,
+    )
 
 
 def _build_company_panel(state: GameState) -> Panel:

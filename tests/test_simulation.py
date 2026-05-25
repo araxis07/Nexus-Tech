@@ -180,6 +180,7 @@ from nexus_tech.simulation.team import (
     calculate_trait_productivity,
     calculate_trait_salary,
 )
+from nexus_tech.simulation.turn_coach import build_turn_coach
 
 
 class FixedRandom:
@@ -12034,6 +12035,75 @@ def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None
     assert pressure.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert pressure.operating_durability in {"resilient", "stretched", "fragile"}
     assert pressure.restructure_heat >= pressure.board_reset_risk // 3
+
+
+def test_turn_coach_surfaces_ranked_commands_from_endgame_and_operating_pressure() -> None:
+    product = make_product(
+        "Coach Pressure Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=260,
+        quality=70,
+        market_fit=72,
+    )
+    account = CustomerAccount(
+        name="Coach Enterprise Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2400.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=50,
+        onboarding_health=46,
+        support_load=44,
+        open_tickets=18,
+        sla_breach_risk=76,
+        renewal_health=42,
+        expansion_potential=54,
+        renewal_turn=12,
+        churn_risk=46,
+        ticket_queue_age=4,
+        status=CustomerAccountStatus.ACTIVE,
+    )
+    partnership = PartnershipDeal(
+        name="Coach Marketplace",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.STRAINED,
+        quality=56,
+        risk=64,
+        conflict_pressure=66,
+        enablement_level=26,
+        sourced_revenue=Decimal("2600.00"),
+        rev_share_rate=Decimal("0.2600"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("4200.00"),
+        current_turn=15,
+    )
+    state.finance.board_resolution_due = True
+    state.finance.governance_risk = 64
+    state.finance.board_pressure = 28
+    state.support_program.backlog_queue = 20
+    state.support_program.escalation_queue = 6
+    pressure = calculate_endgame_pressure(state)
+
+    coach = build_turn_coach(state)
+    valid_commands = {action.value for action in TurnAction}
+
+    assert 2 <= len(coach.recommendations) <= 4
+    assert coach.primary_command in valid_commands
+    assert coach.gate_command == pressure.path_gate_command_alert
+    assert coach.gate_command in valid_commands
+    assert coach.finance_command in valid_commands
+    assert coach.support_command in valid_commands
+    assert coach.channel_command in valid_commands
+    assert {recommendation.rank for recommendation in coach.recommendations} == set(
+        range(1, len(coach.recommendations) + 1)
+    )
+    assert "endgame" in {recommendation.source for recommendation in coach.recommendations}
+    assert any(recommendation.urgency >= 70 for recommendation in coach.recommendations)
 
 
 def test_endgame_pressure_counts_queue_exposure_and_channel_recovery_drag() -> None:

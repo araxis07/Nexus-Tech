@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.83.0 - 2026-05-26
+
+- Added a Turn Coach mission board that ranks the next commands from endgame gates, finance planning, support queues, channel dependency, and board pressure
+- Surfaced the Turn Coach in the main dashboard and compact report so players can see the primary command plus ranked next actions without reading every deep panel
+- Added command-source and urgency metadata to each coach recommendation for clearer triage
+- Added regression coverage that the coach emits valid `TurnAction` commands and stays aligned with the endgame gate command alert
+- Promoted the package version to `0.83.0`
+
 ## 0.82.0 - 2026-05-25
 
 - Added concrete `TurnAction` command ids for every IPO, M&A, independence, and board-reset gate action
