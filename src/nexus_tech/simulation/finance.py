@@ -617,6 +617,11 @@ def build_finance_planner(
         path_pressure_bias = (
             "buyer diligence will discount revenue that still looks concentrated or unstable."
         )
+    elif strategic_outlook == "board_reset" or dominant_endgame_pressure == "board_reset_risk":
+        path_pressure_bias = (
+            "board-reset recovery now depends on visible reserve control, governance relief, "
+            "and a clean hotspot lane."
+        )
     else:
         path_pressure_bias = (
             "independence only holds if reserves, renewals, and debt discipline stay coherent."
@@ -644,7 +649,11 @@ def build_finance_planner(
     else:
         capital_rebalance_note = "the current capital split is still workable with active review."
 
-    if reserve_break_risk in {"critical", "high"}:
+    if dominant_endgame_pressure == "board_reset_risk" and (
+        finance.board_resolution_due or finance.governance_risk >= 58 or capital_fragility >= 70
+    ):
+        capital_priority = "stabilize board reset controls"
+    elif reserve_break_risk in {"critical", "high"}:
         capital_priority = "protect reserve first"
     elif revenue_at_risk_value > renewal_pressure_value and revenue_at_risk_value > ZERO_MONEY:
         capital_priority = "stabilize service revenue"
@@ -669,7 +678,14 @@ def build_finance_planner(
         - (finance.investor_pressure // 2)
         - commercial_risk_score
     )
-    if capital_discipline_index >= 72 and reserve_break_risk in {"controlled", "elevated"}:
+    if (
+        dominant_endgame_pressure == "board_reset_risk"
+        and capital_plan.mode.value == "conserve"
+        and capital_plan.reserve_share >= 34
+        and finance.governance_risk <= 60
+    ):
+        funding_resilience = "funding resilience depends on reset controls"
+    elif capital_discipline_index >= 72 and reserve_break_risk in {"controlled", "elevated"}:
         funding_resilience = "funding resilience is durable"
     elif capital_discipline_index >= 48:
         funding_resilience = "funding resilience is workable but exposed"

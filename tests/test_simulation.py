@@ -4099,6 +4099,53 @@ def test_support_program_recovery_loop_restores_healthy_accounts() -> None:
     assert state.customer_accounts[0].churn_risk < 12
 
 
+def test_support_program_focused_followup_carries_lane_relief() -> None:
+    product = make_product("Billing Followup Core", quality=66, bug_level=12, market_fit=64)
+    account = CustomerAccount(
+        name="Billing Followup Anchor",
+        product_id=product.id,
+        segment=MarketSegment.SMB,
+        contract_value=Decimal("1250.00"),
+        contract_cadence=ContractCadence.MONTHLY,
+        satisfaction=54,
+        onboarding_health=58,
+        support_load=24,
+        open_tickets=4,
+        sla_breach_risk=24,
+        invoice_risk=78,
+        failed_payment_risk=72,
+        dunning_steps=2,
+        renewal_health=46,
+        expansion_potential=50,
+        renewal_turn=5,
+        churn_risk=38,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("9000.00"))
+    state.support_program = SupportProgram(
+        knowledge_base_level=18,
+        automation_level=16,
+        backlog_queue=5,
+        escalation_queue=2,
+        lane_focus=SupportLaneFocus.BILLING,
+    )
+    original_open_tickets = account.open_tickets
+    original_invoice_risk = account.invoice_risk
+    original_failed_payment_risk = account.failed_payment_risk
+    original_renewal_health = account.renewal_health
+    original_churn_risk = account.churn_risk
+
+    summary = apply_end_of_turn_support_program(state)
+    updated_account = state.customer_accounts[0]
+
+    assert summary.focused_followup_accounts == 1
+    assert updated_account.open_tickets < original_open_tickets
+    assert updated_account.invoice_risk < original_invoice_risk
+    assert updated_account.failed_payment_risk < original_failed_payment_risk
+    assert updated_account.renewal_health > original_renewal_health
+    assert updated_account.churn_risk < original_churn_risk
+
+
 def test_set_support_lane_focus_updates_program_bias() -> None:
     product = make_product("White Glove")
     account = CustomerAccount(
@@ -8226,6 +8273,7 @@ def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
     assert evaluation.board_readout
     assert evaluation.pressure_readout
     assert len(evaluation.path_scorecard) == 4
+    assert len(evaluation.path_outcome_gates) == 4
     assert evaluation.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert evaluation.next_chapter
     assert evaluation.outcome in {
@@ -8462,6 +8510,37 @@ def test_finance_planner_flags_commercial_financing_risk_and_actions() -> None:
         "funding resilience is workable but exposed",
         "funding resilience is fragile",
     }
+
+
+def test_finance_planner_prioritizes_board_reset_controls() -> None:
+    state = make_state(
+        make_product("Reset Planner Core"),
+        cash_on_hand=Decimal("7200.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.CONSERVE,
+            source_preference=CapitalSourcePreference.DEBT,
+            reserve_target=Decimal("6200.00"),
+            product_investment_share=32,
+            go_to_market_share=28,
+            reserve_share=40,
+        ),
+    )
+    state.finance.board_resolution_due = True
+    state.finance.governance_risk = 56
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-360.00"),
+        capital_plan=state.capital_plan,
+        strategic_outlook="board_reset",
+        dominant_endgame_pressure="board_reset_risk",
+        capital_fragility=72,
+    )
+
+    assert planner.capital_priority == "stabilize board reset controls"
+    assert planner.funding_resilience == "funding resilience depends on reset controls"
+    assert "board-reset recovery" in planner.path_pressure_bias
 
 
 def test_finance_planner_flags_onboarding_recovery_for_hotspot_lane() -> None:
@@ -11939,7 +12018,9 @@ def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None
     assert pressure.capital_fragility > 0
     assert pressure.board_reset_risk > 0
     assert len(pressure.path_scorecard) == 4
+    assert len(pressure.path_outcome_gates) == 4
     assert len(pressure.path_watchlist) == 4
+    assert any("gate blocked" in gate for gate in pressure.path_outcome_gates)
     assert pressure.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert pressure.operating_durability in {"resilient", "stretched", "fragile"}
     assert pressure.restructure_heat >= pressure.board_reset_risk // 3
@@ -18644,6 +18725,8 @@ def test_partnership_portfolio_summary_surfaces_status_mix() -> None:
     assert summary.commercial_dependency_score >= 0
     assert summary.hotspot_channel in {"reseller", "marketplace"}
     assert summary.channel_mix_note
+    assert "failure mode" in summary.channel_failure_mode
+    assert "Prioritize" in summary.channel_recovery_priority
 
 
 def test_partnership_portfolio_summary_tracks_dependency_and_renegotiation_risk() -> None:

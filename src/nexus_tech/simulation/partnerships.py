@@ -80,6 +80,8 @@ class PartnershipPortfolioSummary:
     hotspot_revenue_share_percent: int
     hotspot_channel: str
     hotspot_dependency_score: int
+    channel_failure_mode: str
+    channel_recovery_priority: str
     hotspot_status_note: str
     channel_mix_note: str
     summary: str
@@ -3962,6 +3964,8 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
             hotspot_revenue_share_percent=0,
             hotspot_channel="-",
             hotspot_dependency_score=0,
+            channel_failure_mode="No active channel failure mode yet.",
+            channel_recovery_priority="Hold channel discovery until partner revenue exists.",
             hotspot_status_note="No hotspot channel yet.",
             channel_mix_note="No active channel portfolio yet.",
             summary="No active channel portfolio yet.",
@@ -4262,10 +4266,34 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         channel_mix_note = (
             "Marketplace exposure is the sharpest source of current channel friction."
         )
+        channel_failure_mode = (
+            "Marketplace failure mode: refunds, policy friction, and payment disputes convert "
+            "quickly into renewal and reputation pressure."
+        )
+        channel_recovery_priority = (
+            "Prioritize chargeback resets, refund controls, and policy appeals before adding "
+            "more marketplace volume."
+        )
     elif hotspot_channel == "integration":
         channel_mix_note = "Integration commitments are the main source of channel execution drag."
+        channel_failure_mode = (
+            "Integration failure mode: cutover reliability and implementation drag become buyer "
+            "diligence issues before revenue concentration is obvious."
+        )
+        channel_recovery_priority = (
+            "Prioritize cutover resets, reliability bridges, and hypercare before treating "
+            "integration revenue as durable."
+        )
     else:
         channel_mix_note = "Reseller overlap is now the main commercial pressure inside channels."
+        channel_failure_mode = (
+            "Reseller failure mode: margin creep, enablement gaps, and direct-sales conflict "
+            "turn distribution into governance pressure."
+        )
+        channel_recovery_priority = (
+            "Prioritize enablement resets, margin reviews, and conflict resets before expanding "
+            "reseller coverage."
+        )
     if commercial_dependency_score >= 70:
         summary = (
             "Channel economics are now concentrated enough to threaten the whole go-to-market mix."
@@ -4323,6 +4351,8 @@ def calculate_partnership_portfolio(state: GameState) -> PartnershipPortfolioSum
         hotspot_revenue_share_percent=hotspot_revenue_share_percent,
         hotspot_channel=hotspot_channel,
         hotspot_dependency_score=hotspot_dependency_score,
+        channel_failure_mode=channel_failure_mode,
+        channel_recovery_priority=channel_recovery_priority,
         hotspot_status_note=hotspot_status_note,
         channel_mix_note=channel_mix_note,
         summary=summary,

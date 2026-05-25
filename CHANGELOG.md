@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.80.0 - 2026-05-25
+
+- Added path outcome gates to endgame pressure, exit evaluation, dashboard panels, and late-game readouts so IPO, M&A, independence, and board-reset routes show open/blocked status directly
+- Added focused support-lane follow-up carryover so enterprise, billing, and onboarding lane focus keeps relieving matching account pressure between explicit recovery actions
+- Added channel failure-mode and recovery-priority identity to partnership portfolio summaries and dashboard channel readouts
+- Sharpened finance planning under board-reset pressure so reset runs prioritize board control stabilization and reserve/governance resilience signals
+- Added regression coverage for outcome gates, focused support follow-up, channel failure identity, and board-reset finance priority
+- Promoted the package version to `0.80.0`
+
 ## 0.79.0 - 2026-05-25
 
 - Deepened the four late-game watch actions so they now promote recovered accounts back to `ACTIVE` when their metrics genuinely stabilize instead of only lowering raw pressure numbers

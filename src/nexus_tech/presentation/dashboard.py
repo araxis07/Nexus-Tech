@@ -1389,6 +1389,7 @@ def render_victory(console: Console, state: GameState) -> None:
         ),
     )
     content.add_row("Pressure Note", pressure.summary)
+    content.add_row("Outcome Gates", " | ".join(pressure.path_outcome_gates[:2]))
     content.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     if state.exit_outcome is not None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
@@ -1399,6 +1400,7 @@ def render_victory(console: Console, state: GameState) -> None:
         content.add_row("Board Readout", exit_evaluation.board_readout)
         content.add_row("Pressure Readout", exit_evaluation.pressure_readout)
         content.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
+        content.add_row("Outcome Gates", " | ".join(exit_evaluation.path_outcome_gates[:2]))
         content.add_row("Next Chapter", exit_evaluation.next_chapter)
         content.add_row("Exit Summary", state.exit_summary or exit_evaluation.summary)
     content.add_row("Portfolio Users", str(run_score.total_users))
@@ -3451,6 +3453,7 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Board Readout", exit_evaluation.board_readout)
     table.add_row("Pressure Readout", exit_evaluation.pressure_readout)
     table.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
+    table.add_row("Outcome Gates", " | ".join(exit_evaluation.path_outcome_gates[:2]))
     table.add_row("Durability", pressure.operating_durability)
     table.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     table.add_row("Next Chapter", exit_evaluation.next_chapter)
@@ -3827,6 +3830,7 @@ def _build_late_game_panel(state: GameState) -> Panel:
     table.add_row("Durability", pressure.operating_durability)
     table.add_row("Path Gap", str(pressure.path_gap))
     table.add_row("Scorecard", " | ".join(pressure.path_scorecard[:2]))
+    table.add_row("Outcome Gates", " | ".join(pressure.path_outcome_gates[:2]))
     table.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
     table.add_row("State", late_game.summary)
@@ -4087,6 +4091,8 @@ def _build_partnership_panel(state: GameState, *, compact: bool = True) -> Panel
         table.add_row("Comm Dependency", str(portfolio.commercial_dependency_score))
         table.add_row("Hotspot Note", portfolio.hotspot_status_note)
         table.add_row("Mix Note", portfolio.channel_mix_note)
+        table.add_row("Failure Mode", portfolio.channel_failure_mode)
+        table.add_row("Recovery Priority", portfolio.channel_recovery_priority)
         table.add_row("Health", portfolio.summary)
         return Panel(table, title="Partnerships", border_style="magenta", expand=True)
 

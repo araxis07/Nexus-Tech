@@ -70,6 +70,7 @@ class SupportProgramSummary:
     dominant_lane: SupportLaneFocus
     focus_mismatch_penalty: int
     lane_overflow_pressure: int
+    focused_followup_accounts: int
     service_cost: Decimal
     reputation_delta: int
     morale_penalty: int
@@ -701,6 +702,10 @@ def apply_end_of_turn_support_program(
                 sla_target=state.support_program.sla_target,
             )
         )
+    focused_followup_accounts = _apply_focused_lane_followup(state, active_accounts)
+    onboarding_ticket_pressure = state.support_program.onboarding_ticket_pressure
+    enterprise_ticket_pressure = state.support_program.enterprise_ticket_pressure
+    billing_ticket_pressure = state.support_program.billing_ticket_pressure
     queue_exposure = calculate_support_queue_exposure(state)
     service_tier_pressure = (
         priority_breach_accounts
@@ -779,6 +784,11 @@ def apply_end_of_turn_support_program(
         )
     elif dominant_lane is SupportLaneFocus.BILLING:
         summary = "Support is stable, but billing queues are now the main post-sale pressure."
+    elif focused_followup_accounts > 0:
+        summary = (
+            f"{state.support_program.lane_focus.value} follow-up is carrying over across "
+            f"{focused_followup_accounts} account(s)."
+        )
     elif recovery_ready_accounts > 0 and support_recovery_window:
         summary = (
             f"Support recovery is rebuilding trust across {recovery_ready_accounts} account(s)."
@@ -844,6 +854,7 @@ def apply_end_of_turn_support_program(
         dominant_lane=dominant_lane,
         focus_mismatch_penalty=focus_mismatch_penalty,
         lane_overflow_pressure=lane_overflow_pressure,
+        focused_followup_accounts=focused_followup_accounts,
         service_cost=service_cost,
         reputation_delta=reputation_delta,
         morale_penalty=morale_penalty,
@@ -10859,6 +10870,53 @@ def _apply_lane_program_relief(
             support_program.billing_ticket_pressure - relief,
         )
     support_program.backlog_queue = max(0, support_program.backlog_queue - max(1, relief // 2))
+
+
+def _apply_focused_lane_followup(
+    state: GameState,
+    active_accounts: list[CustomerAccount],
+) -> int:
+    focus = state.support_program.lane_focus
+    if focus is SupportLaneFocus.BALANCED:
+        return 0
+    candidates = [
+        account
+        for account in sorted(
+            active_accounts,
+            key=_calculate_account_support_severity,
+            reverse=True,
+        )
+        if classify_account_support_lane(account) is focus
+        and (
+            account.open_tickets > 0
+            or account.sla_breach_risk > 0
+            or account.ticket_queue_age > 0
+            or account.support_load > 18
+            or account.status is CustomerAccountStatus.AT_RISK
+        )
+    ]
+    followup_count = 0
+    for account in candidates[:3]:
+        followup_count += 1
+        account.open_tickets = max(0, account.open_tickets - 1)
+        account.sla_breach_risk = clamp_int(account.sla_breach_risk - 2)
+        account.ticket_queue_age = max(0, account.ticket_queue_age - 1)
+        account.support_load = clamp_int(account.support_load - 1)
+        account.renewal_health = clamp_int(account.renewal_health + 1)
+        account.satisfaction = clamp_int(account.satisfaction + 1)
+        account.churn_risk = clamp_int(account.churn_risk - 1)
+        if focus is SupportLaneFocus.BILLING:
+            account.invoice_risk = clamp_int(account.invoice_risk - 2)
+            account.failed_payment_risk = clamp_int(account.failed_payment_risk - 2)
+            account.dunning_steps = max(0, account.dunning_steps - 1)
+        elif focus is SupportLaneFocus.ONBOARDING:
+            account.onboarding_health = clamp_int(account.onboarding_health + 2)
+        elif focus is SupportLaneFocus.ENTERPRISE:
+            account.expansion_potential = clamp_int(account.expansion_potential + 1)
+        _promote_recovered_account_status(account)
+    if followup_count > 0:
+        _apply_lane_program_relief(state.support_program, focus, max(1, followup_count))
+    return followup_count
 
 
 def _promote_recovered_account_status(account: CustomerAccount) -> None:

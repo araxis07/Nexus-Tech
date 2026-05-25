@@ -46,6 +46,7 @@ class EndgamePressureSummary:
     dominant_pressure: str
     active_pressures: tuple[str, ...]
     path_scorecard: tuple[str, ...]
+    path_outcome_gates: tuple[str, ...]
     path_watchlist: tuple[str, ...]
     path_gap: int
     strategic_clarity: str
@@ -67,6 +68,7 @@ class ExitEvaluation:
     board_readout: str
     pressure_readout: str
     path_scorecard: tuple[str, ...]
+    path_outcome_gates: tuple[str, ...]
     strategic_clarity: str
     next_chapter: str
     outcome_tags: tuple[str, ...]
@@ -587,6 +589,54 @@ def calculate_endgame_pressure(
             f"{'resolution due' if state.finance.board_resolution_due else 'resolution buffered'}"
         ),
     )
+    path_outcome_gates = (
+        (
+            "IPO gate open: governance and enterprise reliability can carry scrutiny."
+            if (
+                state.finance.governance_risk <= BALANCE.exit_ipo_governance_risk_cap
+                and support_fragility <= 40
+                and queue_exposure.enterprise_queue_risk_accounts <= 2
+            )
+            else (
+                "IPO gate blocked: governance, support fragility, or enterprise queue risk is "
+                "too visible."
+            )
+        ),
+        (
+            "M&A gate open: channel dependency and diligence risk are still explainable."
+            if (
+                channel_fragility <= 52
+                and portfolio.hotspot_dependency_score < 80
+                and portfolio.paused_dependency_score < 70
+            )
+            else "M&A gate blocked: channel dependency or paused revenue would discount the deal."
+        ),
+        (
+            "Independence gate open: reserves, covenant heat, and billing pressure are coherent."
+            if (
+                capital_fragility <= 48
+                and state.finance.covenant_risk <= 18
+                and queue_exposure.renewal_queue_risk_accounts <= 2
+            )
+            else "Independence gate blocked: reserve, covenant, or renewal pressure is too exposed."
+        ),
+        (
+            (
+                "Reset gate open: reserve posture and governance controls are credible enough "
+                "to recover."
+            )
+            if (
+                state.capital_plan.mode is CapitalPlanMode.CONSERVE
+                and state.capital_plan.reserve_share >= 34
+                and not state.finance.board_resolution_due
+                and state.finance.governance_risk <= 62
+            )
+            else (
+                "Reset gate blocked: board resolution, reserves, or governance heat still need "
+                "containment."
+            )
+        ),
+    )
     return EndgamePressureSummary(
         public_market_scrutiny=public_market_scrutiny,
         acquirer_diligence=acquirer_diligence,
@@ -598,6 +648,7 @@ def calculate_endgame_pressure(
         dominant_pressure=dominant_pressure,
         active_pressures=active_pressures,
         path_scorecard=path_scorecard,
+        path_outcome_gates=path_outcome_gates,
         path_watchlist=path_watchlist,
         path_gap=path_gap,
         strategic_clarity=strategic_clarity,
@@ -730,6 +781,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            path_outcome_gates=pressure.path_outcome_gates,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -829,6 +881,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            path_outcome_gates=pressure.path_outcome_gates,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -921,6 +974,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            path_outcome_gates=pressure.path_outcome_gates,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -1028,6 +1082,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             board_readout=board_readout,
             pressure_readout=pressure_readout,
             path_scorecard=pressure.path_scorecard,
+            path_outcome_gates=pressure.path_outcome_gates,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -1056,6 +1111,7 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         ),
         pressure_readout=pressure_readout,
         path_scorecard=pressure.path_scorecard,
+        path_outcome_gates=pressure.path_outcome_gates,
         strategic_clarity=pressure.strategic_clarity,
         next_chapter="Reset the operating plan before chasing another scale phase.",
         outcome_tags=("restructure", "fragile", "reset"),
