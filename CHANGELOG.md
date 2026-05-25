@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.84.0 - 2026-05-26
+
+- Added a guided opening checklist that adapts the first 6 turns around hiring, assignment, product stabilization, reporting, and first control reviews
+- Expanded Turn Coach into a short mission board with action windows and explicit "if skipped" consequences for each ranked command
+- Added a Risk Forecast panel to the dashboard and report so the next-turn failure modes and mitigations are visible without reading every subsystem
+- Expanded the tutorial and quick guide around Turn Coach, Risk Forecast, and the safer early-turn control loop
+- Upgraded Markdown balance reports with a tuning-priority summary so balance sweeps point to the highest-signal scenario and difficulty cells faster
+- Added regression coverage for guided opening progression, risk forecast command validity, Turn Coach timing metadata, and balance report priorities
+- Promoted the package version to `0.84.0`
+
 ## 0.83.0 - 2026-05-26
 
 - Added a Turn Coach mission board that ranks the next commands from endgame gates, finance planning, support queues, channel dependency, and board pressure

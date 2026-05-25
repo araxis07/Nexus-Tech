@@ -482,6 +482,24 @@ def format_balance_report_markdown(
                 f"{finding.shutdowns} |"
             )
 
+    lines.extend(["", "## Tuning Priorities", ""])
+    if not audit.findings:
+        lines.append(
+            "- No audit hotspots were detected. Re-run this report after changing events, "
+            "constants, or scenario content."
+        )
+    else:
+        critical_count = sum(1 for finding in audit.findings if finding.severity == "critical")
+        high_count = sum(1 for finding in audit.findings if finding.severity == "high")
+        lines.append(f"- Critical findings: `{critical_count}`")
+        lines.append(f"- High findings: `{high_count}`")
+        lines.append("- Highest-signal cells to retest next:")
+        for finding in audit.findings[:3]:
+            lines.append(
+                f"  - `{finding.scenario_id}` on `{finding.difficulty_mode.value}`: "
+                f"{finding.summary}"
+            )
+
     lines.extend(
         [
             "",

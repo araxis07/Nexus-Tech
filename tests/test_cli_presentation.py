@@ -792,6 +792,7 @@ def test_balance_report_command_writes_markdown_file(
     assert result.exit_code == 0
     assert "Balance Report" in result.output
     assert output_path.read_text(encoding="utf-8").startswith("# NEXUS TECH Balance Report")
+    assert "Tuning Priorities" in output_path.read_text(encoding="utf-8")
 
 
 def test_version_option_prints_installed_version() -> None:
@@ -814,6 +815,7 @@ def test_tutorial_command_renders_first_run_path() -> None:
     assert result.exit_code == 0
     assert "First Run Tutorial" in result.output
     assert "new-game" in result.output
+    assert "Risk Forecast" in result.output
 
 
 def test_glossary_command_renders_core_stat_help() -> None:
@@ -1187,6 +1189,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Market Watch" in output
     assert "Late-Game" in output
     assert "Finance" in output
+    assert "Risk Forecast" in output
     assert "Board / Governance" in output
     assert "Key Accounts" in output
     assert "Strategy" in output
@@ -1194,6 +1197,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Roadmap" in output
     assert "Segment" in output
     assert "Onboarding" in output
+    assert "Guided Opening" in output
     assert "Trade-off" in output
 
 
@@ -1221,6 +1225,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
 
     assert "Run Overview" in output
     assert "Scorecard" in output
+    assert "Risk Forecast" in output
     assert "Turn History" in output
     assert "Quarter Plan" in output
     assert "Finance" in output
@@ -1356,6 +1361,7 @@ def test_quick_guide_rendering_contains_opening_flow() -> None:
 
     assert "Quick Guide" in output
     assert "Opening flow" in output
+    assert "Risk Forecast" in output
 
 
 def test_tutorial_rendering_contains_safe_first_actions() -> None:
@@ -1367,6 +1373,7 @@ def test_tutorial_rendering_contains_safe_first_actions() -> None:
     assert "First Run Tutorial" in output
     assert "hire_employee" in output
     assert "End the turn" in output
+    assert "Watch For" in output
 
 
 def test_glossary_rendering_contains_decision_terms() -> None:

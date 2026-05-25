@@ -249,6 +249,9 @@ Each turn represents a business interval. You review the company, choose actions
 - Rich-powered dashboard panels, tables, summaries, and event notifications
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
+- Guided Opening now adapts the first 6 turns into a live checklist instead of leaving onboarding as static text only
+- Turn Coach now includes action windows and skip-consequence notes so the next 2-3 turns are easier to sequence
+- Risk Forecast now surfaces the next-turn failure modes and mitigation commands directly in the dashboard and report
 - Finance and support panels now surface forecast scenarios, staffing capacity, and staffing gaps for faster live decision-making
 - Partnership and archive panels now surface portfolio health, dominant channel, archive benchmarks, and campaign-ladder progress for cleaner late-game demos
 - Progression and archive tools now surface unlock ids, missing endgame paths, and dominant archive outcomes for faster late-game review
@@ -260,7 +263,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Deterministic `balance-matrix` runs to compare the same scenarios across every difficulty profile
 - Deterministic `balance-audit` runs to flag rough scenario/difficulty combinations for tuning
 - Deterministic `export-balance-csv` output for external review of scenario and difficulty balance
-- Deterministic `balance-report` output for Markdown tuning reports that combine matrix and audit data
+- Deterministic `balance-report` output for Markdown tuning reports that combine matrix, audit data, and top tuning priorities
 - Built-in `glossary` command to explain core stats, pressure systems, and decision families
 - Built-in `validate-content` command to check catalog references and event handler wiring before release
 - Report now includes recent events, funding history, and milestone history
@@ -516,12 +519,12 @@ uv run nexus-tech delete-save --slot archive --yes
 
 The core loop is simple:
 
-1. Review the dashboard for company health, products, team status, and recent events.
+1. Review Turn Coach, Risk Forecast, and the dashboard before spending actions.
 2. Spend action points on product or team decisions.
 3. End the turn to resolve revenue, costs, growth, churn, burnout, and event outcomes.
 4. Save locally and continue the run later if needed.
 
-If you are new to the game, run `nexus-tech guide` or use the in-session guide utility to get a compact opening checklist.
+If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to get a compact opening checklist.
 
 Typical decisions include:
 

@@ -72,6 +72,7 @@ from nexus_tech.simulation.meta_progression import (
     build_archive_comparison,
 )
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
+from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.partnerships import (
     calculate_partnership_fatigue,
@@ -79,6 +80,7 @@ from nexus_tech.simulation.partnerships import (
 )
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
 from nexus_tech.simulation.reporting import calculate_run_badges, calculate_run_score
+from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.roadmap import (
     get_effective_roadmap_focus,
     get_roadmap_turns_remaining,
@@ -655,9 +657,9 @@ def render_quick_guide(console: Console) -> None:
 
     content = Group(
         "[bold]Opening flow[/bold]",
-        "1. Review the flagship product and current runway.",
-        "2. Spend early actions on quality, marketing, or one key hire.",
-        "3. End the turn and watch revenue, churn, burnout, and rival pressure.",
+        "1. Use Guided Opening and Turn Coach to line up the first 2 actions.",
+        "2. Fix product health before you buy growth, then end the turn.",
+        "3. Read Risk Forecast and the report before adding more spend or headcount.",
         "",
         "[bold]Useful commands[/bold]",
         (
@@ -667,8 +669,8 @@ def render_quick_guide(console: Console) -> None:
         "",
         "[bold]Strong first turns[/bold]",
         (
-            "Protect quality before bugs compound, keep cash above runway risk, "
-            "and avoid over-hiring before the first clear growth signal."
+            "Protect quality before bugs compound, keep runway visible in Finance and Risk "
+            "Forecast, and avoid over-hiring before the first clean growth signal."
         ),
     )
     console.print(Panel(content, title="Quick Guide", border_style="blue", expand=True))
@@ -681,35 +683,48 @@ def render_tutorial(console: Console) -> None:
     table.add_column("Step", justify="right", style="bold cyan")
     table.add_column("Player Action", style="bold")
     table.add_column("Why It Matters")
+    table.add_column("Watch For")
     table.add_row(
         "1",
         "Run `nexus-tech new-game --scenario founder_journey --seed 7`.",
         "Starts a repeatable demo with the default founder scenario.",
+        "Use Guided Opening as the in-run checklist.",
     )
     table.add_row(
         "2",
-        "Review Company Overview, Product Portfolio, Finance, and Market Watch.",
-        "These panels show runway, product health, pressure, and growth context.",
+        "Review Turn Coach, Risk Forecast, Company Overview, and Finance.",
+        "These panels tell you what to do next and what can fail next.",
+        "Primary command, top risk, and runway.",
     )
     table.add_row(
         "3",
         "Use `hire_employee`, then assign that employee to the flagship product.",
         "A small team improves execution, but salary burn now matters.",
+        "Do not leave the first hire unassigned.",
     )
     table.add_row(
         "4",
         "Choose either `improve_quality` or `market_product`.",
         "Quality protects retention; marketing is better once product health is stable.",
+        "If bugs are high, quality wins first.",
     )
     table.add_row(
         "5",
         "End the turn and read the Turn Summary.",
         "Revenue, operating cost, churn, growth, events, and team pressure resolve here.",
+        "Board pressure, churn, and support load.",
     )
     table.add_row(
         "6",
-        "Use `view_report`, `review_customers`, and `save_game` after a few turns.",
-        "Reports explain score and risk; saves prove the run can be resumed.",
+        "Use `view_report` and `review_finance` before the second hire or bigger spend.",
+        "Reports explain score and risk; finance confirms the runway behind your next move.",
+        "Reserve risk, conservative runway, and board confidence.",
+    )
+    table.add_row(
+        "7",
+        "Only then branch into `review_customers`, partnerships, or deeper board actions.",
+        "Expansion is safer once the first loop is stable and readable.",
+        "Support hotspot lane and channel dependency.",
     )
 
     console.print(
@@ -1024,6 +1039,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
 
     console.print(_build_turn_header_panel(state))
     console.print(_build_turn_coach_panel(state))
+    console.print(_build_risk_forecast_panel(state))
     console.print(
         Columns(
             [
@@ -1182,6 +1198,7 @@ def render_report(console: Console, state: GameState) -> None:
             [
                 _build_report_overview_panel(state, run_score.total_score, run_score.score_tier),
                 _build_turn_coach_panel(state),
+                _build_risk_forecast_panel(state),
                 _build_report_score_panel(state),
                 _build_report_quarter_plan_panel(state),
                 _build_objective_panel(state),
@@ -1644,17 +1661,23 @@ def _build_turn_coach_panel(state: GameState) -> Panel:
     table.add_column("#", justify="right", style="bold cyan")
     table.add_column("Command", style="bold green")
     table.add_column("Source")
+    table.add_column("ETA")
     table.add_column("Why")
+    table.add_column("If Skipped")
     for recommendation in coach.recommendations:
         table.add_row(
             str(recommendation.rank),
             recommendation.command,
             recommendation.source,
+            f"{recommendation.horizon_turns}t",
             recommendation.rationale,
+            recommendation.consequence,
         )
     footer = Table.grid(padding=(0, 1))
     footer.add_row("Primary", coach.primary_command)
     footer.add_row("Focus", coach.focus)
+    footer.add_row("Window", coach.mission_window)
+    footer.add_row("Opening", coach.opening_command)
     footer.add_row("Gate", coach.gate_command)
     footer.add_row("Finance", coach.finance_command)
     footer.add_row("Support", coach.support_command)
@@ -1664,6 +1687,47 @@ def _build_turn_coach_panel(state: GameState) -> Panel:
         title="Turn Coach",
         subtitle=coach.summary,
         border_style="bright_blue",
+        expand=True,
+    )
+
+
+def _build_risk_forecast_panel(state: GameState) -> Panel:
+    forecast = build_risk_forecast(state)
+    if not forecast.items:
+        return Panel(
+            "No near-term operating risk is flashing right now.",
+            title="Risk Forecast",
+            border_style="red",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("#", justify="right", style="bold cyan")
+    table.add_column("Area", style="bold")
+    table.add_column("Severity")
+    table.add_column("ETA")
+    table.add_column("Mitigation", style="bold green")
+    table.add_column("Why")
+    table.add_column("If Ignored")
+    for item in forecast.items:
+        table.add_row(
+            str(item.rank),
+            item.area,
+            item.severity,
+            f"{item.horizon_turns}t",
+            item.command,
+            item.summary,
+            item.consequence,
+        )
+
+    footer = Table.grid(padding=(0, 1))
+    footer.add_row("Top Move", forecast.top_command)
+    footer.add_row("Risk Level", forecast.overall_risk)
+    return Panel(
+        Group(table, footer),
+        title="Risk Forecast",
+        subtitle=forecast.headline,
+        border_style="red",
         expand=True,
     )
 
@@ -3210,40 +3274,31 @@ def _build_event_notification_panel(state: GameState) -> Panel:
 
 
 def _build_onboarding_panel(state: GameState) -> Panel | None:
-    if state.company.current_turn > 3 and state.turn_history:
+    opening = build_guided_opening(state)
+    if not opening.active:
         return None
 
-    suggestions: list[str] = []
-    if not state.employees:
-        suggestions.append("Use [bold]18[/bold] to hire the first team member once runway is safe.")
-    elif any(employee.assigned_product_id is None for employee in state.employees):
-        suggestions.append(
-            "Use [bold]20[/bold] to assign unallocated teammates to the product that matters most."
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Step", justify="right", style="bold cyan")
+    table.add_column("Status")
+    table.add_column("Window")
+    table.add_column("Command", style="bold green")
+    table.add_column("Why")
+    for step in opening.steps:
+        table.add_row(
+            str(step.rank),
+            step.status,
+            step.turn_window,
+            step.command,
+            step.rationale,
         )
-    else:
-        suggestions.append(
-            "Keep assignments focused. Too much portfolio spread will dilute throughput."
-        )
-
-    if any(product.bug_level >= 25 for product in state.products if product.is_active):
-        suggestions.append(
-            "Use [bold]2[/bold] or [bold]4[/bold] before bugs start dragging growth down."
-        )
-    else:
-        suggestions.append(
-            "Use [bold]2[/bold] to raise quality or [bold]5[/bold] "
-            "to buy demand on the flagship product."
-        )
-
-    if state.company.current_turn == 1:
-        suggestions.append("Use [bold]60[/bold] any time if you want the compact guide again.")
-    if state.company.current_turn >= 2:
-        suggestions.append(
-            "Check [bold]40[/bold] after a turn resolves to read the run report and rival pressure."
-        )
-
-    body = "\n".join(f"- {line}" for line in suggestions)
-    return Panel(body, title="Onboarding", border_style="blue", expand=True)
+    return Panel(
+        table,
+        title="Onboarding / Guided Opening",
+        subtitle=opening.summary,
+        border_style="blue",
+        expand=True,
+    )
 
 
 def _build_turn_summary_panel(resolution: TurnResolution) -> Panel:

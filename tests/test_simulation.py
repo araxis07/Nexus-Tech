@@ -136,6 +136,7 @@ from nexus_tech.simulation.meta_progression import (
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
+from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.partnerships import (
     apply_end_of_turn_partnerships,
@@ -151,6 +152,7 @@ from nexus_tech.simulation.product_progression import calculate_delivery_penalty
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.releases import plan_product_release, work_product_release
 from nexus_tech.simulation.reporting import calculate_run_badges, calculate_run_score
+from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.roadmap_projects import (
     start_roadmap_project,
@@ -12099,11 +12101,107 @@ def test_turn_coach_surfaces_ranked_commands_from_endgame_and_operating_pressure
     assert coach.finance_command in valid_commands
     assert coach.support_command in valid_commands
     assert coach.channel_command in valid_commands
+    assert coach.opening_command in valid_commands
+    assert coach.mission_window
     assert {recommendation.rank for recommendation in coach.recommendations} == set(
         range(1, len(coach.recommendations) + 1)
     )
     assert "endgame" in {recommendation.source for recommendation in coach.recommendations}
     assert any(recommendation.urgency >= 70 for recommendation in coach.recommendations)
+    assert all(recommendation.horizon_turns >= 1 for recommendation in coach.recommendations)
+    assert all(recommendation.consequence for recommendation in coach.recommendations)
+
+
+def test_guided_opening_points_to_hire_then_assign_in_early_turns() -> None:
+    product = make_product("Opening Core", quality=52, bug_level=22, user_count=24)
+    state = make_state(product, current_turn=1, cash_on_hand=Decimal("6200.00"))
+
+    opening = build_guided_opening(state)
+
+    assert opening.active is True
+    assert opening.current_command == TurnAction.HIRE_EMPLOYEE.value
+    assert opening.steps[0].status == "next"
+    assert opening.steps[1].command == TurnAction.ASSIGN_EMPLOYEE.value
+
+    hired_state = state.model_copy(
+        update={
+            "employees": [make_employee("Ada Launch", EmployeeRole.ENGINEER)],
+        }
+    )
+    assigned_state = hired_state.model_copy(
+        update={
+            "employees": [
+                hired_state.employees[0].model_copy(
+                    update={"assigned_product_id": product.id}
+                )
+            ]
+        }
+    )
+
+    progressed_opening = build_guided_opening(assigned_state)
+
+    assert progressed_opening.current_command in {
+        TurnAction.IMPROVE_QUALITY.value,
+        TurnAction.MARKET_PRODUCT.value,
+    }
+
+
+def test_risk_forecast_emits_valid_mitigation_commands() -> None:
+    product = make_product(
+        "Risky Core",
+        quality=50,
+        bug_level=28,
+        technical_debt=32,
+        target_segment=MarketSegment.ENTERPRISE,
+    )
+    account = CustomerAccount(
+        name="Risk Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("2600.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=52,
+        onboarding_health=44,
+        support_load=34,
+        open_tickets=8,
+        sla_breach_risk=40,
+        expansion_potential=56,
+        renewal_health=42,
+        renewal_turn=4,
+        churn_risk=34,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    partnership = PartnershipDeal(
+        name="Risk Channel",
+        product_id=product.id,
+        channel=PartnerChannel.MARKETPLACE,
+        status=PartnershipStatus.STRAINED,
+        quality=56,
+        risk=60,
+        conflict_pressure=64,
+        enablement_level=24,
+        sourced_revenue=Decimal("2200.00"),
+        rev_share_rate=Decimal("0.2600"),
+    )
+    state = make_state(
+        product,
+        customer_accounts=[account],
+        partnerships=[partnership],
+        cash_on_hand=Decimal("4100.00"),
+        current_turn=8,
+    )
+    state.support_program.backlog_queue = 12
+    state.support_program.escalation_queue = 4
+    state.finance.governance_risk = 62
+
+    forecast = build_risk_forecast(state)
+    valid_commands = {action.value for action in TurnAction}
+
+    assert forecast.items
+    assert forecast.top_command in valid_commands
+    assert forecast.overall_risk in {"critical", "high", "elevated", "watch"}
+    assert all(item.command in valid_commands for item in forecast.items)
+    assert all(item.horizon_turns >= 1 for item in forecast.items)
 
 
 def test_endgame_pressure_counts_queue_exposure_and_channel_recovery_drag() -> None:
