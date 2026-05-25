@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.82.0 - 2026-05-25
+
+- Added concrete `TurnAction` command ids for every IPO, M&A, independence, and board-reset gate action
+- Added a primary gate command alert so blocked gates now point to the exact command to run next
+- Surfaced gate command alerts and command lists in victory, scorecard, and late-game dashboard/report panels
+- Added regression coverage that gate commands stay valid against the `TurnAction` catalog
+- Promoted the package version to `0.82.0`
+
 ## 0.81.0 - 2026-05-25
 
 - Added actionable gate plans beside each IPO, M&A, independence, and board-reset outcome gate

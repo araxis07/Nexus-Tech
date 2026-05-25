@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from nexus_tech.domain.models import CapitalPlanMode, ExitOutcome, GameState
+from nexus_tech.domain.models import CapitalPlanMode, ExitOutcome, GameState, TurnAction
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.customers import calculate_account_revenue
@@ -48,7 +48,9 @@ class EndgamePressureSummary:
     path_scorecard: tuple[str, ...]
     path_outcome_gates: tuple[str, ...]
     path_gate_actions: tuple[str, ...]
+    path_gate_commands: tuple[str, ...]
     path_gate_alert: str
+    path_gate_command_alert: str
     path_watchlist: tuple[str, ...]
     path_gap: int
     strategic_clarity: str
@@ -72,7 +74,9 @@ class ExitEvaluation:
     path_scorecard: tuple[str, ...]
     path_outcome_gates: tuple[str, ...]
     path_gate_actions: tuple[str, ...]
+    path_gate_commands: tuple[str, ...]
     path_gate_alert: str
+    path_gate_command_alert: str
     strategic_clarity: str
     next_chapter: str
     outcome_tags: tuple[str, ...]
@@ -705,15 +709,80 @@ def calculate_endgame_pressure(
             )
         ),
     )
+    path_gate_commands = (
+        (
+            TurnAction.REVIEW_BOARD.value
+            if ipo_gate_open
+            else (
+                TurnAction.START_BOARD_RECOVERY_PLAN.value
+                if state.finance.governance_risk > BALANCE.exit_ipo_governance_risk_cap
+                else (
+                    TurnAction.RUN_ENTERPRISE_QUEUE_RESET.value
+                    if support_fragility > 40
+                    else TurnAction.RUN_ENTERPRISE_REFERENCE_WATCH.value
+                )
+            )
+        ),
+        (
+            TurnAction.REVIEW_PARTNERSHIPS.value
+            if acquisition_gate_open
+            else (
+                TurnAction.RUN_CHANNEL_FIREBREAK.value
+                if channel_fragility > 52
+                else (
+                    TurnAction.RUN_CHANNEL_DEPENDENCY_RESET.value
+                    if portfolio.hotspot_dependency_score >= 80
+                    else TurnAction.REACTIVATE_PARTNERSHIP.value
+                )
+            )
+        ),
+        (
+            TurnAction.REVIEW_FINANCE.value
+            if independence_gate_open
+            else (
+                TurnAction.SET_PATH_CASH_WATERFALL.value
+                if capital_fragility > 48
+                else (
+                    TurnAction.SET_COVENANT_FIREWALL.value
+                    if state.finance.covenant_risk > 18
+                    else TurnAction.RUN_BILLING_RENEWAL_WATCH.value
+                )
+            )
+        ),
+        (
+            TurnAction.REVIEW_BOARD.value
+            if reset_gate_open
+            else (
+                TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value
+                if (
+                    state.capital_plan.mode is not CapitalPlanMode.CONSERVE
+                    or state.capital_plan.reserve_share < 34
+                )
+                else (
+                    TurnAction.EXECUTE_BOARD_RESPONSE.value
+                    if state.finance.board_resolution_due
+                    else TurnAction.START_BOARD_RECOVERY_PLAN.value
+                )
+            )
+        ),
+    )
     blocked_gate_actions = tuple(
         action
         for gate, action in zip(path_outcome_gates, path_gate_actions, strict=True)
+        if "blocked" in gate
+    )
+    blocked_gate_commands = tuple(
+        command
+        for gate, command in zip(path_outcome_gates, path_gate_commands, strict=True)
         if "blocked" in gate
     )
     path_gate_alert = (
         blocked_gate_actions[0]
         if blocked_gate_actions
         else "Gate alert: all endgame routes have credible operating paths."
+    )
+    path_gate_command_alert = (
+        blocked_gate_commands[0] if blocked_gate_commands else TurnAction.VIEW_REPORT.value
     )
     return EndgamePressureSummary(
         public_market_scrutiny=public_market_scrutiny,
@@ -728,7 +797,9 @@ def calculate_endgame_pressure(
         path_scorecard=path_scorecard,
         path_outcome_gates=path_outcome_gates,
         path_gate_actions=path_gate_actions,
+        path_gate_commands=path_gate_commands,
         path_gate_alert=path_gate_alert,
+        path_gate_command_alert=path_gate_command_alert,
         path_watchlist=path_watchlist,
         path_gap=path_gap,
         strategic_clarity=strategic_clarity,
@@ -863,7 +934,9 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             path_scorecard=pressure.path_scorecard,
             path_outcome_gates=pressure.path_outcome_gates,
             path_gate_actions=pressure.path_gate_actions,
+            path_gate_commands=pressure.path_gate_commands,
             path_gate_alert=pressure.path_gate_alert,
+            path_gate_command_alert=pressure.path_gate_command_alert,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -965,7 +1038,9 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             path_scorecard=pressure.path_scorecard,
             path_outcome_gates=pressure.path_outcome_gates,
             path_gate_actions=pressure.path_gate_actions,
+            path_gate_commands=pressure.path_gate_commands,
             path_gate_alert=pressure.path_gate_alert,
+            path_gate_command_alert=pressure.path_gate_command_alert,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -1060,7 +1135,9 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             path_scorecard=pressure.path_scorecard,
             path_outcome_gates=pressure.path_outcome_gates,
             path_gate_actions=pressure.path_gate_actions,
+            path_gate_commands=pressure.path_gate_commands,
             path_gate_alert=pressure.path_gate_alert,
+            path_gate_command_alert=pressure.path_gate_command_alert,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -1170,7 +1247,9 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
             path_scorecard=pressure.path_scorecard,
             path_outcome_gates=pressure.path_outcome_gates,
             path_gate_actions=pressure.path_gate_actions,
+            path_gate_commands=pressure.path_gate_commands,
             path_gate_alert=pressure.path_gate_alert,
+            path_gate_command_alert=pressure.path_gate_command_alert,
             strategic_clarity=pressure.strategic_clarity,
             next_chapter=next_chapter,
             outcome_tags=outcome_tags,
@@ -1201,7 +1280,9 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         path_scorecard=pressure.path_scorecard,
         path_outcome_gates=pressure.path_outcome_gates,
         path_gate_actions=pressure.path_gate_actions,
+        path_gate_commands=pressure.path_gate_commands,
         path_gate_alert=pressure.path_gate_alert,
+        path_gate_command_alert=pressure.path_gate_command_alert,
         strategic_clarity=pressure.strategic_clarity,
         next_chapter="Reset the operating plan before chasing another scale phase.",
         outcome_tags=("restructure", "fragile", "reset"),
