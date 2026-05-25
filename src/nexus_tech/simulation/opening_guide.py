@@ -44,13 +44,8 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
         employee.assigned_product_id is not None for employee in state.employees
     )
     resolved_turns = len(state.turn_history)
-    growth_ready = (
-        quality_ready
-        and (
-            flagship.user_count >= 50
-            or state.company.reputation >= 54
-            or resolved_turns >= 2
-        )
+    growth_ready = quality_ready and (
+        flagship.user_count >= 50 or state.company.reputation >= 54 or resolved_turns >= 2
     )
     review_ready = resolved_turns > 0
     expansion_ready = review_ready and quality_ready and state.company.current_turn >= 3
@@ -87,7 +82,9 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
             status=(
                 "done"
                 if everyone_assigned and assigned_to_flagship
-                else "next" if state.employees else "later"
+                else "next"
+                if state.employees
+                else "later"
             ),
         ),
         GuidedOpeningStep(
@@ -110,7 +107,9 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
             status=(
                 "done"
                 if quality_ready and resolved_turns > 0
-                else "next" if everyone_assigned else "later"
+                else "next"
+                if everyone_assigned
+                else "later"
             ),
         ),
         GuidedOpeningStep(
@@ -125,7 +124,9 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
             status=(
                 "done"
                 if review_ready
-                else "next" if everyone_assigned and quality_ready else "later"
+                else "next"
+                if everyone_assigned and quality_ready
+                else "later"
             ),
         ),
         GuidedOpeningStep(
@@ -140,7 +141,9 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
             status=(
                 "done"
                 if state.company.current_turn >= 3 and review_ready
-                else "next" if review_ready else "later"
+                else "next"
+                if review_ready
+                else "later"
             ),
         ),
         GuidedOpeningStep(
@@ -155,7 +158,9 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
             status=(
                 "done"
                 if state.company.current_turn >= 4 and (state.customer_accounts or review_ready)
-                else "next" if expansion_ready or growth_ready else "later"
+                else "next"
+                if expansion_ready or growth_ready
+                else "later"
             ),
         ),
     )
@@ -164,9 +169,7 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
         (step for step in steps if step.status == "next"),
         next((step for step in steps if step.status != "done"), steps[-1]),
     )
-    active = state.company.current_turn <= 6 or any(
-        step.status != "done" for step in steps[:4]
-    )
+    active = state.company.current_turn <= 6 or any(step.status != "done" for step in steps[:4])
     summary = (
         f"Guided opening points to `{current_step.command}` next. "
         f"Keep the first loop focused around {flagship.name}."

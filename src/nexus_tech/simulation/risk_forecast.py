@@ -112,9 +112,7 @@ def build_risk_forecast(state: GameState) -> RiskForecastSummary:
 
     if opening.active and (
         not state.employees
-        or any(
-            employee.assigned_product_id is None for employee in state.employees
-        )
+        or any(employee.assigned_product_id is None for employee in state.employees)
     ):
         candidates.append(
             (

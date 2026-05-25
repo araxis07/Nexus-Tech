@@ -12131,9 +12131,7 @@ def test_guided_opening_points_to_hire_then_assign_in_early_turns() -> None:
     assigned_state = hired_state.model_copy(
         update={
             "employees": [
-                hired_state.employees[0].model_copy(
-                    update={"assigned_product_id": product.id}
-                )
+                hired_state.employees[0].model_copy(update={"assigned_product_id": product.id})
             ]
         }
     )
