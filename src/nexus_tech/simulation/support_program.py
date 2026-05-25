@@ -2325,6 +2325,12 @@ def run_enterprise_reference_watch(
             + BALANCE.support_program_enterprise_renewal_cabinet_reputation_gain
         )
     )
+    _promote_recovered_account_status(account)
+    _apply_board_reset_followup_relief(
+        state,
+        lane=SupportLaneFocus.ENTERPRISE,
+        account=account,
+    )
     return SupportOpsActionSummary(
         message=(
             f"Ran an enterprise reference watch for {account.name}. Cash -{total_cost}, "
@@ -2488,6 +2494,12 @@ def run_billing_renewal_watch(
             + BALANCE.support_program_billing_covenant_reset_board_confidence_gain
         )
     )
+    _promote_recovered_account_status(account)
+    _apply_board_reset_followup_relief(
+        state,
+        lane=SupportLaneFocus.BILLING,
+        account=account,
+    )
     return SupportOpsActionSummary(
         message=(
             f"Ran a billing renewal watch for {account.name}. Cash -{total_cost}, "
@@ -2621,6 +2633,12 @@ def run_onboarding_go_live_watch(
     )
     state.finance.board_confidence = clamp_int(state.finance.board_confidence + 1)
     state.company.reputation = clamp_int(state.company.reputation + 1)
+    _promote_recovered_account_status(account)
+    _apply_board_reset_followup_relief(
+        state,
+        lane=SupportLaneFocus.ONBOARDING,
+        account=account,
+    )
     return SupportOpsActionSummary(
         message=(
             f"Ran an onboarding go-live watch for {account.name}. Cash -{total_cost}, "
@@ -2791,6 +2809,12 @@ def run_white_glove_retention_watch(
             + BALANCE.support_program_white_glove_renewal_guard_reputation_gain
             + BALANCE.support_program_white_glove_reference_committee_reputation_gain
         )
+    )
+    _promote_recovered_account_status(account)
+    _apply_board_reset_followup_relief(
+        state,
+        lane=SupportLaneFocus.ENTERPRISE,
+        account=account,
     )
     return SupportOpsActionSummary(
         message=(
@@ -10835,6 +10859,83 @@ def _apply_lane_program_relief(
             support_program.billing_ticket_pressure - relief,
         )
     support_program.backlog_queue = max(0, support_program.backlog_queue - max(1, relief // 2))
+
+
+def _promote_recovered_account_status(account: CustomerAccount) -> None:
+    if account.status is not CustomerAccountStatus.AT_RISK:
+        return
+    if (
+        account.open_tickets <= 3
+        and account.sla_breach_risk <= 28
+        and account.ticket_queue_age <= 2
+        and account.support_load <= 30
+        and account.renewal_health >= 58
+        and account.satisfaction >= 56
+        and account.churn_risk <= 24
+        and account.invoice_risk <= 34
+        and account.failed_payment_risk <= 34
+        and account.onboarding_health >= 42
+    ):
+        account.status = CustomerAccountStatus.ACTIVE
+
+
+def _apply_board_reset_followup_relief(
+    state: GameState,
+    *,
+    lane: SupportLaneFocus,
+    account: CustomerAccount,
+) -> None:
+    if not (
+        state.finance.board_resolution_due
+        or state.finance.restructuring_pressure >= 16
+        or state.finance.governance_risk >= 52
+        or state.finance.board_warning_level >= 2
+    ):
+        return
+
+    queue_exposure = calculate_support_queue_exposure(state)
+    hotspot_match = queue_exposure.hotspot_lane is lane
+    account_still_fragile = _is_revenue_at_risk_account(account, sla_target=24) or (
+        _is_renewal_pressure_account(account) and account.status is CustomerAccountStatus.AT_RISK
+    )
+    if not (
+        hotspot_match
+        or queue_exposure.focus_alignment_gap > 0
+        or account_still_fragile
+        or state.finance.board_resolution_due
+    ):
+        return
+
+    pressure_relief = 2 + int(hotspot_match) + int(state.finance.board_resolution_due)
+    governance_relief = 2 + int(hotspot_match)
+    restructuring_relief = (
+        1 + int(hotspot_match) + int(account.status is CustomerAccountStatus.ACTIVE)
+    )
+
+    state.finance.board_pressure = clamp_int(state.finance.board_pressure - (pressure_relief * 2))
+    state.finance.governance_risk = clamp_int(state.finance.governance_risk - governance_relief)
+    state.finance.restructuring_pressure = max(
+        0,
+        state.finance.restructuring_pressure - restructuring_relief,
+    )
+    state.finance.board_confidence = clamp_int(state.finance.board_confidence + 1)
+    if state.finance.board_warning_level > 0 and state.finance.board_pressure <= 42:
+        state.finance.board_warning_level = max(0, state.finance.board_warning_level - 1)
+        state.finance.board_warning_active = state.finance.board_warning_level > 0
+    if (
+        state.finance.board_resolution_due
+        and state.finance.board_pressure <= 40
+        and state.finance.governance_risk <= 58
+        and state.finance.restructuring_pressure <= 18
+    ):
+        state.finance.board_resolution_due = False
+    if (
+        state.finance.governance_crisis_active
+        and state.finance.governance_risk <= 54
+        and state.finance.board_warning_level <= 1
+        and not state.finance.board_resolution_due
+    ):
+        state.finance.governance_crisis_active = False
 
 
 def _calculate_focus_mismatch_penalty(

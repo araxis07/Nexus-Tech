@@ -997,7 +997,10 @@ def build_finance_planner(
         )
     ):
         recommended_actions.append("run_enterprise_lane_mesh")
-    if strategic_outlook in {"ipo_ready", "strategic_acquisition"} and (
+    if (
+        strategic_outlook in {"ipo_ready", "strategic_acquisition", "board_reset"}
+        or dominant_endgame_pressure == "board_reset_risk"
+    ) and (
         enterprise_queue_risk_accounts > 0
         and high_value_risk_accounts > 0
         and (
@@ -1005,6 +1008,14 @@ def build_finance_planner(
             or support_hotspot_lane_overflow > 4
             or finance.board_pressure >= 40
             or finance.governance_risk >= 64
+            or (
+                dominant_endgame_pressure == "board_reset_risk"
+                and (
+                    finance.board_resolution_due
+                    or finance.board_warning_level >= 2
+                    or finance.restructuring_pressure >= 20
+                )
+            )
         )
     ):
         recommended_actions.append("run_enterprise_reference_watch")
@@ -2002,6 +2013,11 @@ def build_finance_planner(
             "run an enterprise reference watch on the flagship account before proof risk stays "
             "concentrated even after the lane mesh"
         )
+        if dominant_endgame_pressure == "board_reset_risk":
+            action_sequence.append(
+                "use the enterprise reference watch to clear flagship proof risk before the "
+                "board reset path hardens around one still-fragile anchor account"
+            )
     if "run_white_glove_lane_mesh" in recommended_actions:
         action_sequence.append(
             "run a white-glove lane mesh before premium service drag spreads across multiple "

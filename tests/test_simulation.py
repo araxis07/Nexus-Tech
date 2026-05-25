@@ -8236,6 +8236,60 @@ def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
     }
 
 
+def test_exit_evaluation_can_classify_controlled_recovery_reset() -> None:
+    product = make_product(
+        "Controlled Recovery Reset Core",
+        lifecycle_stage=LifecycleStage.MATURE,
+        user_count=24,
+        market_fit=24,
+        technical_debt=52,
+        bug_level=48,
+    )
+    account = CustomerAccount(
+        name="Reset Recovery Anchor",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("4200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=42,
+        onboarding_health=44,
+        support_load=46,
+        open_tickets=14,
+        sla_breach_risk=66,
+        ticket_queue_age=4,
+        renewal_health=40,
+        expansion_potential=58,
+        renewal_turn=9,
+        churn_risk=36,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("16000.00"))
+    state.company.reputation = 24
+    state.capital_plan = CapitalPlan(
+        mode=CapitalPlanMode.CONSERVE,
+        source_preference=CapitalSourcePreference.BOOTSTRAP,
+        planning_horizon_turns=10,
+        reserve_target=Decimal("8000.00"),
+        product_investment_share=28,
+        go_to_market_share=34,
+        reserve_share=38,
+    )
+    state.finance.board_confidence = 28
+    state.finance.board_pressure = 48
+    state.finance.board_score = 30
+    state.finance.governance_risk = 52
+    state.finance.restructuring_pressure = 24
+    state.finance.board_warning_level = 2
+    state.finance.board_resolution_due = False
+
+    evaluation = evaluate_exit_outcome(state, calculate_run_score(state))
+
+    assert evaluation.outcome is ExitOutcome.RESTRUCTURE
+    assert evaluation.ending_variant == "Controlled Recovery Reset"
+    assert "recovery perimeter" in evaluation.board_readout
+    assert "reserve share" in evaluation.next_chapter
+
+
 def test_finance_planner_projects_horizon_cash_positions() -> None:
     product = make_product("Planner Core", user_count=120)
     state = make_state(product, cash_on_hand=Decimal("9000.00"))
@@ -28946,6 +29000,53 @@ def test_run_enterprise_reference_watch_rebuilds_terminal_flagship_trust() -> No
     assert outcome.state.company.cash_on_hand < state.company.cash_on_hand
 
 
+def test_run_enterprise_reference_watch_can_clear_board_reset_follow_up_pressure() -> None:
+    product = make_product("Reference Watch Reset Core", target_segment=MarketSegment.ENTERPRISE)
+    account = CustomerAccount(
+        name="Reset Watch Flagship",
+        product_id=product.id,
+        segment=MarketSegment.ENTERPRISE,
+        contract_value=Decimal("13200.00"),
+        support_tier=SupportTier.WHITE_GLOVE,
+        satisfaction=42,
+        onboarding_health=44,
+        support_load=36,
+        open_tickets=8,
+        sla_breach_risk=48,
+        ticket_queue_age=4,
+        expansion_potential=72,
+        renewal_health=44,
+        renewal_turn=4,
+        churn_risk=28,
+        invoice_risk=18,
+        failed_payment_risk=12,
+        escalation_count=6,
+        status=CustomerAccountStatus.AT_RISK,
+    )
+    state = make_state(product, customer_accounts=[account], cash_on_hand=Decimal("90000.00"))
+    state.support_program.backlog_queue = 24
+    state.support_program.escalation_queue = 12
+    state.finance.board_pressure = 44
+    state.finance.board_confidence = 18
+    state.finance.board_score = 22
+    state.finance.governance_risk = 55
+    state.finance.restructuring_pressure = 18
+    state.finance.board_warning_level = 2
+    state.finance.board_warning_active = True
+    state.finance.board_resolution_due = True
+    state.finance.governance_crisis_active = True
+
+    outcome = apply_action(
+        state,
+        TurnAction.RUN_ENTERPRISE_REFERENCE_WATCH,
+        context=ActionContext(customer_account_id=account.id),
+    )
+
+    assert outcome.state.finance.board_resolution_due is False
+    assert outcome.state.finance.governance_crisis_active is False
+    assert outcome.state.finance.board_warning_level < state.finance.board_warning_level
+
+
 def test_run_billing_renewal_watch_cools_terminal_collections_extreme_heat() -> None:
     product = make_product("Billing Watch Core", target_segment=MarketSegment.SMB)
     account = CustomerAccount(
@@ -29241,6 +29342,54 @@ def test_finance_planner_recommends_enterprise_reference_watch_for_flagship_heat
 
     assert "run_enterprise_reference_watch" in planner.recommended_actions
     assert any("enterprise reference watch" in step for step in planner.action_sequence)
+
+
+def test_finance_planner_recommends_enterprise_reference_watch_for_board_reset_heat() -> None:
+    state = make_state(
+        make_product("Enterprise Reset Watch Planning Core"),
+        cash_on_hand=Decimal("4600.00"),
+        capital_plan=CapitalPlan(
+            mode=CapitalPlanMode.CONSERVE,
+            source_preference=CapitalSourcePreference.BOOTSTRAP,
+            reserve_target=Decimal("7200.00"),
+            product_investment_share=30,
+            go_to_market_share=36,
+            reserve_share=34,
+        ),
+    )
+    state.finance.board_pressure = 36
+    state.finance.governance_risk = 58
+    state.finance.restructuring_pressure = 22
+    state.finance.board_warning_level = 2
+    state.finance.board_resolution_due = True
+    planner = build_finance_planner(
+        state.company,
+        state.finance,
+        state.turn_history,
+        latest_net_cash_flow=Decimal("-1080.00"),
+        capital_plan=state.capital_plan,
+        support_backlog=22,
+        support_escalations=9,
+        premium_revenue_at_risk_value=Decimal("5200.00"),
+        enterprise_queue_risk_accounts=2,
+        high_value_risk_accounts=2,
+        white_glove_queue_risk_accounts=1,
+        revenue_at_risk_value=Decimal("4800.00"),
+        renewal_queue_risk_accounts=2,
+        renewal_pressure_value=Decimal("2600.00"),
+        support_lane_focus=SupportLaneFocus.BILLING,
+        support_hotspot_lane=SupportLaneFocus.ENTERPRISE,
+        support_hotspot_lane_overflow=3,
+        hotspot_lane_account_count=4,
+        focus_alignment_gap=2,
+        strategic_outlook="board_reset",
+        dominant_endgame_pressure="board_reset_risk",
+        commercial_fragility=84,
+        capital_fragility=62,
+    )
+
+    assert "run_enterprise_reference_watch" in planner.recommended_actions
+    assert any("board reset path hardens" in step for step in planner.action_sequence)
 
 
 def test_finance_planner_recommends_white_glove_retention_watch_for_premium_heat() -> None:
@@ -29827,10 +29976,33 @@ def test_board_reset_operating_watch_event_can_ratify_watch() -> None:
     state.finance.board_pressure = 48
     state.finance.board_confidence = 30
     state.finance.board_score = 36
-    state.finance.governance_risk = 68
+    state.finance.governance_risk = 56
     state.finance.board_warning_level = 2
+    state.finance.board_warning_active = True
     state.finance.governance_crisis_active = True
     state.finance.restructuring_pressure = 28
+    state.finance.board_resolution_due = True
+    state.support_program.lane_focus = SupportLaneFocus.BILLING
+    state.customer_accounts = [
+        CustomerAccount(
+            name="Reset Watch Enterprise Anchor",
+            product_id=state.products[0].id,
+            segment=MarketSegment.ENTERPRISE,
+            contract_value=Decimal("7200.00"),
+            support_tier=SupportTier.WHITE_GLOVE,
+            satisfaction=40,
+            onboarding_health=42,
+            support_load=48,
+            open_tickets=16,
+            sla_breach_risk=72,
+            ticket_queue_age=5,
+            renewal_health=44,
+            expansion_potential=58,
+            renewal_turn=8,
+            churn_risk=34,
+            status=CustomerAccountStatus.AT_RISK,
+        )
+    ]
     state.event_history.append(
         EventHistoryEntry(
             event_id="board_reset_operating_ledger",
@@ -29860,6 +30032,9 @@ def test_board_reset_operating_watch_event_can_ratify_watch() -> None:
     assert outcome.state.finance.board_score > state.finance.board_score
     assert outcome.state.finance.governance_risk < state.finance.governance_risk
     assert outcome.state.capital_plan.reserve_share > state.capital_plan.reserve_share
+    assert outcome.state.support_program.lane_focus is SupportLaneFocus.ENTERPRISE
+    assert outcome.state.finance.board_resolution_due is False
+    assert outcome.state.finance.governance_crisis_active is False
     assert outcome.history_entry.event_id == "board_reset_operating_watch"
 
 

@@ -16,6 +16,7 @@ from nexus_tech.domain.models import (
     PartnershipStatus,
     PendingEvent,
     Product,
+    SupportLaneFocus,
     SupportTier,
 )
 from nexus_tech.domain.money import quantize_money
@@ -30,6 +31,7 @@ from nexus_tech.simulation.partnerships import (
 )
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
 from nexus_tech.simulation.support import clamp_int, clamp_rate
+from nexus_tech.simulation.support_program import calculate_support_queue_exposure
 
 
 @dataclass(frozen=True)
@@ -5272,12 +5274,52 @@ def _apply_board_reset_operating_watch(
     if mapped_option is None:
         raise ValueError(f"Unsupported option {option_id} for board-reset operating watch.")
     result = _apply_board_reset_operating_ledger(state, event, mapped_option)
-    return result.replace(
+    result = result.replace(
         "board-reset operating ledger",
         "board-reset operating watch",
     ).replace(
         "operating ledger",
         "operating watch",
+    )
+    queue_exposure = calculate_support_queue_exposure(state)
+    if option_id == "ratify_operating_watch":
+        if queue_exposure.hotspot_lane is not SupportLaneFocus.BALANCED:
+            state.support_program.lane_focus = queue_exposure.hotspot_lane
+        state.finance.board_pressure = clamp_int(state.finance.board_pressure - 3)
+        state.finance.governance_risk = clamp_int(state.finance.governance_risk - 4)
+        state.finance.restructuring_pressure = max(0, state.finance.restructuring_pressure - 2)
+        state.finance.board_confidence = clamp_int(state.finance.board_confidence + 1)
+        if state.finance.board_warning_level > 0 and state.finance.board_pressure <= 42:
+            state.finance.board_warning_level = max(0, state.finance.board_warning_level - 1)
+            state.finance.board_warning_active = state.finance.board_warning_level > 0
+        if (
+            state.finance.board_resolution_due
+            and state.finance.board_pressure <= 40
+            and state.finance.governance_risk <= 58
+        ):
+            state.finance.board_resolution_due = False
+        if (
+            state.finance.governance_crisis_active
+            and state.finance.governance_risk <= 54
+            and not state.finance.board_resolution_due
+        ):
+            state.finance.governance_crisis_active = False
+        return (
+            f"{result} The board also locked the hottest operating lane into the watch, "
+            "which eased reset pressure beyond the prior ledger step."
+        )
+
+    state.finance.board_pressure = clamp_int(state.finance.board_pressure + 2)
+    state.finance.governance_risk = clamp_int(state.finance.governance_risk + 2)
+    state.finance.restructuring_pressure = clamp_int(state.finance.restructuring_pressure + 2)
+    state.finance.board_warning_level = min(3, state.finance.board_warning_level + 1)
+    state.finance.board_warning_active = state.finance.board_warning_level > 0
+    state.finance.board_resolution_due = True
+    if queue_exposure.hotspot_lane is not SupportLaneFocus.BALANCED:
+        state.support_program.lane_focus = queue_exposure.hotspot_lane
+    return (
+        f"{result} The unfinished operating watch kept the reset queue open, so the board "
+        "tightened pressure around the same hotspot lane again."
     )
 
 

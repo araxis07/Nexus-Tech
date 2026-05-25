@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.79.0 - 2026-05-25
+
+- Deepened the four late-game watch actions so they now promote recovered accounts back to `ACTIVE` when their metrics genuinely stabilize instead of only lowering raw pressure numbers
+- Added board-reset follow-up relief behind the watch actions so enterprise, billing, onboarding, and white-glove recovery can directly cool `board_resolution_due`, governance heat, and restructuring pressure when reset pressure is lane-driven
+- Expanded finance-planner logic so `run_enterprise_reference_watch` now surfaces inside `board_reset_risk` runs when flagship enterprise pressure is still one of the drivers of the reset path
+- Upgraded `board_reset_operating_watch` from a pure ledger wrapper into a real follow-up event with extra lane-focus, board-pressure, and governance consequences
+- Sharpened board-reset endgame identity by making reset watchlists, scorecards, recommendations, and restructure variants reflect reserve posture, hotspot lane, and cleared board resolutions more explicitly
+- Added regression coverage for the new board-reset follow-up behavior, planner recommendation path, watch-event consequences, and `Controlled Recovery Reset` exit classification
+- Promoted the package version to `0.79.0`
+
 ## 0.78.0 - 2026-05-25
 
 - Added account-targeted watch actions `run_enterprise_reference_watch`, `run_billing_renewal_watch`, `run_onboarding_go_live_watch`, and `run_white_glove_retention_watch` so late-game support recovery can focus on individual at-risk accounts instead of only broad lane programs

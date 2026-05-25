@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from nexus_tech.domain.models import ExitOutcome, GameState
+from nexus_tech.domain.models import CapitalPlanMode, ExitOutcome, GameState
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.customers import calculate_account_revenue
@@ -417,6 +417,17 @@ def calculate_endgame_pressure(
         for pressure_name, score in pressure_scores.items()
         if score >= BALANCE.event_strategic_crossroads_readiness_threshold
     )
+    reset_lane_label = {
+        "enterprise": "enterprise proof and white-glove service",
+        "billing": "billing collections and renewal cash",
+        "onboarding": "onboarding go-live drag",
+        "balanced": "general operating drag",
+    }[queue_exposure.hotspot_lane.value]
+    reset_channel_note = (
+        f" and de-risk the {portfolio.hotspot_channel} channel"
+        if portfolio.hotspot_channel != "-"
+        else ""
+    )
     path_watchlist = (
         (
             "IPO: run enterprise assurance, an enterprise queue reset, white-glove recovery, "
@@ -457,17 +468,30 @@ def calculate_endgame_pressure(
             else "Independence: capital discipline is currently holding."
         ),
         (
-            "Reset: board pressure is close to forcing a company-wide reset showdown."
+            (
+                f"Reset: protect {reset_lane_label}, hold reserve share at "
+                f"{state.capital_plan.reserve_share}%, close the pending board resolution"
+                f"{reset_channel_note}, and only reopen growth after the reset queue is calm."
+            )
             if board_reset_risk >= 60 or restructure_heat >= 56
-            else "Reset: restructure pressure is real, but not yet dominant."
+            else (
+                f"Reset: restructure pressure is real, but {reset_lane_label} has not forced "
+                "a full board reset yet."
+            )
         ),
     )
     if board_reset_risk >= 70:
+        reset_watch_action = {
+            "enterprise": "run an enterprise reference watch or white-glove retention watch",
+            "billing": "run a billing renewal watch",
+            "onboarding": "run an onboarding go-live watch",
+            "balanced": "run the highest-risk account watch",
+        }[queue_exposure.hotspot_lane.value]
         recommendation = (
-            "Board reset risk is high. Run enterprise or billing lane meshes where pressure is "
-            "broad, use account-level watches where one account still dominates, force a path "
-            "cash waterfall, add a board-reset contingency buffer, de-risk the hotspot channel, "
-            "and prepare to accept a tighter reset plan before the board forces one."
+            f"Board reset risk is high. {reset_watch_action} on the hotspot account, use lane "
+            "meshes where pressure is broad, force a path cash waterfall, add a board-reset "
+            "contingency buffer, de-risk the hotspot channel, and prepare to accept a tighter "
+            "reset plan before the board forces one."
         )
         summary = "Governance and operating strain are now close to forcing a board-led reset."
     elif commercial_fragility >= 70:
@@ -547,10 +571,10 @@ def calculate_endgame_pressure(
             path_watchlist[1],
             path_watchlist[2],
             (
-                "Reset: force a path cash waterfall, add a board-reset contingency buffer, run "
-                "enterprise or billing lane meshes on broad account pressure, use targeted "
-                "watches where one account still dominates, cool hotspot channel dependency, "
-                "and ratify reset controls before another board cycle hardens the reset."
+                f"Reset: force a path cash waterfall, add a board-reset contingency buffer, "
+                f"protect {reset_lane_label}, use targeted watches where one account still "
+                f"dominates{reset_channel_note}, and ratify reset controls before another board "
+                "cycle hardens the reset."
             ),
         )
     path_scorecard = (
@@ -558,8 +582,9 @@ def calculate_endgame_pressure(
         f"M&A {readiness.acquisition_interest_score} / diligence {acquirer_diligence}",
         f"Ind {readiness.independence_score} / discipline {independence_discipline}",
         (
-            f"Reset {restructure_heat} / board risk {board_reset_risk} / governance "
-            f"{state.finance.governance_risk}"
+            f"Reset {restructure_heat} / board risk {board_reset_risk} / reserve "
+            f"{state.capital_plan.reserve_share}% / {queue_exposure.hotspot_lane.value} lane / "
+            f"{'resolution due' if state.finance.board_resolution_due else 'resolution buffered'}"
         ),
     )
     return EndgamePressureSummary(
@@ -814,7 +839,23 @@ def evaluate_exit_outcome(state: GameState, score: RunScore | None = None) -> Ex
         restructure_value = quantize_money(
             max(Decimal("0.00"), adjusted_value - BALANCE.exit_restructure_cash_threshold)
         )
-        if pressure.capital_fragility >= 72:
+        if (
+            pressure.board_reset_risk >= 72
+            and state.capital_plan.mode is CapitalPlanMode.CONSERVE
+            and state.capital_plan.reserve_share >= 34
+            and not state.finance.board_resolution_due
+        ):
+            ending_variant = "Controlled Recovery Reset"
+            board_readout = (
+                "Directors forced a reset, but the company answered with a credible recovery "
+                "perimeter around cash, lane pressure, and governance."
+            )
+            next_chapter = (
+                "Keep reserve share high, defend the hotspot lane, and reopen growth only after "
+                "the reset path stays quiet for several turns."
+            )
+            outcome_tags = ("restructure", "board", "recovery")
+        elif pressure.capital_fragility >= 72:
             ending_variant = "Liquidity Containment Reset"
             board_readout = (
                 "Directors now see cash discipline and operating strain "
