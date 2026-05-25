@@ -8274,6 +8274,8 @@ def test_exit_evaluation_exposes_board_readout_and_next_chapter() -> None:
     assert evaluation.pressure_readout
     assert len(evaluation.path_scorecard) == 4
     assert len(evaluation.path_outcome_gates) == 4
+    assert len(evaluation.path_gate_actions) == 4
+    assert evaluation.path_gate_alert
     assert evaluation.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert evaluation.next_chapter
     assert evaluation.outcome in {
@@ -12019,8 +12021,11 @@ def test_endgame_pressure_surfaces_support_channel_and_reset_fragility() -> None
     assert pressure.board_reset_risk > 0
     assert len(pressure.path_scorecard) == 4
     assert len(pressure.path_outcome_gates) == 4
+    assert len(pressure.path_gate_actions) == 4
     assert len(pressure.path_watchlist) == 4
     assert any("gate blocked" in gate for gate in pressure.path_outcome_gates)
+    assert any("action:" in action for action in pressure.path_gate_actions)
+    assert pressure.path_gate_alert in pressure.path_gate_actions
     assert pressure.strategic_clarity in {"clear path", "clear but stressed", "contested"}
     assert pressure.operating_durability in {"resilient", "stretched", "fragile"}
     assert pressure.restructure_heat >= pressure.board_reset_risk // 3

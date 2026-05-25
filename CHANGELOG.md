@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.81.0 - 2026-05-25
+
+- Added actionable gate plans beside each IPO, M&A, independence, and board-reset outcome gate
+- Added a primary gate alert to endgame pressure and exit evaluation so blocked routes point to the next concrete repair action
+- Surfaced gate alerts and gate actions in victory, scorecard, and late-game dashboard/report panels
+- Added regression coverage for gate action propagation and blocked-gate alert behavior
+- Promoted the package version to `0.81.0`
+
 ## 0.80.0 - 2026-05-25
 
 - Added path outcome gates to endgame pressure, exit evaluation, dashboard panels, and late-game readouts so IPO, M&A, independence, and board-reset routes show open/blocked status directly
