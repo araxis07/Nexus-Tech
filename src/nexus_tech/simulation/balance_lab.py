@@ -20,6 +20,7 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.operations import calculate_operations_summary
@@ -154,6 +155,18 @@ class BalanceAuditResult:
     turns: int
     seed_base: int
     findings: tuple[BalanceAuditFinding, ...]
+
+
+@dataclass(frozen=True)
+class BalanceThresholdEvaluation:
+    """Pass/watch/fail gate for one balance matrix cell."""
+
+    status: str
+    expectation: str
+    summary: str
+    shutdown_ceiling: int
+    cash_floor: Decimal
+    score_floor: float
 
 
 def run_balance_batch(
@@ -341,12 +354,12 @@ def run_balance_audit(
         seed_base=seed_base,
     )
     findings: list[BalanceAuditFinding] = []
-    cash_warning_threshold = calculate_cash_warning_threshold(turns)
     for cell in matrix.cells:
+        evaluation = evaluate_balance_cell(cell, runs=runs, turns=turns)
         if cell.shutdowns >= runs:
             findings.append(
                 BalanceAuditFinding(
-                    severity="high",
+                    severity="critical",
                     scenario_id=cell.scenario_id,
                     difficulty_mode=cell.difficulty_mode,
                     summary="Every audited run shut down before stabilizing.",
@@ -357,26 +370,26 @@ def run_balance_audit(
                 )
             )
             continue
-        if cell.shutdowns >= max(1, runs // 2):
+        if evaluation.status == "fail":
             findings.append(
                 BalanceAuditFinding(
-                    severity="medium",
+                    severity="high" if cell.shutdowns > evaluation.shutdown_ceiling else "medium",
                     scenario_id=cell.scenario_id,
                     difficulty_mode=cell.difficulty_mode,
-                    summary="Shutdowns are common enough that the opening may be too punishing.",
+                    summary=evaluation.summary,
                     average_score=cell.average_score,
                     average_cash=cell.average_cash,
                     shutdowns=cell.shutdowns,
                     victories=cell.victories,
                 )
             )
-        elif cell.average_cash < cash_warning_threshold:
+        elif evaluation.status == "watch":
             findings.append(
                 BalanceAuditFinding(
                     severity="low",
                     scenario_id=cell.scenario_id,
                     difficulty_mode=cell.difficulty_mode,
-                    summary="Average closing cash is thin and leaves little strategic room.",
+                    summary=evaluation.summary,
                     average_score=cell.average_score,
                     average_cash=cell.average_cash,
                     shutdowns=cell.shutdowns,
@@ -386,7 +399,7 @@ def run_balance_audit(
 
     findings.sort(
         key=lambda finding: (
-            {"high": 0, "medium": 1, "low": 2}[finding.severity],
+            {"critical": 0, "high": 1, "medium": 2, "low": 3}[finding.severity],
             finding.scenario_id,
             finding.difficulty_mode.value,
         )
@@ -406,6 +419,81 @@ def calculate_cash_warning_threshold(turns: int) -> Decimal:
     scaled_buffer = BALANCE.base_operating_cost * Decimal(max(1, turns // 3))
     default_buffer = BALANCE.finance_pressure_relief_cash_threshold / Decimal("2")
     return min(default_buffer, scaled_buffer)
+
+
+def evaluate_balance_cell(
+    cell: BalanceMatrixCell,
+    *,
+    runs: int,
+    turns: int,
+) -> BalanceThresholdEvaluation:
+    """Evaluate one balance cell against explicit difficulty expectations."""
+
+    cash_floor_base = calculate_cash_warning_threshold(turns)
+    difficulty_profile = get_difficulty_profile(cell.difficulty_mode)
+    shutdown_ceiling = _shutdown_ceiling(cell.difficulty_mode, runs)
+    cash_floor = cash_floor_base * _cash_floor_multiplier(cell.difficulty_mode)
+    score_floor = _score_floor(cell.difficulty_mode)
+    expectation = difficulty_profile.target_experience
+
+    if cell.shutdowns > shutdown_ceiling:
+        summary = (
+            f"Shutdowns exceeded the {cell.difficulty_mode.value} ceiling "
+            f"({cell.shutdowns}>{shutdown_ceiling})."
+        )
+        status = "fail"
+    elif cell.average_cash < cash_floor and cell.average_score < score_floor:
+        summary = (
+            f"Average cash {cell.average_cash} and score {cell.average_score:.1f} both landed "
+            "under the target floor."
+        )
+        status = "fail"
+    elif cell.average_cash < cash_floor:
+        summary = (
+            f"Average closing cash {cell.average_cash} is under the target floor {cash_floor}."
+        )
+        status = "watch"
+    elif cell.average_score < score_floor:
+        summary = (
+            f"Average score {cell.average_score:.1f} is under the target floor {score_floor:.1f}."
+        )
+        status = "watch"
+    else:
+        summary = "This cell is inside the expected pressure envelope."
+        status = "pass"
+
+    return BalanceThresholdEvaluation(
+        status=status,
+        expectation=expectation,
+        summary=summary,
+        shutdown_ceiling=shutdown_ceiling,
+        cash_floor=cash_floor,
+        score_floor=score_floor,
+    )
+
+
+def _shutdown_ceiling(mode: DifficultyMode, runs: int) -> int:
+    if mode is DifficultyMode.BUILDER:
+        return 0
+    if mode is DifficultyMode.STANDARD:
+        return max(0, runs // 3)
+    return max(1, runs // 2)
+
+
+def _cash_floor_multiplier(mode: DifficultyMode) -> Decimal:
+    if mode is DifficultyMode.BUILDER:
+        return Decimal("1.00")
+    if mode is DifficultyMode.STANDARD:
+        return Decimal("0.85")
+    return Decimal("0.65")
+
+
+def _score_floor(mode: DifficultyMode) -> float:
+    if mode is DifficultyMode.BUILDER:
+        return 125.0
+    if mode is DifficultyMode.STANDARD:
+        return 118.0
+    return 102.0
 
 
 def format_balance_matrix_csv(matrix: BalanceMatrixResult) -> str:
@@ -447,14 +535,19 @@ def format_balance_report_markdown(
         "",
         "## Matrix",
         "",
-        "| Scenario | Difficulty | Avg Score | Avg Cash | Avg Users | Victories | Shutdowns |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        (
+            "| Scenario | Difficulty | Status | Avg Score | Avg Cash | Avg Users | "
+            "Victories | Shutdowns |"
+        ),
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for cell in matrix.cells:
+        evaluation = evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns)
         lines.append(
             "| "
             f"{cell.scenario_id} | "
             f"{cell.difficulty_mode.value} | "
+            f"{evaluation.status} | "
             f"{cell.average_score:.1f} | "
             f"{cell.average_cash} | "
             f"{cell.average_users:.1f} | "
@@ -499,6 +592,20 @@ def format_balance_report_markdown(
                 f"  - `{finding.scenario_id}` on `{finding.difficulty_mode.value}`: "
                 f"{finding.summary}"
             )
+
+    lines.extend(["", "## Threshold Gates", ""])
+    lines.append("| Scenario | Difficulty | Status | Expectation | Gate Summary |")
+    lines.append("| --- | --- | --- | --- | --- |")
+    for cell in matrix.cells:
+        evaluation = evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns)
+        lines.append(
+            "| "
+            f"{cell.scenario_id} | "
+            f"{cell.difficulty_mode.value} | "
+            f"{evaluation.status} | "
+            f"{evaluation.expectation} | "
+            f"{evaluation.summary} |"
+        )
 
     lines.extend(
         [

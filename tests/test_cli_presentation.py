@@ -48,6 +48,7 @@ from nexus_tech.presentation.dashboard import (
     render_competitor_archetype_catalog,
     render_content_health,
     render_dashboard,
+    render_game_over,
     render_glossary,
     render_product_template_catalog,
     render_quick_guide,
@@ -690,7 +691,8 @@ def test_balance_matrix_command_renders_grid(monkeypatch: MonkeyPatch) -> None:
     assert result.exit_code == 0
     assert "Balance Matrix" in result.output
     assert "Scenario x Difficulty" in result.output
-    assert "founder" in result.output
+    assert "Status" in result.output
+    assert "Status Mix" in result.output
 
 
 def test_balance_audit_command_renders_findings(monkeypatch: MonkeyPatch) -> None:
@@ -793,6 +795,7 @@ def test_balance_report_command_writes_markdown_file(
     assert "Balance Report" in result.output
     assert output_path.read_text(encoding="utf-8").startswith("# NEXUS TECH Balance Report")
     assert "Tuning Priorities" in output_path.read_text(encoding="utf-8")
+    assert "Threshold Gates" in output_path.read_text(encoding="utf-8")
 
 
 def test_version_option_prints_installed_version() -> None:
@@ -807,6 +810,7 @@ def test_guide_command_renders_quick_start() -> None:
 
     assert result.exit_code == 0
     assert "Quick Guide" in result.output
+    assert "Difficulty cues" in result.output
 
 
 def test_tutorial_command_renders_first_run_path() -> None:
@@ -816,6 +820,7 @@ def test_tutorial_command_renders_first_run_path() -> None:
     assert "First Run Tutorial" in result.output
     assert "new-game" in result.output
     assert "Risk Forecast" in result.output
+    assert "Difficulty Profile" in result.output
 
 
 def test_glossary_command_renders_core_stat_help() -> None:
@@ -1190,6 +1195,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Late-Game" in output
     assert "Finance" in output
     assert "Risk Forecast" in output
+    assert "End-Turn Preview" in output
     assert "Board / Governance" in output
     assert "Key Accounts" in output
     assert "Strategy" in output
@@ -1198,6 +1204,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Segment" in output
     assert "Onboarding" in output
     assert "Guided Opening" in output
+    assert "Difficulty Profile" in output
     assert "Trade-off" in output
 
 
@@ -1226,6 +1233,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Run Overview" in output
     assert "Scorecard" in output
     assert "Risk Forecast" in output
+    assert "End-Turn Preview" in output
     assert "Turn History" in output
     assert "Quarter Plan" in output
     assert "Finance" in output
@@ -1237,6 +1245,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Trade-off" in output
     assert "Capital Plan" in output
     assert "Partnerships" in output
+    assert "Difficulty Profile" in output
 
 
 def test_show_progression_command_renders_meta_summary(
@@ -1362,6 +1371,7 @@ def test_quick_guide_rendering_contains_opening_flow() -> None:
     assert "Quick Guide" in output
     assert "Opening flow" in output
     assert "Risk Forecast" in output
+    assert "Difficulty cues" in output
 
 
 def test_tutorial_rendering_contains_safe_first_actions() -> None:
@@ -1372,8 +1382,9 @@ def test_tutorial_rendering_contains_safe_first_actions() -> None:
 
     assert "First Run Tutorial" in output
     assert "hire_employee" in output
-    assert "End the turn" in output
+    assert "Turn Summary" in output
     assert "Watch For" in output
+    assert "--difficulty builder" in output
 
 
 def test_glossary_rendering_contains_decision_terms() -> None:
@@ -1421,3 +1432,17 @@ def test_victory_rendering_contains_summary_metrics() -> None:
     assert "Estimated Value" in output
     assert "Exit Path" in output
     assert "Strategic Outlook" in output
+    assert "After-Action Review" in output
+
+
+def test_game_over_rendering_contains_failure_postmortem() -> None:
+    state = make_demo_state()
+    state.company.game_over = True
+    state.company.cash_on_hand = Decimal("-25.00")
+    console = Console(record=True, width=140)
+
+    render_game_over(console, state)
+    output = console.export_text()
+
+    assert "Company Shutdown" in output
+    assert "Failure Postmortem" in output

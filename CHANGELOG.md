@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.85.0 - 2026-05-26
+
+- Added an End-Turn Preview panel that projects one deterministic sample turn ahead and surfaces cash, runway, reputation, user, board-pressure, support, and channel-risk deltas before the player commits
+- Added Failure Postmortem and After-Action Review summaries so shutdown and victory screens rank the main strain lanes, the command that should have been run earlier, and the lesson for the next run
+- Added explicit difficulty messaging across intro, dashboard, report, quick guide, and tutorial so `builder`, `standard`, and `founder` communicate intended play style and failure mode instead of only hidden tuning values
+- Added balance threshold gates with pass/watch/fail expectations per scenario and difficulty to the matrix, audit readout, and Markdown balance report
+- Expanded regression coverage for preview, postmortem, balance thresholds, difficulty guidance, and presentation rendering
+- Promoted the package version to `0.85.0`
+
 ## 0.84.0 - 2026-05-26
 
 - Added a guided opening checklist that adapts the first 6 turns around hiring, assignment, product stabilization, reporting, and first control reviews

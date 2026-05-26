@@ -18,6 +18,7 @@ from nexus_tech.content.models import (
 )
 from nexus_tech.domain.models import (
     CustomerAccountStatus,
+    DifficultyMode,
     Employee,
     EventHistoryEntry,
     FundingHistoryEntry,
@@ -41,6 +42,7 @@ from nexus_tech.simulation.balance_lab import (
     BalanceBatchResult,
     BalanceComparisonResult,
     BalanceMatrixResult,
+    evaluate_balance_cell,
 )
 from nexus_tech.simulation.balance_profiles import BalanceProfile
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
@@ -48,6 +50,8 @@ from nexus_tech.simulation.campaign_starts import CampaignStartDefinition
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
+from nexus_tech.simulation.difficulty import get_difficulty_profile
+from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
     calculate_endgame_readiness,
@@ -79,6 +83,7 @@ from nexus_tech.simulation.partnerships import (
     calculate_partnership_portfolio,
 )
 from nexus_tech.simulation.planning import evaluate_quarter_plan, is_quarter_plan_due
+from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.reporting import calculate_run_badges, calculate_run_score
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.roadmap import (
@@ -112,13 +117,14 @@ def render_intro(
     company_name: str,
     scenario_title: str,
     campaign_start_title: str,
-    difficulty_label: str,
+    difficulty_mode: DifficultyMode,
     campaign_goal_title: str,
     seed: int | None,
 ) -> None:
     """Print the opening game banner."""
 
     seed_text = f"Seed: {seed}" if seed is not None else "Seed: random"
+    difficulty_profile = get_difficulty_profile(difficulty_mode)
     console.print(
         Panel.fit(
             (
@@ -126,11 +132,13 @@ def render_intro(
                 f"Company: [bold]{company_name}[/bold]\n"
                 f"Scenario: {scenario_title}\n"
                 f"Campaign Start: {campaign_start_title}\n"
-                f"Difficulty: {difficulty_label}\n"
+                f"Difficulty: {difficulty_mode.value}\n"
+                f"Difficulty Lens: {difficulty_profile.target_experience}\n"
                 f"Campaign Goal: {campaign_goal_title}\n"
                 f"{seed_text}\n\n"
                 "Run a focused local software company from the terminal.\n"
-                "Build products, manage the team, react to events, and keep cash alive."
+                f"Build products, manage the team, react to events, and keep cash alive.\n"
+                f"Watch for: {difficulty_profile.watch_for}"
             ),
             title="Terminal Management Simulation",
             border_style="cyan",
@@ -658,13 +666,22 @@ def render_quick_guide(console: Console) -> None:
     content = Group(
         "[bold]Opening flow[/bold]",
         "1. Use Guided Opening and Turn Coach to line up the first 2 actions.",
-        "2. Fix product health before you buy growth, then end the turn.",
-        "3. Read Risk Forecast and the report before adding more spend or headcount.",
+        "2. Fix product health before you buy growth, then check End-Turn Preview.",
+        (
+            "3. Read Risk Forecast, Difficulty Profile, and the report before adding more spend "
+            "or headcount."
+        ),
         "",
         "[bold]Useful commands[/bold]",
         (
             "`nexus-tech tutorial`, `guide`, `glossary`, `list-scenarios`, "
             "`list-events`, `validate-content`, `doctor`"
+        ),
+        "",
+        "[bold]Difficulty cues[/bold]",
+        (
+            "Builder teaches the loop safely, Standard expects disciplined balance, and "
+            "Founder punishes weak runway, support, and governance choices faster."
         ),
         "",
         "[bold]Strong first turns[/bold]",
@@ -686,15 +703,18 @@ def render_tutorial(console: Console) -> None:
     table.add_column("Watch For")
     table.add_row(
         "1",
-        "Run `nexus-tech new-game --scenario founder_journey --seed 7`.",
-        "Starts a repeatable demo with the default founder scenario.",
+        "Run `nexus-tech new-game --scenario founder_journey --difficulty builder --seed 7`.",
+        ("Starts a repeatable demo with the default founder scenario on the safest learning mode."),
         "Use Guided Opening as the in-run checklist.",
     )
     table.add_row(
         "2",
-        "Review Turn Coach, Risk Forecast, Company Overview, and Finance.",
-        "These panels tell you what to do next and what can fail next.",
-        "Primary command, top risk, and runway.",
+        "Review Turn Coach, Risk Forecast, End-Turn Preview, Difficulty Profile, and Finance.",
+        (
+            "These panels tell you what to do next, what can fail next, and how this difficulty "
+            "punishes mistakes."
+        ),
+        "Primary command, top risk, preview delta, and runway.",
     )
     table.add_row(
         "3",
@@ -710,9 +730,9 @@ def render_tutorial(console: Console) -> None:
     )
     table.add_row(
         "5",
-        "End the turn and read the Turn Summary.",
+        "Check End-Turn Preview. End the turn and read the Turn Summary.",
         "Revenue, operating cost, churn, growth, events, and team pressure resolve here.",
-        "Board pressure, churn, and support load.",
+        "Board pressure, churn, support load, and projected cash delta.",
     )
     table.add_row(
         "6",
@@ -722,9 +742,12 @@ def render_tutorial(console: Console) -> None:
     )
     table.add_row(
         "7",
-        "Only then branch into `review_customers`, partnerships, or deeper board actions.",
+        (
+            "Only then branch into `review_customers`, partnerships, deeper board actions, or "
+            "harder difficulties."
+        ),
         "Expansion is safer once the first loop is stable and readable.",
-        "Support hotspot lane and channel dependency.",
+        "Support hotspot lane, channel dependency, and the Difficulty Profile watch-for note.",
     )
 
     console.print(
@@ -954,25 +977,40 @@ def render_balance_matrix(console: Console, matrix: BalanceMatrixResult) -> None
     overview.add_row("Turns", str(matrix.turns))
     overview.add_row("Seed Base", str(matrix.seed_base))
     overview.add_row("Cells", str(len(matrix.cells)))
+    evaluations = [
+        evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns) for cell in matrix.cells
+    ]
+    overview.add_row(
+        "Status Mix",
+        (
+            f"pass {sum(1 for evaluation in evaluations if evaluation.status == 'pass')} / "
+            f"watch {sum(1 for evaluation in evaluations if evaluation.status == 'watch')} / "
+            f"fail {sum(1 for evaluation in evaluations if evaluation.status == 'fail')}"
+        ),
+    )
 
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Scenario", style="bold")
     table.add_column("Difficulty")
+    table.add_column("Status")
     table.add_column("Avg Score", justify="right")
     table.add_column("Avg Cash", justify="right")
     table.add_column("Avg Users", justify="right")
     table.add_column("Victories", justify="right")
     table.add_column("Shutdowns", justify="right")
+    table.add_column("Expectation")
 
-    for cell in matrix.cells:
+    for cell, evaluation in zip(matrix.cells, evaluations, strict=False):
         table.add_row(
             cell.scenario_id,
             cell.difficulty_mode.value,
+            evaluation.status,
             f"{cell.average_score:.1f}",
             format_money(cell.average_cash),
             f"{cell.average_users:.1f}",
             str(cell.victories),
             str(cell.shutdowns),
+            evaluation.expectation,
         )
 
     console.print(
@@ -996,6 +1034,13 @@ def render_balance_audit(console: Console, audit: BalanceAuditResult) -> None:
     overview.add_row("Turns", str(audit.turns))
     overview.add_row("Seed Base", str(audit.seed_base))
     overview.add_row("Findings", str(len(audit.findings)))
+    overview.add_row(
+        "Critical / High",
+        (
+            f"{sum(1 for finding in audit.findings if finding.severity == 'critical')} / "
+            f"{sum(1 for finding in audit.findings if finding.severity == 'high')}"
+        ),
+    )
 
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Severity")
@@ -1040,10 +1085,12 @@ def render_dashboard(console: Console, state: GameState) -> None:
     console.print(_build_turn_header_panel(state))
     console.print(_build_turn_coach_panel(state))
     console.print(_build_risk_forecast_panel(state))
+    console.print(_build_end_turn_preview_panel(state))
     console.print(
         Columns(
             [
                 _build_company_panel(state),
+                _build_difficulty_panel(state),
                 _build_totals_panel(state),
                 _build_team_summary_panel(state),
             ],
@@ -1197,8 +1244,10 @@ def render_report(console: Console, state: GameState) -> None:
         Columns(
             [
                 _build_report_overview_panel(state, run_score.total_score, run_score.score_tier),
+                _build_difficulty_panel(state),
                 _build_turn_coach_panel(state),
                 _build_risk_forecast_panel(state),
+                _build_end_turn_preview_panel(state),
                 _build_report_score_panel(state),
                 _build_report_quarter_plan_panel(state),
                 _build_objective_panel(state),
@@ -1439,6 +1488,7 @@ def render_victory(console: Console, state: GameState) -> None:
     content.add_row("Cash On Hand", format_money(state.company.cash_on_hand))
     content.add_row("Reputation", str(state.company.reputation))
     console.print(Panel(content, title="Victory", border_style="green", expand=True))
+    console.print(_build_postmortem_panel(state))
 
 
 def render_pending_event(console: Console, pending_event: PendingEvent) -> None:
@@ -1612,17 +1662,25 @@ def render_game_over(console: Console, state: GameState) -> None:
     """Render the losing state."""
 
     team_condition = calculate_team_condition(state.employees)
+    summary_panel = Panel.fit(
+        (
+            "[bold red]Game Over[/bold red]\n"
+            f"Cash on hand: {format_money(state.company.cash_on_hand)}\n"
+            f"Reputation: {state.company.reputation}\n"
+            f"Active users: {get_total_users(state)}\n"
+            f"Headcount: {team_condition.headcount}"
+        ),
+        title="Company Shutdown",
+        border_style="red",
+    )
     console.print(
-        Panel.fit(
-            (
-                "[bold red]Game Over[/bold red]\n"
-                f"Cash on hand: {format_money(state.company.cash_on_hand)}\n"
-                f"Reputation: {state.company.reputation}\n"
-                f"Active users: {get_total_users(state)}\n"
-                f"Headcount: {team_condition.headcount}"
-            ),
-            title="Company Shutdown",
-            border_style="red",
+        Columns(
+            [
+                summary_panel,
+                _build_postmortem_panel(state),
+            ],
+            equal=True,
+            expand=True,
         )
     )
 
@@ -1732,6 +1790,102 @@ def _build_risk_forecast_panel(state: GameState) -> Panel:
     )
 
 
+def _build_end_turn_preview_panel(state: GameState) -> Panel:
+    preview = build_end_turn_preview(state)
+    if preview.blocked:
+        content = preview.note
+        if preview.warnings:
+            content += "\n\n" + "\n".join(f"- {warning}" for warning in preview.warnings)
+        return Panel(
+            content,
+            title="End-Turn Preview",
+            subtitle=preview.headline,
+            border_style="yellow",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Metric", style="bold")
+    table.add_column("Current")
+    table.add_column("Projected")
+    table.add_column("Delta")
+    table.add_column("Trend")
+    for metric in preview.metrics:
+        table.add_row(
+            metric.label,
+            metric.current,
+            metric.projected,
+            metric.delta,
+            metric.trend,
+        )
+    footer = Table.grid(padding=(0, 1))
+    footer.add_row("Top Preventive Move", preview.top_command)
+    footer.add_row("Risk Shift", preview.risk_shift)
+    footer.add_row("Projected Outcome", preview.projected_outcome)
+    warnings = "\n".join(f"- {warning}" for warning in preview.warnings)
+    return Panel(
+        Group(table, footer, warnings),
+        title="End-Turn Preview",
+        subtitle=preview.headline,
+        border_style="yellow",
+        expand=True,
+    )
+
+
+def _build_difficulty_panel(state: GameState) -> Panel:
+    profile = get_difficulty_profile(state.difficulty_mode)
+    table = Table.grid(padding=(0, 1))
+    table.add_row("Mode", state.difficulty_mode.value)
+    table.add_row("Experience", profile.target_experience)
+    table.add_row("Goal", profile.player_goal)
+    table.add_row("Watch For", profile.watch_for)
+    table.add_row("Pressure", profile.summary)
+    table.add_row("Acquisition", f"{profile.acquisition_bonus:+d}")
+    table.add_row("Churn", f"{profile.churn_modifier:+.2%}")
+    table.add_row("Op Cost", f"{profile.operating_cost_multiplier:.2f}x")
+    table.add_row("Burnout", f"{profile.burnout_modifier:+d}")
+    table.add_row("Score Mod", f"{profile.score_modifier:+d}")
+    return Panel(table, title="Difficulty Profile", border_style="bright_magenta", expand=True)
+
+
+def _build_postmortem_panel(state: GameState) -> Panel:
+    postmortem = build_run_postmortem(state)
+    if not postmortem.findings:
+        return Panel(
+            "No dominant failure lane was isolated from this final state.",
+            title=postmortem.title,
+            subtitle=postmortem.headline,
+            border_style="red" if state.company.game_over else "yellow",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("#", justify="right", style="bold cyan")
+    table.add_column("Area", style="bold")
+    table.add_column("Severity")
+    table.add_column("What Happened")
+    table.add_column("Should Have Run", style="bold green")
+    table.add_column("Lesson")
+    for finding in postmortem.findings:
+        table.add_row(
+            str(finding.rank),
+            finding.area,
+            finding.severity,
+            finding.summary,
+            finding.command,
+            finding.lesson,
+        )
+    footer = Table.grid(padding=(0, 1))
+    footer.add_row("Next Run Focus", postmortem.next_run_focus)
+    return Panel(
+        Group(table, footer),
+        title=postmortem.title,
+        subtitle=postmortem.headline,
+        border_style="red" if state.company.game_over else "yellow",
+        expand=True,
+    )
+
+
 def _build_company_panel(state: GameState) -> Panel:
     effective_roadmap = get_effective_roadmap_focus(
         state.roadmap_focus,
@@ -1744,6 +1898,7 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Name", state.company.name)
     table.add_row("Scenario", state.scenario_title)
     table.add_row("Difficulty", state.difficulty_mode.value)
+    table.add_row("Difficulty Note", get_difficulty_profile(state.difficulty_mode).summary)
     table.add_row("Goal", goal_progress.title)
     objective_progress = evaluate_scenario_objective(state)
     if objective_progress.target_value > 0:

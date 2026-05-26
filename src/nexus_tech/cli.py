@@ -1208,7 +1208,7 @@ def start_new_game(
         company_name=state.company.name,
         scenario_title=state.scenario_title,
         campaign_start_title=campaign_start.title,
-        difficulty_label=state.difficulty_mode.value,
+        difficulty_mode=state.difficulty_mode,
         campaign_goal_title=get_campaign_goal(state.campaign_goal_id).title,
         seed=seed,
     )

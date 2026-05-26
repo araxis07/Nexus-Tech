@@ -67,7 +67,9 @@ from nexus_tech.domain.models import (
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    BalanceMatrixCell,
     calculate_cash_warning_threshold,
+    evaluate_balance_cell,
     format_balance_matrix_csv,
     format_balance_report_markdown,
     run_balance_audit,
@@ -83,12 +85,14 @@ from nexus_tech.simulation.customers import (
     apply_end_of_turn_customers,
     calculate_account_revenue,
 )
+from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.economy import (
     calculate_total_operating_cost,
     calculate_total_revenue,
     calculate_total_salary_cost,
 )
 from nexus_tech.simulation.employee_progression import apply_end_of_turn_employee_progression
+from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
     apply_exit_outcome,
     calculate_endgame_pressure,
@@ -144,6 +148,7 @@ from nexus_tech.simulation.partnerships import (
     calculate_partnership_portfolio,
 )
 from nexus_tech.simulation.planning import build_quarter_plan, is_quarter_plan_due
+from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.pricing import (
     calculate_effective_revenue_per_user,
     determine_target_subscription_package,
@@ -12200,6 +12205,67 @@ def test_risk_forecast_emits_valid_mitigation_commands() -> None:
     assert forecast.overall_risk in {"critical", "high", "elevated", "watch"}
     assert all(item.command in valid_commands for item in forecast.items)
     assert all(item.horizon_turns >= 1 for item in forecast.items)
+
+
+def test_end_turn_preview_projects_next_turn_metrics() -> None:
+    product = make_product("Preview Core", quality=62, bug_level=16, user_count=48)
+    state = make_state(product, cash_on_hand=Decimal("7200.00"), current_turn=4)
+
+    preview = build_end_turn_preview(state)
+
+    assert preview.blocked is False
+    assert preview.top_command in {action.value for action in TurnAction}
+    assert preview.metrics
+    assert any(metric.label == "Cash" for metric in preview.metrics)
+    assert any(metric.label == "Board Pressure" for metric in preview.metrics)
+    assert preview.projected_outcome in {
+        "sample operating turn",
+        "sample shutdown risk",
+        "sample victory path",
+    }
+
+
+def test_run_postmortem_surfaces_ranked_takeaways_for_failure() -> None:
+    product = make_product("Postmortem Core", quality=48, bug_level=30, technical_debt=34)
+    state = make_state(product, cash_on_hand=Decimal("-80.00"), current_turn=9)
+    state.company.game_over = True
+    state.finance.governance_risk = 62
+    state.support_program.backlog_queue = 12
+    state.support_program.escalation_queue = 4
+
+    postmortem = build_run_postmortem(state)
+
+    assert postmortem.title == "Failure Postmortem"
+    assert postmortem.next_run_focus in {action.value for action in TurnAction}
+    assert 1 <= len(postmortem.findings) <= 3
+    assert any(finding.area == "finance" for finding in postmortem.findings)
+
+
+def test_balance_threshold_evaluation_marks_builder_shutdown_as_fail() -> None:
+    cell = BalanceMatrixCell(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.BUILDER,
+        average_score=92.0,
+        average_cash=Decimal("400.00"),
+        average_users=38.0,
+        victories=0,
+        shutdowns=1,
+    )
+
+    evaluation = evaluate_balance_cell(cell, runs=1, turns=6)
+
+    assert evaluation.status == "fail"
+    assert evaluation.shutdown_ceiling == 0
+
+
+def test_difficulty_profiles_expose_player_guidance() -> None:
+    founder_profile = get_difficulty_profile(DifficultyMode.FOUNDER)
+    builder_profile = get_difficulty_profile(DifficultyMode.BUILDER)
+
+    assert founder_profile.target_experience
+    assert founder_profile.player_goal
+    assert founder_profile.watch_for
+    assert builder_profile.target_experience != founder_profile.target_experience
 
 
 def test_endgame_pressure_counts_queue_exposure_and_channel_recovery_drag() -> None:
