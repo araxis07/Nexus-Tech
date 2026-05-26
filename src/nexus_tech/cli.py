@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
-from rich.prompt import Prompt
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.traceback import install as install_rich_traceback
 
@@ -120,6 +120,7 @@ from nexus_tech.simulation.campaign_starts import (
 )
 from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.catalog_validation import validate_content_catalogs
+from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import (
     ActionContext,
     apply_action,
@@ -1256,6 +1257,8 @@ def run_game_loop(
                 try:
                     context = collect_action_context(state, action, db_path=db_path)
                     if context is None:
+                        continue
+                    if action is TurnAction.END_TURN and not confirm_end_turn(state):
                         continue
 
                     outcome = apply_action(state, action, context=context)
@@ -2924,6 +2927,22 @@ def ask_text_input(prompt: str, *, default: str | None = None) -> str:
         )
 
 
+def ask_confirm_input(prompt: str, *, default: bool) -> bool:
+    """Ask for a yes/no confirmation and exit cleanly if input closes."""
+
+    try:
+        return Confirm.ask(
+            prompt,
+            console=console,
+            default=default,
+            show_choices=False,
+        )
+    except EOFError as error:
+        handle_prompt_abort("Input stream closed. Ending the session.", error, exit_code=1)
+    except KeyboardInterrupt as error:
+        handle_prompt_abort("Session interrupted.", error, exit_code=130)
+
+
 def ask_int_input(
     prompt: str,
     *,
@@ -3007,6 +3026,39 @@ def handle_prompt_abort(message: str, error: BaseException, *, exit_code: int) -
 
     console.print(Panel.fit(message, title="Session Ended", border_style="yellow"))
     raise typer.Exit(code=exit_code) from error
+
+
+def confirm_end_turn(state: GameState) -> bool:
+    """Require explicit confirmation when the preview shows a risky end-turn state."""
+
+    preview = build_end_turn_preview(state)
+    if preview.blocked or not preview.requires_confirmation:
+        return True
+
+    summary = Table.grid(padding=(0, 1))
+    summary.add_row("Warning", preview.warning_level)
+    summary.add_row("Risk Shift", preview.risk_shift)
+    summary.add_row("Projected Outcome", preview.projected_outcome)
+    summary.add_row("Do First", preview.top_command)
+    summary.add_row("Reason", preview.confirmation_reason)
+    console.print(
+        Panel(
+            summary,
+            title="End-Turn Warning",
+            border_style="red" if preview.warning_level == "critical" else "yellow",
+            expand=True,
+        )
+    )
+    confirmed = ask_confirm_input("End the turn anyway?", default=False)
+    if not confirmed:
+        console.print(
+            Panel.fit(
+                f"Turn held open. Run `{preview.top_command}` first.",
+                title="End Turn Cancelled",
+                border_style="yellow",
+            )
+        )
+    return confirmed
 
 
 def build_product_selection_summary(product: Product) -> str:

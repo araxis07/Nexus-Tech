@@ -34,6 +34,9 @@ class EndTurnPreviewSummary:
     top_command: str
     risk_shift: str
     projected_outcome: str
+    warning_level: str
+    requires_confirmation: bool
+    confirmation_reason: str
     metrics: tuple[EndTurnPreviewMetric, ...]
     warnings: tuple[str, ...]
 
@@ -49,6 +52,9 @@ def build_end_turn_preview(state: GameState) -> EndTurnPreviewSummary:
             top_command=TurnAction.VIEW_REPORT.value,
             risk_shift="-",
             projected_outcome="terminal",
+            warning_level="blocked",
+            requires_confirmation=False,
+            confirmation_reason="",
             metrics=(),
             warnings=(),
         )
@@ -60,6 +66,9 @@ def build_end_turn_preview(state: GameState) -> EndTurnPreviewSummary:
             top_command=TurnAction.VIEW_REPORT.value,
             risk_shift="-",
             projected_outcome="victory",
+            warning_level="blocked",
+            requires_confirmation=False,
+            confirmation_reason="",
             metrics=(),
             warnings=(),
         )
@@ -74,6 +83,9 @@ def build_end_turn_preview(state: GameState) -> EndTurnPreviewSummary:
             top_command=TurnAction.VIEW_STATUS.value,
             risk_shift="-",
             projected_outcome="blocked",
+            warning_level="blocked",
+            requires_confirmation=False,
+            confirmation_reason="",
             metrics=(),
             warnings=(state.pending_event.description,),
         )
@@ -179,6 +191,15 @@ def build_end_turn_preview(state: GameState) -> EndTurnPreviewSummary:
         ),
     )
     warnings = _build_warnings(current_forecast, projected_forecast, preview_resolution)
+    warning_level, requires_confirmation, confirmation_reason = _evaluate_confirmation(
+        current_forecast=current_forecast,
+        projected_forecast=projected_forecast,
+        current_runway=current_runway,
+        projected_runway=projected_runway,
+        projected_state=projected_state,
+        current_board_pressure=state.finance.board_pressure,
+        projected_board_pressure=projected_state.finance.board_pressure,
+    )
     return EndTurnPreviewSummary(
         blocked=False,
         headline=(
@@ -189,6 +210,9 @@ def build_end_turn_preview(state: GameState) -> EndTurnPreviewSummary:
         top_command=current_forecast.top_command,
         risk_shift=f"{current_forecast.overall_risk} -> {projected_forecast.overall_risk}",
         projected_outcome=_projected_outcome_label(projected_state),
+        warning_level=warning_level,
+        requires_confirmation=requires_confirmation,
+        confirmation_reason=confirmation_reason,
         metrics=metrics,
         warnings=warnings,
     )
@@ -221,6 +245,81 @@ def _projected_outcome_label(projected_state: GameState) -> str:
     if projected_state.victory_achieved:
         return "sample victory path"
     return "sample operating turn"
+
+
+def _evaluate_confirmation(
+    *,
+    current_forecast,
+    projected_forecast,
+    current_runway: int | None,
+    projected_runway: int | None,
+    projected_state,
+    current_board_pressure: int,
+    projected_board_pressure: int,
+) -> tuple[str, bool, str]:
+    preventive_command = (
+        projected_forecast.top_command
+        if projected_forecast.top_command != TurnAction.VIEW_STATUS.value
+        else current_forecast.top_command
+    )
+    if projected_state.company.game_over:
+        return (
+            "critical",
+            True,
+            f"Preview shows a sample shutdown. Run `{preventive_command}` before ending the turn.",
+        )
+    if projected_forecast.overall_risk == "critical":
+        return (
+            "critical",
+            True,
+            (
+                f"Projected risk rises to critical. Run `{preventive_command}` before locking in "
+                "the next turn."
+            ),
+        )
+    if projected_runway is not None and projected_runway <= 2:
+        return (
+            "high",
+            True,
+            (
+                f"Projected runway falls to {projected_runway} turn(s). "
+                f"`{preventive_command}` should happen first."
+            ),
+        )
+    if projected_board_pressure - current_board_pressure >= 8:
+        return (
+            "high",
+            True,
+            (
+                "Board pressure is projected to jump by "
+                f"{projected_board_pressure - current_board_pressure}. "
+                f"Run `{preventive_command}` before ending the turn."
+            ),
+        )
+    if (
+        current_runway is not None
+        and projected_runway is not None
+        and projected_runway < current_runway
+        and projected_forecast.overall_risk in {"high", "elevated"}
+    ):
+        return (
+            "elevated",
+            False,
+            f"Runway is tightening. `{preventive_command}` is still the safer move first.",
+        )
+    if projected_forecast.overall_risk == "high":
+        return (
+            "high",
+            False,
+            f"`{preventive_command}` is recommended before ending the turn.",
+        )
+    if projected_forecast.overall_risk == "elevated":
+        return (
+            "elevated",
+            False,
+            f"`{preventive_command}` would reduce the projected next-turn pressure.",
+        )
+    return ("controlled", False, "No elevated end-turn warning is active.")
 
 
 def _format_money(value: Decimal) -> str:

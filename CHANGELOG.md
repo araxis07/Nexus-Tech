@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.86.0 - 2026-05-26
+
+- Added explicit Turn Coach "Not Now" guidance so players see which commands should be delayed and why instead of only seeing the next recommended move
+- Added end-turn warning confirmation gates that stop high-risk `end_turn` commits behind a clear warning panel when the sample turn points to shutdown, critical risk, or sharp governance deterioration
+- Archived postmortem summaries and next-focus commands with completed runs so `list-archives`, `compare-archives`, and progression review keep the last run lesson attached to the meta layer
+- Tuned autoplay decision rules and several stressed scenarios so `debt_crunch`, `vc_sprint`, `founder_journey`, `bootstrap_studio`, `agency_pivot`, and `enterprise_compliance` are less likely to fail for avoidable reasons during balance sweeps
+- Made partnership creation ids deterministic across resumed runs so save/load replay stays stable when new channel deals open after a restore
+- Expanded regression coverage for warning gates, archive review metadata, deterministic replay, balance resilience, and updated scenario finance seeds
+- Promoted the package version to `0.86.0`
+
 ## 0.85.0 - 2026-05-26
 
 - Added an End-Turn Preview panel that projects one deterministic sample turn ahead and surfaces cash, runway, reputation, user, board-pressure, support, and channel-risk deltas before the player commits

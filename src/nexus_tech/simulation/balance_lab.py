@@ -229,7 +229,10 @@ def run_autoplay(state: GameState, rng: RandomSource, *, max_turns: int) -> Game
 
         while state.action_points_remaining > 0:
             planned_action = _choose_action(state)
-            outcome = apply_action(state, planned_action.action, context=planned_action.context)
+            try:
+                outcome = apply_action(state, planned_action.action, context=planned_action.context)
+            except ValueError:
+                outcome = apply_action(state, TurnAction.WAIT, context=ActionContext())
             state = outcome.state
             if state.pending_event is not None:
                 state = _resolve_pending_event_with_policy(state)
@@ -629,6 +632,7 @@ class PlannedAction:
 
 def _choose_action(state: GameState) -> PlannedAction:
     active_products = [product for product in state.products if product.is_active]
+    active_product_count = len(active_products)
     if not active_products:
         return PlannedAction(TurnAction.WAIT, ActionContext())
 
@@ -672,15 +676,29 @@ def _choose_action(state: GameState) -> PlannedAction:
             ActionContext(roadmap_focus=_choose_roadmap_focus(state)),
         )
 
+    liquidity_floor = max(
+        BALANCE.event_investor_cash_threshold,
+        BALANCE.base_operating_cost * Decimal(active_product_count + 4),
+    )
+    if state.company.cash_on_hand <= liquidity_floor and _can_take_angel_round(state):
+        return PlannedAction(TurnAction.RAISE_ANGEL, ActionContext())
     if (
-        state.company.cash_on_hand <= BALANCE.event_investor_cash_threshold
+        state.company.cash_on_hand <= liquidity_floor
         and state.finance.debt_principal < BALANCE.finance_max_total_debt
     ):
         return PlannedAction(TurnAction.TAKE_LOAN, ActionContext())
 
+    strongest_product = _pick_primary_product(state)
     if (
         state.finance.debt_principal > 0
-        and state.company.cash_on_hand >= BALANCE.finance_repayment_min_cash_buffer * 3
+        and state.company.cash_on_hand
+        >= max(
+            BALANCE.finance_repayment_min_cash_buffer * 5,
+            BALANCE.base_operating_cost * Decimal(active_product_count + 5),
+        )
+        and strongest_product.quality >= 62
+        and strongest_product.market_fit >= 56
+        and strongest_product.bug_level <= 18
     ):
         return PlannedAction(TurnAction.REPAY_DEBT, ActionContext())
 
@@ -695,7 +713,6 @@ def _choose_action(state: GameState) -> PlannedAction:
         )
 
     worst_product = _pick_worst_product(state)
-    strongest_product = _pick_primary_product(state)
     operations = calculate_operations_summary(
         state.products,
         state.employees,
@@ -718,7 +735,7 @@ def _choose_action(state: GameState) -> PlannedAction:
             TurnAction.ADD_FEATURE,
             ActionContext(target_product_id=worst_product.id),
         )
-    if len(state.employees) < 4 and state.company.cash_on_hand >= BALANCE.create_product_cost * 4:
+    if len(state.employees) < 4 and _should_expand_headcount(state):
         return PlannedAction(
             TurnAction.HIRE_EMPLOYEE,
             ActionContext(
@@ -771,13 +788,19 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
     elif event.event_id == "favorable_market_trend":
         option_id = (
             "lean_in"
-            if state.company.cash_on_hand > BALANCE.event_market_trend_invest_cost * 2
+            if (
+                state.company.cash_on_hand > BALANCE.event_market_trend_invest_cost * 3
+                and state.finance.debt_principal <= BALANCE.finance_loan_amount
+            )
             else "bank_it"
         )
     elif event.event_id == "investor_outreach":
         option_id = (
             "take_capital"
-            if state.company.cash_on_hand <= BALANCE.event_investor_cash_threshold
+            if (
+                state.company.cash_on_hand <= BALANCE.event_investor_cash_threshold
+                and _can_take_angel_round(state)
+            )
             else "stay_bootstrapped"
         )
     elif event.event_id == "team_burnout_spike":
@@ -916,7 +939,14 @@ def _resolve_pending_event_with_policy(state: GameState) -> GameState:
     else:
         option_id = event.options[0].id
 
-    return resolve_pending_event(state, option_id).state
+    option_order = [option_id] + [option.id for option in event.options if option.id != option_id]
+    for candidate_id in option_order:
+        preview_state = state.model_copy(deep=True)
+        try:
+            return resolve_pending_event(preview_state, candidate_id).state
+        except ValueError:
+            continue
+    return state
 
 
 def _pick_worst_product(state: GameState) -> Product:
@@ -959,12 +989,46 @@ def _choose_hire_role(state: GameState) -> EmployeeRole:
     return EmployeeRole.ENGINEER
 
 
+def _should_expand_headcount(state: GameState) -> bool:
+    flagship = _pick_primary_product(state)
+    active_products = sum(1 for product in state.products if product.is_active)
+    cash_floor = max(BALANCE.create_product_cost * 4, BALANCE.base_operating_cost * 6)
+    if state.company.cash_on_hand < cash_floor:
+        return False
+    if state.finance.debt_principal >= BALANCE.finance_loan_amount * 2:
+        return False
+    if flagship.quality <= 54 or flagship.bug_level >= 24:
+        return False
+    if active_products == 1 and len(state.employees) >= 2 and state.company.current_turn <= 4:
+        return False
+    return not (active_products >= 2 and len(state.employees) >= active_products + 1)
+
+
 def _should_create_product(state: GameState) -> bool:
+    flagship = _pick_primary_product(state)
     active_products = sum(1 for product in state.products if product.is_active)
     return (
-        state.company.current_turn >= 4
+        state.company.current_turn >= 5
         and active_products < 3
-        and state.company.cash_on_hand >= BALANCE.create_product_cost * 3
+        and len(state.employees) >= active_products + 2
+        and state.company.cash_on_hand
+        >= max(
+            BALANCE.create_product_cost * 5,
+            BALANCE.base_operating_cost * 7,
+        )
+        and state.finance.debt_principal < BALANCE.finance_loan_amount * 2
+        and flagship.quality >= 60
+        and flagship.market_fit >= 56
+        and flagship.bug_level <= 18
+        and flagship.technical_debt <= 28
+    )
+
+
+def _can_take_angel_round(state: GameState) -> bool:
+    total_users = sum(product.user_count for product in state.products if product.is_active)
+    return (
+        state.company.reputation >= BALANCE.finance_angel_reputation_threshold
+        or total_users >= BALANCE.finance_angel_user_threshold
     )
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import (
@@ -139,6 +139,7 @@ def create_partnership(
 
     state.company.cash_on_hand = quantize_money(state.company.cash_on_hand - creation_cost)
     partnership = PartnershipDeal(
+        id=_build_partnership_id(state, product_id, channel),
         name=f"{product.name} {channel.value.replace('_', ' ').title()} Channel",
         product_id=product.id,
         channel=channel,
@@ -158,6 +159,22 @@ def create_partnership(
     state.partnerships.append(partnership)
     return PartnershipActionSummary(
         message=(f"Opened {channel.value} channel for {product.name}. Cash -{creation_cost}.")
+    )
+
+
+def _build_partnership_id(
+    state: GameState,
+    product_id: UUID,
+    channel: PartnerChannel,
+) -> UUID:
+    """Generate a stable partnership id so resumed runs replay the same record."""
+
+    return uuid5(
+        NAMESPACE_URL,
+        (
+            f"nexus-tech:partnership:{state.company.id}:{product_id}:{channel.value}:"
+            f"{state.company.current_turn}:{len(state.partnerships)}"
+        ),
     )
 
 

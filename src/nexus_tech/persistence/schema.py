@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 22
+CURRENT_SCHEMA_VERSION = 23
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 22,
+        schema_version INTEGER NOT NULL DEFAULT 23,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -75,7 +75,11 @@ SCHEMA_STATEMENTS = (
         offer_value TEXT NOT NULL DEFAULT '0.00',
         final_cash TEXT NOT NULL,
         final_reputation INTEGER NOT NULL,
-        archived_at TEXT NOT NULL
+        archived_at TEXT NOT NULL,
+        review_title TEXT NOT NULL DEFAULT '',
+        review_primary_area TEXT NOT NULL DEFAULT '',
+        review_primary_summary TEXT NOT NULL DEFAULT '',
+        review_next_focus TEXT NOT NULL DEFAULT ''
     )
     """,
     """
@@ -1192,6 +1196,30 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="run_archives",
         column_name="offer_value",
         column_definition="TEXT NOT NULL DEFAULT '0.00'",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="review_title",
+        column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="review_primary_area",
+        column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="review_primary_summary",
+        column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="review_next_focus",
+        column_definition="TEXT NOT NULL DEFAULT ''",
     )
     _ensure_column(
         connection,

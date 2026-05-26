@@ -235,6 +235,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Archive run score tier, campaign grade, and estimated valuation so completed runs are easier to compare later
 - Archive compact run badges such as capital discipline, board trust, and enterprise execution so meta history is easier to scan quickly
 - Archive strategic outlook and modeled offer value so completed runs can be compared by likely business outcome as well as score
+- Archive after-action review summaries and next-focus commands so completed runs keep the main lesson attached to progression history
 - Compare completed runs through archive benchmarks such as best score, best offer, and exit-path coverage directly in the terminal
 - Unlock archive-driven reward hints for scenarios, templates, rivals, and review tools as progression achievements stack up
 - Track unlocked archive rewards as explicit typed entries instead of only free-form hint text
@@ -251,8 +252,10 @@ Each turn represents a business interval. You review the company, choose actions
 - Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
 - Guided Opening now adapts the first 6 turns into a live checklist instead of leaving onboarding as static text only
 - Turn Coach now includes action windows and skip-consequence notes so the next 2-3 turns are easier to sequence
+- Turn Coach now also marks "Not Now" commands when growth, hiring, or ending the turn would lock in avoidable risk
 - Risk Forecast now surfaces the next-turn failure modes and mitigation commands directly in the dashboard and report
 - End-Turn Preview now samples the next turn before you commit so cash, runway, board pressure, support load, and channel risk deltas are visible
+- End-Turn Preview can require a confirmation step before risky `end_turn` commits when the sample outcome points to shutdown or critical pressure
 - Victory and shutdown screens now include an after-action review that ranks the main strain lanes and the command that should have been run earlier
 - Difficulty Profile panels and intro messaging now explain the intended play style, goal, and failure mode for `builder`, `standard`, and `founder`
 - Finance and support panels now surface forecast scenarios, staffing capacity, and staffing gaps for faster live decision-making
@@ -267,6 +270,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Deterministic `balance-audit` runs to flag rough scenario/difficulty combinations for tuning
 - Deterministic `export-balance-csv` output for external review of scenario and difficulty balance
 - Deterministic `balance-report` output for Markdown tuning reports that combine matrix, audit data, threshold gates, and top tuning priorities
+- Autoplay balance sweeps now degrade more gracefully around invalid funding/event branches so tuning runs fail as balance signals instead of crashing on input policy mistakes
 - Built-in `glossary` command to explain core stats, pressure systems, and decision families
 - Built-in `validate-content` command to check catalog references and event handler wiring before release
 - Report now includes recent events, funding history, and milestone history

@@ -141,7 +141,7 @@ def test_create_product_action_uses_selected_template() -> None:
 def test_finance_seed_is_loaded_from_scenario_content() -> None:
     state = create_new_game(scenario_id="debt_crunch")
 
-    assert state.finance.debt_principal == Decimal("4200.00")
+    assert state.finance.debt_principal == Decimal("2700.00")
     assert state.finance.loan_interest_rate == Decimal("0.0350")
     assert state.finance.investor_pressure == 8
 

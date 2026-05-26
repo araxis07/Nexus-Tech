@@ -35,6 +35,14 @@ class TurnCoachRecommendation:
 
 
 @dataclass(frozen=True)
+class TurnCoachDeferredAction:
+    """One action the coach explicitly recommends delaying for now."""
+
+    command: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class TurnCoachSummary:
     """Compact mission board for the current turn."""
 
@@ -47,6 +55,7 @@ class TurnCoachSummary:
     finance_command: str
     support_command: str
     channel_command: str
+    deferred_actions: tuple[TurnCoachDeferredAction, ...]
     summary: str
 
 
@@ -110,6 +119,7 @@ def build_turn_coach(state: GameState) -> TurnCoachSummary:
     opening_command = opening.current_command
     support_command = _choose_support_command(state, queue_exposure)
     channel_command = _choose_channel_command(portfolio)
+    flagship = _pick_flagship_product(state)
 
     current_opening_step = next(
         (
@@ -221,11 +231,21 @@ def build_turn_coach(state: GameState) -> TurnCoachSummary:
     primary = ranked[0].command if ranked else TurnAction.VIEW_STATUS.value
     focus = ranked[0].title if ranked else "Review current status"
     mission_window = _build_mission_window(ranked)
+    deferred_actions = _build_deferred_actions(
+        state,
+        pressure=pressure,
+        planner=planner,
+        queue_exposure=queue_exposure,
+        portfolio=portfolio,
+        flagship=flagship,
+    )
     summary = (
         f"Work `{primary}` now, then line up "
         f"{', '.join(recommendation.command for recommendation in ranked[1:3]) or 'review status'} "
         f"over the {mission_window}."
     )
+    if deferred_actions:
+        summary += f" Hold `{deferred_actions[0].command}` for later."
     return TurnCoachSummary(
         primary_command=primary,
         focus=focus,
@@ -236,6 +256,7 @@ def build_turn_coach(state: GameState) -> TurnCoachSummary:
         finance_command=finance_command,
         support_command=support_command,
         channel_command=channel_command,
+        deferred_actions=deferred_actions,
         summary=summary,
     )
 
@@ -455,3 +476,103 @@ def _latest_net_cash_flow(state: GameState) -> Decimal:
     if not state.turn_history:
         return Decimal("0.00")
     return state.turn_history[-1].net_cash_flow
+
+
+def _build_deferred_actions(
+    state: GameState,
+    *,
+    pressure,
+    planner,
+    queue_exposure,
+    portfolio,
+    flagship,
+) -> tuple[TurnCoachDeferredAction, ...]:
+    deferred: list[TurnCoachDeferredAction] = []
+
+    if (
+        state.finance.board_resolution_due
+        or state.finance.governance_risk >= 58
+        or ("blocked" in pressure.path_gate_alert or "action:" in pressure.path_gate_alert)
+    ):
+        deferred.append(
+            TurnCoachDeferredAction(
+                command=TurnAction.END_TURN.value,
+                reason=(
+                    "Control pressure is still open, so ending the turn would lock in "
+                    "avoidable risk."
+                ),
+            )
+        )
+
+    if planner.reserve_break_risk in {
+        "critical",
+        "high",
+        "elevated",
+    } or state.company.cash_on_hand < BALANCE.base_operating_cost * Decimal("4"):
+        deferred.append(
+            TurnCoachDeferredAction(
+                command=TurnAction.HIRE_EMPLOYEE.value,
+                reason="Runway is too thin for another salary until finance pressure cools.",
+            )
+        )
+        deferred.append(
+            TurnCoachDeferredAction(
+                command=TurnAction.CREATE_PRODUCT.value,
+                reason=(
+                    "Another product would widen burn before the current operating loop stabilizes."
+                ),
+            )
+        )
+
+    if flagship.quality <= 54 or flagship.bug_level >= 24 or flagship.technical_debt >= 28:
+        deferred.append(
+            TurnCoachDeferredAction(
+                command=TurnAction.MARKET_PRODUCT.value,
+                reason=(
+                    f"{flagship.name} is still fragile on quality, bugs, or debt, so paid growth "
+                    "would buy churn and support load."
+                ),
+            )
+        )
+
+    if (
+        queue_exposure.severe_queue_accounts > 0
+        or state.support_program.backlog_queue
+        >= BALANCE.support_program_backlog_reputation_threshold
+    ):
+        deferred.append(
+            TurnCoachDeferredAction(
+                command=TurnAction.CREATE_PARTNERSHIP.value,
+                reason=(
+                    "Support queues are already hot, so new demand channels would add "
+                    "avoidable strain."
+                ),
+            )
+        )
+
+    if portfolio.total_count > 0 and portfolio.channel_dependency_risk >= 56:
+        deferred.append(
+            TurnCoachDeferredAction(
+                command=TurnAction.MARKET_PRODUCT.value,
+                reason="Channel dependency is already elevated, so pure growth pushes should wait.",
+            )
+        )
+
+    deduped: dict[str, TurnCoachDeferredAction] = {}
+    for action in deferred:
+        deduped.setdefault(action.command, action)
+    return tuple(deduped.values())[:3]
+
+
+def _pick_flagship_product(state: GameState):
+    active_products = [product for product in state.products if product.is_active]
+    candidates = active_products or state.products
+    return max(
+        candidates,
+        key=lambda product: (
+            product.user_count,
+            product.quality,
+            product.market_fit,
+            -product.bug_level,
+        ),
+    )

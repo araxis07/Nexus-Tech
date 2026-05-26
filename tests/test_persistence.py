@@ -1049,6 +1049,9 @@ def test_completed_runs_are_archived_for_meta_history(tmp_path: Path) -> None:
     assert archives[0].achievement_badges
     assert archives[0].strategic_outlook
     assert archives[0].offer_value > Decimal("0.00")
+    assert archives[0].review_title
+    assert archives[0].review_primary_summary
+    assert archives[0].review_next_focus
 
 
 def test_rename_save_moves_state_to_new_slot(tmp_path: Path) -> None:

@@ -72,6 +72,9 @@ class ArchiveComparisonSummary:
     grade_mix: tuple[str, ...]
     badge_coverage: tuple[str, ...]
     dominant_path: str
+    dominant_review_lane: str
+    latest_review_label: str
+    common_next_focus: str
     path_balance_note: str
     next_gap: str
     recommendation: str
@@ -476,6 +479,9 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
             grade_mix=tuple(),
             badge_coverage=tuple(),
             dominant_path="-",
+            dominant_review_lane="-",
+            latest_review_label="-",
+            common_next_focus="-",
             path_balance_note="No endgame path coverage yet.",
             next_gap="Archive at least one completed run before comparing paths.",
             recommendation="Archive at least one completed run before comparing outcomes.",
@@ -538,6 +544,13 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
         ),
         key=lambda item: item[1],
     )[0]
+    dominant_review_lane = _dominant_review_lane(archives)
+    common_next_focus = _common_next_focus(archives)
+    latest_review_label = (
+        f"{latest_archive.review_primary_area}: {latest_archive.review_primary_summary}"
+        if latest_archive.review_primary_area
+        else latest_archive.review_title or "-"
+    )
     if len(outcome_mix) >= 3:
         path_balance_note = "Archive history now covers multiple viable endgame paths."
     elif dominant_path == "restructure":
@@ -607,10 +620,41 @@ def build_archive_comparison(archives: list[RunArchiveSummary]) -> ArchiveCompar
         grade_mix=grade_mix,
         badge_coverage=badge_coverage,
         dominant_path=dominant_path,
+        dominant_review_lane=dominant_review_lane,
+        latest_review_label=latest_review_label,
+        common_next_focus=common_next_focus,
         path_balance_note=path_balance_note,
         next_gap=next_gap,
         recommendation=recommendation,
     )
+
+
+def _dominant_review_lane(archives: list[RunArchiveSummary]) -> str:
+    lanes = {
+        archive.review_primary_area: sum(
+            1
+            for candidate in archives
+            if candidate.review_primary_area == archive.review_primary_area
+        )
+        for archive in archives
+        if archive.review_primary_area
+    }
+    if not lanes:
+        return "-"
+    return max(lanes.items(), key=lambda item: item[1])[0]
+
+
+def _common_next_focus(archives: list[RunArchiveSummary]) -> str:
+    focuses = {
+        archive.review_next_focus: sum(
+            1 for candidate in archives if candidate.review_next_focus == archive.review_next_focus
+        )
+        for archive in archives
+        if archive.review_next_focus
+    }
+    if not focuses:
+        return "-"
+    return max(focuses.items(), key=lambda item: item[1])[0]
 
 
 def _compute_unlock_status(archives: list[RunArchiveSummary]) -> dict[str, bool]:

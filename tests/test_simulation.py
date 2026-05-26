@@ -12115,6 +12115,8 @@ def test_turn_coach_surfaces_ranked_commands_from_endgame_and_operating_pressure
     assert any(recommendation.urgency >= 70 for recommendation in coach.recommendations)
     assert all(recommendation.horizon_turns >= 1 for recommendation in coach.recommendations)
     assert all(recommendation.consequence for recommendation in coach.recommendations)
+    assert coach.deferred_actions
+    assert all(action.command in valid_commands for action in coach.deferred_actions)
 
 
 def test_guided_opening_points_to_hire_then_assign_in_early_turns() -> None:
@@ -12218,11 +12220,38 @@ def test_end_turn_preview_projects_next_turn_metrics() -> None:
     assert preview.metrics
     assert any(metric.label == "Cash" for metric in preview.metrics)
     assert any(metric.label == "Board Pressure" for metric in preview.metrics)
+    assert preview.warning_level in {"controlled", "elevated", "high", "critical"}
+    assert isinstance(preview.requires_confirmation, bool)
+    assert preview.confirmation_reason
     assert preview.projected_outcome in {
         "sample operating turn",
         "sample shutdown risk",
         "sample victory path",
     }
+
+
+def test_end_turn_preview_requires_confirmation_for_shutdown_sample() -> None:
+    product = make_product(
+        "Fragile Core",
+        quality=42,
+        bug_level=28,
+        technical_debt=34,
+        user_count=6,
+        revenue_per_user=Decimal("9.00"),
+        maintenance_cost=Decimal("420.00"),
+    )
+    state = make_state(
+        product,
+        employees=[make_employee("Burning Cash", EmployeeRole.ENGINEER, salary=Decimal("900.00"))],
+        cash_on_hand=Decimal("180.00"),
+        current_turn=5,
+    )
+
+    preview = build_end_turn_preview(state)
+
+    assert preview.projected_outcome == "sample shutdown risk"
+    assert preview.warning_level == "critical"
+    assert preview.requires_confirmation is True
 
 
 def test_run_postmortem_surfaces_ranked_takeaways_for_failure() -> None:
@@ -12256,6 +12285,20 @@ def test_balance_threshold_evaluation_marks_builder_shutdown_as_fail() -> None:
 
     assert evaluation.status == "fail"
     assert evaluation.shutdown_ceiling == 0
+
+
+def test_balance_batch_handles_debt_crunch_builder_without_crashing() -> None:
+    batch = run_balance_batch(
+        scenario_id="debt_crunch",
+        difficulty_mode=DifficultyMode.BUILDER,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=4,
+        seed_base=100,
+    )
+
+    assert batch.scenario_id == "debt_crunch"
+    assert len(batch.results) == 1
 
 
 def test_difficulty_profiles_expose_player_guidance() -> None:

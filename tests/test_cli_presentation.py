@@ -69,6 +69,7 @@ from nexus_tech.simulation.balance_lab import (
     BalanceScenarioComparison,
 )
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
+from nexus_tech.simulation.end_turn_preview import EndTurnPreviewSummary
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
 
@@ -976,6 +977,10 @@ def test_list_archives_command_renders_archive_catalog(
             final_cash=Decimal("12400.00"),
             final_reputation=64,
             archived_at="2026-04-28T01:00:00+00:00",
+            review_title="After-Action Review",
+            review_primary_area="finance",
+            review_primary_summary="Cash discipline stayed ahead of scale pressure.",
+            review_next_focus="review_finance",
         )
     ]
 
@@ -994,6 +999,7 @@ def test_list_archives_command_renders_archive_catalog(
     assert result.exit_code == 0
     assert captured["db_path"] == db_path
     assert "Run Archives" in result.output
+    assert "Next Focus" in result.output
 
 
 def test_compare_archives_command_renders_archive_comparison(
@@ -1020,6 +1026,10 @@ def test_compare_archives_command_renders_archive_comparison(
             final_cash=Decimal("12400.00"),
             final_reputation=64,
             archived_at="2026-04-28T01:00:00+00:00",
+            review_title="After-Action Review",
+            review_primary_area="finance",
+            review_primary_summary="Cash discipline stayed ahead of scale pressure.",
+            review_next_focus="review_finance",
         )
     ]
 
@@ -1039,6 +1049,7 @@ def test_compare_archives_command_renders_archive_comparison(
     assert "Archive Comparison" in result.output
     assert "Run Leaders" in result.output
     assert "Next Gap" in result.output
+    assert "Review Lane" in result.output
 
 
 def test_rename_save_command_calls_coordinator(monkeypatch: MonkeyPatch, tmp_path: Path) -> None:
@@ -1196,6 +1207,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Finance" in output
     assert "Risk Forecast" in output
     assert "End-Turn Preview" in output
+    assert "Warning Level" in output
     assert "Board / Governance" in output
     assert "Key Accounts" in output
     assert "Strategy" in output
@@ -1206,6 +1218,7 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Guided Opening" in output
     assert "Difficulty Profile" in output
     assert "Trade-off" in output
+    assert "Not Now" in output
 
 
 def test_turn_resolution_rendering_contains_summary_sections() -> None:
@@ -1234,6 +1247,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "Scorecard" in output
     assert "Risk Forecast" in output
     assert "End-Turn Preview" in output
+    assert "Warning Level" in output
     assert "Turn History" in output
     assert "Quarter Plan" in output
     assert "Finance" in output
@@ -1446,3 +1460,32 @@ def test_game_over_rendering_contains_failure_postmortem() -> None:
 
     assert "Company Shutdown" in output
     assert "Failure Postmortem" in output
+
+
+def test_confirm_end_turn_rejects_risky_preview(monkeypatch: MonkeyPatch) -> None:
+    state = make_demo_state()
+    console = Console(record=True, width=120)
+    monkeypatch.setattr(cli_module, "console", console)
+    monkeypatch.setattr(
+        cli_module,
+        "build_end_turn_preview",
+        lambda _state: EndTurnPreviewSummary(
+            blocked=False,
+            headline="Risky preview",
+            note="Sample shutdown",
+            top_command="review_finance",
+            risk_shift="high -> critical",
+            projected_outcome="sample shutdown risk",
+            warning_level="critical",
+            requires_confirmation=True,
+            confirmation_reason="Preview shows a sample shutdown.",
+            metrics=(),
+            warnings=("Sample shutdown",),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "ask_confirm_input", lambda *args, **kwargs: False)
+
+    confirmed = cli_module.confirm_end_turn(state)
+
+    assert confirmed is False
+    assert "End-Turn Warning" in console.export_text()

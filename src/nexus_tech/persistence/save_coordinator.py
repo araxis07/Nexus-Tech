@@ -64,6 +64,7 @@ from nexus_tech.persistence.product_repository import ProductRepository
 from nexus_tech.persistence.quarter_plan_repository import QuarterPlanRepository
 from nexus_tech.persistence.schema import CURRENT_SCHEMA_VERSION
 from nexus_tech.simulation.endgame import evaluate_exit_outcome
+from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_badges
 
@@ -136,6 +137,10 @@ class RunArchiveSummary:
     final_cash: Decimal
     final_reputation: int
     archived_at: str
+    review_title: str = ""
+    review_primary_area: str = ""
+    review_primary_summary: str = ""
+    review_next_focus: str = ""
 
 
 class SaveLoadCoordinator:
@@ -520,7 +525,11 @@ class SaveLoadCoordinator:
                         offer_value,
                         final_cash,
                         final_reputation,
-                        archived_at
+                        archived_at,
+                        review_title,
+                        review_primary_area,
+                        review_primary_summary,
+                        review_next_focus
                     FROM run_archives
                     ORDER BY archived_at DESC
                     """
@@ -550,6 +559,10 @@ class SaveLoadCoordinator:
                 final_cash=Decimal(row["final_cash"] or "0.00"),
                 final_reputation=row["final_reputation"] or 0,
                 archived_at=row["archived_at"],
+                review_title=row["review_title"] or "",
+                review_primary_area=row["review_primary_area"] or "",
+                review_primary_summary=row["review_primary_summary"] or "",
+                review_next_focus=row["review_next_focus"] or "",
             )
             for row in rows
         ]
@@ -880,6 +893,8 @@ class SaveLoadCoordinator:
 
         run_score = calculate_run_score(state)
         exit_evaluation = evaluate_exit_outcome(state, run_score)
+        postmortem = build_run_postmortem(state)
+        primary_finding = postmortem.findings[0] if postmortem.findings else None
         connection.execute(
             """
             INSERT OR REPLACE INTO run_archives (
@@ -902,9 +917,13 @@ class SaveLoadCoordinator:
                 offer_value,
                 final_cash,
                 final_reputation,
-                archived_at
+                archived_at,
+                review_title,
+                review_primary_area,
+                review_primary_summary,
+                review_next_focus
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 archive_key,
@@ -927,6 +946,10 @@ class SaveLoadCoordinator:
                 str(state.company.cash_on_hand),
                 state.company.reputation,
                 timestamp,
+                postmortem.title,
+                primary_finding.area if primary_finding is not None else "",
+                primary_finding.summary if primary_finding is not None else postmortem.headline,
+                postmortem.next_run_focus,
             ),
         )
 

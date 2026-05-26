@@ -594,6 +594,8 @@ def render_run_archive_catalog(
     table.add_column("Value", justify="right")
     table.add_column("Cash", justify="right")
     table.add_column("Rep", justify="right")
+    table.add_column("Review")
+    table.add_column("Next Focus")
     table.add_column("Saved")
 
     for archive in archives:
@@ -613,6 +615,12 @@ def render_run_archive_catalog(
             format_money(archive.estimated_valuation),
             format_money(archive.final_cash),
             str(archive.final_reputation),
+            (
+                f"{archive.review_primary_area}: {archive.review_primary_summary}"
+                if archive.review_primary_area
+                else archive.review_title or "-"
+            ),
+            archive.review_next_focus or "-",
             archive.archived_at,
         )
 
@@ -631,6 +639,15 @@ def render_run_archive_catalog(
         "Best Offer", format_money(max(archive.offer_value for archive in archives))
     )
     summary_table.add_row("Outcome Coverage", str(outcome_count))
+    summary_table.add_row(
+        "Latest Review",
+        (
+            f"{latest_archive.review_primary_area}: {latest_archive.review_primary_summary}"
+            if latest_archive.review_primary_area
+            else latest_archive.review_title or "-"
+        ),
+    )
+    summary_table.add_row("Next Focus", latest_archive.review_next_focus or "-")
     console.print(
         Columns(
             [
@@ -1740,8 +1757,18 @@ def _build_turn_coach_panel(state: GameState) -> Panel:
     footer.add_row("Finance", coach.finance_command)
     footer.add_row("Support", coach.support_command)
     footer.add_row("Channel", coach.channel_command)
+    deferred_table = None
+    if coach.deferred_actions:
+        deferred_table = Table(box=box.SIMPLE_HEAVY, expand=True)
+        deferred_table.add_column("Not Now", style="bold yellow")
+        deferred_table.add_column("Reason")
+        for action in coach.deferred_actions:
+            deferred_table.add_row(action.command, action.reason)
+    content = (
+        Group(table, footer, deferred_table) if deferred_table is not None else Group(table, footer)
+    )
     return Panel(
-        Group(table, footer),
+        content,
         title="Turn Coach",
         subtitle=coach.summary,
         border_style="bright_blue",
@@ -1796,8 +1823,12 @@ def _build_end_turn_preview_panel(state: GameState) -> Panel:
         content = preview.note
         if preview.warnings:
             content += "\n\n" + "\n".join(f"- {warning}" for warning in preview.warnings)
+        footer = Table.grid(padding=(0, 1))
+        footer.add_row("Warning Level", preview.warning_level)
+        footer.add_row("Confirm End Turn", "no")
+        footer.add_row("Reason", preview.note)
         return Panel(
-            content,
+            Group(content, footer),
             title="End-Turn Preview",
             subtitle=preview.headline,
             border_style="yellow",
@@ -1822,6 +1853,12 @@ def _build_end_turn_preview_panel(state: GameState) -> Panel:
     footer.add_row("Top Preventive Move", preview.top_command)
     footer.add_row("Risk Shift", preview.risk_shift)
     footer.add_row("Projected Outcome", preview.projected_outcome)
+    footer.add_row("Warning Level", preview.warning_level)
+    footer.add_row(
+        "Confirm End Turn",
+        "yes" if preview.requires_confirmation else "no",
+    )
+    footer.add_row("Reason", preview.confirmation_reason)
     warnings = "\n".join(f"- {warning}" for warning in preview.warnings)
     return Panel(
         Group(table, footer, warnings),
@@ -4475,6 +4512,9 @@ def _render_archive_comparison_summary(
         "Badges",
         ", ".join(comparison.badge_coverage) if comparison.badge_coverage else "-",
     )
+    coverage.add_row("Latest Review", comparison.latest_review_label)
+    coverage.add_row("Review Lane", comparison.dominant_review_lane)
+    coverage.add_row("Common Focus", comparison.common_next_focus)
     coverage.add_row("Path Note", comparison.path_balance_note)
     coverage.add_row("Next Gap", comparison.next_gap)
     coverage.add_row("Recommendation", comparison.recommendation)
