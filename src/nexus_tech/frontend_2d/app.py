@@ -49,7 +49,7 @@ def launch_2d_frontend(
             "pygame-ce is not installed. Install the optional 2D runtime first."
         ) from error
 
-    from nexus_tech.frontend_2d.scenes import MainGameScene
+    from nexus_tech.frontend_2d.scenes import RunScene
     from nexus_tech.frontend_2d.widgets import create_fonts
 
     pygame.init()
@@ -59,7 +59,7 @@ def launch_2d_frontend(
     pygame.display.set_caption(f"NEXUS TECH 2D | {state.company.name}")
     fonts = create_fonts(pygame)
     coordinator = SaveLoadCoordinator(db_path)
-    scene = MainGameScene(
+    scene = RunScene(
         pygame=pygame,
         fonts=fonts,
         state=state,
@@ -83,6 +83,10 @@ def launch_2d_frontend(
                     continue
                 scene.handle_event(event)
             scene.update(dt)
+            next_scene = scene.pop_next_scene()
+            if next_scene is not None:
+                scene = next_scene
+                continue
             scene.draw(surface)
             pygame.display.flip()
             frame_count += 1

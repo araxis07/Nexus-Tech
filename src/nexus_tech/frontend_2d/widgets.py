@@ -142,3 +142,35 @@ def draw_keycap(surface, pygame, font, *, rect, key_text: str, label: str) -> No
     label_surface = font.render(label, True, MUTED)
     surface.blit(key_surface, (rect.left + 10, rect.top + 7))
     surface.blit(label_surface, (rect.left + 62, rect.top + 7))
+
+
+def draw_button(
+    surface,
+    pygame,
+    *,
+    rect,
+    title: str,
+    detail: str,
+    accent: tuple[int, int, int],
+    title_font,
+    detail_font,
+    enabled: bool = True,
+) -> None:
+    """Draw one clickable action or modal button."""
+
+    fill = PANEL_ALT if enabled else (18, 22, 28)
+    border = accent if enabled else BORDER
+    title_color = TEXT if enabled else MUTED
+    detail_color = MUTED if enabled else (100, 112, 128)
+    pygame.draw.rect(surface, fill, rect, border_radius=14)
+    pygame.draw.rect(surface, border, rect, width=1, border_radius=14)
+    pygame.draw.rect(
+        surface,
+        border,
+        (rect.left + 1, rect.top + 1, rect.width - 2, 4),
+        border_radius=4,
+    )
+    title_surface = title_font.render(title, True, title_color)
+    detail_surface = detail_font.render(detail, True, detail_color)
+    surface.blit(title_surface, (rect.left + 12, rect.top + 10))
+    surface.blit(detail_surface, (rect.left + 12, rect.top + 34))

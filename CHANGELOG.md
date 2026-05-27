@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.88.0 - 2026-05-27
+
+- Split the first `pygame-ce` frontend shell into a live `RunScene` plus an animated `TurnSummaryScene` so `end_turn` now resolves through a dedicated post-turn timeline instead of only dropping transient event cards into the dashboard
+- Added a reusable 2D context-picker layer for strategy, roadmap, budget, support lane, hiring, employee assignment, pricing, channel creation, and partnership-targeted recovery commands so the frontend can collect deeper action context without falling back to the CLI as often
+- Added clickable product cards, coach cards, modal options, save/continue controls, and a two-row action bar so the 2D shell is no longer keyboard-only
+- Tightened the 2D HUD around snapshot chips, compact coach/risk cards, and a clearer action bar while keeping the existing animated gauges and product metrics
+- Expanded regression coverage for picker generation, employee-context selection, turn-summary view models, and the updated headless frontend shell
+- Promoted package metadata and runtime versioning to `0.88.0`
+
 ## 0.87.0 - 2026-05-27
 
 - Added a lightweight `pygame-ce` 2D frontend shell with a real render loop, animated gauges, product cards, event overlays, and a keyboard-driven dashboard scene

@@ -21,6 +21,10 @@ class FrontendIntent(Enum):
     TAKE_LOAN = auto()
     RAISE_ANGEL = auto()
     CREATE_PARTNERSHIP = auto()
+    OPEN_STRATEGY = auto()
+    OPEN_ROADMAP = auto()
+    OPEN_BUDGET = auto()
+    OPEN_SUPPORT = auto()
     END_TURN = auto()
     SAVE_GAME = auto()
     QUIT = auto()
@@ -108,6 +112,30 @@ DEFAULT_BINDINGS: tuple[InputBinding, ...] = (
         "Partner",
         "Open a reseller partnership on the selected product.",
         FrontendIntent.CREATE_PARTNERSHIP,
+    ),
+    InputBinding(
+        "Y",
+        "Strategy",
+        "Pick a company-wide strategy preset.",
+        FrontendIntent.OPEN_STRATEGY,
+    ),
+    InputBinding(
+        "R",
+        "Roadmap",
+        "Pick the next roadmap focus.",
+        FrontendIntent.OPEN_ROADMAP,
+    ),
+    InputBinding(
+        "B",
+        "Budget",
+        "Pick a quarter budget stance.",
+        FrontendIntent.OPEN_BUDGET,
+    ),
+    InputBinding(
+        "U",
+        "Support",
+        "Choose the service lane to emphasize.",
+        FrontendIntent.OPEN_SUPPORT,
     ),
     InputBinding(
         "Space",
