@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.87.0 - 2026-05-27
+
+- Added a lightweight `pygame-ce` 2D frontend shell with a real render loop, animated gauges, product cards, event overlays, and a keyboard-driven dashboard scene
+- Added a view-model adapter, tween bank, event stream, input map, and widget layer so the simulation can render outside the Rich terminal without rewriting core game rules
+- Added `play-2d`, `load-game-2d`, and `continue-last-game-2d` commands plus headless frame caps for smoke testing the 2D frontend in automation
+- Added autosave-on-exit behavior for the 2D shell and support for resolving pending events, ending turns with warning confirmation, and applying a focused subset of high-signal gameplay actions
+- Promoted package metadata and runtime versioning to `0.87.0`
+
 ## 0.86.0 - 2026-05-26
 
 - Added explicit Turn Coach "Not Now" guidance so players see which commands should be delayed and why instead of only seeing the next recommended move

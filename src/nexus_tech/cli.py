@@ -54,6 +54,7 @@ from nexus_tech.domain.models import (
     SupportLaneFocus,
     TurnAction,
 )
+from nexus_tech.frontend_2d import Frontend2DUnavailableError, launch_2d_frontend
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
     DEFAULT_SAVE_SLOT,
@@ -219,6 +220,16 @@ BALANCE_GOAL_OPTION = typer.Option(
 )
 CSV_OUTPUT_OPTION = typer.Option(..., "--output", help="CSV path to write.")
 BALANCE_REPORT_OUTPUT_OPTION = typer.Option(..., "--output", help="Markdown path to write.")
+HEADLESS_2D_OPTION = typer.Option(
+    False,
+    "--headless",
+    help="Run the 2D frontend with SDL dummy drivers and no visible window.",
+)
+MAX_FRAMES_2D_OPTION = typer.Option(
+    None,
+    "--max-frames",
+    help="Optional frame cap used for smoke tests and automated verification.",
+)
 
 ACTION_KEYS = {
     "1": TurnAction.CREATE_PRODUCT,
@@ -574,6 +585,49 @@ def play_alias(
         seed=seed,
         db_path=db_path,
         slot_name=slot,
+    )
+
+
+@app.command("play-2d")
+def play_2d_command(
+    company_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
+        "--company-name",
+        help="Company display name override. Defaults to the scenario's company name.",
+    ),
+    product_name: Optional[str] = typer.Option(  # noqa: UP045
+        None,
+        "--product-name",
+        help="Primary product name override. Applies to the first scenario product.",
+    ),
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
+    seed: Optional[int] = typer.Option(  # noqa: UP045
+        None,
+        "--seed",
+        help=f"Seed for reproducible simulation and demo runs, for example {DEMO_SEED_EXAMPLE}.",
+    ),
+    db_path: Path = DB_PATH_OPTION,
+    slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
+    headless: bool = HEADLESS_2D_OPTION,
+    max_frames: int | None = MAX_FRAMES_2D_OPTION,
+) -> None:
+    """Launch the lightweight 2D dashboard frontend for a new run."""
+
+    start_new_game_2d(
+        company_name=company_name,
+        product_name=product_name,
+        scenario_id=scenario,
+        campaign_start_id=campaign_start,
+        difficulty_mode=difficulty,
+        campaign_goal_id=goal,
+        seed=seed,
+        db_path=db_path,
+        slot_name=slot,
+        headless=headless,
+        max_frames=max_frames,
     )
 
 
@@ -1141,6 +1195,31 @@ def load_game_command(
     )
 
 
+@app.command("load-game-2d")
+def load_game_2d_command(
+    db_path: Path = DB_PATH_OPTION,
+    slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Save slot name."),
+    headless: bool = HEADLESS_2D_OPTION,
+    max_frames: int | None = MAX_FRAMES_2D_OPTION,
+) -> None:
+    """Load one named save slot into the lightweight 2D dashboard."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        loaded_game = coordinator.load_game(slot)
+    except PersistenceError as error:
+        raise_cli_persistence_error("Load Failed", error)
+
+    launch_2d_session(
+        state=loaded_game.state,
+        rng=loaded_game.rng,
+        db_path=db_path,
+        slot_name=loaded_game.slot_name,
+        headless=headless,
+        max_frames=max_frames,
+    )
+
+
 @app.command("continue-last-game")
 def continue_last_game_command(
     db_path: Path = DB_PATH_OPTION,
@@ -1165,6 +1244,30 @@ def continue_last_game_command(
         rng=loaded_game.rng,
         db_path=db_path,
         slot_name=loaded_game.slot_name,
+    )
+
+
+@app.command("continue-last-game-2d")
+def continue_last_game_2d_command(
+    db_path: Path = DB_PATH_OPTION,
+    headless: bool = HEADLESS_2D_OPTION,
+    max_frames: int | None = MAX_FRAMES_2D_OPTION,
+) -> None:
+    """Continue the latest save slot in the lightweight 2D dashboard."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        loaded_game = coordinator.continue_last_game()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Load Failed", error)
+
+    launch_2d_session(
+        state=loaded_game.state,
+        rng=loaded_game.rng,
+        db_path=db_path,
+        slot_name=loaded_game.slot_name,
+        headless=headless,
+        max_frames=max_frames,
     )
 
 
@@ -1214,6 +1317,87 @@ def start_new_game(
         seed=seed,
     )
     run_game_loop(state=state, rng=rng, db_path=db_path, slot_name=slot_name)
+
+
+def start_new_game_2d(
+    company_name: str | None,
+    product_name: str | None,
+    scenario_id: str,
+    campaign_start_id: str,
+    difficulty_mode: DifficultyMode | None,
+    campaign_goal_id: CampaignGoalId | None,
+    seed: int | None,
+    db_path: Path,
+    slot_name: str,
+    *,
+    headless: bool,
+    max_frames: int | None,
+) -> None:
+    """Create a brand new run and launch the lightweight 2D dashboard."""
+
+    validate_scenario_id(scenario_id)
+    validate_player_scenario_access(scenario_id, db_path=db_path)
+    validate_campaign_start_id(campaign_start_id)
+    validate_player_campaign_start_access(campaign_start_id, db_path=db_path)
+    state = create_new_game(
+        company_name=company_name,
+        product_name=product_name,
+        scenario_id=scenario_id,
+        difficulty_mode=difficulty_mode,
+        campaign_goal_id=campaign_goal_id,
+        campaign_start_id=campaign_start_id,
+    )
+    rng = RandomSource(seed=seed)
+    launch_2d_session(
+        state=state,
+        rng=rng,
+        db_path=db_path,
+        slot_name=slot_name,
+        headless=headless,
+        max_frames=max_frames,
+    )
+
+
+def launch_2d_session(
+    *,
+    state: GameState,
+    rng: RandomSource,
+    db_path: Path,
+    slot_name: str,
+    headless: bool,
+    max_frames: int | None,
+) -> None:
+    """Launch one 2D dashboard session and print the closing summary."""
+
+    try:
+        result = launch_2d_frontend(
+            state=state,
+            rng=rng,
+            db_path=db_path,
+            slot_name=slot_name,
+            headless=headless,
+            max_frames=max_frames,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    console.print(
+        Panel.fit(
+            (
+                f"Closed 2D frontend ({result.exit_reason}). "
+                f"{'Autosaved on exit.' if result.saved_on_exit else 'No autosave was needed.'}"
+            ),
+            title="2D Session Closed",
+            border_style="cyan",
+        )
+    )
 
 
 def run_game_loop(

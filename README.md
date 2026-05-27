@@ -248,6 +248,7 @@ Each turn represents a business interval. You review the company, choose actions
 ### 🖥️ Presentation and CLI
 
 - Rich-powered dashboard panels, tables, summaries, and event notifications
+- Lightweight `pygame-ce` 2D dashboard frontend with animated bars, product cards, event overlays, and keyboard-driven turn controls
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
 - Guided Opening now adapts the first 6 turns into a live checklist instead of leaving onboarding as static text only
@@ -263,6 +264,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Progression and archive tools now surface unlock ids, missing endgame paths, and dominant archive outcomes for faster late-game review
 - Built-in quick guide flow for onboarding and live demos
 - Built-in first-run tutorial and glossary commands for new players
+- Built-in `play-2d`, `load-game-2d`, and `continue-last-game-2d` commands for the first animated frontend shell
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
 - Deterministic `compare-balance` scenario rankings for side-by-side tuning across multiple openings
@@ -532,6 +534,8 @@ The core loop is simple:
 4. Save locally and continue the run later if needed.
 
 If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to get a compact opening checklist.
+
+For the first animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7`. Use `Tab` to switch products, `C` to try the primary coach move when it maps cleanly, `Space` to resolve the turn, and `S` to save without leaving the 2D view.
 
 Difficulty guidance:
 
