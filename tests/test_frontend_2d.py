@@ -21,17 +21,22 @@ from nexus_tech.frontend_2d.catalog import (
     list_scenario_choices,
 )
 from nexus_tech.frontend_2d.context import (
+    ActionRequest,
     ContextPicker,
     build_command_request,
+    build_inspector_action_request,
     explain_command_unavailable,
 )
 from nexus_tech.frontend_2d.event_queue import build_action_events
+from nexus_tech.frontend_2d.scenes import RunScene, TitleScene
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_game_view_model,
     build_run_review_view_model,
     build_turn_summary_view_model,
 )
+from nexus_tech.frontend_2d.widgets import create_fonts
+from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
 
@@ -64,6 +69,31 @@ def _build_enriched_2d_state():
         ),
     ).state
     return state
+
+
+def _build_paged_2d_state():
+    state = _build_enriched_2d_state()
+    state.action_points_remaining = 20
+    for _ in range(4):
+        state = apply_action(
+            state,
+            TurnAction.SOURCE_CANDIDATES,
+            context=ActionContext(),
+        ).state
+    return state
+
+
+def _build_pygame_bundle():
+    import os
+
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+    import pygame
+
+    pygame.init()
+    pygame.font.init()
+    surface = pygame.display.set_mode((960, 640), pygame.HIDDEN)
+    return pygame, create_fonts(pygame), surface
 
 
 def test_build_game_view_model_exposes_products_and_coach_lines() -> None:
@@ -263,6 +293,102 @@ def test_deep_panel_actions_are_supported_or_explained() -> None:
                     selected_product_id=state.products[0].id.hex,
                 )
                 assert request is not None or reason is not None, (panel.key, action.command)
+
+
+def test_build_inspector_action_request_targets_live_entities() -> None:
+    state = _build_enriched_2d_state()
+    panels = build_deep_dive_panel_view_models(
+        state,
+        selected_product_id=state.products[0].id.hex,
+    )
+    pipeline_panel = next(panel for panel in panels if panel.key == "pipeline")
+    release_item = next(
+        section.items[0] for section in pipeline_panel.inspectors if section.key == "releases"
+    )
+    deal_item = next(
+        section.items[0] for section in pipeline_panel.inspectors if section.key == "deals"
+    )
+
+    release_request = build_inspector_action_request(
+        state,
+        panel_key="pipeline",
+        section_key="releases",
+        command=TurnAction.WORK_RELEASE.value,
+        payload=release_item.payload,
+        selected_product_id=state.products[0].id.hex,
+    )
+    deal_request = build_inspector_action_request(
+        state,
+        panel_key="pipeline",
+        section_key="deals",
+        command=TurnAction.ADVANCE_SALES_DEAL.value,
+        payload=deal_item.payload,
+        selected_product_id=state.products[0].id.hex,
+    )
+
+    assert isinstance(release_request, ActionRequest)
+    assert release_request.context.release_id == state.product_releases[0].id
+    assert isinstance(deal_request, ActionRequest)
+    assert deal_request.context.sales_deal_id == state.sales_deals[0].id
+
+
+def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = _build_paged_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=7),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._open_inspector("pipeline")
+        scene._select_inspector_section("candidates")
+        assert scene._selected_inspector_section().key == "candidates"
+        assert scene._inspector_total_pages() >= 2
+        first_page_title = scene._selected_inspector_item().title
+
+        scene._change_inspector_page(1)
+        assert scene._inspector_page == 1
+        assert scene._selected_inspector_item().title != first_page_title
+
+        scene._select_inspector_section("releases")
+        before_progress = scene.state.product_releases[0].progress
+        scene._run_selected_inspector_primary_action()
+
+        assert scene.state.product_releases[0].progress > before_progress
+    finally:
+        pygame.quit()
+
+
+def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-scene.db")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=13),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+        )
+
+        menu_lines = scene._title_sidebar_lines()
+        assert any(line.startswith("Campaign tier:") for line in menu_lines)
+        assert any(line.startswith("Next reward:") for line in menu_lines)
+
+        scene._mode = "archives"
+        archive_lines = scene._title_sidebar_lines()
+        assert any("Coverage gap:" in line for line in archive_lines)
+    finally:
+        pygame.quit()
 
 
 def test_explain_command_unavailable_surfaces_specific_reason() -> None:

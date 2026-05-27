@@ -108,6 +108,8 @@ class DeepDiveInspectorItemViewModel:
     title: str
     detail_lines: tuple[str, ...]
     tone: str
+    payload: str = ""
+    actions: tuple[DeepDiveActionViewModel, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1219,6 +1221,33 @@ def _build_team_inspectors(
                 ),
             ),
             tone=_attribute_tone((employee.morale + employee.energy) // 2),
+            payload=employee.id.hex,
+            actions=tuple(
+                action
+                for action in (
+                    DeepDiveActionViewModel(
+                        "assign_employee",
+                        "Assign",
+                        "Assign to the selected product.",
+                        "success",
+                    )
+                    if employee.assigned_product_id is None
+                    else None,
+                    DeepDiveActionViewModel(
+                        "train_employee",
+                        "Train",
+                        "Raise this teammate's output.",
+                        "info",
+                    ),
+                    DeepDiveActionViewModel(
+                        "promote_employee",
+                        "Promote",
+                        "Advance this teammate if they are ready.",
+                        "warning",
+                    ),
+                )
+                if action is not None
+            ),
         )
         for employee in state.employees[:3]
     ) or (_placeholder_item("No Team Yet", "Hire the first teammate to unlock staffing depth."),)
@@ -1236,8 +1265,39 @@ def _build_team_inspectors(
                 ),
             ),
             tone="warning" if candidate.expires_turn <= state.company.current_turn + 1 else "info",
+            payload=candidate.id.hex,
+            actions=tuple(
+                action
+                for action in (
+                    DeepDiveActionViewModel(
+                        "screen_candidate",
+                        "Screen",
+                        "Move this sourced candidate forward.",
+                        "info",
+                    )
+                    if candidate.stage.value == "sourced"
+                    else None,
+                    DeepDiveActionViewModel(
+                        "interview_candidate",
+                        "Interview",
+                        "Interview this screened candidate.",
+                        "warning",
+                    )
+                    if candidate.stage.value == "screened"
+                    else None,
+                    DeepDiveActionViewModel(
+                        "make_hiring_offer",
+                        "Offer",
+                        "Make the hiring offer now.",
+                        "success",
+                    )
+                    if candidate.stage.value == "interviewed"
+                    else None,
+                )
+                if action is not None
+            ),
         )
-        for candidate in state.hiring_candidates[:2]
+        for candidate in state.hiring_candidates
     ) or (
         _placeholder_item(
             "Hiring Funnel Empty",
@@ -1278,6 +1338,20 @@ def _build_finance_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectio
                 f"runway {runway_text} | burn multiple {state.finance.burn_multiple}",
             ),
             tone=_cash_tone(state.company.cash_on_hand),
+            actions=(
+                DeepDiveActionViewModel(
+                    "take_loan",
+                    "Loan",
+                    "Extend liquidity immediately.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    "raise_angel",
+                    "Angel",
+                    "Raise equity against traction.",
+                    "info",
+                ),
+            ),
         ),
         DeepDiveInspectorItemViewModel(
             title="Leverage",
@@ -1292,6 +1366,14 @@ def _build_finance_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectio
                 ),
             ),
             tone="warning" if state.finance.debt_principal > Decimal("0.00") else "success",
+            actions=(
+                DeepDiveActionViewModel(
+                    "set_capital_plan",
+                    "Capital Plan",
+                    "Reframe funding posture.",
+                    "warning",
+                ),
+            ),
         ),
     )
     planning_items = (
@@ -1308,6 +1390,14 @@ def _build_finance_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectio
                 ),
             ),
             tone="info",
+            actions=(
+                DeepDiveActionViewModel(
+                    "set_capital_plan",
+                    "Edit Plan",
+                    "Choose a new capital posture.",
+                    "warning",
+                ),
+            ),
         ),
         DeepDiveInspectorItemViewModel(
             title="Quarter Plan",
@@ -1322,6 +1412,14 @@ def _build_finance_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectio
                 ),
             ),
             tone="warning",
+            actions=(
+                DeepDiveActionViewModel(
+                    "set_functional_budget",
+                    "Function Budget",
+                    "Rebalance operating allocation.",
+                    "warning",
+                ),
+            ),
         ),
     )
     return (
@@ -1370,8 +1468,22 @@ def _build_customer_inspectors(
                 ),
             ),
             tone="danger" if account.churn_risk >= 65 else "warning",
+            actions=(
+                DeepDiveActionViewModel(
+                    "adjust_pricing",
+                    "Pricing",
+                    "Retune monetization on the selected product.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    "set_target_segment",
+                    "Segment",
+                    "Reposition the selected product.",
+                    "info",
+                ),
+            ),
         )
-        for account in hotspot_accounts[:3]
+        for account in hotspot_accounts
     ) or (
         _placeholder_item(
             "No Key Accounts",
@@ -1393,6 +1505,20 @@ def _build_customer_inspectors(
                 ),
             ),
             tone=("danger" if state.support_program.escalation_queue >= 3 else "warning"),
+            actions=(
+                DeepDiveActionViewModel(
+                    "set_support_lane_focus",
+                    "Lane Focus",
+                    "Reallocate service attention.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    "triage_support_backlog",
+                    "Triage",
+                    "Clear the support queue faster.",
+                    "warning",
+                ),
+            ),
         ),
     )
     return (
@@ -1435,12 +1561,27 @@ def _build_partnership_inspectors(
                 ),
             ),
             tone="danger" if partnership.risk >= 65 else "warning",
+            payload=partnership.id.hex,
+            actions=(
+                DeepDiveActionViewModel(
+                    "renegotiate_partnership",
+                    "Renegotiate",
+                    "Repair this channel relationship.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    "run_partner_recovery_sprint",
+                    "Recovery Sprint",
+                    "Reduce immediate partner strain.",
+                    "warning",
+                ),
+            ),
         )
         for partnership in sorted(
             state.partnerships,
             key=lambda item: (item.risk, item.conflict_pressure, item.sourced_revenue),
             reverse=True,
-        )[:3]
+        )
     ) or (
         _placeholder_item(
             "No Live Channels",
@@ -1458,6 +1599,14 @@ def _build_partnership_inspectors(
                 ),
             ),
             tone="info",
+            actions=(
+                DeepDiveActionViewModel(
+                    "rebalance_channel_mix",
+                    "Rebalance",
+                    "Reduce channel concentration risk.",
+                    "info",
+                ),
+            ),
         ),
     )
     return (
@@ -1492,6 +1641,20 @@ def _build_board_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionV
                 ),
             ),
             tone="danger" if state.finance.board_resolution_due else "warning",
+            actions=(
+                DeepDiveActionViewModel(
+                    "execute_board_response",
+                    "Board Response",
+                    "Answer the current board ask.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    "start_board_recovery_plan",
+                    "Recovery Plan",
+                    "Reset governance posture.",
+                    "warning",
+                ),
+            ),
         ),
     )
     scorecard_items = (
@@ -1505,6 +1668,14 @@ def _build_board_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionV
                 (state.finance.board_profitability_score + state.finance.board_reliability_score)
                 // 2
             ),
+            actions=(
+                DeepDiveActionViewModel(
+                    "review_board",
+                    "Refresh",
+                    "Refresh governance status.",
+                    "info",
+                ),
+            ),
         ),
         DeepDiveInspectorItemViewModel(
             title="Operating Scorecard",
@@ -1515,6 +1686,14 @@ def _build_board_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionV
             tone=_attribute_tone(
                 (state.finance.board_team_health_score + state.finance.board_portfolio_focus_score)
                 // 2
+            ),
+            actions=(
+                DeepDiveActionViewModel(
+                    "execute_restructure_plan",
+                    "Restructure",
+                    "Escalate to restructure if needed.",
+                    "danger",
+                ),
             ),
         ),
     )
@@ -1532,6 +1711,14 @@ def _build_board_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionV
                 ),
             ),
             tone="danger" if state.finance.governance_crisis_active else "warning",
+            actions=(
+                DeepDiveActionViewModel(
+                    "start_board_recovery_plan",
+                    "Recovery Plan",
+                    "Address the governance alert.",
+                    "warning",
+                ),
+            ),
         ),
     )
     return (
@@ -1575,8 +1762,17 @@ def _build_pipeline_inspectors(
                 ),
             ),
             tone="success" if deal.probability >= 65 else "warning",
+            payload=deal.id.hex,
+            actions=(
+                DeepDiveActionViewModel(
+                    "advance_sales_deal",
+                    "Advance Deal",
+                    "Move this opportunity forward.",
+                    "warning",
+                ),
+            ),
         )
-        for deal in state.sales_deals[:2]
+        for deal in state.sales_deals
     ) or (
         _placeholder_item(
             "No Sales Deals",
@@ -1594,8 +1790,17 @@ def _build_pipeline_inspectors(
                 (f"progress {release.progress}/{release.required_progress} | risk {release.risk}"),
             ),
             tone="danger" if release.risk >= 65 else "info",
+            payload=release.id.hex,
+            actions=(
+                DeepDiveActionViewModel(
+                    "work_release",
+                    "Work Release",
+                    "Spend execution time here.",
+                    "success",
+                ),
+            ),
         )
-        for release in state.product_releases[:2]
+        for release in state.product_releases
     ) or (
         _placeholder_item(
             "No Planned Releases",
@@ -1617,8 +1822,17 @@ def _build_pipeline_inspectors(
                 ),
             ),
             tone="danger" if project.delivery_risk >= 65 else "warning",
+            payload=project.id.hex,
+            actions=(
+                DeepDiveActionViewModel(
+                    "work_roadmap_project",
+                    "Work Project",
+                    "Advance this roadmap project.",
+                    "warning",
+                ),
+            ),
         )
-        for project in state.roadmap_projects[:2]
+        for project in state.roadmap_projects
     ) or (
         _placeholder_item(
             "No Roadmap Projects",
@@ -1639,8 +1853,39 @@ def _build_pipeline_inspectors(
                 ),
             ),
             tone="warning" if candidate.stage.value == "interviewed" else "info",
+            payload=candidate.id.hex,
+            actions=tuple(
+                action
+                for action in (
+                    DeepDiveActionViewModel(
+                        "screen_candidate",
+                        "Screen",
+                        "Screen this sourced candidate.",
+                        "info",
+                    )
+                    if candidate.stage.value == "sourced"
+                    else None,
+                    DeepDiveActionViewModel(
+                        "interview_candidate",
+                        "Interview",
+                        "Interview this screened candidate.",
+                        "warning",
+                    )
+                    if candidate.stage.value == "screened"
+                    else None,
+                    DeepDiveActionViewModel(
+                        "make_hiring_offer",
+                        "Offer",
+                        "Make the offer now.",
+                        "success",
+                    )
+                    if candidate.stage.value == "interviewed"
+                    else None,
+                )
+                if action is not None
+            ),
         )
-        for candidate in state.hiring_candidates[:2]
+        for candidate in state.hiring_candidates
     ) or (
         _placeholder_item(
             "No Candidates",
@@ -1691,8 +1936,16 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
                 ),
             ),
             tone="success" if entry.net_cash_flow >= Decimal("0.00") else "warning",
+            actions=(
+                DeepDiveActionViewModel(
+                    "view_report",
+                    "Report",
+                    "Refresh full run reporting.",
+                    "info",
+                ),
+            ),
         )
-        for entry in reversed(state.turn_history[-2:])
+        for entry in reversed(state.turn_history)
     ) or (
         _placeholder_item(
             "No Turn Ledger",
@@ -1707,8 +1960,16 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
                 funding.summary,
             ),
             tone="warning" if funding.funding_type.value == "loan" else "info",
+            actions=(
+                DeepDiveActionViewModel(
+                    "review_finance",
+                    "Finance",
+                    "Refresh funding and cash review.",
+                    "info",
+                ),
+            ),
         )
-        for funding in reversed(state.funding_history[-2:])
+        for funding in reversed(state.funding_history)
     ) or (
         _placeholder_item(
             "No Funding Events",
@@ -1720,8 +1981,16 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
             title=milestone.title,
             detail_lines=(f"turn {milestone.unlocked_turn}", milestone.reward_text),
             tone="success",
+            actions=(
+                DeepDiveActionViewModel(
+                    "view_report",
+                    "Report",
+                    "Refresh milestone reporting.",
+                    "info",
+                ),
+            ),
         )
-        for milestone in reversed(state.milestone_history[-2:])
+        for milestone in reversed(state.milestone_history)
     ) or (
         _placeholder_item(
             "No Milestones Yet",
@@ -1736,8 +2005,16 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
                 event.result_text,
             ),
             tone="warning" if event.category.value == "reputation" else "info",
+            actions=(
+                DeepDiveActionViewModel(
+                    "view_report",
+                    "Report",
+                    "Refresh event and run reporting.",
+                    "info",
+                ),
+            ),
         )
-        for event in reversed(state.event_history[-2:])
+        for event in reversed(state.event_history)
     ) or (
         _placeholder_item(
             "No Event History",

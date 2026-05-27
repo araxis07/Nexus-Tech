@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.92.0 - 2026-05-28
+
+- Turned the 2D inspector overlays into interactive control surfaces with section focus, row selection, page navigation, and item-level actions for live releases, deals, roadmap projects, candidates, teammates, and partner records
+- Added item-targeted 2D action routing for employee, candidate, release, sales-deal, roadmap-project, and partnership commands so inspector rows can execute the entity they display instead of falling back to generic top-level pickers
+- Added archive comparison and campaign-progression summaries to the 2D title sidebar so menu and archive views now surface campaign tier, next reward, next gap, and dominant archive path without leaving the frontend shell
+- Expanded regression coverage for item-targeted inspector requests, interactive inspector paging/action flow, and title-scene meta progression summaries
+- Promoted package metadata and runtime versioning to `0.92.0`
+
 ## 0.91.0 - 2026-05-28
 
 - Added full-screen 2D inspector overlays for team, finance, customers, partnerships, board, pipeline, and report review commands so the frontend can inspect live state without dropping back to CLI-style summaries

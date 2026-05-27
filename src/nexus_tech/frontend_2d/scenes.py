@@ -21,7 +21,9 @@ from nexus_tech.frontend_2d.context import (
     ContextPicker,
     PickerOption,
     build_command_request,
+    build_inspector_action_request,
     explain_command_unavailable,
+    explain_inspector_action_unavailable,
 )
 from nexus_tech.frontend_2d.event_queue import (
     FrontendEvent,
@@ -69,6 +71,12 @@ from nexus_tech.persistence.save_coordinator import (
 )
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
+from nexus_tech.simulation.meta_progression import (
+    ArchiveComparisonSummary,
+    MetaProgressionSummary,
+    build_archive_comparison,
+    summarize_meta_progression,
+)
 from nexus_tech.simulation.randomness import RandomSource
 
 
@@ -369,6 +377,8 @@ class TitleScene(BaseScene):
         self._archive_cards: tuple[ArchiveCardViewModel, ...] = ()
         self._save_summaries_by_slot: dict[str, SaveSlotSummary] = {}
         self._archives_by_key: dict[str, RunArchiveSummary] = {}
+        self._meta_progression: MetaProgressionSummary = summarize_meta_progression([])
+        self._archive_comparison: ArchiveComparisonSummary = build_archive_comparison([])
         self._selected_slot_name: str | None = None
         self._confirm_delete_slot_name: str | None = None
         self._scenario_choices: tuple[ScenarioChoice, ...] = ()
@@ -499,6 +509,8 @@ class TitleScene(BaseScene):
         self._archive_cards = build_archive_card_view_models(archive_summaries)
         self._save_summaries_by_slot = {summary.slot_name: summary for summary in save_summaries}
         self._archives_by_key = {summary.archive_key: summary for summary in archive_summaries}
+        self._meta_progression = summarize_meta_progression(archive_summaries)
+        self._archive_comparison = build_archive_comparison(archive_summaries)
         if self._selected_slot_name not in self._save_summaries_by_slot:
             self._selected_slot_name = None
         if self._wizard_state.slot_name in self._save_summaries_by_slot:
@@ -1455,6 +1467,8 @@ class TitleScene(BaseScene):
         surface.blit(footer_surface, (inner.left, inner.top + 10))
 
     def _title_sidebar_lines(self) -> tuple[str, ...]:
+        meta = self._meta_progression
+        comparison = self._archive_comparison
         if self._mode == "wizard":
             scenario = self.selected_scenario_choice
             campaign_start = self.selected_campaign_start_choice
@@ -1473,6 +1487,17 @@ class TitleScene(BaseScene):
                         f"Start hint: {campaign_start.turn_hint} / {campaign_start.pressure_hint}"
                     )
                 ),
+                f"Meta next reward: {meta.next_reward}",
+            )
+        if self._mode == "archives":
+            return (
+                (
+                    f"Archive runs: {comparison.compared_runs} | dominant path: "
+                    f"{comparison.dominant_path}"
+                ),
+                f"Coverage gap: {comparison.next_gap}",
+                comparison.recommendation,
+                f"Common next focus: {comparison.common_next_focus}",
             )
         if self._mode == "slot_detail":
             summary = self._save_summaries_by_slot.get(self._selected_slot_name or "")
@@ -1481,11 +1506,16 @@ class TitleScene(BaseScene):
                     f"Loaded save slot focus: {summary.company_name}",
                     f"Scenario: {summary.scenario_title}",
                     f"Version {summary.saved_with_version} | schema {summary.schema_version}",
+                    f"Archive tier: {meta.campaign_tier} / {meta.campaign_stage}",
                 )
         return (
-            "Menu mode keeps SQLite save slots and archived runs inside the 2D shell.",
-            "Load any live slot to jump straight into the animated dashboard.",
-            "Archive review scenes surface final score, exit type, and the saved lesson.",
+            f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+            (
+                f"Archive progress: {meta.achievement_progress} | "
+                f"outcomes {meta.outcome_coverage_progress}"
+            ),
+            f"Next goal: {meta.next_goal}",
+            f"Next reward: {meta.next_reward}",
         )
 
     def _draw_delete_confirmation_overlay(self, surface) -> None:
@@ -1862,6 +1892,9 @@ class RunScene(BaseScene):
         self._text_input: TextInputModalState | None = None
         self._deep_panel_key: str | None = None
         self._inspector_panel_key: str | None = None
+        self._inspector_section_index = 0
+        self._inspector_page = 0
+        self._inspector_item_index = 0
         self._product_index = 0
         self._tweens = TweenBank(speed=9.0)
         self._set_selected_product(selected_product_id)
@@ -1906,6 +1939,28 @@ class RunScene(BaseScene):
             if panel.key == self._inspector_panel_key:
                 return panel
         return None
+
+    def _open_inspector(self, panel_key: str) -> None:
+        self._inspector_panel_key = panel_key
+        self._inspector_section_index = 0
+        self._inspector_page = 0
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
+    def _selected_inspector_section(self):
+        panel = self.inspector_panel
+        if panel is None or not panel.inspectors:
+            return None
+        return panel.inspectors[self._inspector_section_index]
+
+    def _selected_inspector_item(self):
+        section = self._selected_inspector_section()
+        if section is None:
+            return None
+        page_items = self._current_inspector_page_items()
+        if not page_items:
+            return None
+        return page_items[self._inspector_item_index]
 
     def update(self, dt: float) -> None:
         """Advance animations and expire transient event cards."""
@@ -1958,8 +2013,37 @@ class RunScene(BaseScene):
             return
 
         if self._inspector_panel_key is not None:
+            if event.key == self.pygame.K_TAB:
+                direction = -1 if event.mod & self.pygame.KMOD_SHIFT else 1
+                self._change_inspector_section(direction)
+                return
+            if event.key == self.pygame.K_LEFT:
+                self._change_inspector_section(-1)
+                return
+            if event.key == self.pygame.K_RIGHT:
+                self._change_inspector_section(1)
+                return
+            if event.key == self.pygame.K_UP:
+                self._change_inspector_item(-1)
+                return
+            if event.key == self.pygame.K_DOWN:
+                self._change_inspector_item(1)
+                return
+            if event.key == self.pygame.K_PAGEUP:
+                self._change_inspector_page(-1)
+                return
+            if event.key == self.pygame.K_PAGEDOWN:
+                self._change_inspector_page(1)
+                return
+            if event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
+                self._run_selected_inspector_primary_action()
+                return
             if event.key == self.pygame.K_s:
                 self._save_current_run()
+                return
+            digit_index = self._digit_index(event)
+            if digit_index is not None:
+                self._run_selected_inspector_action(digit_index)
             return
 
         if self.state.company.game_over or self.state.victory_achieved:
@@ -2137,6 +2221,21 @@ class RunScene(BaseScene):
             return
         if target.kind == "close_inspector":
             self._inspector_panel_key = None
+            return
+        if target.kind == "inspector_section":
+            self._select_inspector_section(target.payload)
+            return
+        if target.kind == "inspector_item":
+            self._select_inspector_item(target.payload)
+            return
+        if target.kind == "inspector_prev_page":
+            self._change_inspector_page(-1)
+            return
+        if target.kind == "inspector_next_page":
+            self._change_inspector_page(1)
+            return
+        if target.kind == "inspector_item_action":
+            self._run_selected_inspector_action(int(target.payload))
             return
         if target.kind == "submit_text":
             self._submit_text_modal()
@@ -2348,7 +2447,7 @@ class RunScene(BaseScene):
             return
         inspector_key = self._inspector_key_for_command(command)
         if inspector_key is not None:
-            self._inspector_panel_key = inspector_key
+            self._open_inspector(inspector_key)
             return
         reason = self._command_disabled_reason(command)
         if reason is not None:
@@ -2512,6 +2611,163 @@ class RunScene(BaseScene):
             dirty=self._dirty,
         )
 
+    def _select_inspector_section(self, payload: str) -> None:
+        panel = self.inspector_panel
+        if panel is None:
+            return
+        for index, section in enumerate(panel.inspectors):
+            if section.key == payload:
+                self._inspector_section_index = index
+                self._inspector_page = 0
+                self._inspector_item_index = 0
+                self._sync_inspector_selection()
+                return
+
+    def _select_inspector_item(self, payload: str) -> None:
+        try:
+            absolute_index = int(payload)
+        except ValueError:
+            return
+        section = self._selected_inspector_section()
+        if section is None or not section.items:
+            return
+        absolute_index = max(0, min(absolute_index, len(section.items) - 1))
+        items_per_page = self._inspector_items_per_page()
+        self._inspector_page = absolute_index // items_per_page
+        self._inspector_item_index = absolute_index % items_per_page
+        self._sync_inspector_selection()
+
+    def _change_inspector_section(self, direction: int) -> None:
+        panel = self.inspector_panel
+        if panel is None or not panel.inspectors:
+            return
+        self._inspector_section_index = (self._inspector_section_index + direction) % len(
+            panel.inspectors
+        )
+        self._inspector_page = 0
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
+    def _change_inspector_page(self, direction: int) -> None:
+        total_pages = self._inspector_total_pages()
+        if total_pages <= 1:
+            return
+        self._inspector_page = (self._inspector_page + direction) % total_pages
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
+    def _change_inspector_item(self, direction: int) -> None:
+        page_items = self._current_inspector_page_items()
+        if not page_items:
+            return
+        self._inspector_item_index = (self._inspector_item_index + direction) % len(page_items)
+
+    def _sync_inspector_selection(self) -> None:
+        panel = self.inspector_panel
+        if panel is None or not panel.inspectors:
+            self._inspector_panel_key = None
+            self._inspector_section_index = 0
+            self._inspector_page = 0
+            self._inspector_item_index = 0
+            return
+        self._inspector_section_index = max(
+            0,
+            min(self._inspector_section_index, len(panel.inspectors) - 1),
+        )
+        section = panel.inspectors[self._inspector_section_index]
+        if not section.items:
+            self._inspector_page = 0
+            self._inspector_item_index = 0
+            return
+        total_pages = self._inspector_total_pages()
+        self._inspector_page = max(0, min(self._inspector_page, total_pages - 1))
+        page_items = self._current_inspector_page_items()
+        if not page_items:
+            self._inspector_page = 0
+            page_items = self._current_inspector_page_items()
+        self._inspector_item_index = max(0, min(self._inspector_item_index, len(page_items) - 1))
+
+    def _inspector_items_per_page(self) -> int:
+        return 4
+
+    def _current_inspector_page_start(self) -> int:
+        return self._inspector_page * self._inspector_items_per_page()
+
+    def _current_inspector_page_items(self):
+        section = self._selected_inspector_section()
+        if section is None:
+            return ()
+        start = self._current_inspector_page_start()
+        end = start + self._inspector_items_per_page()
+        return section.items[start:end]
+
+    def _inspector_total_pages(self) -> int:
+        section = self._selected_inspector_section()
+        if section is None or not section.items:
+            return 1
+        return max(
+            1,
+            (len(section.items) + self._inspector_items_per_page() - 1)
+            // self._inspector_items_per_page(),
+        )
+
+    def _run_selected_inspector_primary_action(self) -> None:
+        self._run_selected_inspector_action(0)
+
+    def _run_selected_inspector_action(self, action_index: int) -> None:
+        item = self._selected_inspector_item()
+        section = self._selected_inspector_section()
+        panel = self.inspector_panel
+        if item is None or section is None or panel is None or action_index >= len(item.actions):
+            return
+        action = item.actions[action_index]
+        inspector_key = self._inspector_key_for_command(action.command)
+        if inspector_key is not None:
+            self._open_inspector(inspector_key)
+            return
+        reason = self._inspector_item_action_reason(action.command, item.payload)
+        if reason is not None:
+            self._push_action_blocked_event(action.command, reason)
+            return
+        request = build_inspector_action_request(
+            self.state,
+            panel_key=panel.key,
+            section_key=section.key,
+            command=action.command,
+            payload=item.payload,
+            selected_product_id=self.selected_product.id.hex,
+        )
+        if isinstance(request, ActionRequest):
+            self._apply_action_request(request)
+            return
+        if isinstance(request, ContextPicker):
+            self._context_picker = request
+            return
+        self.push_event(
+            FrontendEvent(
+                title="Inspector Action Missing",
+                detail=f"`{action.command}` still needs a 2D request path for this item.",
+                severity="warning",
+                ttl=5.5,
+            )
+        )
+
+    def _inspector_item_action_reason(self, command: str, payload: str) -> str | None:
+        if self.state.company.game_over or self.state.victory_achieved:
+            return "This run is already complete."
+        section = self._selected_inspector_section()
+        panel = self.inspector_panel
+        if section is None or panel is None:
+            return "No inspector selection is active."
+        return explain_inspector_action_unavailable(
+            self.state,
+            panel_key=panel.key,
+            section_key=section.key,
+            command=command,
+            payload=payload,
+            selected_product_id=self.selected_product.id.hex,
+        )
+
     def _refresh_view_model(self) -> None:
         self._view_model = build_game_view_model(
             self.state,
@@ -2521,6 +2777,7 @@ class RunScene(BaseScene):
             self._deep_panel_key = None
         if self._inspector_panel_key is not None and self.inspector_panel is None:
             self._inspector_panel_key = None
+        self._sync_inspector_selection()
         self._sync_tweens()
 
     def _sync_tweens(self) -> None:
@@ -3175,91 +3432,128 @@ class RunScene(BaseScene):
             surface.blit(label_surface, (card_rect.left + 10, card_rect.top + 8))
             surface.blit(value_surface, (card_rect.left + 10, card_rect.top + 26))
 
-        sections = panel.inspectors
-        if not sections:
-            sections = ()
-        section_top = metric_top + 72
-        section_rect = pygame.Rect(
-            inner.left,
-            section_top,
-            inner.width,
-            inner.bottom - section_top - 56,
+        nav_top = metric_top + 76
+        nav_width = 250
+        nav_rect = pygame.Rect(inner.left, nav_top, nav_width, inner.bottom - nav_top - 56)
+        focus_rect = pygame.Rect(
+            nav_rect.right + 18,
+            nav_top,
+            inner.right - nav_rect.right - 18,
+            inner.bottom - nav_top - 56,
         )
-        section_title = self.fonts.heading.render("Detailed Inspectors", True, TEXT)
-        surface.blit(section_title, (section_rect.left, section_rect.top - 24))
-        if sections:
-            cols = 1 if len(sections) == 1 else 2
-            rows = max(1, (len(sections) + cols - 1) // cols)
-            col_gap = 14
-            row_gap = 14
-            card_width = int((section_rect.width - col_gap * (cols - 1)) / cols)
-            card_height = int((section_rect.height - row_gap * (rows - 1)) / rows)
-            for index, section in enumerate(sections):
-                row = index // cols
-                col = index % cols
-                card_rect = pygame.Rect(
-                    section_rect.left + col * (card_width + col_gap),
-                    section_rect.top + row * (card_height + row_gap),
-                    card_width,
-                    card_height,
-                )
-                self._draw_inspector_section(surface, card_rect, section)
-        else:
-            note_rect = pygame.Rect(section_rect.left, section_rect.top, section_rect.width, 48)
-            draw_wrapped_text(
-                surface,
-                self.fonts.body,
-                "No detailed inspector sections are populated for this panel yet.",
-                MUTED,
-                note_rect,
-                line_height=18,
-                max_lines=2,
-            )
+        self._draw_inspector_section_nav(surface, nav_rect, panel)
+        self._draw_inspector_focus(surface, focus_rect)
 
         close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 34)
         draw_button(
             surface,
             pygame,
             rect=close_rect,
-            title="Esc Back To Panel",
-            detail="Return to the action panel.",
+            title="Esc Close Inspector",
+            detail=self._inspector_hint_line(),
             accent=BORDER,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
         )
         self._click_targets.append(ClickTarget("close_inspector", "", close_rect))
 
-    def _draw_inspector_section(self, surface, rect, section) -> None:
+    def _draw_inspector_section_nav(self, surface, rect, panel: DeepDivePanelViewModel) -> None:
         pygame = self.pygame
-        pygame.draw.rect(surface, (20, 29, 42), rect, border_radius=16)
-        pygame.draw.rect(
+        nav_inner = draw_panel(surface, pygame, rect, title="Sections", accent=INFO)
+        title_surface = self.fonts.heading.render("Sections", True, TEXT)
+        surface.blit(title_surface, (nav_inner.left, nav_inner.top - 24))
+        top = nav_inner.top
+        for index, section in enumerate(panel.inspectors):
+            button_rect = pygame.Rect(nav_inner.left, top, nav_inner.width, 56)
+            selected = index == self._inspector_section_index
+            accent = SELECTION if selected else tone_color(section.tone)
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=section.title,
+                detail=self._section_button_detail(section, selected=selected),
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("inspector_section", section.key, button_rect))
+            top += 66
+
+    def _draw_inspector_focus(self, surface, rect) -> None:
+        pygame = self.pygame
+        section = self._selected_inspector_section()
+        focus_inner = draw_panel(
             surface,
-            tone_color(section.tone),
+            pygame,
             rect,
-            width=1,
-            border_radius=16,
+            title="Records",
+            accent=SELECTION if section is not None else BORDER,
         )
+        if section is None:
+            idle_surface = self.fonts.body.render("No inspector section selected.", True, MUTED)
+            surface.blit(idle_surface, (focus_inner.left, focus_inner.top))
+            return
+        if not section.items:
+            idle_surface = self.fonts.body.render(
+                "No live records are available here yet.",
+                True,
+                MUTED,
+            )
+            surface.blit(idle_surface, (focus_inner.left, focus_inner.top))
+            return
+
         title_surface = self.fonts.heading.render(section.title, True, TEXT)
-        surface.blit(title_surface, (rect.left + 12, rect.top + 12))
-        top = rect.top + 42
-        item_height = max(
-            54,
-            int((rect.height - 54 - 10 * (len(section.items) - 1)) / max(1, len(section.items))),
+        surface.blit(title_surface, (focus_inner.left, focus_inner.top - 24))
+        page_items = self._current_inspector_page_items()
+        page_start = self._current_inspector_page_start()
+        page_total = self._inspector_total_pages()
+        header_rect = pygame.Rect(focus_inner.left, focus_inner.top, focus_inner.width, 24)
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            (
+                f"Page {self._inspector_page + 1}/{page_total} | "
+                f"items {page_start + 1}-{page_start + len(page_items)} of {len(section.items)}"
+            ),
+            MUTED,
+            header_rect,
+            line_height=16,
+            max_lines=1,
         )
-        for item in section.items[:3]:
-            item_rect = pygame.Rect(rect.left + 12, top, rect.width - 24, item_height)
+        item_area_height = focus_inner.height - 128
+        item_gap = 10
+        item_height = max(
+            72,
+            int(
+                (item_area_height - item_gap * max(0, len(page_items) - 1))
+                / max(1, len(page_items))
+            ),
+        )
+        top = focus_inner.top + 30
+        for relative_index, item in enumerate(page_items):
+            absolute_index = page_start + relative_index
+            selected = relative_index == self._inspector_item_index
+            item_rect = pygame.Rect(focus_inner.left, top, focus_inner.width, item_height)
             pygame.draw.rect(surface, (26, 38, 55), item_rect, border_radius=12)
             pygame.draw.rect(
                 surface,
-                tone_color(item.tone),
+                SELECTION if selected else tone_color(item.tone),
                 item_rect,
-                width=1,
+                width=2 if selected else 1,
                 border_radius=12,
             )
-            item_title = self.fonts.small.render(item.title, True, TEXT)
+            self._click_targets.append(
+                ClickTarget("inspector_item", str(absolute_index), item_rect)
+            )
+            item_title = self.fonts.small.render(
+                f"{absolute_index + 1}. {item.title}",
+                True,
+                TEXT,
+            )
             surface.blit(item_title, (item_rect.left + 10, item_rect.top + 8))
-            line_top = item_rect.top + 26
-            for line in item.detail_lines[:2]:
+            line_top = item_rect.top + 28
+            for line in item.detail_lines[:3]:
                 consumed = draw_wrapped_text(
                     surface,
                     self.fonts.small,
@@ -3270,7 +3564,104 @@ class RunScene(BaseScene):
                     max_lines=1,
                 )
                 line_top += max(14, consumed)
-            top += item_height + 10
+            if selected and item.actions:
+                action_summary = " | ".join(
+                    f"{index + 1}:{action.label}" for index, action in enumerate(item.actions[:4])
+                )
+                summary_surface = self.fonts.small.render(action_summary, True, INFO)
+                surface.blit(summary_surface, (item_rect.left + 10, item_rect.bottom - 18))
+            top += item_height + item_gap
+
+        selected_item = self._selected_inspector_item()
+        footer_top = rect.bottom - 72
+        footer_rect = pygame.Rect(focus_inner.left, footer_top, focus_inner.width, 62)
+        action_left = footer_rect.left
+        if page_total > 1:
+            prev_rect = pygame.Rect(footer_rect.left, footer_rect.top, 120, 36)
+            next_rect = pygame.Rect(footer_rect.left + 132, footer_rect.top, 120, 36)
+            draw_button(
+                surface,
+                pygame,
+                rect=prev_rect,
+                title="PgUp Prev",
+                detail="Previous page.",
+                accent=BORDER,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            draw_button(
+                surface,
+                pygame,
+                rect=next_rect,
+                title="PgDn Next",
+                detail="Next page.",
+                accent=BORDER,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("inspector_prev_page", "", prev_rect))
+            self._click_targets.append(ClickTarget("inspector_next_page", "", next_rect))
+            action_left = next_rect.right + 16
+        if selected_item is None or not selected_item.actions:
+            note_surface = self.fonts.small.render(
+                "No item-level actions are wired for this record.",
+                True,
+                MUTED,
+            )
+            surface.blit(note_surface, (action_left, footer_rect.top + 10))
+            return
+
+        action_count = min(3, len(selected_item.actions))
+        available_width = footer_rect.right - action_left
+        action_width = int((available_width - 12 * max(0, action_count - 1)) / action_count)
+        left = action_left
+        for index, action in enumerate(selected_item.actions[:3]):
+            button_rect = pygame.Rect(left, footer_rect.top, action_width, 40)
+            enabled = (
+                self._inspector_item_action_reason(action.command, selected_item.payload) is None
+            )
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=f"{index + 1} {action.label}",
+                detail=self._item_action_detail(
+                    action.command,
+                    selected_item.payload,
+                    action.detail,
+                    enabled=enabled,
+                ),
+                accent=tone_color(action.tone),
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+                enabled=enabled,
+            )
+            self._click_targets.append(
+                ClickTarget("inspector_item_action", str(index), button_rect)
+            )
+            left += action_width + 12
+
+    def _section_button_detail(self, section, *, selected: bool) -> str:
+        state = "active focus" if selected else "click to focus"
+        return f"{len(section.items)} records | {state}"
+
+    def _item_action_detail(
+        self,
+        command: str,
+        payload: str,
+        default_detail: str,
+        *,
+        enabled: bool,
+    ) -> str:
+        if enabled:
+            return default_detail
+        reason = self._inspector_item_action_reason(command, payload)
+        if reason is None:
+            return default_detail
+        return self._compact_button_detail(reason)
+
+    def _inspector_hint_line(self) -> str:
+        return "Tab/Arrows move | PgUp/PgDn page | Enter runs action"
 
     def _draw_outcome_overlay(self, surface) -> None:
         pygame = self.pygame

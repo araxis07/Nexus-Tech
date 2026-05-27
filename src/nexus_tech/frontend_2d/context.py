@@ -739,6 +739,184 @@ def explain_command_unavailable(
     return None
 
 
+def build_inspector_action_request(
+    state: GameState,
+    *,
+    panel_key: str,
+    section_key: str,
+    payload: str,
+    command: str,
+    selected_product_id: str | None = None,
+) -> ActionRequest | ContextPicker | None:
+    """Build one item-targeted action request for the interactive inspector."""
+
+    try:
+        action = TurnAction(command)
+    except ValueError:
+        return None
+
+    if action in {
+        TurnAction.REVIEW_TEAM,
+        TurnAction.REVIEW_FINANCE,
+        TurnAction.REVIEW_CUSTOMERS,
+        TurnAction.REVIEW_PIPELINE,
+        TurnAction.REVIEW_BOARD,
+        TurnAction.REVIEW_PARTNERSHIPS,
+        TurnAction.VIEW_REPORT,
+    }:
+        return ActionRequest(action=action, context=ActionContext(), label=action.value)
+
+    employee = _pick_by_hex(state.employees, payload)
+    if employee is not None and action in {
+        TurnAction.ASSIGN_EMPLOYEE,
+        TurnAction.TRAIN_EMPLOYEE,
+        TurnAction.PROMOTE_EMPLOYEE,
+        TurnAction.RUN_COMP_REVIEW,
+        TurnAction.RUN_SUCCESSION_REVIEW,
+        TurnAction.APPOINT_TEAM_LEAD,
+        TurnAction.FIRE_EMPLOYEE,
+        TurnAction.CLEAR_MANAGER,
+        TurnAction.UNASSIGN_EMPLOYEE,
+    }:
+        if action is TurnAction.ASSIGN_EMPLOYEE:
+            product = _pick_selected_product(state, selected_product_id)
+            if product is None:
+                return None
+            return ActionRequest(
+                action=action,
+                context=ActionContext(
+                    employee_id=employee.id,
+                    target_product_id=product.id,
+                ),
+                label=f"{action.value}:{employee.full_name}",
+            )
+        return ActionRequest(
+            action=action,
+            context=ActionContext(employee_id=employee.id),
+            label=f"{action.value}:{employee.full_name}",
+        )
+
+    candidate = _pick_by_hex(state.hiring_candidates, payload)
+    if candidate is not None and action in {
+        TurnAction.SCREEN_CANDIDATE,
+        TurnAction.INTERVIEW_CANDIDATE,
+        TurnAction.MAKE_HIRING_OFFER,
+    }:
+        return ActionRequest(
+            action=action,
+            context=ActionContext(hiring_candidate_id=candidate.id),
+            label=f"{action.value}:{candidate.full_name}",
+        )
+
+    release = _pick_by_hex(state.product_releases, payload)
+    if release is not None and action is TurnAction.WORK_RELEASE:
+        return ActionRequest(
+            action=action,
+            context=ActionContext(release_id=release.id),
+            label=f"{action.value}:{release.release_type.value}",
+        )
+
+    deal = _pick_by_hex(state.sales_deals, payload)
+    if deal is not None and action is TurnAction.ADVANCE_SALES_DEAL:
+        return ActionRequest(
+            action=action,
+            context=ActionContext(sales_deal_id=deal.id),
+            label=f"{action.value}:{deal.name}",
+        )
+
+    project = _pick_by_hex(state.roadmap_projects, payload)
+    if project is not None and action is TurnAction.WORK_ROADMAP_PROJECT:
+        return ActionRequest(
+            action=action,
+            context=ActionContext(roadmap_project_id=project.id),
+            label=f"{action.value}:{project.project_type.value}",
+        )
+
+    partnership = _pick_by_hex(state.partnerships, payload)
+    if partnership is not None and action in _PARTNERSHIP_ACTIONS:
+        return ActionRequest(
+            action=action,
+            context=ActionContext(partnership_id=partnership.id),
+            label=f"{action.value}:{partnership.name}",
+        )
+
+    _ = panel_key, section_key
+    return build_command_request(
+        state,
+        command=command,
+        selected_product_id=selected_product_id,
+    )
+
+
+def explain_inspector_action_unavailable(
+    state: GameState,
+    *,
+    panel_key: str,
+    section_key: str,
+    payload: str,
+    command: str,
+    selected_product_id: str | None = None,
+) -> str | None:
+    """Return a concrete reason when one inspector item action is blocked."""
+
+    request = build_inspector_action_request(
+        state,
+        panel_key=panel_key,
+        section_key=section_key,
+        payload=payload,
+        command=command,
+        selected_product_id=selected_product_id,
+    )
+    if request is not None:
+        return None
+    try:
+        action = TurnAction(command)
+    except ValueError:
+        return "This command id is not recognized by the game."
+    if (
+        action
+        in {
+            TurnAction.ASSIGN_EMPLOYEE,
+            TurnAction.TRAIN_EMPLOYEE,
+            TurnAction.PROMOTE_EMPLOYEE,
+            TurnAction.RUN_COMP_REVIEW,
+            TurnAction.RUN_SUCCESSION_REVIEW,
+            TurnAction.APPOINT_TEAM_LEAD,
+            TurnAction.FIRE_EMPLOYEE,
+            TurnAction.CLEAR_MANAGER,
+            TurnAction.UNASSIGN_EMPLOYEE,
+        }
+        and _pick_by_hex(state.employees, payload) is None
+    ):
+        return "That teammate is no longer available."
+    if (
+        action
+        in {
+            TurnAction.SCREEN_CANDIDATE,
+            TurnAction.INTERVIEW_CANDIDATE,
+            TurnAction.MAKE_HIRING_OFFER,
+        }
+        and _pick_by_hex(state.hiring_candidates, payload) is None
+    ):
+        return "That candidate is no longer in the funnel."
+    if action is TurnAction.WORK_RELEASE and _pick_by_hex(state.product_releases, payload) is None:
+        return "That release no longer exists."
+    if action is TurnAction.ADVANCE_SALES_DEAL and _pick_by_hex(state.sales_deals, payload) is None:
+        return "That sales deal is no longer active."
+    if (
+        action is TurnAction.WORK_ROADMAP_PROJECT
+        and _pick_by_hex(state.roadmap_projects, payload) is None
+    ):
+        return "That roadmap project is no longer active."
+    if action in _PARTNERSHIP_ACTIONS and _pick_by_hex(state.partnerships, payload) is None:
+        return "That partnership is no longer available."
+    return explain_command_unavailable(
+        state,
+        command=command,
+        selected_product_id=selected_product_id,
+    )
+
+
 def _enum_picker(
     *,
     title: str,
@@ -832,6 +1010,14 @@ def _pick_selected_product(state: GameState, selected_product_id: str | None):
             if product.id.hex == selected_product_id:
                 return product
     return products[0]
+
+
+def _pick_by_hex(items, payload: str):
+    for item in items:
+        item_id = getattr(item, "id", None)
+        if item_id is not None and item_id.hex == payload:
+            return item
+    return None
 
 
 def _label(value: str) -> str:
