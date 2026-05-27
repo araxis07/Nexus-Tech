@@ -20,8 +20,16 @@ from nexus_tech.frontend_2d.event_queue import (
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.tween import TweenBank
 from nexus_tech.frontend_2d.viewmodels import (
+    ArchiveCardViewModel,
+    DeepDivePanelViewModel,
+    RunReviewViewModel,
+    SaveSlotCardViewModel,
     TurnSummaryViewModel,
+    build_archive_card_view_models,
+    build_archive_review_view_model,
     build_game_view_model,
+    build_run_review_view_model,
+    build_save_slot_card_view_models,
     build_turn_summary_view_model,
 )
 from nexus_tech.frontend_2d.widgets import (
@@ -42,8 +50,10 @@ from nexus_tech.frontend_2d.widgets import (
     draw_wrapped_text,
     tone_color,
 )
+from nexus_tech.persistence.errors import PersistenceError
+from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveLoadCoordinator
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
-from nexus_tech.simulation.engine import ActionContext, apply_action, resolve_turn
+from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
 
 
@@ -76,8 +86,48 @@ class TimedFrontendEvent:
     time_left: float
 
 
+@dataclass
+class TextInputModalState:
+    """One live text-input modal used by the 2D frontend."""
+
+    title: str
+    description: str
+    severity: str
+    submit_title: str
+    submit_detail: str
+    text: str
+    placeholder: str
+    on_submit: Callable[[str], None]
+
+
 _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
     ActionButtonSpec("C", "Coach", "Run the top mission-board command.", INFO, "coach", ""),
+    ActionButtonSpec(
+        "N",
+        "New Product",
+        "Name and create one product.",
+        INFO,
+        "text_command",
+        TurnAction.CREATE_PRODUCT.value,
+    ),
+    ActionButtonSpec("1", "Team", "Open team staffing panel.", GOOD, "panel", "team"),
+    ActionButtonSpec("2", "Finance", "Open finance and capital panel.", WARN, "panel", "finance"),
+    ActionButtonSpec(
+        "3",
+        "Customers",
+        "Open pricing, segment, and support panel.",
+        INFO,
+        "panel",
+        "customers",
+    ),
+    ActionButtonSpec(
+        "4",
+        "Partners",
+        "Open channel and partner panel.",
+        INFO,
+        "panel",
+        "partnerships",
+    ),
     ActionButtonSpec(
         "Q",
         "Improve",
@@ -239,6 +289,663 @@ class BaseScene:
         self._dirty = False
 
 
+class TitleScene(BaseScene):
+    """Main 2D title and save/load scene."""
+
+    def __init__(
+        self,
+        *,
+        pygame,
+        fonts: FontPack,
+        state: GameState,
+        rng: RandomSource,
+        slot_name: str,
+        save_callback,
+        coordinator: SaveLoadCoordinator,
+        initial_mode: str = "menu",
+        info_message: str | None = None,
+    ) -> None:
+        super().__init__(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=rng,
+            slot_name=slot_name,
+            save_callback=save_callback,
+            dirty=False,
+        )
+        self.coordinator = coordinator
+        self._mode = initial_mode
+        self._click_targets: list[ClickTarget] = []
+        self._events: list[TimedFrontendEvent] = []
+        self._save_cards: tuple[SaveSlotCardViewModel, ...] = ()
+        self._archive_cards: tuple[ArchiveCardViewModel, ...] = ()
+        self._archives_by_key: dict[str, RunArchiveSummary] = {}
+        self._refresh_lists()
+        if info_message:
+            self.push_event(
+                FrontendEvent(
+                    title="2D Menu Ready",
+                    detail=info_message,
+                    severity="info",
+                    ttl=5.5,
+                )
+            )
+
+    def update(self, dt: float) -> None:
+        self._events = [
+            TimedFrontendEvent(payload=event.payload, time_left=event.time_left - dt)
+            for event in self._events
+            if event.time_left - dt > 0
+        ]
+
+    def handle_event(self, event) -> None:
+        if event.type == self.pygame.QUIT:
+            self.should_exit = True
+            self.exit_reason = "quit"
+            return
+        if event.type == self.pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self._handle_mouse_click(event.pos)
+            return
+        if event.type != self.pygame.KEYDOWN:
+            return
+        if event.key == self.pygame.K_ESCAPE:
+            if self._mode != "menu":
+                self._mode = "menu"
+                return
+            self.should_exit = True
+            self.exit_reason = "quit"
+            return
+        if event.unicode and event.unicode in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
+            self._handle_digit_shortcut(int(event.unicode))
+
+    def draw(self, surface) -> None:
+        pygame = self.pygame
+        self._click_targets = []
+        draw_grid(surface, pygame)
+        width, height = surface.get_size()
+        margin = 24
+        gap = 16
+        header_rect = pygame.Rect(margin, margin, width - margin * 2, 104)
+        footer_rect = pygame.Rect(margin, height - 92 - margin, width - margin * 2, 92)
+        content_top = header_rect.bottom + gap
+        content_height = footer_rect.top - gap - content_top
+        left_width = int((width - margin * 2 - gap) * 0.62)
+        right_width = width - margin * 2 - gap - left_width
+        left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+        right_rect = pygame.Rect(left_rect.right + gap, content_top, right_width, content_height)
+
+        self._draw_title_header(surface, header_rect)
+        if self._mode == "menu":
+            self._draw_title_menu(surface, left_rect)
+        elif self._mode == "slots":
+            self._draw_save_slot_browser(surface, left_rect)
+        else:
+            self._draw_archive_browser(surface, left_rect)
+        self._draw_title_sidebar(surface, right_rect)
+        self._draw_title_footer(surface, footer_rect)
+
+    def push_event(self, payload: FrontendEvent) -> None:
+        self._events.insert(0, TimedFrontendEvent(payload=payload, time_left=payload.ttl))
+        self._events = self._events[:5]
+
+    def _refresh_lists(self) -> None:
+        try:
+            save_summaries = self.coordinator.list_save_slots()
+            archive_summaries = self.coordinator.list_run_archives()
+        except PersistenceError as error:
+            save_summaries = []
+            archive_summaries = []
+            self.push_event(
+                FrontendEvent(
+                    title="Persistence Error",
+                    detail=str(error),
+                    severity="warning",
+                    ttl=6.0,
+                )
+            )
+        self._save_cards = build_save_slot_card_view_models(save_summaries)
+        self._archive_cards = build_archive_card_view_models(archive_summaries)
+        self._archives_by_key = {summary.archive_key: summary for summary in archive_summaries}
+
+    def _handle_mouse_click(self, position: tuple[int, int]) -> None:
+        for target in reversed(self._click_targets):
+            if target.rect.collidepoint(position):
+                self._dispatch_click_target(target)
+                return
+
+    def _dispatch_click_target(self, target: ClickTarget) -> None:
+        if target.kind == "menu":
+            self._handle_menu_action(target.payload)
+            return
+        if target.kind == "slot":
+            self._load_slot(target.payload)
+            return
+        if target.kind == "archive":
+            self._open_archive_review(target.payload)
+            return
+
+    def _handle_digit_shortcut(self, digit: int) -> None:
+        if self._mode == "menu":
+            self._handle_menu_action(
+                {
+                    1: "continue",
+                    2: "load_slots",
+                    3: "archives",
+                    4: "new_default",
+                    5: "quit",
+                }.get(digit, "")
+            )
+            return
+        if self._mode == "slots":
+            if digit == 9:
+                self._mode = "menu"
+                return
+            index = digit - 1
+            if 0 <= index < len(self._save_cards):
+                self._load_slot(self._save_cards[index].slot_name)
+            return
+        if self._mode == "archives":
+            if digit == 9:
+                self._mode = "menu"
+                return
+            index = digit - 1
+            if 0 <= index < len(self._archive_cards):
+                self._open_archive_review(self._archive_cards[index].archive_key)
+
+    def _handle_menu_action(self, action: str) -> None:
+        if action == "continue":
+            self._continue_last_save()
+            return
+        if action == "load_slots":
+            self._mode = "slots"
+            return
+        if action == "archives":
+            self._mode = "archives"
+            return
+        if action == "new_default":
+            self._start_default_run()
+            return
+        if action == "quit":
+            self.should_exit = True
+            self.exit_reason = "quit"
+
+    def _continue_last_save(self) -> None:
+        try:
+            loaded = self.coordinator.continue_last_game()
+        except PersistenceError as error:
+            self.push_event(
+                FrontendEvent(
+                    title="No Continue Slot",
+                    detail=str(error),
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        self._open_loaded_game(loaded.state, loaded.rng, loaded.slot_name)
+
+    def _load_slot(self, slot_name: str) -> None:
+        try:
+            loaded = self.coordinator.load_game(slot_name)
+        except PersistenceError as error:
+            self.push_event(
+                FrontendEvent(
+                    title="Load Failed",
+                    detail=str(error),
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        self._open_loaded_game(loaded.state, loaded.rng, loaded.slot_name)
+
+    def _start_default_run(self) -> None:
+        self._open_loaded_game(
+            create_new_game("NEXUS TECH", "Nexus One"),
+            RandomSource(seed=None),
+            "active",
+        )
+
+    def _open_loaded_game(self, state: GameState, rng: RandomSource, slot_name: str) -> None:
+        self._next_scene = RunScene(
+            pygame=self.pygame,
+            fonts=self.fonts,
+            state=state,
+            rng=rng,
+            slot_name=slot_name,
+            save_callback=self._save_callback,
+        )
+
+    def _open_archive_review(self, archive_key: str) -> None:
+        summary = self._archives_by_key.get(archive_key)
+        if summary is None:
+            return
+        self._next_scene = ReviewScene(
+            pygame=self.pygame,
+            fonts=self.fonts,
+            state=self.state,
+            rng=self.rng,
+            slot_name=self.slot_name,
+            save_callback=self._save_callback,
+            view_model=build_archive_review_view_model(summary),
+            accent=INFO,
+            primary_title="Back to Archives",
+            primary_detail="Return to the archive browser.",
+            return_scene_factory=lambda: self._spawn_scene("archives"),
+            allow_save=False,
+            dirty=False,
+        )
+
+    def _spawn_scene(self, mode: str) -> "TitleScene":
+        return TitleScene(
+            pygame=self.pygame,
+            fonts=self.fonts,
+            state=self.state,
+            rng=self.rng,
+            slot_name=self.slot_name,
+            save_callback=self._save_callback,
+            coordinator=self.coordinator,
+            initial_mode=mode,
+        )
+
+    def _draw_title_header(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Title", accent=INFO)
+        title_surface = self.fonts.title.render("NEXUS TECH 2D", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        subtitle = (
+            "Self-contained frontend shell with loadable saves, archive reviews, "
+            "and live run handoff."
+        )
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            subtitle,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 24),
+            line_height=18,
+            max_lines=2,
+        )
+        meta_surface = self.fonts.small.render(
+            f"Save slots {len(self._save_cards)} | archives {len(self._archive_cards)}",
+            True,
+            TEXT,
+        )
+        surface.blit(meta_surface, (inner.left, inner.top + 38))
+
+    def _draw_title_menu(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Menu", accent=GOOD)
+        title_surface = self.fonts.heading.render("Title Menu", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        buttons = (
+            ("1 Continue Last", "Open the newest save slot directly.", "continue", INFO),
+            ("2 Load Save", "Browse named save slots and resume one run.", "load_slots", GOOD),
+            ("3 Review Archives", "Inspect completed runs and postmortems.", "archives", WARN),
+            (
+                "4 New Default Run",
+                "Boot the default scenario with generated names.",
+                "new_default",
+                INFO,
+            ),
+            ("5 Quit", "Leave the frontend shell.", "quit", DANGER),
+        )
+        top = inner.top
+        for title, detail, payload, accent in buttons:
+            button_rect = pygame.Rect(inner.left, top, inner.width, 62)
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=title,
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.body,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("menu", payload, button_rect))
+            top += 74
+
+    def _draw_save_slot_browser(self, surface, rect) -> None:
+        self._draw_card_browser(
+            surface,
+            rect,
+            title="Save Slot Browser",
+            cards=self._save_cards,
+            click_kind="slot",
+            back_detail="Press 9 or Esc to return to the title menu.",
+        )
+
+    def _draw_archive_browser(self, surface, rect) -> None:
+        self._draw_card_browser(
+            surface,
+            rect,
+            title="Archive Browser",
+            cards=self._archive_cards,
+            click_kind="archive",
+            back_detail="Press 9 or Esc to return to the title menu.",
+        )
+
+    def _draw_card_browser(
+        self, surface, rect, *, title: str, cards, click_kind: str, back_detail: str
+    ) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title=title, accent=SELECTION)
+        title_surface = self.fonts.heading.render(title, True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        if not cards:
+            empty_surface = self.fonts.body.render("Nothing is stored here yet.", True, MUTED)
+            surface.blit(empty_surface, (inner.left, inner.top))
+            note_surface = self.fonts.small.render(back_detail, True, MUTED)
+            surface.blit(note_surface, (inner.left, inner.top + 26))
+            return
+        top = inner.top
+        for index, card in enumerate(cards[:8]):
+            card_rect = pygame.Rect(inner.left, top, inner.width, 74)
+            accent = tone_color(card.tone)
+            draw_button(
+                surface,
+                pygame,
+                rect=card_rect,
+                title=f"{index + 1} {card.headline}",
+                detail=card.detail_lines[0],
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                " | ".join(card.detail_lines[1:]),
+                MUTED,
+                pygame.Rect(card_rect.left + 12, card_rect.top + 34, card_rect.width - 24, 28),
+                line_height=14,
+                max_lines=2,
+            )
+            payload = card.slot_name if hasattr(card, "slot_name") else card.archive_key
+            self._click_targets.append(ClickTarget(click_kind, payload, card_rect))
+            top += 86
+        back_surface = self.fonts.small.render(back_detail, True, MUTED)
+        surface.blit(back_surface, (inner.left, rect.bottom - 26))
+
+    def _draw_title_sidebar(self, surface, rect) -> None:
+        pygame = self.pygame
+        summary_rect = pygame.Rect(rect.left, rect.top, rect.width, int(rect.height * 0.36))
+        events_rect = pygame.Rect(
+            rect.left,
+            summary_rect.bottom + 12,
+            rect.width,
+            rect.height - summary_rect.height - 12,
+        )
+        inner = draw_panel(surface, pygame, summary_rect, title="Status", accent=WARN)
+        title_surface = self.fonts.heading.render("2D Frontend Status", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        lines = (
+            "Menu mode keeps SQLite save slots and archived runs inside the 2D shell.",
+            "Load any live slot to jump straight into the animated dashboard.",
+            "Archive review scenes surface final score, exit type, and the saved lesson.",
+        )
+        top = inner.top
+        for line in lines:
+            consumed = draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                line,
+                MUTED,
+                pygame.Rect(inner.left, top, inner.width, 36),
+                line_height=15,
+                max_lines=2,
+            )
+            top += max(24, consumed)
+
+        event_inner = draw_panel(surface, pygame, events_rect, title="Feed", accent=INFO)
+        event_title = self.fonts.heading.render("Frontend Feed", True, TEXT)
+        surface.blit(event_title, (event_inner.left, event_inner.top - 24))
+        if not self._events:
+            idle_surface = self.fonts.body.render("No menu events yet.", True, MUTED)
+            surface.blit(idle_surface, (event_inner.left, event_inner.top))
+            return
+        top = event_inner.top
+        for timed_event in self._events[:4]:
+            card_rect = pygame.Rect(event_inner.left, top, event_inner.width, 70)
+            self._draw_event_card(surface, card_rect, timed_event)
+            top += 80
+
+    def _draw_title_footer(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Guide", accent=INFO)
+        message = (
+            "Menu: 1 continue, 2 saves, 3 archives, 4 default run, 5 quit."
+            if self._mode == "menu"
+            else "Browser: click a card to open it. Press 9 or Esc to return."
+        )
+        footer_surface = self.fonts.small.render(message, True, TEXT)
+        surface.blit(footer_surface, (inner.left, inner.top + 10))
+
+    def _draw_event_card(self, surface, rect, timed_event: TimedFrontendEvent) -> None:
+        pygame = self.pygame
+        color = tone_color(timed_event.payload.severity)
+        pygame.draw.rect(surface, (26, 38, 55), rect, border_radius=14)
+        pygame.draw.rect(surface, color, rect, width=1, border_radius=14)
+        title_surface = self.fonts.body.render(timed_event.payload.title, True, TEXT)
+        surface.blit(title_surface, (rect.left + 12, rect.top + 10))
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            timed_event.payload.detail,
+            MUTED,
+            pygame.Rect(rect.left + 12, rect.top + 30, rect.width - 24, rect.height - 36),
+            line_height=15,
+            max_lines=2,
+        )
+
+
+class ReviewScene(BaseScene):
+    """Review scene used for completed runs and archive summaries."""
+
+    def __init__(
+        self,
+        *,
+        pygame,
+        fonts: FontPack,
+        state: GameState,
+        rng: RandomSource,
+        slot_name: str,
+        save_callback,
+        view_model: RunReviewViewModel,
+        accent: tuple[int, int, int],
+        primary_title: str,
+        primary_detail: str,
+        return_scene_factory: Callable[[], BaseScene] | None,
+        allow_save: bool,
+        dirty: bool,
+    ) -> None:
+        super().__init__(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=rng,
+            slot_name=slot_name,
+            save_callback=save_callback,
+            dirty=dirty,
+        )
+        self._view_model = view_model
+        self._accent = accent
+        self._primary_title = primary_title
+        self._primary_detail = primary_detail
+        self._return_scene_factory = return_scene_factory
+        self._allow_save = allow_save
+        self._click_targets: list[ClickTarget] = []
+
+    def update(self, dt: float) -> None:
+        _ = dt
+
+    def handle_event(self, event) -> None:
+        if event.type == self.pygame.QUIT:
+            self.should_exit = True
+            self.exit_reason = "quit"
+            return
+        if event.type == self.pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for target in reversed(self._click_targets):
+                if target.rect.collidepoint(event.pos):
+                    self._dispatch_click_target(target)
+                    return
+        if event.type != self.pygame.KEYDOWN:
+            return
+        if event.key == self.pygame.K_s and self._allow_save:
+            self._persist_current_run()
+            return
+        if event.key in (
+            self.pygame.K_ESCAPE,
+            self.pygame.K_SPACE,
+            self.pygame.K_RETURN,
+            self.pygame.K_KP_ENTER,
+        ):
+            self._primary_action()
+
+    def draw(self, surface) -> None:
+        pygame = self.pygame
+        self._click_targets = []
+        draw_grid(surface, pygame)
+        width, height = surface.get_size()
+        margin = 28
+        gap = 16
+        header_rect = pygame.Rect(margin, margin, width - margin * 2, 104)
+        footer_rect = pygame.Rect(margin, height - 104 - margin, width - margin * 2, 104)
+        content_rect = pygame.Rect(
+            margin,
+            header_rect.bottom + gap,
+            width - margin * 2,
+            footer_rect.top - gap - header_rect.bottom,
+        )
+        left_width = int((content_rect.width - gap) * 0.58)
+        right_width = content_rect.width - gap - left_width
+        left_rect = pygame.Rect(
+            content_rect.left, content_rect.top, left_width, content_rect.height
+        )
+        right_rect = pygame.Rect(
+            left_rect.right + gap, content_rect.top, right_width, content_rect.height
+        )
+
+        self._draw_review_header(surface, header_rect)
+        self._draw_review_findings(surface, left_rect)
+        self._draw_review_sidebar(surface, right_rect)
+        self._draw_review_footer(surface, footer_rect)
+
+    def _dispatch_click_target(self, target: ClickTarget) -> None:
+        if target.kind == "review_primary":
+            self._primary_action()
+            return
+        if target.kind == "review_save" and self._allow_save:
+            self._persist_current_run()
+
+    def _primary_action(self) -> None:
+        if self._return_scene_factory is not None:
+            self._next_scene = self._return_scene_factory()
+            return
+        self.should_exit = True
+        self.exit_reason = "quit"
+
+    def _draw_review_header(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Review", accent=self._accent)
+        title_surface = self.fonts.title.render(self._view_model.title, True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        headline_surface = self.fonts.body.render(self._view_model.headline, True, TEXT)
+        surface.blit(headline_surface, (inner.left, inner.top))
+        summary_surface = self.fonts.small.render(self._view_model.summary_line, True, MUTED)
+        surface.blit(summary_surface, (inner.left, inner.top + 26))
+
+    def _draw_review_findings(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Findings", accent=self._accent)
+        title_surface = self.fonts.heading.render("Top Findings", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        if not self._view_model.findings:
+            idle_surface = self.fonts.body.render("No findings were recorded.", True, MUTED)
+            surface.blit(idle_surface, (inner.left, inner.top))
+            return
+        top = inner.top
+        for finding in self._view_model.findings:
+            card_rect = pygame.Rect(inner.left, top, inner.width, 98)
+            accent = tone_color(finding.severity)
+            pygame.draw.rect(surface, (26, 38, 55), card_rect, border_radius=16)
+            pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=16)
+            title_surface = self.fonts.body.render(
+                f"{finding.rank_label} {finding.area} | {finding.command}",
+                True,
+                TEXT,
+            )
+            surface.blit(title_surface, (card_rect.left + 12, card_rect.top + 10))
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                finding.summary,
+                MUTED,
+                pygame.Rect(card_rect.left + 12, card_rect.top + 32, card_rect.width - 24, 28),
+                line_height=15,
+                max_lines=2,
+            )
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                finding.lesson,
+                tone_color(finding.severity),
+                pygame.Rect(card_rect.left + 12, card_rect.top + 62, card_rect.width - 24, 20),
+                line_height=15,
+                max_lines=1,
+            )
+            top += 110
+
+    def _draw_review_sidebar(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Summary", accent=INFO)
+        title_surface = self.fonts.heading.render("Next Focus", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        focus_surface = self.fonts.body.render(self._view_model.next_focus, True, INFO)
+        surface.blit(focus_surface, (inner.left, inner.top))
+        badges_title = self.fonts.small.render("Badges", True, MUTED)
+        surface.blit(badges_title, (inner.left, inner.top + 30))
+        top = inner.top + 52
+        for badge in self._view_model.badges[:6]:
+            chip_rect = pygame.Rect(inner.left, top, inner.width, 28)
+            pygame.draw.rect(surface, (24, 35, 50), chip_rect, border_radius=12)
+            pygame.draw.rect(surface, BORDER, chip_rect, width=1, border_radius=12)
+            badge_surface = self.fonts.small.render(badge.replace("_", " "), True, TEXT)
+            surface.blit(badge_surface, (chip_rect.left + 10, chip_rect.top + 7))
+            top += 36
+
+    def _draw_review_footer(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Actions", accent=self._accent)
+        primary_rect = pygame.Rect(inner.left, inner.top + 20, 260, 40)
+        draw_button(
+            surface,
+            pygame,
+            rect=primary_rect,
+            title=self._primary_title,
+            detail=self._primary_detail,
+            accent=self._accent,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("review_primary", "", primary_rect))
+        if self._allow_save:
+            save_rect = pygame.Rect(inner.left + 276, inner.top + 20, 180, 40)
+            draw_button(
+                surface,
+                pygame,
+                rect=save_rect,
+                title="S Save Final",
+                detail="Persist the finished run.",
+                accent=GOOD,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("review_save", "", save_rect))
+
+
 class RunScene(BaseScene):
     """Main playable dashboard scene."""
 
@@ -268,6 +975,8 @@ class RunScene(BaseScene):
         self._events: list[TimedFrontendEvent] = []
         self._click_targets: list[ClickTarget] = []
         self._context_picker: ContextPicker | None = None
+        self._text_input: TextInputModalState | None = None
+        self._deep_panel_key: str | None = None
         self._product_index = 0
         self._tweens = TweenBank(speed=9.0)
         self._set_selected_product(selected_product_id)
@@ -295,6 +1004,15 @@ class RunScene(BaseScene):
         self._product_index = min(self._product_index, len(products) - 1)
         return products[self._product_index]
 
+    @property
+    def deep_panel(self) -> DeepDivePanelViewModel | None:
+        if self._deep_panel_key is None:
+            return None
+        for panel in self._view_model.deep_panels:
+            if panel.key == self._deep_panel_key:
+                return panel
+        return None
+
     def update(self, dt: float) -> None:
         """Advance animations and expire transient event cards."""
 
@@ -321,11 +1039,21 @@ class RunScene(BaseScene):
             return
 
         if event.key == self.pygame.K_ESCAPE:
+            if self._text_input is not None:
+                self._text_input = None
+                return
             if self._context_picker is not None:
                 self._context_picker = None
                 return
+            if self._deep_panel_key is not None:
+                self._deep_panel_key = None
+                return
             self.should_exit = True
             self.exit_reason = "quit"
+            return
+
+        if self._text_input is not None:
+            self._handle_text_input_key(event)
             return
 
         if self._context_picker is not None:
@@ -335,6 +1063,13 @@ class RunScene(BaseScene):
         if self.state.company.game_over or self.state.victory_achieved:
             if event.key == self.pygame.K_s:
                 self._save_current_run()
+            elif event.key in (
+                self.pygame.K_r,
+                self.pygame.K_SPACE,
+                self.pygame.K_RETURN,
+                self.pygame.K_KP_ENTER,
+            ):
+                self._open_review_scene()
             return
 
         if self.state.pending_event is not None:
@@ -343,6 +1078,22 @@ class RunScene(BaseScene):
 
         if event.key == self.pygame.K_s:
             self._save_current_run()
+            return
+
+        if event.key == self.pygame.K_1:
+            self._deep_panel_key = "team"
+            return
+        if event.key == self.pygame.K_2:
+            self._deep_panel_key = "finance"
+            return
+        if event.key == self.pygame.K_3:
+            self._deep_panel_key = "customers"
+            return
+        if event.key == self.pygame.K_4:
+            self._deep_panel_key = "partnerships"
+            return
+        if event.key == self.pygame.K_n:
+            self._open_create_product_modal()
             return
 
         if event.key == self.pygame.K_TAB:
@@ -365,7 +1116,7 @@ class RunScene(BaseScene):
         margin = 20
         gap = 16
         header_rect = pygame.Rect(margin, margin, width - margin * 2, 118)
-        footer_height = 176
+        footer_height = 246
         footer_rect = pygame.Rect(
             margin,
             height - footer_height - margin,
@@ -401,6 +1152,10 @@ class RunScene(BaseScene):
             self._draw_pending_event_overlay(surface)
         if self._context_picker is not None:
             self._draw_context_picker_overlay(surface)
+        if self._text_input is not None:
+            self._draw_text_input_overlay(surface)
+        if self._deep_panel_key is not None:
+            self._draw_deep_panel_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
 
@@ -436,14 +1191,36 @@ class RunScene(BaseScene):
         if target.kind == "save":
             self._save_current_run()
             return
+        if target.kind == "panel":
+            self._deep_panel_key = target.payload
+            return
+        if target.kind == "text_command":
+            if target.payload == TurnAction.CREATE_PRODUCT.value:
+                self._open_create_product_modal()
+            return
         if target.kind == "picker_option":
             self._apply_picker_index(int(target.payload))
             return
         if target.kind == "close_picker":
             self._context_picker = None
             return
+        if target.kind == "panel_action":
+            self._run_command(target.payload)
+            return
+        if target.kind == "close_panel":
+            self._deep_panel_key = None
+            return
+        if target.kind == "submit_text":
+            self._submit_text_modal()
+            return
+        if target.kind == "cancel_text":
+            self._text_input = None
+            return
         if target.kind == "pending_option":
             self._resolve_pending_event_choice(int(target.payload))
+            return
+        if target.kind == "open_review":
+            self._open_review_scene()
             return
         if target.kind == "close_outcome":
             self.should_exit = True
@@ -461,6 +1238,21 @@ class RunScene(BaseScene):
             self._apply_picker_index(0)
             return
         self._apply_picker_index(self._digit_index(event))
+
+    def _handle_text_input_key(self, event) -> None:
+        modal = self._text_input
+        if modal is None:
+            return
+        if event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
+            self._submit_text_modal()
+            return
+        if event.key == self.pygame.K_BACKSPACE:
+            modal.text = modal.text[:-1]
+            return
+        if event.key == self.pygame.K_TAB:
+            return
+        if event.unicode and event.unicode.isprintable() and len(modal.text) < 40:
+            modal.text += event.unicode
 
     def _resolve_pending_event_choice(self, option_index: int | None) -> None:
         if option_index is None or self.state.pending_event is None:
@@ -496,6 +1288,35 @@ class RunScene(BaseScene):
         outcome = resolve_pending_event(self.state, option_id)
         self.state = outcome.state
         return outcome.message
+
+    def _open_create_product_modal(self) -> None:
+        default_name = f"New Venture {len(self.state.products) + 1}"
+        self._text_input = TextInputModalState(
+            title="Create Product",
+            description="Type the new product name and press Enter to create it.",
+            severity="info",
+            submit_title="Enter Create",
+            submit_detail="Launch the new product into the portfolio.",
+            text=default_name,
+            placeholder="Product name",
+            on_submit=self._submit_create_product_name,
+        )
+
+    def _submit_text_modal(self) -> None:
+        modal = self._text_input
+        if modal is None:
+            return
+        self._text_input = None
+        modal.on_submit(modal.text.strip())
+
+    def _submit_create_product_name(self, value: str) -> None:
+        product_name = value or f"New Venture {len(self.state.products) + 1}"
+        request = ActionRequest(
+            action=TurnAction.CREATE_PRODUCT,
+            context=ActionContext(new_product_name=product_name),
+            label=f"{TurnAction.CREATE_PRODUCT.value}:{product_name}",
+        )
+        self._apply_action_request(request)
 
     def _cycle_product(self, direction: int) -> None:
         products = self._product_choices()
@@ -577,6 +1398,9 @@ class RunScene(BaseScene):
     def _run_command(self, command: str) -> None:
         if command == TurnAction.END_TURN.value:
             self._attempt_end_turn()
+            return
+        if command == TurnAction.CREATE_PRODUCT.value:
+            self._open_create_product_modal()
             return
         request = build_command_request(
             self.state,
@@ -718,11 +1542,30 @@ class RunScene(BaseScene):
             )
         )
 
+    def _open_review_scene(self) -> None:
+        self._next_scene = ReviewScene(
+            pygame=self.pygame,
+            fonts=self.fonts,
+            state=self.state,
+            rng=self.rng,
+            slot_name=self.slot_name,
+            save_callback=self._save_callback,
+            view_model=build_run_review_view_model(self.state),
+            accent=GOOD if self.state.victory_achieved else DANGER,
+            primary_title="Esc Close",
+            primary_detail="Leave the 2D shell.",
+            return_scene_factory=None,
+            allow_save=True,
+            dirty=self._dirty,
+        )
+
     def _refresh_view_model(self) -> None:
         self._view_model = build_game_view_model(
             self.state,
             selected_product_id=self.selected_product.id.hex,
         )
+        if self._deep_panel_key is not None and self.deep_panel is None:
+            self._deep_panel_key = None
         self._sync_tweens()
 
     def _sync_tweens(self) -> None:
@@ -837,7 +1680,7 @@ class RunScene(BaseScene):
         available_height = inner.height
         spacing = 12
         card_height = max(
-            128,
+            108,
             int(
                 (available_height - spacing * (len(self._view_model.products) - 1))
                 / max(1, len(self._view_model.products))
@@ -935,7 +1778,7 @@ class RunScene(BaseScene):
         inner = draw_panel(surface, pygame, rect, title="Actions", accent=INFO)
         title_surface = self.fonts.heading.render("Action Bar", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
-        button_cols = 8
+        button_cols = 7
         button_gap = 10
         button_width = int((inner.width - button_gap * (button_cols - 1)) / button_cols)
         button_height = 62
@@ -1136,6 +1979,175 @@ class RunScene(BaseScene):
         )
         self._click_targets.append(ClickTarget("close_picker", "", close_rect))
 
+    def _draw_text_input_overlay(self, surface) -> None:
+        pygame = self.pygame
+        modal = self._text_input
+        if modal is None:
+            return
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(OVERLAY)
+        surface.blit(overlay, (0, 0))
+        width, height = surface.get_size()
+        modal_rect = pygame.Rect(width // 2 - 300, height // 2 - 140, 600, 280)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Text Input",
+            accent=tone_color(modal.severity),
+        )
+        title_surface = self.fonts.title.render(modal.title, True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            modal.description,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 40),
+            line_height=18,
+            max_lines=2,
+        )
+        input_rect = pygame.Rect(inner.left, inner.top + 60, inner.width, 48)
+        pygame.draw.rect(surface, (24, 35, 50), input_rect, border_radius=14)
+        pygame.draw.rect(surface, tone_color(modal.severity), input_rect, width=1, border_radius=14)
+        input_text = modal.text or modal.placeholder
+        input_color = TEXT if modal.text else MUTED
+        input_surface = self.fonts.body.render(input_text, True, input_color)
+        surface.blit(input_surface, (input_rect.left + 12, input_rect.top + 14))
+        cursor_x = input_rect.left + 12 + input_surface.get_width() + 2
+        pygame.draw.line(
+            surface,
+            tone_color(modal.severity),
+            (cursor_x, input_rect.top + 10),
+            (cursor_x, input_rect.bottom - 10),
+            2,
+        )
+        submit_rect = pygame.Rect(inner.left, inner.top + 134, 220, 40)
+        cancel_rect = pygame.Rect(inner.left + 236, inner.top + 134, 180, 40)
+        draw_button(
+            surface,
+            pygame,
+            rect=submit_rect,
+            title=modal.submit_title,
+            detail=modal.submit_detail,
+            accent=tone_color(modal.severity),
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=cancel_rect,
+            title="Esc Cancel",
+            detail="Close without applying changes.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("submit_text", "", submit_rect))
+        self._click_targets.append(ClickTarget("cancel_text", "", cancel_rect))
+
+    def _draw_deep_panel_overlay(self, surface) -> None:
+        pygame = self.pygame
+        panel = self.deep_panel
+        if panel is None:
+            return
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(OVERLAY)
+        surface.blit(overlay, (0, 0))
+        width, height = surface.get_size()
+        modal_rect = pygame.Rect(width // 2 - 470, height // 2 - 280, 940, 560)
+        inner = draw_panel(surface, pygame, modal_rect, title=panel.title, accent=INFO)
+        title_surface = self.fonts.title.render(panel.title, True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            panel.summary,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 40),
+            line_height=18,
+            max_lines=2,
+        )
+        metric_top = inner.top + 54
+        metric_width = int((inner.width - 24) / 2)
+        for index, metric in enumerate(panel.metrics[:4]):
+            row = index // 2
+            col = index % 2
+            card_rect = pygame.Rect(
+                inner.left + col * (metric_width + 12),
+                metric_top + row * 54,
+                metric_width,
+                42,
+            )
+            pygame.draw.rect(surface, (26, 38, 55), card_rect, border_radius=12)
+            pygame.draw.rect(
+                surface,
+                tone_color(metric.tone),
+                card_rect,
+                width=1,
+                border_radius=12,
+            )
+            label_surface = self.fonts.small.render(metric.label.upper(), True, MUTED)
+            value_surface = self.fonts.body.render(metric.value_text, True, TEXT)
+            surface.blit(label_surface, (card_rect.left + 10, card_rect.top + 6))
+            surface.blit(value_surface, (card_rect.left + 10, card_rect.top + 20))
+
+        detail_rect = pygame.Rect(
+            inner.left, inner.top + 170, int(inner.width * 0.56), inner.height - 196
+        )
+        action_rect = pygame.Rect(
+            detail_rect.right + 20,
+            inner.top + 170,
+            inner.right - detail_rect.right - 20,
+            inner.height - 196,
+        )
+        detail_title = self.fonts.heading.render("Live Notes", True, TEXT)
+        surface.blit(detail_title, (detail_rect.left, detail_rect.top - 24))
+        top = detail_rect.top
+        for line in panel.detail_lines:
+            consumed = draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                line,
+                MUTED,
+                pygame.Rect(detail_rect.left, top, detail_rect.width, 38),
+                line_height=16,
+                max_lines=2,
+            )
+            top += max(26, consumed)
+
+        action_title = self.fonts.heading.render("Panel Actions", True, TEXT)
+        surface.blit(action_title, (action_rect.left, action_rect.top - 24))
+        top = action_rect.top
+        for action in panel.actions:
+            button_rect = pygame.Rect(action_rect.left, top, action_rect.width, 58)
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=action.label,
+                detail=action.detail,
+                accent=tone_color(action.tone),
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("panel_action", action.command, button_rect))
+            top += 68
+
+        close_rect = pygame.Rect(action_rect.left, modal_rect.bottom - 56, 160, 34)
+        draw_button(
+            surface,
+            pygame,
+            rect=close_rect,
+            title="Esc Close",
+            detail="Return to the run.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("close_panel", "", close_rect))
+
     def _draw_outcome_overlay(self, surface) -> None:
         pygame = self.pygame
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
@@ -1162,8 +2174,19 @@ class RunScene(BaseScene):
             line_height=18,
             max_lines=4,
         )
-        save_rect = pygame.Rect(inner.left, inner.bottom - 46, 160, 36)
-        close_rect = pygame.Rect(inner.left + 176, inner.bottom - 46, 160, 36)
+        review_rect = pygame.Rect(inner.left, inner.bottom - 46, 160, 36)
+        save_rect = pygame.Rect(inner.left + 176, inner.bottom - 46, 160, 36)
+        close_rect = pygame.Rect(inner.left + 352, inner.bottom - 46, 140, 36)
+        draw_button(
+            surface,
+            pygame,
+            rect=review_rect,
+            title="Review Run",
+            detail="Open the after-action scene.",
+            accent=INFO,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
         draw_button(
             surface,
             pygame,
@@ -1184,6 +2207,7 @@ class RunScene(BaseScene):
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
         )
+        self._click_targets.append(ClickTarget("open_review", "", review_rect))
         self._click_targets.append(ClickTarget("save", "", save_rect))
         self._click_targets.append(ClickTarget("close_outcome", "", close_rect))
 
@@ -1324,6 +2348,23 @@ class TurnSummaryScene(BaseScene):
                     return
 
     def _continue_to_run(self) -> None:
+        if self.state.company.game_over or self.state.victory_achieved:
+            self._next_scene = ReviewScene(
+                pygame=self.pygame,
+                fonts=self.fonts,
+                state=self.state,
+                rng=self.rng,
+                slot_name=self.slot_name,
+                save_callback=self._save_callback,
+                view_model=build_run_review_view_model(self.state),
+                accent=GOOD if self.state.victory_achieved else DANGER,
+                primary_title="Esc Close",
+                primary_detail="Leave the 2D shell.",
+                return_scene_factory=None,
+                allow_save=True,
+                dirty=self._dirty,
+            )
+            return
         self._next_scene = RunScene(
             pygame=self.pygame,
             fonts=self.fonts,

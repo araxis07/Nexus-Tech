@@ -8,9 +8,11 @@ from decimal import Decimal
 
 from nexus_tech.domain.models import GameState, PendingEvent, Product
 from nexus_tech.domain.money import format_money
+from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import TurnResolution
+from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.turn_coach import build_turn_coach
@@ -81,6 +83,37 @@ class PendingEventViewModel:
 
 
 @dataclass(frozen=True)
+class DeepDiveMetricViewModel:
+    """One metric shown inside a deep-dive operational panel."""
+
+    label: str
+    value_text: str
+    tone: str
+
+
+@dataclass(frozen=True)
+class DeepDiveActionViewModel:
+    """One actionable command surfaced from a deep-dive panel."""
+
+    command: str
+    label: str
+    detail: str
+    tone: str
+
+
+@dataclass(frozen=True)
+class DeepDivePanelViewModel:
+    """One operational deep-dive panel."""
+
+    key: str
+    title: str
+    summary: str
+    metrics: tuple[DeepDiveMetricViewModel, ...]
+    detail_lines: tuple[str, ...]
+    actions: tuple[DeepDiveActionViewModel, ...]
+
+
+@dataclass(frozen=True)
 class TurnMetricViewModel:
     """One metric tile shown in the turn-resolution scene."""
 
@@ -116,6 +149,50 @@ class TurnSummaryViewModel:
 
 
 @dataclass(frozen=True)
+class ReviewFindingViewModel:
+    """One finding surfaced in a review or archive scene."""
+
+    rank_label: str
+    area: str
+    severity: str
+    summary: str
+    command: str
+    lesson: str
+
+
+@dataclass(frozen=True)
+class RunReviewViewModel:
+    """Renderable summary for completed-run or archive review scenes."""
+
+    title: str
+    headline: str
+    summary_line: str
+    next_focus: str
+    badges: tuple[str, ...]
+    findings: tuple[ReviewFindingViewModel, ...]
+
+
+@dataclass(frozen=True)
+class SaveSlotCardViewModel:
+    """One save slot surfaced in the 2D title scene."""
+
+    slot_name: str
+    headline: str
+    detail_lines: tuple[str, ...]
+    tone: str
+
+
+@dataclass(frozen=True)
+class ArchiveCardViewModel:
+    """One archive card surfaced in the 2D title scene."""
+
+    archive_key: str
+    headline: str
+    detail_lines: tuple[str, ...]
+    tone: str
+
+
+@dataclass(frozen=True)
 class GameViewModel:
     """Top-level 2D HUD state."""
 
@@ -141,6 +218,7 @@ class GameViewModel:
     preview_reason: str
     preview_outcome: str
     pending_event: PendingEventViewModel | None
+    deep_panels: tuple[DeepDivePanelViewModel, ...]
 
 
 def build_game_view_model(
@@ -277,6 +355,10 @@ def build_game_view_model(
         preview_reason=preview.confirmation_reason or preview.note,
         preview_outcome=preview.projected_outcome,
         pending_event=_build_pending_event_view_model(state.pending_event),
+        deep_panels=build_deep_dive_panel_view_models(
+            state,
+            selected_product_id=selected_product.id.hex,
+        ),
     )
 
 
@@ -367,6 +449,446 @@ def build_turn_summary_view_model(
         metrics=metrics,
         product_lines=product_lines,
     )
+
+
+def build_deep_dive_panel_view_models(
+    state: GameState,
+    *,
+    selected_product_id: str | None = None,
+) -> tuple[DeepDivePanelViewModel, ...]:
+    """Build the operational side panels used by the 2D frontend."""
+
+    selected_product = _pick_selected_product(state.products, selected_product_id)
+    avg_morale = (
+        sum(employee.morale for employee in state.employees) // len(state.employees)
+        if state.employees
+        else 0
+    )
+    avg_energy = (
+        sum(employee.energy for employee in state.employees) // len(state.employees)
+        if state.employees
+        else 0
+    )
+    active_accounts = [
+        account for account in state.customer_accounts if account.status.value != "churned"
+    ]
+    hotspot_account = max(
+        active_accounts,
+        key=lambda account: (
+            account.churn_risk + account.sla_breach_risk + account.invoice_risk,
+            account.contract_value,
+        ),
+        default=None,
+    )
+    top_partner = max(
+        state.partnerships,
+        key=lambda partnership: (
+            partnership.risk,
+            partnership.conflict_pressure,
+            partnership.sourced_revenue,
+        ),
+        default=None,
+    )
+    customer_summary = (
+        f"{selected_product.name} is currently aimed at "
+        f"{selected_product.target_segment.value.replace('_', ' ')} buyers."
+        if selected_product is not None
+        else "No active product is selected."
+    )
+    partner_summary = (
+        f"Hotspot partner: {top_partner.name}."
+        if top_partner is not None
+        else "No live partner channel exists yet."
+    )
+    team_panel = DeepDivePanelViewModel(
+        key="team",
+        title="Team Control Room",
+        summary="Inspect staffing load, morale, and where idle capacity should go next.",
+        metrics=(
+            DeepDiveMetricViewModel("Headcount", str(len(state.employees)), "info"),
+            DeepDiveMetricViewModel(
+                "Idle",
+                str(sum(1 for employee in state.employees if employee.assigned_product_id is None)),
+                "warning",
+            ),
+            DeepDiveMetricViewModel("Morale", str(avg_morale), _attribute_tone(avg_morale)),
+            DeepDiveMetricViewModel("Energy", str(avg_energy), _attribute_tone(avg_energy)),
+        ),
+        detail_lines=tuple(
+            (
+                f"{employee.full_name} | {employee.role.value.replace('_', ' ')} | "
+                f"morale {employee.morale} | energy {employee.energy}"
+            )
+            for employee in state.employees[:4]
+        )
+        or ("No employees yet. Hiring is still the next staffing move.",),
+        actions=(
+            DeepDiveActionViewModel("hire_employee", "Hire", "Add the next team role.", "info"),
+            DeepDiveActionViewModel(
+                "assign_employee",
+                "Assign",
+                "Point idle capacity at the selected product.",
+                "success",
+            ),
+            DeepDiveActionViewModel(
+                "train_employee",
+                "Train",
+                "Lift productivity on one teammate.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "reorg_team",
+                "Reorg",
+                "Rebalance load if morale or focus drifts.",
+                "warning",
+            ),
+        ),
+    )
+    finance_panel = DeepDivePanelViewModel(
+        key="finance",
+        title="Finance Command",
+        summary="Monitor runway, debt posture, and board pressure before liquidity tightens.",
+        metrics=(
+            DeepDiveMetricViewModel(
+                "Cash",
+                format_money(state.company.cash_on_hand),
+                _cash_tone(state.company.cash_on_hand),
+            ),
+            DeepDiveMetricViewModel(
+                "Debt",
+                format_money(state.finance.debt_principal),
+                "warning" if state.finance.debt_principal > Decimal("0.00") else "success",
+            ),
+            DeepDiveMetricViewModel(
+                "Board",
+                str(state.finance.board_pressure),
+                _attribute_tone(100 - state.finance.board_pressure),
+            ),
+            DeepDiveMetricViewModel(
+                "Confidence",
+                str(state.finance.board_confidence),
+                _attribute_tone(state.finance.board_confidence),
+            ),
+        ),
+        detail_lines=(
+            f"Directive: {state.finance.board_directive.value.replace('_', ' ')}",
+            f"Board ask: {state.finance.active_board_ask.value.replace('_', ' ')}",
+            (
+                "Board resolution is due now."
+                if state.finance.board_resolution_due
+                else "No active board resolution deadline is flashing."
+            ),
+            f"Budget preset: {state.functional_budget.preset.value.replace('_', ' ')}",
+        ),
+        actions=(
+            DeepDiveActionViewModel(
+                "set_capital_plan",
+                "Capital Plan",
+                "Choose the multi-turn funding posture.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "set_functional_budget",
+                "Function Budget",
+                "Rebalance engineering, GTM, and CS spend.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "take_loan",
+                "Loan",
+                "Extend liquidity when runway is shrinking.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "raise_angel",
+                "Angel",
+                "Bring outside capital in if traction supports it.",
+                "info",
+            ),
+        ),
+    )
+    customers_panel = DeepDivePanelViewModel(
+        key="customers",
+        title="Customer / Product Desk",
+        summary="Steer pricing, packaging, segment, and support around the live product mix.",
+        metrics=(
+            DeepDiveMetricViewModel(
+                "Accounts",
+                str(len(active_accounts)),
+                "info",
+            ),
+            DeepDiveMetricViewModel(
+                "Backlog",
+                str(state.support_program.backlog_queue),
+                "danger" if state.support_program.backlog_queue >= 8 else "warning",
+            ),
+            DeepDiveMetricViewModel(
+                "Escalations",
+                str(state.support_program.escalation_queue),
+                "danger" if state.support_program.escalation_queue >= 3 else "warning",
+            ),
+            DeepDiveMetricViewModel(
+                "Selected",
+                selected_product.name if selected_product is not None else "n/a",
+                "info",
+            ),
+        ),
+        detail_lines=(
+            customer_summary,
+            (
+                f"Pricing {selected_product.pricing_tier.value} | "
+                f"packaging {selected_product.packaging_strategy.value.replace('_', ' ')}"
+                if selected_product is not None
+                else "No product selected."
+            ),
+            (
+                f"Hotspot account: {hotspot_account.name} | churn {hotspot_account.churn_risk} | "
+                f"tickets {hotspot_account.open_tickets}"
+                if hotspot_account is not None
+                else "No active key account is flashing right now."
+            ),
+            f"Support lane focus: {state.support_program.lane_focus.value.replace('_', ' ')}",
+        ),
+        actions=(
+            DeepDiveActionViewModel(
+                "create_product",
+                "New Product",
+                "Spin up a named product through the text input modal.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "adjust_pricing",
+                "Pricing",
+                "Shift monetization on the selected product.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "set_packaging_strategy",
+                "Packaging",
+                "Repackage the selected product.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "set_target_segment",
+                "Segment",
+                "Reposition the selected product.",
+                "info",
+            ),
+        ),
+    )
+    partnerships_panel = DeepDivePanelViewModel(
+        key="partnerships",
+        title="Channel / Partnerships Desk",
+        summary="Track channel quality, partner strain, and recovery moves on the live portfolio.",
+        metrics=(
+            DeepDiveMetricViewModel("Partners", str(len(state.partnerships)), "info"),
+            DeepDiveMetricViewModel(
+                "Active",
+                str(
+                    sum(
+                        1
+                        for partnership in state.partnerships
+                        if partnership.status.value == "active"
+                    )
+                ),
+                "success",
+            ),
+            DeepDiveMetricViewModel(
+                "Recovery",
+                str(
+                    sum(
+                        1
+                        for partnership in state.partnerships
+                        if partnership.status.value in {"strained", "recovery", "paused"}
+                    )
+                ),
+                "warning",
+            ),
+            DeepDiveMetricViewModel(
+                "Hotspot Risk",
+                str(top_partner.risk if top_partner is not None else 0),
+                _attribute_tone(100 - (top_partner.risk if top_partner is not None else 0)),
+            ),
+        ),
+        detail_lines=tuple(
+            (
+                f"{partnership.name} | {partnership.channel.value} | {partnership.status.value} | "
+                f"risk {partnership.risk}"
+            )
+            for partnership in state.partnerships[:4]
+        )
+        or (partner_summary,),
+        actions=(
+            DeepDiveActionViewModel(
+                "create_partnership",
+                "New Channel",
+                "Open a new reseller, integration, or marketplace lane.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "renegotiate_partnership",
+                "Renegotiate",
+                "Repair one strained relationship.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "run_partner_recovery_sprint",
+                "Recovery Sprint",
+                "Stabilize the hottest partner lane.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "rebalance_channel_mix",
+                "Rebalance Mix",
+                "Reduce dependency on one noisy partner lane.",
+                "info",
+            ),
+        ),
+    )
+    return (
+        team_panel,
+        finance_panel,
+        customers_panel,
+        partnerships_panel,
+    )
+
+
+def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
+    """Build the review scene for one completed live run."""
+
+    score = calculate_run_score(state)
+    postmortem = build_run_postmortem(state)
+    summary_line = (
+        f"Turn {state.company.current_turn} | score {score.total_score} ({score.score_tier}) | "
+        f"cash {format_money(state.company.cash_on_hand)} | grade {score.campaign_grade}"
+    )
+    badges = (
+        score.score_tier,
+        state.exit_outcome.value if state.exit_outcome is not None else "in_progress",
+        state.difficulty_mode.value,
+    )
+    findings = tuple(
+        ReviewFindingViewModel(
+            rank_label=f"#{finding.rank}",
+            area=finding.area,
+            severity=finding.severity,
+            summary=finding.summary,
+            command=finding.command,
+            lesson=finding.lesson,
+        )
+        for finding in postmortem.findings
+    )
+    return RunReviewViewModel(
+        title=postmortem.title,
+        headline=postmortem.headline,
+        summary_line=summary_line,
+        next_focus=postmortem.next_run_focus,
+        badges=badges,
+        findings=findings,
+    )
+
+
+def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewViewModel:
+    """Build a compact review scene from one archived run summary."""
+
+    findings: list[ReviewFindingViewModel] = []
+    if summary.review_primary_area:
+        findings.append(
+            ReviewFindingViewModel(
+                rank_label="#1",
+                area=summary.review_primary_area,
+                severity="watch",
+                summary=summary.review_primary_summary or "Primary archive lesson captured.",
+                command=summary.review_next_focus or "view_report",
+                lesson=summary.review_next_focus or "Review the archived run details.",
+            )
+        )
+    findings.append(
+        ReviewFindingViewModel(
+            rank_label=f"#{len(findings) + 1}",
+            area="outcome",
+            severity="high" if summary.game_over else "watch",
+            summary=(
+                f"Exit {summary.exit_outcome} at turn {summary.completed_turn} with "
+                f"score tier {summary.score_tier}."
+            ),
+            command=summary.review_next_focus or "view_report",
+            lesson=summary.strategic_outlook.replace("_", " "),
+        )
+    )
+    return RunReviewViewModel(
+        title=summary.review_title or "Archived Run Review",
+        headline=f"{summary.company_name} | {summary.scenario_title}",
+        summary_line=(
+            f"Turn {summary.completed_turn} | score {summary.total_score} ({summary.score_tier}) | "
+            f"grade {summary.campaign_grade} | cash {format_money(summary.final_cash)}"
+        ),
+        next_focus=summary.review_next_focus or "view_report",
+        badges=summary.achievement_badges
+        or (summary.exit_outcome, summary.score_tier, summary.campaign_grade),
+        findings=tuple(findings[:3]),
+    )
+
+
+def build_save_slot_card_view_models(
+    summaries: list[SaveSlotSummary],
+) -> tuple[SaveSlotCardViewModel, ...]:
+    """Build compact save-slot cards for the title scene."""
+
+    cards = []
+    for summary in summaries:
+        tone = "info"
+        if summary.game_over:
+            tone = "danger"
+        elif summary.victory_achieved:
+            tone = "success"
+        cards.append(
+            SaveSlotCardViewModel(
+                slot_name=summary.slot_name,
+                headline=f"{summary.company_name} | Turn {summary.current_turn}",
+                detail_lines=(
+                    summary.scenario_title,
+                    (
+                        f"cash {format_money(summary.cash_on_hand)} | "
+                        f"rep {summary.reputation} | team {summary.headcount}"
+                    ),
+                    (
+                        f"updated {summary.updated_at[:19].replace('T', ' ')} | "
+                        f"v{summary.saved_with_version}"
+                    ),
+                ),
+                tone=tone,
+            )
+        )
+    return tuple(cards)
+
+
+def build_archive_card_view_models(
+    summaries: list[RunArchiveSummary],
+) -> tuple[ArchiveCardViewModel, ...]:
+    """Build archive cards for the title scene."""
+
+    cards = []
+    for summary in summaries:
+        tone = "danger" if summary.game_over else "success" if summary.victory_achieved else "info"
+        cards.append(
+            ArchiveCardViewModel(
+                archive_key=summary.archive_key,
+                headline=(
+                    f"{summary.company_name} | {summary.total_score} | {summary.campaign_grade}"
+                ),
+                detail_lines=(
+                    summary.scenario_title,
+                    (
+                        f"turn {summary.completed_turn} | exit {summary.exit_outcome} | "
+                        f"cash {format_money(summary.final_cash)}"
+                    ),
+                    (summary.review_primary_summary or summary.strategic_outlook.replace("_", " ")),
+                ),
+                tone=tone,
+            )
+        )
+    return tuple(cards)
 
 
 def _build_product_card(product: Product, *, selected_product_id: str) -> ProductCardViewModel:
@@ -477,3 +999,11 @@ def _preview_metric(preview, label: str):
         if metric.label == label:
             return metric
     return None
+
+
+def _attribute_tone(value: int) -> str:
+    if value >= 65:
+        return "success"
+    if value >= 45:
+        return "warning"
+    return "danger"

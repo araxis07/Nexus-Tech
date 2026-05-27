@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.89.0 - 2026-05-27
+
+- Added a 2D title flow with `menu-2d`, a save-slot browser, archive browser, and archived run review scene so the animated frontend can now open and inspect persistent runs without dropping back to the CLI first
+- Added deep-dive 2D operational overlays for team, finance, customers, and partnerships, each with context-aware action buttons that surface pricing, packaging, capital-plan, functional-budget, and partner-recovery commands already supported by the simulation layer
+- Added a reusable text input modal to the 2D shell and used it to name newly created products from inside the frontend instead of falling back to generated defaults only
+- Promoted completed 2D runs into a dedicated review scene with postmortem findings, next-focus commands, and saved-run persistence controls instead of only showing a terminal overlay
+- Expanded regression coverage for the new 2D menu launcher, deep-dive panel view models, review view models, and updated CLI routing
+- Promoted package metadata and runtime versioning to `0.89.0`
+
 ## 0.88.0 - 2026-05-27
 
 - Split the first `pygame-ce` frontend shell into a live `RunScene` plus an animated `TurnSummaryScene` so `end_turn` now resolves through a dedicated post-turn timeline instead of only dropping transient event cards into the dashboard

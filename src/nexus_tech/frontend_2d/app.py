@@ -8,6 +8,7 @@ from pathlib import Path
 
 from nexus_tech.domain.models import GameState
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
+from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.randomness import RandomSource
 
 
@@ -71,9 +72,75 @@ def launch_2d_frontend(
             game_rng,
         ),
     )
+    return _run_frontend_loop(
+        pygame=pygame,
+        surface=surface,
+        scene=scene,
+        flags=flags,
+        max_frames=max_frames,
+    )
+
+
+def launch_2d_menu(
+    *,
+    db_path: Path,
+    headless: bool = False,
+    max_frames: int | None = None,
+    window_size: tuple[int, int] = (1440, 900),
+) -> FrontendRunResult:
+    """Launch the title/save-load scene for the 2D frontend."""
+
+    if headless:
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+    try:
+        import pygame
+    except ModuleNotFoundError as error:
+        raise Frontend2DUnavailableError(
+            "pygame-ce is not installed. Install the optional 2D runtime first."
+        ) from error
+
+    from nexus_tech.frontend_2d.scenes import TitleScene
+    from nexus_tech.frontend_2d.widgets import create_fonts
+
+    pygame.init()
+    pygame.font.init()
+    flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
+    surface = pygame.display.set_mode(window_size, flags)
+    pygame.display.set_caption("NEXUS TECH 2D | Menu")
+    fonts = create_fonts(pygame)
+    coordinator = SaveLoadCoordinator(db_path)
+    scene = TitleScene(
+        pygame=pygame,
+        fonts=fonts,
+        state=create_new_game("NEXUS TECH", "Nexus One"),
+        rng=RandomSource(seed=None),
+        slot_name="active",
+        save_callback=lambda game_state, game_rng, current_slot: coordinator.save_game(
+            current_slot,
+            game_state,
+            game_rng,
+        ),
+        coordinator=coordinator,
+        info_message="Load a save, review archives, or boot the default run from inside 2D.",
+    )
+    return _run_frontend_loop(
+        pygame=pygame,
+        surface=surface,
+        scene=scene,
+        flags=flags,
+        max_frames=max_frames,
+    )
+
+
+def _run_frontend_loop(
+    *, pygame, surface, scene, flags: int, max_frames: int | None
+) -> FrontendRunResult:
+    """Run the shared event loop for any 2D frontend scene."""
+
     clock = pygame.time.Clock()
     frame_count = 0
-
     try:
         while not scene.should_exit:
             dt = clock.tick(60) / 1000

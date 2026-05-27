@@ -54,7 +54,11 @@ from nexus_tech.domain.models import (
     SupportLaneFocus,
     TurnAction,
 )
-from nexus_tech.frontend_2d import Frontend2DUnavailableError, launch_2d_frontend
+from nexus_tech.frontend_2d import (
+    Frontend2DUnavailableError,
+    launch_2d_frontend,
+    launch_2d_menu,
+)
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
     DEFAULT_SAVE_SLOT,
@@ -1268,6 +1272,42 @@ def continue_last_game_2d_command(
         slot_name=loaded_game.slot_name,
         headless=headless,
         max_frames=max_frames,
+    )
+
+
+@app.command("menu-2d")
+def menu_2d_command(
+    db_path: Path = DB_PATH_OPTION,
+    headless: bool = HEADLESS_2D_OPTION,
+    max_frames: int | None = MAX_FRAMES_2D_OPTION,
+) -> None:
+    """Open the 2D title scene with save/load and archive review."""
+
+    try:
+        result = launch_2d_menu(
+            db_path=db_path,
+            headless=headless,
+            max_frames=max_frames,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    console.print(
+        Panel.fit(
+            (
+                f"2D menu closed with reason '{result.exit_reason}'. "
+                f"Slot '{result.slot_name}' remained available."
+            ),
+            title="2D Menu Closed",
+            border_style="cyan",
+        )
     )
 
 

@@ -8,11 +8,13 @@ from typer.testing import CliRunner
 import nexus_tech.cli as cli_module
 from nexus_tech.cli import app
 from nexus_tech.domain.models import CandidateTrait, EmployeeRole, Seniority, TurnAction
-from nexus_tech.frontend_2d import launch_2d_frontend
+from nexus_tech.frontend_2d import launch_2d_frontend, launch_2d_menu
 from nexus_tech.frontend_2d.context import ContextPicker, build_command_request
 from nexus_tech.frontend_2d.event_queue import build_action_events
 from nexus_tech.frontend_2d.viewmodels import (
+    build_deep_dive_panel_view_models,
     build_game_view_model,
+    build_run_review_view_model,
     build_turn_summary_view_model,
 )
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
@@ -110,6 +112,38 @@ def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
     assert summary.product_lines
 
 
+def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    panels = build_deep_dive_panel_view_models(
+        state,
+        selected_product_id=state.products[0].id.hex,
+    )
+
+    keys = {panel.key for panel in panels}
+    assert {"team", "finance", "customers", "partnerships"} <= keys
+    finance_panel = next(panel for panel in panels if panel.key == "finance")
+    customer_panel = next(panel for panel in panels if panel.key == "customers")
+    assert any(
+        action.command == TurnAction.SET_CAPITAL_PLAN.value for action in finance_panel.actions
+    )
+    assert any(
+        action.command == TurnAction.ADJUST_PRICING.value for action in customer_panel.actions
+    )
+
+
+def test_build_run_review_view_model_exposes_findings() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    state.company.game_over = True
+    state.company.cash_on_hand = Decimal("-250.00")
+
+    review = build_run_review_view_model(state)
+
+    assert review.title in {"Failure Postmortem", "After-Action Review"}
+    assert review.findings
+    assert review.next_focus
+
+
 def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> None:
     state = create_new_game("NEXUS TECH", "Nexus One")
     rng = RandomSource(seed=11)
@@ -126,6 +160,18 @@ def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> No
 
     assert result.exit_reason == "max_frames"
     assert result.slot_name == "active"
+    assert result.saved_on_exit is False
+
+
+def test_launch_2d_menu_headless_exits_after_frame_cap(tmp_path: Path) -> None:
+    result = launch_2d_menu(
+        db_path=tmp_path / "menu-2d.db",
+        headless=True,
+        max_frames=2,
+        window_size=(960, 640),
+    )
+
+    assert result.exit_reason == "max_frames"
     assert result.saved_on_exit is False
 
 
@@ -154,5 +200,34 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
     assert result.exit_code == 0
     assert captured["scenario_id"] == "founder_journey"
     assert captured["seed"] == 7
+    assert captured["headless"] is True
+    assert captured["max_frames"] == 2
+
+
+def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_launch_2d_menu(**kwargs):
+        captured.update(kwargs)
+
+        class Result:
+            exit_reason = "max_frames"
+            slot_name = "active"
+
+        return Result()
+
+    monkeypatch.setattr(cli_module, "launch_2d_menu", fake_launch_2d_menu)
+
+    result = runner.invoke(
+        app,
+        [
+            "menu-2d",
+            "--headless",
+            "--max-frames",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
     assert captured["headless"] is True
     assert captured["max_frames"] == 2
