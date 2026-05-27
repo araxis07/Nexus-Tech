@@ -7,7 +7,14 @@ from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
 from nexus_tech.cli import app
-from nexus_tech.domain.models import CandidateTrait, EmployeeRole, Seniority, TurnAction
+from nexus_tech.domain.models import (
+    CandidateTrait,
+    EmployeeRole,
+    ProductReleaseType,
+    RoadmapProjectType,
+    Seniority,
+    TurnAction,
+)
 from nexus_tech.frontend_2d import launch_2d_frontend, launch_2d_menu
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -29,6 +36,34 @@ from nexus_tech.simulation.engine import ActionContext, apply_action, create_new
 from nexus_tech.simulation.randomness import RandomSource
 
 runner = CliRunner()
+
+
+def _build_enriched_2d_state():
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    state.action_points_remaining = 12
+    state = apply_action(state, TurnAction.SOURCE_CANDIDATES, context=ActionContext()).state
+    state = apply_action(
+        state,
+        TurnAction.CREATE_SALES_DEAL,
+        context=ActionContext(target_product_id=state.products[0].id),
+    ).state
+    state = apply_action(
+        state,
+        TurnAction.PLAN_RELEASE,
+        context=ActionContext(
+            target_product_id=state.products[0].id,
+            release_type=ProductReleaseType.MINOR_RELEASE,
+        ),
+    ).state
+    state = apply_action(
+        state,
+        TurnAction.START_ROADMAP_PROJECT,
+        context=ActionContext(
+            target_product_id=state.products[0].id,
+            roadmap_project_type=RoadmapProjectType.PLATFORM_REBUILD,
+        ),
+    ).state
+    return state
 
 
 def test_build_game_view_model_exposes_products_and_coach_lines() -> None:
@@ -160,8 +195,13 @@ def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions(
     board_panel = next(panel for panel in panels if panel.key == "board")
     pipeline_panel = next(panel for panel in panels if panel.key == "pipeline")
     report_panel = next(panel for panel in panels if panel.key == "report")
+    team_panel = next(panel for panel in panels if panel.key == "team")
     assert any(
         action.command == TurnAction.SET_CAPITAL_PLAN.value for action in finance_panel.actions
+    )
+    assert any(action.command == TurnAction.REVIEW_TEAM.value for action in team_panel.actions)
+    assert any(
+        action.command == TurnAction.REVIEW_FINANCE.value for action in finance_panel.actions
     )
     assert any(
         action.command == TurnAction.ADJUST_PRICING.value for action in customer_panel.actions
@@ -171,6 +211,58 @@ def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions(
         action.command == TurnAction.CREATE_SALES_DEAL.value for action in pipeline_panel.actions
     )
     assert any(action.command == TurnAction.VIEW_REPORT.value for action in report_panel.actions)
+
+
+def test_deep_dive_panels_expose_live_inspector_sections() -> None:
+    state = _build_enriched_2d_state()
+
+    panels = build_deep_dive_panel_view_models(
+        state,
+        selected_product_id=state.products[0].id.hex,
+    )
+
+    pipeline_panel = next(panel for panel in panels if panel.key == "pipeline")
+    board_panel = next(panel for panel in panels if panel.key == "board")
+    report_panel = next(panel for panel in panels if panel.key == "report")
+    assert {section.key for section in pipeline_panel.inspectors} == {
+        "deals",
+        "releases",
+        "projects",
+        "candidates",
+    }
+    assert pipeline_panel.inspectors[0].items[0].title != "No Sales Deals"
+    assert {section.key for section in board_panel.inspectors} == {
+        "resolution",
+        "scorecard",
+        "alerts",
+    }
+    assert {section.key for section in report_panel.inspectors} == {
+        "turns",
+        "funding",
+        "milestones",
+        "events",
+    }
+
+
+def test_deep_panel_actions_are_supported_or_explained() -> None:
+    for state in (create_new_game("NEXUS TECH", "Nexus One"), _build_enriched_2d_state()):
+        panels = build_deep_dive_panel_view_models(
+            state,
+            selected_product_id=state.products[0].id.hex,
+        )
+        for panel in panels:
+            for action in panel.actions:
+                request = build_command_request(
+                    state,
+                    command=action.command,
+                    selected_product_id=state.products[0].id.hex,
+                )
+                reason = explain_command_unavailable(
+                    state,
+                    command=action.command,
+                    selected_product_id=state.products[0].id.hex,
+                )
+                assert request is not None or reason is not None, (panel.key, action.command)
 
 
 def test_explain_command_unavailable_surfaces_specific_reason() -> None:

@@ -102,6 +102,25 @@ class DeepDiveActionViewModel:
 
 
 @dataclass(frozen=True)
+class DeepDiveInspectorItemViewModel:
+    """One compact record rendered inside a detailed 2D inspector."""
+
+    title: str
+    detail_lines: tuple[str, ...]
+    tone: str
+
+
+@dataclass(frozen=True)
+class DeepDiveInspectorSectionViewModel:
+    """One logical section in a detailed 2D inspector overlay."""
+
+    key: str
+    title: str
+    tone: str
+    items: tuple[DeepDiveInspectorItemViewModel, ...]
+
+
+@dataclass(frozen=True)
 class DeepDivePanelViewModel:
     """One operational deep-dive panel."""
 
@@ -111,6 +130,7 @@ class DeepDivePanelViewModel:
     metrics: tuple[DeepDiveMetricViewModel, ...]
     detail_lines: tuple[str, ...]
     actions: tuple[DeepDiveActionViewModel, ...]
+    inspectors: tuple[DeepDiveInspectorSectionViewModel, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -511,6 +531,7 @@ def build_deep_dive_panel_view_models(
     )
     latest_turn = state.turn_history[-1] if state.turn_history else None
     run_score = calculate_run_score(state)
+    product_by_id = {product.id: product for product in state.products}
     customer_summary = (
         f"{selected_product.name} is currently aimed at "
         f"{selected_product.target_segment.value.replace('_', ' ')} buyers."
@@ -588,7 +609,14 @@ def build_deep_dive_panel_view_models(
                 "Close on the most advanced candidate.",
                 "success",
             ),
+            DeepDiveActionViewModel(
+                "review_team",
+                "Team Review",
+                "Open the full staffing and hiring inspector.",
+                "info",
+            ),
         ),
+        inspectors=_build_team_inspectors(state, product_by_id=product_by_id),
     )
     finance_panel = DeepDivePanelViewModel(
         key="finance",
@@ -652,12 +680,19 @@ def build_deep_dive_panel_view_models(
                 "info",
             ),
             DeepDiveActionViewModel(
+                "review_finance",
+                "Finance Review",
+                "Open the full finance and forecast inspector.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
                 "review_board",
                 "Board Review",
                 "Open governance status without leaving 2D.",
                 "info",
             ),
         ),
+        inspectors=_build_finance_inspectors(state),
     )
     customers_panel = DeepDivePanelViewModel(
         key="customers",
@@ -729,6 +764,7 @@ def build_deep_dive_panel_view_models(
                 "info",
             ),
         ),
+        inspectors=_build_customer_inspectors(state, product_by_id=product_by_id),
     )
     partnerships_panel = DeepDivePanelViewModel(
         key="partnerships",
@@ -804,6 +840,7 @@ def build_deep_dive_panel_view_models(
                 "info",
             ),
         ),
+        inspectors=_build_partnership_inspectors(state, product_by_id=product_by_id),
     )
     board_panel = DeepDivePanelViewModel(
         key="board",
@@ -872,6 +909,7 @@ def build_deep_dive_panel_view_models(
                 "danger",
             ),
         ),
+        inspectors=_build_board_inspectors(state),
     )
     pipeline_panel = DeepDivePanelViewModel(
         key="pipeline",
@@ -953,6 +991,7 @@ def build_deep_dive_panel_view_models(
                 "warning",
             ),
         ),
+        inspectors=_build_pipeline_inspectors(state, product_by_id=product_by_id),
     )
     report_panel = DeepDivePanelViewModel(
         key="report",
@@ -1009,6 +1048,7 @@ def build_deep_dive_panel_view_models(
                 "info",
             ),
         ),
+        inspectors=_build_report_inspectors(state),
     )
     return (
         team_panel,
@@ -1157,6 +1197,599 @@ def build_archive_card_view_models(
             )
         )
     return tuple(cards)
+
+
+def _build_team_inspectors(
+    state: GameState,
+    *,
+    product_by_id: dict,
+) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    roster_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=employee.full_name,
+            detail_lines=(
+                (
+                    f"{employee.role.value.replace('_', ' ')} | "
+                    f"{employee.seniority.value} | "
+                    f"{_product_name(product_by_id, employee.assigned_product_id) or 'bench'}"
+                ),
+                (
+                    f"morale {employee.morale} | energy {employee.energy} | "
+                    f"perf {employee.performance_rating}"
+                ),
+            ),
+            tone=_attribute_tone((employee.morale + employee.energy) // 2),
+        )
+        for employee in state.employees[:3]
+    ) or (_placeholder_item("No Team Yet", "Hire the first teammate to unlock staffing depth."),)
+    candidate_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=candidate.full_name,
+            detail_lines=(
+                (
+                    f"{candidate.role.value.replace('_', ' ')} | "
+                    f"{candidate.seniority.value} | {candidate.stage.value}"
+                ),
+                (
+                    f"salary {format_money(candidate.salary_expectation)} | "
+                    f"prod {candidate.expected_productivity} | expires t{candidate.expires_turn}"
+                ),
+            ),
+            tone="warning" if candidate.expires_turn <= state.company.current_turn + 1 else "info",
+        )
+        for candidate in state.hiring_candidates[:2]
+    ) or (
+        _placeholder_item(
+            "Hiring Funnel Empty",
+            "Source candidates before screening or interviewing.",
+            tone="warning",
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="roster",
+            title="Roster",
+            tone="info",
+            items=roster_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="candidates",
+            title="Hiring Funnel",
+            tone="warning",
+            items=candidate_items,
+        ),
+    )
+
+
+def _build_finance_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    runway_text = (
+        f"{state.finance.forecast_runway_turns} turns"
+        if state.finance.forecast_runway_turns is not None
+        else "unknown"
+    )
+    capital_items = (
+        DeepDiveInspectorItemViewModel(
+            title="Liquidity",
+            detail_lines=(
+                (
+                    f"cash {format_money(state.company.cash_on_hand)} | "
+                    f"forecast {format_money(state.finance.forecast_net_cash_flow)}"
+                ),
+                f"runway {runway_text} | burn multiple {state.finance.burn_multiple}",
+            ),
+            tone=_cash_tone(state.company.cash_on_hand),
+        ),
+        DeepDiveInspectorItemViewModel(
+            title="Leverage",
+            detail_lines=(
+                (
+                    f"debt {format_money(state.finance.debt_principal)} | "
+                    f"raised {format_money(state.finance.total_raised)}"
+                ),
+                (
+                    f"dilution {state.finance.equity_dilution} | "
+                    f"covenant {state.finance.covenant_risk}"
+                ),
+            ),
+            tone="warning" if state.finance.debt_principal > Decimal("0.00") else "success",
+        ),
+    )
+    planning_items = (
+        DeepDiveInspectorItemViewModel(
+            title="Capital Plan",
+            detail_lines=(
+                (
+                    f"{state.capital_plan.mode.value.replace('_', ' ')} | "
+                    f"{state.capital_plan.source_preference.value.replace('_', ' ')}"
+                ),
+                (
+                    f"reserve {format_money(state.capital_plan.reserve_target)} | "
+                    f"horizon {state.capital_plan.planning_horizon_turns} turns"
+                ),
+            ),
+            tone="info",
+        ),
+        DeepDiveInspectorItemViewModel(
+            title="Quarter Plan",
+            detail_lines=(
+                (
+                    f"budget {state.quarter_plan.budget_stance.value} | "
+                    f"target turn {state.quarter_plan.target_turn}"
+                ),
+                (
+                    f"rev {format_money(state.quarter_plan.revenue_target)} | "
+                    f"cash {format_money(state.quarter_plan.cash_reserve_target)}"
+                ),
+            ),
+            tone="warning",
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="capital",
+            title="Capital Posture",
+            tone="warning",
+            items=capital_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="planning",
+            title="Plans",
+            tone="info",
+            items=planning_items,
+        ),
+    )
+
+
+def _build_customer_inspectors(
+    state: GameState,
+    *,
+    product_by_id: dict,
+) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    active_accounts = [
+        account for account in state.customer_accounts if account.status.value != "churned"
+    ]
+    hotspot_accounts = sorted(
+        active_accounts,
+        key=lambda account: (
+            account.churn_risk + account.sla_breach_risk + account.invoice_risk,
+            account.contract_value,
+        ),
+        reverse=True,
+    )
+    account_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=account.name,
+            detail_lines=(
+                (
+                    f"{_product_name(product_by_id, account.product_id) or 'unknown'} | "
+                    f"{account.segment.value} | {account.plan_tier.value}"
+                ),
+                (
+                    f"renewal {account.renewal_health} | churn {account.churn_risk} | "
+                    f"tickets {account.open_tickets}"
+                ),
+            ),
+            tone="danger" if account.churn_risk >= 65 else "warning",
+        )
+        for account in hotspot_accounts[:3]
+    ) or (
+        _placeholder_item(
+            "No Key Accounts",
+            "Land more traction before customer-account pressure starts stacking up.",
+        ),
+    )
+    support_items = (
+        DeepDiveInspectorItemViewModel(
+            title="Support Control",
+            detail_lines=(
+                (
+                    f"lane {state.support_program.lane_focus.value.replace('_', ' ')} | "
+                    f"backlog {state.support_program.backlog_queue}"
+                ),
+                (
+                    f"enterprise {state.support_program.enterprise_ticket_pressure} | "
+                    f"onboarding {state.support_program.onboarding_ticket_pressure} | "
+                    f"billing {state.support_program.billing_ticket_pressure}"
+                ),
+            ),
+            tone=("danger" if state.support_program.escalation_queue >= 3 else "warning"),
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="accounts",
+            title="Hot Accounts",
+            tone="warning",
+            items=account_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="support",
+            title="Support Lanes",
+            tone="danger" if state.support_program.escalation_queue >= 3 else "warning",
+            items=support_items,
+        ),
+    )
+
+
+def _build_partnership_inspectors(
+    state: GameState,
+    *,
+    product_by_id: dict,
+) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    active_partnerships = sum(1 for item in state.partnerships if item.status.value == "active")
+    recovery_partnerships = sum(
+        1 for item in state.partnerships if item.status.value in {"strained", "recovery", "paused"}
+    )
+    total_sourced_revenue = format_money(sum(item.sourced_revenue for item in state.partnerships))
+    partner_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=partnership.name,
+            detail_lines=(
+                (
+                    f"{partnership.channel.value} | {partnership.status.value} | "
+                    f"{_product_name(product_by_id, partnership.product_id) or 'unknown'}"
+                ),
+                (
+                    f"risk {partnership.risk} | conflict {partnership.conflict_pressure} | "
+                    f"revenue {format_money(partnership.sourced_revenue)}"
+                ),
+            ),
+            tone="danger" if partnership.risk >= 65 else "warning",
+        )
+        for partnership in sorted(
+            state.partnerships,
+            key=lambda item: (item.risk, item.conflict_pressure, item.sourced_revenue),
+            reverse=True,
+        )[:3]
+    ) or (
+        _placeholder_item(
+            "No Live Channels",
+            "Open a reseller, integration, or marketplace lane to inspect channel depth.",
+        ),
+    )
+    mix_items = (
+        DeepDiveInspectorItemViewModel(
+            title="Exposure Mix",
+            detail_lines=(
+                (f"active {active_partnerships} | recovery {recovery_partnerships}"),
+                (
+                    f"users {sum(item.sourced_users for item in state.partnerships)} | "
+                    f"sourced revenue {total_sourced_revenue}"
+                ),
+            ),
+            tone="info",
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="partners",
+            title="Live Channels",
+            tone="warning",
+            items=partner_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="mix",
+            title="Exposure Mix",
+            tone="info",
+            items=mix_items,
+        ),
+    )
+
+
+def _build_board_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    resolution_items = (
+        DeepDiveInspectorItemViewModel(
+            title=state.finance.board_resolution.value.replace("_", " ").title(),
+            detail_lines=(
+                (
+                    f"directive {state.finance.board_directive.value.replace('_', ' ')} | "
+                    f"ask {state.finance.active_board_ask.value.replace('_', ' ')}"
+                ),
+                (
+                    "response due now"
+                    if state.finance.board_resolution_due
+                    else f"window {state.finance.board_resolution_window} turns"
+                ),
+            ),
+            tone="danger" if state.finance.board_resolution_due else "warning",
+        ),
+    )
+    scorecard_items = (
+        DeepDiveInspectorItemViewModel(
+            title="Commercial Scorecard",
+            detail_lines=(
+                f"profitability {state.finance.board_profitability_score}",
+                f"reliability {state.finance.board_reliability_score}",
+            ),
+            tone=_attribute_tone(
+                (state.finance.board_profitability_score + state.finance.board_reliability_score)
+                // 2
+            ),
+        ),
+        DeepDiveInspectorItemViewModel(
+            title="Operating Scorecard",
+            detail_lines=(
+                f"team health {state.finance.board_team_health_score}",
+                f"portfolio focus {state.finance.board_portfolio_focus_score}",
+            ),
+            tone=_attribute_tone(
+                (state.finance.board_team_health_score + state.finance.board_portfolio_focus_score)
+                // 2
+            ),
+        ),
+    )
+    alert_items = (
+        DeepDiveInspectorItemViewModel(
+            title="Warning Ladder",
+            detail_lines=(
+                (
+                    f"warnings {state.finance.board_warning_level} | "
+                    f"miss streak {state.finance.board_resolution_miss_streak}"
+                ),
+                (
+                    f"crisis {state.finance.governance_crisis_level} | "
+                    f"recovery {state.finance.board_recovery_turns_remaining} turns"
+                ),
+            ),
+            tone="danger" if state.finance.governance_crisis_active else "warning",
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="resolution",
+            title="Resolution Loop",
+            tone="warning",
+            items=resolution_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="scorecard",
+            title="Scorecard",
+            tone="info",
+            items=scorecard_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="alerts",
+            title="Alerts",
+            tone="danger" if state.finance.governance_crisis_active else "warning",
+            items=alert_items,
+        ),
+    )
+
+
+def _build_pipeline_inspectors(
+    state: GameState,
+    *,
+    product_by_id: dict,
+) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    deal_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=deal.name,
+            detail_lines=(
+                (
+                    f"{deal.stage.value} | {deal.segment.value} | "
+                    f"{_product_name(product_by_id, deal.product_id) or 'unknown'}"
+                ),
+                (
+                    f"prob {deal.probability} | value {format_money(deal.value)} | "
+                    f"{deal.plan_tier.value}"
+                ),
+            ),
+            tone="success" if deal.probability >= 65 else "warning",
+        )
+        for deal in state.sales_deals[:2]
+    ) or (
+        _placeholder_item(
+            "No Sales Deals",
+            "Create a deal before trying to advance the enterprise pipeline.",
+        ),
+    )
+    release_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=release.release_type.value.replace("_", " ").title(),
+            detail_lines=(
+                (
+                    f"{_product_name(product_by_id, release.product_id) or 'unknown'} | "
+                    f"{release.status.value} | scheduled t{release.scheduled_turn}"
+                ),
+                (f"progress {release.progress}/{release.required_progress} | risk {release.risk}"),
+            ),
+            tone="danger" if release.risk >= 65 else "info",
+        )
+        for release in state.product_releases[:2]
+    ) or (
+        _placeholder_item(
+            "No Planned Releases",
+            "Plan a release before trying to spend delivery work.",
+            tone="warning",
+        ),
+    )
+    project_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=project.project_type.value.replace("_", " ").title(),
+            detail_lines=(
+                (
+                    f"{project.status.value} | "
+                    f"{_product_name(product_by_id, project.target_product_id) or 'company-wide'}"
+                ),
+                (
+                    f"progress {project.progress}/{project.required_progress} | "
+                    f"deadline t{project.deadline_turn}"
+                ),
+            ),
+            tone="danger" if project.delivery_risk >= 65 else "warning",
+        )
+        for project in state.roadmap_projects[:2]
+    ) or (
+        _placeholder_item(
+            "No Roadmap Projects",
+            "Start a roadmap project before trying to work one.",
+        ),
+    )
+    candidate_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=candidate.full_name,
+            detail_lines=(
+                (
+                    f"{candidate.stage.value} | {candidate.role.value.replace('_', ' ')} | "
+                    f"{candidate.seniority.value}"
+                ),
+                (
+                    f"salary {format_money(candidate.salary_expectation)} | "
+                    f"score {candidate.interview_score} | accept {candidate.acceptance_chance}"
+                ),
+            ),
+            tone="warning" if candidate.stage.value == "interviewed" else "info",
+        )
+        for candidate in state.hiring_candidates[:2]
+    ) or (
+        _placeholder_item(
+            "No Candidates",
+            "Source candidates before the funnel can move forward.",
+            tone="warning",
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="deals",
+            title="Sales Deals",
+            tone="info",
+            items=deal_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="releases",
+            title="Releases",
+            tone="warning",
+            items=release_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="projects",
+            title="Roadmap Projects",
+            tone="warning",
+            items=project_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="candidates",
+            title="Candidates",
+            tone="info",
+            items=candidate_items,
+        ),
+    )
+
+
+def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    latest_turn_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=f"Turn {entry.turn}",
+            detail_lines=(
+                (
+                    f"revenue {format_money(entry.total_revenue)} | "
+                    f"net {format_money(entry.net_cash_flow)}"
+                ),
+                (
+                    f"cash {format_money(entry.cash_on_hand)} | users {entry.total_users} | "
+                    f"headcount {entry.headcount}"
+                ),
+            ),
+            tone="success" if entry.net_cash_flow >= Decimal("0.00") else "warning",
+        )
+        for entry in reversed(state.turn_history[-2:])
+    ) or (
+        _placeholder_item(
+            "No Turn Ledger",
+            "End at least one turn to populate report history.",
+        ),
+    )
+    funding_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=funding.funding_type.value.replace("_", " ").title(),
+            detail_lines=(
+                f"turn {funding.turn} | amount {format_money(funding.amount)}",
+                funding.summary,
+            ),
+            tone="warning" if funding.funding_type.value == "loan" else "info",
+        )
+        for funding in reversed(state.funding_history[-2:])
+    ) or (
+        _placeholder_item(
+            "No Funding Events",
+            "Debt and equity moves will appear here once the run raises capital.",
+        ),
+    )
+    milestone_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=milestone.title,
+            detail_lines=(f"turn {milestone.unlocked_turn}", milestone.reward_text),
+            tone="success",
+        )
+        for milestone in reversed(state.milestone_history[-2:])
+    ) or (
+        _placeholder_item(
+            "No Milestones Yet",
+            "Growth, resilience, and portfolio milestones will collect here.",
+        ),
+    )
+    event_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=event.title,
+            detail_lines=(
+                f"turn {event.resolved_turn} | {event.selected_option_label}",
+                event.result_text,
+            ),
+            tone="warning" if event.category.value == "reputation" else "info",
+        )
+        for event in reversed(state.event_history[-2:])
+    ) or (
+        _placeholder_item(
+            "No Event History",
+            "Resolved events will show their last outcome here.",
+        ),
+    )
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="turns",
+            title="Latest Turns",
+            tone="info",
+            items=latest_turn_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="funding",
+            title="Funding",
+            tone="warning",
+            items=funding_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="milestones",
+            title="Milestones",
+            tone="success",
+            items=milestone_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="events",
+            title="Events",
+            tone="info",
+            items=event_items,
+        ),
+    )
+
+
+def _placeholder_item(
+    title: str,
+    detail: str,
+    *,
+    tone: str = "info",
+) -> DeepDiveInspectorItemViewModel:
+    return DeepDiveInspectorItemViewModel(
+        title=title,
+        detail_lines=(detail,),
+        tone=tone,
+    )
+
+
+def _product_name(product_by_id: dict, product_id) -> str | None:
+    if product_id is None:
+        return None
+    product = product_by_id.get(product_id)
+    return product.name if product is not None else None
 
 
 def _build_product_card(product: Product, *, selected_product_id: str) -> ProductCardViewModel:

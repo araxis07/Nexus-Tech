@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.91.0 - 2026-05-28
+
+- Added full-screen 2D inspector overlays for team, finance, customers, partnerships, board, pipeline, and report review commands so the frontend can inspect live state without dropping back to CLI-style summaries
+- Expanded panel data with structured inspector sections for sales deals, releases, roadmap projects, hiring candidates, board scorecards, recent funding, milestones, and event history
+- Routed `review_*` and `view_report` commands inside the 2D shell to those inspectors so common coach and panel review actions now have explicit frontend coverage instead of only transient action messages
+- Surfaced compact disabled-action reasons inline on 2D action buttons and deep-panel buttons so blocked actions explain missing prerequisites before the player clicks into dead ends
+- Added regression coverage that panel inspector sections render, panel actions stay either executable or explicitly blocked, and enriched pipeline states keep their 2D command coverage
+- Promoted package metadata and runtime versioning to `0.91.0`
+
 ## 0.90.0 - 2026-05-28
 
 - Added a fuller 2D new-game wizard that lets the frontend choose scenario, difficulty, campaign start, campaign goal, company name, product name, save slot, and optional seed before opening a run

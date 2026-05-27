@@ -1861,6 +1861,7 @@ class RunScene(BaseScene):
         self._context_picker: ContextPicker | None = None
         self._text_input: TextInputModalState | None = None
         self._deep_panel_key: str | None = None
+        self._inspector_panel_key: str | None = None
         self._product_index = 0
         self._tweens = TweenBank(speed=9.0)
         self._set_selected_product(selected_product_id)
@@ -1897,6 +1898,15 @@ class RunScene(BaseScene):
                 return panel
         return None
 
+    @property
+    def inspector_panel(self) -> DeepDivePanelViewModel | None:
+        if self._inspector_panel_key is None:
+            return None
+        for panel in self._view_model.deep_panels:
+            if panel.key == self._inspector_panel_key:
+                return panel
+        return None
+
     def update(self, dt: float) -> None:
         """Advance animations and expire transient event cards."""
 
@@ -1929,6 +1939,9 @@ class RunScene(BaseScene):
             if self._context_picker is not None:
                 self._context_picker = None
                 return
+            if self._inspector_panel_key is not None:
+                self._inspector_panel_key = None
+                return
             if self._deep_panel_key is not None:
                 self._deep_panel_key = None
                 return
@@ -1942,6 +1955,11 @@ class RunScene(BaseScene):
 
         if self._context_picker is not None:
             self._handle_picker_key(event)
+            return
+
+        if self._inspector_panel_key is not None:
+            if event.key == self.pygame.K_s:
+                self._save_current_run()
             return
 
         if self.state.company.game_over or self.state.victory_achieved:
@@ -2049,6 +2067,8 @@ class RunScene(BaseScene):
             self._draw_text_input_overlay(surface)
         if self._deep_panel_key is not None:
             self._draw_deep_panel_overlay(surface)
+        if self._inspector_panel_key is not None:
+            self._draw_inspector_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
 
@@ -2114,6 +2134,9 @@ class RunScene(BaseScene):
             return
         if target.kind == "close_panel":
             self._deep_panel_key = None
+            return
+        if target.kind == "close_inspector":
+            self._inspector_panel_key = None
             return
         if target.kind == "submit_text":
             self._submit_text_modal()
@@ -2323,6 +2346,10 @@ class RunScene(BaseScene):
         if command == TurnAction.END_TURN.value:
             self._attempt_end_turn()
             return
+        inspector_key = self._inspector_key_for_command(command)
+        if inspector_key is not None:
+            self._inspector_panel_key = inspector_key
+            return
         reason = self._command_disabled_reason(command)
         if reason is not None:
             self._push_action_blocked_event(command, reason)
@@ -2492,6 +2519,8 @@ class RunScene(BaseScene):
         )
         if self._deep_panel_key is not None and self.deep_panel is None:
             self._deep_panel_key = None
+        if self._inspector_panel_key is not None and self.inspector_panel is None:
+            self._inspector_panel_key = None
         self._sync_tweens()
 
     def _sync_tweens(self) -> None:
@@ -2715,16 +2744,21 @@ class RunScene(BaseScene):
                 top += button_height + 10
                 left = inner.left
             button_rect = pygame.Rect(left, top, button_width, button_height)
+            enabled = self._button_is_enabled(button)
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
                 title=f"{button.key_hint} {button.title}",
-                detail=button.detail,
+                detail=self._button_detail(
+                    button.payload if button.kind in {"command", "text_command"} else None,
+                    button.detail,
+                    enabled=enabled,
+                ),
                 accent=button.accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
-                enabled=self._button_is_enabled(button),
+                enabled=enabled,
             )
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
@@ -3075,7 +3109,7 @@ class RunScene(BaseScene):
                 pygame,
                 rect=button_rect,
                 title=action.label,
-                detail=action.detail,
+                detail=self._button_detail(action.command, action.detail, enabled=enabled),
                 accent=tone_color(action.tone),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
@@ -3096,6 +3130,147 @@ class RunScene(BaseScene):
             detail_font=self.fonts.small,
         )
         self._click_targets.append(ClickTarget("close_panel", "", close_rect))
+
+    def _draw_inspector_overlay(self, surface) -> None:
+        pygame = self.pygame
+        panel = self.inspector_panel
+        if panel is None:
+            return
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(OVERLAY)
+        surface.blit(overlay, (0, 0))
+        width, height = surface.get_size()
+        modal_rect = pygame.Rect(width // 2 - 520, height // 2 - 300, 1040, 600)
+        inner = draw_panel(surface, pygame, modal_rect, title=panel.title, accent=SELECTION)
+        title_surface = self.fonts.title.render(f"{panel.title} Inspector", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            panel.summary,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 42),
+            line_height=18,
+            max_lines=2,
+        )
+        metric_top = inner.top + 58
+        metric_width = int((inner.width - 36) / 4)
+        for index, metric in enumerate(panel.metrics[:4]):
+            card_rect = pygame.Rect(
+                inner.left + index * (metric_width + 12),
+                metric_top,
+                metric_width,
+                52,
+            )
+            pygame.draw.rect(surface, (26, 38, 55), card_rect, border_radius=12)
+            pygame.draw.rect(
+                surface,
+                tone_color(metric.tone),
+                card_rect,
+                width=1,
+                border_radius=12,
+            )
+            label_surface = self.fonts.small.render(metric.label.upper(), True, MUTED)
+            value_surface = self.fonts.body.render(metric.value_text, True, TEXT)
+            surface.blit(label_surface, (card_rect.left + 10, card_rect.top + 8))
+            surface.blit(value_surface, (card_rect.left + 10, card_rect.top + 26))
+
+        sections = panel.inspectors
+        if not sections:
+            sections = ()
+        section_top = metric_top + 72
+        section_rect = pygame.Rect(
+            inner.left,
+            section_top,
+            inner.width,
+            inner.bottom - section_top - 56,
+        )
+        section_title = self.fonts.heading.render("Detailed Inspectors", True, TEXT)
+        surface.blit(section_title, (section_rect.left, section_rect.top - 24))
+        if sections:
+            cols = 1 if len(sections) == 1 else 2
+            rows = max(1, (len(sections) + cols - 1) // cols)
+            col_gap = 14
+            row_gap = 14
+            card_width = int((section_rect.width - col_gap * (cols - 1)) / cols)
+            card_height = int((section_rect.height - row_gap * (rows - 1)) / rows)
+            for index, section in enumerate(sections):
+                row = index // cols
+                col = index % cols
+                card_rect = pygame.Rect(
+                    section_rect.left + col * (card_width + col_gap),
+                    section_rect.top + row * (card_height + row_gap),
+                    card_width,
+                    card_height,
+                )
+                self._draw_inspector_section(surface, card_rect, section)
+        else:
+            note_rect = pygame.Rect(section_rect.left, section_rect.top, section_rect.width, 48)
+            draw_wrapped_text(
+                surface,
+                self.fonts.body,
+                "No detailed inspector sections are populated for this panel yet.",
+                MUTED,
+                note_rect,
+                line_height=18,
+                max_lines=2,
+            )
+
+        close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 34)
+        draw_button(
+            surface,
+            pygame,
+            rect=close_rect,
+            title="Esc Back To Panel",
+            detail="Return to the action panel.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("close_inspector", "", close_rect))
+
+    def _draw_inspector_section(self, surface, rect, section) -> None:
+        pygame = self.pygame
+        pygame.draw.rect(surface, (20, 29, 42), rect, border_radius=16)
+        pygame.draw.rect(
+            surface,
+            tone_color(section.tone),
+            rect,
+            width=1,
+            border_radius=16,
+        )
+        title_surface = self.fonts.heading.render(section.title, True, TEXT)
+        surface.blit(title_surface, (rect.left + 12, rect.top + 12))
+        top = rect.top + 42
+        item_height = max(
+            54,
+            int((rect.height - 54 - 10 * (len(section.items) - 1)) / max(1, len(section.items))),
+        )
+        for item in section.items[:3]:
+            item_rect = pygame.Rect(rect.left + 12, top, rect.width - 24, item_height)
+            pygame.draw.rect(surface, (26, 38, 55), item_rect, border_radius=12)
+            pygame.draw.rect(
+                surface,
+                tone_color(item.tone),
+                item_rect,
+                width=1,
+                border_radius=12,
+            )
+            item_title = self.fonts.small.render(item.title, True, TEXT)
+            surface.blit(item_title, (item_rect.left + 10, item_rect.top + 8))
+            line_top = item_rect.top + 26
+            for line in item.detail_lines[:2]:
+                consumed = draw_wrapped_text(
+                    surface,
+                    self.fonts.small,
+                    line,
+                    MUTED,
+                    pygame.Rect(item_rect.left + 10, line_top, item_rect.width - 20, 18),
+                    line_height=14,
+                    max_lines=1,
+                )
+                line_top += max(14, consumed)
+            top += item_height + 10
 
     def _draw_outcome_overlay(self, surface) -> None:
         pygame = self.pygame
@@ -3193,6 +3368,37 @@ class RunScene(BaseScene):
             self.pygame.K_9: 8,
         }
         return key_map.get(event.key)
+
+    def _inspector_key_for_command(self, command: str) -> str | None:
+        return {
+            TurnAction.REVIEW_TEAM.value: "team",
+            TurnAction.REVIEW_FINANCE.value: "finance",
+            TurnAction.REVIEW_CUSTOMERS.value: "customers",
+            TurnAction.REVIEW_PARTNERSHIPS.value: "partnerships",
+            TurnAction.REVIEW_BOARD.value: "board",
+            TurnAction.REVIEW_PIPELINE.value: "pipeline",
+            TurnAction.VIEW_REPORT.value: "report",
+        }.get(command)
+
+    def _button_detail(
+        self,
+        command: str | None,
+        default_detail: str,
+        *,
+        enabled: bool,
+    ) -> str:
+        if enabled or command is None:
+            return default_detail
+        reason = self._command_disabled_reason(command)
+        if reason is None:
+            return default_detail
+        return self._compact_button_detail(reason)
+
+    def _compact_button_detail(self, detail: str) -> str:
+        compact = detail.strip().replace("`", "")
+        if len(compact) <= 44:
+            return compact
+        return f"{compact[:41].rstrip()}..."
 
 
 class TurnSummaryScene(BaseScene):
