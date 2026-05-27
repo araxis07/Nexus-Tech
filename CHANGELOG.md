@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.90.0 - 2026-05-28
+
+- Added a fuller 2D new-game wizard that lets the frontend choose scenario, difficulty, campaign start, campaign goal, company name, product name, save slot, and optional seed before opening a run
+- Added in-shell save-slot management to the 2D title flow so slots can be loaded, renamed, duplicated, and deleted without dropping back to the CLI
+- Expanded 2D deep-dive coverage with board, pipeline, and report panels plus broader action pickers for candidate funnel, release, sales-deal, and roadmap-project commands
+- Added disabled-reason feedback for blocked 2D actions so the UI now explains missing employees, releases, deals, partnerships, pending events, and similar prerequisites directly
+- Tightened title-scene modal handling so text entry and delete confirmations can be cancelled cleanly from the keyboard instead of leaking through to background menu shortcuts
+- Expanded regression coverage for wizard catalogs, new panel surfacing, command availability reasons, and the wider 2D action picker set
+- Promoted package metadata and runtime versioning to `0.90.0`
+
 ## 0.89.0 - 2026-05-27
 
 - Added a 2D title flow with `menu-2d`, a save-slot browser, archive browser, and archived run review scene so the animated frontend can now open and inspect persistent runs without dropping back to the CLI first

@@ -6,11 +6,22 @@ from dataclasses import dataclass
 from typing import Callable
 
 from nexus_tech.domain.models import GameState, TurnAction
+from nexus_tech.frontend_2d.catalog import (
+    CampaignGoalChoice,
+    CampaignStartChoice,
+    DifficultyChoice,
+    ScenarioChoice,
+    list_campaign_goal_choices,
+    list_campaign_start_choices,
+    list_difficulty_choices,
+    list_scenario_choices,
+)
 from nexus_tech.frontend_2d.context import (
     ActionRequest,
     ContextPicker,
     PickerOption,
     build_command_request,
+    explain_command_unavailable,
 )
 from nexus_tech.frontend_2d.event_queue import (
     FrontendEvent,
@@ -51,7 +62,11 @@ from nexus_tech.frontend_2d.widgets import (
     tone_color,
 )
 from nexus_tech.persistence.errors import PersistenceError
-from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveLoadCoordinator
+from nexus_tech.persistence.save_coordinator import (
+    RunArchiveSummary,
+    SaveLoadCoordinator,
+    SaveSlotSummary,
+)
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
@@ -100,6 +115,20 @@ class TextInputModalState:
     on_submit: Callable[[str], None]
 
 
+@dataclass
+class NewGameWizardState:
+    """Mutable configuration used by the 2D new-game wizard."""
+
+    scenario_index: int
+    difficulty_index: int
+    campaign_start_index: int
+    goal_index: int
+    company_name: str
+    product_name: str
+    slot_name: str
+    seed_text: str = ""
+
+
 _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
     ActionButtonSpec("C", "Coach", "Run the top mission-board command.", INFO, "coach", ""),
     ActionButtonSpec(
@@ -127,6 +156,23 @@ _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
         INFO,
         "panel",
         "partnerships",
+    ),
+    ActionButtonSpec("5", "Board", "Open board and governance panel.", WARN, "panel", "board"),
+    ActionButtonSpec(
+        "6",
+        "Pipeline",
+        "Open delivery, deals, and hiring panel.",
+        INFO,
+        "panel",
+        "pipeline",
+    ),
+    ActionButtonSpec(
+        "7",
+        "Report",
+        "Open run-summary and reporting panel.",
+        INFO,
+        "panel",
+        "report",
     ),
     ActionButtonSpec(
         "Q",
@@ -318,10 +364,28 @@ class TitleScene(BaseScene):
         self._mode = initial_mode
         self._click_targets: list[ClickTarget] = []
         self._events: list[TimedFrontendEvent] = []
+        self._text_input: TextInputModalState | None = None
         self._save_cards: tuple[SaveSlotCardViewModel, ...] = ()
         self._archive_cards: tuple[ArchiveCardViewModel, ...] = ()
+        self._save_summaries_by_slot: dict[str, SaveSlotSummary] = {}
         self._archives_by_key: dict[str, RunArchiveSummary] = {}
+        self._selected_slot_name: str | None = None
+        self._confirm_delete_slot_name: str | None = None
+        self._scenario_choices: tuple[ScenarioChoice, ...] = ()
+        self._difficulty_choices: tuple[DifficultyChoice, ...] = list_difficulty_choices()
+        self._campaign_start_choices: tuple[CampaignStartChoice, ...] = ()
+        self._campaign_goal_choices: tuple[CampaignGoalChoice, ...] = list_campaign_goal_choices()
+        self._wizard_state = NewGameWizardState(
+            scenario_index=0,
+            difficulty_index=0,
+            campaign_start_index=0,
+            goal_index=0,
+            company_name="NEXUS TECH",
+            product_name="Nexus One",
+            slot_name="active",
+        )
         self._refresh_lists()
+        self._refresh_wizard_catalog()
         if info_message:
             self.push_event(
                 FrontendEvent(
@@ -349,12 +413,31 @@ class TitleScene(BaseScene):
             return
         if event.type != self.pygame.KEYDOWN:
             return
+        if self._text_input is not None:
+            if event.key == self.pygame.K_ESCAPE:
+                self._text_input = None
+                return
+            self._handle_text_input_key(event)
+            return
+        if self._confirm_delete_slot_name is not None:
+            if event.key == self.pygame.K_ESCAPE:
+                self._confirm_delete_slot_name = None
+            elif event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
+                self._delete_selected_slot()
+            return
         if event.key == self.pygame.K_ESCAPE:
             if self._mode != "menu":
-                self._mode = "menu"
+                self._mode = "slots" if self._mode == "slot_detail" else "menu"
                 return
             self.should_exit = True
             self.exit_reason = "quit"
+            return
+        if self._mode == "wizard" and event.key in (
+            self.pygame.K_RETURN,
+            self.pygame.K_KP_ENTER,
+            self.pygame.K_SPACE,
+        ):
+            self._launch_wizard_run()
             return
         if event.unicode and event.unicode in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
             self._handle_digit_shortcut(int(event.unicode))
@@ -380,10 +463,18 @@ class TitleScene(BaseScene):
             self._draw_title_menu(surface, left_rect)
         elif self._mode == "slots":
             self._draw_save_slot_browser(surface, left_rect)
+        elif self._mode == "slot_detail":
+            self._draw_slot_detail(surface, left_rect)
+        elif self._mode == "wizard":
+            self._draw_new_game_wizard(surface, left_rect)
         else:
             self._draw_archive_browser(surface, left_rect)
         self._draw_title_sidebar(surface, right_rect)
         self._draw_title_footer(surface, footer_rect)
+        if self._confirm_delete_slot_name is not None:
+            self._draw_delete_confirmation_overlay(surface)
+        if self._text_input is not None:
+            self._draw_text_input_overlay(surface)
 
     def push_event(self, payload: FrontendEvent) -> None:
         self._events.insert(0, TimedFrontendEvent(payload=payload, time_left=payload.ttl))
@@ -406,7 +497,12 @@ class TitleScene(BaseScene):
             )
         self._save_cards = build_save_slot_card_view_models(save_summaries)
         self._archive_cards = build_archive_card_view_models(archive_summaries)
+        self._save_summaries_by_slot = {summary.slot_name: summary for summary in save_summaries}
         self._archives_by_key = {summary.archive_key: summary for summary in archive_summaries}
+        if self._selected_slot_name not in self._save_summaries_by_slot:
+            self._selected_slot_name = None
+        if self._wizard_state.slot_name in self._save_summaries_by_slot:
+            self._wizard_state.slot_name = self._suggest_new_slot_name()
 
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
         for target in reversed(self._click_targets):
@@ -419,10 +515,37 @@ class TitleScene(BaseScene):
             self._handle_menu_action(target.payload)
             return
         if target.kind == "slot":
-            self._load_slot(target.payload)
+            self._open_slot_detail(target.payload)
             return
         if target.kind == "archive":
             self._open_archive_review(target.payload)
+            return
+        if target.kind == "slot_action":
+            self._handle_slot_action(target.payload)
+            return
+        if target.kind == "wizard_cycle":
+            self._cycle_wizard_field(target.payload)
+            return
+        if target.kind == "wizard_text":
+            self._open_wizard_text_modal(target.payload)
+            return
+        if target.kind == "wizard_launch":
+            self._launch_wizard_run()
+            return
+        if target.kind == "wizard_back":
+            self._mode = "menu"
+            return
+        if target.kind == "confirm_delete":
+            self._delete_selected_slot()
+            return
+        if target.kind == "cancel_delete":
+            self._confirm_delete_slot_name = None
+            return
+        if target.kind == "submit_text":
+            self._submit_text_modal()
+            return
+        if target.kind == "cancel_text":
+            self._text_input = None
             return
 
     def _handle_digit_shortcut(self, digit: int) -> None:
@@ -432,7 +555,7 @@ class TitleScene(BaseScene):
                     1: "continue",
                     2: "load_slots",
                     3: "archives",
-                    4: "new_default",
+                    4: "new_wizard",
                     5: "quit",
                 }.get(digit, "")
             )
@@ -443,7 +566,19 @@ class TitleScene(BaseScene):
                 return
             index = digit - 1
             if 0 <= index < len(self._save_cards):
-                self._load_slot(self._save_cards[index].slot_name)
+                self._open_slot_detail(self._save_cards[index].slot_name)
+            return
+        if self._mode == "slot_detail":
+            slot_actions = {
+                1: "load",
+                2: "rename",
+                3: "duplicate",
+                4: "delete",
+                9: "back",
+            }
+            action = slot_actions.get(digit)
+            if action is not None:
+                self._handle_slot_action(action)
             return
         if self._mode == "archives":
             if digit == 9:
@@ -452,6 +587,12 @@ class TitleScene(BaseScene):
             index = digit - 1
             if 0 <= index < len(self._archive_cards):
                 self._open_archive_review(self._archive_cards[index].archive_key)
+            return
+        if self._mode == "wizard":
+            if digit == 8:
+                self._mode = "menu"
+            elif digit == 9:
+                self._launch_wizard_run()
 
     def _handle_menu_action(self, action: str) -> None:
         if action == "continue":
@@ -463,8 +604,8 @@ class TitleScene(BaseScene):
         if action == "archives":
             self._mode = "archives"
             return
-        if action == "new_default":
-            self._start_default_run()
+        if action == "new_wizard":
+            self._mode = "wizard"
             return
         if action == "quit":
             self.should_exit = True
@@ -500,13 +641,6 @@ class TitleScene(BaseScene):
             return
         self._open_loaded_game(loaded.state, loaded.rng, loaded.slot_name)
 
-    def _start_default_run(self) -> None:
-        self._open_loaded_game(
-            create_new_game("NEXUS TECH", "Nexus One"),
-            RandomSource(seed=None),
-            "active",
-        )
-
     def _open_loaded_game(self, state: GameState, rng: RandomSource, slot_name: str) -> None:
         self._next_scene = RunScene(
             pygame=self.pygame,
@@ -537,6 +671,12 @@ class TitleScene(BaseScene):
             dirty=False,
         )
 
+    def _open_slot_detail(self, slot_name: str) -> None:
+        if slot_name not in self._save_summaries_by_slot:
+            return
+        self._selected_slot_name = slot_name
+        self._mode = "slot_detail"
+
     def _spawn_scene(self, mode: str) -> "TitleScene":
         return TitleScene(
             pygame=self.pygame,
@@ -548,6 +688,413 @@ class TitleScene(BaseScene):
             coordinator=self.coordinator,
             initial_mode=mode,
         )
+
+    def _refresh_wizard_catalog(self) -> None:
+        previous_scenario = (
+            self.selected_scenario_choice.scenario_id if self._scenario_choices else None
+        )
+        previous_start = (
+            self.selected_campaign_start_choice.start_id if self._campaign_start_choices else None
+        )
+        self._scenario_choices = list_scenario_choices(self.coordinator.db_path)
+        self._campaign_start_choices = list_campaign_start_choices(self.coordinator.db_path)
+        if not self._scenario_choices or not self._campaign_start_choices:
+            return
+        self._wizard_state = self._build_wizard_state(
+            scenario_id=previous_scenario,
+            campaign_start_id=previous_start,
+        )
+
+    @property
+    def selected_scenario_choice(self) -> ScenarioChoice:
+        return self._scenario_choices[self._wizard_state.scenario_index]
+
+    @property
+    def selected_difficulty_choice(self) -> DifficultyChoice:
+        return self._difficulty_choices[self._wizard_state.difficulty_index]
+
+    @property
+    def selected_campaign_start_choice(self) -> CampaignStartChoice:
+        return self._campaign_start_choices[self._wizard_state.campaign_start_index]
+
+    @property
+    def selected_goal_choice(self) -> CampaignGoalChoice:
+        return self._campaign_goal_choices[self._wizard_state.goal_index]
+
+    def _build_wizard_state(
+        self,
+        *,
+        scenario_id: str | None = None,
+        campaign_start_id: str | None = None,
+    ) -> NewGameWizardState:
+        scenario_index = self._find_choice_index(
+            [entry.scenario_id for entry in self._scenario_choices],
+            scenario_id,
+        )
+        scenario_choice = self._scenario_choices[scenario_index]
+        difficulty_index = self._find_choice_index(
+            [entry.mode.value for entry in self._difficulty_choices],
+            scenario_choice.default_difficulty.value,
+        )
+        goal_index = self._find_choice_index(
+            [entry.goal_id.value for entry in self._campaign_goal_choices],
+            scenario_choice.default_goal_id.value,
+        )
+        campaign_start_index = self._find_choice_index(
+            [entry.start_id for entry in self._campaign_start_choices],
+            campaign_start_id or "standard",
+        )
+        return NewGameWizardState(
+            scenario_index=scenario_index,
+            difficulty_index=difficulty_index,
+            campaign_start_index=campaign_start_index,
+            goal_index=goal_index,
+            company_name="NEXUS TECH",
+            product_name="Nexus One",
+            slot_name=self._suggest_new_slot_name(),
+        )
+
+    def _find_choice_index(self, values: list[str], wanted: str | None) -> int:
+        if wanted is not None and wanted in values:
+            return values.index(wanted)
+        return 0
+
+    def _suggest_new_slot_name(self) -> str:
+        existing = set(self._save_summaries_by_slot)
+        if "active" not in existing:
+            return "active"
+        counter = 1
+        while f"run-{counter}" in existing:
+            counter += 1
+        return f"run-{counter}"
+
+    def _handle_slot_action(self, action: str) -> None:
+        if action == "back":
+            self._mode = "slots"
+            return
+        slot_name = self._selected_slot_name
+        if slot_name is None:
+            return
+        if action == "load":
+            self._load_slot(slot_name)
+            return
+        if action == "rename":
+            self._text_input = TextInputModalState(
+                title="Rename Save Slot",
+                description=f"Enter the new name for `{slot_name}`.",
+                severity="warning",
+                submit_title="Enter Rename",
+                submit_detail="Rename the selected save slot.",
+                text=slot_name,
+                placeholder="Save slot name",
+                on_submit=self._rename_selected_slot,
+            )
+            return
+        if action == "duplicate":
+            self._text_input = TextInputModalState(
+                title="Duplicate Save Slot",
+                description=f"Enter the name for the duplicate of `{slot_name}`.",
+                severity="info",
+                submit_title="Enter Duplicate",
+                submit_detail="Create another save slot with the same run.",
+                text=f"{slot_name}-copy",
+                placeholder="Save slot name",
+                on_submit=self._duplicate_selected_slot,
+            )
+            return
+        if action == "delete":
+            self._confirm_delete_slot_name = slot_name
+
+    def _rename_selected_slot(self, new_name: str) -> None:
+        slot_name = self._selected_slot_name
+        target_name = new_name.strip()
+        if slot_name is None or not target_name:
+            self.push_event(
+                FrontendEvent(
+                    title="Rename Rejected",
+                    detail="Save slot names must not be empty.",
+                    severity="warning",
+                    ttl=5.0,
+                )
+            )
+            return
+        try:
+            self.coordinator.rename_save(slot_name, target_name)
+        except PersistenceError as error:
+            self.push_event(
+                FrontendEvent(
+                    title="Rename Failed",
+                    detail=str(error),
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        self._selected_slot_name = target_name
+        self._refresh_lists()
+        self.push_event(
+            FrontendEvent(
+                title="Save Slot Renamed",
+                detail=f"`{slot_name}` is now `{target_name}`.",
+                severity="success",
+                ttl=5.0,
+            )
+        )
+
+    def _duplicate_selected_slot(self, new_name: str) -> None:
+        slot_name = self._selected_slot_name
+        target_name = new_name.strip()
+        if slot_name is None or not target_name:
+            self.push_event(
+                FrontendEvent(
+                    title="Duplicate Rejected",
+                    detail="Duplicate slot names must not be empty.",
+                    severity="warning",
+                    ttl=5.0,
+                )
+            )
+            return
+        if target_name in self._save_summaries_by_slot:
+            self.push_event(
+                FrontendEvent(
+                    title="Duplicate Rejected",
+                    detail=f"Save slot `{target_name}` already exists.",
+                    severity="warning",
+                    ttl=5.0,
+                )
+            )
+            return
+        try:
+            loaded = self.coordinator.load_game(slot_name)
+            self.coordinator.save_game(target_name, loaded.state, loaded.rng)
+        except PersistenceError as error:
+            self.push_event(
+                FrontendEvent(
+                    title="Duplicate Failed",
+                    detail=str(error),
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        self._selected_slot_name = target_name
+        self._refresh_lists()
+        self.push_event(
+            FrontendEvent(
+                title="Save Slot Duplicated",
+                detail=f"Created `{target_name}` from `{slot_name}`.",
+                severity="success",
+                ttl=5.0,
+            )
+        )
+
+    def _delete_selected_slot(self) -> None:
+        slot_name = self._confirm_delete_slot_name
+        self._confirm_delete_slot_name = None
+        if slot_name is None:
+            return
+        try:
+            self.coordinator.delete_save(slot_name)
+        except PersistenceError as error:
+            self.push_event(
+                FrontendEvent(
+                    title="Delete Failed",
+                    detail=str(error),
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        self._selected_slot_name = None
+        self._mode = "slots"
+        self._refresh_lists()
+        self.push_event(
+            FrontendEvent(
+                title="Save Slot Deleted",
+                detail=f"Removed `{slot_name}` from local saves.",
+                severity="success",
+                ttl=5.0,
+            )
+        )
+
+    def _cycle_wizard_field(self, field: str) -> None:
+        if field == "scenario":
+            self._wizard_state.scenario_index = (self._wizard_state.scenario_index + 1) % len(
+                self._scenario_choices
+            )
+            scenario_choice = self.selected_scenario_choice
+            self._wizard_state.difficulty_index = self._find_choice_index(
+                [entry.mode.value for entry in self._difficulty_choices],
+                scenario_choice.default_difficulty.value,
+            )
+            self._wizard_state.goal_index = self._find_choice_index(
+                [entry.goal_id.value for entry in self._campaign_goal_choices],
+                scenario_choice.default_goal_id.value,
+            )
+            return
+        if field == "difficulty":
+            self._wizard_state.difficulty_index = (self._wizard_state.difficulty_index + 1) % len(
+                self._difficulty_choices
+            )
+            return
+        if field == "campaign_start":
+            self._wizard_state.campaign_start_index = (
+                self._wizard_state.campaign_start_index + 1
+            ) % len(self._campaign_start_choices)
+            return
+        if field == "goal":
+            self._wizard_state.goal_index = (self._wizard_state.goal_index + 1) % len(
+                self._campaign_goal_choices
+            )
+
+    def _open_wizard_text_modal(self, field: str) -> None:
+        field_map = {
+            "company": (
+                "Company Name",
+                "Set the company name for the next run.",
+                self._wizard_state.company_name,
+                "Company name",
+                self._set_wizard_company_name,
+            ),
+            "product": (
+                "Product Name",
+                "Set the first product name for the next run.",
+                self._wizard_state.product_name,
+                "Product name",
+                self._set_wizard_product_name,
+            ),
+            "slot": (
+                "Save Slot",
+                "Choose the save slot name for this run.",
+                self._wizard_state.slot_name,
+                "Save slot name",
+                self._set_wizard_slot_name,
+            ),
+            "seed": (
+                "Seed",
+                "Optional deterministic RNG seed. Leave blank for a fresh random run.",
+                self._wizard_state.seed_text,
+                "Seed",
+                self._set_wizard_seed,
+            ),
+        }
+        entry = field_map.get(field)
+        if entry is None:
+            return
+        title, description, text, placeholder, callback = entry
+        self._text_input = TextInputModalState(
+            title=title,
+            description=description,
+            severity="info",
+            submit_title="Enter Apply",
+            submit_detail="Apply this value to the new-run wizard.",
+            text=text,
+            placeholder=placeholder,
+            on_submit=callback,
+        )
+
+    def _set_wizard_company_name(self, value: str) -> None:
+        self._wizard_state.company_name = value.strip() or "NEXUS TECH"
+
+    def _set_wizard_product_name(self, value: str) -> None:
+        self._wizard_state.product_name = value.strip() or "Nexus One"
+
+    def _set_wizard_slot_name(self, value: str) -> None:
+        self._wizard_state.slot_name = value.strip() or self._suggest_new_slot_name()
+
+    def _set_wizard_seed(self, value: str) -> None:
+        self._wizard_state.seed_text = value.strip()
+
+    def _launch_wizard_run(self) -> None:
+        scenario = self.selected_scenario_choice
+        campaign_start = self.selected_campaign_start_choice
+        if scenario.locked:
+            self.push_event(
+                FrontendEvent(
+                    title="Scenario Locked",
+                    detail=scenario.lock_reason,
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        if campaign_start.locked:
+            self.push_event(
+                FrontendEvent(
+                    title="Campaign Start Locked",
+                    detail=campaign_start.lock_reason,
+                    severity="warning",
+                    ttl=5.5,
+                )
+            )
+            return
+        slot_name = self._wizard_state.slot_name.strip()
+        if not slot_name:
+            self.push_event(
+                FrontendEvent(
+                    title="Save Slot Needed",
+                    detail="Choose a non-empty save slot name before launching the run.",
+                    severity="warning",
+                    ttl=5.0,
+                )
+            )
+            return
+        if slot_name in self._save_summaries_by_slot:
+            self.push_event(
+                FrontendEvent(
+                    title="Save Slot In Use",
+                    detail=(
+                        f"Save slot `{slot_name}` already exists. Rename, delete, or choose "
+                        "another slot before launching."
+                    ),
+                    severity="warning",
+                    ttl=6.0,
+                )
+            )
+            return
+        seed_text = self._wizard_state.seed_text.strip()
+        if seed_text and not seed_text.lstrip("-").isdigit():
+            self.push_event(
+                FrontendEvent(
+                    title="Invalid Seed",
+                    detail="Seed must be blank or a whole number.",
+                    severity="warning",
+                    ttl=5.0,
+                )
+            )
+            return
+        seed = int(seed_text) if seed_text else None
+        state = create_new_game(
+            self._wizard_state.company_name.strip() or None,
+            self._wizard_state.product_name.strip() or None,
+            scenario_id=scenario.scenario_id,
+            difficulty_mode=self.selected_difficulty_choice.mode,
+            campaign_goal_id=self.selected_goal_choice.goal_id,
+            campaign_start_id=campaign_start.start_id,
+        )
+        self._open_loaded_game(state, RandomSource(seed=seed), slot_name)
+
+    def _handle_text_input_key(self, event) -> None:
+        modal = self._text_input
+        if modal is None:
+            return
+        if event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
+            self._submit_text_modal()
+            return
+        if event.key == self.pygame.K_BACKSPACE:
+            modal.text = modal.text[:-1]
+            return
+        if event.key == self.pygame.K_TAB:
+            return
+        if event.unicode and event.unicode.isprintable() and len(modal.text) < 48:
+            modal.text += event.unicode
+
+    def _submit_text_modal(self) -> None:
+        modal = self._text_input
+        if modal is None:
+            return
+        self._text_input = None
+        modal.on_submit(modal.text.strip())
 
     def _draw_title_header(self, surface, rect) -> None:
         pygame = self.pygame
@@ -581,12 +1128,17 @@ class TitleScene(BaseScene):
         surface.blit(title_surface, (inner.left, inner.top - 24))
         buttons = (
             ("1 Continue Last", "Open the newest save slot directly.", "continue", INFO),
-            ("2 Load Save", "Browse named save slots and resume one run.", "load_slots", GOOD),
+            (
+                "2 Manage Saves",
+                "Browse, load, rename, duplicate, or delete save slots.",
+                "load_slots",
+                GOOD,
+            ),
             ("3 Review Archives", "Inspect completed runs and postmortems.", "archives", WARN),
             (
-                "4 New Default Run",
-                "Boot the default scenario with generated names.",
-                "new_default",
+                "4 New Game Wizard",
+                "Choose scenario, difficulty, start, goal, names, slot, and seed.",
+                "new_wizard",
                 INFO,
             ),
             ("5 Quit", "Leave the frontend shell.", "quit", DANGER),
@@ -614,7 +1166,7 @@ class TitleScene(BaseScene):
             title="Save Slot Browser",
             cards=self._save_cards,
             click_kind="slot",
-            back_detail="Press 9 or Esc to return to the title menu.",
+            back_detail="Click one save slot to open load/rename/duplicate/delete actions.",
         )
 
     def _draw_archive_browser(self, surface, rect) -> None:
@@ -669,6 +1221,184 @@ class TitleScene(BaseScene):
         back_surface = self.fonts.small.render(back_detail, True, MUTED)
         surface.blit(back_surface, (inner.left, rect.bottom - 26))
 
+    def _draw_slot_detail(self, surface, rect) -> None:
+        pygame = self.pygame
+        summary = self._save_summaries_by_slot.get(self._selected_slot_name or "")
+        inner = draw_panel(surface, pygame, rect, title="Save Slot", accent=GOOD)
+        title_surface = self.fonts.heading.render("Save Slot Actions", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        if summary is None:
+            empty_surface = self.fonts.body.render("Select a save slot first.", True, MUTED)
+            surface.blit(empty_surface, (inner.left, inner.top))
+            return
+        lines = (
+            f"Slot: {summary.slot_name}",
+            f"Company: {summary.company_name}",
+            f"Scenario: {summary.scenario_title}",
+            (
+                f"Turn {summary.current_turn} | cash {summary.cash_on_hand} | "
+                f"rep {summary.reputation} | team {summary.headcount}"
+            ),
+            (
+                f"Products {summary.active_products} | updated "
+                f"{summary.updated_at[:19].replace('T', ' ')}"
+            ),
+        )
+        top = inner.top
+        for line in lines:
+            consumed = draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                line,
+                TEXT if line.startswith("Slot:") else MUTED,
+                pygame.Rect(inner.left, top, inner.width, 24),
+                line_height=16,
+                max_lines=2,
+            )
+            top += max(22, consumed)
+        buttons = (
+            ("1 Load Save", "Resume this run in the live 2D dashboard.", "load", INFO),
+            ("2 Rename", "Rename the selected save slot.", "rename", WARN),
+            ("3 Duplicate", "Clone this run into another slot.", "duplicate", INFO),
+            ("4 Delete", "Remove this save slot permanently.", "delete", DANGER),
+            ("9 Back", "Return to the save-slot browser.", "back", BORDER),
+        )
+        top += 10
+        for title, detail, payload, accent in buttons:
+            button_rect = pygame.Rect(inner.left, top, inner.width, 54)
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=title,
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("slot_action", payload, button_rect))
+            top += 66
+
+    def _draw_new_game_wizard(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="New Game", accent=INFO)
+        title_surface = self.fonts.heading.render("New Game Wizard", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        scenario = self.selected_scenario_choice
+        difficulty = self.selected_difficulty_choice
+        campaign_start = self.selected_campaign_start_choice
+        goal = self.selected_goal_choice
+        rows = (
+            (
+                "Scenario",
+                scenario.title,
+                scenario.description,
+                "scenario",
+                "wizard_cycle",
+                DANGER if scenario.locked else INFO,
+            ),
+            (
+                "Difficulty",
+                difficulty.title,
+                difficulty.summary,
+                "difficulty",
+                "wizard_cycle",
+                WARN,
+            ),
+            (
+                "Campaign Start",
+                campaign_start.title,
+                campaign_start.description,
+                "campaign_start",
+                "wizard_cycle",
+                DANGER if campaign_start.locked else INFO,
+            ),
+            (
+                "Campaign Goal",
+                goal.title,
+                goal.description,
+                "goal",
+                "wizard_cycle",
+                GOOD,
+            ),
+            (
+                "Company Name",
+                self._wizard_state.company_name,
+                "Click to edit the company name.",
+                "company",
+                "wizard_text",
+                INFO,
+            ),
+            (
+                "Product Name",
+                self._wizard_state.product_name,
+                "Click to edit the first product name.",
+                "product",
+                "wizard_text",
+                INFO,
+            ),
+            (
+                "Save Slot",
+                self._wizard_state.slot_name,
+                "Choose the save slot for this run.",
+                "slot",
+                "wizard_text",
+                WARN if self._wizard_state.slot_name in self._save_summaries_by_slot else GOOD,
+            ),
+            (
+                "Seed",
+                self._wizard_state.seed_text or "random",
+                "Optional deterministic seed. Blank means fresh randomness.",
+                "seed",
+                "wizard_text",
+                INFO,
+            ),
+        )
+        top = inner.top
+        for label, value, detail, payload, kind, accent in rows:
+            button_rect = pygame.Rect(inner.left, top, inner.width, 56)
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=f"{label}: {value}",
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget(kind, payload, button_rect))
+            top += 66
+        launch_rect = pygame.Rect(inner.left, rect.bottom - 86, inner.width // 2 - 8, 44)
+        back_rect = pygame.Rect(
+            launch_rect.right + 16,
+            rect.bottom - 86,
+            inner.width // 2 - 8,
+            44,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=launch_rect,
+            title="Enter Launch Run",
+            detail="Create and open the selected run.",
+            accent=GOOD,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=back_rect,
+            title="Esc Back",
+            detail="Return to the title menu.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("wizard_launch", "", launch_rect))
+        self._click_targets.append(ClickTarget("wizard_back", "", back_rect))
+
     def _draw_title_sidebar(self, surface, rect) -> None:
         pygame = self.pygame
         summary_rect = pygame.Rect(rect.left, rect.top, rect.width, int(rect.height * 0.36))
@@ -681,11 +1411,7 @@ class TitleScene(BaseScene):
         inner = draw_panel(surface, pygame, summary_rect, title="Status", accent=WARN)
         title_surface = self.fonts.heading.render("2D Frontend Status", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
-        lines = (
-            "Menu mode keeps SQLite save slots and archived runs inside the 2D shell.",
-            "Load any live slot to jump straight into the animated dashboard.",
-            "Archive review scenes surface final score, exit type, and the saved lesson.",
-        )
+        lines = self._title_sidebar_lines()
         top = inner.top
         for line in lines:
             consumed = draw_wrapped_text(
@@ -715,13 +1441,171 @@ class TitleScene(BaseScene):
     def _draw_title_footer(self, surface, rect) -> None:
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Guide", accent=INFO)
-        message = (
-            "Menu: 1 continue, 2 saves, 3 archives, 4 default run, 5 quit."
-            if self._mode == "menu"
-            else "Browser: click a card to open it. Press 9 or Esc to return."
-        )
+        if self._mode == "menu":
+            message = "Menu: 1 continue, 2 saves, 3 archives, 4 wizard, 5 quit."
+        elif self._mode == "slots":
+            message = "Saves: click a card to manage it. Press 9 or Esc to return."
+        elif self._mode == "slot_detail":
+            message = "Slot: 1 load, 2 rename, 3 duplicate, 4 delete, 9 back."
+        elif self._mode == "wizard":
+            message = "Wizard: click rows to cycle/edit. Enter launches. Esc returns to menu."
+        else:
+            message = "Archives: click a card to inspect it. Press 9 or Esc to return."
         footer_surface = self.fonts.small.render(message, True, TEXT)
         surface.blit(footer_surface, (inner.left, inner.top + 10))
+
+    def _title_sidebar_lines(self) -> tuple[str, ...]:
+        if self._mode == "wizard":
+            scenario = self.selected_scenario_choice
+            campaign_start = self.selected_campaign_start_choice
+            difficulty = self.selected_difficulty_choice
+            return (
+                f"Scenario: {scenario.title}",
+                (
+                    scenario.lock_reason
+                    if scenario.locked
+                    else f"Difficulty watch: {difficulty.watch_for}"
+                ),
+                (
+                    campaign_start.lock_reason
+                    if campaign_start.locked
+                    else (
+                        f"Start hint: {campaign_start.turn_hint} / {campaign_start.pressure_hint}"
+                    )
+                ),
+            )
+        if self._mode == "slot_detail":
+            summary = self._save_summaries_by_slot.get(self._selected_slot_name or "")
+            if summary is not None:
+                return (
+                    f"Loaded save slot focus: {summary.company_name}",
+                    f"Scenario: {summary.scenario_title}",
+                    f"Version {summary.saved_with_version} | schema {summary.schema_version}",
+                )
+        return (
+            "Menu mode keeps SQLite save slots and archived runs inside the 2D shell.",
+            "Load any live slot to jump straight into the animated dashboard.",
+            "Archive review scenes surface final score, exit type, and the saved lesson.",
+        )
+
+    def _draw_delete_confirmation_overlay(self, surface) -> None:
+        pygame = self.pygame
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(OVERLAY)
+        surface.blit(overlay, (0, 0))
+        width, height = surface.get_size()
+        slot_name = self._confirm_delete_slot_name or "selected slot"
+        modal_rect = pygame.Rect(width // 2 - 270, height // 2 - 100, 540, 200)
+        inner = draw_panel(surface, pygame, modal_rect, title="Delete Save", accent=DANGER)
+        title_surface = self.fonts.title.render("Delete Save Slot?", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            f"This permanently removes `{slot_name}` from local saves.",
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 40),
+            line_height=18,
+            max_lines=2,
+        )
+        confirm_rect = pygame.Rect(inner.left, inner.top + 74, 220, 40)
+        cancel_rect = pygame.Rect(inner.left + 236, inner.top + 74, 180, 40)
+        draw_button(
+            surface,
+            pygame,
+            rect=confirm_rect,
+            title="Confirm Delete",
+            detail="Remove the save slot now.",
+            accent=DANGER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=cancel_rect,
+            title="Esc Cancel",
+            detail="Keep the save slot.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("confirm_delete", "", confirm_rect))
+        self._click_targets.append(ClickTarget("cancel_delete", "", cancel_rect))
+
+    def _draw_text_input_overlay(self, surface) -> None:
+        pygame = self.pygame
+        modal = self._text_input
+        if modal is None:
+            return
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(OVERLAY)
+        surface.blit(overlay, (0, 0))
+        width, height = surface.get_size()
+        modal_rect = pygame.Rect(width // 2 - 300, height // 2 - 140, 600, 280)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Text Input",
+            accent=tone_color(modal.severity),
+        )
+        title_surface = self.fonts.title.render(modal.title, True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            modal.description,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 40),
+            line_height=18,
+            max_lines=2,
+        )
+        input_rect = pygame.Rect(inner.left, inner.top + 60, inner.width, 48)
+        pygame.draw.rect(surface, (24, 35, 50), input_rect, border_radius=14)
+        pygame.draw.rect(
+            surface,
+            tone_color(modal.severity),
+            input_rect,
+            width=1,
+            border_radius=14,
+        )
+        input_text = modal.text or modal.placeholder
+        input_color = TEXT if modal.text else MUTED
+        input_surface = self.fonts.body.render(input_text, True, input_color)
+        surface.blit(input_surface, (input_rect.left + 12, input_rect.top + 14))
+        cursor_x = input_rect.left + 12 + input_surface.get_width() + 2
+        pygame.draw.line(
+            surface,
+            tone_color(modal.severity),
+            (cursor_x, input_rect.top + 10),
+            (cursor_x, input_rect.bottom - 10),
+            2,
+        )
+        submit_rect = pygame.Rect(inner.left, inner.top + 134, 220, 40)
+        cancel_rect = pygame.Rect(inner.left + 236, inner.top + 134, 180, 40)
+        draw_button(
+            surface,
+            pygame,
+            rect=submit_rect,
+            title=modal.submit_title,
+            detail=modal.submit_detail,
+            accent=tone_color(modal.severity),
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=cancel_rect,
+            title="Esc Cancel",
+            detail="Close without applying changes.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("submit_text", "", submit_rect))
+        self._click_targets.append(ClickTarget("cancel_text", "", cancel_rect))
 
     def _draw_event_card(self, surface, rect, timed_event: TimedFrontendEvent) -> None:
         pygame = self.pygame
@@ -1092,6 +1976,15 @@ class RunScene(BaseScene):
         if event.key == self.pygame.K_4:
             self._deep_panel_key = "partnerships"
             return
+        if event.key == self.pygame.K_5:
+            self._deep_panel_key = "board"
+            return
+        if event.key == self.pygame.K_6:
+            self._deep_panel_key = "pipeline"
+            return
+        if event.key == self.pygame.K_7:
+            self._deep_panel_key = "report"
+            return
         if event.key == self.pygame.K_n:
             self._open_create_product_modal()
             return
@@ -1116,7 +2009,7 @@ class RunScene(BaseScene):
         margin = 20
         gap = 16
         header_rect = pygame.Rect(margin, margin, width - margin * 2, 118)
-        footer_height = 246
+        footer_height = 332
         footer_rect = pygame.Rect(
             margin,
             height - footer_height - margin,
@@ -1183,6 +2076,10 @@ class RunScene(BaseScene):
             self._refresh_view_model()
             return
         if target.kind == "command":
+            reason = self._command_disabled_reason(target.payload)
+            if reason is not None:
+                self._push_action_blocked_event(target.payload, reason)
+                return
             self._run_command(target.payload)
             return
         if target.kind == "coach":
@@ -1195,6 +2092,10 @@ class RunScene(BaseScene):
             self._deep_panel_key = target.payload
             return
         if target.kind == "text_command":
+            reason = self._command_disabled_reason(target.payload)
+            if reason is not None:
+                self._push_action_blocked_event(target.payload, reason)
+                return
             if target.payload == TurnAction.CREATE_PRODUCT.value:
                 self._open_create_product_modal()
             return
@@ -1205,6 +2106,10 @@ class RunScene(BaseScene):
             self._context_picker = None
             return
         if target.kind == "panel_action":
+            reason = self._command_disabled_reason(target.payload)
+            if reason is not None:
+                self._push_action_blocked_event(target.payload, reason)
+                return
             self._run_command(target.payload)
             return
         if target.kind == "close_panel":
@@ -1226,6 +2131,25 @@ class RunScene(BaseScene):
             self.should_exit = True
             self.exit_reason = "quit"
             return
+
+    def _command_disabled_reason(self, command: str) -> str | None:
+        if self.state.company.game_over or self.state.victory_achieved:
+            return "This run is already complete."
+        return explain_command_unavailable(
+            self.state,
+            command=command,
+            selected_product_id=self.selected_product.id.hex,
+        )
+
+    def _push_action_blocked_event(self, command: str, reason: str) -> None:
+        self.push_event(
+            FrontendEvent(
+                title="Action Not Ready",
+                detail=f"`{command}` is blocked right now: {reason}",
+                severity="warning",
+                ttl=5.5,
+            )
+        )
 
     def _handle_pending_event_key(self, event) -> None:
         if event.key == self.pygame.K_s:
@@ -1399,6 +2323,10 @@ class RunScene(BaseScene):
         if command == TurnAction.END_TURN.value:
             self._attempt_end_turn()
             return
+        reason = self._command_disabled_reason(command)
+        if reason is not None:
+            self._push_action_blocked_event(command, reason)
+            return
         if command == TurnAction.CREATE_PRODUCT.value:
             self._open_create_product_modal()
             return
@@ -1415,10 +2343,8 @@ class RunScene(BaseScene):
             return
         self.push_event(
             FrontendEvent(
-                title="Action Needs Deeper UI",
-                detail=(
-                    f"`{command}` is valid, but this 2D shell still needs a richer picker for it."
-                ),
+                title="Action Needs More 2D Coverage",
+                detail=f"`{command}` is valid, but the 2D shell still needs a picker for it.",
                 severity="warning",
                 ttl=5.5,
             )
@@ -1778,7 +2704,7 @@ class RunScene(BaseScene):
         inner = draw_panel(surface, pygame, rect, title="Actions", accent=INFO)
         title_surface = self.fonts.heading.render("Action Bar", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
-        button_cols = 7
+        button_cols = 6 if inner.width < 1120 else 7
         button_gap = 10
         button_width = int((inner.width - button_gap * (button_cols - 1)) / button_cols)
         button_height = 62
@@ -1798,12 +2724,25 @@ class RunScene(BaseScene):
                 accent=button.accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
-                enabled=not self.state.company.game_over,
+                enabled=self._button_is_enabled(button),
             )
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
         watch_text = self.fonts.small.render(self._view_model.watch_for, True, MUTED)
-        surface.blit(watch_text, (inner.left, inner.bottom - 4))
+        hint_text = self.fonts.small.render(
+            "Hotkeys: 1-7 panels | N new product | disabled buttons explain why when clicked.",
+            True,
+            MUTED,
+        )
+        surface.blit(watch_text, (inner.left, inner.bottom - 22))
+        surface.blit(hint_text, (inner.left, inner.bottom - 4))
+
+    def _button_is_enabled(self, button: ActionButtonSpec) -> bool:
+        if button.kind in {"save", "panel"}:
+            return True
+        if button.kind in {"command", "panel_action", "text_command"}:
+            return self._command_disabled_reason(button.payload) is None
+        return not self.state.company.game_over
 
     def _draw_product_card(self, surface, rect, product) -> None:
         pygame = self.pygame
@@ -2119,9 +3058,18 @@ class RunScene(BaseScene):
 
         action_title = self.fonts.heading.render("Panel Actions", True, TEXT)
         surface.blit(action_title, (action_rect.left, action_rect.top - 24))
+        cols = 2
+        button_gap = 10
+        button_width = int((action_rect.width - button_gap * (cols - 1)) / cols)
+        button_height = 54
         top = action_rect.top
-        for action in panel.actions:
-            button_rect = pygame.Rect(action_rect.left, top, action_rect.width, 58)
+        left = action_rect.left
+        for index, action in enumerate(panel.actions):
+            if index and index % cols == 0:
+                top += button_height + 10
+                left = action_rect.left
+            button_rect = pygame.Rect(left, top, button_width, button_height)
+            enabled = self._command_disabled_reason(action.command) is None
             draw_button(
                 surface,
                 pygame,
@@ -2131,9 +3079,10 @@ class RunScene(BaseScene):
                 accent=tone_color(action.tone),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                enabled=enabled,
             )
             self._click_targets.append(ClickTarget("panel_action", action.command, button_rect))
-            top += 68
+            left += button_width + button_gap
 
         close_rect = pygame.Rect(action_rect.left, modal_rect.bottom - 56, 160, 34)
         draw_button(

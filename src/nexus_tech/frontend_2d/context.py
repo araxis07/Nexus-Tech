@@ -17,7 +17,9 @@ from nexus_tech.domain.models import (
     PackagingStrategy,
     PartnerChannel,
     PricingTier,
+    ProductReleaseType,
     RoadmapFocus,
+    RoadmapProjectType,
     Seniority,
     SupportLaneFocus,
     TurnAction,
@@ -345,7 +347,11 @@ def build_command_request(
         TurnAction.ASSIGN_EMPLOYEE,
         TurnAction.TRAIN_EMPLOYEE,
         TurnAction.PROMOTE_EMPLOYEE,
+        TurnAction.RUN_COMP_REVIEW,
+        TurnAction.RUN_SUCCESSION_REVIEW,
+        TurnAction.APPOINT_TEAM_LEAD,
         TurnAction.FIRE_EMPLOYEE,
+        TurnAction.CLEAR_MANAGER,
         TurnAction.UNASSIGN_EMPLOYEE,
     }:
         if not state.employees:
@@ -383,6 +389,33 @@ def build_command_request(
             description="Choose the employee to apply this action to.",
             severity="info",
             options=tuple(options),
+        )
+
+    if action is TurnAction.SCREEN_CANDIDATE:
+        return _candidate_picker(
+            state,
+            action=action,
+            title="Screen Candidate",
+            description="Choose a sourced candidate to screen.",
+            stage_filter={"sourced"},
+        )
+
+    if action is TurnAction.INTERVIEW_CANDIDATE:
+        return _candidate_picker(
+            state,
+            action=action,
+            title="Interview Candidate",
+            description="Choose a screened candidate to interview.",
+            stage_filter={"screened"},
+        )
+
+    if action is TurnAction.MAKE_HIRING_OFFER:
+        return _candidate_picker(
+            state,
+            action=action,
+            title="Make Hiring Offer",
+            description="Choose an interviewed candidate to receive an offer.",
+            stage_filter={"interviewed"},
         )
 
     if action is TurnAction.SET_COMPANY_STRATEGY:
@@ -484,6 +517,113 @@ def build_command_request(
             ),
         )
 
+    if action is TurnAction.PLAN_RELEASE and product is not None:
+        return _enum_picker(
+            title="Choose Release Type",
+            description=f"Plan a new release for {product.name}.",
+            severity="info",
+            action=action,
+            values=ProductReleaseType,
+            context_builder=lambda release_type: ActionContext(
+                target_product_id=product.id,
+                release_type=release_type,
+            ),
+        )
+
+    if action is TurnAction.WORK_RELEASE:
+        if not state.product_releases:
+            return None
+        return _picker(
+            title="Work Release",
+            description="Choose which planned release should get execution time.",
+            severity="info",
+            options=tuple(
+                PickerOption(
+                    key_hint=str(index + 1),
+                    title=f"{release.release_type.value.replace('_', ' ')}",
+                    description=(
+                        f"Progress {release.progress}/{release.required_progress} | "
+                        f"risk {release.risk}"
+                    ),
+                    request=ActionRequest(
+                        action=action,
+                        context=ActionContext(release_id=release.id),
+                        label=f"{action.value}:{release.id}",
+                    ),
+                )
+                for index, release in enumerate(state.product_releases[:9])
+            ),
+        )
+
+    if action is TurnAction.CREATE_SALES_DEAL and product is not None:
+        return ActionRequest(
+            action=action,
+            context=ActionContext(target_product_id=product.id),
+            label=f"{action.value}:{product.name}",
+        )
+
+    if action is TurnAction.ADVANCE_SALES_DEAL:
+        if not state.sales_deals:
+            return None
+        return _picker(
+            title="Advance Sales Deal",
+            description="Choose which active deal should move forward.",
+            severity="info",
+            options=tuple(
+                PickerOption(
+                    key_hint=str(index + 1),
+                    title=deal.name,
+                    description=(
+                        f"{deal.stage.value} | prob {deal.probability} | {deal.plan_tier.value}"
+                    ),
+                    request=ActionRequest(
+                        action=action,
+                        context=ActionContext(sales_deal_id=deal.id),
+                        label=f"{action.value}:{deal.name}",
+                    ),
+                )
+                for index, deal in enumerate(state.sales_deals[:9])
+            ),
+        )
+
+    if action is TurnAction.START_ROADMAP_PROJECT:
+        return _enum_picker(
+            title="Choose Roadmap Project",
+            description="Launch one strategic roadmap project.",
+            severity="info",
+            action=action,
+            values=RoadmapProjectType,
+            context_builder=lambda project_type: ActionContext(
+                target_product_id=product.id if product is not None else None,
+                roadmap_project_type=project_type,
+            ),
+        )
+
+    if action is TurnAction.WORK_ROADMAP_PROJECT:
+        if not state.roadmap_projects:
+            return None
+        return _picker(
+            title="Work Roadmap Project",
+            description="Choose the project that should get execution time.",
+            severity="info",
+            options=tuple(
+                PickerOption(
+                    key_hint=str(index + 1),
+                    title=project.project_type.value.replace("_", " ").title(),
+                    description=(
+                        f"{project.status.value} | progress {project.progress}/"
+                        f"{project.required_progress} | risk {project.delivery_risk}"
+                    ),
+                    request=ActionRequest(
+                        action=action,
+                        context=ActionContext(roadmap_project_id=project.id),
+                        label=f"{action.value}:{project.project_type.value}",
+                    ),
+                )
+                for index, project in enumerate(state.roadmap_projects[:9])
+            ),
+        )
+
     if action in _PARTNERSHIP_ACTIONS:
         if not state.partnerships:
             return None
@@ -509,6 +649,93 @@ def build_command_request(
             ),
         )
 
+    return None
+
+
+def explain_command_unavailable(
+    state: GameState,
+    *,
+    command: str,
+    selected_product_id: str | None = None,
+) -> str | None:
+    """Return a concrete reason when the 2D frontend should block one command."""
+
+    try:
+        action = TurnAction(command)
+    except ValueError:
+        return "This command id is not recognized by the game."
+
+    product = _pick_selected_product(state, selected_product_id)
+    if state.pending_event is not None and action not in _DIRECT_ACTIONS:
+        return "Resolve the pending event before taking new operating actions."
+    if action in _PRODUCT_ACTIONS and product is None:
+        return "Select an active product first."
+    if (
+        action
+        in {
+            TurnAction.CREATE_PARTNERSHIP,
+            TurnAction.ADJUST_PRICING,
+            TurnAction.SET_PACKAGING_STRATEGY,
+            TurnAction.SET_TARGET_SEGMENT,
+            TurnAction.PLAN_RELEASE,
+            TurnAction.CREATE_SALES_DEAL,
+        }
+        and product is None
+    ):
+        return "You need an active product before running this command."
+    if action is TurnAction.ASSIGN_EMPLOYEE and not state.employees:
+        return "Hire someone first. There is no employee to assign yet."
+    if action is TurnAction.ASSIGN_EMPLOYEE and not any(
+        employee.assigned_product_id is None for employee in state.employees
+    ):
+        return "Every teammate is already assigned. Unassign or hire before reassigning."
+    if (
+        action
+        in {
+            TurnAction.TRAIN_EMPLOYEE,
+            TurnAction.PROMOTE_EMPLOYEE,
+            TurnAction.RUN_COMP_REVIEW,
+            TurnAction.RUN_SUCCESSION_REVIEW,
+            TurnAction.APPOINT_TEAM_LEAD,
+            TurnAction.FIRE_EMPLOYEE,
+            TurnAction.CLEAR_MANAGER,
+            TurnAction.UNASSIGN_EMPLOYEE,
+        }
+        and not state.employees
+    ):
+        return "There is no employee available for this action yet."
+    if (
+        action
+        in {
+            TurnAction.SCREEN_CANDIDATE,
+            TurnAction.INTERVIEW_CANDIDATE,
+            TurnAction.MAKE_HIRING_OFFER,
+        }
+        and not state.hiring_candidates
+    ):
+        return "Source candidates first. The hiring funnel is empty."
+    if action is TurnAction.SCREEN_CANDIDATE and not any(
+        candidate.stage.value == "sourced" for candidate in state.hiring_candidates
+    ):
+        return "No sourced candidate is ready to screen."
+    if action is TurnAction.INTERVIEW_CANDIDATE and not any(
+        candidate.stage.value == "screened" for candidate in state.hiring_candidates
+    ):
+        return "No screened candidate is ready for an interview."
+    if action is TurnAction.MAKE_HIRING_OFFER and not any(
+        candidate.stage.value == "interviewed" for candidate in state.hiring_candidates
+    ):
+        return "No interviewed candidate is ready for an offer."
+    if action is TurnAction.WORK_RELEASE and not state.product_releases:
+        return "Plan a release first. There is nothing to work yet."
+    if action is TurnAction.ADVANCE_SALES_DEAL and not state.sales_deals:
+        return "Create a sales deal first. The pipeline is empty."
+    if action is TurnAction.WORK_ROADMAP_PROJECT and not state.roadmap_projects:
+        return "Start a roadmap project first."
+    if action in _PARTNERSHIP_ACTIONS and not state.partnerships:
+        return "Open a partnership first. There is no live channel to target."
+    if action is TurnAction.END_TURN and state.pending_event is not None:
+        return "Resolve the pending event before ending the turn."
     return None
 
 
@@ -556,6 +783,42 @@ def _picker(
         description=description,
         severity=severity,
         options=options,
+    )
+
+
+def _candidate_picker(
+    state: GameState,
+    *,
+    action: TurnAction,
+    title: str,
+    description: str,
+    stage_filter: set[str],
+) -> ContextPicker | None:
+    candidates = [
+        candidate for candidate in state.hiring_candidates if candidate.stage.value in stage_filter
+    ]
+    if not candidates:
+        return None
+    return _picker(
+        title=title,
+        description=description,
+        severity="info",
+        options=tuple(
+            PickerOption(
+                key_hint=str(index + 1),
+                title=candidate.full_name,
+                description=(
+                    f"{candidate.role.value.replace('_', ' ')} | "
+                    f"{candidate.stage.value} | productivity {candidate.expected_productivity}"
+                ),
+                request=ActionRequest(
+                    action=action,
+                    context=ActionContext(hiring_candidate_id=candidate.id),
+                    label=f"{action.value}:{candidate.full_name}",
+                ),
+            )
+            for index, candidate in enumerate(candidates[:9])
+        ),
     )
 
 

@@ -9,7 +9,15 @@ import nexus_tech.cli as cli_module
 from nexus_tech.cli import app
 from nexus_tech.domain.models import CandidateTrait, EmployeeRole, Seniority, TurnAction
 from nexus_tech.frontend_2d import launch_2d_frontend, launch_2d_menu
-from nexus_tech.frontend_2d.context import ContextPicker, build_command_request
+from nexus_tech.frontend_2d.catalog import (
+    list_campaign_start_choices,
+    list_scenario_choices,
+)
+from nexus_tech.frontend_2d.context import (
+    ContextPicker,
+    build_command_request,
+    explain_command_unavailable,
+)
 from nexus_tech.frontend_2d.event_queue import build_action_events
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
@@ -73,6 +81,31 @@ def test_build_command_request_returns_assign_picker_for_idle_employee() -> None
     assert picker.options[0].request.context.target_product_id == hire_outcome.state.products[0].id
 
 
+def test_build_command_request_supports_pipeline_and_candidate_actions() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    release_picker = build_command_request(
+        state,
+        command=TurnAction.PLAN_RELEASE.value,
+        selected_product_id=state.products[0].id.hex,
+    )
+    candidate_state = apply_action(
+        state,
+        TurnAction.SOURCE_CANDIDATES,
+        context=ActionContext(),
+    ).state
+    screen_picker = build_command_request(
+        candidate_state,
+        command=TurnAction.SCREEN_CANDIDATE.value,
+        selected_product_id=candidate_state.products[0].id.hex,
+    )
+
+    assert isinstance(release_picker, ContextPicker)
+    assert release_picker.options
+    assert isinstance(screen_picker, ContextPicker)
+    assert screen_picker.options
+
+
 def test_build_action_events_surfaces_cash_and_product_deltas() -> None:
     previous_state = create_new_game("NEXUS TECH", "Nexus One")
     current_state = previous_state.model_copy(deep=True)
@@ -121,15 +154,54 @@ def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions(
     )
 
     keys = {panel.key for panel in panels}
-    assert {"team", "finance", "customers", "partnerships"} <= keys
+    assert {"team", "finance", "customers", "partnerships", "board", "pipeline", "report"} <= keys
     finance_panel = next(panel for panel in panels if panel.key == "finance")
     customer_panel = next(panel for panel in panels if panel.key == "customers")
+    board_panel = next(panel for panel in panels if panel.key == "board")
+    pipeline_panel = next(panel for panel in panels if panel.key == "pipeline")
+    report_panel = next(panel for panel in panels if panel.key == "report")
     assert any(
         action.command == TurnAction.SET_CAPITAL_PLAN.value for action in finance_panel.actions
     )
     assert any(
         action.command == TurnAction.ADJUST_PRICING.value for action in customer_panel.actions
     )
+    assert any(action.command == TurnAction.REVIEW_BOARD.value for action in board_panel.actions)
+    assert any(
+        action.command == TurnAction.CREATE_SALES_DEAL.value for action in pipeline_panel.actions
+    )
+    assert any(action.command == TurnAction.VIEW_REPORT.value for action in report_panel.actions)
+
+
+def test_explain_command_unavailable_surfaces_specific_reason() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    assign_reason = explain_command_unavailable(
+        state,
+        command=TurnAction.ASSIGN_EMPLOYEE.value,
+        selected_product_id=state.products[0].id.hex,
+    )
+    release_reason = explain_command_unavailable(
+        state,
+        command=TurnAction.WORK_RELEASE.value,
+        selected_product_id=state.products[0].id.hex,
+    )
+
+    assert assign_reason is not None
+    assert "Hire" in assign_reason or "employee" in assign_reason
+    assert release_reason is not None
+    assert "release" in release_reason.lower()
+
+
+def test_catalog_choices_mix_unlocked_and_locked_content(tmp_path: Path) -> None:
+    scenario_choices = list_scenario_choices(tmp_path / "menu.db")
+    campaign_start_choices = list_campaign_start_choices(tmp_path / "menu.db")
+
+    assert scenario_choices
+    assert campaign_start_choices
+    assert any(not choice.locked for choice in scenario_choices)
+    assert any(choice.locked for choice in scenario_choices)
+    assert any(not choice.locked for choice in campaign_start_choices)
 
 
 def test_build_run_review_view_model_exposes_findings() -> None:

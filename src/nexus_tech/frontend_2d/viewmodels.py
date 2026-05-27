@@ -457,7 +457,6 @@ def build_deep_dive_panel_view_models(
     selected_product_id: str | None = None,
 ) -> tuple[DeepDivePanelViewModel, ...]:
     """Build the operational side panels used by the 2D frontend."""
-
     selected_product = _pick_selected_product(state.products, selected_product_id)
     avg_morale = (
         sum(employee.morale for employee in state.employees) // len(state.employees)
@@ -489,6 +488,29 @@ def build_deep_dive_panel_view_models(
         ),
         default=None,
     )
+    top_deal = max(
+        state.sales_deals,
+        key=lambda deal: (deal.probability, deal.value),
+        default=None,
+    )
+    top_release = next(
+        (release for release in state.product_releases if release.status.value == "planned"),
+        None,
+    )
+    top_project = next(
+        (project for project in state.roadmap_projects if project.status.value == "active"),
+        None,
+    )
+    top_candidate = next(
+        (
+            candidate
+            for candidate in state.hiring_candidates
+            if candidate.stage.value in {"sourced", "screened", "interviewed"}
+        ),
+        None,
+    )
+    latest_turn = state.turn_history[-1] if state.turn_history else None
+    run_score = calculate_run_score(state)
     customer_summary = (
         f"{selected_product.name} is currently aimed at "
         f"{selected_product.target_segment.value.replace('_', ' ')} buyers."
@@ -541,6 +563,30 @@ def build_deep_dive_panel_view_models(
                 "Reorg",
                 "Rebalance load if morale or focus drifts.",
                 "warning",
+            ),
+            DeepDiveActionViewModel(
+                "source_candidates",
+                "Source",
+                "Open the hiring funnel for the next seat.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "screen_candidate",
+                "Screen",
+                "Move the best sourced candidate forward.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "interview_candidate",
+                "Interview",
+                "Deepen evaluation for screened candidates.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "make_hiring_offer",
+                "Offer",
+                "Close on the most advanced candidate.",
+                "success",
             ),
         ),
     )
@@ -605,6 +651,12 @@ def build_deep_dive_panel_view_models(
                 "Bring outside capital in if traction supports it.",
                 "info",
             ),
+            DeepDiveActionViewModel(
+                "review_board",
+                "Board Review",
+                "Open governance status without leaving 2D.",
+                "info",
+            ),
         ),
     )
     customers_panel = DeepDivePanelViewModel(
@@ -612,11 +664,7 @@ def build_deep_dive_panel_view_models(
         title="Customer / Product Desk",
         summary="Steer pricing, packaging, segment, and support around the live product mix.",
         metrics=(
-            DeepDiveMetricViewModel(
-                "Accounts",
-                str(len(active_accounts)),
-                "info",
-            ),
+            DeepDiveMetricViewModel("Accounts", str(len(active_accounts)), "info"),
             DeepDiveMetricViewModel(
                 "Backlog",
                 str(state.support_program.backlog_queue),
@@ -672,6 +720,12 @@ def build_deep_dive_panel_view_models(
                 "set_target_segment",
                 "Segment",
                 "Reposition the selected product.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "review_customers",
+                "Customer Review",
+                "Refresh the customer/account perspective.",
                 "info",
             ),
         ),
@@ -743,6 +797,217 @@ def build_deep_dive_panel_view_models(
                 "Reduce dependency on one noisy partner lane.",
                 "info",
             ),
+            DeepDiveActionViewModel(
+                "review_partnerships",
+                "Portfolio Review",
+                "Refresh partner-state reporting.",
+                "info",
+            ),
+        ),
+    )
+    board_panel = DeepDivePanelViewModel(
+        key="board",
+        title="Board / Governance Desk",
+        summary=(
+            "Track board trust, governance heat, and recovery posture before the review loop bites."
+        ),
+        metrics=(
+            DeepDiveMetricViewModel(
+                "Pressure",
+                str(state.finance.board_pressure),
+                _attribute_tone(100 - state.finance.board_pressure),
+            ),
+            DeepDiveMetricViewModel(
+                "Confidence",
+                str(state.finance.board_confidence),
+                _attribute_tone(state.finance.board_confidence),
+            ),
+            DeepDiveMetricViewModel(
+                "Governance",
+                str(state.finance.governance_risk),
+                _attribute_tone(100 - state.finance.governance_risk),
+            ),
+            DeepDiveMetricViewModel(
+                "Warnings",
+                str(state.finance.board_warning_level),
+                "danger" if state.finance.board_warning_level >= 2 else "warning",
+            ),
+        ),
+        detail_lines=(
+            f"Directive: {state.finance.board_directive.value.replace('_', ' ')}",
+            f"Active ask: {state.finance.active_board_ask.value.replace('_', ' ')}",
+            (
+                f"Recovery focus: {state.finance.board_recovery_focus.value.replace('_', ' ')} "
+                f"for {state.finance.board_recovery_turns_remaining} turns."
+            ),
+            (
+                "Board response is due right now."
+                if state.finance.board_resolution_due
+                else "No board response deadline is active this turn."
+            ),
+        ),
+        actions=(
+            DeepDiveActionViewModel(
+                "review_board",
+                "Review Board",
+                "Refresh the governance panel from inside 2D.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "execute_board_response",
+                "Board Response",
+                "Answer the active board ask.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "start_board_recovery_plan",
+                "Recovery Plan",
+                "Reset governance control before pressure spikes.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "execute_restructure_plan",
+                "Restructure",
+                "Use only when the governance loop is already breaking.",
+                "danger",
+            ),
+        ),
+    )
+    pipeline_panel = DeepDivePanelViewModel(
+        key="pipeline",
+        title="Pipeline / Delivery Desk",
+        summary="Drive delivery, deals, roadmap projects, and the hiring funnel from one panel.",
+        metrics=(
+            DeepDiveMetricViewModel("Deals", str(len(state.sales_deals)), "info"),
+            DeepDiveMetricViewModel("Releases", str(len(state.product_releases)), "info"),
+            DeepDiveMetricViewModel("Projects", str(len(state.roadmap_projects)), "info"),
+            DeepDiveMetricViewModel("Candidates", str(len(state.hiring_candidates)), "info"),
+        ),
+        detail_lines=(
+            (
+                f"Top deal: {top_deal.name} | {top_deal.stage.value} | "
+                f"prob {top_deal.probability} | {format_money(top_deal.value)}"
+                if top_deal is not None
+                else "No active sales deal exists yet."
+            ),
+            (
+                f"Next release: {top_release.release_type.value} | progress "
+                f"{top_release.progress}/{top_release.required_progress}"
+                if top_release is not None
+                else "No planned release is waiting for delivery work."
+            ),
+            (
+                f"Roadmap: {top_project.project_type.value} | progress "
+                f"{top_project.progress}/{top_project.required_progress}"
+                if top_project is not None
+                else "No active roadmap project is open."
+            ),
+            (
+                f"Candidate: {top_candidate.full_name} | {top_candidate.stage.value} | "
+                f"{top_candidate.role.value.replace('_', ' ')}"
+                if top_candidate is not None
+                else "No live hiring candidate is in the funnel."
+            ),
+        ),
+        actions=(
+            DeepDiveActionViewModel(
+                "review_pipeline",
+                "Pipeline Review",
+                "Refresh the deal and delivery status lens.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "create_sales_deal",
+                "New Deal",
+                "Open a fresh sales opportunity for the selected product.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "advance_sales_deal",
+                "Advance Deal",
+                "Push the most relevant deal forward.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                "plan_release",
+                "Plan Release",
+                "Schedule the next selected-product release.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "work_release",
+                "Work Release",
+                "Spend execution effort on the hottest release.",
+                "success",
+            ),
+            DeepDiveActionViewModel(
+                "start_roadmap_project",
+                "Start Project",
+                "Launch a strategic roadmap project.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "work_roadmap_project",
+                "Work Project",
+                "Push the active roadmap project forward.",
+                "warning",
+            ),
+        ),
+    )
+    report_panel = DeepDivePanelViewModel(
+        key="report",
+        title="Report / Run Summary Desk",
+        summary="Read the current run at a higher level before you commit the next turn.",
+        metrics=(
+            DeepDiveMetricViewModel("Score", str(run_score.total_score), "info"),
+            DeepDiveMetricViewModel(
+                "Tier",
+                run_score.score_tier,
+                "success" if run_score.total_score >= 170 else "warning",
+            ),
+            DeepDiveMetricViewModel(
+                "Valuation",
+                format_money(run_score.estimated_valuation),
+                "info",
+            ),
+            DeepDiveMetricViewModel("History", str(len(state.turn_history)), "info"),
+        ),
+        detail_lines=(
+            f"Scenario objective: {state.scenario_objective or 'None set.'}",
+            f"Campaign goal: {state.campaign_goal_id.value.replace('_', ' ')}",
+            (
+                f"Latest turn: revenue {format_money(latest_turn.total_revenue)} | "
+                f"net {format_money(latest_turn.net_cash_flow)} | users {latest_turn.total_users}"
+                if latest_turn is not None
+                else "No turn ledger exists yet."
+            ),
+            f"Milestones unlocked: {len(state.milestone_history)}",
+        ),
+        actions=(
+            DeepDiveActionViewModel(
+                "view_report",
+                "Full Report",
+                "Open the broad run report in the 2D event flow.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "review_finance",
+                "Finance Review",
+                "Refresh finance-specific reporting.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "review_customers",
+                "Customer Review",
+                "Refresh account and retention reporting.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                "review_partnerships",
+                "Partner Review",
+                "Refresh partnership reporting.",
+                "info",
+            ),
         ),
     )
     return (
@@ -750,6 +1015,9 @@ def build_deep_dive_panel_view_models(
         finance_panel,
         customers_panel,
         partnerships_panel,
+        board_panel,
+        pipeline_panel,
+        report_panel,
     )
 
 
