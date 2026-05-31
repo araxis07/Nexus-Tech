@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.96.0 - 2026-06-01
+
+- Expanded the 2D endgame board into a fuller late-game cockpit with direct path-specific fix buttons for IPO, M&A, independence, and reset recovery instead of only one global gate command
+- Added reusable endgame cockpit action coverage so regression tests now assert that the 2D endgame board keeps surfacing all four path-fix buttons as the cockpit evolves
+- Ran a fresh internal 2D playtest and balance audit pass, captured the results in repo docs, and tightened the release checklist so `doctor`, 2D headless smokes, and `balance-audit` are part of the baseline release routine
+- Promoted package metadata and runtime versioning to `0.96.0`
+
 ## 0.95.0 - 2026-05-31
 
 - Added a broader 2D usability polish pass with responsive run-scene layout shifts, active panel highlighting in the action bar, stronger selected-product affordances, and live hover tooltips instead of only footer hints

@@ -18,6 +18,8 @@ uv run pytest -q
 uv run nexus-tech --version
 uv run nexus-tech doctor
 uv run nexus-tech validate-content
+uv run nexus-tech play-2d --headless --max-frames 4 --scenario founder_journey --seed 11
+uv run nexus-tech menu-2d --headless --max-frames 4
 ```
 
 ## Demo Verification
@@ -30,6 +32,7 @@ uv run nexus-tech list-templates
 uv run nexus-tech list-rivals
 uv run nexus-tech list-events
 uv run nexus-tech simulate-balance --scenario founder_journey --runs 1 --turns 3 --seed-base 7
+uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech balance-report --output /tmp/nexus-balance-report.md --scenario founder_journey --runs 1 --turns 3 --seed-base 7
 ```
 
@@ -41,6 +44,11 @@ uv run nexus-tech list-saves
 ```
 
 If no save database exists yet, `doctor` should still run cleanly and explain that no save has been created.
+
+## 2D Audit Notes
+
+- Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
+- If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
 
 ## Scope Guardrails
 

@@ -32,6 +32,7 @@ from nexus_tech.frontend_2d.event_queue import build_action_events, build_turn_r
 from nexus_tech.frontend_2d.scenes import RunScene, TitleScene, TurnSummaryScene
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
+    build_endgame_cockpit_actions,
     build_game_view_model,
     build_run_review_view_model,
     build_turn_summary_view_model,
@@ -417,6 +418,19 @@ def test_endgame_inspector_actions_are_supported_or_explained() -> None:
                     item.title,
                     action.command,
                 )
+
+
+def test_endgame_cockpit_actions_expose_all_path_fix_buttons() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    actions = build_endgame_cockpit_actions(
+        state,
+        selected_product_id=state.products[0].id.hex,
+    )
+
+    labels = {action.label for action in actions}
+    assert {"IPO Fix", "M&A Fix", "Independence Fix", "Reset Fix"} <= labels
+    assert any(action.label == "Gate Command" for action in actions)
 
 
 def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> None:

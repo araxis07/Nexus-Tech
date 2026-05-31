@@ -1163,6 +1163,7 @@ def _build_endgame_panel(
     pressure,
     evaluation,
 ) -> DeepDivePanelViewModel:
+    path_labels = ("IPO", "M&A", "Independence", "Reset")
     blocked_paths = sum(1 for gate in pressure.path_outcome_gates if "blocked" in gate.lower())
     gate_command_tone = "danger" if blocked_paths >= 2 else "warning" if blocked_paths else "info"
     return DeepDivePanelViewModel(
@@ -1207,37 +1208,52 @@ def _build_endgame_panel(
             f"Gate alert: {pressure.path_gate_alert}",
             f"Recommendation: {pressure.recommendation}",
         ),
-        actions=(
-            DeepDiveActionViewModel(
-                pressure.path_gate_command_alert,
-                "Gate Command",
-                pressure.path_gate_alert,
-                gate_command_tone,
-            ),
-            DeepDiveActionViewModel(
-                TurnAction.REVIEW_BOARD.value,
-                "Board Review",
-                "Refresh governance and reset pressure.",
-                "warning",
-            ),
-            DeepDiveActionViewModel(
-                TurnAction.REVIEW_FINANCE.value,
-                "Finance Review",
-                "Refresh reserve, debt, and capital posture.",
-                "warning",
-            ),
-            DeepDiveActionViewModel(
-                TurnAction.REVIEW_PARTNERSHIPS.value,
-                "Partner Review",
-                "Refresh diligence and channel concentration.",
-                "info",
-            ),
-            DeepDiveActionViewModel(
-                TurnAction.VIEW_REPORT.value,
-                "Full Report",
-                "Open the broader scorecard and archive-ready summary.",
-                "info",
-            ),
+        actions=tuple(
+            [
+                DeepDiveActionViewModel(
+                    pressure.path_gate_command_alert,
+                    "Gate Command",
+                    pressure.path_gate_alert,
+                    gate_command_tone,
+                ),
+                *(
+                    DeepDiveActionViewModel(
+                        pressure.path_gate_commands[index],
+                        f"{path_labels[index]} Fix",
+                        pressure.path_gate_actions[index],
+                        (
+                            "success"
+                            if "open" in pressure.path_outcome_gates[index].lower()
+                            else "warning"
+                        ),
+                    )
+                    for index in range(4)
+                ),
+                DeepDiveActionViewModel(
+                    TurnAction.REVIEW_BOARD.value,
+                    "Board Review",
+                    "Refresh governance and reset pressure.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    TurnAction.REVIEW_FINANCE.value,
+                    "Finance Review",
+                    "Refresh reserve, debt, and capital posture.",
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    TurnAction.REVIEW_PARTNERSHIPS.value,
+                    "Partner Review",
+                    "Refresh diligence and channel concentration.",
+                    "info",
+                ),
+                DeepDiveActionViewModel(
+                    TurnAction.VIEW_REPORT.value,
+                    "Full Report",
+                    "Open the broader scorecard and archive-ready summary.",
+                    "info",
+                ),
+            ]
         ),
         inspectors=_build_endgame_inspectors(
             state,
@@ -1246,6 +1262,24 @@ def _build_endgame_panel(
             evaluation=evaluation,
         ),
     )
+
+
+def build_endgame_cockpit_actions(
+    state: GameState,
+    *,
+    selected_product_id: str | None = None,
+) -> tuple[DeepDiveActionViewModel, ...]:
+    """Expose the live cockpit actions for tests and richer 2D routing."""
+
+    panel = next(
+        panel
+        for panel in build_deep_dive_panel_view_models(
+            state,
+            selected_product_id=selected_product_id,
+        )
+        if panel.key == "endgame"
+    )
+    return panel.actions
 
 
 def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
