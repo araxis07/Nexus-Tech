@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Callable
 
@@ -58,6 +59,7 @@ from nexus_tech.frontend_2d.widgets import (
     FontPack,
     draw_button,
     draw_grid,
+    draw_keycap,
     draw_panel,
     draw_progress_bar,
     draw_wrapped_text,
@@ -135,6 +137,20 @@ class NewGameWizardState:
     product_name: str
     slot_name: str
     seed_text: str = ""
+
+
+def _fit_modal_rect(pygame, surface, *, width: int, height: int, margin: int = 24):
+    """Clamp a centered modal rect so it stays inside smaller windows."""
+
+    window_width, window_height = surface.get_size()
+    safe_width = min(width, max(320, window_width - margin * 2))
+    safe_height = min(height, max(240, window_height - margin * 2))
+    return pygame.Rect(
+        window_width // 2 - safe_width // 2,
+        window_height // 2 - safe_height // 2,
+        safe_width,
+        safe_height,
+    )
 
 
 _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
@@ -296,6 +312,10 @@ _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
         TurnAction.END_TURN.value,
     ),
 )
+
+_INSPECTOR_SORT_MODES: tuple[str, ...] = ("default", "risk", "value", "stalled")
+_INSPECTOR_FILTER_MODES: tuple[str, ...] = ("all", "actionable", "attention")
+_TONE_PRIORITY = {"danger": 3, "warning": 2, "info": 1, "success": 0}
 
 
 class BaseScene:
@@ -463,14 +483,35 @@ class TitleScene(BaseScene):
         footer_rect = pygame.Rect(margin, height - 92 - margin, width - margin * 2, 92)
         content_top = header_rect.bottom + gap
         content_height = footer_rect.top - gap - content_top
-        left_width = int((width - margin * 2 - gap) * 0.62)
-        right_width = width - margin * 2 - gap - left_width
-        left_rect = pygame.Rect(margin, content_top, left_width, content_height)
-        right_rect = pygame.Rect(left_rect.right + gap, content_top, right_width, content_height)
+        if width < 1180:
+            left_rect = pygame.Rect(
+                margin,
+                content_top,
+                width - margin * 2,
+                int(content_height * 0.56),
+            )
+            right_rect = pygame.Rect(
+                margin,
+                left_rect.bottom + gap,
+                width - margin * 2,
+                content_top + content_height - left_rect.bottom - gap,
+            )
+        else:
+            left_width = int((width - margin * 2 - gap) * 0.62)
+            right_width = width - margin * 2 - gap - left_width
+            left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+            right_rect = pygame.Rect(
+                left_rect.right + gap,
+                content_top,
+                right_width,
+                content_height,
+            )
 
         self._draw_title_header(surface, header_rect)
         if self._mode == "menu":
             self._draw_title_menu(surface, left_rect)
+        elif self._mode == "meta":
+            self._draw_meta_board(surface, left_rect)
         elif self._mode == "slots":
             self._draw_save_slot_browser(surface, left_rect)
         elif self._mode == "slot_detail":
@@ -567,10 +608,22 @@ class TitleScene(BaseScene):
                     1: "continue",
                     2: "load_slots",
                     3: "archives",
-                    4: "new_wizard",
-                    5: "quit",
+                    4: "meta",
+                    5: "new_wizard",
+                    6: "quit",
                 }.get(digit, "")
             )
+            return
+        if self._mode == "meta":
+            meta_actions = {
+                1: "archives",
+                2: "load_slots",
+                3: "new_wizard",
+                9: "menu",
+            }
+            action = meta_actions.get(digit)
+            if action:
+                self._handle_menu_action(action)
             return
         if self._mode == "slots":
             if digit == 9:
@@ -607,6 +660,9 @@ class TitleScene(BaseScene):
                 self._launch_wizard_run()
 
     def _handle_menu_action(self, action: str) -> None:
+        if action == "menu":
+            self._mode = "menu"
+            return
         if action == "continue":
             self._continue_last_save()
             return
@@ -615,6 +671,9 @@ class TitleScene(BaseScene):
             return
         if action == "archives":
             self._mode = "archives"
+            return
+        if action == "meta":
+            self._mode = "meta"
             return
         if action == "new_wizard":
             self._mode = "wizard"
@@ -1148,12 +1207,18 @@ class TitleScene(BaseScene):
             ),
             ("3 Review Archives", "Inspect completed runs and postmortems.", "archives", WARN),
             (
-                "4 New Game Wizard",
+                "4 Meta Board",
+                "See archive progression, dominant path, and next unlocks.",
+                "meta",
+                SELECTION,
+            ),
+            (
+                "5 New Game Wizard",
                 "Choose scenario, difficulty, start, goal, names, slot, and seed.",
                 "new_wizard",
                 INFO,
             ),
-            ("5 Quit", "Leave the frontend shell.", "quit", DANGER),
+            ("6 Quit", "Leave the frontend shell.", "quit", DANGER),
         )
         top = inner.top
         for title, detail, payload, accent in buttons:
@@ -1170,6 +1235,84 @@ class TitleScene(BaseScene):
             )
             self._click_targets.append(ClickTarget("menu", payload, button_rect))
             top += 74
+
+    def _draw_meta_board(self, surface, rect) -> None:
+        pygame = self.pygame
+        meta = self._meta_progression
+        comparison = self._archive_comparison
+        inner = draw_panel(surface, pygame, rect, title="Meta Board", accent=SELECTION)
+        title_surface = self.fonts.heading.render("Archive / Progression Board", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+
+        left_width = int(inner.width * 0.56)
+        summary_rect = pygame.Rect(inner.left, inner.top, left_width, inner.height - 66)
+        action_rect = pygame.Rect(
+            summary_rect.right + 20,
+            inner.top,
+            inner.right - summary_rect.right - 20,
+            inner.height - 66,
+        )
+
+        summary_lines = (
+            f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+            (
+                f"Runs: {meta.total_runs} | victories: {meta.victories} | "
+                f"best score: {meta.best_score}"
+            ),
+            f"Next goal: {meta.next_goal}",
+            f"Next reward: {meta.next_reward}",
+            f"Dominant path: {comparison.dominant_path}",
+            f"Coverage gap: {comparison.next_gap}",
+            f"Recommendation: {comparison.recommendation}",
+        )
+        top = summary_rect.top
+        for line in summary_lines:
+            consumed = draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                line,
+                MUTED if ":" in line else TEXT,
+                pygame.Rect(summary_rect.left, top, summary_rect.width, 34),
+                line_height=16,
+                max_lines=2,
+            )
+            top += max(22, consumed)
+        ladder_title = self.fonts.small.render("Campaign Ladder", True, INFO)
+        surface.blit(ladder_title, (summary_rect.left, top + 6))
+        top += 28
+        for step in meta.campaign_ladder[:6]:
+            consumed = draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                step,
+                TEXT,
+                pygame.Rect(summary_rect.left, top, summary_rect.width, 22),
+                line_height=15,
+                max_lines=1,
+            )
+            top += max(18, consumed)
+
+        buttons = (
+            ("1 Open Archives", "Jump into completed-run reviews.", "archives", WARN),
+            ("2 Manage Saves", "Browse current save slots.", "load_slots", GOOD),
+            ("3 New Wizard", "Start the next campaign from the 2D wizard.", "new_wizard", INFO),
+            ("9 Back", "Return to the title menu.", "menu", BORDER),
+        )
+        top = action_rect.top
+        for title, detail, payload, accent in buttons:
+            button_rect = pygame.Rect(action_rect.left, top, action_rect.width, 58)
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=title,
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("menu", payload, button_rect))
+            top += 70
 
     def _draw_save_slot_browser(self, surface, rect) -> None:
         self._draw_card_browser(
@@ -1454,7 +1597,9 @@ class TitleScene(BaseScene):
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Guide", accent=INFO)
         if self._mode == "menu":
-            message = "Menu: 1 continue, 2 saves, 3 archives, 4 wizard, 5 quit."
+            message = "Menu: 1 continue, 2 saves, 3 archives, 4 meta board, 5 wizard, 6 quit."
+        elif self._mode == "meta":
+            message = "Meta board: 1 archives, 2 saves, 3 wizard, 9 back."
         elif self._mode == "slots":
             message = "Saves: click a card to manage it. Press 9 or Esc to return."
         elif self._mode == "slot_detail":
@@ -1488,6 +1633,13 @@ class TitleScene(BaseScene):
                     )
                 ),
                 f"Meta next reward: {meta.next_reward}",
+            )
+        if self._mode == "meta":
+            return (
+                f"Best path labels: IPO {comparison.best_ipo_label}",
+                f"M&A {comparison.best_acquisition_label}",
+                f"Independence {comparison.best_independence_label}",
+                f"Common next focus: {comparison.common_next_focus}",
             )
         if self._mode == "archives":
             return (
@@ -1523,9 +1675,8 @@ class TitleScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
         slot_name = self._confirm_delete_slot_name or "selected slot"
-        modal_rect = pygame.Rect(width // 2 - 270, height // 2 - 100, 540, 200)
+        modal_rect = _fit_modal_rect(pygame, surface, width=540, height=200, margin=24)
         inner = draw_panel(surface, pygame, modal_rect, title="Delete Save", accent=DANGER)
         title_surface = self.fonts.title.render("Delete Save Slot?", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -1571,8 +1722,7 @@ class TitleScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_rect = pygame.Rect(width // 2 - 300, height // 2 - 140, 600, 280)
+        modal_rect = _fit_modal_rect(pygame, surface, width=600, height=280, margin=24)
         inner = draw_panel(
             surface,
             pygame,
@@ -1895,6 +2045,9 @@ class RunScene(BaseScene):
         self._inspector_section_index = 0
         self._inspector_page = 0
         self._inspector_item_index = 0
+        self._inspector_sort_mode_index = 0
+        self._inspector_filter_mode_index = 0
+        self._help_overlay_visible = False
         self._product_index = 0
         self._tweens = TweenBank(speed=9.0)
         self._set_selected_product(selected_product_id)
@@ -1945,6 +2098,8 @@ class RunScene(BaseScene):
         self._inspector_section_index = 0
         self._inspector_page = 0
         self._inspector_item_index = 0
+        self._inspector_sort_mode_index = 0
+        self._inspector_filter_mode_index = 0
         self._sync_inspector_selection()
 
     def _selected_inspector_section(self):
@@ -1987,7 +2142,14 @@ class RunScene(BaseScene):
         if event.type != self.pygame.KEYDOWN:
             return
 
+        if event.key == self.pygame.K_F1 or event.unicode == "?":
+            self._help_overlay_visible = not self._help_overlay_visible
+            return
+
         if event.key == self.pygame.K_ESCAPE:
+            if self._help_overlay_visible:
+                self._help_overlay_visible = False
+                return
             if self._text_input is not None:
                 self._text_input = None
                 return
@@ -2002,6 +2164,9 @@ class RunScene(BaseScene):
                 return
             self.should_exit = True
             self.exit_reason = "quit"
+            return
+
+        if self._help_overlay_visible:
             return
 
         if self._text_input is not None:
@@ -2034,6 +2199,12 @@ class RunScene(BaseScene):
                 return
             if event.key == self.pygame.K_PAGEDOWN:
                 self._change_inspector_page(1)
+                return
+            if event.key == self.pygame.K_z:
+                self._cycle_inspector_sort_mode()
+                return
+            if event.key == self.pygame.K_x:
+                self._cycle_inspector_filter_mode()
                 return
             if event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
                 self._run_selected_inspector_primary_action()
@@ -2153,6 +2324,8 @@ class RunScene(BaseScene):
             self._draw_deep_panel_overlay(surface)
         if self._inspector_panel_key is not None:
             self._draw_inspector_overlay(surface)
+        if self._help_overlay_visible:
+            self._draw_help_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
 
@@ -2234,6 +2407,12 @@ class RunScene(BaseScene):
         if target.kind == "inspector_next_page":
             self._change_inspector_page(1)
             return
+        if target.kind == "inspector_cycle_sort":
+            self._cycle_inspector_sort_mode()
+            return
+        if target.kind == "inspector_cycle_filter":
+            self._cycle_inspector_filter_mode()
+            return
         if target.kind == "inspector_item_action":
             self._run_selected_inspector_action(int(target.payload))
             return
@@ -2252,6 +2431,9 @@ class RunScene(BaseScene):
         if target.kind == "close_outcome":
             self.should_exit = True
             self.exit_reason = "quit"
+            return
+        if target.kind == "close_help":
+            self._help_overlay_visible = False
             return
 
     def _command_disabled_reason(self, command: str) -> str | None:
@@ -2628,10 +2810,10 @@ class RunScene(BaseScene):
             absolute_index = int(payload)
         except ValueError:
             return
-        section = self._selected_inspector_section()
-        if section is None or not section.items:
+        section_items = self._filtered_sorted_inspector_items()
+        if not section_items:
             return
-        absolute_index = max(0, min(absolute_index, len(section.items) - 1))
+        absolute_index = max(0, min(absolute_index, len(section_items) - 1))
         items_per_page = self._inspector_items_per_page()
         self._inspector_page = absolute_index // items_per_page
         self._inspector_item_index = absolute_index % items_per_page
@@ -2662,6 +2844,22 @@ class RunScene(BaseScene):
             return
         self._inspector_item_index = (self._inspector_item_index + direction) % len(page_items)
 
+    def _cycle_inspector_sort_mode(self) -> None:
+        self._inspector_sort_mode_index = (self._inspector_sort_mode_index + 1) % len(
+            _INSPECTOR_SORT_MODES
+        )
+        self._inspector_page = 0
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
+    def _cycle_inspector_filter_mode(self) -> None:
+        self._inspector_filter_mode_index = (self._inspector_filter_mode_index + 1) % len(
+            _INSPECTOR_FILTER_MODES
+        )
+        self._inspector_page = 0
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
     def _sync_inspector_selection(self) -> None:
         panel = self.inspector_panel
         if panel is None or not panel.inspectors:
@@ -2674,8 +2872,7 @@ class RunScene(BaseScene):
             0,
             min(self._inspector_section_index, len(panel.inspectors) - 1),
         )
-        section = panel.inspectors[self._inspector_section_index]
-        if not section.items:
+        if not self._filtered_sorted_inspector_items():
             self._inspector_page = 0
             self._inspector_item_index = 0
             return
@@ -2694,22 +2891,86 @@ class RunScene(BaseScene):
         return self._inspector_page * self._inspector_items_per_page()
 
     def _current_inspector_page_items(self):
-        section = self._selected_inspector_section()
-        if section is None:
-            return ()
+        section_items = self._filtered_sorted_inspector_items()
         start = self._current_inspector_page_start()
         end = start + self._inspector_items_per_page()
-        return section.items[start:end]
+        return section_items[start:end]
 
     def _inspector_total_pages(self) -> int:
-        section = self._selected_inspector_section()
-        if section is None or not section.items:
+        section_items = self._filtered_sorted_inspector_items()
+        if not section_items:
             return 1
         return max(
             1,
-            (len(section.items) + self._inspector_items_per_page() - 1)
+            (len(section_items) + self._inspector_items_per_page() - 1)
             // self._inspector_items_per_page(),
         )
+
+    def _filtered_sorted_inspector_items(self):
+        section = self._selected_inspector_section()
+        if section is None:
+            return ()
+        items = list(section.items)
+        filter_mode = _INSPECTOR_FILTER_MODES[self._inspector_filter_mode_index]
+        if filter_mode == "actionable":
+            items = [item for item in items if item.actions]
+        elif filter_mode == "attention":
+            items = [
+                item
+                for item in items
+                if item.tone in {"danger", "warning"} or self._item_has_attention_signal(item)
+            ]
+        sort_mode = _INSPECTOR_SORT_MODES[self._inspector_sort_mode_index]
+        if sort_mode != "default":
+            items = sorted(
+                items,
+                key=lambda item: self._inspector_sort_key(item, sort_mode),
+                reverse=True,
+            )
+        return tuple(items)
+
+    def _inspector_sort_key(self, item, sort_mode: str) -> tuple[int, int, int, int]:
+        tone_score = _TONE_PRIORITY.get(item.tone, 0)
+        risk_score = self._extract_named_number(item, "risk")
+        value_score = self._extract_money_score(item)
+        stalled_score = self._extract_progress_gap(item)
+        if sort_mode == "risk":
+            return (risk_score, tone_score, stalled_score, value_score)
+        if sort_mode == "value":
+            return (value_score, risk_score, tone_score, stalled_score)
+        if sort_mode == "stalled":
+            return (stalled_score, risk_score, tone_score, value_score)
+        return (tone_score, risk_score, value_score, stalled_score)
+
+    def _item_has_attention_signal(self, item) -> bool:
+        text = " ".join(item.detail_lines).lower()
+        return any(
+            marker in text
+            for marker in ("risk ", "hotspot", "strained", "paused", "warning", "overdue")
+        )
+
+    def _extract_named_number(self, item, label: str) -> int:
+        text = " ".join(item.detail_lines).lower()
+        match = re.search(rf"{re.escape(label.lower())}\\s+(\\d+)", text)
+        if match:
+            return int(match.group(1))
+        return 0
+
+    def _extract_money_score(self, item) -> int:
+        text = " ".join(item.detail_lines)
+        money_matches = re.findall(r"\\$([0-9,]+(?:\\.\\d+)?)", text)
+        if not money_matches:
+            return 0
+        normalized = money_matches[0].replace(",", "")
+        return int(float(normalized))
+
+    def _extract_progress_gap(self, item) -> int:
+        text = " ".join(item.detail_lines).lower()
+        match = re.search(r"progress\\s+(\\d+)/(\\d+)", text)
+        if match:
+            current, total = int(match.group(1)), int(match.group(2))
+            return max(0, total - current)
+        return 0
 
     def _run_selected_inspector_primary_action(self) -> None:
         self._run_selected_inspector_action(0)
@@ -2990,7 +3251,14 @@ class RunScene(BaseScene):
         inner = draw_panel(surface, pygame, rect, title="Actions", accent=INFO)
         title_surface = self.fonts.heading.render("Action Bar", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
-        button_cols = 6 if inner.width < 1120 else 7
+        if inner.width < 860:
+            button_cols = 4
+        elif inner.width < 1040:
+            button_cols = 5
+        elif inner.width < 1240:
+            button_cols = 6
+        else:
+            button_cols = 7
         button_gap = 10
         button_width = int((inner.width - button_gap * (button_cols - 1)) / button_cols)
         button_height = 62
@@ -3021,7 +3289,11 @@ class RunScene(BaseScene):
             left += button_width + button_gap
         watch_text = self.fonts.small.render(self._view_model.watch_for, True, MUTED)
         hint_text = self.fonts.small.render(
-            "Hotkeys: 1-7 panels | N new product | disabled buttons explain why when clicked.",
+            self._hover_hint_line()
+            or (
+                "Hotkeys: 1-7 panels | F1 help | N new product | "
+                "click disabled buttons for reasons."
+            ),
             True,
             MUTED,
         )
@@ -3034,6 +3306,51 @@ class RunScene(BaseScene):
         if button.kind in {"command", "panel_action", "text_command"}:
             return self._command_disabled_reason(button.payload) is None
         return not self.state.company.game_over
+
+    def _hover_hint_line(self) -> str:
+        target = self._hover_target()
+        if target is None:
+            return ""
+        return self._describe_click_target(target)
+
+    def _hover_target(self) -> ClickTarget | None:
+        mouse_pos = self.pygame.mouse.get_pos()
+        for target in reversed(self._click_targets):
+            if target.rect.collidepoint(mouse_pos):
+                return target
+        return None
+
+    def _describe_click_target(self, target: ClickTarget) -> str:
+        if target.kind == "select_product":
+            for product in self._view_model.products:
+                if product.id == target.payload:
+                    return f"Hover: focus {product.name} and route product actions there."
+        if target.kind in {"command", "panel_action", "text_command"}:
+            reason = self._command_disabled_reason(target.payload)
+            if reason is not None:
+                return f"Hover: `{target.payload}` is blocked because {reason}"
+            return f"Hover: run `{target.payload}` now."
+        if target.kind == "panel":
+            return f"Hover: open the {target.payload} deep-dive panel."
+        if target.kind == "coach":
+            return "Hover: run the top mission-board recommendation."
+        if target.kind == "inspector_section":
+            return f"Hover: focus the `{target.payload}` inspector section."
+        if target.kind == "inspector_item_action":
+            item = self._selected_inspector_item()
+            if item is None:
+                return "Hover: run the selected inspector action."
+            action_index = int(target.payload)
+            if action_index < len(item.actions):
+                action = item.actions[action_index]
+                return f"Hover: {action.label} on {item.title}."
+        if target.kind == "inspector_item":
+            return "Hover: focus this record and expose item-level actions."
+        if target.kind == "save":
+            return "Hover: persist the current run to the active slot."
+        if target.kind == "pending_option":
+            return "Hover: resolve the pending event with this option."
+        return ""
 
     def _draw_product_card(self, surface, rect, product) -> None:
         pygame = self.pygame
@@ -3114,8 +3431,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_rect = pygame.Rect(width // 2 - 280, height // 2 - 180, 560, 360)
+        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=360, margin=24)
         inner = draw_panel(surface, pygame, modal_rect, title="Pending Event", accent=WARN)
         event_model = self._view_model.pending_event
         if event_model is None:
@@ -3155,14 +3471,8 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_height = min(height - 120, 180 + len(picker.options) * 64)
-        modal_rect = pygame.Rect(
-            width // 2 - 300,
-            height // 2 - modal_height // 2,
-            600,
-            modal_height,
-        )
+        modal_height = 180 + len(picker.options) * 64
+        modal_rect = _fit_modal_rect(pygame, surface, width=600, height=modal_height, margin=24)
         inner = draw_panel(
             surface,
             pygame,
@@ -3217,8 +3527,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_rect = pygame.Rect(width // 2 - 300, height // 2 - 140, 600, 280)
+        modal_rect = _fit_modal_rect(pygame, surface, width=600, height=280, margin=24)
         inner = draw_panel(
             surface,
             pygame,
@@ -3285,8 +3594,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_rect = pygame.Rect(width // 2 - 470, height // 2 - 280, 940, 560)
+        modal_rect = _fit_modal_rect(pygame, surface, width=940, height=560, margin=24)
         inner = draw_panel(surface, pygame, modal_rect, title=panel.title, accent=INFO)
         title_surface = self.fonts.title.render(panel.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -3396,8 +3704,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_rect = pygame.Rect(width // 2 - 520, height // 2 - 300, 1040, 600)
+        modal_rect = _fit_modal_rect(pygame, surface, width=1040, height=600, margin=24)
         inner = draw_panel(surface, pygame, modal_rect, title=panel.title, accent=SELECTION)
         title_surface = self.fonts.title.render(f"{panel.title} Inspector", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -3462,7 +3769,31 @@ class RunScene(BaseScene):
         nav_inner = draw_panel(surface, pygame, rect, title="Sections", accent=INFO)
         title_surface = self.fonts.heading.render("Sections", True, TEXT)
         surface.blit(title_surface, (nav_inner.left, nav_inner.top - 24))
-        top = nav_inner.top
+        sort_rect = pygame.Rect(nav_inner.left, nav_inner.top, nav_inner.width, 40)
+        filter_rect = pygame.Rect(nav_inner.left, nav_inner.top + 48, nav_inner.width, 40)
+        draw_button(
+            surface,
+            pygame,
+            rect=sort_rect,
+            title=f"Z Sort: {self._inspector_sort_mode_label()}",
+            detail="Cycle ranking for the current section.",
+            accent=INFO,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=filter_rect,
+            title=f"X Filter: {self._inspector_filter_mode_label()}",
+            detail="Cycle between all, actionable, and attention items.",
+            accent=WARN,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("inspector_cycle_sort", "", sort_rect))
+        self._click_targets.append(ClickTarget("inspector_cycle_filter", "", filter_rect))
+        top = nav_inner.top + 100
         for index, section in enumerate(panel.inspectors):
             button_rect = pygame.Rect(nav_inner.left, top, nav_inner.width, 56)
             selected = index == self._inspector_section_index
@@ -3494,9 +3825,10 @@ class RunScene(BaseScene):
             idle_surface = self.fonts.body.render("No inspector section selected.", True, MUTED)
             surface.blit(idle_surface, (focus_inner.left, focus_inner.top))
             return
-        if not section.items:
+        filtered_items = self._filtered_sorted_inspector_items()
+        if not filtered_items:
             idle_surface = self.fonts.body.render(
-                "No live records are available here yet.",
+                "No records match the current filter in this section.",
                 True,
                 MUTED,
             )
@@ -3514,14 +3846,14 @@ class RunScene(BaseScene):
             self.fonts.small,
             (
                 f"Page {self._inspector_page + 1}/{page_total} | "
-                f"items {page_start + 1}-{page_start + len(page_items)} of {len(section.items)}"
+                f"items {page_start + 1}-{page_start + len(page_items)} of {len(filtered_items)}"
             ),
             MUTED,
             header_rect,
             line_height=16,
             max_lines=1,
         )
-        item_area_height = focus_inner.height - 128
+        item_area_height = focus_inner.height - 172
         item_gap = 10
         item_height = max(
             72,
@@ -3573,6 +3905,23 @@ class RunScene(BaseScene):
             top += item_height + item_gap
 
         selected_item = self._selected_inspector_item()
+        focus_note_rect = pygame.Rect(
+            focus_inner.left,
+            focus_inner.bottom - 110,
+            focus_inner.width,
+            30,
+        )
+        if selected_item is not None:
+            focus_line = " | ".join(selected_item.detail_lines[:2]) or "No detail lines captured."
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                f"Focus: {selected_item.title} | {focus_line}",
+                MUTED,
+                focus_note_rect,
+                line_height=15,
+                max_lines=2,
+            )
         footer_top = rect.bottom - 72
         footer_rect = pygame.Rect(focus_inner.left, footer_top, focus_inner.width, 62)
         action_left = footer_rect.left
@@ -3645,6 +3994,23 @@ class RunScene(BaseScene):
         state = "active focus" if selected else "click to focus"
         return f"{len(section.items)} records | {state}"
 
+    def _inspector_sort_mode_label(self) -> str:
+        labels = {
+            "default": "Default",
+            "risk": "Highest Risk",
+            "value": "Biggest Value",
+            "stalled": "Most Stalled",
+        }
+        return labels[_INSPECTOR_SORT_MODES[self._inspector_sort_mode_index]]
+
+    def _inspector_filter_mode_label(self) -> str:
+        labels = {
+            "all": "All",
+            "actionable": "Actionable",
+            "attention": "Attention",
+        }
+        return labels[_INSPECTOR_FILTER_MODES[self._inspector_filter_mode_index]]
+
     def _item_action_detail(
         self,
         command: str,
@@ -3661,15 +4027,73 @@ class RunScene(BaseScene):
         return self._compact_button_detail(reason)
 
     def _inspector_hint_line(self) -> str:
-        return "Tab/Arrows move | PgUp/PgDn page | Enter runs action"
+        return "Tab/Arrows move | Z sort | X filter | PgUp/PgDn page | Enter action"
+
+    def _draw_help_overlay(self, surface) -> None:
+        pygame = self.pygame
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(OVERLAY)
+        surface.blit(overlay, (0, 0))
+        modal_rect = _fit_modal_rect(pygame, surface, width=860, height=520, margin=28)
+        inner = draw_panel(surface, pygame, modal_rect, title="Help", accent=INFO)
+        title_surface = self.fonts.title.render("2D Control Guide", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            (
+                "This frontend is now self-contained for the main run loop. "
+                "Use these controls to move between products, panels, inspectors, "
+                "and turn resolution without dropping back to the CLI."
+            ),
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 48),
+            line_height=18,
+            max_lines=3,
+        )
+        keycaps = (
+            ("Tab", "Next product / next inspector section"),
+            ("1-7", "Open deep panels"),
+            ("C", "Run primary coach command"),
+            ("Q/F/M/D", "Product actions"),
+            ("H/A/Y/R/B/U", "Team / strategy / budget / support"),
+            ("Space", "End turn"),
+            ("Z/X", "Inspector sort / filter"),
+            ("PgUp/PgDn", "Inspector page"),
+            ("Enter", "Run selected inspector action"),
+            ("F1/?", "Toggle this help"),
+        )
+        top = inner.top + 72
+        for key_text, label in keycaps:
+            keycap_rect = pygame.Rect(inner.left, top, inner.width, 28)
+            draw_keycap(
+                surface,
+                pygame,
+                self.fonts.small,
+                rect=keycap_rect,
+                key_text=key_text,
+                label=label,
+            )
+            top += 36
+        close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 36)
+        draw_button(
+            surface,
+            pygame,
+            rect=close_rect,
+            title="Esc Close Help",
+            detail="Return to the run dashboard.",
+            accent=BORDER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("close_help", "", close_rect))
 
     def _draw_outcome_overlay(self, surface) -> None:
         pygame = self.pygame
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(OVERLAY)
         surface.blit(overlay, (0, 0))
-        width, height = surface.get_size()
-        modal_rect = pygame.Rect(width // 2 - 260, height // 2 - 132, 520, 264)
+        modal_rect = _fit_modal_rect(pygame, surface, width=520, height=264, margin=24)
         accent = GOOD if self.state.victory_achieved else DANGER
         inner = draw_panel(surface, pygame, modal_rect, title="Run Complete", accent=accent)
         title = "Victory Achieved" if self.state.victory_achieved else "Company Shutdown"

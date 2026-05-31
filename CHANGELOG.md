@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.93.0 - 2026-05-31
+
+- Added a dedicated 2D meta board scene so the title flow now surfaces campaign tier, dominant archive path, next gap, next reward, and campaign ladder progress without leaving the frontend shell
+- Upgraded 2D inspectors with sort and filter controls plus a clearer focus strip, making larger candidate, pipeline, and partner lists easier to navigate and act on from inside the frontend
+- Added an in-run help overlay, hover-driven footer hints, and safer modal sizing so the 2D frontend is easier to learn and less brittle on smaller windows
+- Added parity-audit regression coverage for guided-opening, coach, risk, endgame-gate, and deep-panel commands so surfaced 2D actions stay either executable or explicitly explained
+- Promoted package metadata and runtime versioning to `0.93.0`
+
 ## 0.92.0 - 2026-05-28
 
 - Turned the 2D inspector overlays into interactive control surfaces with section focus, row selection, page navigation, and item-level actions for live releases, deals, roadmap projects, candidates, teammates, and partner records

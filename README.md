@@ -248,7 +248,7 @@ Each turn represents a business interval. You review the company, choose actions
 ### 🖥️ Presentation and CLI
 
 - Rich-powered dashboard panels, tables, summaries, and event notifications
-- Lightweight `pygame-ce` 2D dashboard frontend with animated bars, product cards, action/context pickers, clickable controls, a full title/new-game wizard flow, save-slot management, deep-dive overlays, interactive inspector overlays, and review scenes
+- Lightweight `pygame-ce` 2D dashboard frontend with animated bars, product cards, action/context pickers, clickable controls, a full title/new-game wizard flow, save-slot management, deep-dive overlays, interactive inspector overlays, a meta board, and review scenes
 - Typer-based CLI commands for starting, loading, and continuing runs
 - Dedicated board/governance review plus deeper support, hiring, and customer account panels for demo-friendly runs
 - Guided Opening now adapts the first 6 turns into a live checklist instead of leaving onboarding as static text only
@@ -264,7 +264,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Progression and archive tools now surface unlock ids, missing endgame paths, and dominant archive outcomes for faster late-game review
 - Built-in quick guide flow for onboarding and live demos
 - Built-in first-run tutorial and glossary commands for new players
-- Built-in `play-2d`, `load-game-2d`, `continue-last-game-2d`, and `menu-2d` commands for the animated frontend shell, now with a new-game wizard, save-slot management, archive browsing, interactive inspector overlays, archive meta summaries, disabled-action explanations, and post-turn summaries
+- Built-in `play-2d`, `load-game-2d`, `continue-last-game-2d`, and `menu-2d` commands for the animated frontend shell, now with a new-game wizard, save-slot management, archive browsing, a dedicated meta board, interactive inspector overlays with sort/filter controls, hover/help guidance, disabled-action explanations, and post-turn summaries
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
 - Deterministic `compare-balance` scenario rankings for side-by-side tuning across multiple openings
@@ -535,7 +535,7 @@ The core loop is simple:
 
 If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to get a compact opening checklist.
 
-For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, and read campaign-tier / next-reward meta summaries before entering play. Inside a run you can click product cards, coach cards, modal options, deep-dive panel buttons, and the action bar directly, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `Q`, `F`, `M`, `D`, `H`, `A`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, and `S`. Review commands now open structured inspectors for finance, customers, partnerships, board state, pipeline, and report history, and those inspectors now support section focus, row selection, page navigation, and item-level actions. If a button is disabled, the 2D shell now tells you exactly which prerequisite is missing before you waste the click.
+For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, and open a dedicated meta board for campaign-tier, dominant-path, and next-reward summaries before entering play. Inside a run you can click product cards, coach cards, modal options, deep-dive panel buttons, and the action bar directly, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `Q`, `F`, `M`, `D`, `H`, `A`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, and `F1`. Review commands now open structured inspectors for finance, customers, partnerships, board state, pipeline, and report history, and those inspectors now support section focus, row selection, page navigation, sort/filter controls, and item-level actions. If a button is disabled, the 2D shell now tells you exactly which prerequisite is missing before you waste the click, and the footer shows hover hints for the current control.
 
 Difficulty guidance:
 

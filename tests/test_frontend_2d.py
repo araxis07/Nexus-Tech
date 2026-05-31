@@ -37,8 +37,16 @@ from nexus_tech.frontend_2d.viewmodels import (
 )
 from nexus_tech.frontend_2d.widgets import create_fonts
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
+from nexus_tech.simulation.endgame import (
+    calculate_endgame_pressure,
+    calculate_endgame_readiness,
+    evaluate_exit_outcome,
+)
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
+from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.risk_forecast import build_risk_forecast
+from nexus_tech.simulation.turn_coach import build_turn_coach
 
 runner = CliRunner()
 
@@ -366,7 +374,7 @@ def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> Non
 
 
 def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
-    pygame, fonts, _surface = _build_pygame_bundle()
+    pygame, fonts, surface = _build_pygame_bundle()
     try:
         coordinator = SaveLoadCoordinator(tmp_path / "title-scene.db")
         scene = TitleScene(
@@ -387,6 +395,99 @@ def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
         scene._mode = "archives"
         archive_lines = scene._title_sidebar_lines()
         assert any("Coverage gap:" in line for line in archive_lines)
+        scene._mode = "meta"
+        meta_lines = scene._title_sidebar_lines()
+        assert any("Best path labels:" in line for line in meta_lines)
+        scene.draw(surface)
+    finally:
+        pygame.quit()
+
+
+def test_guidance_and_endgame_commands_are_supported_or_explained(tmp_path: Path) -> None:
+    unlocked_choices = [
+        choice for choice in list_scenario_choices(tmp_path / "audit.db") if not choice.locked
+    ]
+    commands: set[str] = set()
+    for choice in unlocked_choices:
+        state = create_new_game(
+            "NEXUS TECH",
+            "Nexus One",
+            scenario_id=choice.scenario_id,
+            difficulty_mode=choice.default_difficulty,
+            campaign_goal_id=choice.default_goal_id,
+        )
+        pid = state.products[0].id.hex
+        guide = build_guided_opening(state)
+        commands.add(guide.current_command)
+        commands.update(step.command for step in guide.steps)
+        commands.update(rec.command for rec in build_turn_coach(state).recommendations)
+        commands.update(item.command for item in build_risk_forecast(state).items)
+        readiness = calculate_endgame_readiness(state)
+        pressure = calculate_endgame_pressure(state, readiness)
+        commands.update(pressure.path_gate_commands)
+        if pressure.path_gate_command_alert in TurnAction._value2member_map_:
+            commands.add(pressure.path_gate_command_alert)
+        outcome = evaluate_exit_outcome(state)
+        commands.update(outcome.path_gate_commands)
+        if outcome.path_gate_command_alert in TurnAction._value2member_map_:
+            commands.add(outcome.path_gate_command_alert)
+        for panel in build_deep_dive_panel_view_models(state, selected_product_id=pid):
+            commands.update(action.command for action in panel.actions)
+
+    for command in sorted(commands):
+        command_supported = False
+        command_explained = False
+        for choice in unlocked_choices:
+            state = create_new_game(
+                "NEXUS TECH",
+                "Nexus One",
+                scenario_id=choice.scenario_id,
+                difficulty_mode=choice.default_difficulty,
+                campaign_goal_id=choice.default_goal_id,
+            )
+            pid = state.products[0].id.hex
+            request = build_command_request(
+                state,
+                command=command,
+                selected_product_id=pid,
+            )
+            reason = explain_command_unavailable(
+                state,
+                command=command,
+                selected_product_id=pid,
+            )
+            command_supported = command_supported or request is not None
+            command_explained = command_explained or reason is not None
+        assert command_supported or command_explained, command
+
+
+def test_run_scene_inspector_sort_filter_and_small_window_draw() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        state = _build_paged_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=17),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._open_inspector("pipeline")
+        scene._select_inspector_section("candidates")
+        base_items = scene._filtered_sorted_inspector_items()
+        scene._cycle_inspector_sort_mode()
+        scene._cycle_inspector_filter_mode()
+        filtered_items = scene._filtered_sorted_inspector_items()
+        scene._help_overlay_visible = True
+        scene.draw(surface)
+
+        assert scene._inspector_sort_mode_label() == "Highest Risk"
+        assert scene._inspector_filter_mode_label() == "Actionable"
+        assert len(filtered_items) <= len(base_items)
     finally:
         pygame.quit()
 
