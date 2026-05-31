@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.94.0 - 2026-05-31
+
+- Added a dedicated in-run 2D endgame and exit board so late-game readiness, blocked gates, dominant pressure, and the next repair command are visible without dropping back to terminal reporting
+- Added structured endgame inspector sections for exit paths, per-path watchlists, and projected outcome summaries so the 2D frontend can drill into late-game posture instead of only surfacing a compact overlay
+- Added panel-level inspector access from the 2D shell, including an `I` hotkey and overlay button, so deep panels can open their detailed inspectors directly instead of relying only on command-specific review routes
+- Expanded regression coverage for the new endgame panel, endgame inspector action availability, and run-scene inspector access from the deep-panel hotkey flow
+- Promoted package metadata and runtime versioning to `0.94.0`
+
 ## 0.93.0 - 2026-05-31
 
 - Added a dedicated 2D meta board scene so the title flow now surfaces campaign tier, dominant archive path, next gap, next reward, and campaign ladder progress without leaving the frontend shell

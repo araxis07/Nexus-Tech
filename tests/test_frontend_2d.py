@@ -26,6 +26,7 @@ from nexus_tech.frontend_2d.context import (
     build_command_request,
     build_inspector_action_request,
     explain_command_unavailable,
+    explain_inspector_action_unavailable,
 )
 from nexus_tech.frontend_2d.event_queue import build_action_events
 from nexus_tech.frontend_2d.scenes import RunScene, TitleScene
@@ -220,6 +221,8 @@ def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
 
 def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions() -> None:
     state = create_new_game("NEXUS TECH", "Nexus One")
+    readiness = calculate_endgame_readiness(state)
+    pressure = calculate_endgame_pressure(state, readiness)
 
     panels = build_deep_dive_panel_view_models(
         state,
@@ -227,12 +230,22 @@ def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions(
     )
 
     keys = {panel.key for panel in panels}
-    assert {"team", "finance", "customers", "partnerships", "board", "pipeline", "report"} <= keys
+    assert {
+        "team",
+        "finance",
+        "customers",
+        "partnerships",
+        "board",
+        "pipeline",
+        "report",
+        "endgame",
+    } <= keys
     finance_panel = next(panel for panel in panels if panel.key == "finance")
     customer_panel = next(panel for panel in panels if panel.key == "customers")
     board_panel = next(panel for panel in panels if panel.key == "board")
     pipeline_panel = next(panel for panel in panels if panel.key == "pipeline")
     report_panel = next(panel for panel in panels if panel.key == "report")
+    endgame_panel = next(panel for panel in panels if panel.key == "endgame")
     team_panel = next(panel for panel in panels if panel.key == "team")
     assert any(
         action.command == TurnAction.SET_CAPITAL_PLAN.value for action in finance_panel.actions
@@ -249,6 +262,9 @@ def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions(
         action.command == TurnAction.CREATE_SALES_DEAL.value for action in pipeline_panel.actions
     )
     assert any(action.command == TurnAction.VIEW_REPORT.value for action in report_panel.actions)
+    assert any(
+        action.command == pressure.path_gate_command_alert for action in endgame_panel.actions
+    )
 
 
 def test_deep_dive_panels_expose_live_inspector_sections() -> None:
@@ -262,6 +278,7 @@ def test_deep_dive_panels_expose_live_inspector_sections() -> None:
     pipeline_panel = next(panel for panel in panels if panel.key == "pipeline")
     board_panel = next(panel for panel in panels if panel.key == "board")
     report_panel = next(panel for panel in panels if panel.key == "report")
+    endgame_panel = next(panel for panel in panels if panel.key == "endgame")
     assert {section.key for section in pipeline_panel.inspectors} == {
         "deals",
         "releases",
@@ -279,6 +296,11 @@ def test_deep_dive_panels_expose_live_inspector_sections() -> None:
         "funding",
         "milestones",
         "events",
+    }
+    assert {section.key for section in endgame_panel.inspectors} == {
+        "paths",
+        "watchlist",
+        "projection",
     }
 
 
@@ -340,6 +362,43 @@ def test_build_inspector_action_request_targets_live_entities() -> None:
     assert deal_request.context.sales_deal_id == state.sales_deals[0].id
 
 
+def test_endgame_inspector_actions_are_supported_or_explained() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    panel = next(
+        panel
+        for panel in build_deep_dive_panel_view_models(
+            state,
+            selected_product_id=state.products[0].id.hex,
+        )
+        if panel.key == "endgame"
+    )
+
+    for section in panel.inspectors:
+        for item in section.items:
+            for action in item.actions:
+                request = build_inspector_action_request(
+                    state,
+                    panel_key=panel.key,
+                    section_key=section.key,
+                    command=action.command,
+                    payload=item.payload,
+                    selected_product_id=state.products[0].id.hex,
+                )
+                reason = explain_inspector_action_unavailable(
+                    state,
+                    panel_key=panel.key,
+                    section_key=section.key,
+                    command=action.command,
+                    payload=item.payload,
+                    selected_product_id=state.products[0].id.hex,
+                )
+                assert request is not None or reason is not None, (
+                    section.key,
+                    item.title,
+                    action.command,
+                )
+
+
 def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -369,6 +428,29 @@ def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> Non
         scene._run_selected_inspector_primary_action()
 
         assert scene.state.product_releases[0].progress > before_progress
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_can_open_endgame_panel_inspector_from_hotkey() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=7),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._deep_panel_key = "endgame"
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_i, unicode="i"))
+
+        assert scene._inspector_panel_key == "endgame"
+        assert scene._selected_inspector_section().key == "paths"
     finally:
         pygame.quit()
 

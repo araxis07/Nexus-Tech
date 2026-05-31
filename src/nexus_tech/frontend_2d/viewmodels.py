@@ -6,11 +6,16 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal
 
-from nexus_tech.domain.models import GameState, PendingEvent, Product
+from nexus_tech.domain.models import GameState, PendingEvent, Product, TurnAction
 from nexus_tech.domain.money import format_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
+from nexus_tech.simulation.endgame import (
+    calculate_endgame_pressure,
+    calculate_endgame_readiness,
+    evaluate_exit_outcome,
+)
 from nexus_tech.simulation.engine import TurnResolution
 from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.reporting import calculate_run_score
@@ -533,6 +538,9 @@ def build_deep_dive_panel_view_models(
     )
     latest_turn = state.turn_history[-1] if state.turn_history else None
     run_score = calculate_run_score(state)
+    endgame_readiness = calculate_endgame_readiness(state, run_score)
+    endgame_pressure = calculate_endgame_pressure(state, endgame_readiness)
+    endgame_evaluation = evaluate_exit_outcome(state, run_score)
     product_by_id = {product.id: product for product in state.products}
     customer_summary = (
         f"{selected_product.name} is currently aimed at "
@@ -1052,6 +1060,12 @@ def build_deep_dive_panel_view_models(
         ),
         inspectors=_build_report_inspectors(state),
     )
+    endgame_panel = _build_endgame_panel(
+        state,
+        readiness=endgame_readiness,
+        pressure=endgame_pressure,
+        evaluation=endgame_evaluation,
+    )
     return (
         team_panel,
         finance_panel,
@@ -1060,6 +1074,99 @@ def build_deep_dive_panel_view_models(
         board_panel,
         pipeline_panel,
         report_panel,
+        endgame_panel,
+    )
+
+
+def _build_endgame_panel(
+    state: GameState,
+    *,
+    readiness,
+    pressure,
+    evaluation,
+) -> DeepDivePanelViewModel:
+    blocked_paths = sum(1 for gate in pressure.path_outcome_gates if "blocked" in gate.lower())
+    gate_command_tone = "danger" if blocked_paths >= 2 else "warning" if blocked_paths else "info"
+    return DeepDivePanelViewModel(
+        key="endgame",
+        title="Endgame / Exit Board",
+        summary=(
+            "Track exit readiness, blocked path gates, and the next late-game repair command "
+            "without leaving the 2D run loop."
+        ),
+        metrics=(
+            DeepDiveMetricViewModel(
+                "IPO",
+                str(readiness.ipo_readiness_score),
+                _attribute_tone(readiness.ipo_readiness_score),
+            ),
+            DeepDiveMetricViewModel(
+                "M&A",
+                str(readiness.acquisition_interest_score),
+                _attribute_tone(readiness.acquisition_interest_score),
+            ),
+            DeepDiveMetricViewModel(
+                "Independence",
+                str(readiness.independence_score),
+                _attribute_tone(readiness.independence_score),
+            ),
+            DeepDiveMetricViewModel(
+                "Reset Risk",
+                str(pressure.board_reset_risk),
+                _attribute_tone(100 - pressure.board_reset_risk),
+            ),
+        ),
+        detail_lines=(
+            (
+                f"Projected path: {evaluation.title} | grade {evaluation.grade} | "
+                f"offer {format_money(evaluation.offer_value)}"
+            ),
+            (
+                f"Clarity: {pressure.strategic_clarity} | durability "
+                f"{pressure.operating_durability} | dominant "
+                f"{pressure.dominant_pressure.replace('_', ' ')}"
+            ),
+            f"Gate alert: {pressure.path_gate_alert}",
+            f"Recommendation: {pressure.recommendation}",
+        ),
+        actions=(
+            DeepDiveActionViewModel(
+                pressure.path_gate_command_alert,
+                "Gate Command",
+                pressure.path_gate_alert,
+                gate_command_tone,
+            ),
+            DeepDiveActionViewModel(
+                TurnAction.REVIEW_BOARD.value,
+                "Board Review",
+                "Refresh governance and reset pressure.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                TurnAction.REVIEW_FINANCE.value,
+                "Finance Review",
+                "Refresh reserve, debt, and capital posture.",
+                "warning",
+            ),
+            DeepDiveActionViewModel(
+                TurnAction.REVIEW_PARTNERSHIPS.value,
+                "Partner Review",
+                "Refresh diligence and channel concentration.",
+                "info",
+            ),
+            DeepDiveActionViewModel(
+                TurnAction.VIEW_REPORT.value,
+                "Full Report",
+                "Open the broader scorecard and archive-ready summary.",
+                "info",
+            ),
+        ),
+        inspectors=_build_endgame_inspectors(
+            state,
+            readiness=readiness,
+            pressure=pressure,
+            evaluation=evaluation,
+        ),
     )
 
 
@@ -2045,6 +2152,191 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
             title="Events",
             tone="info",
             items=event_items,
+        ),
+    )
+
+
+def _build_endgame_inspectors(
+    state: GameState,
+    *,
+    readiness,
+    pressure,
+    evaluation,
+) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    path_labels = ("IPO", "M&A", "Independence", "Reset")
+    review_actions = (
+        (
+            TurnAction.REVIEW_BOARD.value,
+            "Board Review",
+            "Refresh governance and enterprise proof.",
+        ),
+        (
+            TurnAction.REVIEW_PARTNERSHIPS.value,
+            "Partner Review",
+            "Refresh diligence and channel concentration.",
+        ),
+        (
+            TurnAction.REVIEW_FINANCE.value,
+            "Finance Review",
+            "Refresh reserve, debt, and renewal posture.",
+        ),
+        (
+            TurnAction.REVIEW_BOARD.value,
+            "Board Review",
+            "Refresh reset credibility and governance controls.",
+        ),
+    )
+    path_payloads = ("ipo", "ma", "independence", "reset")
+    path_scores = (
+        readiness.ipo_readiness_score,
+        readiness.acquisition_interest_score,
+        readiness.independence_score,
+        max(0, 100 - pressure.board_reset_risk),
+    )
+    path_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=path_labels[index],
+            detail_lines=(
+                pressure.path_scorecard[index],
+                pressure.path_outcome_gates[index],
+            ),
+            tone=(
+                "success"
+                if "open" in pressure.path_outcome_gates[index].lower()
+                else _attribute_tone(path_scores[index])
+            ),
+            payload=path_payloads[index],
+            actions=(
+                DeepDiveActionViewModel(
+                    pressure.path_gate_commands[index],
+                    "Gate Command",
+                    pressure.path_gate_actions[index],
+                    (
+                        "success"
+                        if "open" in pressure.path_outcome_gates[index].lower()
+                        else "warning"
+                    ),
+                ),
+                DeepDiveActionViewModel(
+                    review_actions[index][0],
+                    review_actions[index][1],
+                    review_actions[index][2],
+                    "info",
+                ),
+            ),
+        )
+        for index in range(4)
+    )
+    watchlist_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=f"{path_labels[index]} Watch",
+            detail_lines=(
+                pressure.path_watchlist[index],
+                pressure.path_gate_actions[index],
+            ),
+            tone="warning" if "blocked" in pressure.path_outcome_gates[index].lower() else "info",
+            payload=path_payloads[index],
+            actions=(
+                DeepDiveActionViewModel(
+                    pressure.path_gate_commands[index],
+                    "Run Fix",
+                    "Run the primary gate-unblocker for this path.",
+                    "warning"
+                    if "blocked" in pressure.path_outcome_gates[index].lower()
+                    else "info",
+                ),
+                DeepDiveActionViewModel(
+                    review_actions[index][0],
+                    review_actions[index][1],
+                    review_actions[index][2],
+                    "info",
+                ),
+            ),
+        )
+        for index in range(4)
+    )
+    projection_items = (
+        DeepDiveInspectorItemViewModel(
+            title=evaluation.title,
+            detail_lines=(
+                (
+                    f"{evaluation.ending_variant} | grade {evaluation.grade} | "
+                    f"offer {format_money(evaluation.offer_value)}"
+                ),
+                f"Next chapter: {evaluation.next_chapter}",
+                f"Tags: {', '.join(evaluation.outcome_tags)}",
+            ),
+            tone=_attribute_tone(max(path_scores[:3])),
+            payload="projection",
+            actions=(
+                DeepDiveActionViewModel(
+                    TurnAction.VIEW_REPORT.value,
+                    "Full Report",
+                    "Open the full scorecard and archive-facing report.",
+                    "info",
+                ),
+                DeepDiveActionViewModel(
+                    pressure.path_gate_command_alert,
+                    "Next Command",
+                    "Run the top late-game unblocker across all exit paths.",
+                    "warning",
+                ),
+            ),
+        ),
+        DeepDiveInspectorItemViewModel(
+            title="Pressure Profile",
+            detail_lines=(
+                f"{pressure.summary}",
+                (
+                    f"Dominant {pressure.dominant_pressure.replace('_', ' ')} | "
+                    f"clarity {pressure.strategic_clarity} | durability "
+                    f"{pressure.operating_durability}"
+                ),
+                pressure.recommendation,
+            ),
+            tone=(
+                "danger"
+                if pressure.board_reset_risk >= 70
+                else "warning"
+                if pressure.board_reset_risk >= 50
+                else "info"
+            ),
+            payload="pressure",
+            actions=(
+                DeepDiveActionViewModel(
+                    pressure.path_gate_command_alert,
+                    "Gate Command",
+                    pressure.path_gate_alert,
+                    "warning",
+                ),
+                DeepDiveActionViewModel(
+                    TurnAction.REVIEW_BOARD.value,
+                    "Board Review",
+                    "Cross-check pressure against governance state.",
+                    "warning",
+                ),
+            ),
+        ),
+    )
+    _ = state
+    return (
+        DeepDiveInspectorSectionViewModel(
+            key="paths",
+            title="Exit Paths",
+            tone="info",
+            items=path_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="watchlist",
+            title="Path Watchlist",
+            tone="warning",
+            items=watchlist_items,
+        ),
+        DeepDiveInspectorSectionViewModel(
+            key="projection",
+            title="Projection",
+            tone="info",
+            items=projection_items,
         ),
     )
 

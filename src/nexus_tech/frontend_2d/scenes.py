@@ -199,6 +199,14 @@ _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
         "report",
     ),
     ActionButtonSpec(
+        "8",
+        "Endgame",
+        "Open exit readiness and late-game gate board.",
+        WARN,
+        "panel",
+        "endgame",
+    ),
+    ActionButtonSpec(
         "Q",
         "Improve",
         "Invest in product quality.",
@@ -2258,8 +2266,19 @@ class RunScene(BaseScene):
         if event.key == self.pygame.K_7:
             self._deep_panel_key = "report"
             return
+        if event.key == self.pygame.K_8:
+            self._deep_panel_key = "endgame"
+            return
         if event.key == self.pygame.K_n:
             self._open_create_product_modal()
+            return
+        if (
+            event.key == self.pygame.K_i
+            and self._deep_panel_key is not None
+            and self.deep_panel is not None
+            and self.deep_panel.inspectors
+        ):
+            self._open_inspector(self._deep_panel_key)
             return
 
         if event.key == self.pygame.K_TAB:
@@ -2367,6 +2386,9 @@ class RunScene(BaseScene):
             return
         if target.kind == "panel":
             self._deep_panel_key = target.payload
+            return
+        if target.kind == "open_panel_inspector":
+            self._open_inspector(target.payload)
             return
         if target.kind == "text_command":
             reason = self._command_disabled_reason(target.payload)
@@ -3291,7 +3313,7 @@ class RunScene(BaseScene):
         hint_text = self.fonts.small.render(
             self._hover_hint_line()
             or (
-                "Hotkeys: 1-7 panels | F1 help | N new product | "
+                "Hotkeys: 1-8 panels | I inspect panel | F1 help | N new product | "
                 "click disabled buttons for reasons."
             ),
             True,
@@ -3332,6 +3354,8 @@ class RunScene(BaseScene):
             return f"Hover: run `{target.payload}` now."
         if target.kind == "panel":
             return f"Hover: open the {target.payload} deep-dive panel."
+        if target.kind == "open_panel_inspector":
+            return f"Hover: inspect the `{target.payload}` panel in full detail."
         if target.kind == "coach":
             return "Hover: run the top mission-board recommendation."
         if target.kind == "inspector_section":
@@ -3683,7 +3707,20 @@ class RunScene(BaseScene):
             self._click_targets.append(ClickTarget("panel_action", action.command, button_rect))
             left += button_width + button_gap
 
-        close_rect = pygame.Rect(action_rect.left, modal_rect.bottom - 56, 160, 34)
+        inspect_rect = pygame.Rect(action_rect.left, modal_rect.bottom - 56, 170, 34)
+        close_rect = pygame.Rect(action_rect.left + 184, modal_rect.bottom - 56, 160, 34)
+        if panel.inspectors:
+            draw_button(
+                surface,
+                pygame,
+                rect=inspect_rect,
+                title="I Open Inspector",
+                detail="Inspect this panel in detail.",
+                accent=SELECTION,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("open_panel_inspector", panel.key, inspect_rect))
         draw_button(
             surface,
             pygame,
@@ -4044,7 +4081,7 @@ class RunScene(BaseScene):
             (
                 "This frontend is now self-contained for the main run loop. "
                 "Use these controls to move between products, panels, inspectors, "
-                "and turn resolution without dropping back to the CLI."
+                "the endgame board, and turn resolution without dropping back to the CLI."
             ),
             MUTED,
             pygame.Rect(inner.left, inner.top, inner.width, 48),
@@ -4053,7 +4090,8 @@ class RunScene(BaseScene):
         )
         keycaps = (
             ("Tab", "Next product / next inspector section"),
-            ("1-7", "Open deep panels"),
+            ("1-8", "Open deep panels"),
+            ("I", "Inspect the current deep panel"),
             ("C", "Run primary coach command"),
             ("Q/F/M/D", "Product actions"),
             ("H/A/Y/R/B/U", "Team / strategy / budget / support"),
