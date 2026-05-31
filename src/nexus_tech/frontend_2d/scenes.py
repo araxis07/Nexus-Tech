@@ -47,6 +47,7 @@ from nexus_tech.frontend_2d.viewmodels import (
     build_turn_summary_view_model,
 )
 from nexus_tech.frontend_2d.widgets import (
+    BACKGROUND,
     BORDER,
     DANGER,
     GOOD,
@@ -2301,7 +2302,7 @@ class RunScene(BaseScene):
         margin = 20
         gap = 16
         header_rect = pygame.Rect(margin, margin, width - margin * 2, 118)
-        footer_height = 332
+        footer_height = 388 if width < 980 else 348 if width < 1180 else 332
         footer_rect = pygame.Rect(
             margin,
             height - footer_height - margin,
@@ -2310,22 +2311,55 @@ class RunScene(BaseScene):
         )
         content_top = header_rect.bottom + gap
         content_height = footer_rect.top - gap - content_top
-        left_width = int((width - margin * 2 - gap * 2) * 0.27)
-        center_width = int((width - margin * 2 - gap * 2) * 0.36)
-        right_width = width - margin * 2 - gap * 2 - left_width - center_width
-        left_rect = pygame.Rect(margin, content_top, left_width, content_height)
-        center_rect = pygame.Rect(
-            left_rect.right + gap,
-            content_top,
-            center_width,
-            content_height,
-        )
-        right_rect = pygame.Rect(
-            center_rect.right + gap,
-            content_top,
-            right_width,
-            content_height,
-        )
+        if width < 940:
+            section_height = int((content_height - gap * 2) / 3)
+            left_rect = pygame.Rect(margin, content_top, width - margin * 2, section_height)
+            center_rect = pygame.Rect(
+                margin,
+                left_rect.bottom + gap,
+                width - margin * 2,
+                section_height,
+            )
+            right_rect = pygame.Rect(
+                margin,
+                center_rect.bottom + gap,
+                width - margin * 2,
+                content_top + content_height - center_rect.bottom - gap,
+            )
+        elif width < 1260:
+            top_height = int((content_height - gap) * 0.52)
+            left_width = int((width - margin * 2 - gap) * 0.42)
+            center_width = width - margin * 2 - gap - left_width
+            left_rect = pygame.Rect(margin, content_top, left_width, top_height)
+            center_rect = pygame.Rect(
+                left_rect.right + gap,
+                content_top,
+                center_width,
+                top_height,
+            )
+            right_rect = pygame.Rect(
+                margin,
+                left_rect.bottom + gap,
+                width - margin * 2,
+                content_top + content_height - left_rect.bottom - gap,
+            )
+        else:
+            left_width = int((width - margin * 2 - gap * 2) * 0.27)
+            center_width = int((width - margin * 2 - gap * 2) * 0.36)
+            right_width = width - margin * 2 - gap * 2 - left_width - center_width
+            left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+            center_rect = pygame.Rect(
+                left_rect.right + gap,
+                content_top,
+                center_width,
+                content_height,
+            )
+            right_rect = pygame.Rect(
+                center_rect.right + gap,
+                content_top,
+                right_width,
+                content_height,
+            )
 
         self._draw_header(surface, header_rect)
         self._draw_left_column(surface, left_rect)
@@ -2347,6 +2381,7 @@ class RunScene(BaseScene):
             self._draw_help_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
+        self._draw_hover_tooltip(surface)
 
     def push_event(self, payload: FrontendEvent) -> None:
         """Add one transient UI event card."""
@@ -3292,6 +3327,7 @@ class RunScene(BaseScene):
                 left = inner.left
             button_rect = pygame.Rect(left, top, button_width, button_height)
             enabled = self._button_is_enabled(button)
+            selected = button.kind == "panel" and button.payload == self._active_panel_key()
             draw_button(
                 surface,
                 pygame,
@@ -3306,6 +3342,7 @@ class RunScene(BaseScene):
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
                 enabled=enabled,
+                selected=selected,
             )
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
@@ -3335,12 +3372,43 @@ class RunScene(BaseScene):
             return ""
         return self._describe_click_target(target)
 
+    def _active_panel_key(self) -> str | None:
+        return self._inspector_panel_key or self._deep_panel_key
+
     def _hover_target(self) -> ClickTarget | None:
         mouse_pos = self.pygame.mouse.get_pos()
         for target in reversed(self._click_targets):
             if target.rect.collidepoint(mouse_pos):
                 return target
         return None
+
+    def _draw_hover_tooltip(self, surface) -> None:
+        if self._help_overlay_visible or self._text_input is not None:
+            return
+        target = self._hover_target()
+        if target is None:
+            return
+        description = self._describe_click_target(target)
+        if not description:
+            return
+        pygame = self.pygame
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        tooltip_width = 360 if surface.get_width() >= 1024 else 300
+        tooltip_rect = pygame.Rect(mouse_x + 16, mouse_y + 16, tooltip_width, 88)
+        if tooltip_rect.right > surface.get_width() - 16:
+            tooltip_rect.left = surface.get_width() - tooltip_rect.width - 16
+        if tooltip_rect.bottom > surface.get_height() - 16:
+            tooltip_rect.top = mouse_y - tooltip_rect.height - 12
+        inner = draw_panel(surface, pygame, tooltip_rect, title="Hint", accent=INFO)
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            description,
+            TEXT,
+            pygame.Rect(inner.left, inner.top, inner.width, inner.height - 4),
+            line_height=16,
+            max_lines=4,
+        )
 
     def _describe_click_target(self, target: ClickTarget) -> str:
         if target.kind == "select_product":
@@ -3385,6 +3453,11 @@ class RunScene(BaseScene):
             surface, border, rect, width=2 if product.selected else 1, border_radius=16
         )
         self._click_targets.append(ClickTarget("select_product", product.id, rect))
+        if product.selected:
+            badge_rect = pygame.Rect(rect.right - 84, rect.top + 10, 70, 18)
+            pygame.draw.rect(surface, SELECTION, badge_rect, border_radius=9)
+            badge_surface = self.fonts.small.render("ACTIVE", True, BACKGROUND)
+            surface.blit(badge_surface, (badge_rect.left + 10, badge_rect.top + 3))
         title_surface = self.fonts.heading.render(product.name, True, TEXT)
         subtitle_surface = self.fonts.small.render(
             f"{product.stage} | {product.segment} | users {product.users_text}",
@@ -4297,8 +4370,17 @@ class TurnSummaryScene(BaseScene):
     def update(self, dt: float) -> None:
         self._elapsed += dt
         self._tweens.update(dt)
-        reveal_count = min(len(self._events), 1 + int(self._elapsed / 0.45))
+        reveal_count = min(len(self._events), 1 + int(self._elapsed / 0.35))
         self._visible_event_count = max(self._visible_event_count, reveal_count)
+
+    def _phase_index(self) -> int:
+        return min(len(self._view_model.phase_labels) - 1, int(self._elapsed / 0.85))
+
+    def _visible_metric_count(self) -> int:
+        return min(len(self._view_model.metrics), 2 + self._phase_index() * 3)
+
+    def _visible_product_count(self) -> int:
+        return min(len(self._view_model.product_lines), 1 + self._phase_index())
 
     def handle_event(self, event) -> None:
         if event.type == self.pygame.QUIT:
@@ -4331,10 +4413,25 @@ class TurnSummaryScene(BaseScene):
         footer_rect = pygame.Rect(margin, height - 94 - margin, width - margin * 2, 94)
         content_top = header_rect.bottom + gap
         content_height = footer_rect.top - gap - content_top
-        left_width = int((width - margin * 2 - gap) * 0.55)
-        right_width = width - margin * 2 - gap - left_width
-        left_rect = pygame.Rect(margin, content_top, left_width, content_height)
-        right_rect = pygame.Rect(left_rect.right + gap, content_top, right_width, content_height)
+        if width < 1100:
+            top_height = int((content_height - gap) * 0.58)
+            left_rect = pygame.Rect(margin, content_top, width - margin * 2, top_height)
+            right_rect = pygame.Rect(
+                margin,
+                left_rect.bottom + gap,
+                width - margin * 2,
+                content_top + content_height - left_rect.bottom - gap,
+            )
+        else:
+            left_width = int((width - margin * 2 - gap) * 0.55)
+            right_width = width - margin * 2 - gap - left_width
+            left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+            right_rect = pygame.Rect(
+                left_rect.right + gap,
+                content_top,
+                right_width,
+                content_height,
+            )
 
         self._draw_summary_header(surface, header_rect)
         self._draw_summary_main(surface, left_rect)
@@ -4393,6 +4490,16 @@ class TurnSummaryScene(BaseScene):
         surface.blit(title_surface, (inner.left, inner.top - 28))
         headline_surface = self.fonts.body.render(self._view_model.headline, True, INFO)
         surface.blit(headline_surface, (inner.left, inner.top))
+        phase_left = inner.right - 310
+        for index, label in enumerate(self._view_model.phase_labels):
+            chip_rect = pygame.Rect(phase_left + index * 100, inner.top, 92, 20)
+            color = SELECTION if index <= self._phase_index() else BORDER
+            fill = (34, 47, 66) if index <= self._phase_index() else (24, 35, 50)
+            pygame.draw.rect(surface, fill, chip_rect, border_radius=10)
+            pygame.draw.rect(surface, color, chip_rect, width=1, border_radius=10)
+            chip_text_color = TEXT if index <= self._phase_index() else MUTED
+            chip_surface = self.fonts.small.render(label, True, chip_text_color)
+            surface.blit(chip_surface, (chip_rect.left + 8, chip_rect.top + 4))
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -4405,7 +4512,9 @@ class TurnSummaryScene(BaseScene):
 
     def _draw_summary_main(self, surface, rect) -> None:
         pygame = self.pygame
-        metrics_height = 220
+        visible_metrics = self._view_model.metrics[: self._visible_metric_count()]
+        metric_rows = max(1, (len(visible_metrics) + 2) // 3)
+        metrics_height = 94 + metric_rows * 86
         metrics_rect = pygame.Rect(rect.left, rect.top, rect.width, metrics_height)
         products_rect = pygame.Rect(
             rect.left,
@@ -4422,7 +4531,7 @@ class TurnSummaryScene(BaseScene):
         card_height = 74
         top = inner.top
         left = inner.left
-        for index, metric in enumerate(self._view_model.metrics):
+        for index, metric in enumerate(visible_metrics):
             if index and index % cols == 0:
                 top += card_height + 12
                 left = inner.left
@@ -4440,7 +4549,8 @@ class TurnSummaryScene(BaseScene):
         product_title = self.fonts.heading.render("Product Outcomes", True, TEXT)
         surface.blit(product_title, (product_inner.left, product_inner.top - 24))
         top = product_inner.top
-        for product_line in self._view_model.product_lines:
+        visible_products = self._view_model.product_lines[: self._visible_product_count()]
+        for product_line in visible_products:
             line_rect = pygame.Rect(product_inner.left, top, product_inner.width, 56)
             color = tone_color(product_line.tone)
             pygame.draw.rect(surface, (26, 38, 55), line_rect, border_radius=14)
@@ -4467,10 +4577,22 @@ class TurnSummaryScene(BaseScene):
                 (line_rect.right - cost_surface.get_width() - 12, line_rect.top + 32),
             )
             top += 66
+        if not visible_products:
+            idle_surface = self.fonts.body.render("No live product delta surfaced.", True, MUTED)
+            surface.blit(idle_surface, (product_inner.left, product_inner.top))
 
     def _draw_summary_timeline(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Timeline", accent=WARN)
+        strategy_height = 176 if rect.height >= 360 else 156
+        strategy_rect = pygame.Rect(rect.left, rect.top, rect.width, strategy_height)
+        timeline_rect = pygame.Rect(
+            rect.left,
+            strategy_rect.bottom + 12,
+            rect.width,
+            rect.height - strategy_height - 12,
+        )
+        self._draw_summary_strategy(surface, strategy_rect)
+        inner = draw_panel(surface, pygame, timeline_rect, title="Timeline", accent=WARN)
         title_surface = self.fonts.heading.render("Turn Resolution Timeline", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         if not self._events:
@@ -4482,6 +4604,47 @@ class TurnSummaryScene(BaseScene):
             card_rect = pygame.Rect(inner.left, top, inner.width, 70)
             self._draw_summary_event(surface, card_rect, event)
             top += 80
+            if top + 70 > inner.bottom:
+                break
+
+    def _draw_summary_strategy(self, surface, rect) -> None:
+        pygame = self.pygame
+        inner = draw_panel(surface, pygame, rect, title="Strategy", accent=INFO)
+        title_surface = self.fonts.heading.render("Strategic Delta", True, TEXT)
+        surface.blit(title_surface, (inner.left, inner.top - 24))
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            self._view_model.strategic_headline,
+            INFO,
+            pygame.Rect(inner.left, inner.top, inner.width, 34),
+            line_height=18,
+            max_lines=2,
+        )
+        command_rect = pygame.Rect(inner.left, inner.top + 34, inner.width, 42)
+        draw_button(
+            surface,
+            pygame,
+            rect=command_rect,
+            title=f"Next Command {self._view_model.focus_command}",
+            detail=self._view_model.focus_detail,
+            accent=WARN,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+            selected=self._phase_index() >= 2,
+        )
+        top = command_rect.bottom + 12
+        for line in self._view_model.strategic_lines:
+            consumed = draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                line,
+                MUTED,
+                pygame.Rect(inner.left, top, inner.width, 34),
+                line_height=15,
+                max_lines=2,
+            )
+            top += max(20, consumed)
 
     def _draw_summary_footer(self, surface, rect) -> None:
         pygame = self.pygame

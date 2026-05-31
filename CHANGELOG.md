@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.95.0 - 2026-05-31
+
+- Added a broader 2D usability polish pass with responsive run-scene layout shifts, active panel highlighting in the action bar, stronger selected-product affordances, and live hover tooltips instead of only footer hints
+- Upgraded the 2D turn-resolution scene into a staged post-turn readout that reveals cash and demand, operating pressure, and strategic outlook in sequence instead of dumping a flat event list all at once
+- Added strategic delta summaries to the turn-resolution view so late-game readiness, blocked-gate movement, the next endgame command, and dominant pressure shifts are visible before returning to the run
+- Expanded turn-resolution events with gate-command and strategic-outlook cards so post-turn animation stays aligned with the endgame board and late-game path guidance
+- Expanded regression coverage for the richer turn-summary model, endgame-aware resolution events, small-window drawing, and the new staged summary scene behavior
+- Promoted package metadata and runtime versioning to `0.95.0`
+
 ## 0.94.0 - 2026-05-31
 
 - Added a dedicated in-run 2D endgame and exit board so late-game readiness, blocked gates, dominant pressure, and the next repair command are visible without dropping back to terminal reporting

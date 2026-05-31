@@ -6,6 +6,11 @@ from dataclasses import dataclass
 
 from nexus_tech.domain.models import GameState
 from nexus_tech.domain.money import format_money
+from nexus_tech.simulation.endgame import (
+    calculate_endgame_pressure,
+    calculate_endgame_readiness,
+    evaluate_exit_outcome,
+)
 from nexus_tech.simulation.engine import TurnResolution
 
 
@@ -69,6 +74,57 @@ def build_turn_resolution_events(
                 title="Users Shifted",
                 detail=f"Net users {'+' if total_user_delta > 0 else ''}{total_user_delta}.",
                 severity=tone,
+            )
+        )
+    previous_readiness = calculate_endgame_readiness(previous_state)
+    current_readiness = calculate_endgame_readiness(current_state, resolution.run_score)
+    previous_pressure = calculate_endgame_pressure(previous_state, previous_readiness)
+    current_pressure = calculate_endgame_pressure(current_state, current_readiness)
+    previous_outcome = evaluate_exit_outcome(previous_state)
+    current_outcome = evaluate_exit_outcome(current_state, resolution.run_score)
+    previous_blocked_paths = sum(
+        1 for gate in previous_pressure.path_outcome_gates if "blocked" in gate.lower()
+    )
+    current_blocked_paths = sum(
+        1 for gate in current_pressure.path_outcome_gates if "blocked" in gate.lower()
+    )
+    events.append(
+        FrontendEvent(
+            title="Gate Command",
+            detail=(
+                f"{current_pressure.path_gate_command_alert}: {current_pressure.path_gate_alert}"
+            ),
+            severity="warning" if current_blocked_paths else "info",
+            ttl=5.0,
+        )
+    )
+    if (
+        current_outcome.title != previous_outcome.title
+        or current_pressure.dominant_pressure != previous_pressure.dominant_pressure
+    ):
+        events.append(
+            FrontendEvent(
+                title="Strategic Outlook",
+                detail=(
+                    f"{previous_outcome.title} -> {current_outcome.title} | "
+                    f"{current_pressure.dominant_pressure.replace('_', ' ')}"
+                ),
+                severity="info",
+                ttl=5.0,
+            )
+        )
+    if current_blocked_paths != previous_blocked_paths:
+        events.append(
+            FrontendEvent(
+                title="Exit Gates",
+                detail=f"{previous_blocked_paths} -> {current_blocked_paths} blocked paths.",
+                severity=(
+                    "danger"
+                    if current_blocked_paths > previous_blocked_paths
+                    else "success"
+                    if current_blocked_paths < previous_blocked_paths
+                    else "warning"
+                ),
             )
         )
     events.extend(_build_delta_events(previous_state, current_state))

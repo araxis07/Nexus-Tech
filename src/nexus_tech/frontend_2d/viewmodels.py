@@ -171,6 +171,11 @@ class TurnSummaryViewModel:
     headline: str
     narrative: str
     footer: str
+    phase_labels: tuple[str, ...]
+    strategic_headline: str
+    strategic_lines: tuple[str, ...]
+    focus_command: str
+    focus_detail: str
     metrics: tuple[TurnMetricViewModel, ...]
     product_lines: tuple[TurnProductSummaryViewModel, ...]
 
@@ -397,6 +402,27 @@ def build_turn_summary_view_model(
 
     total_user_delta = sum(item.net_user_delta for item in resolution.product_summaries)
     board_delta = resolution.state.finance.board_pressure - previous_state.finance.board_pressure
+    support_delta = (
+        resolution.state.support_program.backlog_queue
+        - previous_state.support_program.backlog_queue
+    )
+    previous_readiness = calculate_endgame_readiness(previous_state)
+    current_readiness = calculate_endgame_readiness(resolution.state, resolution.run_score)
+    previous_pressure = calculate_endgame_pressure(previous_state, previous_readiness)
+    current_pressure = calculate_endgame_pressure(resolution.state, current_readiness)
+    previous_outcome = evaluate_exit_outcome(previous_state)
+    current_outcome = evaluate_exit_outcome(resolution.state, resolution.run_score)
+    previous_blocked_paths = sum(
+        1 for gate in previous_pressure.path_outcome_gates if "blocked" in gate.lower()
+    )
+    current_blocked_paths = sum(
+        1 for gate in current_pressure.path_outcome_gates if "blocked" in gate.lower()
+    )
+    path_shift = (
+        f"{previous_outcome.title} -> {current_outcome.title}"
+        if previous_outcome.title != current_outcome.title
+        else current_outcome.title
+    )
     footer = "Press Space or click Continue to return to the run."
     if resolution.pending_event is not None:
         footer = f"Pending event unlocked: {resolution.pending_event.title}."
@@ -446,6 +472,28 @@ def build_turn_summary_view_model(
             tone="danger" if board_delta > 0 else "success",
         ),
         TurnMetricViewModel(
+            key="support",
+            label="Support Queue",
+            value_text=_signed_int(support_delta),
+            detail=f"Backlog now {resolution.state.support_program.backlog_queue}",
+            ratio=_scaled_ratio(abs(support_delta), ceiling=8),
+            tone="danger" if support_delta > 0 else "success",
+        ),
+        TurnMetricViewModel(
+            key="gates",
+            label="Blocked Gates",
+            value_text=str(current_blocked_paths),
+            detail=f"Was {previous_blocked_paths} | gap {current_pressure.path_gap}",
+            ratio=_scaled_ratio(current_blocked_paths, ceiling=4),
+            tone=(
+                "danger"
+                if current_blocked_paths >= 3
+                else "warning"
+                if current_blocked_paths >= 1
+                else "success"
+            ),
+        ),
+        TurnMetricViewModel(
             key="actions_reset",
             label="Next Turn AP",
             value_text=str(resolution.state.action_points_remaining),
@@ -468,11 +516,41 @@ def build_turn_summary_view_model(
         )
         for summary in resolution.product_summaries[:4]
     )
+    ipo_delta = _signed_int(
+        current_readiness.ipo_readiness_score - previous_readiness.ipo_readiness_score
+    )
+    acquisition_delta = _signed_int(
+        current_readiness.acquisition_interest_score - previous_readiness.acquisition_interest_score
+    )
+    independence_delta = _signed_int(
+        current_readiness.independence_score - previous_readiness.independence_score
+    )
+    reset_risk_delta = _signed_int(
+        current_pressure.board_reset_risk - previous_pressure.board_reset_risk
+    )
     return TurnSummaryViewModel(
         title=f"Turn {resolution.resolved_turn} Resolved",
         headline=resolution.scale_pressure_summary,
         narrative=resolution.narrative,
         footer=footer,
+        phase_labels=("Cash + Demand", "Operating Pressure", "Strategic Outlook"),
+        strategic_headline=(
+            f"{path_shift} | {current_pressure.dominant_pressure.replace('_', ' ')}"
+        ),
+        strategic_lines=(
+            (
+                f"Readiness delta: IPO {ipo_delta} | M&A {acquisition_delta} | "
+                f"Ind {independence_delta}"
+            ),
+            (
+                f"Blocked gates {previous_blocked_paths} -> {current_blocked_paths} | "
+                f"board reset risk {reset_risk_delta}"
+            ),
+            f"Focus command: {current_pressure.path_gate_command_alert}",
+            current_pressure.path_gate_alert,
+        ),
+        focus_command=current_pressure.path_gate_command_alert,
+        focus_detail=current_pressure.recommendation,
         metrics=metrics,
         product_lines=product_lines,
     )

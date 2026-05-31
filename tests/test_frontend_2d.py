@@ -28,8 +28,8 @@ from nexus_tech.frontend_2d.context import (
     explain_command_unavailable,
     explain_inspector_action_unavailable,
 )
-from nexus_tech.frontend_2d.event_queue import build_action_events
-from nexus_tech.frontend_2d.scenes import RunScene, TitleScene
+from nexus_tech.frontend_2d.event_queue import build_action_events, build_turn_resolution_events
+from nexus_tech.frontend_2d.scenes import RunScene, TitleScene, TurnSummaryScene
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_game_view_model,
@@ -216,7 +216,27 @@ def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
 
     assert summary.title.startswith("Turn ")
     assert any(metric.label == "Net Cash" for metric in summary.metrics)
+    assert any(metric.label == "Blocked Gates" for metric in summary.metrics)
     assert summary.product_lines
+    assert summary.strategic_lines
+    assert summary.focus_command
+
+
+def test_build_turn_resolution_events_exposes_gate_and_outlook_cards() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    working_state = previous_state.model_copy(deep=True)
+    working_state = apply_action(
+        working_state,
+        TurnAction.IMPROVE_QUALITY,
+        context=ActionContext(target_product_id=working_state.products[0].id),
+    ).state
+    resolution = resolve_turn(working_state, RandomSource(seed=19))
+
+    events = build_turn_resolution_events(previous_state, resolution)
+
+    titles = {event.title for event in events}
+    assert "Gate Command" in titles
+    assert "Turn 1 Resolved" in titles
 
 
 def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions() -> None:
@@ -564,12 +584,14 @@ def test_run_scene_inspector_sort_filter_and_small_window_draw() -> None:
         scene._cycle_inspector_sort_mode()
         scene._cycle_inspector_filter_mode()
         filtered_items = scene._filtered_sorted_inspector_items()
+        scene._deep_panel_key = "endgame"
         scene._help_overlay_visible = True
         scene.draw(surface)
 
         assert scene._inspector_sort_mode_label() == "Highest Risk"
         assert scene._inspector_filter_mode_label() == "Actionable"
         assert len(filtered_items) <= len(base_items)
+        assert scene._active_panel_key() == "pipeline"
     finally:
         pygame.quit()
 
@@ -634,6 +656,41 @@ def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> No
     assert result.exit_reason == "max_frames"
     assert result.slot_name == "active"
     assert result.saved_on_exit is False
+
+
+def test_turn_summary_scene_reveals_all_phases_and_draws_small_window() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((900, 640), pygame.HIDDEN)
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = previous_state.model_copy(deep=True)
+        working_state = apply_action(
+            working_state,
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=working_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=23))
+        scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=23),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+
+        scene.update(2.7)
+        scene.draw(surface)
+
+        assert scene._phase_index() == 2
+        assert scene._visible_metric_count() == len(scene._view_model.metrics)
+        assert scene._visible_product_count() == len(scene._view_model.product_lines)
+    finally:
+        pygame.quit()
 
 
 def test_launch_2d_menu_headless_exits_after_frame_cap(tmp_path: Path) -> None:

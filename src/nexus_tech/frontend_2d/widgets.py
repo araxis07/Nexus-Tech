@@ -155,11 +155,12 @@ def draw_button(
     title_font,
     detail_font,
     enabled: bool = True,
+    selected: bool = False,
 ) -> None:
     """Draw one clickable action or modal button."""
 
-    fill = PANEL_ALT if enabled else (18, 22, 28)
-    border = accent if enabled else BORDER
+    fill = (28, 40, 58) if selected and enabled else PANEL_ALT if enabled else (18, 22, 28)
+    border = SELECTION if selected and enabled else accent if enabled else BORDER
     title_color = TEXT if enabled else MUTED
     detail_color = MUTED if enabled else (100, 112, 128)
     pygame.draw.rect(surface, fill, rect, border_radius=14)
@@ -170,6 +171,13 @@ def draw_button(
         (rect.left + 1, rect.top + 1, rect.width - 2, 4),
         border_radius=4,
     )
+    if selected and enabled:
+        pygame.draw.rect(
+            surface,
+            SELECTION,
+            (rect.left + 1, rect.bottom - 5, rect.width - 2, 3),
+            border_radius=3,
+        )
     title_surface = title_font.render(title, True, title_color)
     detail_surface = detail_font.render(detail, True, detail_color)
     surface.blit(title_surface, (rect.left + 12, rect.top + 10))
