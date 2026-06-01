@@ -33,6 +33,7 @@ uv run nexus-tech list-rivals
 uv run nexus-tech list-events
 uv run nexus-tech simulate-balance --scenario founder_journey --runs 1 --turns 3 --seed-base 7
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
+uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
 uv run nexus-tech balance-report --output /tmp/nexus-balance-report.md --scenario founder_journey --runs 1 --turns 3 --seed-base 7
 ```
 
@@ -49,6 +50,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 
 - Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
+- If founder-pressure openings were retuned, rerun at least one longer `simulate-balance` founder batch so angel-cap, pricing, and cash-guard policies are verified on real seeds instead of only short audits.
 
 ## Scope Guardrails
 

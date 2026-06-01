@@ -33,6 +33,8 @@ from nexus_tech.domain.models import (
     FinanceState,
     FunctionalBudget,
     FunctionalBudgetPreset,
+    FundingHistoryEntry,
+    FundingType,
     GameState,
     HiringCandidateStage,
     LifecycleStage,
@@ -68,6 +70,8 @@ from nexus_tech.persistence.save_coordinator import RunArchiveSummary
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     BalanceMatrixCell,
+    _choose_action,
+    _choose_pricing_tier,
     calculate_cash_warning_threshold,
     evaluate_balance_cell,
     format_balance_matrix_csv,
@@ -3324,6 +3328,63 @@ def test_balance_audit_returns_actionable_result() -> None:
     assert audit.runs == 1
     assert audit.turns == 2
     assert isinstance(audit.findings, tuple)
+
+
+def test_balance_autoplay_skips_angel_when_round_cap_is_already_hit() -> None:
+    state = create_new_game(
+        scenario_id="debt_crunch",
+        difficulty_mode=DifficultyMode.FOUNDER,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+    )
+    state.company.cash_on_hand = Decimal("3200.00")
+    state.funding_history.extend(
+        [
+            FundingHistoryEntry(
+                funding_type=FundingType.ANGEL,
+                turn=1,
+                amount=Decimal("4200.00"),
+                summary="Angel round 1",
+            ),
+            FundingHistoryEntry(
+                funding_type=FundingType.ANGEL,
+                turn=2,
+                amount=Decimal("4200.00"),
+                summary="Angel round 2",
+            ),
+        ]
+    )
+
+    plan = _choose_action(state)
+
+    assert plan.action is TurnAction.TAKE_LOAN
+
+
+def test_balance_autoplay_keeps_standard_pricing_for_profit_machine_opening() -> None:
+    state = create_new_game(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.FOUNDER,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+    )
+    flagship = state.products[0]
+
+    target_tier = _choose_pricing_tier(state, flagship)
+
+    assert target_tier is PricingTier.STANDARD
+
+
+def test_balance_autoplay_shifts_into_cash_guard_before_product_push() -> None:
+    state = create_new_game(
+        scenario_id="debt_crunch",
+        difficulty_mode=DifficultyMode.FOUNDER,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+    )
+    state.company.current_turn = 3
+    state.company.cash_on_hand = Decimal("6400.00")
+
+    plan = _choose_action(state)
+
+    assert plan.action is TurnAction.SET_FUNCTIONAL_BUDGET
+    assert plan.context.functional_budget_preset is FunctionalBudgetPreset.CASH_GUARD
 
 
 def test_cash_warning_threshold_scales_with_audit_horizon() -> None:

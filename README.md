@@ -273,6 +273,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Deterministic `export-balance-csv` output for external review of scenario and difficulty balance
 - Deterministic `balance-report` output for Markdown tuning reports that combine matrix, audit data, threshold gates, and top tuning priorities
 - Autoplay balance sweeps now degrade more gracefully around invalid funding/event branches so tuning runs fail as balance signals instead of crashing on input policy mistakes
+- Founder-focused autoplay balance sweeps now respect angel funding caps, keep profit-first openings on viable standard pricing, and shift into cash-guard posture earlier when runway or board pressure tightens
 - Built-in `glossary` command to explain core stats, pressure systems, and decision families
 - Built-in `validate-content` command to check catalog references and event handler wiring before release
 - Report now includes recent events, funding history, and milestone history

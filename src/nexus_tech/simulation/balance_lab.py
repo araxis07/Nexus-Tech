@@ -8,26 +8,33 @@ from decimal import Decimal
 from nexus_tech.domain.models import (
     BudgetStance,
     CampaignGoalId,
+    CapitalPlanMode,
+    CapitalSourcePreference,
     CompanyStrategy,
     DifficultyMode,
     EmployeeRole,
+    FunctionalBudgetPreset,
+    FundingType,
     GameState,
     MarketSegment,
     PricingTier,
     Product,
     RoadmapFocus,
     Seniority,
+    SupportLaneFocus,
     TurnAction,
 )
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.events import resolve_pending_event
+from nexus_tech.simulation.finance import count_funding_rounds
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.planning import is_quarter_plan_due
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.scenarios import get_available_product_templates
+from nexus_tech.simulation.support_program import calculate_support_queue_exposure
 
 
 @dataclass(frozen=True)
@@ -670,16 +677,17 @@ def _choose_action(state: GameState) -> PlannedAction:
             ActionContext(budget_stance=_choose_budget_stance(state)),
         )
 
-    if state.company.current_turn >= state.roadmap_set_turn + 4:
-        return PlannedAction(
-            TurnAction.SET_ROADMAP,
-            ActionContext(roadmap_focus=_choose_roadmap_focus(state)),
-        )
-
+    support_exposure = calculate_support_queue_exposure(state)
     liquidity_floor = max(
         BALANCE.event_investor_cash_threshold,
         BALANCE.base_operating_cost * Decimal(active_product_count + 4),
     )
+    if state.finance.debt_principal > 0:
+        liquidity_floor += BALANCE.base_operating_cost
+    if state.finance.investor_pressure >= 18:
+        liquidity_floor += BALANCE.base_operating_cost
+    if state.finance.board_pressure >= (BALANCE.board_pressure_warning_threshold // 4):
+        liquidity_floor += BALANCE.base_operating_cost
     if state.company.cash_on_hand <= liquidity_floor and _can_take_angel_round(state):
         return PlannedAction(TurnAction.RAISE_ANGEL, ActionContext())
     if (
@@ -687,6 +695,45 @@ def _choose_action(state: GameState) -> PlannedAction:
         and state.finance.debt_principal < BALANCE.finance_max_total_debt
     ):
         return PlannedAction(TurnAction.TAKE_LOAN, ActionContext())
+
+    if (
+        support_exposure.hotspot_lane_overflow > 0
+        and support_exposure.hotspot_lane is not SupportLaneFocus.BALANCED
+        and state.support_program.lane_focus is not support_exposure.hotspot_lane
+    ):
+        return PlannedAction(
+            TurnAction.SET_SUPPORT_LANE_FOCUS,
+            ActionContext(support_lane_focus=support_exposure.hotspot_lane),
+        )
+
+    if _should_shift_into_cash_guard(state):
+        if state.functional_budget.preset is not FunctionalBudgetPreset.CASH_GUARD:
+            return PlannedAction(
+                TurnAction.SET_FUNCTIONAL_BUDGET,
+                ActionContext(functional_budget_preset=FunctionalBudgetPreset.CASH_GUARD),
+            )
+        if (
+            state.capital_plan.mode is not CapitalPlanMode.CONSERVE
+            or state.capital_plan.source_preference is not CapitalSourcePreference.BOOTSTRAP
+        ):
+            return PlannedAction(
+                TurnAction.SET_CAPITAL_PLAN,
+                ActionContext(
+                    capital_plan_mode=CapitalPlanMode.CONSERVE,
+                    capital_source_preference=CapitalSourcePreference.BOOTSTRAP,
+                ),
+            )
+        if state.company.strategy is not CompanyStrategy.EFFICIENCY:
+            return PlannedAction(
+                TurnAction.SET_COMPANY_STRATEGY,
+                ActionContext(strategy=CompanyStrategy.EFFICIENCY),
+            )
+
+    if state.company.current_turn >= state.roadmap_set_turn + 4:
+        return PlannedAction(
+            TurnAction.SET_ROADMAP,
+            ActionContext(roadmap_focus=_choose_roadmap_focus(state)),
+        )
 
     strongest_product = _pick_primary_product(state)
     if (
@@ -730,7 +777,13 @@ def _choose_action(state: GameState) -> PlannedAction:
             TurnAction.REDUCE_TECHNICAL_DEBT,
             ActionContext(target_product_id=worst_product.id),
         )
-    if worst_product.market_fit < 44 or worst_product.feature_count < 2:
+    if worst_product.market_fit < 44 or (
+        worst_product.feature_count < 2
+        and worst_product.market_fit < 52
+        and worst_product.quality >= 58
+        and worst_product.bug_level <= 18
+        and state.company.cash_on_hand > BALANCE.finance_pressure_relief_cash_threshold
+    ):
         return PlannedAction(
             TurnAction.ADD_FEATURE,
             ActionContext(target_product_id=worst_product.id),
@@ -745,7 +798,7 @@ def _choose_action(state: GameState) -> PlannedAction:
                 hire_specialization="generalist",
             ),
         )
-    target_pricing_tier = _choose_pricing_tier(strongest_product)
+    target_pricing_tier = _choose_pricing_tier(state, strongest_product)
     if target_pricing_tier is not strongest_product.pricing_tier:
         return PlannedAction(
             TurnAction.ADJUST_PRICING,
@@ -765,7 +818,9 @@ def _choose_action(state: GameState) -> PlannedAction:
                 target_segment=MarketSegment.SMB,
             ),
         )
-    if state.company.strategy is CompanyStrategy.BALANCED and state.company.current_turn >= 5:
+    if state.company.strategy is CompanyStrategy.BALANCED and (
+        state.company.current_turn >= 5 or _should_shift_into_cash_guard(state)
+    ):
         return PlannedAction(
             TurnAction.SET_COMPANY_STRATEGY,
             ActionContext(strategy=_choose_company_strategy(state)),
@@ -997,8 +1052,19 @@ def _should_expand_headcount(state: GameState) -> bool:
         return False
     if state.finance.debt_principal >= BALANCE.finance_loan_amount * 2:
         return False
+    if (
+        state.finance.board_pressure >= 18
+        or state.finance.investor_pressure >= 18
+        or state.functional_budget.preset is FunctionalBudgetPreset.CASH_GUARD
+    ):
+        return False
     if flagship.quality <= 54 or flagship.bug_level >= 24:
         return False
+    if active_products == 1 and len(state.employees) >= 1:
+        if state.company.current_turn <= 3:
+            return False
+        if flagship.market_fit < 56 or flagship.quality < 62 or flagship.bug_level > 20:
+            return False
     if active_products == 1 and len(state.employees) >= 2 and state.company.current_turn <= 4:
         return False
     return not (active_products >= 2 and len(state.employees) >= active_products + 1)
@@ -1025,6 +1091,11 @@ def _should_create_product(state: GameState) -> bool:
 
 
 def _can_take_angel_round(state: GameState) -> bool:
+    if (
+        count_funding_rounds(state.funding_history, FundingType.ANGEL)
+        >= BALANCE.finance_angel_round_limit
+    ):
+        return False
     total_users = sum(product.user_count for product in state.products if product.is_active)
     return (
         state.company.reputation >= BALANCE.finance_angel_reputation_threshold
@@ -1082,12 +1153,35 @@ def _choose_roadmap_focus(state: GameState) -> RoadmapFocus:
     return RoadmapFocus.BALANCED_EXECUTION
 
 
-def _choose_pricing_tier(product: Product):
+def _choose_pricing_tier(state: GameState, product: Product):
     if product.target_segment is MarketSegment.ENTERPRISE:
         return PricingTier.PREMIUM
-    if product.quality >= 72 and product.market_fit >= 62:
+    if product.pricing_tier is PricingTier.PREMIUM and (
+        product.quality < 66 or product.market_fit < 58
+    ):
         return PricingTier.STANDARD
-    return PricingTier.BUDGET
+    if product.quality >= 74 and product.market_fit >= 64:
+        return PricingTier.PREMIUM
+    if (
+        product.pricing_tier is PricingTier.STANDARD
+        and state.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE
+        and product.target_segment in {MarketSegment.STARTUP, MarketSegment.SMB}
+        and product.quality >= 56
+        and product.market_fit >= 50
+    ):
+        return PricingTier.STANDARD
+    if (
+        state.company.cash_on_hand < BALANCE.finance_pressure_relief_cash_threshold
+        and product.pricing_tier is not PricingTier.BUDGET
+        and product.market_fit >= 48
+        and product.quality >= 54
+    ):
+        return PricingTier.STANDARD
+    if product.quality >= 66 and product.market_fit >= 58:
+        return PricingTier.STANDARD
+    if product.market_fit < 44 or product.quality < 50:
+        return PricingTier.BUDGET
+    return product.pricing_tier
 
 
 def _choose_company_strategy(state: GameState) -> CompanyStrategy:
@@ -1096,3 +1190,12 @@ def _choose_company_strategy(state: GameState) -> CompanyStrategy:
     if any(product.technical_debt >= 40 for product in state.products if product.is_active):
         return CompanyStrategy.QUALITY
     return CompanyStrategy.GROWTH
+
+
+def _should_shift_into_cash_guard(state: GameState) -> bool:
+    return (
+        state.company.cash_on_hand < BALANCE.finance_pressure_relief_cash_threshold
+        or state.finance.board_pressure >= 20
+        or state.finance.investor_pressure >= 18
+        or state.finance.debt_principal >= BALANCE.finance_loan_amount
+    )

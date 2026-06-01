@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.97.0 - 2026-06-01
+
+- Retuned the deterministic balance autoplayer so founder-pressure openings now respect the angel-round cap, stop downshifting profit-machine scenarios into budget pricing too early, and enter cash-guard / conserve posture sooner under cash, debt, or board stress
+- Tightened autoplay sequencing around early feature creep, headcount expansion, and support-lane focus so finance and execution controls are applied before fragile openings burn through runway
+- Added regression coverage for the new founder-survival autoplay policy, including angel-cap handling, profit-first pricing preservation, and cash-guard activation
+- Re-ran founder-focused and multi-scenario balance audits, closed the previous founder watch cells, and promoted package metadata and runtime versioning to `0.97.0`
+
 ## 0.96.0 - 2026-06-01
 
 - Expanded the 2D endgame board into a fuller late-game cockpit with direct path-specific fix buttons for IPO, M&A, independence, and reset recovery instead of only one global gate command
