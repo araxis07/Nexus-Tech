@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.98.0 - 2026-06-02
+
+- Added 2D inspector memory per deep panel so reopening pipeline, finance, board, customer, and report inspectors restores the last section, page, row focus, and sort/filter state instead of dumping players back at the default section
+- Added `A` and `H` inspector focus controls plus matching clickable shortcuts so actionable rows and highest-risk hotspot rows can be surfaced without cycling through every filter and sort combination by hand
+- Added workspace routing for major 2D commands so finance, customer, partnership, team, pipeline, board, and report actions now bring the matching deep panel into focus before launching their picker, inspector, or direct action flow
+- Expanded regression coverage for inspector-state restore, actionable/hotspot hotkeys, and finance-workspace routing from command launch
+- Promoted package metadata and runtime versioning to `0.98.0`
+
 ## 0.97.0 - 2026-06-01
 
 - Retuned the deterministic balance autoplayer so founder-pressure openings now respect the angel-round cap, stop downshifting profit-machine scenarios into budget pricing too early, and enter cash-guard / conserve posture sooner under cash, debt, or board stress

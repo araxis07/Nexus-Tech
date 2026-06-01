@@ -466,6 +466,65 @@ def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> Non
         pygame.quit()
 
 
+def test_run_scene_inspector_reopen_restores_panel_memory() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = _build_paged_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=29),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._open_inspector("pipeline")
+        scene._select_inspector_section("candidates")
+        scene._set_inspector_sort_mode("risk")
+        scene._set_inspector_filter_mode("actionable")
+        scene._change_inspector_page(1)
+        remembered_title = scene._selected_inspector_item().title
+
+        scene._open_inspector("finance")
+        scene._open_inspector("pipeline")
+
+        assert scene._selected_inspector_section().key == "candidates"
+        assert scene._inspector_page == 1
+        assert scene._inspector_sort_mode_label() == "Highest Risk"
+        assert scene._inspector_filter_mode_label() == "Actionable"
+        assert scene._selected_inspector_item().title == remembered_title
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_inspector_hotkeys_focus_actionable_and_hotspot() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = _build_paged_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=31),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._open_inspector("pipeline")
+        scene._select_inspector_section("candidates")
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, unicode="a"))
+        assert scene._inspector_filter_mode_label() == "Actionable"
+
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_h, unicode="h"))
+        assert scene._inspector_sort_mode_label() == "Highest Risk"
+        assert scene._inspector_filter_mode_label() == "Attention"
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_can_open_endgame_panel_inspector_from_hotkey() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -485,6 +544,28 @@ def test_run_scene_can_open_endgame_panel_inspector_from_hotkey() -> None:
 
         assert scene._inspector_panel_key == "endgame"
         assert scene._selected_inspector_section().key == "paths"
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_routes_capital_plan_command_to_finance_workspace() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=37),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._run_command(TurnAction.SET_CAPITAL_PLAN.value)
+
+        assert scene._deep_panel_key == "finance"
+        assert scene._context_picker is not None
     finally:
         pygame.quit()
 

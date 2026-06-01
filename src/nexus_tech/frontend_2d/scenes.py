@@ -140,6 +140,17 @@ class NewGameWizardState:
     seed_text: str = ""
 
 
+@dataclass(frozen=True)
+class InspectorMemoryState:
+    """Remember one panel's last inspector focus so reopening is less noisy."""
+
+    section_key: str
+    page: int
+    item_index: int
+    sort_mode_index: int
+    filter_mode_index: int
+
+
 def _fit_modal_rect(pygame, surface, *, width: int, height: int, margin: int = 24):
     """Clamp a centered modal rect so it stays inside smaller windows."""
 
@@ -325,6 +336,110 @@ _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
 _INSPECTOR_SORT_MODES: tuple[str, ...] = ("default", "risk", "value", "stalled")
 _INSPECTOR_FILTER_MODES: tuple[str, ...] = ("all", "actionable", "attention")
 _TONE_PRIORITY = {"danger": 3, "warning": 2, "info": 1, "success": 0}
+_FINANCE_PANEL_COMMANDS = {
+    TurnAction.REVIEW_FINANCE.value,
+    TurnAction.TAKE_LOAN.value,
+    TurnAction.RAISE_ANGEL.value,
+    TurnAction.RAISE_VC.value,
+    TurnAction.REPAY_DEBT.value,
+    TurnAction.REFINANCE_DEBT.value,
+    TurnAction.DEBT_ROLLOVER.value,
+    TurnAction.REBALANCE_CAPITAL.value,
+    TurnAction.RAISE_RESERVE_TARGET.value,
+    TurnAction.SET_CAPITAL_PLAN.value,
+    TurnAction.SET_REFINANCING_POSTURE.value,
+    TurnAction.SET_COVENANT_FIREWALL.value,
+    TurnAction.SET_DEBT_STRATEGY.value,
+    TurnAction.SET_GROWTH_FIREBREAK.value,
+    TurnAction.SET_PATH_CAPITAL_POSTURE.value,
+    TurnAction.SET_ENDGAME_CAPITAL_MAP.value,
+    TurnAction.SET_EXIT_READINESS_BUFFER.value,
+    TurnAction.SET_TERMINAL_LIQUIDITY_CONTROLS.value,
+    TurnAction.SET_CAPITAL_REALLOCATION_GRID.value,
+    TurnAction.SET_PATH_CONTROL_MATRIX.value,
+    TurnAction.SET_PATH_RESILIENCE_GRID.value,
+    TurnAction.SET_BALANCE_SHEET_RECOVERY_MESH.value,
+    TurnAction.SET_TERMINAL_RECOVERY_LATTICE.value,
+    TurnAction.SET_TERMINAL_CONTINUITY_MATRIX.value,
+    TurnAction.SET_TERMINAL_RESILIENCE_COVENANT.value,
+    TurnAction.SET_TERMINAL_SOLVENCY_STATUTE.value,
+    TurnAction.SET_TERMINAL_SOLVENCY_MANDATE.value,
+    TurnAction.SET_TERMINAL_SOLVENCY_COMMISSION.value,
+    TurnAction.SET_TERMINAL_SOLVENCY_OVERSIGHT.value,
+    TurnAction.SET_TERMINAL_SOLVENCY_COUNCIL.value,
+    TurnAction.SET_PATH_CASH_WATERFALL.value,
+    TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
+    TurnAction.STEP_UP_RESERVE_DISCIPLINE.value,
+    TurnAction.HARDEN_FINANCING_POSTURE.value,
+    TurnAction.LOCK_CAPITAL_BUFFER.value,
+}
+_TEAM_PANEL_COMMANDS = {
+    TurnAction.REVIEW_TEAM.value,
+    TurnAction.HIRE_EMPLOYEE.value,
+    TurnAction.FIRE_EMPLOYEE.value,
+    TurnAction.ASSIGN_EMPLOYEE.value,
+    TurnAction.UNASSIGN_EMPLOYEE.value,
+    TurnAction.REST_TEAM.value,
+    TurnAction.TRAIN_EMPLOYEE.value,
+    TurnAction.PROMOTE_EMPLOYEE.value,
+    TurnAction.RUN_COMP_REVIEW.value,
+    TurnAction.RUN_SUCCESSION_REVIEW.value,
+    TurnAction.APPOINT_TEAM_LEAD.value,
+    TurnAction.ASSIGN_MANAGER.value,
+    TurnAction.CLEAR_MANAGER.value,
+    TurnAction.REORG_TEAM.value,
+}
+_PIPELINE_PANEL_COMMANDS = {
+    TurnAction.REVIEW_PIPELINE.value,
+    TurnAction.PLAN_RELEASE.value,
+    TurnAction.WORK_RELEASE.value,
+    TurnAction.CREATE_SALES_DEAL.value,
+    TurnAction.ADVANCE_SALES_DEAL.value,
+    TurnAction.START_ROADMAP_PROJECT.value,
+    TurnAction.WORK_ROADMAP_PROJECT.value,
+    TurnAction.SOURCE_CANDIDATES.value,
+    TurnAction.SCREEN_CANDIDATE.value,
+    TurnAction.INTERVIEW_CANDIDATE.value,
+    TurnAction.MAKE_HIRING_OFFER.value,
+}
+_BOARD_PANEL_COMMANDS = {
+    TurnAction.REVIEW_BOARD.value,
+    TurnAction.EXECUTE_BOARD_RESPONSE.value,
+    TurnAction.START_BOARD_RECOVERY_PLAN.value,
+    TurnAction.EXECUTE_RESTRUCTURE_PLAN.value,
+}
+_CUSTOMER_PANEL_COMMANDS = {
+    TurnAction.REVIEW_CUSTOMERS.value,
+    TurnAction.ADJUST_PRICING.value,
+    TurnAction.SET_PACKAGING_STRATEGY.value,
+    TurnAction.SET_TARGET_SEGMENT.value,
+    TurnAction.INVEST_IN_CUSTOMER_SUCCESS.value,
+    TurnAction.RUN_RETENTION_PLAY.value,
+    TurnAction.MAKE_RENEWAL_OFFER.value,
+    TurnAction.RUN_WIN_BACK_PLAY.value,
+    TurnAction.ROUTE_SUPPORT_ESCALATION.value,
+    TurnAction.RUN_ACCOUNT_RESCUE.value,
+    TurnAction.RUN_LANE_RECOVERY.value,
+    TurnAction.RUN_RENEWAL_SWEEP.value,
+    TurnAction.RUN_ENTERPRISE_ASSURANCE.value,
+    TurnAction.RUN_BILLING_STABILIZATION.value,
+    TurnAction.RUN_ONBOARDING_RECOVERY.value,
+    TurnAction.RUN_ONBOARDING_FAST_TRACK.value,
+    TurnAction.TRIAGE_SUPPORT_BACKLOG.value,
+    TurnAction.INVEST_IN_SUPPORT_STAFFING.value,
+    TurnAction.SET_SUPPORT_LANE_FOCUS.value,
+    TurnAction.UPGRADE_SUPPORT_PROGRAM.value,
+}
+_PARTNERSHIP_PANEL_COMMANDS = {
+    TurnAction.CREATE_PARTNERSHIP.value,
+    TurnAction.INVEST_IN_PARTNER_ENABLEMENT.value,
+    TurnAction.RUN_CHANNEL_QBR.value,
+    TurnAction.REBALANCE_CHANNEL_MIX.value,
+    TurnAction.RENEGOTIATE_PARTNERSHIP.value,
+    TurnAction.REACTIVATE_PARTNERSHIP.value,
+    TurnAction.PAUSE_PARTNERSHIP.value,
+    TurnAction.REVIEW_PARTNERSHIPS.value,
+}
 
 
 class BaseScene:
@@ -2056,6 +2171,7 @@ class RunScene(BaseScene):
         self._inspector_item_index = 0
         self._inspector_sort_mode_index = 0
         self._inspector_filter_mode_index = 0
+        self._inspector_memory: dict[str, InspectorMemoryState] = {}
         self._help_overlay_visible = False
         self._product_index = 0
         self._tweens = TweenBank(speed=9.0)
@@ -2104,11 +2220,30 @@ class RunScene(BaseScene):
 
     def _open_inspector(self, panel_key: str) -> None:
         self._inspector_panel_key = panel_key
-        self._inspector_section_index = 0
-        self._inspector_page = 0
-        self._inspector_item_index = 0
-        self._inspector_sort_mode_index = 0
-        self._inspector_filter_mode_index = 0
+        memory = self._inspector_memory.get(panel_key)
+        if memory is None:
+            self._inspector_section_index = 0
+            self._inspector_page = 0
+            self._inspector_item_index = 0
+            self._inspector_sort_mode_index = 0
+            self._inspector_filter_mode_index = 0
+        else:
+            self._inspector_page = memory.page
+            self._inspector_item_index = memory.item_index
+            self._inspector_sort_mode_index = memory.sort_mode_index
+            self._inspector_filter_mode_index = memory.filter_mode_index
+            panel = self.inspector_panel
+            if panel is None or not panel.inspectors:
+                self._inspector_section_index = 0
+            else:
+                self._inspector_section_index = next(
+                    (
+                        index
+                        for index, section in enumerate(panel.inspectors)
+                        if section.key == memory.section_key
+                    ),
+                    0,
+                )
         self._sync_inspector_selection()
 
     def _selected_inspector_section(self):
@@ -2214,6 +2349,12 @@ class RunScene(BaseScene):
                 return
             if event.key == self.pygame.K_x:
                 self._cycle_inspector_filter_mode()
+                return
+            if event.key == self.pygame.K_a:
+                self._focus_inspector_actionable()
+                return
+            if event.key == self.pygame.K_h:
+                self._focus_inspector_hotspot()
                 return
             if event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
                 self._run_selected_inspector_primary_action()
@@ -2470,6 +2611,12 @@ class RunScene(BaseScene):
         if target.kind == "inspector_cycle_filter":
             self._cycle_inspector_filter_mode()
             return
+        if target.kind == "inspector_focus_actionable":
+            self._focus_inspector_actionable()
+            return
+        if target.kind == "inspector_focus_hotspot":
+            self._focus_inspector_hotspot()
+            return
         if target.kind == "inspector_item_action":
             self._run_selected_inspector_action(int(target.payload))
             return
@@ -2684,8 +2831,10 @@ class RunScene(BaseScene):
         if command == TurnAction.END_TURN.value:
             self._attempt_end_turn()
             return
+        self._focus_workspace_for_command(command)
         inspector_key = self._inspector_key_for_command(command)
         if inspector_key is not None:
+            self._deep_panel_key = inspector_key
             self._open_inspector(inspector_key)
             return
         reason = self._command_disabled_reason(command)
@@ -2900,6 +3049,7 @@ class RunScene(BaseScene):
         if not page_items:
             return
         self._inspector_item_index = (self._inspector_item_index + direction) % len(page_items)
+        self._remember_inspector_state()
 
     def _cycle_inspector_sort_mode(self) -> None:
         self._inspector_sort_mode_index = (self._inspector_sort_mode_index + 1) % len(
@@ -2940,6 +3090,43 @@ class RunScene(BaseScene):
             self._inspector_page = 0
             page_items = self._current_inspector_page_items()
         self._inspector_item_index = max(0, min(self._inspector_item_index, len(page_items) - 1))
+        self._remember_inspector_state()
+
+    def _remember_inspector_state(self) -> None:
+        panel = self.inspector_panel
+        section = self._selected_inspector_section()
+        if panel is None or section is None:
+            return
+        self._inspector_memory[panel.key] = InspectorMemoryState(
+            section_key=section.key,
+            page=self._inspector_page,
+            item_index=self._inspector_item_index,
+            sort_mode_index=self._inspector_sort_mode_index,
+            filter_mode_index=self._inspector_filter_mode_index,
+        )
+
+    def _set_inspector_sort_mode(self, mode: str) -> None:
+        if mode not in _INSPECTOR_SORT_MODES:
+            return
+        self._inspector_sort_mode_index = _INSPECTOR_SORT_MODES.index(mode)
+        self._inspector_page = 0
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
+    def _set_inspector_filter_mode(self, mode: str) -> None:
+        if mode not in _INSPECTOR_FILTER_MODES:
+            return
+        self._inspector_filter_mode_index = _INSPECTOR_FILTER_MODES.index(mode)
+        self._inspector_page = 0
+        self._inspector_item_index = 0
+        self._sync_inspector_selection()
+
+    def _focus_inspector_actionable(self) -> None:
+        self._set_inspector_filter_mode("actionable")
+
+    def _focus_inspector_hotspot(self) -> None:
+        self._set_inspector_sort_mode("risk")
+        self._set_inspector_filter_mode("attention")
 
     def _inspector_items_per_page(self) -> int:
         return 4
@@ -3041,6 +3228,7 @@ class RunScene(BaseScene):
         action = item.actions[action_index]
         inspector_key = self._inspector_key_for_command(action.command)
         if inspector_key is not None:
+            self._deep_panel_key = inspector_key
             self._open_inspector(inspector_key)
             return
         reason = self._inspector_item_action_reason(action.command, item.payload)
@@ -3903,7 +4091,37 @@ class RunScene(BaseScene):
         )
         self._click_targets.append(ClickTarget("inspector_cycle_sort", "", sort_rect))
         self._click_targets.append(ClickTarget("inspector_cycle_filter", "", filter_rect))
-        top = nav_inner.top + 100
+        action_width = int((nav_inner.width - 10) / 2)
+        actionable_rect = pygame.Rect(nav_inner.left, nav_inner.top + 96, action_width, 40)
+        hotspot_rect = pygame.Rect(
+            actionable_rect.right + 10,
+            nav_inner.top + 96,
+            nav_inner.width - action_width - 10,
+            40,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=actionable_rect,
+            title="A Actionable",
+            detail="Jump to rows with ready actions.",
+            accent=GOOD,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=hotspot_rect,
+            title="H Hotspot",
+            detail="Focus the highest-risk attention rows.",
+            accent=DANGER,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+        )
+        self._click_targets.append(ClickTarget("inspector_focus_actionable", "", actionable_rect))
+        self._click_targets.append(ClickTarget("inspector_focus_hotspot", "", hotspot_rect))
+        top = nav_inner.top + 148
         for index, section in enumerate(panel.inspectors):
             button_rect = pygame.Rect(nav_inner.left, top, nav_inner.width, 56)
             selected = index == self._inspector_section_index
@@ -4137,7 +4355,7 @@ class RunScene(BaseScene):
         return self._compact_button_detail(reason)
 
     def _inspector_hint_line(self) -> str:
-        return "Tab/Arrows move | Z sort | X filter | PgUp/PgDn page | Enter action"
+        return "Tab/Arrows move | Z/X sort-filter | A/H focus | PgUp/PgDn page | Enter action"
 
     def _draw_help_overlay(self, surface) -> None:
         pygame = self.pygame
@@ -4170,6 +4388,7 @@ class RunScene(BaseScene):
             ("H/A/Y/R/B/U", "Team / strategy / budget / support"),
             ("Space", "End turn"),
             ("Z/X", "Inspector sort / filter"),
+            ("A/H", "Inspector actionable / hotspot focus"),
             ("PgUp/PgDn", "Inspector page"),
             ("Enter", "Run selected inspector action"),
             ("F1/?", "Toggle this help"),
@@ -4305,6 +4524,49 @@ class RunScene(BaseScene):
             TurnAction.REVIEW_PIPELINE.value: "pipeline",
             TurnAction.VIEW_REPORT.value: "report",
         }.get(command)
+
+    def _focus_workspace_for_command(self, command: str) -> None:
+        panel_key = self._workspace_panel_key_for_command(command)
+        if panel_key is None:
+            return
+        self._deep_panel_key = panel_key
+
+    def _workspace_panel_key_for_command(self, command: str) -> str | None:
+        if command in _TEAM_PANEL_COMMANDS:
+            return "team"
+        if command in _FINANCE_PANEL_COMMANDS:
+            return "finance"
+        if command in _PIPELINE_PANEL_COMMANDS:
+            return "pipeline"
+        if command in _BOARD_PANEL_COMMANDS:
+            return "board"
+        if command in _CUSTOMER_PANEL_COMMANDS:
+            return "customers"
+        if command in _PARTNERSHIP_PANEL_COMMANDS:
+            return "partnerships"
+        if command == TurnAction.VIEW_REPORT.value:
+            return "report"
+        if command.startswith(
+            (
+                "run_enterprise_",
+                "run_billing_",
+                "run_onboarding_",
+                "run_white_glove_",
+                "run_reference_",
+            )
+        ):
+            return "customers"
+        if command.startswith(
+            (
+                "run_channel_",
+                "run_partner_",
+                "run_reseller_",
+                "run_integration_",
+                "run_marketplace_",
+            )
+        ):
+            return "partnerships"
+        return None
 
     def _button_detail(
         self,
