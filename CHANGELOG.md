@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.100.0 - 2026-06-02
+
+- Added action-specific 2D choreography cards for core product, hiring, pipeline, pricing, and partnership commands so the frontend now shows a distinct motion narrative before the normal delta cards land
+- Expanded overlay transitions across deep panels, inspectors, pickers, text input, help, and pending-event layers so the run scene uses one motion language instead of mixing animated widgets with static modal layers
+- Added turn-summary handoff back into the live run, including a seeded `Next Focus` event and automatic workspace-panel restore for the summary's recommended command
+- Added regression coverage for choreography-card emission, overlay-motion triggering, and summary-to-run focus restoration
+- Promoted package metadata and runtime versioning to `0.100.0`
+
 ## 0.99.0 - 2026-06-02
 
 - Added a shared 2D motion foundation with reusable panel, button, and progress-bar emphasis states plus a pulse bank for short-lived highlight cues across the animated frontend

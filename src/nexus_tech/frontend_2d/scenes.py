@@ -444,6 +444,44 @@ _PARTNERSHIP_PANEL_COMMANDS = {
 }
 
 
+def _workspace_panel_key_for_command(command: str) -> str | None:
+    if command in _TEAM_PANEL_COMMANDS:
+        return "team"
+    if command in _FINANCE_PANEL_COMMANDS:
+        return "finance"
+    if command in _PIPELINE_PANEL_COMMANDS:
+        return "pipeline"
+    if command in _BOARD_PANEL_COMMANDS:
+        return "board"
+    if command in _CUSTOMER_PANEL_COMMANDS:
+        return "customers"
+    if command in _PARTNERSHIP_PANEL_COMMANDS:
+        return "partnerships"
+    if command == TurnAction.VIEW_REPORT.value:
+        return "report"
+    if command.startswith(
+        (
+            "run_enterprise_",
+            "run_billing_",
+            "run_onboarding_",
+            "run_white_glove_",
+            "run_reference_",
+        )
+    ):
+        return "customers"
+    if command.startswith(
+        (
+            "run_channel_",
+            "run_partner_",
+            "run_reseller_",
+            "run_integration_",
+            "run_marketplace_",
+        )
+    ):
+        return "partnerships"
+    return None
+
+
 class BaseScene:
     """Shared save, exit, and scene-switch mechanics."""
 
@@ -2149,6 +2187,7 @@ class RunScene(BaseScene):
         slot_name: str,
         save_callback,
         selected_product_id: str | None = None,
+        initial_panel_key: str | None = None,
         seed_events: tuple[FrontendEvent, ...] = (),
         dirty: bool = False,
         show_ready_event: bool = True,
@@ -2184,6 +2223,7 @@ class RunScene(BaseScene):
             selected_product_id=self.selected_product.id.hex,
         )
         self._sync_tweens()
+        self._set_deep_panel(initial_panel_key)
         self.push_events(seed_events)
         if show_ready_event:
             self.push_event(
@@ -2221,7 +2261,38 @@ class RunScene(BaseScene):
                 return panel
         return None
 
+    def _overlay_motion_level(self, overlay_key: str) -> float:
+        return self._motion_level(f"overlay:{overlay_key}")
+
+    def _trigger_overlay_motion(self, overlay_key: str, *, intensity: float = 0.7) -> None:
+        self._motion_pulses.trigger(f"overlay:{overlay_key}", intensity=intensity, decay=2.2)
+
+    def _set_deep_panel(self, panel_key: str | None) -> None:
+        if panel_key == self._deep_panel_key:
+            return
+        self._deep_panel_key = panel_key
+        if panel_key is not None:
+            self._trigger_overlay_motion("panel", intensity=0.75)
+            self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.7, decay=2.0)
+
+    def _set_context_picker(self, picker: ContextPicker | None) -> None:
+        self._context_picker = picker
+        if picker is not None:
+            self._trigger_overlay_motion("picker", intensity=0.78)
+
+    def _set_text_input(self, modal: TextInputModalState | None) -> None:
+        self._text_input = modal
+        if modal is not None:
+            self._trigger_overlay_motion("text_input", intensity=0.78)
+
+    def _set_help_overlay_visible(self, visible: bool) -> None:
+        self._help_overlay_visible = visible
+        if visible:
+            self._trigger_overlay_motion("help", intensity=0.7)
+
     def _open_inspector(self, panel_key: str) -> None:
+        self._trigger_overlay_motion("inspector", intensity=0.82)
+        self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.72, decay=2.0)
         self._inspector_panel_key = panel_key
         memory = self._inspector_memory.get(panel_key)
         if memory is None:
@@ -2291,24 +2362,24 @@ class RunScene(BaseScene):
             return
 
         if event.key == self.pygame.K_F1 or event.unicode == "?":
-            self._help_overlay_visible = not self._help_overlay_visible
+            self._set_help_overlay_visible(not self._help_overlay_visible)
             return
 
         if event.key == self.pygame.K_ESCAPE:
             if self._help_overlay_visible:
-                self._help_overlay_visible = False
+                self._set_help_overlay_visible(False)
                 return
             if self._text_input is not None:
-                self._text_input = None
+                self._set_text_input(None)
                 return
             if self._context_picker is not None:
-                self._context_picker = None
+                self._set_context_picker(None)
                 return
             if self._inspector_panel_key is not None:
                 self._inspector_panel_key = None
                 return
             if self._deep_panel_key is not None:
-                self._deep_panel_key = None
+                self._set_deep_panel(None)
                 return
             self.should_exit = True
             self.exit_reason = "quit"
@@ -2392,28 +2463,28 @@ class RunScene(BaseScene):
             return
 
         if event.key == self.pygame.K_1:
-            self._deep_panel_key = "team"
+            self._set_deep_panel("team")
             return
         if event.key == self.pygame.K_2:
-            self._deep_panel_key = "finance"
+            self._set_deep_panel("finance")
             return
         if event.key == self.pygame.K_3:
-            self._deep_panel_key = "customers"
+            self._set_deep_panel("customers")
             return
         if event.key == self.pygame.K_4:
-            self._deep_panel_key = "partnerships"
+            self._set_deep_panel("partnerships")
             return
         if event.key == self.pygame.K_5:
-            self._deep_panel_key = "board"
+            self._set_deep_panel("board")
             return
         if event.key == self.pygame.K_6:
-            self._deep_panel_key = "pipeline"
+            self._set_deep_panel("pipeline")
             return
         if event.key == self.pygame.K_7:
-            self._deep_panel_key = "report"
+            self._set_deep_panel("report")
             return
         if event.key == self.pygame.K_8:
-            self._deep_panel_key = "endgame"
+            self._set_deep_panel("endgame")
             return
         if event.key == self.pygame.K_n:
             self._open_create_product_modal()
@@ -2580,6 +2651,11 @@ class RunScene(BaseScene):
             return 0.0
         return max(self._motion_pulses.get(key) for key in keys)
 
+    def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
+        pulse = self._overlay_motion_level(overlay_key)
+        alpha = min(224, 180 + int(pulse * 36))
+        return (8, 10, 14, alpha)
+
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
         for target in reversed(self._click_targets):
             if target.rect.collidepoint(position):
@@ -2605,7 +2681,7 @@ class RunScene(BaseScene):
             self._save_current_run()
             return
         if target.kind == "panel":
-            self._deep_panel_key = target.payload
+            self._set_deep_panel(target.payload)
             return
         if target.kind == "open_panel_inspector":
             self._open_inspector(target.payload)
@@ -2622,7 +2698,7 @@ class RunScene(BaseScene):
             self._apply_picker_index(int(target.payload))
             return
         if target.kind == "close_picker":
-            self._context_picker = None
+            self._set_context_picker(None)
             return
         if target.kind == "panel_action":
             reason = self._command_disabled_reason(target.payload)
@@ -2632,7 +2708,7 @@ class RunScene(BaseScene):
             self._run_command(target.payload)
             return
         if target.kind == "close_panel":
-            self._deep_panel_key = None
+            self._set_deep_panel(None)
             return
         if target.kind == "close_inspector":
             self._inspector_panel_key = None
@@ -2668,7 +2744,7 @@ class RunScene(BaseScene):
             self._submit_text_modal()
             return
         if target.kind == "cancel_text":
-            self._text_input = None
+            self._set_text_input(None)
             return
         if target.kind == "pending_option":
             self._resolve_pending_event_choice(int(target.payload))
@@ -2681,7 +2757,7 @@ class RunScene(BaseScene):
             self.exit_reason = "quit"
             return
         if target.kind == "close_help":
-            self._help_overlay_visible = False
+            self._set_help_overlay_visible(False)
             return
 
     def _command_disabled_reason(self, command: str) -> str | None:
@@ -2755,7 +2831,7 @@ class RunScene(BaseScene):
         if option_index >= len(self._context_picker.options):
             return
         request = self._context_picker.options[option_index].request
-        self._context_picker = None
+        self._set_context_picker(None)
         self._apply_action_request(request)
 
     def _resolve_pending_event(self, option_id: str) -> str:
@@ -2767,22 +2843,25 @@ class RunScene(BaseScene):
 
     def _open_create_product_modal(self) -> None:
         default_name = f"New Venture {len(self.state.products) + 1}"
-        self._text_input = TextInputModalState(
-            title="Create Product",
-            description="Type the new product name and press Enter to create it.",
-            severity="info",
-            submit_title="Enter Create",
-            submit_detail="Launch the new product into the portfolio.",
-            text=default_name,
-            placeholder="Product name",
-            on_submit=self._submit_create_product_name,
+        self._trigger_command_choreography(TurnAction.CREATE_PRODUCT.value)
+        self._set_text_input(
+            TextInputModalState(
+                title="Create Product",
+                description="Type the new product name and press Enter to create it.",
+                severity="info",
+                submit_title="Enter Create",
+                submit_detail="Launch the new product into the portfolio.",
+                text=default_name,
+                placeholder="Product name",
+                on_submit=self._submit_create_product_name,
+            )
         )
 
     def _submit_text_modal(self) -> None:
         modal = self._text_input
         if modal is None:
             return
-        self._text_input = None
+        self._set_text_input(None)
         modal.on_submit(modal.text.strip())
 
     def _submit_create_product_name(self, value: str) -> None:
@@ -2871,6 +2950,27 @@ class RunScene(BaseScene):
             return
         self._run_command(command)
 
+    def _trigger_command_choreography(self, command: str) -> None:
+        panel_key = _workspace_panel_key_for_command(command)
+        if panel_key is not None:
+            self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.65, decay=1.8)
+            self._motion_pulses.trigger("footer", intensity=0.32, decay=1.6)
+        if command in {
+            TurnAction.IMPROVE_QUALITY.value,
+            TurnAction.ADD_FEATURE.value,
+            TurnAction.MARKET_PRODUCT.value,
+            TurnAction.REDUCE_TECHNICAL_DEBT.value,
+            TurnAction.CREATE_PRODUCT.value,
+        }:
+            product_key = f"product:{self.selected_product.id.hex}"
+            self._motion_pulses.trigger(product_key, intensity=0.75, decay=1.9)
+            self._motion_pulses.trigger("panel:products", intensity=0.65, decay=1.8)
+        if command == TurnAction.HIRE_EMPLOYEE.value:
+            self._motion_pulses.trigger("panel:team", intensity=0.7, decay=1.8)
+        if command == TurnAction.END_TURN.value:
+            self._motion_pulses.trigger("summary:timeline", intensity=0.6, decay=1.4)
+            self._motion_pulses.trigger("stat:cash", intensity=0.45, decay=1.4)
+
     def _run_command(self, command: str) -> None:
         if command == TurnAction.END_TURN.value:
             self._attempt_end_turn()
@@ -2878,9 +2978,10 @@ class RunScene(BaseScene):
         self._focus_workspace_for_command(command)
         inspector_key = self._inspector_key_for_command(command)
         if inspector_key is not None:
-            self._deep_panel_key = inspector_key
+            self._set_deep_panel(inspector_key)
             self._open_inspector(inspector_key)
             return
+        self._trigger_command_choreography(command)
         reason = self._command_disabled_reason(command)
         if reason is not None:
             self._push_action_blocked_event(command, reason)
@@ -2897,7 +2998,7 @@ class RunScene(BaseScene):
             self._apply_action_request(request)
             return
         if isinstance(request, ContextPicker):
-            self._context_picker = request
+            self._set_context_picker(request)
             return
         self.push_event(
             FrontendEvent(
@@ -2912,6 +3013,7 @@ class RunScene(BaseScene):
         if request.action is TurnAction.END_TURN:
             self._resolve_end_turn()
             return
+        self._trigger_command_choreography(request.action.value)
         previous_state = self.state.model_copy(deep=True)
         try:
             outcome = apply_action(self.state, request.action, context=request.context)
@@ -2967,24 +3069,27 @@ class RunScene(BaseScene):
                 context=ActionContext(),
                 label=TurnAction.END_TURN.value,
             )
-            self._context_picker = ContextPicker(
-                title="Confirm Turn Resolve",
-                description=preview.confirmation_reason,
-                severity="danger" if preview.warning_level == "critical" else "warning",
-                options=(
-                    PickerOption(
-                        "1",
-                        "Confirm End Turn",
-                        f"Resolve now. Forecast: {preview.projected_outcome}.",
-                        confirmation,
+            self._set_context_picker(
+                ContextPicker(
+                    title="Confirm Turn Resolve",
+                    description=preview.confirmation_reason,
+                    severity="danger" if preview.warning_level == "critical" else "warning",
+                    options=(
+                        PickerOption(
+                            "1",
+                            "Confirm End Turn",
+                            f"Resolve now. Forecast: {preview.projected_outcome}.",
+                            confirmation,
+                        ),
                     ),
-                ),
+                )
             )
             return
 
         self._resolve_end_turn()
 
     def _resolve_end_turn(self) -> None:
+        self._trigger_command_choreography(TurnAction.END_TURN.value)
         previous_state = self.state.model_copy(deep=True)
         try:
             outcome = apply_action(self.state, TurnAction.END_TURN, context=ActionContext())
@@ -3272,9 +3377,10 @@ class RunScene(BaseScene):
         action = item.actions[action_index]
         inspector_key = self._inspector_key_for_command(action.command)
         if inspector_key is not None:
-            self._deep_panel_key = inspector_key
+            self._set_deep_panel(inspector_key)
             self._open_inspector(inspector_key)
             return
+        self._trigger_command_choreography(action.command)
         reason = self._inspector_item_action_reason(action.command, item.payload)
         if reason is not None:
             self._push_action_blocked_event(action.command, reason)
@@ -3291,7 +3397,7 @@ class RunScene(BaseScene):
             self._apply_action_request(request)
             return
         if isinstance(request, ContextPicker):
-            self._context_picker = request
+            self._set_context_picker(request)
             return
         self.push_event(
             FrontendEvent(
@@ -3908,11 +4014,20 @@ class RunScene(BaseScene):
 
     def _draw_pending_event_overlay(self, surface) -> None:
         pygame = self.pygame
+        overlay_motion = self._overlay_motion_level("pending")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("pending"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=560, height=360, margin=24)
-        inner = draw_panel(surface, pygame, modal_rect, title="Pending Event", accent=WARN)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Pending Event",
+            accent=WARN,
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 5),
+        )
         event_model = self._view_model.pending_event
         if event_model is None:
             return
@@ -3948,8 +4063,9 @@ class RunScene(BaseScene):
         picker = self._context_picker
         if picker is None:
             return
+        overlay_motion = self._overlay_motion_level("picker")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("picker"))
         surface.blit(overlay, (0, 0))
         modal_height = 180 + len(picker.options) * 64
         modal_rect = _fit_modal_rect(pygame, surface, width=600, height=modal_height, margin=24)
@@ -3959,6 +4075,8 @@ class RunScene(BaseScene):
             modal_rect,
             title="Action Picker",
             accent=tone_color(picker.severity),
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 5),
         )
         title_surface = self.fonts.title.render(picker.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -4004,8 +4122,9 @@ class RunScene(BaseScene):
         modal = self._text_input
         if modal is None:
             return
+        overlay_motion = self._overlay_motion_level("text_input")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("text_input"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=600, height=280, margin=24)
         inner = draw_panel(
@@ -4014,6 +4133,8 @@ class RunScene(BaseScene):
             modal_rect,
             title="Text Input",
             accent=tone_color(modal.severity),
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 5),
         )
         title_surface = self.fonts.title.render(modal.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -4071,8 +4192,9 @@ class RunScene(BaseScene):
         panel = self.deep_panel
         if panel is None:
             return
+        overlay_motion = self._overlay_motion_level("panel")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("panel"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=940, height=560, margin=24)
         panel_motion = self._motion_level(f"panel:{panel.key}")
@@ -4082,8 +4204,8 @@ class RunScene(BaseScene):
             modal_rect,
             title=panel.title,
             accent=INFO,
-            emphasis=panel_motion,
-            lift=int(panel_motion * 4),
+            emphasis=max(panel_motion, overlay_motion),
+            lift=int(max(panel_motion, overlay_motion) * 5),
         )
         title_surface = self.fonts.title.render(panel.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -4203,8 +4325,9 @@ class RunScene(BaseScene):
         panel = self.inspector_panel
         if panel is None:
             return
+        overlay_motion = self._overlay_motion_level("inspector")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("inspector"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=1040, height=600, margin=24)
         panel_motion = self._motion_level(f"panel:{panel.key}")
@@ -4214,8 +4337,8 @@ class RunScene(BaseScene):
             modal_rect,
             title=panel.title,
             accent=SELECTION,
-            emphasis=panel_motion,
-            lift=int(panel_motion * 4),
+            emphasis=max(panel_motion, overlay_motion),
+            lift=int(max(panel_motion, overlay_motion) * 5),
         )
         title_surface = self.fonts.title.render(f"{panel.title} Inspector", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -4572,11 +4695,20 @@ class RunScene(BaseScene):
 
     def _draw_help_overlay(self, surface) -> None:
         pygame = self.pygame
+        overlay_motion = self._overlay_motion_level("help")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("help"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=860, height=520, margin=28)
-        inner = draw_panel(surface, pygame, modal_rect, title="Help", accent=INFO)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Help",
+            accent=INFO,
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 5),
+        )
         title_surface = self.fonts.title.render("2D Control Guide", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
         draw_wrapped_text(
@@ -4754,44 +4886,10 @@ class RunScene(BaseScene):
         panel_key = self._workspace_panel_key_for_command(command)
         if panel_key is None:
             return
-        self._deep_panel_key = panel_key
+        self._set_deep_panel(panel_key)
 
     def _workspace_panel_key_for_command(self, command: str) -> str | None:
-        if command in _TEAM_PANEL_COMMANDS:
-            return "team"
-        if command in _FINANCE_PANEL_COMMANDS:
-            return "finance"
-        if command in _PIPELINE_PANEL_COMMANDS:
-            return "pipeline"
-        if command in _BOARD_PANEL_COMMANDS:
-            return "board"
-        if command in _CUSTOMER_PANEL_COMMANDS:
-            return "customers"
-        if command in _PARTNERSHIP_PANEL_COMMANDS:
-            return "partnerships"
-        if command == TurnAction.VIEW_REPORT.value:
-            return "report"
-        if command.startswith(
-            (
-                "run_enterprise_",
-                "run_billing_",
-                "run_onboarding_",
-                "run_white_glove_",
-                "run_reference_",
-            )
-        ):
-            return "customers"
-        if command.startswith(
-            (
-                "run_channel_",
-                "run_partner_",
-                "run_reseller_",
-                "run_integration_",
-                "run_marketplace_",
-            )
-        ):
-            return "partnerships"
-        return None
+        return _workspace_panel_key_for_command(command)
 
     def _button_detail(
         self,
@@ -4966,6 +5064,11 @@ class TurnSummaryScene(BaseScene):
                 dirty=self._dirty,
             )
             return
+        focus_panel_key = _workspace_panel_key_for_command(self._view_model.focus_command)
+        seed_events = self._events[:6]
+        handoff_event = self._build_return_focus_event(focus_panel_key)
+        if handoff_event is not None:
+            seed_events = (handoff_event,) + self._events[:5]
         self._next_scene = RunScene(
             pygame=self.pygame,
             fonts=self.fonts,
@@ -4974,7 +5077,8 @@ class TurnSummaryScene(BaseScene):
             slot_name=self.slot_name,
             save_callback=self._save_callback,
             selected_product_id=self._selected_product_id,
-            seed_events=self._events,
+            initial_panel_key=focus_panel_key,
+            seed_events=seed_events,
             dirty=self._dirty,
             show_ready_event=False,
         )
@@ -4989,6 +5093,21 @@ class TurnSummaryScene(BaseScene):
         if not keys:
             return 0.0
         return max(self._motion_pulses.get(key) for key in keys)
+
+    def _build_return_focus_event(self, panel_key: str | None) -> FrontendEvent | None:
+        if not self._view_model.focus_command:
+            return None
+        targets = ("feed",)
+        if panel_key is not None:
+            targets = targets + (f"panel:{panel_key}",)
+        return FrontendEvent(
+            title="Next Focus",
+            detail=f"{self._view_model.focus_command}: {self._view_model.focus_detail}",
+            severity="info",
+            ttl=5.5,
+            motion="slide",
+            targets=targets,
+        )
 
     def _draw_summary_header(self, surface, rect) -> None:
         pygame = self.pygame

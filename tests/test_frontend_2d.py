@@ -225,6 +225,32 @@ def test_build_action_events_emit_motion_targets() -> None:
     )
 
 
+def test_build_action_events_emit_action_choreography_cards() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    current_state = previous_state.model_copy(deep=True)
+    current_state.products[0].user_count += 42
+
+    events = build_action_events(
+        previous_state,
+        current_state,
+        action_label=TurnAction.MARKET_PRODUCT.value,
+        message="Demand work landed.",
+    )
+
+    event_by_title = {event.title: event for event in events}
+    assert "Demand Push" in event_by_title
+    assert event_by_title["Demand Push"].targets == (
+        f"product:{current_state.products[0].id.hex}",
+        f"product:{current_state.products[0].id.hex}:quality",
+        f"product:{current_state.products[0].id.hex}:bugs",
+        f"product:{current_state.products[0].id.hex}:fit",
+        f"product:{current_state.products[0].id.hex}:debt",
+        "stat:users",
+        "panel:customers",
+    )
+    assert f"{current_state.products[0].name} Users" in event_by_title
+
+
 def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
     previous_state = create_new_game("NEXUS TECH", "Nexus One")
     working_state = previous_state.model_copy(deep=True)
@@ -626,6 +652,31 @@ def test_run_scene_action_request_triggers_motion_pulses() -> None:
         pygame.quit()
 
 
+def test_run_scene_panel_and_picker_overlay_motion_are_triggered() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=43),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("finance")
+        scene._run_command(TurnAction.SET_CAPITAL_PLAN.value)
+
+        assert scene._deep_panel_key == "finance"
+        assert scene._context_picker is not None
+        assert scene._motion_pulses.get("overlay:panel") > 0
+        assert scene._motion_pulses.get("overlay:picker") > 0
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
     pygame, fonts, surface = _build_pygame_bundle()
     try:
@@ -840,6 +891,42 @@ def test_turn_summary_scene_reveals_all_phases_and_draws_small_window() -> None:
         assert scene._phase_index() == 2
         assert scene._visible_metric_count() == len(scene._view_model.metrics)
         assert scene._visible_product_count() == len(scene._view_model.product_lines)
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_handoff_restores_workspace_focus() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = previous_state.model_copy(deep=True)
+        working_state = apply_action(
+            working_state,
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=working_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=29))
+        scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=29),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+
+        scene._continue_to_run()
+        next_scene = scene.pop_next_scene()
+
+        assert isinstance(next_scene, RunScene)
+        assert next_scene._deep_panel_key == next_scene._workspace_panel_key_for_command(
+            scene._view_model.focus_command
+        )
+        assert any(event.payload.title == "Next Focus" for event in next_scene._events)
     finally:
         pygame.quit()
 

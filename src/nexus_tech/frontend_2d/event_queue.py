@@ -45,6 +45,7 @@ def build_action_events(
             targets=("feed",) + _action_workspace_targets(action_label),
         )
     ]
+    events.extend(_build_action_choreography_events(previous_state, current_state, action_label))
     events.extend(_build_delta_events(previous_state, current_state))
     return tuple(events)
 
@@ -273,6 +274,118 @@ def _append_product_delta_events(
                 ),
             )
         )
+
+
+def _build_action_choreography_events(
+    previous_state: GameState,
+    current_state: GameState,
+    action_label: str,
+) -> tuple[FrontendEvent, ...]:
+    primary_product_targets = _primary_product_targets(previous_state, current_state)
+    choreography_map = {
+        "improve_quality": FrontendEvent(
+            title="Quality Sprint",
+            detail="Polish work is landing on the active product lane.",
+            severity="success",
+            motion="slide",
+            targets=primary_product_targets + ("panel:products",),
+        ),
+        "add_feature": FrontendEvent(
+            title="Feature Scope",
+            detail="The product roadmap is absorbing net-new scope.",
+            severity="info",
+            motion="slide",
+            targets=primary_product_targets + ("panel:products", "panel:pipeline"),
+        ),
+        "market_product": FrontendEvent(
+            title="Demand Push",
+            detail="Marketing pressure is now chasing user and revenue lift.",
+            severity="info",
+            motion="slide",
+            targets=primary_product_targets + ("stat:users", "panel:customers"),
+        ),
+        "reduce_technical_debt": FrontendEvent(
+            title="Debt Burn",
+            detail="Engineering focus is paying down accumulated technical drag.",
+            severity="success",
+            motion="slide",
+            targets=primary_product_targets + ("panel:products",),
+        ),
+        "hire_employee": FrontendEvent(
+            title="Team Added",
+            detail="A new teammate has entered the operating system.",
+            severity="success",
+            motion="slide",
+            targets=("panel:team", "stat:actions"),
+        ),
+        "assign_employee": FrontendEvent(
+            title="Assignment Locked",
+            detail="Execution capacity has been routed into a live workstream.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team",) + primary_product_targets,
+        ),
+        "plan_release": FrontendEvent(
+            title="Release Framed",
+            detail="The delivery pipeline now has a committed release plan.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline",) + primary_product_targets,
+        ),
+        "advance_sales_deal": FrontendEvent(
+            title="Pipeline Advanced",
+            detail="A sales opportunity moved one step closer to closing.",
+            severity="success",
+            motion="slide",
+            targets=("panel:pipeline", "panel:customers"),
+        ),
+        "adjust_pricing": FrontendEvent(
+            title="Pricing Shift",
+            detail="The revenue model changed and customer pressure is repricing around it.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:customers", "stat:cash"),
+        ),
+        "create_partnership": FrontendEvent(
+            title="Channel Activated",
+            detail="A new partner lane is now part of the growth mix.",
+            severity="success",
+            motion="slide",
+            targets=("panel:partnerships", "stat:users"),
+        ),
+    }
+    event = choreography_map.get(action_label)
+    return (event,) if event is not None else ()
+
+
+def _primary_product_targets(
+    previous_state: GameState,
+    current_state: GameState,
+) -> tuple[str, ...]:
+    previous_products = {product.id: product for product in previous_state.products}
+    best_product = None
+    best_score = -1
+    for product in current_state.products:
+        previous_product = previous_products.get(product.id)
+        if previous_product is None:
+            continue
+        score = (
+            abs(product.quality - previous_product.quality)
+            + abs(product.bug_level - previous_product.bug_level)
+            + abs(product.user_count - previous_product.user_count)
+        )
+        if score > best_score:
+            best_score = score
+            best_product = product
+    if best_product is None:
+        return ("panel:products",)
+    return (
+        f"product:{best_product.id.hex}",
+        f"product:{best_product.id.hex}:quality",
+        f"product:{best_product.id.hex}:bugs",
+        f"product:{best_product.id.hex}:fit",
+        f"product:{best_product.id.hex}:debt",
+    )
 
 
 def _action_workspace_targets(action_label: str) -> tuple[str, ...]:
