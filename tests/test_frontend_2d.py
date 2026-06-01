@@ -203,6 +203,28 @@ def test_build_action_events_surfaces_cash_and_product_deltas() -> None:
     assert f"{current_state.products[0].name} Bugs" in titles
 
 
+def test_build_action_events_emit_motion_targets() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    current_state = previous_state.model_copy(deep=True)
+    current_state.company.cash_on_hand += Decimal("500.00")
+    current_state.products[0].quality += 2
+
+    events = build_action_events(
+        previous_state,
+        current_state,
+        action_label=TurnAction.IMPROVE_QUALITY.value,
+        message="Quality work landed.",
+    )
+
+    event_by_title = {event.title: event for event in events}
+    assert event_by_title["Improve Quality"].targets == ("feed", "panel:products")
+    assert event_by_title["Cash Changed"].targets == ("stat:cash", "summary:metrics")
+    assert event_by_title[f"{current_state.products[0].name} Quality"].targets == (
+        f"product:{current_state.products[0].id.hex}",
+        f"product:{current_state.products[0].id.hex}:quality",
+    )
+
+
 def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
     previous_state = create_new_game("NEXUS TECH", "Nexus One")
     working_state = previous_state.model_copy(deep=True)
@@ -238,6 +260,9 @@ def test_build_turn_resolution_events_exposes_gate_and_outlook_cards() -> None:
     titles = {event.title for event in events}
     assert "Gate Command" in titles
     assert "Turn 1 Resolved" in titles
+    gate_event = next(event for event in events if event.title == "Gate Command")
+    assert "panel:endgame" in gate_event.targets
+    assert "summary:timeline" in gate_event.targets
 
 
 def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions() -> None:
@@ -566,6 +591,37 @@ def test_run_scene_routes_capital_plan_command_to_finance_workspace() -> None:
 
         assert scene._deep_panel_key == "finance"
         assert scene._context_picker is not None
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_action_request_triggers_motion_pulses() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=41),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._apply_action_request(
+            ActionRequest(
+                action=TurnAction.IMPROVE_QUALITY,
+                context=ActionContext(target_product_id=state.products[0].id),
+                label=TurnAction.IMPROVE_QUALITY.value,
+            )
+        )
+
+        product_key = f"product:{state.products[0].id.hex}"
+        assert scene._motion_pulses.get("feed") > 0
+        assert scene._motion_pulses.get("panel:products") > 0
+        assert scene._motion_pulses.get(product_key) > 0
+        assert scene._motion_pulses.get(f"{product_key}:quality") > 0
     finally:
         pygame.quit()
 

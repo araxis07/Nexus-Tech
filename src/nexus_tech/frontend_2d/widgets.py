@@ -54,6 +54,19 @@ def tone_color(tone: str) -> tuple[int, int, int]:
     return INFO
 
 
+def blend_color(
+    source: tuple[int, int, int],
+    target: tuple[int, int, int],
+    amount: float,
+) -> tuple[int, int, int]:
+    """Blend one RGB color toward another."""
+
+    safe_amount = max(0.0, min(1.0, amount))
+    return tuple(
+        int(source[index] + (target[index] - source[index]) * safe_amount) for index in range(3)
+    )
+
+
 def draw_grid(surface, pygame) -> None:
     """Paint a subtle background grid."""
 
@@ -65,37 +78,86 @@ def draw_grid(surface, pygame) -> None:
         pygame.draw.line(surface, GRID, (0, y_pos), (width, y_pos), 1)
 
 
-def draw_panel(surface, pygame, rect, *, title: str, accent: tuple[int, int, int]) -> object:
+def draw_panel(
+    surface,
+    pygame,
+    rect,
+    *,
+    title: str,
+    accent: tuple[int, int, int],
+    emphasis: float = 0.0,
+    lift: int = 0,
+) -> object:
     """Draw a framed panel and return its inner content rect."""
 
-    pygame.draw.rect(surface, PANEL, rect, border_radius=18)
-    pygame.draw.rect(surface, BORDER, rect, width=1, border_radius=18)
-    header_rect = pygame.Rect(rect.left, rect.top, rect.width, 34)
+    safe_emphasis = max(0.0, min(1.0, emphasis))
+    visual_rect = pygame.Rect(rect.left, rect.top - lift, rect.width, rect.height)
+    panel_fill = blend_color(PANEL, accent, safe_emphasis * 0.16)
+    panel_border = blend_color(BORDER, accent, safe_emphasis * 0.48)
+    header_fill = blend_color(PANEL_ALT, accent, safe_emphasis * 0.12)
+    border_width = 2 if safe_emphasis >= 0.45 else 1
+    accent_height = 4 + int(safe_emphasis * 2)
+
+    pygame.draw.rect(surface, panel_fill, visual_rect, border_radius=18)
+    pygame.draw.rect(surface, panel_border, visual_rect, width=border_width, border_radius=18)
+    header_rect = pygame.Rect(visual_rect.left, visual_rect.top, visual_rect.width, 34)
     pygame.draw.rect(
         surface,
-        PANEL_ALT,
+        header_fill,
         header_rect,
         border_top_left_radius=18,
         border_top_right_radius=18,
     )
     pygame.draw.rect(
         surface,
-        accent,
-        (rect.left + 1, rect.top + 1, rect.width - 2, 4),
+        blend_color(accent, TEXT, safe_emphasis * 0.15),
+        (visual_rect.left + 1, visual_rect.top + 1, visual_rect.width - 2, accent_height),
         border_radius=4,
     )
-    return pygame.Rect(rect.left + 16, rect.top + 44, rect.width - 32, rect.height - 60)
+    return pygame.Rect(
+        visual_rect.left + 16,
+        visual_rect.top + 44,
+        visual_rect.width - 32,
+        visual_rect.height - 60,
+    )
 
 
-def draw_progress_bar(surface, pygame, rect, *, ratio: float, color: tuple[int, int, int]) -> None:
+def draw_progress_bar(
+    surface,
+    pygame,
+    rect,
+    *,
+    ratio: float,
+    color: tuple[int, int, int],
+    emphasis: float = 0.0,
+) -> None:
     """Draw one compact progress bar."""
 
     safe_ratio = max(0.0, min(1.0, ratio))
-    pygame.draw.rect(surface, (31, 42, 58), rect, border_radius=8)
+    safe_emphasis = max(0.0, min(1.0, emphasis))
+    pygame.draw.rect(
+        surface,
+        blend_color((31, 42, 58), color, safe_emphasis * 0.14),
+        rect,
+        border_radius=8,
+    )
+    if safe_emphasis >= 0.08:
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, color, safe_emphasis * 0.45),
+            rect,
+            width=1,
+            border_radius=8,
+        )
     fill_width = max(6, int(rect.width * safe_ratio)) if safe_ratio > 0 else 0
     if fill_width > 0:
         fill_rect = pygame.Rect(rect.left, rect.top, fill_width, rect.height)
-        pygame.draw.rect(surface, color, fill_rect, border_radius=8)
+        pygame.draw.rect(
+            surface,
+            blend_color(color, TEXT, safe_emphasis * 0.16),
+            fill_rect,
+            border_radius=8,
+        )
 
 
 def draw_wrapped_text(
@@ -156,29 +218,41 @@ def draw_button(
     detail_font,
     enabled: bool = True,
     selected: bool = False,
+    emphasis: float = 0.0,
+    lift: int = 0,
 ) -> None:
     """Draw one clickable action or modal button."""
 
-    fill = (28, 40, 58) if selected and enabled else PANEL_ALT if enabled else (18, 22, 28)
-    border = SELECTION if selected and enabled else accent if enabled else BORDER
+    safe_emphasis = max(0.0, min(1.0, emphasis))
+    visual_rect = pygame.Rect(rect.left, rect.top - lift, rect.width, rect.height)
+    base_fill = (28, 40, 58) if selected and enabled else PANEL_ALT if enabled else (18, 22, 28)
+    fill = blend_color(base_fill, accent, safe_emphasis * 0.18)
+    border_seed = SELECTION if selected and enabled else accent if enabled else BORDER
+    border = blend_color(border_seed, TEXT, safe_emphasis * 0.14)
     title_color = TEXT if enabled else MUTED
     detail_color = MUTED if enabled else (100, 112, 128)
-    pygame.draw.rect(surface, fill, rect, border_radius=14)
-    pygame.draw.rect(surface, border, rect, width=1, border_radius=14)
+    border_width = 2 if safe_emphasis >= 0.4 else 1
+    pygame.draw.rect(surface, fill, visual_rect, border_radius=14)
+    pygame.draw.rect(surface, border, visual_rect, width=border_width, border_radius=14)
     pygame.draw.rect(
         surface,
         border,
-        (rect.left + 1, rect.top + 1, rect.width - 2, 4),
+        (
+            visual_rect.left + 1,
+            visual_rect.top + 1,
+            visual_rect.width - 2,
+            4 + int(safe_emphasis * 2),
+        ),
         border_radius=4,
     )
     if selected and enabled:
         pygame.draw.rect(
             surface,
             SELECTION,
-            (rect.left + 1, rect.bottom - 5, rect.width - 2, 3),
+            (visual_rect.left + 1, visual_rect.bottom - 5, visual_rect.width - 2, 3),
             border_radius=3,
         )
     title_surface = title_font.render(title, True, title_color)
     detail_surface = detail_font.render(detail, True, detail_color)
-    surface.blit(title_surface, (rect.left + 12, rect.top + 10))
-    surface.blit(detail_surface, (rect.left + 12, rect.top + 34))
+    surface.blit(title_surface, (visual_rect.left + 12, visual_rect.top + 10))
+    surface.blit(detail_surface, (visual_rect.left + 12, visual_rect.top + 34))

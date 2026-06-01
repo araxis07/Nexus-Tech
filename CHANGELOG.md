@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.99.0 - 2026-06-02
+
+- Added a shared 2D motion foundation with reusable panel, button, and progress-bar emphasis states plus a pulse bank for short-lived highlight cues across the animated frontend
+- Added targeted frontend event metadata so action and turn-resolution events now carry motion style and UI targets such as stats, products, endgame panels, report panels, and summary channels instead of only free-form event text
+- Wired the run scene to react to those event targets with animated stat lanes, pulsing product cards, emphasized action-bar panel buttons, workspace-aware coach emphasis, and sliding event cards in the live feed
+- Extended the staged turn-summary scene with the same motion language so strategy, timeline, and metric cards now inherit endgame/report emphasis instead of using a completely separate visual rhythm
+- Added regression coverage for motion-target emission, endgame timeline targeting, and run-scene pulse activation after live action requests
+- Promoted package metadata and runtime versioning to `0.99.0`
+
 ## 0.98.0 - 2026-06-02
 
 - Added 2D inspector memory per deep panel so reopening pipeline, finance, board, customer, and report inspectors restores the last section, page, row focus, and sort/filter state instead of dumping players back at the default section

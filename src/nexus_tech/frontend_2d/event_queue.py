@@ -22,6 +22,8 @@ class FrontendEvent:
     detail: str
     severity: str = "info"
     ttl: float = 4.5
+    motion: str = "pulse"
+    targets: tuple[str, ...] = ()
 
 
 def build_action_events(
@@ -39,6 +41,8 @@ def build_action_events(
             detail=message,
             severity="info",
             ttl=4.0,
+            motion="slide",
+            targets=("feed",) + _action_workspace_targets(action_label),
         )
     ]
     events.extend(_build_delta_events(previous_state, current_state))
@@ -62,6 +66,8 @@ def build_turn_resolution_events(
         ),
         severity=severity,
         ttl=5.5,
+        motion="slide",
+        targets=("feed", "summary:timeline", "summary:metrics", "stat:cash"),
     )
     events = [summary]
     total_user_delta = sum(
@@ -74,6 +80,7 @@ def build_turn_resolution_events(
                 title="Users Shifted",
                 detail=f"Net users {'+' if total_user_delta > 0 else ''}{total_user_delta}.",
                 severity=tone,
+                targets=("stat:users", "summary:metrics"),
             )
         )
     previous_readiness = calculate_endgame_readiness(previous_state)
@@ -96,6 +103,8 @@ def build_turn_resolution_events(
             ),
             severity="warning" if current_blocked_paths else "info",
             ttl=5.0,
+            motion="flash" if current_blocked_paths else "pulse",
+            targets=("panel:endgame", "summary:timeline"),
         )
     )
     if (
@@ -111,6 +120,7 @@ def build_turn_resolution_events(
                 ),
                 severity="info",
                 ttl=5.0,
+                targets=("panel:endgame", "panel:report", "summary:timeline"),
             )
         )
     if current_blocked_paths != previous_blocked_paths:
@@ -125,6 +135,8 @@ def build_turn_resolution_events(
                     if current_blocked_paths < previous_blocked_paths
                     else "warning"
                 ),
+                motion="flash",
+                targets=("panel:endgame", "summary:timeline"),
             )
         )
     events.extend(_build_delta_events(previous_state, current_state))
@@ -141,6 +153,7 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
                 title="Cash Changed",
                 detail=f"{'+' if cash_delta > 0 else ''}{format_money(cash_delta)}",
                 severity="success" if cash_delta > 0 else "warning",
+                targets=("stat:cash", "summary:metrics"),
             )
         )
 
@@ -151,6 +164,7 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
                 title="Reputation Shifted",
                 detail=f"{'+' if reputation_delta > 0 else ''}{reputation_delta} reputation.",
                 severity="success" if reputation_delta > 0 else "warning",
+                targets=("stat:reputation", "summary:metrics"),
             )
         )
 
@@ -161,6 +175,8 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
                 title="Board Pressure",
                 detail=f"{'+' if board_delta > 0 else ''}{board_delta} board pressure.",
                 severity="danger" if board_delta > 0 else "success",
+                motion="flash" if board_delta > 0 else "pulse",
+                targets=("stat:board_pressure", "panel:board", "summary:metrics"),
             )
         )
 
@@ -181,6 +197,8 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
                 detail=current_state.pending_event.description,
                 severity="warning",
                 ttl=6.0,
+                motion="slide",
+                targets=("feed", "panel:report", "overlay:pending"),
             )
         )
 
@@ -191,6 +209,8 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
                 detail=current_state.victory_reason or "The company reached a winning end state.",
                 severity="success",
                 ttl=7.0,
+                motion="flash",
+                targets=("panel:endgame", "panel:report", "feed"),
             )
         )
     if current_state.company.game_over and not previous_state.company.game_over:
@@ -200,6 +220,8 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
                 detail="Cash or governance pressure broke the run.",
                 severity="danger",
                 ttl=7.0,
+                motion="flash",
+                targets=("panel:endgame", "panel:board", "feed"),
             )
         )
 
@@ -216,6 +238,10 @@ def _append_product_delta_events(
                 title=f"{current_product.name} Quality",
                 detail=f"{'+' if quality_delta > 0 else ''}{quality_delta} quality.",
                 severity="success" if quality_delta > 0 else "warning",
+                targets=(
+                    f"product:{current_product.id.hex}",
+                    f"product:{current_product.id.hex}:quality",
+                ),
             )
         )
 
@@ -226,6 +252,11 @@ def _append_product_delta_events(
                 title=f"{current_product.name} Bugs",
                 detail=f"{'+' if bug_delta > 0 else ''}{bug_delta} bug pressure.",
                 severity="danger" if bug_delta > 0 else "success",
+                motion="flash" if bug_delta > 0 else "pulse",
+                targets=(
+                    f"product:{current_product.id.hex}",
+                    f"product:{current_product.id.hex}:bugs",
+                ),
             )
         )
 
@@ -236,5 +267,124 @@ def _append_product_delta_events(
                 title=f"{current_product.name} Users",
                 detail=f"{'+' if user_delta > 0 else ''}{user_delta} users.",
                 severity="success" if user_delta > 0 else "warning",
+                targets=(
+                    "stat:users",
+                    f"product:{current_product.id.hex}",
+                ),
             )
         )
+
+
+def _action_workspace_targets(action_label: str) -> tuple[str, ...]:
+    if action_label.startswith(
+        (
+            "improve_quality",
+            "add_feature",
+            "market_product",
+            "reduce_technical_debt",
+            "create_product",
+        )
+    ):
+        return ("panel:products",)
+    if action_label.startswith(
+        (
+            "take_loan",
+            "raise_",
+            "repay_debt",
+            "refinance_debt",
+            "debt_rollover",
+            "rebalance_capital",
+            "raise_reserve_target",
+            "set_capital_",
+            "set_refinancing_",
+            "set_covenant_",
+            "set_debt_",
+            "set_growth_firebreak",
+            "set_path_",
+            "set_endgame_capital_",
+            "set_exit_readiness_",
+            "set_terminal_",
+            "step_up_reserve_",
+            "harden_financing_",
+            "lock_capital_",
+        )
+    ):
+        return ("panel:finance",)
+    if action_label.startswith(
+        (
+            "hire_",
+            "fire_",
+            "assign_",
+            "unassign_",
+            "rest_",
+            "train_",
+            "promote_",
+            "run_comp_",
+            "run_succession_",
+            "appoint_",
+            "clear_manager",
+            "reorg_",
+        )
+    ):
+        return ("panel:team",)
+    if action_label.startswith(
+        (
+            "plan_release",
+            "work_release",
+            "create_sales_deal",
+            "advance_sales_deal",
+            "start_roadmap_project",
+            "work_roadmap_project",
+            "source_candidates",
+            "screen_candidate",
+            "interview_candidate",
+            "make_hiring_offer",
+        )
+    ):
+        return ("panel:pipeline",)
+    if action_label.startswith(
+        (
+            "adjust_pricing",
+            "set_packaging_strategy",
+            "set_target_segment",
+            "invest_in_customer_success",
+            "run_retention_",
+            "make_renewal_",
+            "run_win_back_",
+            "route_support_",
+            "run_account_",
+            "run_lane_",
+            "run_renewal_",
+            "run_enterprise_",
+            "run_billing_",
+            "run_onboarding_",
+            "run_white_glove_",
+            "run_reference_",
+            "triage_support_",
+            "invest_in_support_",
+            "set_support_",
+            "upgrade_support_",
+        )
+    ):
+        return ("panel:customers",)
+    if action_label.startswith(
+        (
+            "create_partnership",
+            "invest_in_partner_",
+            "run_channel_",
+            "run_partner_",
+            "run_reseller_",
+            "run_integration_",
+            "run_marketplace_",
+            "rebalance_channel_",
+            "renegotiate_partnership",
+            "reactivate_partnership",
+            "pause_partnership",
+        )
+    ):
+        return ("panel:partnerships",)
+    if action_label.startswith(("execute_board_", "start_board_", "execute_restructure_")):
+        return ("panel:board",)
+    if action_label.startswith(("review_", "view_report")):
+        return ("feed",)
+    return ()
