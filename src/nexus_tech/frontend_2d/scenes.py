@@ -2542,6 +2542,79 @@ class RunScene(BaseScene):
         if panel_key is not None:
             self._trigger_overlay_motion("panel", intensity=0.75)
             self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.7, decay=2.0)
+            if panel_key == "endgame":
+                self._announce_endgame_cockpit()
+
+    def _announce_endgame_cockpit(self) -> None:
+        panel = self.deep_panel
+        if panel is None or panel.key != "endgame":
+            return
+        blocked_line = next(
+            (line for line in panel.detail_lines if line.lower().startswith("blocked paths:")),
+            panel.detail_lines[0] if panel.detail_lines else panel.summary,
+        )
+        gate_action = next(
+            (action for action in panel.actions if action.label == "Gate Command"), None
+        )
+        detail = blocked_line
+        if gate_action is not None:
+            detail = f"{detail} | {gate_action.detail}"
+        self.push_event(
+            FrontendEvent(
+                title="Endgame Cockpit",
+                detail=detail,
+                severity="warning",
+                ttl=5.2,
+                motion="slide",
+                targets=("feed", "panel:endgame"),
+            )
+        )
+
+    def _panel_display_name(self, panel_key: str) -> str:
+        panel = next(
+            (entry for entry in self._view_model.deep_panels if entry.key == panel_key), None
+        )
+        if panel is not None:
+            return panel.title
+        return panel_key.replace("_", " ").title()
+
+    def _push_workspace_handoff_event(
+        self,
+        command: str,
+        *,
+        source_panel_key: str | None,
+        target_panel_key: str | None,
+        overlay_key: str | None = None,
+    ) -> None:
+        if (
+            source_panel_key is None
+            or target_panel_key is None
+            or source_panel_key == target_panel_key
+        ):
+            return
+        source_title = self._panel_display_name(source_panel_key)
+        target_title = self._panel_display_name(target_panel_key)
+        detail = f"`{command}` moved focus from {source_title} to {target_title}."
+        targets = ("feed", f"panel:{source_panel_key}", f"panel:{target_panel_key}")
+        if overlay_key == "inspector":
+            detail = f"{detail} Inspector opened on the late-game hotspot."
+            targets = targets + ("overlay:inspector",)
+        elif overlay_key == "picker":
+            detail = f"{detail} Choose the follow-up option in the picker."
+            targets = targets + ("overlay:picker",)
+        elif overlay_key == "text":
+            detail = f"{detail} Finish the context in the text modal."
+            targets = targets + ("overlay:text",)
+        self.push_event(
+            FrontendEvent(
+                title="Cockpit Handoff" if source_panel_key == "endgame" else "Workspace Handoff",
+                detail=detail,
+                severity="warning" if source_panel_key == "endgame" else "info",
+                ttl=5.2,
+                motion="slide",
+                targets=targets,
+            )
+        )
 
     def _set_context_picker(self, picker: ContextPicker | None) -> None:
         self._context_picker = picker
@@ -2973,6 +3046,9 @@ class RunScene(BaseScene):
             if reason is not None:
                 self._push_action_blocked_event(target.payload, reason)
                 return
+            if self._deep_panel_key == "endgame":
+                self._run_endgame_cockpit_command(target.payload)
+                return
             self._run_command(target.payload)
             return
         if target.kind == "close_panel":
@@ -3270,6 +3346,17 @@ class RunScene(BaseScene):
             self._motion_pulses.trigger("stat:cash", intensity=0.45, decay=1.4)
 
     def _run_command(self, command: str) -> None:
+        self._execute_command(command)
+
+    def _run_endgame_cockpit_command(self, command: str) -> None:
+        self._execute_command(command, handoff_source_panel_key="endgame")
+
+    def _execute_command(
+        self,
+        command: str,
+        *,
+        handoff_source_panel_key: str | None = None,
+    ) -> None:
         if command == TurnAction.END_TURN.value:
             self._attempt_end_turn()
             return
@@ -3278,6 +3365,12 @@ class RunScene(BaseScene):
         if inspector_key is not None:
             self._set_deep_panel(inspector_key)
             self._open_inspector(inspector_key)
+            self._push_workspace_handoff_event(
+                command,
+                source_panel_key=handoff_source_panel_key,
+                target_panel_key=inspector_key,
+                overlay_key="inspector",
+            )
             return
         self._trigger_command_choreography(command)
         reason = self._command_disabled_reason(command)
@@ -3286,6 +3379,12 @@ class RunScene(BaseScene):
             return
         if command == TurnAction.CREATE_PRODUCT.value:
             self._open_create_product_modal()
+            self._push_workspace_handoff_event(
+                command,
+                source_panel_key=handoff_source_panel_key,
+                target_panel_key="pipeline",
+                overlay_key="text",
+            )
             return
         request = build_command_request(
             self.state,
@@ -3294,9 +3393,20 @@ class RunScene(BaseScene):
         )
         if isinstance(request, ActionRequest):
             self._apply_action_request(request)
+            self._push_workspace_handoff_event(
+                command,
+                source_panel_key=handoff_source_panel_key,
+                target_panel_key=self._workspace_panel_key_for_command(command),
+            )
             return
         if isinstance(request, ContextPicker):
             self._set_context_picker(request)
+            self._push_workspace_handoff_event(
+                command,
+                source_panel_key=handoff_source_panel_key,
+                target_panel_key=self._workspace_panel_key_for_command(command),
+                overlay_key="picker",
+            )
             return
         self.push_event(
             FrontendEvent(
@@ -3673,6 +3783,9 @@ class RunScene(BaseScene):
         if item is None or section is None or panel is None or action_index >= len(item.actions):
             return
         action = item.actions[action_index]
+        if panel.key == "endgame":
+            self._run_endgame_cockpit_command(action.command)
+            return
         inspector_key = self._inspector_key_for_command(action.command)
         if inspector_key is not None:
             self._set_deep_panel(inspector_key)

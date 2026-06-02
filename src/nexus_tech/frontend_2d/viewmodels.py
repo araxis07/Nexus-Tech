@@ -1166,6 +1166,9 @@ def _build_endgame_panel(
     path_labels = ("IPO", "M&A", "Independence", "Reset")
     blocked_paths = sum(1 for gate in pressure.path_outcome_gates if "blocked" in gate.lower())
     gate_command_tone = "danger" if blocked_paths >= 2 else "warning" if blocked_paths else "info"
+    hotspot_command, hotspot_label, hotspot_detail, hotspot_tone = _endgame_hotspot_review_spec(
+        pressure
+    )
     return DeepDivePanelViewModel(
         key="endgame",
         title="Endgame / Exit Board",
@@ -1205,6 +1208,10 @@ def _build_endgame_panel(
                 f"{pressure.operating_durability} | dominant "
                 f"{pressure.dominant_pressure.replace('_', ' ')}"
             ),
+            (
+                f"Blocked paths: {blocked_paths}/4 | hotspot {hotspot_label.lower()} | "
+                f"next {pressure.path_gate_command_alert}"
+            ),
             f"Gate alert: {pressure.path_gate_alert}",
             f"Recommendation: {pressure.recommendation}",
         ),
@@ -1215,6 +1222,12 @@ def _build_endgame_panel(
                     "Gate Command",
                     pressure.path_gate_alert,
                     gate_command_tone,
+                ),
+                DeepDiveActionViewModel(
+                    hotspot_command,
+                    "Hotspot Review",
+                    hotspot_detail,
+                    hotspot_tone,
                 ),
                 *(
                     DeepDiveActionViewModel(
@@ -1280,6 +1293,36 @@ def build_endgame_cockpit_actions(
         if panel.key == "endgame"
     )
     return panel.actions
+
+
+def _endgame_hotspot_review_spec(pressure) -> tuple[str, str, str, str]:
+    if pressure.dominant_pressure == "public_market_scrutiny":
+        return (
+            TurnAction.REVIEW_CUSTOMERS.value,
+            "Customer Hotspot",
+            "Open the enterprise and retention hotspot that is weakening the public-market story.",
+            "warning",
+        )
+    if pressure.dominant_pressure == "acquirer_diligence":
+        return (
+            TurnAction.REVIEW_PARTNERSHIPS.value,
+            "Channel Hotspot",
+            "Open the partner and concentration hotspot that is adding diligence drag.",
+            "warning",
+        )
+    if pressure.dominant_pressure == "independence_discipline":
+        return (
+            TurnAction.REVIEW_FINANCE.value,
+            "Capital Hotspot",
+            "Open the reserve, debt, and billing hotspot threatening independence.",
+            "warning",
+        )
+    return (
+        TurnAction.REVIEW_BOARD.value,
+        "Reset Hotspot",
+        "Open the governance hotspot before reset pressure forces the board's hand.",
+        "danger",
+    )
 
 
 def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
@@ -2276,6 +2319,9 @@ def _build_endgame_inspectors(
     evaluation,
 ) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
     path_labels = ("IPO", "M&A", "Independence", "Reset")
+    hotspot_command, hotspot_label, hotspot_detail, hotspot_tone = _endgame_hotspot_review_spec(
+        pressure
+    )
     review_actions = (
         (
             TurnAction.REVIEW_BOARD.value,
@@ -2422,10 +2468,34 @@ def _build_endgame_inspectors(
                     "warning",
                 ),
                 DeepDiveActionViewModel(
-                    TurnAction.REVIEW_BOARD.value,
-                    "Board Review",
-                    "Cross-check pressure against governance state.",
+                    hotspot_command,
+                    "Hotspot Review",
+                    hotspot_detail,
+                    hotspot_tone,
+                ),
+            ),
+        ),
+        DeepDiveInspectorItemViewModel(
+            title="Cockpit Route",
+            detail_lines=(
+                f"Hotspot {hotspot_label.lower()} | next {pressure.path_gate_command_alert}",
+                pressure.path_gate_alert,
+                pressure.recommendation,
+            ),
+            tone=hotspot_tone,
+            payload="cockpit",
+            actions=(
+                DeepDiveActionViewModel(
+                    pressure.path_gate_command_alert,
+                    "Run Gate Command",
+                    "Launch the current late-game unblocker from the cockpit.",
                     "warning",
+                ),
+                DeepDiveActionViewModel(
+                    hotspot_command,
+                    "Review Hotspot",
+                    hotspot_detail,
+                    hotspot_tone,
                 ),
             ),
         ),

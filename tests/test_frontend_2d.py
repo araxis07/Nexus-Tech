@@ -503,6 +503,62 @@ def test_endgame_cockpit_actions_expose_all_path_fix_buttons() -> None:
     labels = {action.label for action in actions}
     assert {"IPO Fix", "M&A Fix", "Independence Fix", "Reset Fix"} <= labels
     assert any(action.label == "Gate Command" for action in actions)
+    assert any(action.label == "Hotspot Review" for action in actions)
+
+
+def test_run_scene_opening_endgame_panel_pushes_cockpit_brief_event() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=17),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("endgame")
+
+        assert any(event.payload.title == "Endgame Cockpit" for event in scene._events)
+        assert scene._motion_pulses.get("panel:endgame") > 0
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_endgame_cockpit_command_pushes_handoff_event() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=19),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("endgame")
+        panel = scene.deep_panel
+        assert panel is not None
+        hotspot_action = next(
+            action for action in panel.actions if action.label == "Hotspot Review"
+        )
+
+        scene._run_endgame_cockpit_command(hotspot_action.command)
+
+        expected_panel = scene._inspector_key_for_command(
+            hotspot_action.command
+        ) or scene._workspace_panel_key_for_command(hotspot_action.command)
+        assert expected_panel is not None
+        assert any(event.payload.title == "Cockpit Handoff" for event in scene._events)
+        assert scene._deep_panel_key == expected_panel
+    finally:
+        pygame.quit()
 
 
 def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> None:

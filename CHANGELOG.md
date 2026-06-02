@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.102.0 - 2026-06-02
+
+- Upgraded the 2D endgame board into a stronger late-game cockpit with a dedicated `Hotspot Review` action, richer blocked-path / hotspot detail lines, and a projection-route inspector item so exit pressure can route directly into the right recovery workspace
+- Added cockpit brief and handoff events in the 2D run scene so opening the endgame board now summarizes the current blocked-path state, while cockpit commands visibly hand the player off into the matching finance, board, customer, or partnership workspace with picker / inspector cues
+- Expanded regression coverage for cockpit brief emission, hotspot-review routing, and the richer endgame action set to keep late-game 2D usability from regressing as motion and panels evolve
+- Added a dedicated cockpit audit note and promoted package metadata and runtime versioning to `0.102.0`
+
 ## 0.101.0 - 2026-06-02
 
 - Expanded 2D action choreography coverage beyond core product work so finance, board, customer/support, partner/channel, pipeline, roadmap, and hiring command families now emit motion-aware event cards with focused UI targets
