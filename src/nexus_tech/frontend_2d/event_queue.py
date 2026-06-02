@@ -553,8 +553,7 @@ def _build_family_choreography_event(
         return FrontendEvent(
             title="Team Rewire",
             detail=(
-                "Capacity, leadership, or the hiring funnel is shifting around "
-                "execution demand."
+                "Capacity, leadership, or the hiring funnel is shifting around execution demand."
             ),
             severity="info",
             motion="slide",
