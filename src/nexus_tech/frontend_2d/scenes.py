@@ -2943,6 +2943,14 @@ class RunScene(BaseScene):
     def push_event(self, payload: FrontendEvent) -> None:
         """Add one transient UI event card."""
 
+        for index, timed_event in enumerate(self._events):
+            if (
+                timed_event.payload.title == payload.title
+                and timed_event.payload.detail == payload.detail
+                and timed_event.payload.severity == payload.severity
+            ):
+                self._events.pop(index)
+                break
         self._events.insert(0, TimedFrontendEvent(payload=payload, time_left=payload.ttl))
         self._events = self._events[:6]
         self._trigger_event_motion(payload)
@@ -4180,17 +4188,60 @@ class RunScene(BaseScene):
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
         watch_text = self.fonts.small.render(self._view_model.watch_for, True, MUTED)
-        hint_text = self.fonts.small.render(
-            self._hover_hint_line()
-            or (
-                "Hotkeys: 1-8 panels | I inspect panel | F1 help | N new product | "
-                "click disabled buttons for reasons."
-            ),
-            True,
-            MUTED,
+        status_line, hint_line = self._footer_status_lines()
+        surface.blit(watch_text, (inner.left, inner.bottom - 38))
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            status_line,
+            TEXT,
+            pygame.Rect(inner.left, inner.bottom - 26, inner.width, 18),
+            line_height=14,
+            max_lines=1,
         )
-        surface.blit(watch_text, (inner.left, inner.bottom - 22))
-        surface.blit(hint_text, (inner.left, inner.bottom - 4))
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            hint_line,
+            MUTED,
+            pygame.Rect(inner.left, inner.bottom - 10, inner.width, 32),
+            line_height=14,
+            max_lines=2,
+        )
+
+    def _footer_status_lines(self) -> tuple[str, str]:
+        workspace_key = self._active_panel_key()
+        workspace_title = (
+            self._panel_display_name(workspace_key) if workspace_key is not None else "Core HUD"
+        )
+        if self._inspector_panel_key is not None and self.inspector_panel is not None:
+            section = self._selected_inspector_section()
+            section_title = section.title if section is not None else "Records"
+            primary = (
+                f"Inspector: {self.inspector_panel.title} | {section_title} | "
+                f"page {self._inspector_page + 1}/{self._inspector_total_pages()}"
+            )
+        elif self._context_picker is not None:
+            primary = (
+                f"Picker: {self._context_picker.title} | {len(self._context_picker.options)} "
+                f"options | workspace {workspace_title}"
+            )
+        elif self._text_input is not None:
+            primary = f"Input: {self._text_input.title} | workspace {workspace_title}"
+        elif self.state.pending_event is not None:
+            primary = (
+                f"Pending Event: {self.state.pending_event.title} | resolve before more actions"
+            )
+        else:
+            primary = (
+                f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
+                f"Actions Left: {self.state.action_points_remaining}"
+            )
+        hint = self._hover_hint_line() or (
+            "Hotkeys: 1-8 panels | I inspect | F1 help | N new product | "
+            "click disabled buttons for prerequisites."
+        )
+        return primary, hint
 
     def _button_is_enabled(self, button: ActionButtonSpec) -> bool:
         if button.kind in {"save", "panel"}:
@@ -4942,7 +4993,10 @@ class RunScene(BaseScene):
             absolute_index = page_start + relative_index
             selected = relative_index == self._inspector_item_index
             item_rect = pygame.Rect(focus_inner.left, top, focus_inner.width, item_height)
-            pygame.draw.rect(surface, (26, 38, 55), item_rect, border_radius=12)
+            fill = (
+                blend_color((26, 38, 55), tone_color(item.tone), 0.18) if selected else (26, 38, 55)
+            )
+            pygame.draw.rect(surface, fill, item_rect, border_radius=12)
             pygame.draw.rect(
                 surface,
                 SELECTION if selected else tone_color(item.tone),
@@ -4959,6 +5013,12 @@ class RunScene(BaseScene):
                 TEXT,
             )
             surface.blit(item_title, (item_rect.left + 10, item_rect.top + 8))
+            if selected:
+                badge_rect = pygame.Rect(item_rect.right - 82, item_rect.top + 8, 72, 18)
+                pygame.draw.rect(surface, (30, 54, 76), badge_rect, border_radius=9)
+                pygame.draw.rect(surface, SELECTION, badge_rect, width=1, border_radius=9)
+                badge_surface = self.fonts.small.render("ACTIVE", True, SELECTION)
+                surface.blit(badge_surface, (badge_rect.left + 10, badge_rect.top + 2))
             line_top = item_rect.top + 28
             for line in item.detail_lines[:3]:
                 consumed = draw_wrapped_text(

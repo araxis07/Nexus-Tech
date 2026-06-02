@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.103.0 - 2026-06-02
+
+- Ran a fresh 2D playtest-driven polish pass focused on late-game cockpit readability, event-feed noise, and inspector discoverability instead of adding more systems
+- Coalesced duplicate frontend events so repeated cockpit briefs, handoffs, and similar warnings refresh in place instead of flooding the live feed during heavier late-game loops
+- Added contextual footer status lines for workspace, picker, inspector, and pending-event states so the action bar now explains the current layer and next control path more clearly on both wide and narrow layouts
+- Strengthened inspector selection affordances with a clearer active-row fill and `ACTIVE` badge, then expanded regression coverage for event coalescing and footer-context state
+- Added a dedicated playtest audit note and promoted package metadata and runtime versioning to `0.103.0`
+
 ## 0.102.0 - 2026-06-02
 
 - Upgraded the 2D endgame board into a stronger late-game cockpit with a dedicated `Hotspot Review` action, richer blocked-path / hotspot detail lines, and a projection-route inspector item so exit pressure can route directly into the right recovery workspace

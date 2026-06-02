@@ -23,12 +23,17 @@ from nexus_tech.frontend_2d.catalog import (
 from nexus_tech.frontend_2d.context import (
     ActionRequest,
     ContextPicker,
+    PickerOption,
     build_command_request,
     build_inspector_action_request,
     explain_command_unavailable,
     explain_inspector_action_unavailable,
 )
-from nexus_tech.frontend_2d.event_queue import build_action_events, build_turn_resolution_events
+from nexus_tech.frontend_2d.event_queue import (
+    FrontendEvent,
+    build_action_events,
+    build_turn_resolution_events,
+)
 from nexus_tech.frontend_2d.scenes import ReviewScene, RunScene, TitleScene, TurnSummaryScene
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
@@ -557,6 +562,80 @@ def test_run_scene_endgame_cockpit_command_pushes_handoff_event() -> None:
         assert expected_panel is not None
         assert any(event.payload.title == "Cockpit Handoff" for event in scene._events)
         assert scene._deep_panel_key == expected_panel
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_coalesces_duplicate_events() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=23),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        payload = FrontendEvent(
+            title="Endgame Cockpit",
+            detail="Blocked paths: 2/4 | next review_board",
+            severity="warning",
+            ttl=5.2,
+        )
+        scene.push_event(payload)
+        scene.push_event(payload)
+
+        assert len(scene._events) == 1
+        assert scene._events[0].payload.title == "Endgame Cockpit"
+        assert scene._events[0].time_left == payload.ttl
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=29),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("endgame")
+        workspace_line, hint_line = scene._footer_status_lines()
+        assert "Workspace: Endgame / Exit Board" in workspace_line
+        assert hint_line
+
+        picker = ContextPicker(
+            title="Capital Plan",
+            description="Choose the next capital posture.",
+            severity="warning",
+            options=(
+                PickerOption(
+                    key_hint="1",
+                    title="Balanced",
+                    description="Hold a balanced reserve posture.",
+                    request=ActionRequest(
+                        action=TurnAction.SET_CAPITAL_PLAN,
+                        context=ActionContext(),
+                        label=TurnAction.SET_CAPITAL_PLAN.value,
+                    ),
+                ),
+            ),
+        )
+        scene._set_context_picker(picker)
+        picker_line, _ = scene._footer_status_lines()
+
+        assert picker_line.startswith("Picker: Capital Plan")
     finally:
         pygame.quit()
 
