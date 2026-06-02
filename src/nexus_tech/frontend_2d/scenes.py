@@ -696,11 +696,12 @@ class TitleScene(BaseScene):
         content_top = header_rect.bottom + gap
         content_height = footer_rect.top - gap - content_top
         if width < 1180:
+            left_share = 0.62 if self._mode == "meta" else 0.56
             left_rect = pygame.Rect(
                 margin,
                 content_top,
                 width - margin * 2,
-                int(content_height * 0.56),
+                int(content_height * left_share),
             )
             right_rect = pygame.Rect(
                 margin,
@@ -1482,8 +1483,7 @@ class TitleScene(BaseScene):
 
     def _draw_meta_board(self, surface, rect) -> None:
         pygame = self.pygame
-        meta = self._meta_progression
-        comparison = self._archive_comparison
+        compact = self._meta_board_compact_layout(rect)
         meta_motion = self._motion_level("title:mode:meta", "title:content")
         inner = draw_panel(
             surface,
@@ -1506,18 +1506,7 @@ class TitleScene(BaseScene):
             inner.height - 66,
         )
 
-        summary_lines = (
-            f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
-            (
-                f"Runs: {meta.total_runs} | victories: {meta.victories} | "
-                f"best score: {meta.best_score}"
-            ),
-            f"Next goal: {meta.next_goal}",
-            f"Next reward: {meta.next_reward}",
-            f"Dominant path: {comparison.dominant_path}",
-            f"Coverage gap: {comparison.next_gap}",
-            f"Recommendation: {comparison.recommendation}",
-        )
+        summary_lines = self._meta_board_summary_lines(compact)
         top = summary_rect.top
         for line in summary_lines:
             consumed = draw_wrapped_text(
@@ -1530,20 +1519,21 @@ class TitleScene(BaseScene):
                 max_lines=2,
             )
             top += max(22, consumed)
-        ladder_title = self.fonts.small.render("Campaign Ladder", True, INFO)
-        surface.blit(ladder_title, (summary_rect.left, top + 6))
-        top += 28
-        for step in meta.campaign_ladder[:6]:
-            consumed = draw_wrapped_text(
-                surface,
-                self.fonts.small,
-                step,
-                TEXT,
-                pygame.Rect(summary_rect.left, top, summary_rect.width, 22),
-                line_height=15,
-                max_lines=1,
-            )
-            top += max(18, consumed)
+        if not compact:
+            ladder_title = self.fonts.small.render("Campaign Ladder", True, INFO)
+            surface.blit(ladder_title, (summary_rect.left, top + 6))
+            top += 28
+            for step in self._meta_progression.campaign_ladder[:6]:
+                consumed = draw_wrapped_text(
+                    surface,
+                    self.fonts.small,
+                    step,
+                    TEXT,
+                    pygame.Rect(summary_rect.left, top, summary_rect.width, 22),
+                    line_height=15,
+                    max_lines=1,
+                )
+                top += max(18, consumed)
 
         buttons = (
             ("1 Open Archives", "Jump into completed-run reviews.", "archives", WARN),
@@ -1551,21 +1541,46 @@ class TitleScene(BaseScene):
             ("3 New Wizard", "Start the next campaign from the 2D wizard.", "new_wizard", INFO),
             ("9 Back", "Return to the title menu.", "menu", BORDER),
         )
-        top = action_rect.top
-        for title, detail, payload, accent in buttons:
-            button_rect = pygame.Rect(action_rect.left, top, action_rect.width, 58)
-            draw_button(
-                surface,
-                pygame,
-                rect=button_rect,
-                title=title,
-                detail=detail,
-                accent=accent,
-                title_font=self.fonts.small,
-                detail_font=self.fonts.small,
-            )
-            self._click_targets.append(ClickTarget("menu", payload, button_rect))
-            top += 70
+        if compact:
+            button_gap = 10
+            button_width = int((action_rect.width - button_gap) / 2)
+            button_height = 46
+            for index, (title, detail, payload, accent) in enumerate(buttons):
+                row = index // 2
+                col = index % 2
+                button_rect = pygame.Rect(
+                    action_rect.left + col * (button_width + button_gap),
+                    action_rect.top + row * (button_height + button_gap),
+                    button_width,
+                    button_height,
+                )
+                draw_button(
+                    surface,
+                    pygame,
+                    rect=button_rect,
+                    title=title,
+                    detail=self._compact_text(detail, 30),
+                    accent=accent,
+                    title_font=self.fonts.small,
+                    detail_font=self.fonts.small,
+                )
+                self._click_targets.append(ClickTarget("menu", payload, button_rect))
+        else:
+            top = action_rect.top
+            for title, detail, payload, accent in buttons:
+                button_rect = pygame.Rect(action_rect.left, top, action_rect.width, 58)
+                draw_button(
+                    surface,
+                    pygame,
+                    rect=button_rect,
+                    title=title,
+                    detail=detail,
+                    accent=accent,
+                    title_font=self.fonts.small,
+                    detail_font=self.fonts.small,
+                )
+                self._click_targets.append(ClickTarget("menu", payload, button_rect))
+                top += 70
 
     def _draw_save_slot_browser(self, surface, rect) -> None:
         self._draw_card_browser(
@@ -1837,7 +1852,10 @@ class TitleScene(BaseScene):
 
     def _draw_title_sidebar(self, surface, rect) -> None:
         pygame = self.pygame
-        summary_rect = pygame.Rect(rect.left, rect.top, rect.width, int(rect.height * 0.36))
+        summary_share = 0.56 if self._mode == "meta" else 0.36
+        summary_rect = pygame.Rect(
+            rect.left, rect.top, rect.width, int(rect.height * summary_share)
+        )
         events_rect = pygame.Rect(
             rect.left,
             summary_rect.bottom + 12,
@@ -1944,10 +1962,8 @@ class TitleScene(BaseScene):
             )
         if self._mode == "meta":
             return (
-                f"Best path labels: IPO {comparison.best_ipo_label}",
-                f"M&A {comparison.best_acquisition_label}",
-                f"Independence {comparison.best_independence_label}",
-                f"Common next focus: {comparison.common_next_focus}",
+                f"Best: IPO {comparison.best_ipo_label} | M&A {comparison.best_acquisition_label}",
+                f"Ind {comparison.best_independence_label} | Focus {comparison.common_next_focus}",
             )
         if self._mode == "archives":
             return (
@@ -1977,6 +1993,41 @@ class TitleScene(BaseScene):
             f"Next goal: {meta.next_goal}",
             f"Next reward: {meta.next_reward}",
         )
+
+    def _meta_board_compact_layout(self, rect) -> bool:
+        return rect.height < 280 or rect.width < 900
+
+    def _meta_board_summary_lines(self, compact: bool) -> tuple[str, ...]:
+        meta = self._meta_progression
+        comparison = self._archive_comparison
+        if compact:
+            return (
+                f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+                (
+                    f"Runs {meta.total_runs} | victories {meta.victories} | "
+                    f"best score {meta.best_score}"
+                ),
+                f"Next reward: {meta.next_reward}",
+                f"Coverage gap: {comparison.next_gap}",
+            )
+        return (
+            f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+            (
+                f"Runs: {meta.total_runs} | victories: {meta.victories} | "
+                f"best score: {meta.best_score}"
+            ),
+            f"Next goal: {meta.next_goal}",
+            f"Next reward: {meta.next_reward}",
+            f"Dominant path: {comparison.dominant_path}",
+            f"Coverage gap: {comparison.next_gap}",
+            f"Recommendation: {comparison.recommendation}",
+        )
+
+    def _compact_text(self, value: str, max_length: int) -> str:
+        compact = value.strip().replace("`", "")
+        if len(compact) <= max_length:
+            return compact
+        return f"{compact[: max_length - 3].rstrip()}..."
 
     def _draw_delete_confirmation_overlay(self, surface) -> None:
         pygame = self.pygame
@@ -3694,6 +3745,14 @@ class RunScene(BaseScene):
         self._set_inspector_filter_mode("attention")
 
     def _inspector_items_per_page(self) -> int:
+        surface = self.pygame.display.get_surface()
+        if surface is None:
+            return 4
+        width, height = surface.get_size()
+        if width < 900:
+            return 2
+        if height < 700:
+            return 3
         return 4
 
     def _current_inspector_page_start(self) -> int:
@@ -4161,17 +4220,12 @@ class RunScene(BaseScene):
         )
         title_surface = self.fonts.heading.render("Action Bar", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
-        if inner.width < 860:
-            button_cols = 4
-        elif inner.width < 1040:
-            button_cols = 5
-        elif inner.width < 1240:
-            button_cols = 6
-        else:
-            button_cols = 7
+        button_cols, button_height, footer_band_height = self._footer_layout_metrics(
+            inner.width,
+            inner.height,
+        )
         button_gap = 10
         button_width = int((inner.width - button_gap * (button_cols - 1)) / button_cols)
-        button_height = 62
         top = inner.top
         left = inner.left
         for index, button in enumerate(_ACTION_BUTTONS):
@@ -4189,10 +4243,10 @@ class RunScene(BaseScene):
                 pygame,
                 rect=button_rect,
                 title=f"{button.key_hint} {button.title}",
-                detail=self._button_detail(
-                    button.payload if button.kind in {"command", "text_command"} else None,
-                    button.detail,
+                detail=self._footer_button_detail(
+                    button,
                     enabled=enabled,
+                    button_cols=button_cols,
                 ),
                 accent=button.accent,
                 title_font=self.fonts.small,
@@ -4204,13 +4258,14 @@ class RunScene(BaseScene):
             )
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
+        footer_top = inner.bottom - footer_band_height + 6
         status_line, hint_line = self._footer_status_lines()
         draw_wrapped_text(
             surface,
             self.fonts.small,
             status_line,
             TEXT,
-            pygame.Rect(inner.left, inner.bottom - 32, inner.width, 16),
+            pygame.Rect(inner.left, footer_top, inner.width, 16),
             line_height=14,
             max_lines=1,
         )
@@ -4219,10 +4274,44 @@ class RunScene(BaseScene):
             self.fonts.small,
             hint_line,
             MUTED,
-            pygame.Rect(inner.left, inner.bottom - 16, inner.width, 16),
+            pygame.Rect(inner.left, footer_top + 18, inner.width, 16),
             line_height=14,
             max_lines=1,
         )
+
+    def _footer_layout_metrics(self, inner_width: int, inner_height: int) -> tuple[int, int, int]:
+        if inner_width < 860:
+            button_cols = 4
+        elif inner_width < 1040:
+            button_cols = 5
+        elif inner_width < 1240:
+            button_cols = 6
+        else:
+            button_cols = 7
+        rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
+        footer_band_height = 52 if button_cols <= 4 else 48
+        button_gap = 10
+        button_area_height = max(
+            50,
+            inner_height - footer_band_height - button_gap * max(0, rows - 1),
+        )
+        button_height = min(62, max(50, int(button_area_height / rows)))
+        return button_cols, button_height, footer_band_height
+
+    def _footer_button_detail(
+        self,
+        button: ActionButtonSpec,
+        *,
+        enabled: bool,
+        button_cols: int,
+    ) -> str:
+        detail = self._button_detail(
+            button.payload if button.kind in {"command", "text_command"} else None,
+            button.detail,
+            enabled=enabled,
+        )
+        max_length = 30 if button_cols <= 4 else 34 if button_cols == 5 else 40
+        return self._compact_button_detail(detail, max_length=max_length)
 
     def _footer_status_lines(self) -> tuple[str, str]:
         workspace_key = self._active_panel_key()
@@ -5067,6 +5156,7 @@ class RunScene(BaseScene):
             absolute_index = page_start + relative_index
             selected = relative_index == self._inspector_item_index
             item_rect = pygame.Rect(focus_inner.left, top, focus_inner.width, item_height)
+            detail_line_limit = self._inspector_item_line_limit(item_height, focus_inner.width)
             fill = (
                 blend_color((26, 38, 55), tone_color(item.tone), 0.18) if selected else (26, 38, 55)
             )
@@ -5107,7 +5197,7 @@ class RunScene(BaseScene):
                     status_surface = self.fonts.small.render(label, True, accent)
                     surface.blit(status_surface, (status_rect.left + 8, status_rect.top + 2))
             line_top = item_rect.top + 28
-            for line in item.detail_lines[:3]:
+            for line in item.detail_lines[:detail_line_limit]:
                 consumed = draw_wrapped_text(
                     surface,
                     self.fonts.small,
@@ -5117,8 +5207,8 @@ class RunScene(BaseScene):
                     line_height=14,
                     max_lines=1,
                 )
-                line_top += max(14, consumed)
-            if selected and item.actions:
+                line_top += max(16, consumed)
+            if selected and item.actions and item_height >= 86:
                 action_summary = " | ".join(
                     f"{index + 1}:{action.label}" for index, action in enumerate(item.actions[:4])
                 )
@@ -5254,11 +5344,18 @@ class RunScene(BaseScene):
         enabled: bool,
     ) -> str:
         if enabled:
-            return default_detail
+            return self._compact_button_detail(default_detail, max_length=26)
         reason = self._inspector_item_action_reason(command, payload)
         if reason is None:
-            return default_detail
-        return self._compact_button_detail(reason)
+            return self._compact_button_detail(default_detail, max_length=26)
+        return self._compact_button_detail(reason, max_length=26)
+
+    def _inspector_item_line_limit(self, item_height: int, focus_width: int) -> int:
+        if item_height < 80 or focus_width < 500:
+            return 1
+        if item_height < 84 or focus_width < 560:
+            return 2
+        return 3
 
     def _inspector_hint_line(self) -> str:
         return "Tab/Arrows move | Z/X sort-filter | A/H focus | PgUp/PgDn page | Enter action"
@@ -5851,8 +5948,8 @@ class TurnSummaryScene(BaseScene):
             surface,
             pygame,
             rect=command_rect,
-            title=f"Next Command {self._view_model.focus_command}",
-            detail=self._view_model.focus_detail,
+            title=self._summary_focus_command_title(),
+            detail=self._summary_focus_command_detail(),
             accent=WARN,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
@@ -5870,6 +5967,18 @@ class TurnSummaryScene(BaseScene):
                 max_lines=2,
             )
             top += max(20, consumed)
+
+    def _summary_focus_command_title(self) -> str:
+        return f"Next {self._compact_summary_text(self._view_model.focus_command, max_length=28)}"
+
+    def _summary_focus_command_detail(self) -> str:
+        return ""
+
+    def _compact_summary_text(self, detail: str, *, max_length: int) -> str:
+        compact = detail.strip().replace("`", "")
+        if len(compact) <= max_length:
+            return compact
+        return f"{compact[: max_length - 3].rstrip()}..."
 
     def _draw_summary_footer(self, surface, rect) -> None:
         pygame = self.pygame

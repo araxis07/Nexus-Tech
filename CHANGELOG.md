@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.106.0 - 2026-06-03
+
+- Ran a second frame-backed 2D UX pass focused on narrow-window late-game scenes after `0.105.0`, using captured endgame-inspector, title-meta, and turn-summary frames to close the next spacing and density gaps
+- Reserved a dedicated footer band for the live action bar, compacted footer button copy by layout width, and kept the run HUD readable without letting dense bottom-row controls bleed into the status lines
+- Added compact meta-board behavior for stacked title layouts so the progression board and sidebar no longer fight for the same vertical space on 960x640-class windows
+- Tightened small-window inspector density with adaptive item paging, more aggressive line limits, and shorter item-action detail copy so endgame projection rows stop collapsing into their own action buttons
+- Trimmed turn-summary focus-command copy so the strategic handoff card stops dumping long raw command detail into a shallow button slot
+- Expanded regression coverage for footer layout compaction, adaptive inspector paging, compact meta-board summaries, and summary-command copy, then promoted package metadata and runtime versioning to `0.106.0`
+
 ## 0.105.0 - 2026-06-03
 
 - Ran a frame-backed 2D visual UX pass against captured title, run, inspector, endgame, review, and turn-summary scenes instead of relying only on deterministic test output

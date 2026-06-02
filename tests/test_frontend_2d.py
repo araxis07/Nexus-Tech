@@ -6,6 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
+import nexus_tech.frontend_2d.scenes as scenes_module
 from nexus_tech.cli import app
 from nexus_tech.domain.models import (
     CandidateTrait,
@@ -737,6 +738,74 @@ def test_run_scene_overlay_button_detail_compacts_long_copy() -> None:
         pygame.quit()
 
 
+def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=47),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        detail = scene._footer_button_detail(
+            scenes_module._ACTION_BUTTONS[0],
+            enabled=True,
+            button_cols=4,
+        )
+        _, _, footer_band_height = scene._footer_layout_metrics(820, 320)
+
+        assert len(detail) <= 30
+        assert footer_band_height == 52
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_inspector_item_line_limit_tightens_for_small_cards() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=49),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        assert scene._inspector_item_line_limit(72, 540) == 1
+        assert scene._inspector_item_line_limit(96, 700) == 3
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_inspector_items_per_page_tracks_window_size() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=51),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        assert scene._inspector_items_per_page() == 2
+
+        pygame.display.set_mode((960, 640), pygame.HIDDEN)
+        assert scene._inspector_items_per_page() == 3
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_inspector_supports_selection_paging_and_item_actions() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -978,8 +1047,33 @@ def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
         assert any("Coverage gap:" in line for line in archive_lines)
         scene._mode = "meta"
         meta_lines = scene._title_sidebar_lines()
-        assert any("Best path labels:" in line for line in meta_lines)
+        assert any("Best:" in line for line in meta_lines)
         scene.draw(surface)
+    finally:
+        pygame.quit()
+
+
+def test_title_scene_meta_board_compacts_summary_when_space_is_tight(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-compact.db")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=15),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="meta",
+        )
+
+        compact = scene._meta_board_compact_layout(pygame.Rect(0, 0, 900, 240))
+        lines = scene._meta_board_summary_lines(compact)
+
+        assert compact is True
+        assert len(lines) == 4
+        assert all("Recommendation:" not in line for line in lines)
     finally:
         pygame.quit()
 
@@ -1262,6 +1356,39 @@ def test_turn_summary_scene_handoff_restores_workspace_focus() -> None:
             scene._view_model.focus_command
         )
         assert any(event.payload.title == "Next Focus" for event in next_scene._events)
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_compacts_focus_command_copy() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = previous_state.model_copy(deep=True)
+        working_state = apply_action(
+            working_state,
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=working_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=37))
+        scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=37),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+
+        title = scene._summary_focus_command_title()
+        detail = scene._summary_focus_command_detail()
+
+        assert title.startswith("Next ")
+        assert len(detail) <= 48
     finally:
         pygame.quit()
 
