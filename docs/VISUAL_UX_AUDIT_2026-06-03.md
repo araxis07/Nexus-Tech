@@ -1,34 +1,37 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.104.0`
+Version under audit: `0.105.0`
 
 ## Scope
 
 - `pytest -q tests/test_frontend_2d.py`
-- direct `RunScene` inspection of footer state, cockpit tooltip wording, and inspector focus summaries
+- direct `RunScene` inspection of footer state, cockpit tooltip wording, inspector focus summaries, and header/detail density
 - `nexus_tech.cli play-2d --headless --max-frames 4 --scenario founder_journey --seed 11`
 - `nexus_tech.cli menu-2d --headless --max-frames 4`
+- captured scene frames from `/tmp/nexus-tech-visual-audit` for title, run, endgame, inspector, summary, review, and small-window layouts
 
 ## Friction Findings
 
-1. Late-game players still had to infer the current gate and hotspot command from the endgame panel body instead of getting that context directly in the footer status line.
-2. Cockpit button hover text still said only “run command” and did not clearly explain where the action would hand off next.
-3. Inspector focus improved with the `ACTIVE` badge, but the player still had to infer whether the selected row’s primary action was immediately usable or blocked.
+1. The live run header still rendered score metadata as a raw `RunScore(...)` string, which overflowed the second line and competed with product/coach context.
+2. Dense late-game scenes stacked footer watch text, status text, and hint text on top of the bottom control row, creating visible overlap in captured frames.
+3. Endgame and deep-panel action buttons carried detail copy that was too long for narrow button widths, especially in smaller overlays.
+4. Strict inspector filters could produce an empty detail pane with no clear next step beyond trial-and-error key presses.
 
 ## Fix Summary
 
-- Endgame footer context now surfaces both the current gate command and hotspot command directly in the action-bar status line.
-- Cockpit hover hints now explicitly name the workspace that the action will hand off into.
-- Selected inspector rows now show a `READY` or `BLOCKED` chip for the primary action, and the focus note/status line now includes the next action or blocked prerequisite.
+- The live run header now renders score as compact `value (tier)` metadata and keeps the product/coach note short enough to stay within one wrapped line.
+- The action-bar footer now renders exactly one status line plus one watch-or-hover hint line, removing the extra stacked watch row that was colliding with controls.
+- Endgame and deep-panel button details now use a tighter compacting pass so command context stays readable without overrunning button bounds.
+- Empty inspector results now show an explicit recovery hint telling the player to cycle filters or refocus with `A` / `H`.
 
 ## Verification Snapshot
 
-- `tests/test_frontend_2d.py`: passed with new coverage for endgame footer context, cockpit tooltip routing, and inspector primary-action summaries
+- `tests/test_frontend_2d.py`: passed with new coverage for compact score labels, overlay-detail compaction, endgame footer context, cockpit tooltip routing, and inspector primary-action summaries
 - `play-2d --headless --max-frames 4`: passed
 - `menu-2d --headless --max-frames 4`: passed
 
 ## Remaining Risk
 
-- This is still a deterministic scene audit, not a freeform human visual test over a long late-game run.
-- Motion density, pacing, and card hierarchy should still be judged in a real open-window session before calling the 2D frontend beta-ready.
+- This is still a deterministic visual audit over captured frames, not a freeform human session over a long late-game run.
+- Motion density, pacing, and card hierarchy still need to be judged in a real open-window session before calling the 2D frontend beta-ready.

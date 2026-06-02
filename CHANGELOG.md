@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.105.0 - 2026-06-03
+
+- Ran a frame-backed 2D visual UX pass against captured title, run, inspector, endgame, review, and turn-summary scenes instead of relying only on deterministic test output
+- Tightened the live run header so score metadata now renders as a compact `score (tier)` label and no longer spills a raw `RunScore(...)` object across the top bar
+- Simplified the action-bar footer down to one status line plus one watch-or-hover hint line so late-game guidance stops colliding with the bottom control row on dense layouts
+- Compacted deep-panel and endgame action detail copy so overlay buttons keep their command context without overrunning narrow button bounds
+- Improved filtered inspector empty states with an explicit recovery hint, then expanded regression coverage for compact score labels and overlay-detail compaction
+- Added a refreshed visual-UX audit note and promoted package metadata and runtime versioning to `0.105.0`
+
 ## 0.104.0 - 2026-06-03
 
 - Ran another playtest-driven 2D UX pass centered on late-game clarity rather than adding new systems, focusing on cockpit guidance, inspector scanning, and hover language

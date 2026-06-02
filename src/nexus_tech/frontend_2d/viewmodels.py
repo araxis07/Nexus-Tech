@@ -361,16 +361,14 @@ def build_game_view_model(
     risk_lines = tuple(
         f"{item.area}: {item.command} ({item.severity})" for item in forecast.items[:3]
     ) or ("No elevated operating risk is flashing right now.",)
-    header_note = (
-        f"Selected product: {selected_product.name} | Primary coach: {coach.primary_command}"
-    )
+    header_note = f"Product {selected_product.name} | Coach {coach.primary_command}"
     return GameViewModel(
         company_name=state.company.name,
         scenario_title=state.scenario_title,
         difficulty_label=state.difficulty_mode.value,
         difficulty_summary=difficulty.summary,
         turn_label=f"Turn {state.company.current_turn}",
-        score_label=str(score),
+        score_label=f"{score.total_score} ({score.score_tier})",
         market_label=state.market_cycle.value,
         roadmap_label=state.roadmap_focus.value,
         budget_label=state.quarter_plan.budget_stance.value,

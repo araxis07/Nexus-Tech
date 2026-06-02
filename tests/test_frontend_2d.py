@@ -621,7 +621,7 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         assert "Workspace: Endgame / Exit Board" in workspace_line
         assert "Gate:" in workspace_line
         assert "Hotspot:" in workspace_line
-        assert hint_line
+        assert hint_line.startswith("Watch:")
 
         picker = ContextPicker(
             title="Capital Plan",
@@ -699,6 +699,40 @@ def test_run_scene_inspector_primary_action_summary_reflects_ready_state() -> No
         assert summary.startswith("Next: 1 ")
         assert badge is not None
         assert badge[0] in {"READY", "BLOCKED"}
+    finally:
+        pygame.quit()
+
+
+def test_game_view_model_uses_compact_score_label() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    view_model = build_game_view_model(state, selected_product_id=state.products[0].id.hex)
+
+    assert not view_model.score_label.startswith("RunScore(")
+    assert "(" in view_model.score_label
+
+
+def test_run_scene_overlay_button_detail_compacts_long_copy() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=43),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        detail = scene._overlay_button_detail(
+            TurnAction.REVIEW_FINANCE.value,
+            "Refresh reserve, debt, and capital posture for the whole company.",
+            enabled=True,
+        )
+
+        assert len(detail) <= 32
     finally:
         pygame.quit()
 

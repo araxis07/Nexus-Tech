@@ -3877,16 +3877,33 @@ class RunScene(BaseScene):
             f"{self._view_model.scenario_title} | difficulty {self._view_model.difficulty_label} | "
             f"score {self._view_model.score_label} | market {self._view_model.market_label}"
         )
-        meta_surface = self.fonts.body.render(meta_text, True, MUTED)
-        surface.blit(meta_surface, (inner.left, inner.top))
-        note_surface = self.fonts.small.render(self._view_model.header_note, True, TEXT)
-        surface.blit(note_surface, (inner.left, inner.top + 22))
-        profile_surface = self.fonts.small.render(
-            self._view_model.difficulty_summary,
-            True,
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            meta_text,
             MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 20),
+            line_height=18,
+            max_lines=1,
         )
-        surface.blit(profile_surface, (inner.left, inner.top + 42))
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            self._view_model.header_note,
+            TEXT,
+            pygame.Rect(inner.left, inner.top + 22, inner.width, 18),
+            line_height=15,
+            max_lines=1,
+        )
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            self._view_model.difficulty_summary,
+            MUTED,
+            pygame.Rect(inner.left, inner.top + 42, inner.width, 18),
+            line_height=15,
+            max_lines=1,
+        )
         chip_width = int((inner.width - 24) / 3)
         chip_height = 28
         top = inner.top + 66
@@ -4187,15 +4204,13 @@ class RunScene(BaseScene):
             )
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
-        watch_text = self.fonts.small.render(self._view_model.watch_for, True, MUTED)
         status_line, hint_line = self._footer_status_lines()
-        surface.blit(watch_text, (inner.left, inner.bottom - 38))
         draw_wrapped_text(
             surface,
             self.fonts.small,
             status_line,
             TEXT,
-            pygame.Rect(inner.left, inner.bottom - 26, inner.width, 18),
+            pygame.Rect(inner.left, inner.bottom - 32, inner.width, 16),
             line_height=14,
             max_lines=1,
         )
@@ -4204,9 +4219,9 @@ class RunScene(BaseScene):
             self.fonts.small,
             hint_line,
             MUTED,
-            pygame.Rect(inner.left, inner.bottom - 10, inner.width, 32),
+            pygame.Rect(inner.left, inner.bottom - 16, inner.width, 16),
             line_height=14,
-            max_lines=2,
+            max_lines=1,
         )
 
     def _footer_status_lines(self) -> tuple[str, str]:
@@ -4242,10 +4257,7 @@ class RunScene(BaseScene):
                 f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
                 f"Actions Left: {self.state.action_points_remaining}"
             )
-        hint = self._hover_hint_line() or (
-            "Hotkeys: 1-8 panels | I inspect | F1 help | N new product | "
-            "click disabled buttons for prerequisites."
-        )
+        hint = self._hover_hint_line() or f"Watch: {self._view_model.watch_for}"
         return primary, hint
 
     def _endgame_cockpit_status_line(self) -> str:
@@ -4376,6 +4388,16 @@ class RunScene(BaseScene):
         if target.kind == "pending_option":
             return "Hover: resolve the pending event with this option."
         return ""
+
+    def _overlay_button_detail(
+        self,
+        command: str | None,
+        default_detail: str,
+        *,
+        enabled: bool,
+    ) -> str:
+        detail = self._button_detail(command, default_detail, enabled=enabled)
+        return self._compact_button_detail(detail, max_length=32)
 
     def _draw_product_card(self, surface, rect, product) -> None:
         pygame = self.pygame
@@ -4796,7 +4818,7 @@ class RunScene(BaseScene):
                 pygame,
                 rect=button_rect,
                 title=action.label,
-                detail=self._button_detail(action.command, action.detail, enabled=enabled),
+                detail=self._overlay_button_detail(action.command, action.detail, enabled=enabled),
                 accent=tone_color(action.tone),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
@@ -5002,12 +5024,15 @@ class RunScene(BaseScene):
             return
         filtered_items = self._filtered_sorted_inspector_items()
         if not filtered_items:
-            idle_surface = self.fonts.body.render(
-                "No records match the current filter in this section.",
-                True,
+            draw_wrapped_text(
+                surface,
+                self.fonts.body,
+                "No records match this filter. Press X to cycle filters or A/H to refocus.",
                 MUTED,
+                pygame.Rect(focus_inner.left, focus_inner.top, focus_inner.width, 54),
+                line_height=18,
+                max_lines=3,
             )
-            surface.blit(idle_surface, (focus_inner.left, focus_inner.top))
             return
 
         title_surface = self.fonts.heading.render(section.title, True, TEXT)
@@ -5450,11 +5475,11 @@ class RunScene(BaseScene):
             return default_detail
         return self._compact_button_detail(reason)
 
-    def _compact_button_detail(self, detail: str) -> str:
+    def _compact_button_detail(self, detail: str, *, max_length: int = 44) -> str:
         compact = detail.strip().replace("`", "")
-        if len(compact) <= 44:
+        if len(compact) <= max_length:
             return compact
-        return f"{compact[:41].rstrip()}..."
+        return f"{compact[: max_length - 3].rstrip()}..."
 
 
 class TurnSummaryScene(BaseScene):
