@@ -1,6 +1,6 @@
 # 2D Playtest Audit
 
-Date: `2026-06-02`  
+Date: `2026-06-02`
 Version under audit: `0.103.0`
 
 ## Scope
