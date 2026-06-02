@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.101.0 - 2026-06-02
+
+- Expanded 2D action choreography coverage beyond core product work so finance, board, customer/support, partner/channel, pipeline, roadmap, and hiring command families now emit motion-aware event cards with focused UI targets
+- Added motion consistency to `TitleScene` and `ReviewScene`, including animated mode transitions, feed emphasis, and overlay transitions for text input and delete confirmation instead of leaving those flows visually static
+- Tightened run-scene pre-action pulses so finance, board, report, customer, and pipeline commands animate the most relevant stats and late-game panels before their state deltas arrive
+- Added regression coverage for finance-family choreography, board-command motion routing, title-scene mode/overlay motion, and review-scene motion initialization
+- Promoted package metadata and runtime versioning to `0.101.0`
+
 ## 0.100.0 - 2026-06-02
 
 - Added action-specific 2D choreography cards for core product, hiring, pipeline, pricing, and partnership commands so the frontend now shows a distinct motion narrative before the normal delta cards land

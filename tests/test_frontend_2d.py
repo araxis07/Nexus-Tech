@@ -29,7 +29,7 @@ from nexus_tech.frontend_2d.context import (
     explain_inspector_action_unavailable,
 )
 from nexus_tech.frontend_2d.event_queue import build_action_events, build_turn_resolution_events
-from nexus_tech.frontend_2d.scenes import RunScene, TitleScene, TurnSummaryScene
+from nexus_tech.frontend_2d.scenes import ReviewScene, RunScene, TitleScene, TurnSummaryScene
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_endgame_cockpit_actions,
@@ -37,7 +37,7 @@ from nexus_tech.frontend_2d.viewmodels import (
     build_run_review_view_model,
     build_turn_summary_view_model,
 )
-from nexus_tech.frontend_2d.widgets import create_fonts
+from nexus_tech.frontend_2d.widgets import DANGER, create_fonts
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
@@ -249,6 +249,27 @@ def test_build_action_events_emit_action_choreography_cards() -> None:
         "panel:customers",
     )
     assert f"{current_state.products[0].name} Users" in event_by_title
+
+
+def test_build_action_events_emit_finance_family_choreography_cards() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    current_state = previous_state.model_copy(deep=True)
+    current_state.company.cash_on_hand += Decimal("15000.00")
+
+    events = build_action_events(
+        previous_state,
+        current_state,
+        action_label=TurnAction.TAKE_LOAN.value,
+        message="Debt bridge secured.",
+    )
+
+    event_by_title = {event.title: event for event in events}
+    assert "Funding Pulse" in event_by_title
+    assert event_by_title["Funding Pulse"].targets == (
+        "panel:finance",
+        "stat:cash",
+        "stat:runway",
+    )
 
 
 def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
@@ -677,6 +698,30 @@ def test_run_scene_panel_and_picker_overlay_motion_are_triggered() -> None:
         pygame.quit()
 
 
+def test_run_scene_board_command_triggers_board_and_endgame_motion() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=47),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._run_command(TurnAction.START_BOARD_RECOVERY_PLAN.value)
+
+        assert scene._deep_panel_key == "board"
+        assert scene._motion_pulses.get("panel:board") > 0
+        assert scene._motion_pulses.get("stat:board_pressure") > 0
+        assert scene._motion_pulses.get("panel:endgame") > 0
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
     pygame, fonts, surface = _build_pygame_bundle()
     try:
@@ -703,6 +748,32 @@ def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
         meta_lines = scene._title_sidebar_lines()
         assert any("Best path labels:" in line for line in meta_lines)
         scene.draw(surface)
+    finally:
+        pygame.quit()
+
+
+def test_title_scene_mode_and_overlay_motion_are_triggered(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-motion.db")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=17),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+        )
+
+        scene._handle_menu_action("meta")
+        scene._open_wizard_text_modal("company")
+
+        assert scene._mode == "meta"
+        assert scene._text_input is not None
+        assert scene._motion_pulses.get("title:mode:meta") > 0
+        assert scene._motion_pulses.get("title:overlay:text_input") > 0
     finally:
         pygame.quit()
 
@@ -891,6 +962,38 @@ def test_turn_summary_scene_reveals_all_phases_and_draws_small_window() -> None:
         assert scene._phase_index() == 2
         assert scene._visible_metric_count() == len(scene._view_model.metrics)
         assert scene._visible_product_count() == len(scene._view_model.product_lines)
+    finally:
+        pygame.quit()
+
+
+def test_review_scene_initializes_motion_and_draws() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.company.game_over = True
+        state.company.cash_on_hand = Decimal("-125.00")
+        review = build_run_review_view_model(state)
+        scene = ReviewScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=53),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            view_model=review,
+            accent=DANGER,
+            primary_title="Esc Close",
+            primary_detail="Leave the 2D shell.",
+            return_scene_factory=None,
+            allow_save=False,
+            dirty=False,
+        )
+
+        scene.draw(surface)
+
+        assert scene._motion_pulses.get("review:header") > 0
+        assert scene._motion_pulses.get("review:findings") > 0
+        assert scene._motion_pulses.get("review:sidebar") > 0
     finally:
         pygame.quit()
 

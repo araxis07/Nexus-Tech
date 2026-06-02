@@ -355,6 +355,9 @@ def _build_action_choreography_events(
         ),
     }
     event = choreography_map.get(action_label)
+    if event is not None:
+        return (event,)
+    event = _build_family_choreography_event(action_label, primary_product_targets)
     return (event,) if event is not None else ()
 
 
@@ -386,6 +389,178 @@ def _primary_product_targets(
         f"product:{best_product.id.hex}:fit",
         f"product:{best_product.id.hex}:debt",
     )
+
+
+def _build_family_choreography_event(
+    action_label: str,
+    primary_product_targets: tuple[str, ...],
+) -> FrontendEvent | None:
+    if action_label.startswith(
+        (
+            "take_loan",
+            "raise_",
+            "repay_debt",
+            "refinance_debt",
+            "debt_rollover",
+            "rebalance_capital",
+            "raise_reserve_target",
+            "set_capital_",
+            "set_refinancing_",
+            "set_covenant_",
+            "set_debt_",
+            "set_growth_firebreak",
+            "set_path_",
+            "set_endgame_capital_",
+            "set_exit_readiness_",
+            "set_terminal_",
+            "step_up_reserve_",
+            "harden_financing_",
+            "lock_capital_",
+        )
+    ):
+        title = (
+            "Funding Pulse"
+            if action_label.startswith(("raise_", "take_loan"))
+            else "Capital Shuffle"
+        )
+        detail = (
+            "The balance sheet, reserve posture, or funding path just moved."
+            if title == "Capital Shuffle"
+            else "Fresh financing pressure is now flowing through the company plan."
+        )
+        severity = "warning" if action_label.startswith(("take_loan", "repay_debt")) else "info"
+        return FrontendEvent(
+            title=title,
+            detail=detail,
+            severity=severity,
+            motion="slide",
+            targets=("panel:finance", "stat:cash", "stat:runway"),
+        )
+    if action_label.startswith(
+        (
+            "execute_board_",
+            "start_board_",
+            "execute_restructure_",
+        )
+    ):
+        return FrontendEvent(
+            title="Board Countermove",
+            detail="Governance pressure is being answered with a direct control move.",
+            severity="warning",
+            motion="flash",
+            targets=("panel:board", "panel:endgame", "stat:board_pressure"),
+        )
+    if action_label.startswith(
+        (
+            "adjust_pricing",
+            "set_packaging_strategy",
+            "set_target_segment",
+        )
+    ):
+        return FrontendEvent(
+            title="Go-To-Market Reset",
+            detail="Positioning, packaging, or price changed around the active demand lane.",
+            severity="info",
+            motion="slide",
+            targets=primary_product_targets + ("panel:customers", "stat:users"),
+        )
+    if action_label.startswith(
+        (
+            "invest_in_customer_success",
+            "run_retention_",
+            "make_renewal_",
+            "run_win_back_",
+            "route_support_",
+            "run_account_",
+            "run_lane_",
+            "run_renewal_",
+            "run_enterprise_",
+            "run_billing_",
+            "run_onboarding_",
+            "triage_support_",
+            "invest_in_support_",
+            "set_support_",
+            "upgrade_support_",
+        )
+    ):
+        return FrontendEvent(
+            title="Customer Defense",
+            detail="Support, retention, or rescue capacity is being pushed into the customer base.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:customers", "stat:users") + primary_product_targets,
+        )
+    if action_label.startswith(
+        (
+            "invest_in_partner_",
+            "run_channel_",
+            "rebalance_channel_",
+            "renegotiate_partnership",
+            "reactivate_partnership",
+            "pause_partnership",
+            "run_partner_",
+            "run_reseller_",
+            "run_integration_",
+            "run_marketplace_",
+        )
+    ):
+        return FrontendEvent(
+            title="Channel Recovery",
+            detail="Partner leverage or channel mix is being actively reshaped.",
+            severity="info",
+            motion="slide",
+            targets=("panel:partnerships", "stat:users"),
+        )
+    if action_label.startswith(("create_sales_deal", "advance_sales_deal")):
+        return FrontendEvent(
+            title="Pipeline Pressure",
+            detail="Sales motion is changing the commercial pipeline in real time.",
+            severity="success" if action_label.startswith("advance_") else "info",
+            motion="slide",
+            targets=("panel:pipeline", "panel:customers", "stat:users"),
+        )
+    if action_label.startswith(("work_release", "plan_release")):
+        return FrontendEvent(
+            title="Release Burn",
+            detail="The delivery lane is converting execution into a shippable milestone.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline",) + primary_product_targets,
+        )
+    if action_label.startswith(("start_roadmap_project", "work_roadmap_project")):
+        return FrontendEvent(
+            title="Roadmap Pressure",
+            detail="A strategic project is absorbing delivery capacity and product focus.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline", "panel:products") + primary_product_targets,
+        )
+    if action_label.startswith(
+        (
+            "source_candidates",
+            "screen_candidate",
+            "interview_candidate",
+            "make_hiring_offer",
+            "train_",
+            "promote_",
+            "reorg_",
+            "rest_",
+            "appoint_",
+            "assign_manager",
+            "clear_manager",
+        )
+    ):
+        return FrontendEvent(
+            title="Team Rewire",
+            detail=(
+                "Capacity, leadership, or the hiring funnel is shifting around "
+                "execution demand."
+            ),
+            severity="info",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        )
+    return None
 
 
 def _action_workspace_targets(action_label: str) -> tuple[str, ...]:

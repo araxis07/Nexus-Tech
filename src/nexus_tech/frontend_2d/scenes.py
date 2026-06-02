@@ -556,6 +556,7 @@ class TitleScene(BaseScene):
         self._mode = initial_mode
         self._click_targets: list[ClickTarget] = []
         self._events: list[TimedFrontendEvent] = []
+        self._motion_pulses = PulseBank(decay=1.9)
         self._text_input: TextInputModalState | None = None
         self._save_cards: tuple[SaveSlotCardViewModel, ...] = ()
         self._archive_cards: tuple[ArchiveCardViewModel, ...] = ()
@@ -580,6 +581,8 @@ class TitleScene(BaseScene):
         )
         self._refresh_lists()
         self._refresh_wizard_catalog()
+        self._trigger_title_motion("header", intensity=0.5)
+        self._trigger_mode_motion(initial_mode, intensity=0.72)
         if info_message:
             self.push_event(
                 FrontendEvent(
@@ -591,11 +594,56 @@ class TitleScene(BaseScene):
             )
 
     def update(self, dt: float) -> None:
+        self._motion_pulses.update(dt)
         self._events = [
             TimedFrontendEvent(payload=event.payload, time_left=event.time_left - dt)
             for event in self._events
             if event.time_left - dt > 0
         ]
+
+    def _motion_level(self, *keys: str) -> float:
+        if not keys:
+            return 0.0
+        return max(self._motion_pulses.get(key) for key in keys)
+
+    def _overlay_motion_level(self, overlay_key: str) -> float:
+        return self._motion_level(f"title:overlay:{overlay_key}")
+
+    def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
+        pulse = self._overlay_motion_level(overlay_key)
+        alpha = min(224, 180 + int(pulse * 36))
+        return (8, 10, 14, alpha)
+
+    def _trigger_title_motion(self, section_key: str, *, intensity: float = 0.6) -> None:
+        self._motion_pulses.trigger(f"title:{section_key}", intensity=intensity, decay=2.1)
+
+    def _trigger_mode_motion(self, mode: str, *, intensity: float = 0.72) -> None:
+        self._motion_pulses.trigger(f"title:mode:{mode}", intensity=intensity, decay=2.4)
+        self._trigger_title_motion("content", intensity=max(0.44, intensity * 0.7))
+        self._trigger_title_motion("footer", intensity=max(0.32, intensity * 0.5))
+
+    def _trigger_overlay_motion(self, overlay_key: str, *, intensity: float = 0.76) -> None:
+        self._motion_pulses.trigger(
+            f"title:overlay:{overlay_key}",
+            intensity=intensity,
+            decay=2.2,
+        )
+
+    def _set_mode(self, mode: str) -> None:
+        if mode == self._mode:
+            return
+        self._mode = mode
+        self._trigger_mode_motion(mode)
+
+    def _set_text_input(self, modal: TextInputModalState | None) -> None:
+        self._text_input = modal
+        if modal is not None:
+            self._trigger_overlay_motion("text_input")
+
+    def _set_confirm_delete_slot_name(self, slot_name: str | None) -> None:
+        self._confirm_delete_slot_name = slot_name
+        if slot_name is not None:
+            self._trigger_overlay_motion("delete")
 
     def handle_event(self, event) -> None:
         if event.type == self.pygame.QUIT:
@@ -609,19 +657,19 @@ class TitleScene(BaseScene):
             return
         if self._text_input is not None:
             if event.key == self.pygame.K_ESCAPE:
-                self._text_input = None
+                self._set_text_input(None)
                 return
             self._handle_text_input_key(event)
             return
         if self._confirm_delete_slot_name is not None:
             if event.key == self.pygame.K_ESCAPE:
-                self._confirm_delete_slot_name = None
+                self._set_confirm_delete_slot_name(None)
             elif event.key in (self.pygame.K_RETURN, self.pygame.K_KP_ENTER):
                 self._delete_selected_slot()
             return
         if event.key == self.pygame.K_ESCAPE:
             if self._mode != "menu":
-                self._mode = "slots" if self._mode == "slot_detail" else "menu"
+                self._set_mode("slots" if self._mode == "slot_detail" else "menu")
                 return
             self.should_exit = True
             self.exit_reason = "quit"
@@ -694,6 +742,14 @@ class TitleScene(BaseScene):
     def push_event(self, payload: FrontendEvent) -> None:
         self._events.insert(0, TimedFrontendEvent(payload=payload, time_left=payload.ttl))
         self._events = self._events[:5]
+        intensity = _MOTION_INTENSITY.get(payload.severity, 0.42)
+        self._trigger_title_motion("feed", intensity=max(0.3, intensity * 0.72))
+        self._trigger_title_motion("status", intensity=max(0.24, intensity * 0.5))
+        self._motion_pulses.trigger(
+            f"title:mode:{self._mode}",
+            intensity=max(0.22, intensity * 0.4),
+            decay=2.0,
+        )
 
     def _refresh_lists(self) -> None:
         try:
@@ -750,19 +806,19 @@ class TitleScene(BaseScene):
             self._launch_wizard_run()
             return
         if target.kind == "wizard_back":
-            self._mode = "menu"
+            self._set_mode("menu")
             return
         if target.kind == "confirm_delete":
             self._delete_selected_slot()
             return
         if target.kind == "cancel_delete":
-            self._confirm_delete_slot_name = None
+            self._set_confirm_delete_slot_name(None)
             return
         if target.kind == "submit_text":
             self._submit_text_modal()
             return
         if target.kind == "cancel_text":
-            self._text_input = None
+            self._set_text_input(None)
             return
 
     def _handle_digit_shortcut(self, digit: int) -> None:
@@ -791,7 +847,7 @@ class TitleScene(BaseScene):
             return
         if self._mode == "slots":
             if digit == 9:
-                self._mode = "menu"
+                self._set_mode("menu")
                 return
             index = digit - 1
             if 0 <= index < len(self._save_cards):
@@ -811,7 +867,7 @@ class TitleScene(BaseScene):
             return
         if self._mode == "archives":
             if digit == 9:
-                self._mode = "menu"
+                self._set_mode("menu")
                 return
             index = digit - 1
             if 0 <= index < len(self._archive_cards):
@@ -819,28 +875,28 @@ class TitleScene(BaseScene):
             return
         if self._mode == "wizard":
             if digit == 8:
-                self._mode = "menu"
+                self._set_mode("menu")
             elif digit == 9:
                 self._launch_wizard_run()
 
     def _handle_menu_action(self, action: str) -> None:
         if action == "menu":
-            self._mode = "menu"
+            self._set_mode("menu")
             return
         if action == "continue":
             self._continue_last_save()
             return
         if action == "load_slots":
-            self._mode = "slots"
+            self._set_mode("slots")
             return
         if action == "archives":
-            self._mode = "archives"
+            self._set_mode("archives")
             return
         if action == "meta":
-            self._mode = "meta"
+            self._set_mode("meta")
             return
         if action == "new_wizard":
-            self._mode = "wizard"
+            self._set_mode("wizard")
             return
         if action == "quit":
             self.should_exit = True
@@ -910,7 +966,7 @@ class TitleScene(BaseScene):
         if slot_name not in self._save_summaries_by_slot:
             return
         self._selected_slot_name = slot_name
-        self._mode = "slot_detail"
+        self._set_mode("slot_detail")
 
     def _spawn_scene(self, mode: str) -> "TitleScene":
         return TitleScene(
@@ -1005,7 +1061,7 @@ class TitleScene(BaseScene):
 
     def _handle_slot_action(self, action: str) -> None:
         if action == "back":
-            self._mode = "slots"
+            self._set_mode("slots")
             return
         slot_name = self._selected_slot_name
         if slot_name is None:
@@ -1014,31 +1070,35 @@ class TitleScene(BaseScene):
             self._load_slot(slot_name)
             return
         if action == "rename":
-            self._text_input = TextInputModalState(
-                title="Rename Save Slot",
-                description=f"Enter the new name for `{slot_name}`.",
-                severity="warning",
-                submit_title="Enter Rename",
-                submit_detail="Rename the selected save slot.",
-                text=slot_name,
-                placeholder="Save slot name",
-                on_submit=self._rename_selected_slot,
+            self._set_text_input(
+                TextInputModalState(
+                    title="Rename Save Slot",
+                    description=f"Enter the new name for `{slot_name}`.",
+                    severity="warning",
+                    submit_title="Enter Rename",
+                    submit_detail="Rename the selected save slot.",
+                    text=slot_name,
+                    placeholder="Save slot name",
+                    on_submit=self._rename_selected_slot,
+                )
             )
             return
         if action == "duplicate":
-            self._text_input = TextInputModalState(
-                title="Duplicate Save Slot",
-                description=f"Enter the name for the duplicate of `{slot_name}`.",
-                severity="info",
-                submit_title="Enter Duplicate",
-                submit_detail="Create another save slot with the same run.",
-                text=f"{slot_name}-copy",
-                placeholder="Save slot name",
-                on_submit=self._duplicate_selected_slot,
+            self._set_text_input(
+                TextInputModalState(
+                    title="Duplicate Save Slot",
+                    description=f"Enter the name for the duplicate of `{slot_name}`.",
+                    severity="info",
+                    submit_title="Enter Duplicate",
+                    submit_detail="Create another save slot with the same run.",
+                    text=f"{slot_name}-copy",
+                    placeholder="Save slot name",
+                    on_submit=self._duplicate_selected_slot,
+                )
             )
             return
         if action == "delete":
-            self._confirm_delete_slot_name = slot_name
+            self._set_confirm_delete_slot_name(slot_name)
 
     def _rename_selected_slot(self, new_name: str) -> None:
         slot_name = self._selected_slot_name
@@ -1125,7 +1185,7 @@ class TitleScene(BaseScene):
 
     def _delete_selected_slot(self) -> None:
         slot_name = self._confirm_delete_slot_name
-        self._confirm_delete_slot_name = None
+        self._set_confirm_delete_slot_name(None)
         if slot_name is None:
             return
         try:
@@ -1141,7 +1201,7 @@ class TitleScene(BaseScene):
             )
             return
         self._selected_slot_name = None
-        self._mode = "slots"
+        self._set_mode("slots")
         self._refresh_lists()
         self.push_event(
             FrontendEvent(
@@ -1217,15 +1277,17 @@ class TitleScene(BaseScene):
         if entry is None:
             return
         title, description, text, placeholder, callback = entry
-        self._text_input = TextInputModalState(
-            title=title,
-            description=description,
-            severity="info",
-            submit_title="Enter Apply",
-            submit_detail="Apply this value to the new-run wizard.",
-            text=text,
-            placeholder=placeholder,
-            on_submit=callback,
+        self._set_text_input(
+            TextInputModalState(
+                title=title,
+                description=description,
+                severity="info",
+                submit_title="Enter Apply",
+                submit_detail="Apply this value to the new-run wizard.",
+                text=text,
+                placeholder=placeholder,
+                on_submit=callback,
+            )
         )
 
     def _set_wizard_company_name(self, value: str) -> None:
@@ -1328,12 +1390,21 @@ class TitleScene(BaseScene):
         modal = self._text_input
         if modal is None:
             return
-        self._text_input = None
+        self._set_text_input(None)
         modal.on_submit(modal.text.strip())
 
     def _draw_title_header(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Title", accent=INFO)
+        header_motion = self._motion_level("title:header", f"title:mode:{self._mode}")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Title",
+            accent=INFO,
+            emphasis=header_motion,
+            lift=int(header_motion * 3),
+        )
         title_surface = self.fonts.title.render("NEXUS TECH 2D", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
         subtitle = (
@@ -1358,7 +1429,16 @@ class TitleScene(BaseScene):
 
     def _draw_title_menu(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Menu", accent=GOOD)
+        menu_motion = self._motion_level("title:mode:menu", "title:content")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Menu",
+            accent=GOOD,
+            emphasis=menu_motion,
+            lift=int(menu_motion * 3),
+        )
         title_surface = self.fonts.heading.render("Title Menu", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         buttons = (
@@ -1404,7 +1484,16 @@ class TitleScene(BaseScene):
         pygame = self.pygame
         meta = self._meta_progression
         comparison = self._archive_comparison
-        inner = draw_panel(surface, pygame, rect, title="Meta Board", accent=SELECTION)
+        meta_motion = self._motion_level("title:mode:meta", "title:content")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Meta Board",
+            accent=SELECTION,
+            emphasis=meta_motion,
+            lift=int(meta_motion * 3),
+        )
         title_surface = self.fonts.heading.render("Archive / Progression Board", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
 
@@ -1502,7 +1591,17 @@ class TitleScene(BaseScene):
         self, surface, rect, *, title: str, cards, click_kind: str, back_detail: str
     ) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title=title, accent=SELECTION)
+        mode_key = "archives" if click_kind == "archive" else "slots"
+        browser_motion = self._motion_level(f"title:mode:{mode_key}", "title:content")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title=title,
+            accent=SELECTION,
+            emphasis=browser_motion,
+            lift=int(browser_motion * 3),
+        )
         title_surface = self.fonts.heading.render(title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         if not cards:
@@ -1543,7 +1642,16 @@ class TitleScene(BaseScene):
     def _draw_slot_detail(self, surface, rect) -> None:
         pygame = self.pygame
         summary = self._save_summaries_by_slot.get(self._selected_slot_name or "")
-        inner = draw_panel(surface, pygame, rect, title="Save Slot", accent=GOOD)
+        detail_motion = self._motion_level("title:mode:slot_detail", "title:content")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Save Slot",
+            accent=GOOD,
+            emphasis=detail_motion,
+            lift=int(detail_motion * 3),
+        )
         title_surface = self.fonts.heading.render("Save Slot Actions", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         if summary is None:
@@ -1600,7 +1708,16 @@ class TitleScene(BaseScene):
 
     def _draw_new_game_wizard(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="New Game", accent=INFO)
+        wizard_motion = self._motion_level("title:mode:wizard", "title:content")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="New Game",
+            accent=INFO,
+            emphasis=wizard_motion,
+            lift=int(wizard_motion * 3),
+        )
         title_surface = self.fonts.heading.render("New Game Wizard", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         scenario = self.selected_scenario_choice
@@ -1727,7 +1844,16 @@ class TitleScene(BaseScene):
             rect.width,
             rect.height - summary_rect.height - 12,
         )
-        inner = draw_panel(surface, pygame, summary_rect, title="Status", accent=WARN)
+        status_motion = self._motion_level("title:status", f"title:mode:{self._mode}")
+        inner = draw_panel(
+            surface,
+            pygame,
+            summary_rect,
+            title="Status",
+            accent=WARN,
+            emphasis=status_motion,
+            lift=int(status_motion * 2),
+        )
         title_surface = self.fonts.heading.render("2D Frontend Status", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         lines = self._title_sidebar_lines()
@@ -1744,7 +1870,16 @@ class TitleScene(BaseScene):
             )
             top += max(24, consumed)
 
-        event_inner = draw_panel(surface, pygame, events_rect, title="Feed", accent=INFO)
+        feed_motion = self._motion_level("title:feed")
+        event_inner = draw_panel(
+            surface,
+            pygame,
+            events_rect,
+            title="Feed",
+            accent=INFO,
+            emphasis=feed_motion,
+            lift=int(feed_motion * 2),
+        )
         event_title = self.fonts.heading.render("Frontend Feed", True, TEXT)
         surface.blit(event_title, (event_inner.left, event_inner.top - 24))
         if not self._events:
@@ -1759,7 +1894,16 @@ class TitleScene(BaseScene):
 
     def _draw_title_footer(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Guide", accent=INFO)
+        footer_motion = self._motion_level("title:footer", f"title:mode:{self._mode}")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Guide",
+            accent=INFO,
+            emphasis=footer_motion,
+            lift=int(footer_motion * 2),
+        )
         if self._mode == "menu":
             message = "Menu: 1 continue, 2 saves, 3 archives, 4 meta board, 5 wizard, 6 quit."
         elif self._mode == "meta":
@@ -1837,11 +1981,20 @@ class TitleScene(BaseScene):
     def _draw_delete_confirmation_overlay(self, surface) -> None:
         pygame = self.pygame
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay_motion = self._overlay_motion_level("delete")
+        overlay.fill(self._overlay_fill("delete"))
         surface.blit(overlay, (0, 0))
         slot_name = self._confirm_delete_slot_name or "selected slot"
         modal_rect = _fit_modal_rect(pygame, surface, width=540, height=200, margin=24)
-        inner = draw_panel(surface, pygame, modal_rect, title="Delete Save", accent=DANGER)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Delete Save",
+            accent=DANGER,
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 5),
+        )
         title_surface = self.fonts.title.render("Delete Save Slot?", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
         draw_wrapped_text(
@@ -1884,7 +2037,8 @@ class TitleScene(BaseScene):
         if modal is None:
             return
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay_motion = self._overlay_motion_level("text_input")
+        overlay.fill(self._overlay_fill("text_input"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=600, height=280, margin=24)
         inner = draw_panel(
@@ -1893,6 +2047,8 @@ class TitleScene(BaseScene):
             modal_rect,
             title="Text Input",
             accent=tone_color(modal.severity),
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 5),
         )
         title_surface = self.fonts.title.render(modal.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
@@ -1954,16 +2110,38 @@ class TitleScene(BaseScene):
     def _draw_event_card(self, surface, rect, timed_event: TimedFrontendEvent) -> None:
         pygame = self.pygame
         color = tone_color(timed_event.payload.severity)
-        pygame.draw.rect(surface, (26, 38, 55), rect, border_radius=14)
-        pygame.draw.rect(surface, color, rect, width=1, border_radius=14)
+        event_motion = self._motion_level("title:feed")
+        enter_duration = 0.3 if timed_event.payload.motion == "slide" else 0.2
+        enter_ratio = min(1.0, max(0.0, timed_event.time_left / max(0.01, enter_duration)))
+        animated_rect = pygame.Rect(
+            rect.left,
+            rect.top - int((1.0 - enter_ratio) * 5 + event_motion * 2),
+            rect.width,
+            rect.height,
+        )
+        fill = blend_color((26, 38, 55), color, min(0.22, event_motion * 0.16))
+        border = blend_color(color, TEXT, event_motion * 0.1)
+        pygame.draw.rect(surface, fill, animated_rect, border_radius=14)
+        pygame.draw.rect(
+            surface,
+            border,
+            animated_rect,
+            width=2 if event_motion >= 0.4 else 1,
+            border_radius=14,
+        )
         title_surface = self.fonts.body.render(timed_event.payload.title, True, TEXT)
-        surface.blit(title_surface, (rect.left + 12, rect.top + 10))
+        surface.blit(title_surface, (animated_rect.left + 12, animated_rect.top + 10))
         draw_wrapped_text(
             surface,
             self.fonts.small,
             timed_event.payload.detail,
             MUTED,
-            pygame.Rect(rect.left + 12, rect.top + 30, rect.width - 24, rect.height - 36),
+            pygame.Rect(
+                animated_rect.left + 12,
+                animated_rect.top + 30,
+                animated_rect.width - 24,
+                animated_rect.height - 36,
+            ),
             line_height=15,
             max_lines=2,
         )
@@ -2005,9 +2183,22 @@ class ReviewScene(BaseScene):
         self._return_scene_factory = return_scene_factory
         self._allow_save = allow_save
         self._click_targets: list[ClickTarget] = []
+        self._motion_pulses = PulseBank(decay=1.9)
+        self._trigger_review_motion("header", intensity=0.58)
+        self._trigger_review_motion("findings", intensity=0.72 if view_model.findings else 0.4)
+        self._trigger_review_motion("sidebar", intensity=0.52)
+        self._trigger_review_motion("footer", intensity=0.5)
 
     def update(self, dt: float) -> None:
-        _ = dt
+        self._motion_pulses.update(dt)
+
+    def _trigger_review_motion(self, section_key: str, *, intensity: float = 0.6) -> None:
+        self._motion_pulses.trigger(f"review:{section_key}", intensity=intensity, decay=2.2)
+
+    def _motion_level(self, *keys: str) -> float:
+        if not keys:
+            return 0.0
+        return max(self._motion_pulses.get(key) for key in keys)
 
     def handle_event(self, event) -> None:
         if event.type == self.pygame.QUIT:
@@ -2077,7 +2268,16 @@ class ReviewScene(BaseScene):
 
     def _draw_review_header(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Review", accent=self._accent)
+        header_motion = self._motion_level("review:header")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Review",
+            accent=self._accent,
+            emphasis=header_motion,
+            lift=int(header_motion * 3),
+        )
         title_surface = self.fonts.title.render(self._view_model.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
         headline_surface = self.fonts.body.render(self._view_model.headline, True, TEXT)
@@ -2087,7 +2287,16 @@ class ReviewScene(BaseScene):
 
     def _draw_review_findings(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Findings", accent=self._accent)
+        findings_motion = self._motion_level("review:findings")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Findings",
+            accent=self._accent,
+            emphasis=findings_motion,
+            lift=int(findings_motion * 3),
+        )
         title_surface = self.fonts.heading.render("Top Findings", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         if not self._view_model.findings:
@@ -2098,20 +2307,45 @@ class ReviewScene(BaseScene):
         for finding in self._view_model.findings:
             card_rect = pygame.Rect(inner.left, top, inner.width, 98)
             accent = tone_color(finding.severity)
-            pygame.draw.rect(surface, (26, 38, 55), card_rect, border_radius=16)
-            pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=16)
+            finding_motion = max(
+                findings_motion * 0.65, 0.18 if finding.rank_label == "#1" else 0.0
+            )
+            animated_rect = pygame.Rect(
+                card_rect.left,
+                card_rect.top - int(finding_motion * 4),
+                card_rect.width,
+                card_rect.height,
+            )
+            pygame.draw.rect(
+                surface,
+                blend_color((26, 38, 55), accent, finding_motion * 0.12),
+                animated_rect,
+                border_radius=16,
+            )
+            pygame.draw.rect(
+                surface,
+                blend_color(accent, TEXT, finding_motion * 0.08),
+                animated_rect,
+                width=2 if finding_motion >= 0.42 else 1,
+                border_radius=16,
+            )
             title_surface = self.fonts.body.render(
                 f"{finding.rank_label} {finding.area} | {finding.command}",
                 True,
                 TEXT,
             )
-            surface.blit(title_surface, (card_rect.left + 12, card_rect.top + 10))
+            surface.blit(title_surface, (animated_rect.left + 12, animated_rect.top + 10))
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
                 finding.summary,
                 MUTED,
-                pygame.Rect(card_rect.left + 12, card_rect.top + 32, card_rect.width - 24, 28),
+                pygame.Rect(
+                    animated_rect.left + 12,
+                    animated_rect.top + 32,
+                    animated_rect.width - 24,
+                    28,
+                ),
                 line_height=15,
                 max_lines=2,
             )
@@ -2120,7 +2354,12 @@ class ReviewScene(BaseScene):
                 self.fonts.small,
                 finding.lesson,
                 tone_color(finding.severity),
-                pygame.Rect(card_rect.left + 12, card_rect.top + 62, card_rect.width - 24, 20),
+                pygame.Rect(
+                    animated_rect.left + 12,
+                    animated_rect.top + 62,
+                    animated_rect.width - 24,
+                    20,
+                ),
                 line_height=15,
                 max_lines=1,
             )
@@ -2128,7 +2367,16 @@ class ReviewScene(BaseScene):
 
     def _draw_review_sidebar(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Summary", accent=INFO)
+        sidebar_motion = self._motion_level("review:sidebar")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Summary",
+            accent=INFO,
+            emphasis=sidebar_motion,
+            lift=int(sidebar_motion * 2),
+        )
         title_surface = self.fonts.heading.render("Next Focus", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         focus_surface = self.fonts.body.render(self._view_model.next_focus, True, INFO)
@@ -2138,15 +2386,35 @@ class ReviewScene(BaseScene):
         top = inner.top + 52
         for badge in self._view_model.badges[:6]:
             chip_rect = pygame.Rect(inner.left, top, inner.width, 28)
-            pygame.draw.rect(surface, (24, 35, 50), chip_rect, border_radius=12)
-            pygame.draw.rect(surface, BORDER, chip_rect, width=1, border_radius=12)
+            pygame.draw.rect(
+                surface,
+                blend_color((24, 35, 50), INFO, sidebar_motion * 0.08),
+                chip_rect,
+                border_radius=12,
+            )
+            pygame.draw.rect(
+                surface,
+                blend_color(BORDER, INFO, sidebar_motion * 0.12),
+                chip_rect,
+                width=1,
+                border_radius=12,
+            )
             badge_surface = self.fonts.small.render(badge.replace("_", " "), True, TEXT)
             surface.blit(badge_surface, (chip_rect.left + 10, chip_rect.top + 7))
             top += 36
 
     def _draw_review_footer(self, surface, rect) -> None:
         pygame = self.pygame
-        inner = draw_panel(surface, pygame, rect, title="Actions", accent=self._accent)
+        footer_motion = self._motion_level("review:footer")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Actions",
+            accent=self._accent,
+            emphasis=footer_motion,
+            lift=int(footer_motion * 2),
+        )
         primary_rect = pygame.Rect(inner.left, inner.top + 20, 260, 40)
         draw_button(
             surface,
@@ -2955,6 +3223,18 @@ class RunScene(BaseScene):
         if panel_key is not None:
             self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.65, decay=1.8)
             self._motion_pulses.trigger("footer", intensity=0.32, decay=1.6)
+        if panel_key == "finance":
+            self._motion_pulses.trigger("stat:cash", intensity=0.52, decay=1.7)
+            self._motion_pulses.trigger("stat:runway", intensity=0.44, decay=1.7)
+        elif panel_key == "customers":
+            self._motion_pulses.trigger("stat:users", intensity=0.5, decay=1.7)
+        elif panel_key == "partnerships":
+            self._motion_pulses.trigger("stat:users", intensity=0.42, decay=1.7)
+        elif panel_key == "board":
+            self._motion_pulses.trigger("stat:board_pressure", intensity=0.58, decay=1.8)
+            self._motion_pulses.trigger("panel:endgame", intensity=0.4, decay=1.8)
+        elif panel_key == "report":
+            self._motion_pulses.trigger("panel:endgame", intensity=0.34, decay=1.6)
         if command in {
             TurnAction.IMPROVE_QUALITY.value,
             TurnAction.ADD_FEATURE.value,
@@ -2967,6 +3247,24 @@ class RunScene(BaseScene):
             self._motion_pulses.trigger("panel:products", intensity=0.65, decay=1.8)
         if command == TurnAction.HIRE_EMPLOYEE.value:
             self._motion_pulses.trigger("panel:team", intensity=0.7, decay=1.8)
+        if command in {
+            TurnAction.PLAN_RELEASE.value,
+            TurnAction.WORK_RELEASE.value,
+            TurnAction.START_ROADMAP_PROJECT.value,
+            TurnAction.WORK_ROADMAP_PROJECT.value,
+            TurnAction.CREATE_SALES_DEAL.value,
+            TurnAction.ADVANCE_SALES_DEAL.value,
+        }:
+            self._motion_pulses.trigger("panel:pipeline", intensity=0.68, decay=1.8)
+            self._motion_pulses.trigger("panel:products", intensity=0.4, decay=1.8)
+        if command in {
+            TurnAction.EXECUTE_BOARD_RESPONSE.value,
+            TurnAction.START_BOARD_RECOVERY_PLAN.value,
+            TurnAction.EXECUTE_RESTRUCTURE_PLAN.value,
+        }:
+            self._motion_pulses.trigger("panel:board", intensity=0.75, decay=1.9)
+            self._motion_pulses.trigger("stat:board_pressure", intensity=0.62, decay=1.9)
+            self._motion_pulses.trigger("panel:endgame", intensity=0.45, decay=1.9)
         if command == TurnAction.END_TURN.value:
             self._motion_pulses.trigger("summary:timeline", intensity=0.6, decay=1.4)
             self._motion_pulses.trigger("stat:cash", intensity=0.45, decay=1.4)
