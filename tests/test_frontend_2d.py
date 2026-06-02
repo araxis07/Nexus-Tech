@@ -34,7 +34,13 @@ from nexus_tech.frontend_2d.event_queue import (
     build_action_events,
     build_turn_resolution_events,
 )
-from nexus_tech.frontend_2d.scenes import ReviewScene, RunScene, TitleScene, TurnSummaryScene
+from nexus_tech.frontend_2d.scenes import (
+    ClickTarget,
+    ReviewScene,
+    RunScene,
+    TitleScene,
+    TurnSummaryScene,
+)
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_endgame_cockpit_actions,
@@ -613,6 +619,8 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         scene._set_deep_panel("endgame")
         workspace_line, hint_line = scene._footer_status_lines()
         assert "Workspace: Endgame / Exit Board" in workspace_line
+        assert "Gate:" in workspace_line
+        assert "Hotspot:" in workspace_line
         assert hint_line
 
         picker = ContextPicker(
@@ -636,6 +644,61 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         picker_line, _ = scene._footer_status_lines()
 
         assert picker_line.startswith("Picker: Capital Plan")
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_endgame_panel_action_tooltip_mentions_handoff_destination() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=31),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("endgame")
+        panel = scene.deep_panel
+        assert panel is not None
+        action = next(entry for entry in panel.actions if entry.label == "Hotspot Review")
+        hint = scene._describe_click_target(
+            ClickTarget("panel_action", action.command, _surface.get_rect())
+        )
+
+        assert "from the cockpit" in hint
+        assert "hand off into" in hint
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_inspector_primary_action_summary_reflects_ready_state() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = _build_enriched_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=41),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._open_inspector("pipeline")
+        scene._select_inspector_section("releases")
+
+        summary = scene._selected_inspector_primary_action_summary()
+        badge = scene._inspector_item_action_badge(scene._selected_inspector_item())
+
+        assert summary.startswith("Next: 1 ")
+        assert badge is not None
+        assert badge[0] in {"READY", "BLOCKED"}
     finally:
         pygame.quit()
 

@@ -4217,10 +4217,13 @@ class RunScene(BaseScene):
         if self._inspector_panel_key is not None and self.inspector_panel is not None:
             section = self._selected_inspector_section()
             section_title = section.title if section is not None else "Records"
+            action_summary = self._selected_inspector_primary_action_summary()
             primary = (
                 f"Inspector: {self.inspector_panel.title} | {section_title} | "
                 f"page {self._inspector_page + 1}/{self._inspector_total_pages()}"
             )
+            if action_summary:
+                primary = f"{primary} | {action_summary}"
         elif self._context_picker is not None:
             primary = (
                 f"Picker: {self._context_picker.title} | {len(self._context_picker.options)} "
@@ -4232,6 +4235,8 @@ class RunScene(BaseScene):
             primary = (
                 f"Pending Event: {self.state.pending_event.title} | resolve before more actions"
             )
+        elif self._deep_panel_key == "endgame":
+            primary = self._endgame_cockpit_status_line()
         else:
             primary = (
                 f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
@@ -4242,6 +4247,41 @@ class RunScene(BaseScene):
             "click disabled buttons for prerequisites."
         )
         return primary, hint
+
+    def _endgame_cockpit_status_line(self) -> str:
+        panel = self.deep_panel
+        workspace_title = (
+            self._panel_display_name(self._deep_panel_key)
+            if self._deep_panel_key is not None
+            else "Endgame / Exit Board"
+        )
+        if panel is None:
+            return f"Workspace: {workspace_title}"
+        gate_action = next(
+            (action for action in panel.actions if action.label == "Gate Command"),
+            None,
+        )
+        hotspot_action = next(
+            (action for action in panel.actions if action.label == "Hotspot Review"),
+            None,
+        )
+        segments = [f"Workspace: {workspace_title}"]
+        if gate_action is not None:
+            segments.append(f"Gate: {gate_action.command}")
+        if hotspot_action is not None:
+            segments.append(f"Hotspot: {hotspot_action.command}")
+        segments.append(f"Actions Left: {self.state.action_points_remaining}")
+        return " | ".join(segments)
+
+    def _selected_inspector_primary_action_summary(self) -> str:
+        item = self._selected_inspector_item()
+        if item is None or not item.actions:
+            return ""
+        action = item.actions[0]
+        reason = self._inspector_item_action_reason(action.command, item.payload)
+        if reason is None:
+            return f"Next: 1 {action.label}"
+        return f"Blocked: {self._compact_button_detail(reason)}"
 
     def _button_is_enabled(self, button: ActionButtonSpec) -> bool:
         if button.kind in {"save", "panel"}:
@@ -4303,6 +4343,15 @@ class RunScene(BaseScene):
             reason = self._command_disabled_reason(target.payload)
             if reason is not None:
                 return f"Hover: `{target.payload}` is blocked because {reason}"
+            if target.kind == "panel_action" and self._deep_panel_key == "endgame":
+                workspace_key = self._workspace_panel_key_for_command(target.payload)
+                inspector_key = self._inspector_key_for_command(target.payload)
+                destination = inspector_key or workspace_key
+                if destination is not None:
+                    return (
+                        f"Hover: run `{target.payload}` from the cockpit and hand off into "
+                        f"{self._panel_display_name(destination)}."
+                    )
             return f"Hover: run `{target.payload}` now."
         if target.kind == "panel":
             return f"Hover: open the {target.payload} deep-dive panel."
@@ -5019,6 +5068,19 @@ class RunScene(BaseScene):
                 pygame.draw.rect(surface, SELECTION, badge_rect, width=1, border_radius=9)
                 badge_surface = self.fonts.small.render("ACTIVE", True, SELECTION)
                 surface.blit(badge_surface, (badge_rect.left + 10, badge_rect.top + 2))
+                action_badge = self._inspector_item_action_badge(item)
+                if action_badge is not None:
+                    label, accent = action_badge
+                    status_rect = pygame.Rect(item_rect.right - 170, item_rect.top + 8, 78, 18)
+                    pygame.draw.rect(
+                        surface,
+                        blend_color((24, 35, 50), accent, 0.2),
+                        status_rect,
+                        border_radius=9,
+                    )
+                    pygame.draw.rect(surface, accent, status_rect, width=1, border_radius=9)
+                    status_surface = self.fonts.small.render(label, True, accent)
+                    surface.blit(status_surface, (status_rect.left + 8, status_rect.top + 2))
             line_top = item_rect.top + 28
             for line in item.detail_lines[:3]:
                 consumed = draw_wrapped_text(
@@ -5048,6 +5110,9 @@ class RunScene(BaseScene):
         )
         if selected_item is not None:
             focus_line = " | ".join(selected_item.detail_lines[:2]) or "No detail lines captured."
+            next_line = self._selected_inspector_primary_action_summary()
+            if next_line:
+                focus_line = f"{focus_line} | {next_line}"
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
@@ -5128,6 +5193,15 @@ class RunScene(BaseScene):
     def _section_button_detail(self, section, *, selected: bool) -> str:
         state = "active focus" if selected else "click to focus"
         return f"{len(section.items)} records | {state}"
+
+    def _inspector_item_action_badge(self, item) -> tuple[str, tuple[int, int, int]] | None:
+        if not item.actions:
+            return None
+        action = item.actions[0]
+        reason = self._inspector_item_action_reason(action.command, item.payload)
+        if reason is None:
+            return ("READY", GOOD)
+        return ("BLOCKED", WARN)
 
     def _inspector_sort_mode_label(self) -> str:
         labels = {

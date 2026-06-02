@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.104.0 - 2026-06-03
+
+- Ran another playtest-driven 2D UX pass centered on late-game clarity rather than adding new systems, focusing on cockpit guidance, inspector scanning, and hover language
+- Upgraded the action-bar footer so endgame panels now expose gate and hotspot context directly, while inspectors surface their next primary action or blocked prerequisite in the live status line
+- Improved cockpit hover hints so late-game panel buttons now tell the player which workspace they will hand off into instead of only naming the raw command
+- Strengthened inspector focus readability with a `READY` / `BLOCKED` status chip on the active row plus a richer focus note, and added regression coverage for endgame footer status, cockpit tooltip routing, and inspector action summaries
+- Added a dedicated visual-UX audit note and promoted package metadata and runtime versioning to `0.104.0`
+
 ## 0.103.0 - 2026-06-02
 
 - Ran a fresh 2D playtest-driven polish pass focused on late-game cockpit readability, event-feed noise, and inspector discoverability instead of adding more systems
