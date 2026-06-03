@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.112.0 - 2026-06-03
+
+- Stabilized 2D live-event retention by ranking backlog cards around severity, workspace targets, and key titles such as `Gate Command`, `Endgame Cockpit`, and `Next Focus`, so narrow or overlay-heavy runs drop low-signal cards before late-game repair cues
+- Tightened hover-tooltip layout on the 2D shell with narrower presets, top/bottom clamping, and cursor-flip placement logic so hints stay readable instead of spilling off cramped windows
+- Preserved surfaced-command motion coverage at `43 specific / 0 family / 0 none` while extending regression coverage to priority backlog retention and tooltip-bound helpers, then promoted package metadata and runtime versioning to `0.112.0`
+
 ## 0.111.0 - 2026-06-03
 
 - Tuned live-run event pacing so low-severity feed cards now shorten their lifetime under dense queues, overlay-heavy states, and narrow windows instead of lingering long enough to create motion noise

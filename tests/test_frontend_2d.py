@@ -734,6 +734,47 @@ def test_run_scene_info_event_ttl_shortens_when_queue_is_dense() -> None:
         pygame.quit()
 
 
+def test_run_scene_event_backlog_keeps_priority_warning_cards() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        pygame.display.set_mode((880, 640), pygame.HIDDEN)
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=25),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene.push_event(
+            FrontendEvent(
+                title="Gate Command",
+                detail="Priority warning should survive queue trimming.",
+                severity="warning",
+                ttl=5.0,
+                motion="flash",
+                targets=("panel:endgame", "panel:finance"),
+            )
+        )
+        for index in range(8):
+            scene.push_event(
+                FrontendEvent(
+                    title=f"Info {index}",
+                    detail="Lower-priority queue filler.",
+                    severity="info",
+                    ttl=4.0,
+                )
+            )
+
+        assert len(scene._events) <= scene._event_retention_limit()
+        assert any(event.payload.title == "Gate Command" for event in scene._events)
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -801,6 +842,35 @@ def test_run_scene_endgame_footer_status_compacts_commands_on_small_windows() ->
         assert "Endgame: Endgame / Exit Board" in workspace_line
         assert "set_board_reset_cont..." not in workspace_line
         assert "Gate:" in workspace_line
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_hover_tooltip_rect_clamps_inside_surface() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=32),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        rect = scene._hover_tooltip_rect(
+            surface,
+            mouse_x=950,
+            mouse_y=620,
+            width=320,
+            height=88,
+        )
+
+        assert rect.left >= 16
+        assert rect.top >= 16
+        assert rect.right <= surface.get_width() - 16
+        assert rect.bottom <= surface.get_height() - 16
     finally:
         pygame.quit()
 

@@ -1,7 +1,7 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.111.0`
+Version under audit: `0.112.0`
 
 ## Scope
 
@@ -38,6 +38,8 @@ Version under audit: `0.111.0`
 - Low-severity live-run events now shorten their TTL under dense queues, overlay-heavy states, and narrow windows so the feed clears itself faster instead of layering long-lived informational cards over active repair loops.
 - Very narrow or overlay-heavy run states can now collapse the visible event queue down to a single card, reducing motion clutter when the screen is already carrying a deep panel, inspector, or pending-event overlay.
 - Turn-summary reveal cadence now slows further when the summary carries a heavier event list, and `Next Focus` handoffs escalate into warning/flash cues when the return lane is a repair-heavy finance, board, customer, or partnership workspace.
+- When the retained live queue must shrink, backlog trimming now keeps higher-priority late-game cards such as `Gate Command`, `Endgame Cockpit`, and `Next Focus` ahead of low-signal info cards instead of dropping them by recency alone.
+- Hover tooltips now clamp against all window edges, shrink on narrow layouts, and flip above the cursor when the default placement would push the hint below the visible surface.
 
 ## Verification Snapshot
 

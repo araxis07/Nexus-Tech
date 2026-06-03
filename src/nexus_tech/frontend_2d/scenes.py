@@ -3011,7 +3011,7 @@ class RunScene(BaseScene):
                 self._events.pop(index)
                 break
         self._events.insert(0, TimedFrontendEvent(payload=payload, time_left=payload.ttl))
-        self._events = self._events[:6]
+        self._trim_event_backlog()
         self._trigger_event_motion(payload)
 
     def push_events(self, payloads: tuple[FrontendEvent, ...]) -> None:
@@ -3055,6 +3055,54 @@ class RunScene(BaseScene):
             motion=payload.motion,
             targets=payload.targets,
         )
+
+    def _event_retention_limit(self) -> int:
+        limit = 6
+        if self._window_width() < 920:
+            limit = 5
+        if self._overlay_or_pending_active():
+            limit = min(limit, 4)
+        return limit
+
+    def _event_backlog_score(
+        self,
+        timed_event: TimedFrontendEvent,
+        index: int,
+    ) -> tuple[int, int, int]:
+        payload = timed_event.payload
+        severity = _TONE_PRIORITY.get(payload.severity, 0)
+        title_boost = 0
+        if payload.title in {
+            "Company Shutdown",
+            "Victory Achieved",
+            "Exit Gates",
+            "Gate Command",
+            "Endgame Cockpit",
+            "Cockpit Handoff",
+            "Next Focus",
+        }:
+            title_boost += 3
+        if payload.motion == "flash":
+            title_boost += 1
+        workspace_targets = sum(
+            1
+            for target in payload.targets
+            if target.startswith("panel:") or target.startswith("stat:")
+        )
+        return (severity + title_boost, workspace_targets, -index)
+
+    def _trim_event_backlog(self) -> None:
+        limit = self._event_retention_limit()
+        if len(self._events) <= limit:
+            return
+        keep_indices = {0}
+        ranked = sorted(
+            range(1, len(self._events)),
+            key=lambda index: self._event_backlog_score(self._events[index], index),
+            reverse=True,
+        )
+        keep_indices.update(ranked[: max(0, limit - 1)])
+        self._events = [event for index, event in enumerate(self._events) if index in keep_indices]
 
     def _trigger_event_motion(self, payload: FrontendEvent) -> None:
         intensity = _MOTION_INTENSITY.get(payload.severity, 0.42)
@@ -4501,12 +4549,17 @@ class RunScene(BaseScene):
             return
         pygame = self.pygame
         mouse_x, mouse_y = pygame.mouse.get_pos()
-        tooltip_width = 360 if surface.get_width() >= 1024 else 300
-        tooltip_rect = pygame.Rect(mouse_x + 16, mouse_y + 16, tooltip_width, 88)
-        if tooltip_rect.right > surface.get_width() - 16:
-            tooltip_rect.left = surface.get_width() - tooltip_rect.width - 16
-        if tooltip_rect.bottom > surface.get_height() - 16:
-            tooltip_rect.top = mouse_y - tooltip_rect.height - 12
+        tooltip_width = (
+            360 if surface.get_width() >= 1024 else 320 if surface.get_width() >= 900 else 280
+        )
+        tooltip_height = 88 if surface.get_width() >= 900 else 80
+        tooltip_rect = self._hover_tooltip_rect(
+            surface,
+            mouse_x=mouse_x,
+            mouse_y=mouse_y,
+            width=tooltip_width,
+            height=tooltip_height,
+        )
         inner = draw_panel(surface, pygame, tooltip_rect, title="Hint", accent=INFO)
         draw_wrapped_text(
             surface,
@@ -4515,8 +4568,28 @@ class RunScene(BaseScene):
             TEXT,
             pygame.Rect(inner.left, inner.top, inner.width, inner.height - 4),
             line_height=16,
-            max_lines=4,
+            max_lines=4 if tooltip_width >= 320 else 3,
         )
+
+    def _hover_tooltip_rect(
+        self,
+        surface,
+        *,
+        mouse_x: int,
+        mouse_y: int,
+        width: int,
+        height: int,
+    ):
+        pygame = self.pygame
+        margin = 16
+        rect = pygame.Rect(mouse_x + 16, mouse_y + 16, width, height)
+        if rect.right > surface.get_width() - margin:
+            rect.left = surface.get_width() - rect.width - margin
+        if rect.bottom > surface.get_height() - margin:
+            rect.top = mouse_y - rect.height - 12
+        rect.left = max(margin, rect.left)
+        rect.top = max(margin, rect.top)
+        return rect
 
     def _describe_click_target(self, target: ClickTarget) -> str:
         if target.kind == "select_product":
