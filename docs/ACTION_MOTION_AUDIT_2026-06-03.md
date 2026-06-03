@@ -1,7 +1,7 @@
 # 2D Action Motion Audit
 
 Date: `2026-06-03`
-Version under audit: `0.109.0`
+Version under audit: `0.110.0`
 
 ## Scope
 
@@ -14,8 +14,8 @@ Version under audit: `0.109.0`
 ## Coverage Snapshot
 
 - actionable surfaced commands audited: `43`
-- `specific` choreography coverage: `35`
-- `family` choreography coverage: `8`
+- `specific` choreography coverage: `43`
+- `family` choreography coverage: `0`
 - uncovered `none` commands: `0`
 
 ## Specific Coverage Highlights
@@ -26,18 +26,19 @@ Version under audit: `0.109.0`
 - hiring lane: `source_candidates`, `screen_candidate`, `interview_candidate`, `make_hiring_offer`, `hire_employee`, `assign_employee`, `train_employee`, `reorg_team`
 - commercial / pricing lane: `create_sales_deal`, `advance_sales_deal`, `adjust_pricing`, `set_packaging_strategy`, `set_target_segment`
 - finance / budget lane: `set_capital_plan`, `set_functional_budget`
+- funding / restructure lane: `take_loan`, `raise_angel`, `repay_debt`, `execute_restructure_plan`
+- channel recovery lane: `rebalance_channel_mix`, `renegotiate_partnership`, `run_partner_recovery_sprint`, `run_billing_stabilization`
 
-## Family Coverage Still In Use
+## Surfaced Coverage Status
 
-- funding / capital family: `take_loan`, `raise_angel`, `repay_debt`
-- restructure / partner family: `execute_restructure_plan`, `rebalance_channel_mix`, `renegotiate_partnership`, `run_partner_recovery_sprint`
-- customer-support family: `run_billing_stabilization`
+All currently surfaced 2D commands now resolve to `specific` choreography.
 
-These commands already animate through focused family motion and panel targets, but they are still candidates for future command-specific choreography if the playtest shows they need a more distinct visual signature.
+Family motion still exists as a fallback for deeper or currently unsurfaced commands, but the main player-facing control surface no longer depends on it.
 
 ## Regression Guardrails
 
 - `tests/test_frontend_2d.py::test_surfaced_2d_commands_have_motion_coverage`
 - `tests/test_frontend_2d.py::test_high_priority_2d_commands_use_specific_motion_profiles`
+- `tests/test_frontend_2d.py::test_build_action_events_emit_remaining_family_choreography_cards`
 
-These tests keep surfaced commands from silently dropping back to `none` coverage and keep the late-game / review / finance lane from regressing to generic-only motion.
+These tests keep surfaced commands from silently dropping back to `family` or `none`, while still preserving a verified family-motion fallback for deeper commands that are not yet surfaced in the main 2D loop.

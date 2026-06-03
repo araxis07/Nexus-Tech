@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.110.0 - 2026-06-03
+
+- Completed specific choreography coverage for the last surfaced 2D family commands, including debt bridges, angel funding, debt paydown, restructure execution, channel-mix resets, partner renegotiation, partner recovery sprints, and billing stabilization
+- Promoted the surfaced-command motion audit from `35 specific / 8 family / 0 none` to `43 specific / 0 family / 0 none`, so every command currently surfaced by the guided opening, coach, risk forecast, endgame board, and deep panels now has a command-specific choreography card
+- Tightened turn-flow cohesion by routing turn-resolution `Gate Command` events into the matching workspace panel as well as the endgame board and timeline, so late-game summaries now pulse the actual repair lane they are pointing at
+- Expanded regression coverage to enforce all surfaced commands as `specific` motion profiles, preserve at least one family-motion fallback for deeper unsurfaced commands, and keep gate-command timeline cards tied to a concrete workspace target, then promoted package metadata and runtime versioning to `0.110.0`
+
 ## 0.109.0 - 2026-06-03
 
 - Added a 2D motion-coverage audit layer so surfaced commands from the guided opening, coach, risk forecast, endgame board, and deep panels can be classified as `specific`, `family`, or `none` instead of relying on visual spot-checks alone

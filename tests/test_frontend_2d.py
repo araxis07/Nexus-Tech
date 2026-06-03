@@ -296,7 +296,7 @@ def test_build_action_events_emit_action_choreography_cards() -> None:
     assert f"{current_state.products[0].name} Users" in event_by_title
 
 
-def test_build_action_events_emit_finance_family_choreography_cards() -> None:
+def test_build_action_events_emit_remaining_family_choreography_cards() -> None:
     previous_state = create_new_game("NEXUS TECH", "Nexus One")
     current_state = previous_state.model_copy(deep=True)
     current_state.company.cash_on_hand += Decimal("15000.00")
@@ -304,13 +304,13 @@ def test_build_action_events_emit_finance_family_choreography_cards() -> None:
     events = build_action_events(
         previous_state,
         current_state,
-        action_label=TurnAction.TAKE_LOAN.value,
-        message="Debt bridge secured.",
+        action_label=TurnAction.REFINANCE_DEBT.value,
+        message="Refinancing posture changed.",
     )
 
     event_by_title = {event.title: event for event in events}
-    assert "Funding Pulse" in event_by_title
-    assert event_by_title["Funding Pulse"].targets == (
+    assert "Capital Shuffle" in event_by_title
+    assert event_by_title["Capital Shuffle"].targets == (
         "panel:finance",
         "stat:cash",
         "stat:runway",
@@ -338,6 +338,27 @@ def test_build_action_events_emit_endgame_gate_choreography_cards() -> None:
         "panel:finance",
         "stat:cash",
         "stat:board_pressure",
+    )
+
+
+def test_build_action_events_emit_specific_finance_bridge_choreography_cards() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    current_state = previous_state.model_copy(deep=True)
+    current_state.company.cash_on_hand += Decimal("15000.00")
+
+    events = build_action_events(
+        previous_state,
+        current_state,
+        action_label=TurnAction.TAKE_LOAN.value,
+        message="Debt bridge secured.",
+    )
+
+    event_by_title = {event.title: event for event in events}
+    assert "Debt Bridge" in event_by_title
+    assert event_by_title["Debt Bridge"].targets == (
+        "panel:finance",
+        "stat:cash",
+        "stat:runway",
     )
 
 
@@ -379,6 +400,10 @@ def test_build_turn_resolution_events_exposes_gate_and_outlook_cards() -> None:
     gate_event = next(event for event in events if event.title == "Gate Command")
     assert "panel:endgame" in gate_event.targets
     assert "summary:timeline" in gate_event.targets
+    assert any(
+        target.startswith("panel:") and target not in {"panel:endgame"}
+        for target in gate_event.targets
+    )
     assert events[0].title == "Turn 1 Resolved"
     if "Cash Changed" in titles:
         cash_index = next(
@@ -1298,15 +1323,13 @@ def test_guidance_and_endgame_commands_are_supported_or_explained(tmp_path: Path
 
 def test_surfaced_2d_commands_have_motion_coverage(tmp_path: Path) -> None:
     commands = _collect_surfaced_2d_commands(tmp_path)
-    uncovered = {
+    profiles = {
         command: describe_action_motion_profile(command)
         for command in sorted(commands)
-        if (
-            command != TurnAction.END_TURN.value
-            and describe_action_motion_profile(command) == "none"
-        )
+        if command != TurnAction.END_TURN.value
     }
-    assert not uncovered
+    assert profiles
+    assert set(profiles.values()) == {"specific"}
 
 
 def test_high_priority_2d_commands_use_specific_motion_profiles() -> None:
@@ -1322,6 +1345,14 @@ def test_high_priority_2d_commands_use_specific_motion_profiles() -> None:
         TurnAction.SET_CAPITAL_PLAN.value,
         TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
         TurnAction.SET_PATH_CASH_WATERFALL.value,
+        TurnAction.TAKE_LOAN.value,
+        TurnAction.RAISE_ANGEL.value,
+        TurnAction.REPAY_DEBT.value,
+        TurnAction.EXECUTE_RESTRUCTURE_PLAN.value,
+        TurnAction.REBALANCE_CHANNEL_MIX.value,
+        TurnAction.RENEGOTIATE_PARTNERSHIP.value,
+        TurnAction.RUN_PARTNER_RECOVERY_SPRINT.value,
+        TurnAction.RUN_BILLING_STABILIZATION.value,
     ):
         assert describe_action_motion_profile(command) == "specific", command
 

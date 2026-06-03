@@ -96,6 +96,10 @@ def build_turn_resolution_events(
     current_blocked_paths = sum(
         1 for gate in current_pressure.path_outcome_gates if "blocked" in gate.lower()
     )
+    gate_command_targets = _merge_event_targets(
+        ("panel:endgame", "summary:timeline"),
+        _action_workspace_targets(current_pressure.path_gate_command_alert),
+    )
     events.append(
         FrontendEvent(
             title="Gate Command",
@@ -105,7 +109,7 @@ def build_turn_resolution_events(
             severity="warning" if current_blocked_paths else "info",
             ttl=5.0,
             motion="flash" if current_blocked_paths else "pulse",
-            targets=("panel:endgame", "summary:timeline"),
+            targets=gate_command_targets,
         )
     )
     if (
@@ -142,6 +146,15 @@ def build_turn_resolution_events(
         )
     events.extend(_build_delta_events(previous_state, current_state))
     return _prioritize_turn_resolution_events(tuple(events))
+
+
+def _merge_event_targets(*groups: tuple[str, ...]) -> tuple[str, ...]:
+    merged: list[str] = []
+    for group in groups:
+        for target in group:
+            if target not in merged:
+                merged.append(target)
+    return tuple(merged)
 
 
 def _build_delta_events(previous_state: GameState, current_state: GameState) -> list[FrontendEvent]:
@@ -480,6 +493,27 @@ def _build_specific_action_choreography_event(
             motion="slide",
             targets=("panel:customers", "panel:products", "stat:users"),
         ),
+        TurnAction.TAKE_LOAN.value: FrontendEvent(
+            title="Debt Bridge",
+            detail="Borrowed capital has been pulled in to extend runway under pressure.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:finance", "stat:cash", "stat:runway"),
+        ),
+        TurnAction.RAISE_ANGEL.value: FrontendEvent(
+            title="Angel Round",
+            detail="Outside capital is reopening room for the next operating move.",
+            severity="success",
+            motion="slide",
+            targets=("panel:finance", "stat:cash", "stat:runway"),
+        ),
+        TurnAction.REPAY_DEBT.value: FrontendEvent(
+            title="Debt Paydown",
+            detail="Capital is being redirected to reduce leverage and future drag.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:finance", "stat:cash", "stat:runway"),
+        ),
         TurnAction.REVIEW_TEAM.value: FrontendEvent(
             title="Team Review",
             detail="Staffing, focus, and hiring pressure are under direct review.",
@@ -624,6 +658,48 @@ def _build_specific_action_choreography_event(
                 "panel:finance",
                 "stat:board_pressure",
             ),
+        ),
+        TurnAction.EXECUTE_RESTRUCTURE_PLAN.value: FrontendEvent(
+            title="Restructure Plan",
+            detail="Operating shape is being reset to keep the company viable through pressure.",
+            severity="warning",
+            motion="flash",
+            targets=(
+                "panel:board",
+                "panel:finance",
+                "panel:endgame",
+                "stat:board_pressure",
+                "stat:cash",
+            ),
+        ),
+        TurnAction.REBALANCE_CHANNEL_MIX.value: FrontendEvent(
+            title="Channel Mix Reset",
+            detail="Partner exposure is being redistributed across the portfolio mix.",
+            severity="info",
+            motion="slide",
+            targets=("panel:partnerships", "panel:customers", "stat:users"),
+        ),
+        TurnAction.RUN_PARTNER_RECOVERY_SPRINT.value: FrontendEvent(
+            title="Partner Recovery Sprint",
+            detail="One strained partner lane is being stabilized before more demand leaks away.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:partnerships", "panel:customers", "stat:users"),
+        ),
+        TurnAction.RENEGOTIATE_PARTNERSHIP.value: FrontendEvent(
+            title="Partnership Renegotiation",
+            detail="Commercial terms are being reset to keep the partner lane workable.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:partnerships", "panel:finance", "stat:cash", "stat:users"),
+        ),
+        TurnAction.RUN_BILLING_STABILIZATION.value: FrontendEvent(
+            title="Billing Stabilization",
+            detail="Collections, invoices, and renewal drag are being pulled back into control.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:customers", "panel:finance", "stat:cash", "stat:users")
+            + primary_product_targets,
         ),
     }
     return choreography_map.get(action_label)
@@ -832,6 +908,11 @@ def _build_family_choreography_event(
 
 
 def _action_workspace_targets(action_label: str) -> tuple[str, ...]:
+    exact_targets = {
+        TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value: ("panel:finance", "panel:board"),
+    }
+    if action_label in exact_targets:
+        return exact_targets[action_label]
     if action_label.startswith(
         (
             "improve_quality",
