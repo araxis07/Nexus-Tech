@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.115.0 - 2026-06-04
+
+- Added pulse-bank pruning so crowded 2D scenes can drop the weakest unprotected highlight pulses instead of letting low-value residual motion accumulate across long sessions
+- Run-scene stability now prunes dense low-value pulses while preserving feed, overlay, and active panel cues, and turn summaries now do the same for timeline/metrics-heavy states so late-game resolution scenes cool down faster after busy turns
+- Extended regression coverage to pulse pruning plus run-scene and summary-scene stabilization helpers, then promoted package metadata and runtime versioning to `0.115.0`
+
 ## 0.114.0 - 2026-06-03
 
 - Added pulse-pressure telemetry to the 2D motion layer so live scenes and turn summaries can measure how many highlight pulses are active and how much total intensity is already on screen

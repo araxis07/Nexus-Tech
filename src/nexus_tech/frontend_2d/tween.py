@@ -123,6 +123,50 @@ class PulseBank:
 
         return sum(pulse.value for pulse in self._values.values())
 
+    def prune(
+        self,
+        *,
+        max_count: int,
+        min_value: float = 0.0,
+        protected_prefixes: tuple[str, ...] = (),
+    ) -> int:
+        """Drop the weakest unprotected pulses when the bank gets too crowded."""
+
+        if len(self._values) <= max_count:
+            return 0
+
+        protected_keys = {
+            key
+            for key in self._values
+            if any(key.startswith(prefix) for prefix in protected_prefixes)
+        }
+        removable = [
+            (key, pulse.value)
+            for key, pulse in self._values.items()
+            if key not in protected_keys and pulse.value <= max(0.0, min_value)
+        ]
+        removable.sort(key=lambda item: item[1])
+        removed = 0
+        for key, _value in removable:
+            if len(self._values) <= max_count:
+                break
+            self._values.pop(key, None)
+            removed += 1
+
+        if len(self._values) <= max_count:
+            return removed
+
+        removable = [
+            (key, pulse.value) for key, pulse in self._values.items() if key not in protected_keys
+        ]
+        removable.sort(key=lambda item: item[1])
+        for key, _value in removable:
+            if len(self._values) <= max_count:
+                break
+            self._values.pop(key, None)
+            removed += 1
+        return removed
+
     def get(self, key: str, fallback: float = 0.0) -> float:
         """Read the live pulse value if present."""
 

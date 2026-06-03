@@ -2739,11 +2739,27 @@ class RunScene(BaseScene):
 
         self._tweens.update(dt)
         self._motion_pulses.update(dt)
+        self._stabilize_motion_bank()
         self._events = [
             TimedFrontendEvent(payload=event.payload, time_left=event.time_left - dt)
             for event in self._events
             if event.time_left - dt > 0
         ]
+
+    def _stabilize_motion_bank(self) -> None:
+        if self._motion_pulses.live_count() <= 18:
+            return
+        max_count = 14 if self._window_width() < 960 or self._overlay_or_pending_active() else 18
+        protected_prefixes = ["feed", "footer", "overlay:"]
+        if self._deep_panel_key is not None:
+            protected_prefixes.append(f"panel:{self._deep_panel_key}")
+        if self._inspector_panel_key is not None:
+            protected_prefixes.append(f"panel:{self._inspector_panel_key}")
+        self._motion_pulses.prune(
+            max_count=max_count,
+            min_value=0.18,
+            protected_prefixes=tuple(protected_prefixes),
+        )
 
     def handle_event(self, event) -> None:
         """Handle one pygame event."""
@@ -5814,6 +5830,7 @@ class TurnSummaryScene(BaseScene):
         self._elapsed += dt
         self._tweens.update(dt)
         self._motion_pulses.update(dt)
+        self._stabilize_motion_bank()
         previous_visible = self._visible_event_count
         reveal_count = min(
             len(self._events),
@@ -5823,6 +5840,15 @@ class TurnSummaryScene(BaseScene):
             for event in self._events[previous_visible:reveal_count]:
                 self._trigger_summary_event_motion(event)
         self._visible_event_count = max(self._visible_event_count, reveal_count)
+
+    def _stabilize_motion_bank(self) -> None:
+        if self._motion_pulses.live_count() <= 14:
+            return
+        self._motion_pulses.prune(
+            max_count=12,
+            min_value=0.2,
+            protected_prefixes=("summary:timeline", "summary:metrics", "panel:endgame"),
+        )
 
     def _phase_index(self) -> int:
         return min(len(self._view_model.phase_labels) - 1, int(self._elapsed / 0.85))

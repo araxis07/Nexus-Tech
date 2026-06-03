@@ -750,6 +750,30 @@ def test_pulse_bank_reports_live_count_and_total_intensity() -> None:
     assert bank.total_intensity() == 0.0
 
 
+def test_pulse_bank_prune_drops_weak_unprotected_pulses_first() -> None:
+    bank = PulseBank(decay=2.0)
+
+    bank.trigger("feed", intensity=0.7)
+    bank.trigger("panel:endgame", intensity=0.6)
+    bank.trigger("busy:low", intensity=0.08)
+    bank.trigger("busy:mid", intensity=0.12)
+    bank.trigger("busy:high", intensity=0.4)
+
+    removed = bank.prune(
+        max_count=3,
+        min_value=0.15,
+        protected_prefixes=("feed", "panel:endgame"),
+    )
+
+    assert removed == 2
+    assert bank.live_count() == 3
+    assert bank.get("feed") > 0
+    assert bank.get("panel:endgame") > 0
+    assert bank.get("busy:high") > 0
+    assert bank.get("busy:low") == 0.0
+    assert bank.get("busy:mid") == 0.0
+
+
 def test_run_scene_busy_motion_bank_shortens_info_ttl_further() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -825,6 +849,36 @@ def test_run_scene_busy_motion_bank_dampens_feed_pulse() -> None:
         busy_feed = busy_scene._motion_pulses.get("feed")
 
         assert busy_feed < quiet_feed
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_stabilize_motion_bank_prunes_dense_low_value_pulses() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=71),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("finance")
+        scene._motion_pulses.trigger("feed", intensity=0.8, decay=1.8)
+        scene._motion_pulses.trigger("panel:finance", intensity=0.7, decay=1.8)
+        for index in range(24):
+            scene._motion_pulses.trigger(f"busy:{index}", intensity=0.1, decay=1.8)
+
+        before = scene._motion_pulses.live_count()
+        scene._stabilize_motion_bank()
+        after = scene._motion_pulses.live_count()
+
+        assert after < before
+        assert scene._motion_pulses.get("feed") > 0
+        assert scene._motion_pulses.get("panel:finance") > 0
     finally:
         pygame.quit()
 
@@ -1828,6 +1882,41 @@ def test_turn_summary_scene_busy_motion_bank_dampens_timeline_pulse() -> None:
         busy_pulse = busy_scene._motion_pulses.get("panel:finance")
 
         assert busy_pulse < quiet_pulse
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_stabilize_motion_bank_preserves_timeline_lane() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        resolution = resolve_turn(previous_state, RandomSource(seed=72))
+        scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=72),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+
+        scene._motion_pulses = PulseBank(decay=1.9)
+        scene._motion_pulses.trigger("summary:timeline", intensity=0.75, decay=1.8)
+        scene._motion_pulses.trigger("summary:metrics", intensity=0.65, decay=1.8)
+        for index in range(20):
+            scene._motion_pulses.trigger(f"busy:{index}", intensity=0.1, decay=1.8)
+
+        before = scene._motion_pulses.live_count()
+        scene._stabilize_motion_bank()
+        after = scene._motion_pulses.live_count()
+
+        assert after < before
+        assert scene._motion_pulses.get("summary:timeline") > 0
+        assert scene._motion_pulses.get("summary:metrics") > 0
     finally:
         pygame.quit()
 
