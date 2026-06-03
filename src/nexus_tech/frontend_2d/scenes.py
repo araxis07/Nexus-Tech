@@ -3001,6 +3001,7 @@ class RunScene(BaseScene):
     def push_event(self, payload: FrontendEvent) -> None:
         """Add one transient UI event card."""
 
+        payload = self._normalized_event_payload(payload)
         for index, timed_event in enumerate(self._events):
             if (
                 timed_event.payload.title == payload.title
@@ -3019,11 +3020,56 @@ class RunScene(BaseScene):
         for payload in reversed(payloads):
             self.push_event(payload)
 
+    def _overlay_or_pending_active(self) -> bool:
+        return (
+            self._deep_panel_key is not None
+            or self._inspector_panel_key is not None
+            or self._context_picker is not None
+            or self._text_input is not None
+            or self.state.pending_event is not None
+        )
+
+    def _normalized_event_payload(self, payload: FrontendEvent) -> FrontendEvent:
+        ttl = payload.ttl
+        if payload.severity in {"info", "success"}:
+            if self._window_width() < 920:
+                ttl *= 0.9
+            if self._overlay_or_pending_active():
+                ttl *= 0.84
+            if len(self._events) >= 4:
+                ttl *= 0.82
+            ttl = max(3.2, min(payload.ttl, ttl))
+        elif (
+            payload.severity == "warning"
+            and self._overlay_or_pending_active()
+            and len(self._events) >= 4
+        ):
+            ttl = max(4.0, min(payload.ttl, payload.ttl * 0.92))
+        if abs(ttl - payload.ttl) < 0.01:
+            return payload
+        return FrontendEvent(
+            title=payload.title,
+            detail=payload.detail,
+            severity=payload.severity,
+            ttl=round(ttl, 2),
+            motion=payload.motion,
+            targets=payload.targets,
+        )
+
     def _trigger_event_motion(self, payload: FrontendEvent) -> None:
         intensity = _MOTION_INTENSITY.get(payload.severity, 0.42)
+        if self._window_width() < 920 and payload.severity in {"info", "success"}:
+            intensity *= 0.9
+        if len(self._events) >= 4 and payload.severity != "danger":
+            intensity *= 0.9
+        feed_intensity = max(0.24, intensity * 0.68)
+        if self._overlay_or_pending_active():
+            feed_intensity *= 0.88
+        if len(self._events) >= 4:
+            feed_intensity *= 0.86
         self._motion_pulses.trigger(
             "feed",
-            intensity=max(0.28, intensity * 0.7),
+            intensity=min(1.0, feed_intensity),
             decay=2.4 if payload.motion == "slide" else 1.8,
         )
         for target in payload.targets:
@@ -4357,18 +4403,14 @@ class RunScene(BaseScene):
         return primary, hint
 
     def _event_queue_visible_count(self, event_height: int) -> int:
-        overlay_open = (
-            self._deep_panel_key is not None
-            or self._inspector_panel_key is not None
-            or self._context_picker is not None
-            or self._text_input is not None
-            or self.state.pending_event is not None
-        )
-        if event_height < 180 or overlay_open:
-            return 2
-        if event_height < 280:
-            return 3
-        return 4
+        visible = 2 if event_height < 180 else 3 if event_height < 280 else 4
+        if self._overlay_or_pending_active():
+            visible = min(visible, 2)
+        if self._window_width() < 920:
+            visible = max(1, visible - 1)
+        if self._overlay_or_pending_active() and len(self._events) >= 4:
+            visible = max(1, visible - 1)
+        return visible
 
     def _endgame_cockpit_status_line(self) -> str:
         panel = self.deep_panel
@@ -4663,7 +4705,7 @@ class RunScene(BaseScene):
                 visual_rect.height - 36,
             ),
             line_height=15,
-            max_lines=2,
+            max_lines=1 if visual_rect.width < 320 else 2,
         )
         ttl_ratio = timed_event.time_left / timed_event.payload.ttl
         draw_progress_bar(
@@ -5698,7 +5740,12 @@ class TurnSummaryScene(BaseScene):
         if surface is None:
             return 0.35
         width, _height = surface.get_size()
-        return 0.45 if width < 1000 else 0.35
+        base = 0.45 if width < 1000 else 0.35
+        if len(self._events) >= 4:
+            base += 0.05
+        if len(self._events) >= 6:
+            base += 0.03
+        return base
 
     def handle_event(self, event) -> None:
         if event.type == self.pygame.QUIT:
@@ -5809,7 +5856,13 @@ class TurnSummaryScene(BaseScene):
 
     def _trigger_summary_event_motion(self, event: FrontendEvent) -> None:
         intensity = _MOTION_INTENSITY.get(event.severity, 0.42)
-        self._motion_pulses.trigger("summary:timeline", intensity=max(0.28, intensity * 0.75))
+        surface = self.pygame.display.get_surface()
+        width = surface.get_size()[0] if surface is not None else 1280
+        if width < 1000 and event.severity in {"info", "success"}:
+            intensity *= 0.88
+        if len(self._events) >= 4 and event.severity != "danger":
+            intensity *= 0.9
+        self._motion_pulses.trigger("summary:timeline", intensity=max(0.24, intensity * 0.72))
         for target in event.targets:
             self._motion_pulses.trigger(target, intensity=intensity)
 
@@ -5821,15 +5874,17 @@ class TurnSummaryScene(BaseScene):
     def _build_return_focus_event(self, panel_key: str | None) -> FrontendEvent | None:
         if not self._view_model.focus_command:
             return None
-        targets = ("feed",)
+        targets = ("feed", "summary:timeline")
         if panel_key is not None:
             targets = targets + (f"panel:{panel_key}",)
+        warning_panels = {"finance", "board", "customers", "partnerships"}
+        severity = "warning" if panel_key in warning_panels else "info"
         return FrontendEvent(
             title="Next Focus",
             detail=f"{self._view_model.focus_command}: {self._view_model.focus_detail}",
-            severity="info",
-            ttl=5.5,
-            motion="slide",
+            severity=severity,
+            ttl=5.2 if severity == "warning" else 4.8,
+            motion="flash" if severity == "warning" else "slide",
             targets=targets,
         )
 

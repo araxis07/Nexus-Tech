@@ -1,7 +1,7 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.108.0`
+Version under audit: `0.111.0`
 
 ## Scope
 
@@ -35,10 +35,13 @@ Version under audit: `0.108.0`
 - Late-game gate commands now emit path-specific choreography cards and targets, so `board recovery`, `channel firebreak`, `cash waterfall`, `covenant firewall`, `renewal watch`, and `reset buffer` reads feel distinct instead of collapsing into generic family motion.
 - Turn-resolution events now prioritize exit gates, gate commands, and strategic outlook ahead of lower-signal deltas, which keeps late-game summaries readable when narrow panels can only show one to three timeline cards.
 - The compact endgame footer now shortens gate and hotspot command labels on sub-1000px layouts so the cockpit line keeps the next repair route visible without flooding the footer band with raw command ids.
+- Low-severity live-run events now shorten their TTL under dense queues, overlay-heavy states, and narrow windows so the feed clears itself faster instead of layering long-lived informational cards over active repair loops.
+- Very narrow or overlay-heavy run states can now collapse the visible event queue down to a single card, reducing motion clutter when the screen is already carrying a deep panel, inspector, or pending-event overlay.
+- Turn-summary reveal cadence now slows further when the summary carries a heavier event list, and `Next Focus` handoffs escalate into warning/flash cues when the return lane is a repair-heavy finance, board, customer, or partnership workspace.
 
 ## Verification Snapshot
 
-- `tests/test_frontend_2d.py`: passed with new coverage for title-feed pacing, late-game command choreography, compact cockpit footer copy, and summary reveal / ordering behavior
+- `tests/test_frontend_2d.py`: passed with new coverage for title/live feed pacing, queue-tightened TTL behavior, compact cockpit footer copy, late-game command choreography, and summary reveal / handoff behavior
 - `play-2d --headless --max-frames 4`: passed
 - `menu-2d --headless --max-frames 4`: passed
 

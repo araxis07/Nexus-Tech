@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.111.0 - 2026-06-03
+
+- Tuned live-run event pacing so low-severity feed cards now shorten their lifetime under dense queues, overlay-heavy states, and narrow windows instead of lingering long enough to create motion noise
+- Tightened feed density on smaller layouts by letting narrow-window and dense-overlay states drop to a one-card visible queue when needed, while compacting live event-card detail to one line on tighter card widths
+- Smoothed turn-summary sequencing by slowing reveal cadence when more events are present, damping low-severity summary pulses on narrow/dense scenes, and making `Next Focus` handoff cards escalate into warning/flash treatment when they route the player back into finance, board, customer, or partnership repair lanes
+- Preserved command-specific motion coverage at `43 specific / 0 family / 0 none` for surfaced 2D commands and extended regression coverage to the new pacing, TTL, and late-game handoff helpers, then promoted package metadata and runtime versioning to `0.111.0`
+
 ## 0.110.0 - 2026-06-03
 
 - Completed specific choreography coverage for the last surfaced 2D family commands, including debt bridges, angel funding, debt paydown, restructure execution, channel-mix resets, partner renegotiation, partner recovery sprints, and billing stabilization

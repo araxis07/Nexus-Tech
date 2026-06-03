@@ -694,6 +694,46 @@ def test_run_scene_coalesces_duplicate_events() -> None:
         pygame.quit()
 
 
+def test_run_scene_info_event_ttl_shortens_when_queue_is_dense() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        pygame.display.set_mode((880, 640), pygame.HIDDEN)
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=24),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("finance")
+        for index in range(4):
+            scene.push_event(
+                FrontendEvent(
+                    title=f"Queue {index}",
+                    detail="Background motion.",
+                    severity="info",
+                    ttl=5.0,
+                )
+            )
+
+        payload = FrontendEvent(
+            title="Compact Feed",
+            detail="Queue density should shorten this card.",
+            severity="info",
+            ttl=6.0,
+        )
+        scene.push_event(payload)
+
+        assert scene._events[0].payload.title == "Compact Feed"
+        assert scene._events[0].time_left < payload.ttl
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1107,6 +1147,17 @@ def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> Non
         scene._set_deep_panel("finance")
         assert scene._event_queue_visible_count(320) == 2
         assert scene._event_queue_visible_count(170) == 2
+        pygame.display.set_mode((880, 640), pygame.HIDDEN)
+        for index in range(5):
+            scene.push_event(
+                FrontendEvent(
+                    title=f"Dense {index}",
+                    detail="Dense queue card.",
+                    severity="info",
+                    ttl=4.0,
+                )
+            )
+        assert scene._event_queue_visible_count(320) == 1
     finally:
         pygame.quit()
 
@@ -1512,7 +1563,17 @@ def test_turn_summary_scene_event_pacing_helpers_track_window_size() -> None:
         )
 
         pygame.display.set_mode((960, 640), pygame.HIDDEN)
+        scene._events = scene._events[:1]
         assert scene._summary_event_reveal_interval() == 0.45
+        scene._events = scene._events + (
+            FrontendEvent(title="Extra 1", detail="Load", severity="info"),
+            FrontendEvent(title="Extra 2", detail="Load", severity="warning"),
+            FrontendEvent(title="Extra 3", detail="Load", severity="info"),
+        )
+        assert scene._summary_event_reveal_interval() == 0.5
+        pygame.display.set_mode((1280, 720), pygame.HIDDEN)
+        scene._events = scene._events[:1]
+        assert scene._summary_event_reveal_interval() == 0.35
         assert scene._summary_timeline_visible_count(160) == 1
         assert scene._summary_timeline_visible_count(220) == 2
         assert scene._summary_timeline_visible_count(320) == 3
@@ -1584,6 +1645,41 @@ def test_turn_summary_scene_handoff_restores_workspace_focus() -> None:
             scene._view_model.focus_command
         )
         assert any(event.payload.title == "Next Focus" for event in next_scene._events)
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_next_focus_event_warns_for_late_game_lane() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = previous_state.model_copy(deep=True)
+        working_state = apply_action(
+            working_state,
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=working_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=31))
+        scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=31),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+
+        event = scene._build_return_focus_event("finance")
+
+        assert event is not None
+        assert event.severity == "warning"
+        assert event.motion == "flash"
+        assert "summary:timeline" in event.targets
+        assert "panel:finance" in event.targets
     finally:
         pygame.quit()
 

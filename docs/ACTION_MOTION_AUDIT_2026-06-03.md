@@ -1,7 +1,7 @@
 # 2D Action Motion Audit
 
 Date: `2026-06-03`
-Version under audit: `0.110.0`
+Version under audit: `0.111.0`
 
 ## Scope
 
@@ -42,3 +42,5 @@ Family motion still exists as a fallback for deeper or currently unsurfaced comm
 - `tests/test_frontend_2d.py::test_build_action_events_emit_remaining_family_choreography_cards`
 
 These tests keep surfaced commands from silently dropping back to `family` or `none`, while still preserving a verified family-motion fallback for deeper commands that are not yet surfaced in the main 2D loop.
+
+Turn-summary `Gate Command` and `Next Focus` handoffs now also route motion into the concrete workspace lane they reference, so command-specific choreography survives the post-turn summary path instead of collapsing back into generic endgame-only emphasis.
