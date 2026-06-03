@@ -5299,7 +5299,7 @@ class RunScene(BaseScene):
             max_lines=1,
         )
         compact_footer = focus_inner.width < 560
-        item_area_height = focus_inner.height - (206 if compact_footer else 172)
+        item_area_height = focus_inner.height - (224 if compact_footer else 172)
         item_gap = 10
         item_height = max(
             72,
@@ -5374,27 +5374,24 @@ class RunScene(BaseScene):
             top += item_height + item_gap
 
         selected_item = self._selected_inspector_item()
+        footer_top = rect.bottom - (108 if compact_footer else 72)
+        focus_note_height = 18 if compact_footer else 30
         focus_note_rect = pygame.Rect(
             focus_inner.left,
-            focus_inner.bottom - (138 if compact_footer else 110),
+            footer_top - focus_note_height - 10,
             focus_inner.width,
-            30,
+            focus_note_height,
         )
-        if selected_item is not None:
-            focus_line = " | ".join(selected_item.detail_lines[:2]) or "No detail lines captured."
-            next_line = self._selected_inspector_primary_action_summary()
-            if next_line:
-                focus_line = f"{focus_line} | {next_line}"
+        if selected_item is not None and not compact_footer:
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
-                f"Focus: {selected_item.title} | {focus_line}",
+                self._inspector_focus_summary_text(selected_item, compact=False),
                 MUTED,
                 focus_note_rect,
                 line_height=15,
                 max_lines=2,
             )
-        footer_top = rect.bottom - (104 if compact_footer else 72)
         footer_rect = pygame.Rect(
             focus_inner.left,
             footer_top,
@@ -5410,7 +5407,7 @@ class RunScene(BaseScene):
                 pygame,
                 rect=prev_rect,
                 title="PgUp Prev",
-                detail="Previous page.",
+                detail="" if compact_footer else "Previous page.",
                 accent=BORDER,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
@@ -5420,7 +5417,7 @@ class RunScene(BaseScene):
                 pygame,
                 rect=next_rect,
                 title="PgDn Next",
-                detail="Next page.",
+                detail="" if compact_footer else "Next page.",
                 accent=BORDER,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
@@ -5451,11 +5448,15 @@ class RunScene(BaseScene):
                 pygame,
                 rect=button_rect,
                 title=f"{index + 1} {action.label}",
-                detail=self._item_action_detail(
-                    action.command,
-                    selected_item.payload,
-                    action.detail,
-                    enabled=enabled,
+                detail=(
+                    ""
+                    if compact_footer
+                    else self._item_action_detail(
+                        action.command,
+                        selected_item.payload,
+                        action.detail,
+                        enabled=enabled,
+                    )
                 ),
                 accent=tone_color(action.tone),
                 title_font=self.fonts.small,
@@ -5518,6 +5519,16 @@ class RunScene(BaseScene):
         if item_height < 84 or focus_width < 560:
             return 2
         return 3
+
+    def _inspector_focus_summary_text(self, item, *, compact: bool) -> str:
+        detail_count = 1 if compact else 2
+        focus_line = " | ".join(item.detail_lines[:detail_count]) or "No detail lines captured."
+        next_line = self._selected_inspector_primary_action_summary()
+        if next_line:
+            focus_line = f"{focus_line} | {next_line}"
+        if compact:
+            focus_line = self._compact_button_detail(focus_line, max_length=88)
+        return f"Focus: {item.title} | {focus_line}"
 
     def _inspector_hint_line(self) -> str:
         return "Tab/Arrows move | Z/X sort-filter | A/H focus | PgUp/PgDn page | Enter action"
@@ -5808,6 +5819,13 @@ class TurnSummaryScene(BaseScene):
     def _visible_product_count(self) -> int:
         return min(len(self._view_model.product_lines), 1 + self._phase_index())
 
+    def _summary_top_section_ratio(self, width: int) -> float:
+        if width < 900:
+            return 0.5 if len(self._events) >= 4 else 0.52
+        if width < 1040:
+            return 0.54
+        return 0.58
+
     def _summary_event_reveal_interval(self) -> float:
         surface = self.pygame.display.get_surface()
         if surface is None:
@@ -5852,7 +5870,7 @@ class TurnSummaryScene(BaseScene):
         content_top = header_rect.bottom + gap
         content_height = footer_rect.top - gap - content_top
         if width < 1100:
-            top_height = int((content_height - gap) * 0.58)
+            top_height = int((content_height - gap) * self._summary_top_section_ratio(width))
             left_rect = pygame.Rect(margin, content_top, width - margin * 2, top_height)
             right_rect = pygame.Rect(
                 margin,
@@ -6072,7 +6090,7 @@ class TurnSummaryScene(BaseScene):
 
     def _draw_summary_timeline(self, surface, rect) -> None:
         pygame = self.pygame
-        strategy_height = 176 if rect.height >= 360 else 156
+        strategy_height = self._summary_strategy_height(rect.height)
         strategy_rect = pygame.Rect(rect.left, rect.top, rect.width, strategy_height)
         timeline_rect = pygame.Rect(
             rect.left,
@@ -6106,6 +6124,13 @@ class TurnSummaryScene(BaseScene):
             if top + 70 > inner.bottom:
                 break
 
+    def _summary_strategy_height(self, total_height: int) -> int:
+        if total_height < 220:
+            return max(72, total_height - 96)
+        if total_height < 300:
+            return 116
+        return 176 if total_height >= 360 else 156
+
     def _draw_summary_strategy(self, surface, rect) -> None:
         pygame = self.pygame
         strategy_motion = self._summary_motion_level("panel:endgame", "panel:report")
@@ -6120,21 +6145,27 @@ class TurnSummaryScene(BaseScene):
         )
         title_surface = self.fonts.heading.render("Strategic Delta", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
+        compact = rect.height < 150 or rect.width < 520
         draw_wrapped_text(
             surface,
             self.fonts.body,
             self._view_model.strategic_headline,
             INFO,
-            pygame.Rect(inner.left, inner.top, inner.width, 34),
+            pygame.Rect(inner.left, inner.top, inner.width, 24 if compact else 34),
             line_height=18,
-            max_lines=2,
+            max_lines=1 if compact else 2,
         )
-        command_rect = pygame.Rect(inner.left, inner.top + 34, inner.width, 42)
+        command_rect = pygame.Rect(
+            inner.left,
+            inner.top + (28 if compact else 34),
+            inner.width,
+            38 if compact else 42,
+        )
         draw_button(
             surface,
             pygame,
             rect=command_rect,
-            title=self._summary_focus_command_title(),
+            title=self._summary_focus_command_title(max_length=22 if compact else 28),
             detail=self._summary_focus_command_detail(),
             accent=WARN,
             title_font=self.fonts.small,
@@ -6142,20 +6173,25 @@ class TurnSummaryScene(BaseScene):
             selected=self._phase_index() >= 2,
         )
         top = command_rect.bottom + 12
-        for line in self._view_model.strategic_lines:
+        visible_lines = self._view_model.strategic_lines[: (2 if compact else 3)]
+        for line in visible_lines:
             consumed = draw_wrapped_text(
                 surface,
                 self.fonts.small,
                 line,
                 MUTED,
-                pygame.Rect(inner.left, top, inner.width, 34),
+                pygame.Rect(inner.left, top, inner.width, 22 if compact else 34),
                 line_height=15,
-                max_lines=2,
+                max_lines=1 if compact else 2,
             )
             top += max(20, consumed)
 
-    def _summary_focus_command_title(self) -> str:
-        return f"Next {self._compact_summary_text(self._view_model.focus_command, max_length=28)}"
+    def _summary_focus_command_title(self, *, max_length: int = 28) -> str:
+        command = self._compact_summary_text(
+            self._view_model.focus_command,
+            max_length=max_length,
+        )
+        return f"Next {command}"
 
     def _summary_focus_command_detail(self) -> str:
         return ""
@@ -6167,16 +6203,21 @@ class TurnSummaryScene(BaseScene):
         return f"{compact[: max_length - 3].rstrip()}..."
 
     def _summary_timeline_visible_count(self, timeline_height: int) -> int:
-        if timeline_height < 170:
+        if timeline_height < 140:
             return 1
-        if timeline_height < 250:
+        if timeline_height < 220:
             return 2
         return 3
 
     def _draw_summary_footer(self, surface, rect) -> None:
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Continue", accent=INFO)
-        footer_surface = self.fonts.small.render(self._view_model.footer, True, TEXT)
+        compact = rect.width < 760
+        footer_surface = self.fonts.small.render(
+            "Press Space or click Continue." if compact else self._view_model.footer,
+            True,
+            TEXT,
+        )
         surface.blit(footer_surface, (inner.left, inner.top - 2))
         continue_rect = pygame.Rect(inner.left, inner.top + 24, 200, 38)
         save_rect = pygame.Rect(inner.left + 216, inner.top + 24, 170, 38)
@@ -6186,7 +6227,7 @@ class TurnSummaryScene(BaseScene):
             pygame,
             rect=continue_rect,
             title="Space Continue",
-            detail="Return to the live run.",
+            detail="" if compact else "Return to the live run.",
             accent=INFO,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
@@ -6196,7 +6237,7 @@ class TurnSummaryScene(BaseScene):
             pygame,
             rect=save_rect,
             title="S Save",
-            detail="Persist before leaving this scene.",
+            detail="" if compact else "Persist before leaving this scene.",
             accent=GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
@@ -6206,7 +6247,7 @@ class TurnSummaryScene(BaseScene):
             pygame,
             rect=close_rect,
             title="Esc Close",
-            detail="Exit the 2D shell now.",
+            detail="" if compact else "Exit the 2D shell now.",
             accent=WARN,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
@@ -6245,17 +6286,41 @@ class TurnSummaryScene(BaseScene):
             True,
             blend_color(TEXT, color, metric_motion * 0.12),
         )
+        compact = visual_rect.width < 320
         surface.blit(label_surface, (visual_rect.left + 12, visual_rect.top + 10))
-        surface.blit(value_surface, (visual_rect.left + 12, visual_rect.top + 28))
-        draw_wrapped_text(
-            surface,
-            self.fonts.small,
-            metric.detail,
-            MUTED,
-            pygame.Rect(visual_rect.left + 90, visual_rect.top + 12, visual_rect.width - 102, 20),
-            line_height=14,
-            max_lines=2,
-        )
+        if compact:
+            detail_text = self._compact_summary_text(metric.detail, max_length=24)
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                detail_text,
+                MUTED,
+                pygame.Rect(
+                    visual_rect.left + 12,
+                    visual_rect.top + 24,
+                    visual_rect.width - 24,
+                    16,
+                ),
+                line_height=14,
+                max_lines=1,
+            )
+            surface.blit(value_surface, (visual_rect.left + 12, visual_rect.top + 40))
+        else:
+            surface.blit(value_surface, (visual_rect.left + 12, visual_rect.top + 28))
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                metric.detail,
+                MUTED,
+                pygame.Rect(
+                    visual_rect.left + 90,
+                    visual_rect.top + 12,
+                    visual_rect.width - 102,
+                    20,
+                ),
+                line_height=14,
+                max_lines=2,
+            )
         draw_progress_bar(
             surface,
             pygame,

@@ -1,7 +1,7 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.112.0`
+Version under audit: `0.113.0`
 
 ## Scope
 
@@ -19,6 +19,8 @@ Version under audit: `0.112.0`
 4. Strict inspector filters could produce an empty detail pane with no clear next step beyond trial-and-error key presses.
 5. Follow-up narrow-window renders still showed stacked meta-board copy in the title flow, overly dense endgame inspector rows, and turn-summary command copy that was too long for a shallow action slot.
 6. Even after the compact-layout pass, feed-heavy scenes and staged summaries could still feel visually busy on smaller windows because card counts and reveal cadence did not adapt strongly enough to available height.
+7. Captured `820x620` and `960x640` endgame inspectors still let the selected-record focus note collide with pager and item-action rows, especially when a hotspot row carried a long primary-action summary.
+8. Captured narrow turn summaries could still starve the timeline lane entirely, while short summary/footer buttons and compact metric cards were letting secondary detail copy spill into adjacent content bands.
 
 ## Fix Summary
 
@@ -40,12 +42,17 @@ Version under audit: `0.112.0`
 - Turn-summary reveal cadence now slows further when the summary carries a heavier event list, and `Next Focus` handoffs escalate into warning/flash cues when the return lane is a repair-heavy finance, board, customer, or partnership workspace.
 - When the retained live queue must shrink, backlog trimming now keeps higher-priority late-game cards such as `Gate Command`, `Endgame Cockpit`, and `Next Focus` ahead of low-signal info cards instead of dropping them by recency alone.
 - Hover tooltips now clamp against all window edges, shrink on narrow layouts, and flip above the cursor when the default placement would push the hint below the visible surface.
+- Short action buttons now suppress detail copy automatically and vertically center their primary label, which removes the most obvious text-bleed in compact inspector rows, summary footer controls, and other 38-40px button strips.
+- Compact endgame inspectors now drop the extra focus-note line before it can collide with pager/action rows, relying on the selected-row highlight plus `READY` / `BLOCKED` chips as the primary cue on tight layouts.
+- Narrow turn summaries now reserve a dedicated timeline lane by shrinking the upper metrics band more aggressively, using a responsive strategy-panel height, compacting metric-card copy earlier, and blanking footer button details before they start clipping.
 
 ## Verification Snapshot
 
 - `tests/test_frontend_2d.py`: passed with new coverage for title/live feed pacing, queue-tightened TTL behavior, compact cockpit footer copy, late-game command choreography, and summary reveal / handoff behavior
+- `tests/test_frontend_2d.py`: passed with added coverage for compact inspector focus summaries and narrow summary layout helpers
 - `play-2d --headless --max-frames 4`: passed
 - `menu-2d --headless --max-frames 4`: passed
+- captured follow-up frames from `/tmp/nexus-tech-visual-pass-2` and `/tmp/nexus-tech-visual-pass-3` confirmed that the narrow summary timeline is back on-screen and compact inspector controls no longer leak overlapping detail copy
 
 ## Remaining Risk
 

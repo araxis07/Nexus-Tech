@@ -1010,6 +1010,34 @@ def test_run_scene_inspector_item_line_limit_tightens_for_small_cards() -> None:
         pygame.quit()
 
 
+def test_run_scene_inspector_focus_summary_text_compacts_for_small_layouts() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = _build_enriched_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=50),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("pipeline")
+        scene._open_inspector("pipeline")
+        item = scene._selected_inspector_item()
+
+        assert item is not None
+        compact_summary = scene._inspector_focus_summary_text(item, compact=True)
+        full_summary = scene._inspector_focus_summary_text(item, compact=False)
+
+        assert compact_summary.startswith("Focus:")
+        assert len(compact_summary) < len(full_summary)
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_inspector_items_per_page_tracks_window_size() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1635,17 +1663,20 @@ def test_turn_summary_scene_event_pacing_helpers_track_window_size() -> None:
         pygame.display.set_mode((960, 640), pygame.HIDDEN)
         scene._events = scene._events[:1]
         assert scene._summary_event_reveal_interval() == 0.45
+        assert scene._summary_top_section_ratio(820) == 0.52
         scene._events = scene._events + (
             FrontendEvent(title="Extra 1", detail="Load", severity="info"),
             FrontendEvent(title="Extra 2", detail="Load", severity="warning"),
             FrontendEvent(title="Extra 3", detail="Load", severity="info"),
         )
         assert scene._summary_event_reveal_interval() == 0.5
+        assert scene._summary_top_section_ratio(820) == 0.5
         pygame.display.set_mode((1280, 720), pygame.HIDDEN)
         scene._events = scene._events[:1]
         assert scene._summary_event_reveal_interval() == 0.35
-        assert scene._summary_timeline_visible_count(160) == 1
-        assert scene._summary_timeline_visible_count(220) == 2
+        assert scene._summary_strategy_height(140) == 72
+        assert scene._summary_timeline_visible_count(130) == 1
+        assert scene._summary_timeline_visible_count(200) == 2
         assert scene._summary_timeline_visible_count(320) == 3
     finally:
         pygame.quit()

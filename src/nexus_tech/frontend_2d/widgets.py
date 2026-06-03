@@ -253,6 +253,13 @@ def draw_button(
             border_radius=3,
         )
     title_surface = title_font.render(title, True, title_color)
-    detail_surface = detail_font.render(detail, True, detail_color)
-    surface.blit(title_surface, (visual_rect.left + 12, visual_rect.top + 10))
-    surface.blit(detail_surface, (visual_rect.left + 12, visual_rect.top + 34))
+    show_detail = bool(detail) and visual_rect.height >= 46
+    title_top = (
+        visual_rect.top + 10
+        if show_detail
+        else visual_rect.top + max(8, int((visual_rect.height - title_surface.get_height()) / 2))
+    )
+    surface.blit(title_surface, (visual_rect.left + 12, title_top))
+    if show_detail:
+        detail_surface = detail_font.render(detail, True, detail_color)
+        surface.blit(detail_surface, (visual_rect.left + 12, visual_rect.top + 34))

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.113.0 - 2026-06-03
+
+- Tightened 2D compact-button rendering by suppressing detail copy on short buttons and vertically centering their primary labels, which stops inspector pagers, summary footer controls, and other compact actions from bleeding text outside their bounds
+- Reworked narrow summary stacking so `820x620`-class turn summaries keep a visible timeline lane, shrink strategy height responsively, compact metric-card copy earlier, and drop footer detail text before it starts clipping
+- Cleaned up compact endgame inspectors by removing the overlapping focus-note line on tight layouts, shortening pager/action rows, and preserving the selected-row/action badges as the primary cue instead of letting explanatory copy collide with buttons
+- Extended 2D regression coverage to the new compact focus-summary and summary-layout helpers, then promoted package metadata and runtime versioning to `0.113.0`
+
 ## 0.112.0 - 2026-06-03
 
 - Stabilized 2D live-event retention by ranking backlog cards around severity, workspace targets, and key titles such as `Gate Command`, `Endgame Cockpit`, and `Next Focus`, so narrow or overlay-heavy runs drop low-signal cards before late-game repair cues
