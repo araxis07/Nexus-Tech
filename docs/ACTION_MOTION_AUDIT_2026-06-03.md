@@ -1,7 +1,7 @@
 # 2D Action Motion Audit
 
 Date: `2026-06-03`
-Version under audit: `0.113.0`
+Version under audit: `0.114.0`
 
 ## Scope
 
@@ -43,4 +43,4 @@ Family motion still exists as a fallback for deeper or currently unsurfaced comm
 
 These tests keep surfaced commands from silently dropping back to `family` or `none`, while still preserving a verified family-motion fallback for deeper commands that are not yet surfaced in the main 2D loop.
 
-Turn-summary `Gate Command` and `Next Focus` handoffs now also route motion into the concrete workspace lane they reference, so command-specific choreography survives the post-turn summary path instead of collapsing back into generic endgame-only emphasis. The `0.113.0` compact-layout pass did not change surfaced coverage counts; it tightened how that motion is presented on short buttons and narrow summary/inspector layouts instead.
+Turn-summary `Gate Command` and `Next Focus` handoffs now also route motion into the concrete workspace lane they reference, so command-specific choreography survives the post-turn summary path instead of collapsing back into generic endgame-only emphasis. The `0.113.0` compact-layout pass and `0.114.0` pulse-pressure tuning did not change surfaced coverage counts; they tightened how that motion is presented on short buttons, narrow summary/inspector layouts, and long-running dense-motion scenes instead.

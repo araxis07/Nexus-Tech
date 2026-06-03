@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.114.0 - 2026-06-03
+
+- Added pulse-pressure telemetry to the 2D motion layer so live scenes and turn summaries can measure how many highlight pulses are active and how much total intensity is already on screen
+- Tuned run-scene event normalization and feed motion so dense pulse banks now shorten low-severity TTLs further and damp live feed intensity before long sessions or overlay-heavy states turn into motion spam
+- Tuned turn-summary sequencing under pressure so heavy summary pulse banks slow reveal cadence slightly and reduce target-lane pulse intensity instead of stacking every new cue at full strength
+- Added regression coverage for pulse-bank pressure, busy-feed damping, busy-summary damping, and the new reveal-pressure helper, then promoted package metadata and runtime versioning to `0.114.0`
+
 ## 0.113.0 - 2026-06-03
 
 - Tightened 2D compact-button rendering by suppressing detail copy on short buttons and vertically centering their primary labels, which stops inspector pagers, summary footer controls, and other compact actions from bleeding text outside their bounds

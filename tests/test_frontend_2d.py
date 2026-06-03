@@ -43,6 +43,7 @@ from nexus_tech.frontend_2d.scenes import (
     TitleScene,
     TurnSummaryScene,
 )
+from nexus_tech.frontend_2d.tween import PulseBank
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_endgame_cockpit_actions,
@@ -730,6 +731,100 @@ def test_run_scene_info_event_ttl_shortens_when_queue_is_dense() -> None:
 
         assert scene._events[0].payload.title == "Compact Feed"
         assert scene._events[0].time_left < payload.ttl
+    finally:
+        pygame.quit()
+
+
+def test_pulse_bank_reports_live_count_and_total_intensity() -> None:
+    bank = PulseBank(decay=2.0)
+
+    bank.trigger("feed", intensity=0.5)
+    bank.trigger("panel:finance", intensity=0.8)
+
+    assert bank.live_count() == 2
+    assert bank.total_intensity() == 1.3
+
+    bank.update(1.0)
+
+    assert bank.live_count() == 0
+    assert bank.total_intensity() == 0.0
+
+
+def test_run_scene_busy_motion_bank_shortens_info_ttl_further() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        quiet_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=64),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        busy_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=65),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        payload = FrontendEvent(
+            title="Queue Watch",
+            detail="Info card for pressure test.",
+            severity="info",
+            ttl=6.0,
+        )
+
+        quiet_ttl = quiet_scene._normalized_event_payload(payload).ttl
+        for index in range(12):
+            busy_scene._motion_pulses.trigger(f"busy:{index}", intensity=0.7, decay=1.8)
+        busy_ttl = busy_scene._normalized_event_payload(payload).ttl
+
+        assert busy_ttl < quiet_ttl
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_busy_motion_bank_dampens_feed_pulse() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        quiet_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=66),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        busy_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=67),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        payload = FrontendEvent(
+            title="Queue Watch",
+            detail="Info card for feed damping.",
+            severity="info",
+            ttl=5.0,
+            targets=("panel:finance",),
+        )
+
+        quiet_scene.push_event(payload)
+        quiet_feed = quiet_scene._motion_pulses.get("feed")
+        for index in range(12):
+            busy_scene._motion_pulses.trigger(f"busy:{index}", intensity=0.7, decay=1.8)
+        busy_scene.push_event(payload)
+        busy_feed = busy_scene._motion_pulses.get("feed")
+
+        assert busy_feed < quiet_feed
     finally:
         pygame.quit()
 
@@ -1678,6 +1773,61 @@ def test_turn_summary_scene_event_pacing_helpers_track_window_size() -> None:
         assert scene._summary_timeline_visible_count(130) == 1
         assert scene._summary_timeline_visible_count(200) == 2
         assert scene._summary_timeline_visible_count(320) == 3
+        for index in range(8):
+            scene._motion_pulses.trigger(f"busy:{index}", intensity=0.7, decay=1.8)
+        assert scene._summary_motion_pressure_ratio() > 0
+        assert scene._summary_event_reveal_interval() > 0.35
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_busy_motion_bank_dampens_timeline_pulse() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = previous_state.model_copy(deep=True)
+        resolution = resolve_turn(working_state, RandomSource(seed=68))
+        quiet_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=68),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+        busy_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=69),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+        event = FrontendEvent(
+            title="Timeline Pulse",
+            detail="Pressure damping test.",
+            severity="info",
+            targets=("panel:finance",),
+        )
+
+        quiet_scene._motion_pulses = PulseBank(decay=1.9)
+        busy_scene._motion_pulses = PulseBank(decay=1.9)
+        quiet_scene._trigger_summary_event_motion(event)
+        quiet_pulse = quiet_scene._motion_pulses.get("panel:finance")
+        for index in range(8):
+            busy_scene._motion_pulses.trigger(f"busy:{index}", intensity=0.7, decay=1.8)
+        busy_scene._trigger_summary_event_motion(event)
+        busy_pulse = busy_scene._motion_pulses.get("panel:finance")
+
+        assert busy_pulse < quiet_pulse
     finally:
         pygame.quit()
 

@@ -113,6 +113,16 @@ class PulseBank:
         for key in stale_keys:
             self._values.pop(key, None)
 
+    def live_count(self) -> int:
+        """Return the number of active pulse keys."""
+
+        return len(self._values)
+
+    def total_intensity(self) -> float:
+        """Return the summed intensity of all active pulses."""
+
+        return sum(pulse.value for pulse in self._values.values())
+
     def get(self, key: str, fallback: float = 0.0) -> float:
         """Read the live pulse value if present."""
 

@@ -1,7 +1,7 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.113.0`
+Version under audit: `0.114.0`
 
 ## Scope
 
@@ -53,6 +53,7 @@ Version under audit: `0.113.0`
 - `play-2d --headless --max-frames 4`: passed
 - `menu-2d --headless --max-frames 4`: passed
 - captured follow-up frames from `/tmp/nexus-tech-visual-pass-2` and `/tmp/nexus-tech-visual-pass-3` confirmed that the narrow summary timeline is back on-screen and compact inspector controls no longer leak overlapping detail copy
+- follow-up motion-pressure tuning now also dampens low-signal feed and summary cues when the pulse bank is already dense, reducing the risk that long sessions drift back toward noisy overlay/feed stacking
 
 ## Remaining Risk
 

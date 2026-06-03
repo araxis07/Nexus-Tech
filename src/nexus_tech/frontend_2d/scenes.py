@@ -3029,8 +3029,16 @@ class RunScene(BaseScene):
             or self.state.pending_event is not None
         )
 
+    def _motion_pressure_ratio(self) -> float:
+        live_count = self._motion_pulses.live_count()
+        total_intensity = self._motion_pulses.total_intensity()
+        pressure = max(0.0, live_count - 10) * 0.015
+        pressure += max(0.0, total_intensity - 5.0) * 0.01
+        return min(0.32, pressure)
+
     def _normalized_event_payload(self, payload: FrontendEvent) -> FrontendEvent:
         ttl = payload.ttl
+        pressure = self._motion_pressure_ratio()
         if payload.severity in {"info", "success"}:
             if self._window_width() < 920:
                 ttl *= 0.9
@@ -3038,13 +3046,14 @@ class RunScene(BaseScene):
                 ttl *= 0.84
             if len(self._events) >= 4:
                 ttl *= 0.82
+            if pressure > 0:
+                ttl *= 1.0 - pressure * 0.65
             ttl = max(3.2, min(payload.ttl, ttl))
-        elif (
-            payload.severity == "warning"
-            and self._overlay_or_pending_active()
-            and len(self._events) >= 4
-        ):
-            ttl = max(4.0, min(payload.ttl, payload.ttl * 0.92))
+        elif payload.severity == "warning":
+            if self._overlay_or_pending_active() and len(self._events) >= 4:
+                ttl = max(4.0, min(payload.ttl, payload.ttl * 0.92))
+            if pressure > 0:
+                ttl = max(4.0, min(ttl, ttl * (1.0 - pressure * 0.28)))
         if abs(ttl - payload.ttl) < 0.01:
             return payload
         return FrontendEvent(
@@ -3106,15 +3115,20 @@ class RunScene(BaseScene):
 
     def _trigger_event_motion(self, payload: FrontendEvent) -> None:
         intensity = _MOTION_INTENSITY.get(payload.severity, 0.42)
+        pressure = self._motion_pressure_ratio()
         if self._window_width() < 920 and payload.severity in {"info", "success"}:
             intensity *= 0.9
         if len(self._events) >= 4 and payload.severity != "danger":
             intensity *= 0.9
+        if pressure > 0:
+            intensity *= max(0.72, 1.0 - pressure * 0.55)
         feed_intensity = max(0.24, intensity * 0.68)
         if self._overlay_or_pending_active():
             feed_intensity *= 0.88
         if len(self._events) >= 4:
             feed_intensity *= 0.86
+        if pressure > 0:
+            feed_intensity *= max(0.55, 1.0 - pressure * 1.05)
         self._motion_pulses.trigger(
             "feed",
             intensity=min(1.0, feed_intensity),
@@ -5826,6 +5840,13 @@ class TurnSummaryScene(BaseScene):
             return 0.54
         return 0.58
 
+    def _summary_motion_pressure_ratio(self) -> float:
+        live_count = self._motion_pulses.live_count()
+        total_intensity = self._motion_pulses.total_intensity()
+        pressure = max(0.0, live_count - 8) * 0.02
+        pressure += max(0.0, total_intensity - 4.0) * 0.015
+        return min(0.28, pressure)
+
     def _summary_event_reveal_interval(self) -> float:
         surface = self.pygame.display.get_surface()
         if surface is None:
@@ -5836,6 +5857,9 @@ class TurnSummaryScene(BaseScene):
             base += 0.05
         if len(self._events) >= 6:
             base += 0.03
+        pressure = self._summary_motion_pressure_ratio()
+        if pressure > 0:
+            base += pressure * 0.18
         return base
 
     def handle_event(self, event) -> None:
@@ -5947,12 +5971,15 @@ class TurnSummaryScene(BaseScene):
 
     def _trigger_summary_event_motion(self, event: FrontendEvent) -> None:
         intensity = _MOTION_INTENSITY.get(event.severity, 0.42)
+        pressure = self._summary_motion_pressure_ratio()
         surface = self.pygame.display.get_surface()
         width = surface.get_size()[0] if surface is not None else 1280
         if width < 1000 and event.severity in {"info", "success"}:
             intensity *= 0.88
         if len(self._events) >= 4 and event.severity != "danger":
             intensity *= 0.9
+        if pressure > 0:
+            intensity *= max(0.72, 1.0 - pressure * 0.52)
         self._motion_pulses.trigger("summary:timeline", intensity=max(0.24, intensity * 0.72))
         for target in event.targets:
             self._motion_pulses.trigger(target, intensity=intensity)
