@@ -34,6 +34,7 @@ from nexus_tech.frontend_2d.event_queue import (
     FrontendEvent,
     build_action_events,
     build_turn_resolution_events,
+    describe_action_motion_profile,
 )
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
@@ -116,6 +117,38 @@ def _build_pygame_bundle():
     pygame.font.init()
     surface = pygame.display.set_mode((960, 640), pygame.HIDDEN)
     return pygame, create_fonts(pygame), surface
+
+
+def _collect_surfaced_2d_commands(tmp_path: Path) -> set[str]:
+    commands: set[str] = set()
+    unlocked_choices = [
+        choice
+        for choice in list_scenario_choices(tmp_path / "motion-audit.db")
+        if not choice.locked
+    ]
+    for choice in unlocked_choices:
+        state = create_new_game(
+            "NEXUS TECH",
+            "Nexus One",
+            scenario_id=choice.scenario_id,
+            difficulty_mode=choice.default_difficulty,
+            campaign_goal_id=choice.default_goal_id,
+        )
+        pid = state.products[0].id.hex
+        guide = build_guided_opening(state)
+        commands.add(guide.current_command)
+        commands.update(step.command for step in guide.steps)
+        commands.update(rec.command for rec in build_turn_coach(state).recommendations)
+        commands.update(item.command for item in build_risk_forecast(state).items)
+        pressure = calculate_endgame_pressure(state, calculate_endgame_readiness(state))
+        commands.update(pressure.path_gate_commands)
+        commands.add(pressure.path_gate_command_alert)
+        outcome = evaluate_exit_outcome(state)
+        commands.update(outcome.path_gate_commands)
+        commands.add(outcome.path_gate_command_alert)
+        for panel in build_deep_dive_panel_view_models(state, selected_product_id=pid):
+            commands.update(action.command for action in panel.actions)
+    return commands
 
 
 def test_build_game_view_model_exposes_products_and_coach_lines() -> None:
@@ -1261,6 +1294,36 @@ def test_guidance_and_endgame_commands_are_supported_or_explained(tmp_path: Path
             command_supported = command_supported or request is not None
             command_explained = command_explained or reason is not None
         assert command_supported or command_explained, command
+
+
+def test_surfaced_2d_commands_have_motion_coverage(tmp_path: Path) -> None:
+    commands = _collect_surfaced_2d_commands(tmp_path)
+    uncovered = {
+        command: describe_action_motion_profile(command)
+        for command in sorted(commands)
+        if (
+            command != TurnAction.END_TURN.value
+            and describe_action_motion_profile(command) == "none"
+        )
+    }
+    assert not uncovered
+
+
+def test_high_priority_2d_commands_use_specific_motion_profiles() -> None:
+    for command in (
+        TurnAction.REVIEW_BOARD.value,
+        TurnAction.REVIEW_FINANCE.value,
+        TurnAction.REVIEW_CUSTOMERS.value,
+        TurnAction.REVIEW_PARTNERSHIPS.value,
+        TurnAction.REVIEW_PIPELINE.value,
+        TurnAction.REVIEW_TEAM.value,
+        TurnAction.VIEW_REPORT.value,
+        TurnAction.SET_FUNCTIONAL_BUDGET.value,
+        TurnAction.SET_CAPITAL_PLAN.value,
+        TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
+        TurnAction.SET_PATH_CASH_WATERFALL.value,
+    ):
+        assert describe_action_motion_profile(command) == "specific", command
 
 
 def test_run_scene_inspector_sort_filter_and_small_window_draw() -> None:

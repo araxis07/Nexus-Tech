@@ -282,96 +282,235 @@ def _build_action_choreography_events(
     action_label: str,
 ) -> tuple[FrontendEvent, ...]:
     primary_product_targets = _primary_product_targets(previous_state, current_state)
-    choreography_map = {
-        "improve_quality": FrontendEvent(
-            title="Quality Sprint",
-            detail="Polish work is landing on the active product lane.",
-            severity="success",
-            motion="slide",
-            targets=primary_product_targets + ("panel:products",),
-        ),
-        "add_feature": FrontendEvent(
-            title="Feature Scope",
-            detail="The product roadmap is absorbing net-new scope.",
-            severity="info",
-            motion="slide",
-            targets=primary_product_targets + ("panel:products", "panel:pipeline"),
-        ),
-        "market_product": FrontendEvent(
-            title="Demand Push",
-            detail="Marketing pressure is now chasing user and revenue lift.",
-            severity="info",
-            motion="slide",
-            targets=primary_product_targets + ("stat:users", "panel:customers"),
-        ),
-        "reduce_technical_debt": FrontendEvent(
-            title="Debt Burn",
-            detail="Engineering focus is paying down accumulated technical drag.",
-            severity="success",
-            motion="slide",
-            targets=primary_product_targets + ("panel:products",),
-        ),
-        "hire_employee": FrontendEvent(
-            title="Team Added",
-            detail="A new teammate has entered the operating system.",
-            severity="success",
-            motion="slide",
-            targets=("panel:team", "stat:actions"),
-        ),
-        "assign_employee": FrontendEvent(
-            title="Assignment Locked",
-            detail="Execution capacity has been routed into a live workstream.",
-            severity="info",
-            motion="slide",
-            targets=("panel:team",) + primary_product_targets,
-        ),
-        "plan_release": FrontendEvent(
-            title="Release Framed",
-            detail="The delivery pipeline now has a committed release plan.",
-            severity="info",
-            motion="slide",
-            targets=("panel:pipeline",) + primary_product_targets,
-        ),
-        "advance_sales_deal": FrontendEvent(
-            title="Pipeline Advanced",
-            detail="A sales opportunity moved one step closer to closing.",
-            severity="success",
-            motion="slide",
-            targets=("panel:pipeline", "panel:customers"),
-        ),
-        "adjust_pricing": FrontendEvent(
-            title="Pricing Shift",
-            detail="The revenue model changed and customer pressure is repricing around it.",
-            severity="warning",
-            motion="slide",
-            targets=("panel:customers", "stat:cash"),
-        ),
-        "create_partnership": FrontendEvent(
-            title="Channel Activated",
-            detail="A new partner lane is now part of the growth mix.",
-            severity="success",
-            motion="slide",
-            targets=("panel:partnerships", "stat:users"),
-        ),
-    }
-    event = choreography_map.get(action_label)
-    if event is not None:
-        return (event,)
-    event = _build_gate_command_choreography_event(action_label, primary_product_targets)
+    event = _build_specific_action_choreography_event(action_label, primary_product_targets)
     if event is not None:
         return (event,)
     event = _build_family_choreography_event(action_label, primary_product_targets)
     return (event,) if event is not None else ()
 
 
-def _build_gate_command_choreography_event(
+def describe_action_motion_profile(action_label: str) -> str:
+    """Classify one command's animation coverage for audit tests and docs."""
+
+    placeholder_targets = ("panel:products",)
+    if _build_specific_action_choreography_event(action_label, placeholder_targets) is not None:
+        return "specific"
+    if _build_family_choreography_event(action_label, placeholder_targets) is not None:
+        return "family"
+    return "none"
+
+
+def _build_specific_action_choreography_event(
     action_label: str,
     primary_product_targets: tuple[str, ...],
 ) -> FrontendEvent | None:
-    gate_command_map = {
+    choreography_map = {
+        TurnAction.IMPROVE_QUALITY.value: FrontendEvent(
+            title="Quality Sprint",
+            detail="Polish work is landing on the active product lane.",
+            severity="success",
+            motion="slide",
+            targets=primary_product_targets + ("panel:products",),
+        ),
+        TurnAction.ADD_FEATURE.value: FrontendEvent(
+            title="Feature Scope",
+            detail="The product roadmap is absorbing net-new scope.",
+            severity="info",
+            motion="slide",
+            targets=primary_product_targets + ("panel:products", "panel:pipeline"),
+        ),
+        TurnAction.MARKET_PRODUCT.value: FrontendEvent(
+            title="Demand Push",
+            detail="Marketing pressure is now chasing user and revenue lift.",
+            severity="info",
+            motion="slide",
+            targets=primary_product_targets + ("stat:users", "panel:customers"),
+        ),
+        TurnAction.REDUCE_TECHNICAL_DEBT.value: FrontendEvent(
+            title="Debt Burn",
+            detail="Engineering focus is paying down accumulated technical drag.",
+            severity="success",
+            motion="slide",
+            targets=primary_product_targets + ("panel:products",),
+        ),
+        TurnAction.CREATE_PRODUCT.value: FrontendEvent(
+            title="Product Seed",
+            detail="A new product lane has been framed and added to the portfolio.",
+            severity="success",
+            motion="slide",
+            targets=("panel:products", "panel:pipeline"),
+        ),
+        TurnAction.HIRE_EMPLOYEE.value: FrontendEvent(
+            title="Team Added",
+            detail="A new teammate has entered the operating system.",
+            severity="success",
+            motion="slide",
+            targets=("panel:team", "stat:actions"),
+        ),
+        TurnAction.ASSIGN_EMPLOYEE.value: FrontendEvent(
+            title="Assignment Locked",
+            detail="Execution capacity has been routed into a live workstream.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team",) + primary_product_targets,
+        ),
+        TurnAction.SOURCE_CANDIDATES.value: FrontendEvent(
+            title="Talent Search",
+            detail="The hiring funnel is pulling fresh candidates into view.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.SCREEN_CANDIDATE.value: FrontendEvent(
+            title="Candidate Screen",
+            detail="The hiring funnel is narrowing toward viable operators.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.INTERVIEW_CANDIDATE.value: FrontendEvent(
+            title="Interview Loop",
+            detail="Hiring focus is now validating one candidate in depth.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.MAKE_HIRING_OFFER.value: FrontendEvent(
+            title="Offer Extended",
+            detail="A candidate is being converted into near-term execution capacity.",
+            severity="success",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.TRAIN_EMPLOYEE.value: FrontendEvent(
+            title="Training Cycle",
+            detail="Execution quality is being improved through focused team development.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.REORG_TEAM.value: FrontendEvent(
+            title="Org Rewire",
+            detail="Reporting lines and operating load are being redistributed.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.PLAN_RELEASE.value: FrontendEvent(
+            title="Release Framed",
+            detail="The delivery pipeline now has a committed release plan.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline",) + primary_product_targets,
+        ),
+        TurnAction.WORK_RELEASE.value: FrontendEvent(
+            title="Release Execution",
+            detail="Delivery work is converting the plan into a shippable milestone.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline",) + primary_product_targets,
+        ),
+        TurnAction.CREATE_SALES_DEAL.value: FrontendEvent(
+            title="Deal Opened",
+            detail="A new pipeline opportunity is now competing for close attention.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline", "panel:customers", "stat:users"),
+        ),
+        TurnAction.ADVANCE_SALES_DEAL.value: FrontendEvent(
+            title="Pipeline Advanced",
+            detail="A sales opportunity moved one step closer to closing.",
+            severity="success",
+            motion="slide",
+            targets=("panel:pipeline", "panel:customers"),
+        ),
+        TurnAction.START_ROADMAP_PROJECT.value: FrontendEvent(
+            title="Project Charter",
+            detail="A strategic roadmap push has been committed into the delivery queue.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline", "panel:products") + primary_product_targets,
+        ),
+        TurnAction.WORK_ROADMAP_PROJECT.value: FrontendEvent(
+            title="Project Burn",
+            detail="Roadmap work is consuming delivery capacity toward a strategic bet.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline", "panel:products") + primary_product_targets,
+        ),
+        TurnAction.ADJUST_PRICING.value: FrontendEvent(
+            title="Pricing Shift",
+            detail="The revenue model changed and customer pressure is repricing around it.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:customers", "stat:cash"),
+        ),
+        TurnAction.CREATE_PARTNERSHIP.value: FrontendEvent(
+            title="Channel Activated",
+            detail="A new partner lane is now part of the growth mix.",
+            severity="success",
+            motion="slide",
+            targets=("panel:partnerships", "stat:users"),
+        ),
+        TurnAction.SET_CAPITAL_PLAN.value: FrontendEvent(
+            title="Capital Posture",
+            detail="Capital posture has been recut to change how runway absorbs pressure.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:finance", "stat:cash", "stat:runway"),
+        ),
+        TurnAction.SET_FUNCTIONAL_BUDGET.value: FrontendEvent(
+            title="Budget Recut",
+            detail="Functional spend has been redistributed across delivery and go-to-market.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:finance", "panel:pipeline", "panel:customers"),
+        ),
+        TurnAction.SET_PACKAGING_STRATEGY.value: FrontendEvent(
+            title="Packaging Reset",
+            detail="The product offer changed shape before the next demand push lands.",
+            severity="info",
+            motion="slide",
+            targets=("panel:customers", "panel:products", "stat:users"),
+        ),
+        TurnAction.SET_TARGET_SEGMENT.value: FrontendEvent(
+            title="Segment Pivot",
+            detail="Demand focus has moved to a different customer segment lane.",
+            severity="info",
+            motion="slide",
+            targets=("panel:customers", "panel:products", "stat:users"),
+        ),
+        TurnAction.REVIEW_TEAM.value: FrontendEvent(
+            title="Team Review",
+            detail="Staffing, focus, and hiring pressure are under direct review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:team", "panel:pipeline"),
+        ),
+        TurnAction.REVIEW_PIPELINE.value: FrontendEvent(
+            title="Pipeline Review",
+            detail="Sales, releases, projects, and hiring queues are under direct review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:pipeline", "panel:customers"),
+        ),
+        TurnAction.REVIEW_CUSTOMERS.value: FrontendEvent(
+            title="Customer Review",
+            detail="Retention risk, backlog heat, and account pressure are under review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:customers", "stat:users", "stat:cash") + primary_product_targets,
+        ),
+        TurnAction.VIEW_REPORT.value: FrontendEvent(
+            title="Report Review",
+            detail="Strategic state, run score, and recent operating pressure are in review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:report", "panel:endgame", "feed"),
+        ),
         TurnAction.REVIEW_BOARD.value: FrontendEvent(
-            title="IPO Gate Review",
-            detail="Board scrutiny and governance gaps are under direct late-game review.",
+            title="Board Review",
+            detail="Governance heat and board obligations are under direct review.",
             severity="info",
             motion="slide",
             targets=("panel:endgame", "panel:board", "stat:board_pressure"),
@@ -487,7 +626,7 @@ def _build_gate_command_choreography_event(
             ),
         ),
     }
-    return gate_command_map.get(action_label)
+    return choreography_map.get(action_label)
 
 
 def _primary_product_targets(
@@ -537,6 +676,7 @@ def _build_family_choreography_event(
             "set_refinancing_",
             "set_covenant_",
             "set_debt_",
+            "set_functional_",
             "set_growth_firebreak",
             "set_path_",
             "set_endgame_capital_",
@@ -799,6 +939,17 @@ def _action_workspace_targets(action_label: str) -> tuple[str, ...]:
         )
     ):
         return ("panel:partnerships",)
+    review_targets = {
+        TurnAction.REVIEW_TEAM.value: ("panel:team",),
+        TurnAction.REVIEW_PIPELINE.value: ("panel:pipeline",),
+        TurnAction.REVIEW_CUSTOMERS.value: ("panel:customers",),
+        TurnAction.REVIEW_FINANCE.value: ("panel:finance",),
+        TurnAction.REVIEW_PARTNERSHIPS.value: ("panel:partnerships",),
+        TurnAction.REVIEW_BOARD.value: ("panel:board",),
+        TurnAction.VIEW_REPORT.value: ("panel:report",),
+    }
+    if action_label in review_targets:
+        return review_targets[action_label]
     if action_label.startswith(("execute_board_", "start_board_", "execute_restructure_")):
         return ("panel:board",)
     if action_label.startswith(("review_", "view_report")):

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.109.0 - 2026-06-03
+
+- Added a 2D motion-coverage audit layer so surfaced commands from the guided opening, coach, risk forecast, endgame board, and deep panels can be classified as `specific`, `family`, or `none` instead of relying on visual spot-checks alone
+- Expanded specific choreography coverage across review/report flows, hiring-funnel actions, roadmap/project work, product creation, budget-setting, and other surfaced commands so the 2D shell no longer has any `none`-coverage commands in its main guided/control surfaces
+- Tightened review-command workspace routing so `review_*` and `view_report` action cards now pulse the corresponding panel instead of only refreshing the generic feed lane
+- Added a dedicated action-motion audit note plus regression coverage that now enforces zero uncovered surfaced commands and promotes key late-game / finance / review commands to `specific` motion profiles, then promoted package metadata and runtime versioning to `0.109.0`
+
 ## 0.108.0 - 2026-06-03
 
 - Extended the 2D choreography pass into late-game path work so concrete gate commands such as board recovery, channel firebreaks, covenant firewalls, renewal watches, and reset-buffer setup now emit path-specific motion cards instead of falling back to generic family pulses
