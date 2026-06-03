@@ -974,6 +974,27 @@ def test_run_scene_action_request_triggers_motion_pulses() -> None:
         pygame.quit()
 
 
+def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=45),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        assert scene._event_queue_visible_count(320) == 4
+        scene._set_deep_panel("finance")
+        assert scene._event_queue_visible_count(320) == 2
+        assert scene._event_queue_visible_count(170) == 2
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_panel_and_picker_overlay_motion_are_triggered() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1100,6 +1121,28 @@ def test_title_scene_mode_and_overlay_motion_are_triggered(tmp_path: Path) -> No
         assert scene._text_input is not None
         assert scene._motion_pulses.get("title:mode:meta") > 0
         assert scene._motion_pulses.get("title:overlay:text_input") > 0
+    finally:
+        pygame.quit()
+
+
+def test_title_scene_feed_visible_count_tracks_sidebar_height(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-feed.db")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=21),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+        )
+
+        assert scene._title_feed_visible_count(160) == 2
+        assert scene._title_feed_visible_count(220) == 3
+        assert scene._title_feed_visible_count(320) == 4
     finally:
         pygame.quit()
 
@@ -1288,6 +1331,39 @@ def test_turn_summary_scene_reveals_all_phases_and_draws_small_window() -> None:
         assert scene._phase_index() == 2
         assert scene._visible_metric_count() == len(scene._view_model.metrics)
         assert scene._visible_product_count() == len(scene._view_model.product_lines)
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_event_pacing_helpers_track_window_size() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = previous_state.model_copy(deep=True)
+        working_state = apply_action(
+            working_state,
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=working_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=41))
+        scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=41),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+
+        pygame.display.set_mode((960, 640), pygame.HIDDEN)
+        assert scene._summary_event_reveal_interval() == 0.45
+        assert scene._summary_timeline_visible_count(160) == 1
+        assert scene._summary_timeline_visible_count(220) == 2
+        assert scene._summary_timeline_visible_count(320) == 3
     finally:
         pygame.quit()
 

@@ -1905,7 +1905,7 @@ class TitleScene(BaseScene):
             surface.blit(idle_surface, (event_inner.left, event_inner.top))
             return
         top = event_inner.top
-        for timed_event in self._events[:4]:
+        for timed_event in self._events[: self._title_feed_visible_count(events_rect.height)]:
             card_rect = pygame.Rect(event_inner.left, top, event_inner.width, 70)
             self._draw_event_card(surface, card_rect, timed_event)
             top += 80
@@ -1993,6 +1993,13 @@ class TitleScene(BaseScene):
             f"Next goal: {meta.next_goal}",
             f"Next reward: {meta.next_reward}",
         )
+
+    def _title_feed_visible_count(self, event_height: int) -> int:
+        if event_height < 170:
+            return 2
+        if event_height < 260:
+            return 3
+        return 4
 
     def _meta_board_compact_layout(self, rect) -> bool:
         return rect.height < 280 or rect.width < 900
@@ -4201,7 +4208,7 @@ class RunScene(BaseScene):
             surface.blit(idle_surface, (event_inner.left, event_inner.top))
             return
         event_top = event_inner.top
-        for timed_event in self._events[:4]:
+        for timed_event in self._events[: self._event_queue_visible_count(event_rect.height)]:
             card_rect = pygame.Rect(event_inner.left, event_top, event_inner.width, 66)
             self._draw_event_card(surface, card_rect, timed_event)
             event_top += 76
@@ -4348,6 +4355,20 @@ class RunScene(BaseScene):
             )
         hint = self._hover_hint_line() or f"Watch: {self._view_model.watch_for}"
         return primary, hint
+
+    def _event_queue_visible_count(self, event_height: int) -> int:
+        overlay_open = (
+            self._deep_panel_key is not None
+            or self._inspector_panel_key is not None
+            or self._context_picker is not None
+            or self._text_input is not None
+            or self.state.pending_event is not None
+        )
+        if event_height < 180 or overlay_open:
+            return 2
+        if event_height < 280:
+            return 3
+        return 4
 
     def _endgame_cockpit_status_line(self) -> str:
         panel = self.deep_panel
@@ -5142,7 +5163,8 @@ class RunScene(BaseScene):
             line_height=16,
             max_lines=1,
         )
-        item_area_height = focus_inner.height - 172
+        compact_footer = focus_inner.width < 560
+        item_area_height = focus_inner.height - (206 if compact_footer else 172)
         item_gap = 10
         item_height = max(
             72,
@@ -5219,7 +5241,7 @@ class RunScene(BaseScene):
         selected_item = self._selected_inspector_item()
         focus_note_rect = pygame.Rect(
             focus_inner.left,
-            focus_inner.bottom - 110,
+            focus_inner.bottom - (138 if compact_footer else 110),
             focus_inner.width,
             30,
         )
@@ -5237,8 +5259,13 @@ class RunScene(BaseScene):
                 line_height=15,
                 max_lines=2,
             )
-        footer_top = rect.bottom - 72
-        footer_rect = pygame.Rect(focus_inner.left, footer_top, focus_inner.width, 62)
+        footer_top = rect.bottom - (104 if compact_footer else 72)
+        footer_rect = pygame.Rect(
+            focus_inner.left,
+            footer_top,
+            focus_inner.width,
+            94 if compact_footer else 62,
+        )
         action_left = footer_rect.left
         if page_total > 1:
             prev_rect = pygame.Rect(footer_rect.left, footer_rect.top, 120, 36)
@@ -5628,7 +5655,10 @@ class TurnSummaryScene(BaseScene):
         self._tweens.update(dt)
         self._motion_pulses.update(dt)
         previous_visible = self._visible_event_count
-        reveal_count = min(len(self._events), 1 + int(self._elapsed / 0.35))
+        reveal_count = min(
+            len(self._events),
+            1 + int(self._elapsed / self._summary_event_reveal_interval()),
+        )
         if reveal_count > previous_visible:
             for event in self._events[previous_visible:reveal_count]:
                 self._trigger_summary_event_motion(event)
@@ -5642,6 +5672,13 @@ class TurnSummaryScene(BaseScene):
 
     def _visible_product_count(self) -> int:
         return min(len(self._view_model.product_lines), 1 + self._phase_index())
+
+    def _summary_event_reveal_interval(self) -> float:
+        surface = self.pygame.display.get_surface()
+        if surface is None:
+            return 0.35
+        width, _height = surface.get_size()
+        return 0.45 if width < 1000 else 0.35
 
     def handle_event(self, event) -> None:
         if event.type == self.pygame.QUIT:
@@ -5913,7 +5950,8 @@ class TurnSummaryScene(BaseScene):
             surface.blit(idle_surface, (inner.left, inner.top))
             return
         top = inner.top
-        for event in self._events[: self._visible_event_count]:
+        visible_event_cap = self._summary_timeline_visible_count(inner.height)
+        for event in self._events[: min(self._visible_event_count, visible_event_cap)]:
             card_rect = pygame.Rect(inner.left, top, inner.width, 70)
             self._draw_summary_event(surface, card_rect, event)
             top += 80
@@ -5979,6 +6017,13 @@ class TurnSummaryScene(BaseScene):
         if len(compact) <= max_length:
             return compact
         return f"{compact[: max_length - 3].rstrip()}..."
+
+    def _summary_timeline_visible_count(self, timeline_height: int) -> int:
+        if timeline_height < 170:
+            return 1
+        if timeline_height < 250:
+            return 2
+        return 3
 
     def _draw_summary_footer(self, surface, rect) -> None:
         pygame = self.pygame

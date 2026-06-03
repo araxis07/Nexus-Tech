@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.107.0 - 2026-06-03
+
+- Ran another 2D motion-and-pacing pass focused on small-window animation readability instead of adding new systems, using fresh rendered audits for the live feed, title feed, endgame inspector, and staged turn summary
+- Added adaptive event-feed caps for the title flow and live run so tighter layouts and overlay-heavy states now show fewer transient cards instead of flooding the visible queue
+- Slowed turn-summary timeline reveal slightly on narrower windows and capped visible timeline cards by available height so post-turn animation stays readable rather than racing the panel bounds
+- Expanded inspector footer breathing room on small windows so paging controls and item-level actions no longer crowd the bottom of endgame and pipeline records as aggressively
+- Expanded regression coverage for title-feed pacing, live event-queue pacing, and summary reveal timing, then promoted package metadata and runtime versioning to `0.107.0`
+
 ## 0.106.0 - 2026-06-03
 
 - Ran a second frame-backed 2D UX pass focused on narrow-window late-game scenes after `0.105.0`, using captured endgame-inspector, title-meta, and turn-summary frames to close the next spacing and density gaps

@@ -1,7 +1,7 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.106.0`
+Version under audit: `0.107.0`
 
 ## Scope
 
@@ -18,6 +18,7 @@ Version under audit: `0.106.0`
 3. Endgame and deep-panel action buttons carried detail copy that was too long for narrow button widths, especially in smaller overlays.
 4. Strict inspector filters could produce an empty detail pane with no clear next step beyond trial-and-error key presses.
 5. Follow-up narrow-window renders still showed stacked meta-board copy in the title flow, overly dense endgame inspector rows, and turn-summary command copy that was too long for a shallow action slot.
+6. Even after the compact-layout pass, feed-heavy scenes and staged summaries could still feel visually busy on smaller windows because card counts and reveal cadence did not adapt strongly enough to available height.
 
 ## Fix Summary
 
@@ -28,10 +29,13 @@ Version under audit: `0.106.0`
 - The title/meta board now collapses into a compact stacked layout on narrow windows instead of pushing archive/progression controls into the sidebar region.
 - Small-window inspectors now tighten per-page density with adaptive paging, shorter action-detail copy, and stricter line limits for narrow cards.
 - The turn-summary focus command now truncates to the command label instead of pushing a long detail sentence through a shallow button slot.
+- Title and live-run feeds now cap visible cards by available height, with overlay-heavy run states dropping to a tighter queue instead of showing the full default stack.
+- Turn-summary timeline events now reveal more slowly on narrower windows and cap the visible card count by panel height so post-turn animation reads as a sequence instead of a pileup.
+- Small-window inspector footers now reserve more breathing room below the active cards before drawing page controls and row actions.
 
 ## Verification Snapshot
 
-- `tests/test_frontend_2d.py`: passed with new coverage for compact score labels, overlay-detail compaction, footer-band metrics, adaptive inspector paging, compact meta-board summaries, and summary-command copy
+- `tests/test_frontend_2d.py`: passed with new coverage for title-feed pacing, live event-queue caps, adaptive inspector paging, and summary reveal timing
 - `play-2d --headless --max-frames 4`: passed
 - `menu-2d --headless --max-frames 4`: passed
 
