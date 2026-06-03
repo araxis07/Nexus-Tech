@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from nexus_tech.domain.models import GameState
+from nexus_tech.domain.models import GameState, TurnAction
 from nexus_tech.domain.money import format_money
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
@@ -141,7 +141,7 @@ def build_turn_resolution_events(
             )
         )
     events.extend(_build_delta_events(previous_state, current_state))
-    return tuple(events)
+    return _prioritize_turn_resolution_events(tuple(events))
 
 
 def _build_delta_events(previous_state: GameState, current_state: GameState) -> list[FrontendEvent]:
@@ -357,8 +357,137 @@ def _build_action_choreography_events(
     event = choreography_map.get(action_label)
     if event is not None:
         return (event,)
+    event = _build_gate_command_choreography_event(action_label, primary_product_targets)
+    if event is not None:
+        return (event,)
     event = _build_family_choreography_event(action_label, primary_product_targets)
     return (event,) if event is not None else ()
+
+
+def _build_gate_command_choreography_event(
+    action_label: str,
+    primary_product_targets: tuple[str, ...],
+) -> FrontendEvent | None:
+    gate_command_map = {
+        TurnAction.REVIEW_BOARD.value: FrontendEvent(
+            title="IPO Gate Review",
+            detail="Board scrutiny and governance gaps are under direct late-game review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:endgame", "panel:board", "stat:board_pressure"),
+        ),
+        TurnAction.START_BOARD_RECOVERY_PLAN.value: FrontendEvent(
+            title="Board Recovery Plan",
+            detail="Governance heat is being converted into a deliberate recovery track.",
+            severity="warning",
+            motion="flash",
+            targets=("panel:endgame", "panel:board", "stat:board_pressure"),
+        ),
+        TurnAction.RUN_ENTERPRISE_QUEUE_RESET.value: FrontendEvent(
+            title="Enterprise Queue Reset",
+            detail="Support drag is being cleared before the IPO lane can reopen.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:endgame", "panel:customers", "stat:users") + primary_product_targets,
+        ),
+        TurnAction.RUN_ENTERPRISE_REFERENCE_WATCH.value: FrontendEvent(
+            title="Reference Watch",
+            detail="Enterprise proof points are being stabilized for public-market diligence.",
+            severity="info",
+            motion="slide",
+            targets=(
+                "panel:endgame",
+                "panel:customers",
+                "stat:reputation",
+            )
+            + primary_product_targets,
+        ),
+        TurnAction.REVIEW_PARTNERSHIPS.value: FrontendEvent(
+            title="M&A Diligence Review",
+            detail="Channel concentration and partner quality are under acquisition review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:endgame", "panel:partnerships", "stat:users"),
+        ),
+        TurnAction.RUN_CHANNEL_FIREBREAK.value: FrontendEvent(
+            title="Channel Firebreak",
+            detail="Partner dependence is being contained before the acquirer path reopens.",
+            severity="warning",
+            motion="flash",
+            targets=("panel:endgame", "panel:partnerships", "stat:users"),
+        ),
+        TurnAction.RUN_CHANNEL_DEPENDENCY_RESET.value: FrontendEvent(
+            title="Dependency Reset",
+            detail="The channel mix is being reset to reduce acquisition-path fragility.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:endgame", "panel:partnerships", "stat:users"),
+        ),
+        TurnAction.REACTIVATE_PARTNERSHIP.value: FrontendEvent(
+            title="Partner Reactivation",
+            detail="A strained partner lane is being pulled back into the portfolio.",
+            severity="success",
+            motion="slide",
+            targets=("panel:endgame", "panel:partnerships", "stat:users"),
+        ),
+        TurnAction.REVIEW_FINANCE.value: FrontendEvent(
+            title="Independence Runway Review",
+            detail="Cash durability and covenant posture are under direct independence review.",
+            severity="info",
+            motion="slide",
+            targets=("panel:endgame", "panel:finance", "stat:cash", "stat:runway"),
+        ),
+        TurnAction.SET_PATH_CASH_WATERFALL.value: FrontendEvent(
+            title="Cash Waterfall",
+            detail="Capital allocation is being re-cut to keep the independent path solvent.",
+            severity="warning",
+            motion="slide",
+            targets=("panel:endgame", "panel:finance", "stat:cash", "stat:runway"),
+        ),
+        TurnAction.SET_COVENANT_FIREWALL.value: FrontendEvent(
+            title="Covenant Firewall",
+            detail="Debt covenants are being hardened before the independence path slips.",
+            severity="warning",
+            motion="flash",
+            targets=("panel:endgame", "panel:finance", "stat:cash", "stat:runway"),
+        ),
+        TurnAction.RUN_BILLING_RENEWAL_WATCH.value: FrontendEvent(
+            title="Renewal Watch",
+            detail=(
+                "Billing and renewal risk is being reduced before independence credibility erodes."
+            ),
+            severity="warning",
+            motion="slide",
+            targets=("panel:endgame", "panel:customers", "stat:cash", "stat:users")
+            + primary_product_targets,
+        ),
+        TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value: FrontendEvent(
+            title="Reset Buffer",
+            detail="Reserve posture is being hardened before the board-reset path reopens.",
+            severity="warning",
+            motion="flash",
+            targets=(
+                "panel:endgame",
+                "panel:board",
+                "panel:finance",
+                "stat:cash",
+                "stat:board_pressure",
+            ),
+        ),
+        TurnAction.EXECUTE_BOARD_RESPONSE.value: FrontendEvent(
+            title="Board Resolution",
+            detail="A live board obligation is being answered to keep the reset path intact.",
+            severity="warning",
+            motion="flash",
+            targets=(
+                "panel:endgame",
+                "panel:board",
+                "panel:finance",
+                "stat:board_pressure",
+            ),
+        ),
+    }
+    return gate_command_map.get(action_label)
 
 
 def _primary_product_targets(
@@ -675,3 +804,43 @@ def _action_workspace_targets(action_label: str) -> tuple[str, ...]:
     if action_label.startswith(("review_", "view_report")):
         return ("feed",)
     return ()
+
+
+def _prioritize_turn_resolution_events(
+    events: tuple[FrontendEvent, ...],
+) -> tuple[FrontendEvent, ...]:
+    if not events:
+        return events
+    summary, *rest = events
+    prioritized_rest = sorted(
+        enumerate(rest),
+        key=lambda item: (-_turn_resolution_event_priority(item[1]), item[0]),
+    )
+    return (summary, *(event for _index, event in prioritized_rest))
+
+
+def _turn_resolution_event_priority(event: FrontendEvent) -> int:
+    title_priority = {
+        "Company Shutdown": 160,
+        "Victory Achieved": 155,
+        "Exit Gates": 145,
+        "Gate Command": 140,
+        "Strategic Outlook": 135,
+        "Board Pressure": 115,
+        "Cash Changed": 110,
+        "Users Shifted": 105,
+        "Reputation Shifted": 95,
+    }
+    severity_priority = {
+        "danger": 40,
+        "warning": 28,
+        "success": 18,
+        "info": 12,
+    }
+    priority = title_priority.get(event.title, 60)
+    priority += severity_priority.get(event.severity, 10)
+    if "panel:endgame" in event.targets:
+        priority += 12
+    if event.motion == "flash":
+        priority += 6
+    return priority

@@ -284,6 +284,30 @@ def test_build_action_events_emit_finance_family_choreography_cards() -> None:
     )
 
 
+def test_build_action_events_emit_endgame_gate_choreography_cards() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    current_state = previous_state.model_copy(deep=True)
+    current_state.company.cash_on_hand -= Decimal("1200.00")
+    current_state.finance.board_pressure += 6
+
+    events = build_action_events(
+        previous_state,
+        current_state,
+        action_label=TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
+        message="Reserve posture hardened.",
+    )
+
+    event_by_title = {event.title: event for event in events}
+    assert "Reset Buffer" in event_by_title
+    assert event_by_title["Reset Buffer"].targets == (
+        "panel:endgame",
+        "panel:board",
+        "panel:finance",
+        "stat:cash",
+        "stat:board_pressure",
+    )
+
+
 def test_build_turn_summary_view_model_exposes_resolution_metrics() -> None:
     previous_state = create_new_game("NEXUS TECH", "Nexus One")
     working_state = previous_state.model_copy(deep=True)
@@ -322,6 +346,15 @@ def test_build_turn_resolution_events_exposes_gate_and_outlook_cards() -> None:
     gate_event = next(event for event in events if event.title == "Gate Command")
     assert "panel:endgame" in gate_event.targets
     assert "summary:timeline" in gate_event.targets
+    assert events[0].title == "Turn 1 Resolved"
+    if "Cash Changed" in titles:
+        cash_index = next(
+            index for index, event in enumerate(events) if event.title == "Cash Changed"
+        )
+        gate_index = next(
+            index for index, event in enumerate(events) if event.title == "Gate Command"
+        )
+        assert gate_index < cash_index
 
 
 def test_build_deep_dive_panel_view_models_exposes_finance_and_customer_actions() -> None:
@@ -619,7 +652,7 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
 
         scene._set_deep_panel("endgame")
         workspace_line, hint_line = scene._footer_status_lines()
-        assert "Workspace: Endgame / Exit Board" in workspace_line
+        assert "Endgame: Endgame / Exit Board" in workspace_line
         assert "Gate:" in workspace_line
         assert "Hotspot:" in workspace_line
         assert hint_line.startswith("Watch:")
@@ -645,6 +678,31 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         picker_line, _ = scene._footer_status_lines()
 
         assert picker_line.startswith("Picker: Capital Plan")
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_endgame_footer_status_compacts_commands_on_small_windows() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        pygame.display.set_mode((920, 640), pygame.HIDDEN)
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=31),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("endgame")
+        workspace_line, _hint_line = scene._footer_status_lines()
+
+        assert "Endgame: Endgame / Exit Board" in workspace_line
+        assert "set_board_reset_cont..." not in workspace_line
+        assert "Gate:" in workspace_line
     finally:
         pygame.quit()
 

@@ -4372,13 +4372,14 @@ class RunScene(BaseScene):
 
     def _endgame_cockpit_status_line(self) -> str:
         panel = self.deep_panel
+        compact = self._window_width() < 1000
         workspace_title = (
             self._panel_display_name(self._deep_panel_key)
             if self._deep_panel_key is not None
             else "Endgame / Exit Board"
         )
         if panel is None:
-            return f"Workspace: {workspace_title}"
+            return f"{'Endgame' if compact else 'Workspace'}: {workspace_title}"
         gate_action = next(
             (action for action in panel.actions if action.label == "Gate Command"),
             None,
@@ -4387,13 +4388,32 @@ class RunScene(BaseScene):
             (action for action in panel.actions if action.label == "Hotspot Review"),
             None,
         )
-        segments = [f"Workspace: {workspace_title}"]
+        segments = [f"{'Endgame' if compact else 'Workspace'}: {workspace_title}"]
         if gate_action is not None:
-            segments.append(f"Gate: {gate_action.command}")
+            segments.append(
+                f"Gate: {self._compact_command_token(gate_action.command, compact=compact)}"
+            )
         if hotspot_action is not None:
-            segments.append(f"Hotspot: {hotspot_action.command}")
+            segments.append(
+                f"Hotspot: {self._compact_command_token(hotspot_action.command, compact=compact)}"
+            )
         segments.append(f"Actions Left: {self.state.action_points_remaining}")
         return " | ".join(segments)
+
+    def _window_width(self) -> int:
+        surface = self.pygame.display.get_surface()
+        if surface is None:
+            return 1280
+        return surface.get_size()[0]
+
+    def _compact_command_token(self, command: str, *, compact: bool) -> str:
+        if not compact:
+            return command
+        command = command.replace("review_", "review:")
+        command = command.replace("run_", "")
+        command = command.replace("set_", "")
+        command = command.replace("execute_", "")
+        return self._compact_button_detail(command.replace("_", " "), max_length=24)
 
     def _selected_inspector_primary_action_summary(self) -> str:
         item = self._selected_inspector_item()

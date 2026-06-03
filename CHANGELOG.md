@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.108.0 - 2026-06-03
+
+- Extended the 2D choreography pass into late-game path work so concrete gate commands such as board recovery, channel firebreaks, covenant firewalls, renewal watches, and reset-buffer setup now emit path-specific motion cards instead of falling back to generic family pulses
+- Prioritized turn-resolution timeline cards around exit-gate state, gate commands, and strategic outlook before lower-signal deltas so narrow staged summaries keep the late-game story visible even when only a few cards fit
+- Tightened endgame cockpit status copy on smaller windows by compacting gate and hotspot command tokens inside the footer line instead of dumping long raw snake-case command ids across the HUD
+- Expanded regression coverage for endgame command choreography, turn-resolution event ordering, compact cockpit footer copy, and the earlier feed/timeline pacing helpers, then promoted package metadata and runtime versioning to `0.108.0`
+
 ## 0.107.0 - 2026-06-03
 
 - Ran another 2D motion-and-pacing pass focused on small-window animation readability instead of adding new systems, using fresh rendered audits for the live feed, title feed, endgame inspector, and staged turn summary

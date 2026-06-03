@@ -1,7 +1,7 @@
 # 2D Visual UX Audit
 
 Date: `2026-06-03`
-Version under audit: `0.107.0`
+Version under audit: `0.108.0`
 
 ## Scope
 
@@ -32,10 +32,13 @@ Version under audit: `0.107.0`
 - Title and live-run feeds now cap visible cards by available height, with overlay-heavy run states dropping to a tighter queue instead of showing the full default stack.
 - Turn-summary timeline events now reveal more slowly on narrower windows and cap the visible card count by panel height so post-turn animation reads as a sequence instead of a pileup.
 - Small-window inspector footers now reserve more breathing room below the active cards before drawing page controls and row actions.
+- Late-game gate commands now emit path-specific choreography cards and targets, so `board recovery`, `channel firebreak`, `cash waterfall`, `covenant firewall`, `renewal watch`, and `reset buffer` reads feel distinct instead of collapsing into generic family motion.
+- Turn-resolution events now prioritize exit gates, gate commands, and strategic outlook ahead of lower-signal deltas, which keeps late-game summaries readable when narrow panels can only show one to three timeline cards.
+- The compact endgame footer now shortens gate and hotspot command labels on sub-1000px layouts so the cockpit line keeps the next repair route visible without flooding the footer band with raw command ids.
 
 ## Verification Snapshot
 
-- `tests/test_frontend_2d.py`: passed with new coverage for title-feed pacing, live event-queue caps, adaptive inspector paging, and summary reveal timing
+- `tests/test_frontend_2d.py`: passed with new coverage for title-feed pacing, late-game command choreography, compact cockpit footer copy, and summary reveal / ordering behavior
 - `play-2d --headless --max-frames 4`: passed
 - `menu-2d --headless --max-frames 4`: passed
 
