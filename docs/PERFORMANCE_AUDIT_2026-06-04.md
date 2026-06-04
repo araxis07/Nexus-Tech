@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.118.0`
+Version: `0.119.0`
 
 ## Scope
 
@@ -8,6 +8,7 @@ Version: `0.118.0`
 - The audit stresses the live run and staged turn summary with dense pulse banks across `820x620`, `960x640`, and `1280x720` viewports.
 - The audit also exercises title/menu motion, save-slot detail, rename/delete overlays, archive/meta/wizard subflows, review-scene motion, inspector overlays, picker overlays, and 2D request-path coverage.
 - Inspector interactions now have explicit section, item, page, sort, filter, actionable-focus, and hotspot-focus pulse lanes.
+- The 2D shell now supports `--motion-mode full|reduced|off` for launchers and `audit-2d-motion`, with reduced/off modes preserving gameplay while lowering or disabling highlight pulses.
 - Each viewport reports pulse-bank cooldown before/after counts, average frame time, and max frame spike.
 
 ## Stability Budgets
@@ -26,6 +27,8 @@ Version: `0.118.0`
 ## Verification Commands
 
 - `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2`
+- `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced`
+- `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode off`
 - `pytest -q tests/test_frontend_2d.py -k "motion_audit or audit_2d_motion"`
 
 ## Result

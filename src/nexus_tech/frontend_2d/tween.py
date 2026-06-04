@@ -3,7 +3,40 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from math import exp
+
+
+class MotionMode(StrEnum):
+    """User-selectable 2D motion intensity mode."""
+
+    FULL = "full"
+    REDUCED = "reduced"
+    OFF = "off"
+
+    @property
+    def pulse_scale(self) -> float:
+        """Return the multiplier applied to highlight pulse intensity."""
+
+        if self is MotionMode.FULL:
+            return 1.0
+        if self is MotionMode.REDUCED:
+            return 0.38
+        return 0.0
+
+
+def normalize_motion_mode(value: MotionMode | str | None) -> MotionMode:
+    """Normalize API/CLI values into a supported motion mode."""
+
+    if value is None:
+        return MotionMode.FULL
+    if isinstance(value, MotionMode):
+        return value
+    try:
+        return MotionMode(str(value).lower())
+    except ValueError as error:
+        valid_values = ", ".join(mode.value for mode in MotionMode)
+        raise ValueError(f"motion mode must be one of: {valid_values}") from error
 
 
 @dataclass
@@ -87,14 +120,23 @@ class PulseValue:
 class PulseBank:
     """Store multiple named highlight pulses."""
 
-    def __init__(self, *, decay: float = 1.8) -> None:
+    def __init__(self, *, decay: float = 1.8, intensity_scale: float = 1.0) -> None:
         self._decay = decay
+        self._intensity_scale = max(0.0, min(1.0, intensity_scale))
         self._values: dict[str, PulseValue] = {}
+
+    @property
+    def intensity_scale(self) -> float:
+        """Return the configured intensity multiplier for new pulses."""
+
+        return self._intensity_scale
 
     def trigger(self, key: str, *, intensity: float = 1.0, decay: float | None = None) -> None:
         """Start or refresh one pulse."""
 
-        clamped = max(0.0, min(1.0, intensity))
+        clamped = max(0.0, min(1.0, intensity)) * self._intensity_scale
+        if clamped <= 0:
+            return
         pulse = self._values.get(key)
         if pulse is None:
             self._values[key] = PulseValue(clamped, decay or self._decay)

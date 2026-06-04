@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.119.0 - 2026-06-04
+
+- Added a 2D `--motion-mode full|reduced|off` option across play, load, continue, menu, and motion-audit commands so highlight animation intensity can be lowered or disabled without changing gameplay
+- Wired motion mode through title, run, review, and turn-summary scene transitions so save loads, wizard launches, archive reviews, post-turn summaries, and final reviews preserve the selected motion setting
+- Extended regression coverage and docs for reduced/off pulse behavior, scene propagation, CLI routing, and deterministic audit reporting
+
 ## 0.118.0 - 2026-06-04
 
 - Expanded the 2D animation audit into title/save/archive subflows, including save-slot detail, rename text overlays, delete confirmation, archive browsing, meta board, and wizard overlays

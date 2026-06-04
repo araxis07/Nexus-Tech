@@ -23,6 +23,7 @@ from nexus_tech.frontend_2d.context import (
     explain_command_unavailable,
     explain_inspector_action_unavailable,
 )
+from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_run_review_view_model,
@@ -152,6 +153,7 @@ class MotionAuditReport:
     seed: int
     frames: int
     cells: tuple[MotionAuditCell, ...]
+    motion_mode: str = MotionMode.FULL.value
     flow_report: FlowAuditReport = FlowAuditReport(
         command_count=0,
         inspector_action_count=0,
@@ -179,11 +181,13 @@ def run_2d_motion_audit(
     seed: int,
     frames: int = 90,
     sizes: tuple[tuple[int, int], ...] = DEFAULT_MOTION_AUDIT_SIZES,
+    motion_mode: MotionMode | str = MotionMode.FULL,
 ) -> MotionAuditReport:
     """Run a deterministic headless 2D motion stability audit."""
 
     if frames < 1:
         raise ValueError("frames must be at least 1")
+    motion_mode = normalize_motion_mode(motion_mode)
 
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -222,6 +226,7 @@ def run_2d_motion_audit(
                     slot_name="motion-audit",
                     save_callback=lambda *_args: None,
                     show_ready_event=False,
+                    motion_mode=motion_mode,
                 )
                 run_scene._set_deep_panel("pipeline")
                 run_scene._open_inspector("pipeline")
@@ -251,6 +256,7 @@ def run_2d_motion_audit(
                     resolution=resolution,
                     selected_product_id=resolution.state.products[0].id.hex,
                     dirty=True,
+                    motion_mode=motion_mode,
                 )
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
@@ -265,6 +271,7 @@ def run_2d_motion_audit(
                     save_callback=lambda *_args: None,
                     coordinator=coordinator,
                     initial_mode="menu",
+                    motion_mode=motion_mode,
                 )
                 _exercise_title_subflows(title_scene, coordinator, seed)
                 title_before = title_scene._motion_pulses.live_count()
@@ -287,6 +294,7 @@ def run_2d_motion_audit(
                     return_scene_factory=None,
                     allow_save=False,
                     dirty=False,
+                    motion_mode=motion_mode,
                 )
                 review_before = review_scene._motion_pulses.live_count()
                 review_avg, review_max = _exercise_scene(review_scene, surface, frames)
@@ -333,6 +341,7 @@ def run_2d_motion_audit(
             seed=seed,
             frames=frames,
             cells=tuple(cells),
+            motion_mode=motion_mode.value,
             flow_report=flow_report,
         )
     finally:

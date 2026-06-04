@@ -51,7 +51,7 @@ from nexus_tech.frontend_2d.scenes import (
     TitleScene,
     TurnSummaryScene,
 )
-from nexus_tech.frontend_2d.tween import PulseBank
+from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
     build_endgame_cockpit_actions,
@@ -782,6 +782,22 @@ def test_pulse_bank_prune_drops_weak_unprotected_pulses_first() -> None:
     assert bank.get("busy:mid") == 0.0
 
 
+def test_motion_mode_scales_or_disables_new_pulses() -> None:
+    assert normalize_motion_mode("reduced") is MotionMode.REDUCED
+
+    reduced_bank = PulseBank(decay=2.0, intensity_scale=MotionMode.REDUCED.pulse_scale)
+    reduced_bank.trigger("feed", intensity=1.0)
+
+    assert reduced_bank.live_count() == 1
+    assert round(reduced_bank.get("feed"), 2) == 0.38
+
+    off_bank = PulseBank(decay=2.0, intensity_scale=MotionMode.OFF.pulse_scale)
+    off_bank.trigger("feed", intensity=1.0)
+
+    assert off_bank.live_count() == 0
+    assert off_bank.get("feed") == 0.0
+
+
 def test_run_scene_busy_motion_bank_shortens_info_ttl_further() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1466,6 +1482,42 @@ def test_run_scene_board_command_triggers_board_and_endgame_motion() -> None:
         pygame.quit()
 
 
+def test_run_scene_reduced_motion_scales_command_pulses() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        full_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=51),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        reduced_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=52),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.REDUCED,
+        )
+
+        full_scene._set_deep_panel("endgame")
+        reduced_scene._set_deep_panel("endgame")
+
+        assert reduced_scene.motion_mode is MotionMode.REDUCED
+        assert (
+            0
+            < reduced_scene._motion_pulses.get("panel:endgame")
+            < full_scene._motion_pulses.get("panel:endgame")
+        )
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
     pygame, fonts, surface = _build_pygame_bundle()
     try:
@@ -1543,6 +1595,33 @@ def test_title_scene_mode_and_overlay_motion_are_triggered(tmp_path: Path) -> No
         assert scene._text_input is not None
         assert scene._motion_pulses.get("title:mode:meta") > 0
         assert scene._motion_pulses.get("title:overlay:text_input") > 0
+    finally:
+        pygame.quit()
+
+
+def test_title_scene_preserves_motion_mode_when_loading_run(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-motion-mode.db")
+        loaded_state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=loaded_state,
+            rng=RandomSource(seed=18),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._open_loaded_game(loaded_state, RandomSource(seed=19), "active")
+
+        assert scene.motion_mode is MotionMode.OFF
+        assert scene._motion_pulses.live_count() == 0
+        assert scene._next_scene is not None
+        assert scene._next_scene.motion_mode is MotionMode.OFF
     finally:
         pygame.quit()
 
@@ -1757,6 +1836,7 @@ def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> No
         headless=True,
         max_frames=2,
         window_size=(960, 640),
+        motion_mode=MotionMode.REDUCED,
     )
 
     assert result.exit_reason == "max_frames"
@@ -2077,6 +2157,7 @@ def test_launch_2d_menu_headless_exits_after_frame_cap(tmp_path: Path) -> None:
         headless=True,
         max_frames=2,
         window_size=(960, 640),
+        motion_mode=MotionMode.REDUCED,
     )
 
     assert result.exit_reason == "max_frames"
@@ -2093,6 +2174,7 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     )
 
     assert report.status == "pass"
+    assert report.motion_mode == MotionMode.FULL.value
     assert len(report.cells) == 1
     cell = report.cells[0]
     assert cell.run_before_pulses > cell.run_after_pulses
@@ -2109,6 +2191,33 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.long_run_after_pulses <= 18
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
+
+
+def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
+    report = run_2d_motion_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        frames=1,
+        sizes=((820, 620),),
+        motion_mode=MotionMode.OFF,
+    )
+
+    cell = report.cells[0]
+    assert report.status == "pass"
+    assert report.motion_mode == MotionMode.OFF.value
+    assert cell.run_before_pulses == 0
+    assert cell.run_after_pulses == 0
+    assert cell.summary_before_pulses == 0
+    assert cell.summary_after_pulses == 0
+    assert cell.title_before_pulses == 0
+    assert cell.title_after_pulses == 0
+    assert cell.review_before_pulses == 0
+    assert cell.review_after_pulses == 0
+    assert cell.inspector_before_pulses == 0
+    assert cell.inspector_after_pulses == 0
+    assert cell.long_run_before_pulses == 0
+    assert cell.long_run_after_pulses == 0
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2150,6 +2259,7 @@ def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
                     max_frame_ms=8.0,
                 ),
             ),
+            motion_mode=kwargs["motion_mode"].value,
             flow_report=FlowAuditReport(
                 command_count=43,
                 inspector_action_count=24,
@@ -2169,15 +2279,19 @@ def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
             "7",
             "--frames",
             "2",
+            "--motion-mode",
+            "reduced",
         ],
     )
 
     assert result.exit_code == 0
     assert "2D Motion Audit" in result.output
+    assert "motion reduced" in result.output
     assert "2D flow request paths: PASS" in result.output
     assert calls["scenario_id"] == "founder_journey"
     assert calls["seed"] == 7
     assert calls["frames"] == 2
+    assert calls["motion_mode"] is MotionMode.REDUCED
 
 
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
@@ -2199,6 +2313,8 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
             "--headless",
             "--max-frames",
             "2",
+            "--motion-mode",
+            "off",
         ],
     )
 
@@ -2207,6 +2323,7 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
     assert captured["seed"] == 7
     assert captured["headless"] is True
     assert captured["max_frames"] == 2
+    assert captured["motion_mode"] is MotionMode.OFF
 
 
 def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
@@ -2230,9 +2347,12 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
             "--headless",
             "--max-frames",
             "2",
+            "--motion-mode",
+            "reduced",
         ],
     )
 
     assert result.exit_code == 0
     assert captured["headless"] is True
     assert captured["max_frames"] == 2
+    assert captured["motion_mode"] is MotionMode.REDUCED

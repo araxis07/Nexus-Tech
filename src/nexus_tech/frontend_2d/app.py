@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nexus_tech.domain.models import GameState
+from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.randomness import RandomSource
@@ -36,9 +37,11 @@ def launch_2d_frontend(
     headless: bool = False,
     max_frames: int | None = None,
     window_size: tuple[int, int] = (1440, 900),
+    motion_mode: MotionMode | str = MotionMode.FULL,
 ) -> FrontendRunResult:
     """Launch the lightweight animated 2D dashboard."""
 
+    motion_mode = normalize_motion_mode(motion_mode)
     if headless:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -71,6 +74,7 @@ def launch_2d_frontend(
             game_state,
             game_rng,
         ),
+        motion_mode=motion_mode,
     )
     return _run_frontend_loop(
         pygame=pygame,
@@ -87,9 +91,11 @@ def launch_2d_menu(
     headless: bool = False,
     max_frames: int | None = None,
     window_size: tuple[int, int] = (1440, 900),
+    motion_mode: MotionMode | str = MotionMode.FULL,
 ) -> FrontendRunResult:
     """Launch the title/save-load scene for the 2D frontend."""
 
+    motion_mode = normalize_motion_mode(motion_mode)
     if headless:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -124,6 +130,7 @@ def launch_2d_menu(
         ),
         coordinator=coordinator,
         info_message="Load a save, review archives, or boot the default run from inside 2D.",
+        motion_mode=motion_mode,
     )
     return _run_frontend_loop(
         pygame=pygame,

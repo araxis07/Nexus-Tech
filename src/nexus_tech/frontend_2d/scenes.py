@@ -32,7 +32,7 @@ from nexus_tech.frontend_2d.event_queue import (
     build_turn_resolution_events,
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
-from nexus_tech.frontend_2d.tween import PulseBank, TweenBank
+from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
     DeepDivePanelViewModel,
@@ -495,6 +495,7 @@ class BaseScene:
         slot_name: str,
         save_callback: Callable[[GameState, RandomSource, str], None],
         dirty: bool = False,
+        motion_mode: MotionMode | str = MotionMode.FULL,
     ) -> None:
         self.pygame = pygame
         self.fonts = fonts
@@ -503,6 +504,7 @@ class BaseScene:
         self.slot_name = slot_name
         self._save_callback = save_callback
         self._dirty = dirty
+        self.motion_mode = normalize_motion_mode(motion_mode)
         self.should_exit = False
         self.exit_reason = "quit"
         self._next_scene: BaseScene | None = None
@@ -542,6 +544,7 @@ class TitleScene(BaseScene):
         coordinator: SaveLoadCoordinator,
         initial_mode: str = "menu",
         info_message: str | None = None,
+        motion_mode: MotionMode | str = MotionMode.FULL,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -551,12 +554,16 @@ class TitleScene(BaseScene):
             slot_name=slot_name,
             save_callback=save_callback,
             dirty=False,
+            motion_mode=motion_mode,
         )
         self.coordinator = coordinator
         self._mode = initial_mode
         self._click_targets: list[ClickTarget] = []
         self._events: list[TimedFrontendEvent] = []
-        self._motion_pulses = PulseBank(decay=1.9)
+        self._motion_pulses = PulseBank(
+            decay=1.9,
+            intensity_scale=self.motion_mode.pulse_scale,
+        )
         self._text_input: TextInputModalState | None = None
         self._save_cards: tuple[SaveSlotCardViewModel, ...] = ()
         self._archive_cards: tuple[ArchiveCardViewModel, ...] = ()
@@ -941,6 +948,7 @@ class TitleScene(BaseScene):
             rng=rng,
             slot_name=slot_name,
             save_callback=self._save_callback,
+            motion_mode=self.motion_mode,
         )
 
     def _open_archive_review(self, archive_key: str) -> None:
@@ -961,6 +969,7 @@ class TitleScene(BaseScene):
             return_scene_factory=lambda: self._spawn_scene("archives"),
             allow_save=False,
             dirty=False,
+            motion_mode=self.motion_mode,
         )
 
     def _open_slot_detail(self, slot_name: str) -> None:
@@ -979,6 +988,7 @@ class TitleScene(BaseScene):
             save_callback=self._save_callback,
             coordinator=self.coordinator,
             initial_mode=mode,
+            motion_mode=self.motion_mode,
         )
 
     def _refresh_wizard_catalog(self) -> None:
@@ -2224,6 +2234,7 @@ class ReviewScene(BaseScene):
         return_scene_factory: Callable[[], BaseScene] | None,
         allow_save: bool,
         dirty: bool,
+        motion_mode: MotionMode | str = MotionMode.FULL,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -2233,6 +2244,7 @@ class ReviewScene(BaseScene):
             slot_name=slot_name,
             save_callback=save_callback,
             dirty=dirty,
+            motion_mode=motion_mode,
         )
         self._view_model = view_model
         self._accent = accent
@@ -2241,7 +2253,10 @@ class ReviewScene(BaseScene):
         self._return_scene_factory = return_scene_factory
         self._allow_save = allow_save
         self._click_targets: list[ClickTarget] = []
-        self._motion_pulses = PulseBank(decay=1.9)
+        self._motion_pulses = PulseBank(
+            decay=1.9,
+            intensity_scale=self.motion_mode.pulse_scale,
+        )
         self._trigger_review_motion("header", intensity=0.58)
         self._trigger_review_motion("findings", intensity=0.72 if view_model.findings else 0.4)
         self._trigger_review_motion("sidebar", intensity=0.52)
@@ -2517,6 +2532,7 @@ class RunScene(BaseScene):
         seed_events: tuple[FrontendEvent, ...] = (),
         dirty: bool = False,
         show_ready_event: bool = True,
+        motion_mode: MotionMode | str = MotionMode.FULL,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -2526,6 +2542,7 @@ class RunScene(BaseScene):
             slot_name=slot_name,
             save_callback=save_callback,
             dirty=dirty,
+            motion_mode=motion_mode,
         )
         self._events: list[TimedFrontendEvent] = []
         self._click_targets: list[ClickTarget] = []
@@ -2542,7 +2559,10 @@ class RunScene(BaseScene):
         self._help_overlay_visible = False
         self._product_index = 0
         self._tweens = TweenBank(speed=9.0)
-        self._motion_pulses = PulseBank(decay=1.8)
+        self._motion_pulses = PulseBank(
+            decay=1.8,
+            intensity_scale=self.motion_mode.pulse_scale,
+        )
         self._set_selected_product(selected_product_id)
         self._view_model = build_game_view_model(
             self.state,
@@ -3721,6 +3741,7 @@ class RunScene(BaseScene):
             resolution=resolution,
             selected_product_id=self.selected_product.id.hex,
             dirty=True,
+            motion_mode=self.motion_mode,
         )
 
     def _save_current_run(self) -> None:
@@ -3748,6 +3769,7 @@ class RunScene(BaseScene):
             return_scene_factory=None,
             allow_save=True,
             dirty=self._dirty,
+            motion_mode=self.motion_mode,
         )
 
     def _select_inspector_section(self, payload: str) -> None:
@@ -5820,6 +5842,7 @@ class TurnSummaryScene(BaseScene):
         resolution,
         selected_product_id: str,
         dirty: bool,
+        motion_mode: MotionMode | str = MotionMode.FULL,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -5829,6 +5852,7 @@ class TurnSummaryScene(BaseScene):
             slot_name=slot_name,
             save_callback=save_callback,
             dirty=dirty,
+            motion_mode=motion_mode,
         )
         self._previous_state = previous_state
         self._resolution = resolution
@@ -5838,7 +5862,10 @@ class TurnSummaryScene(BaseScene):
         self._visible_event_count = 1
         self._elapsed = 0.0
         self._tweens = TweenBank(speed=8.0)
-        self._motion_pulses = PulseBank(decay=1.9)
+        self._motion_pulses = PulseBank(
+            decay=1.9,
+            intensity_scale=self.motion_mode.pulse_scale,
+        )
         self._view_model: TurnSummaryViewModel = build_turn_summary_view_model(
             previous_state,
             resolution,
@@ -5996,6 +6023,7 @@ class TurnSummaryScene(BaseScene):
                 return_scene_factory=None,
                 allow_save=True,
                 dirty=self._dirty,
+                motion_mode=self.motion_mode,
             )
             return
         focus_panel_key = _workspace_panel_key_for_command(self._view_model.focus_command)
@@ -6015,6 +6043,7 @@ class TurnSummaryScene(BaseScene):
             seed_events=seed_events,
             dirty=self._dirty,
             show_ready_event=False,
+            motion_mode=self.motion_mode,
         )
 
     def _trigger_summary_event_motion(self, event: FrontendEvent) -> None:

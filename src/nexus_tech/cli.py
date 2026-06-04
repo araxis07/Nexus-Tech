@@ -56,6 +56,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
+    MotionMode,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_motion_audit,
@@ -234,6 +235,11 @@ MAX_FRAMES_2D_OPTION = typer.Option(
     None,
     "--max-frames",
     help="Optional frame cap used for smoke tests and automated verification.",
+)
+MOTION_MODE_2D_OPTION = typer.Option(
+    MotionMode.FULL,
+    "--motion-mode",
+    help="2D animation intensity mode: full, reduced, or off.",
 )
 
 ACTION_KEYS = {
@@ -618,6 +624,7 @@ def play_2d_command(
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
     headless: bool = HEADLESS_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
+    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
     """Launch the lightweight 2D dashboard frontend for a new run."""
 
@@ -633,6 +640,7 @@ def play_2d_command(
         slot_name=slot,
         headless=headless,
         max_frames=max_frames,
+        motion_mode=motion_mode,
     )
 
 
@@ -651,6 +659,7 @@ def audit_2d_motion_command(
         min=1,
         help="Number of fixed-timestep frames to render per scene and viewport.",
     ),
+    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
     """Run a deterministic headless 2D animation stability audit."""
 
@@ -660,6 +669,7 @@ def audit_2d_motion_command(
             difficulty_mode=difficulty,
             seed=seed,
             frames=frames,
+            motion_mode=motion_mode,
         )
     except Frontend2DUnavailableError as error:
         console.print(
@@ -672,7 +682,11 @@ def audit_2d_motion_command(
         raise typer.Exit(code=1) from error
 
     table = Table(
-        title=(f"2D Motion Audit | {report.scenario_id} | {report.difficulty} | seed {report.seed}")
+        title=(
+            "2D Motion Audit | "
+            f"{report.scenario_id} | {report.difficulty} | "
+            f"seed {report.seed} | motion {report.motion_mode}"
+        )
     )
     table.add_column("Viewport", style="cyan")
     table.add_column("Run Pulses", justify="right")
@@ -1309,6 +1323,7 @@ def load_game_2d_command(
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Save slot name."),
     headless: bool = HEADLESS_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
+    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
     """Load one named save slot into the lightweight 2D dashboard."""
 
@@ -1325,6 +1340,7 @@ def load_game_2d_command(
         slot_name=loaded_game.slot_name,
         headless=headless,
         max_frames=max_frames,
+        motion_mode=motion_mode,
     )
 
 
@@ -1360,6 +1376,7 @@ def continue_last_game_2d_command(
     db_path: Path = DB_PATH_OPTION,
     headless: bool = HEADLESS_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
+    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
     """Continue the latest save slot in the lightweight 2D dashboard."""
 
@@ -1376,6 +1393,7 @@ def continue_last_game_2d_command(
         slot_name=loaded_game.slot_name,
         headless=headless,
         max_frames=max_frames,
+        motion_mode=motion_mode,
     )
 
 
@@ -1384,6 +1402,7 @@ def menu_2d_command(
     db_path: Path = DB_PATH_OPTION,
     headless: bool = HEADLESS_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
+    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
     """Open the 2D title scene with save/load and archive review."""
 
@@ -1392,6 +1411,7 @@ def menu_2d_command(
             db_path=db_path,
             headless=headless,
             max_frames=max_frames,
+            motion_mode=motion_mode,
         )
     except Frontend2DUnavailableError as error:
         console.print(
@@ -1476,6 +1496,7 @@ def start_new_game_2d(
     *,
     headless: bool,
     max_frames: int | None,
+    motion_mode: MotionMode,
 ) -> None:
     """Create a brand new run and launch the lightweight 2D dashboard."""
 
@@ -1499,6 +1520,7 @@ def start_new_game_2d(
         slot_name=slot_name,
         headless=headless,
         max_frames=max_frames,
+        motion_mode=motion_mode,
     )
 
 
@@ -1510,6 +1532,7 @@ def launch_2d_session(
     slot_name: str,
     headless: bool,
     max_frames: int | None,
+    motion_mode: MotionMode,
 ) -> None:
     """Launch one 2D dashboard session and print the closing summary."""
 
@@ -1521,6 +1544,7 @@ def launch_2d_session(
             slot_name=slot_name,
             headless=headless,
             max_frames=max_frames,
+            motion_mode=motion_mode,
         )
     except Frontend2DUnavailableError as error:
         console.print(

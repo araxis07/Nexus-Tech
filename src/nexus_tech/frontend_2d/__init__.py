@@ -15,6 +15,7 @@ from nexus_tech.frontend_2d.motion_audit import (
     run_2d_flow_audit,
     run_2d_motion_audit,
 )
+from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 
 __all__ = [
     "DEFAULT_MOTION_AUDIT_SIZES",
@@ -22,10 +23,12 @@ __all__ = [
     "FlowAuditReport",
     "Frontend2DUnavailableError",
     "FrontendRunResult",
+    "MotionMode",
     "MotionAuditCell",
     "MotionAuditReport",
     "launch_2d_frontend",
     "launch_2d_menu",
+    "normalize_motion_mode",
     "run_2d_flow_audit",
     "run_2d_motion_audit",
 ]
