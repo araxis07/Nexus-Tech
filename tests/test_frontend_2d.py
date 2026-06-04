@@ -798,6 +798,54 @@ def test_motion_mode_scales_or_disables_new_pulses() -> None:
     assert off_bank.get("feed") == 0.0
 
 
+def test_scene_entry_transition_tracks_motion_mode() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        full_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=61),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            entry_transition="title_to_run",
+        )
+        reduced_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=62),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.REDUCED,
+            entry_transition="title_to_run",
+        )
+        off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=63),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+            entry_transition="title_to_run",
+        )
+
+        assert full_scene.scene_transition_key == "title_to_run"
+        assert full_scene.scene_transition_active()
+        assert reduced_scene.scene_transition_active()
+        assert not off_scene.scene_transition_active()
+        full_scene.update(1.0)
+
+        assert full_scene.scene_transition_progress() == 1.0
+        assert not full_scene.scene_transition_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_busy_motion_bank_shortens_info_ttl_further() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1622,6 +1670,8 @@ def test_title_scene_preserves_motion_mode_when_loading_run(tmp_path: Path) -> N
         assert scene._motion_pulses.live_count() == 0
         assert scene._next_scene is not None
         assert scene._next_scene.motion_mode is MotionMode.OFF
+        assert scene._next_scene.scene_transition_key == "title_to_run"
+        assert not scene._next_scene.scene_transition_active()
     finally:
         pygame.quit()
 
@@ -2078,6 +2128,8 @@ def test_turn_summary_scene_handoff_restores_workspace_focus() -> None:
         assert next_scene._deep_panel_key == next_scene._workspace_panel_key_for_command(
             scene._view_model.focus_command
         )
+        assert next_scene.scene_transition_key == "summary_to_run"
+        assert next_scene.scene_transition_active()
         assert any(event.payload.title == "Next Focus" for event in next_scene._events)
     finally:
         pygame.quit()
@@ -2189,6 +2241,8 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.long_run_before_pulses > cell.long_run_after_pulses
     assert cell.inspector_after_pulses <= 12
     assert cell.long_run_after_pulses <= 18
+    assert cell.transition_active_scenes == 4
+    assert cell.transition_disabled_scenes == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2218,6 +2272,8 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.inspector_after_pulses == 0
     assert cell.long_run_before_pulses == 0
     assert cell.long_run_after_pulses == 0
+    assert cell.transition_active_scenes == 0
+    assert cell.transition_disabled_scenes == 4
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:

@@ -67,6 +67,8 @@ class MotionAuditCell:
     long_run_after_pulses: int
     average_frame_ms: float
     max_frame_ms: float
+    transition_active_scenes: int = 0
+    transition_disabled_scenes: int = 0
 
     @property
     def status(self) -> str:
@@ -227,7 +229,10 @@ def run_2d_motion_audit(
                     save_callback=lambda *_args: None,
                     show_ready_event=False,
                     motion_mode=motion_mode,
+                    entry_transition="boot_run",
                 )
+                transition_active_count = int(run_scene.scene_transition_active())
+                transition_disabled_count = int(not run_scene.scene_transition_active())
                 run_scene._set_deep_panel("pipeline")
                 run_scene._open_inspector("pipeline")
                 _exercise_inspector_interactions(run_scene)
@@ -257,7 +262,10 @@ def run_2d_motion_audit(
                     selected_product_id=resolution.state.products[0].id.hex,
                     dirty=True,
                     motion_mode=motion_mode,
+                    entry_transition="run_to_summary",
                 )
+                transition_active_count += int(summary_scene.scene_transition_active())
+                transition_disabled_count += int(not summary_scene.scene_transition_active())
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
                 summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
@@ -272,7 +280,10 @@ def run_2d_motion_audit(
                     coordinator=coordinator,
                     initial_mode="menu",
                     motion_mode=motion_mode,
+                    entry_transition="boot_title",
                 )
+                transition_active_count += int(title_scene.scene_transition_active())
+                transition_disabled_count += int(not title_scene.scene_transition_active())
                 _exercise_title_subflows(title_scene, coordinator, seed)
                 title_before = title_scene._motion_pulses.live_count()
                 title_avg, title_max = _exercise_scene(title_scene, surface, frames)
@@ -295,7 +306,10 @@ def run_2d_motion_audit(
                     allow_save=False,
                     dirty=False,
                     motion_mode=motion_mode,
+                    entry_transition="run_to_review",
                 )
+                transition_active_count += int(review_scene.scene_transition_active())
+                transition_disabled_count += int(not review_scene.scene_transition_active())
                 review_before = review_scene._motion_pulses.live_count()
                 review_avg, review_max = _exercise_scene(review_scene, surface, frames)
 
@@ -333,6 +347,8 @@ def run_2d_motion_audit(
                         long_run_after_pulses=long_after,
                         average_frame_ms=round(sum(averages) / len(averages), 2),
                         max_frame_ms=round(max(maxes), 2),
+                        transition_active_scenes=transition_active_count,
+                        transition_disabled_scenes=transition_disabled_count,
                     )
                 )
         return MotionAuditReport(

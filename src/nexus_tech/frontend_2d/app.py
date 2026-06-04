@@ -75,6 +75,7 @@ def launch_2d_frontend(
             game_rng,
         ),
         motion_mode=motion_mode,
+        entry_transition="boot_run",
     )
     return _run_frontend_loop(
         pygame=pygame,
@@ -131,6 +132,7 @@ def launch_2d_menu(
         coordinator=coordinator,
         info_message="Load a save, review archives, or boot the default run from inside 2D.",
         motion_mode=motion_mode,
+        entry_transition="boot_title",
     )
     return _run_frontend_loop(
         pygame=pygame,

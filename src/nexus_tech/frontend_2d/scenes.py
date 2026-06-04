@@ -338,6 +338,17 @@ _INSPECTOR_SORT_MODES: tuple[str, ...] = ("default", "risk", "value", "stalled")
 _INSPECTOR_FILTER_MODES: tuple[str, ...] = ("all", "actionable", "attention")
 _TONE_PRIORITY = {"danger": 3, "warning": 2, "info": 1, "success": 0}
 _MOTION_INTENSITY = {"success": 0.55, "info": 0.42, "warning": 0.75, "danger": 1.0}
+_SCENE_TRANSITION_LABELS = {
+    "boot_title": ("Title Boot", INFO),
+    "boot_run": ("Run Boot", INFO),
+    "title_to_run": ("Entering Run", GOOD),
+    "title_to_review": ("Archive Review", INFO),
+    "review_to_title": ("Back To Archives", INFO),
+    "run_to_summary": ("Resolving Turn", WARN),
+    "run_to_review": ("Run Review", DANGER),
+    "summary_to_run": ("Return Focus", GOOD),
+    "summary_to_review": ("Final Review", DANGER),
+}
 _FINANCE_PANEL_COMMANDS = {
     TurnAction.REVIEW_FINANCE.value,
     TurnAction.TAKE_LOAN.value,
@@ -496,6 +507,7 @@ class BaseScene:
         save_callback: Callable[[GameState, RandomSource, str], None],
         dirty: bool = False,
         motion_mode: MotionMode | str = MotionMode.FULL,
+        entry_transition: str = "boot_run",
     ) -> None:
         self.pygame = pygame
         self.fonts = fonts
@@ -508,6 +520,27 @@ class BaseScene:
         self.should_exit = False
         self.exit_reason = "quit"
         self._next_scene: BaseScene | None = None
+        self._scene_transition_key = entry_transition
+        self._scene_transition_elapsed = 0.0
+        self._scene_transition_duration = self._entry_transition_duration(entry_transition)
+
+    @property
+    def scene_transition_key(self) -> str:
+        """Return the active entry-transition identifier."""
+
+        return self._scene_transition_key
+
+    def scene_transition_progress(self) -> float:
+        """Return normalized transition progress from 0.0 to 1.0."""
+
+        if self._scene_transition_duration <= 0:
+            return 1.0
+        return min(1.0, self._scene_transition_elapsed / self._scene_transition_duration)
+
+    def scene_transition_active(self) -> bool:
+        """Return whether the scene entry transition is still visible."""
+
+        return self._scene_transition_duration > 0 and self.scene_transition_progress() < 1.0
 
     def maybe_save_on_exit(self) -> bool:
         """Persist the run if the scene dirtied the state."""
@@ -528,6 +561,73 @@ class BaseScene:
         self._save_callback(self.state, self.rng, self.slot_name)
         self._dirty = False
 
+    def _entry_transition_duration(self, entry_transition: str) -> float:
+        if not entry_transition or self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.26 if self.motion_mode is MotionMode.REDUCED else 0.42
+
+    def _transition_intensity(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.45 if self.motion_mode is MotionMode.REDUCED else 1.0
+
+    def _update_scene_transition(self, dt: float) -> None:
+        if self._scene_transition_duration <= 0:
+            return
+        self._scene_transition_elapsed = min(
+            self._scene_transition_duration,
+            self._scene_transition_elapsed + max(0.0, dt),
+        )
+
+    def _draw_scene_transition_overlay(self, surface) -> None:
+        if not self.scene_transition_active():
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        progress = self.scene_transition_progress()
+        eased = 1.0 - (1.0 - progress) * (1.0 - progress)
+        intensity = self._transition_intensity()
+        label, accent = _SCENE_TRANSITION_LABELS.get(
+            self._scene_transition_key,
+            ("Scene Shift", INFO),
+        )
+
+        overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+        fade_alpha = int((1.0 - eased) * 150 * intensity)
+        if fade_alpha > 0:
+            overlay.fill((3, 6, 12, fade_alpha))
+
+        sweep_width = max(80, int(width * 0.14))
+        sweep_x = int((eased * (width + sweep_width * 2)) - sweep_width * 1.4)
+        sweep_alpha = int(max(0.0, 1.0 - abs(progress - 0.48) * 2.1) * 80 * intensity)
+        if sweep_alpha > 0:
+            sweep_rect = pygame.Rect(sweep_x, 0, sweep_width, height)
+            pygame.draw.rect(overlay, (*accent, sweep_alpha), sweep_rect)
+            edge_rect = pygame.Rect(sweep_rect.right - 4, 0, 4, height)
+            pygame.draw.rect(overlay, (*TEXT, min(160, sweep_alpha + 36)), edge_rect)
+
+        line_gap = 26 if self.motion_mode is MotionMode.FULL else 38
+        line_alpha = int((1.0 - progress) * 42 * intensity)
+        if line_alpha > 0:
+            for y in range(0, height, line_gap):
+                pygame.draw.line(overlay, (*accent, line_alpha), (0, y), (width, y), 1)
+
+        surface.blit(overlay, (0, 0))
+        if progress < 0.62 and intensity > 0.5:
+            badge = self.fonts.small.render(label, True, TEXT)
+            badge_rect = badge.get_rect()
+            badge_rect.topright = (width - 28, 28)
+            pad = 9
+            panel_rect = pygame.Rect(
+                badge_rect.left - pad,
+                badge_rect.top - 5,
+                badge_rect.width + pad * 2,
+                badge_rect.height + 10,
+            )
+            pygame.draw.rect(surface, (8, 13, 22), panel_rect, border_radius=12)
+            pygame.draw.rect(surface, accent, panel_rect, width=1, border_radius=12)
+            surface.blit(badge, badge_rect)
+
 
 class TitleScene(BaseScene):
     """Main 2D title and save/load scene."""
@@ -545,6 +645,7 @@ class TitleScene(BaseScene):
         initial_mode: str = "menu",
         info_message: str | None = None,
         motion_mode: MotionMode | str = MotionMode.FULL,
+        entry_transition: str = "boot_title",
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -555,6 +656,7 @@ class TitleScene(BaseScene):
             save_callback=save_callback,
             dirty=False,
             motion_mode=motion_mode,
+            entry_transition=entry_transition,
         )
         self.coordinator = coordinator
         self._mode = initial_mode
@@ -601,6 +703,7 @@ class TitleScene(BaseScene):
             )
 
     def update(self, dt: float) -> None:
+        self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
         self._events = [
             TimedFrontendEvent(payload=event.payload, time_left=event.time_left - dt)
@@ -746,6 +849,7 @@ class TitleScene(BaseScene):
             self._draw_delete_confirmation_overlay(surface)
         if self._text_input is not None:
             self._draw_text_input_overlay(surface)
+        self._draw_scene_transition_overlay(surface)
 
     def push_event(self, payload: FrontendEvent) -> None:
         self._events.insert(0, TimedFrontendEvent(payload=payload, time_left=payload.ttl))
@@ -949,6 +1053,7 @@ class TitleScene(BaseScene):
             slot_name=slot_name,
             save_callback=self._save_callback,
             motion_mode=self.motion_mode,
+            entry_transition="title_to_run",
         )
 
     def _open_archive_review(self, archive_key: str) -> None:
@@ -970,6 +1075,7 @@ class TitleScene(BaseScene):
             allow_save=False,
             dirty=False,
             motion_mode=self.motion_mode,
+            entry_transition="title_to_review",
         )
 
     def _open_slot_detail(self, slot_name: str) -> None:
@@ -978,7 +1084,7 @@ class TitleScene(BaseScene):
         self._selected_slot_name = slot_name
         self._set_mode("slot_detail")
 
-    def _spawn_scene(self, mode: str) -> "TitleScene":
+    def _spawn_scene(self, mode: str, *, entry_transition: str = "review_to_title") -> "TitleScene":
         return TitleScene(
             pygame=self.pygame,
             fonts=self.fonts,
@@ -989,6 +1095,7 @@ class TitleScene(BaseScene):
             coordinator=self.coordinator,
             initial_mode=mode,
             motion_mode=self.motion_mode,
+            entry_transition=entry_transition,
         )
 
     def _refresh_wizard_catalog(self) -> None:
@@ -2235,6 +2342,7 @@ class ReviewScene(BaseScene):
         allow_save: bool,
         dirty: bool,
         motion_mode: MotionMode | str = MotionMode.FULL,
+        entry_transition: str = "run_to_review",
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -2245,6 +2353,7 @@ class ReviewScene(BaseScene):
             save_callback=save_callback,
             dirty=dirty,
             motion_mode=motion_mode,
+            entry_transition=entry_transition,
         )
         self._view_model = view_model
         self._accent = accent
@@ -2263,6 +2372,7 @@ class ReviewScene(BaseScene):
         self._trigger_review_motion("footer", intensity=0.5)
 
     def update(self, dt: float) -> None:
+        self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
 
     def _trigger_review_motion(self, section_key: str, *, intensity: float = 0.6) -> None:
@@ -2324,6 +2434,7 @@ class ReviewScene(BaseScene):
         self._draw_review_findings(surface, left_rect)
         self._draw_review_sidebar(surface, right_rect)
         self._draw_review_footer(surface, footer_rect)
+        self._draw_scene_transition_overlay(surface)
 
     def _dispatch_click_target(self, target: ClickTarget) -> None:
         if target.kind == "review_primary":
@@ -2533,6 +2644,7 @@ class RunScene(BaseScene):
         dirty: bool = False,
         show_ready_event: bool = True,
         motion_mode: MotionMode | str = MotionMode.FULL,
+        entry_transition: str = "boot_run",
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -2543,6 +2655,7 @@ class RunScene(BaseScene):
             save_callback=save_callback,
             dirty=dirty,
             motion_mode=motion_mode,
+            entry_transition=entry_transition,
         )
         self._events: list[TimedFrontendEvent] = []
         self._click_targets: list[ClickTarget] = []
@@ -2762,6 +2875,7 @@ class RunScene(BaseScene):
         """Advance animations and expire transient event cards."""
 
         self._tweens.update(dt)
+        self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
         self._stabilize_motion_bank()
         self._events = [
@@ -3037,6 +3151,7 @@ class RunScene(BaseScene):
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
         self._draw_hover_tooltip(surface)
+        self._draw_scene_transition_overlay(surface)
 
     def push_event(self, payload: FrontendEvent) -> None:
         """Add one transient UI event card."""
@@ -3742,6 +3857,7 @@ class RunScene(BaseScene):
             selected_product_id=self.selected_product.id.hex,
             dirty=True,
             motion_mode=self.motion_mode,
+            entry_transition="run_to_summary",
         )
 
     def _save_current_run(self) -> None:
@@ -3770,6 +3886,7 @@ class RunScene(BaseScene):
             allow_save=True,
             dirty=self._dirty,
             motion_mode=self.motion_mode,
+            entry_transition="run_to_review",
         )
 
     def _select_inspector_section(self, payload: str) -> None:
@@ -5843,6 +5960,7 @@ class TurnSummaryScene(BaseScene):
         selected_product_id: str,
         dirty: bool,
         motion_mode: MotionMode | str = MotionMode.FULL,
+        entry_transition: str = "run_to_summary",
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -5853,6 +5971,7 @@ class TurnSummaryScene(BaseScene):
             save_callback=save_callback,
             dirty=dirty,
             motion_mode=motion_mode,
+            entry_transition=entry_transition,
         )
         self._previous_state = previous_state
         self._resolution = resolution
@@ -5877,6 +5996,7 @@ class TurnSummaryScene(BaseScene):
 
     def update(self, dt: float) -> None:
         self._elapsed += dt
+        self._update_scene_transition(dt)
         self._tweens.update(dt)
         self._motion_pulses.update(dt)
         self._stabilize_motion_bank()
@@ -5992,6 +6112,7 @@ class TurnSummaryScene(BaseScene):
         self._draw_summary_main(surface, left_rect)
         self._draw_summary_timeline(surface, right_rect)
         self._draw_summary_footer(surface, footer_rect)
+        self._draw_scene_transition_overlay(surface)
 
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
         for target in reversed(self._click_targets):
@@ -6024,6 +6145,7 @@ class TurnSummaryScene(BaseScene):
                 allow_save=True,
                 dirty=self._dirty,
                 motion_mode=self.motion_mode,
+                entry_transition="summary_to_review",
             )
             return
         focus_panel_key = _workspace_panel_key_for_command(self._view_model.focus_command)
@@ -6044,6 +6166,7 @@ class TurnSummaryScene(BaseScene):
             dirty=self._dirty,
             show_ready_event=False,
             motion_mode=self.motion_mode,
+            entry_transition="summary_to_run",
         )
 
     def _trigger_summary_event_motion(self, event: FrontendEvent) -> None:

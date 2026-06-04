@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.120.0 - 2026-06-05
+
+- Added a shared 2D scene-entry transition layer with fade, sweep, scanline, and scene-label treatment for title, live run, turn summary, and review scenes
+- Wired transition keys across boot, title-to-run, title-to-review, run-to-summary, run-to-review, summary-to-run, summary-to-review, and review-to-title flows while preserving `--motion-mode reduced/off`
+- Extended motion-audit telemetry and regression coverage so full/reduced modes expose active scene transitions and off mode proves transition animation is disabled
+
 ## 0.119.0 - 2026-06-04
 
 - Added a 2D `--motion-mode full|reduced|off` option across play, load, continue, menu, and motion-audit commands so highlight animation intensity can be lowered or disabled without changing gameplay
