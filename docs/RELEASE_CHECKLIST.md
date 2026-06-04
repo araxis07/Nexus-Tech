@@ -50,7 +50,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 ## 2D Audit Notes
 
 - Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
-- Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, or staged-summary motion changes.
+- Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, staged-summary motion, or 2D request-path coverage changes.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
 - If founder-pressure openings were retuned, rerun at least one longer `simulate-balance` founder batch so angel-cap, pricing, and cash-guard policies are verified on real seeds instead of only short audits.
 

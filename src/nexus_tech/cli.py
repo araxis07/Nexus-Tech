@@ -677,7 +677,9 @@ def audit_2d_motion_command(
     table.add_column("Viewport", style="cyan")
     table.add_column("Run Pulses", justify="right")
     table.add_column("Summary Pulses", justify="right")
+    table.add_column("Title/Review", justify="right")
     table.add_column("Avg Frame", justify="right")
+    table.add_column("Max Frame", justify="right")
     table.add_column("Status", justify="center")
     table.add_column("Notes")
     for cell in report.cells:
@@ -685,11 +687,38 @@ def audit_2d_motion_command(
             f"{cell.width}x{cell.height}",
             f"{cell.run_before_pulses} -> {cell.run_after_pulses}",
             f"{cell.summary_before_pulses} -> {cell.summary_after_pulses}",
+            (
+                f"T {cell.title_before_pulses}->{cell.title_after_pulses} / "
+                f"R {cell.review_before_pulses}->{cell.review_after_pulses}"
+            ),
             f"{cell.average_frame_ms:.2f} ms",
+            f"{cell.max_frame_ms:.2f} ms",
             cell.status.upper(),
             cell.notes,
         )
     console.print(table)
+
+    flow = report.flow_report
+    if flow.findings:
+        flow_table = Table(title="2D Flow Request Path Findings")
+        flow_table.add_column("Surface", style="cyan")
+        flow_table.add_column("Command")
+        flow_table.add_column("Detail")
+        for finding in flow.findings[:12]:
+            flow_table.add_row(finding.surface, finding.command, finding.detail)
+        console.print(flow_table)
+    else:
+        console.print(
+            Panel.fit(
+                (
+                    "2D flow request paths: PASS "
+                    f"({flow.command_count} commands, "
+                    f"{flow.inspector_action_count} inspector actions)."
+                ),
+                title="2D Flow Audit",
+                border_style="green",
+            )
+        )
 
     border_style = "green" if report.status == "pass" else "yellow"
     if report.status == "fail":

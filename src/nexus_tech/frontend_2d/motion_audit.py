@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from time import perf_counter
 
 from nexus_tech.domain.models import (
@@ -13,8 +16,28 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.frontend_2d.app import Frontend2DUnavailableError
+from nexus_tech.frontend_2d.catalog import list_scenario_choices
+from nexus_tech.frontend_2d.context import (
+    build_command_request,
+    build_inspector_action_request,
+    explain_command_unavailable,
+    explain_inspector_action_unavailable,
+)
+from nexus_tech.frontend_2d.viewmodels import (
+    build_deep_dive_panel_view_models,
+    build_run_review_view_model,
+)
+from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
+from nexus_tech.simulation.endgame import (
+    calculate_endgame_pressure,
+    calculate_endgame_readiness,
+    evaluate_exit_outcome,
+)
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
+from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.risk_forecast import build_risk_forecast
+from nexus_tech.simulation.turn_coach import build_turn_coach
 
 DEFAULT_MOTION_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
     (820, 620),
@@ -33,7 +56,12 @@ class MotionAuditCell:
     run_after_pulses: int
     summary_before_pulses: int
     summary_after_pulses: int
+    title_before_pulses: int
+    title_after_pulses: int
+    review_before_pulses: int
+    review_after_pulses: int
     average_frame_ms: float
+    max_frame_ms: float
 
     @property
     def status(self) -> str:
@@ -42,13 +70,19 @@ class MotionAuditCell:
         if (
             self.run_after_pulses <= 18
             and self.summary_after_pulses <= 12
+            and self.title_after_pulses <= 8
+            and self.review_after_pulses <= 6
             and self.average_frame_ms <= 24.0
+            and self.max_frame_ms <= 50.0
         ):
             return "pass"
         if (
             self.run_after_pulses <= 24
             and self.summary_after_pulses <= 18
+            and self.title_after_pulses <= 12
+            and self.review_after_pulses <= 10
             and self.average_frame_ms <= 33.0
+            and self.max_frame_ms <= 75.0
         ):
             return "watch"
         return "fail"
@@ -62,9 +96,39 @@ class MotionAuditCell:
             notes.append("run pulse bank above target")
         if self.summary_after_pulses > 12:
             notes.append("summary pulse bank above target")
+        if self.title_after_pulses > 8:
+            notes.append("title pulse bank above target")
+        if self.review_after_pulses > 6:
+            notes.append("review pulse bank above target")
         if self.average_frame_ms > 24.0:
             notes.append("frame budget above target")
+        if self.max_frame_ms > 50.0:
+            notes.append("max frame spike above target")
         return "; ".join(notes) if notes else "stable"
+
+
+@dataclass(frozen=True)
+class FlowAuditFinding:
+    """One 2D command or inspector action that can still fall through at runtime."""
+
+    surface: str
+    command: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class FlowAuditReport:
+    """Request-path coverage for the 2D command and inspector surfaces."""
+
+    command_count: int
+    inspector_action_count: int
+    findings: tuple[FlowAuditFinding, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when no runtime fallback path remains."""
+
+        return "pass" if not self.findings else "fail"
 
 
 @dataclass(frozen=True)
@@ -76,6 +140,11 @@ class MotionAuditReport:
     seed: int
     frames: int
     cells: tuple[MotionAuditCell, ...]
+    flow_report: FlowAuditReport = FlowAuditReport(
+        command_count=0,
+        inspector_action_count=0,
+        findings=(),
+    )
 
     @property
     def status(self) -> str:
@@ -83,6 +152,8 @@ class MotionAuditReport:
 
         statuses = {cell.status for cell in self.cells}
         if "fail" in statuses:
+            return "fail"
+        if self.flow_report.status == "fail":
             return "fail"
         if "watch" in statuses:
             return "watch"
@@ -111,8 +182,8 @@ def run_2d_motion_audit(
             "pygame-ce is not installed. Install the optional 2D runtime first."
         ) from error
 
-    from nexus_tech.frontend_2d.scenes import RunScene, TurnSummaryScene
-    from nexus_tech.frontend_2d.widgets import create_fonts
+    from nexus_tech.frontend_2d.scenes import ReviewScene, RunScene, TitleScene, TurnSummaryScene
+    from nexus_tech.frontend_2d.widgets import DANGER, create_fonts
 
     pygame.init()
     pygame.font.init()
@@ -126,70 +197,242 @@ def run_2d_motion_audit(
         previous_state = state.model_copy(deep=True)
         resolution = resolve_turn(state, RandomSource(seed=seed + 7))
         cells: list[MotionAuditCell] = []
-        for width, height in sizes:
-            surface = pygame.display.set_mode((width, height), pygame.HIDDEN)
-            run_scene = RunScene(
-                pygame=pygame,
-                fonts=fonts,
-                state=state,
-                rng=RandomSource(seed=seed),
-                slot_name="motion-audit",
-                save_callback=lambda *_args: None,
-                show_ready_event=False,
-            )
-            run_scene._set_deep_panel("endgame")
-            run_scene._open_inspector("endgame")
-            _seed_dense_run_pulses(run_scene)
-            run_before = run_scene._motion_pulses.live_count()
-            frame_start = perf_counter()
-            for _index in range(frames):
-                run_scene.update(1 / 60)
-                run_scene.draw(surface)
-            run_elapsed = perf_counter() - frame_start
-
-            summary_scene = TurnSummaryScene(
-                pygame=pygame,
-                fonts=fonts,
-                state=resolution.state,
-                rng=RandomSource(seed=seed + 7),
-                slot_name="motion-audit",
-                save_callback=lambda *_args: None,
-                previous_state=previous_state,
-                resolution=resolution,
-                selected_product_id=resolution.state.products[0].id.hex,
-                dirty=True,
-            )
-            _seed_dense_summary_pulses(summary_scene)
-            summary_before = summary_scene._motion_pulses.live_count()
-            summary_start = perf_counter()
-            for _index in range(frames):
-                summary_scene.update(1 / 60)
-                summary_scene.draw(surface)
-            summary_elapsed = perf_counter() - summary_start
-            average_frame_ms = ((run_elapsed + summary_elapsed) / (frames * 2)) * 1000
-            cells.append(
-                MotionAuditCell(
-                    width=width,
-                    height=height,
-                    run_before_pulses=run_before,
-                    run_after_pulses=run_scene._motion_pulses.live_count(),
-                    summary_before_pulses=summary_before,
-                    summary_after_pulses=summary_scene._motion_pulses.live_count(),
-                    average_frame_ms=round(average_frame_ms, 2),
+        flow_report = run_2d_flow_audit(seed=seed)
+        with TemporaryDirectory(prefix="nexus-tech-motion-audit-") as tmpdir:
+            coordinator = SaveLoadCoordinator(Path(tmpdir) / "motion-audit.db")
+            for width, height in sizes:
+                surface = pygame.display.set_mode((width, height), pygame.HIDDEN)
+                run_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state,
+                    rng=RandomSource(seed=seed),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
                 )
-            )
+                run_scene._set_deep_panel("endgame")
+                run_scene._open_inspector("endgame")
+                run_scene._run_command(TurnAction.SET_COMPANY_STRATEGY.value)
+                _seed_dense_run_pulses(run_scene)
+                run_before = run_scene._motion_pulses.live_count()
+                run_avg, run_max = _exercise_scene(run_scene, surface, frames)
+
+                summary_scene = TurnSummaryScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=resolution.state,
+                    rng=RandomSource(seed=seed + 7),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    previous_state=previous_state,
+                    resolution=resolution,
+                    selected_product_id=resolution.state.products[0].id.hex,
+                    dirty=True,
+                )
+                _seed_dense_summary_pulses(summary_scene)
+                summary_before = summary_scene._motion_pulses.live_count()
+                summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
+
+                title_scene = TitleScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=create_new_game("NEXUS TECH", "Nexus One"),
+                    rng=RandomSource(seed=seed + 11),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    coordinator=coordinator,
+                    initial_mode="menu",
+                )
+                title_scene._set_mode("meta")
+                title_scene._set_mode("wizard")
+                title_scene._open_wizard_text_modal("company")
+                title_before = title_scene._motion_pulses.live_count()
+                title_avg, title_max = _exercise_scene(title_scene, surface, frames)
+
+                review_state = resolution.state.model_copy(deep=True)
+                review_state.company.game_over = True
+                review_state.company.cash_on_hand = Decimal("-125.00")
+                review_scene = ReviewScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=review_state,
+                    rng=RandomSource(seed=seed + 13),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    view_model=build_run_review_view_model(review_state),
+                    accent=DANGER,
+                    primary_title="Esc Close",
+                    primary_detail="Leave the 2D shell.",
+                    return_scene_factory=None,
+                    allow_save=False,
+                    dirty=False,
+                )
+                review_before = review_scene._motion_pulses.live_count()
+                review_avg, review_max = _exercise_scene(review_scene, surface, frames)
+
+                averages = (run_avg, summary_avg, title_avg, review_avg)
+                maxes = (run_max, summary_max, title_max, review_max)
+                cells.append(
+                    MotionAuditCell(
+                        width=width,
+                        height=height,
+                        run_before_pulses=run_before,
+                        run_after_pulses=run_scene._motion_pulses.live_count(),
+                        summary_before_pulses=summary_before,
+                        summary_after_pulses=summary_scene._motion_pulses.live_count(),
+                        title_before_pulses=title_before,
+                        title_after_pulses=title_scene._motion_pulses.live_count(),
+                        review_before_pulses=review_before,
+                        review_after_pulses=review_scene._motion_pulses.live_count(),
+                        average_frame_ms=round(sum(averages) / len(averages), 2),
+                        max_frame_ms=round(max(maxes), 2),
+                    )
+                )
         return MotionAuditReport(
             scenario_id=scenario_id,
             difficulty=difficulty_mode.value if difficulty_mode is not None else "scenario",
             seed=seed,
             frames=frames,
             cells=tuple(cells),
+            flow_report=flow_report,
         )
     finally:
         pygame.quit()
 
 
 run_motion_audit = run_2d_motion_audit
+
+
+def run_2d_flow_audit(*, seed: int = 7) -> FlowAuditReport:
+    """Audit runtime request paths before 2D actions can hit fallback warnings."""
+
+    findings: list[FlowAuditFinding] = []
+    with TemporaryDirectory(prefix="nexus-tech-flow-audit-") as tmpdir:
+        choices = [
+            choice
+            for choice in list_scenario_choices(Path(tmpdir) / "flow-audit.db")
+            if not choice.locked
+        ]
+    commands = _collect_surfaced_commands(choices)
+    for command in sorted(commands):
+        command_supported = False
+        command_explained = False
+        for choice in choices:
+            state = create_new_game(
+                "NEXUS TECH",
+                "Nexus One",
+                scenario_id=choice.scenario_id,
+                difficulty_mode=choice.default_difficulty,
+                campaign_goal_id=choice.default_goal_id,
+            )
+            product_id = state.products[0].id.hex
+            request = build_command_request(
+                state,
+                command=command,
+                selected_product_id=product_id,
+            )
+            reason = explain_command_unavailable(
+                state,
+                command=command,
+                selected_product_id=product_id,
+            )
+            command_supported = command_supported or request is not None
+            command_explained = command_explained or reason is not None
+        if not command_supported and not command_explained:
+            findings.append(
+                FlowAuditFinding(
+                    surface="command",
+                    command=command,
+                    detail="surfaced command has no request path or disabled explanation",
+                )
+            )
+
+    inspector_count = 0
+    for state in (
+        create_new_game("NEXUS TECH", "Nexus One"),
+        _build_motion_audit_state(
+            scenario_id="founder_journey",
+            difficulty_mode=None,
+            seed=seed,
+        ),
+    ):
+        product_id = state.products[0].id.hex
+        for panel in build_deep_dive_panel_view_models(state, selected_product_id=product_id):
+            for section in panel.inspectors:
+                for item in section.items:
+                    for action in item.actions:
+                        inspector_count += 1
+                        request = build_inspector_action_request(
+                            state,
+                            panel_key=panel.key,
+                            section_key=section.key,
+                            command=action.command,
+                            payload=item.payload,
+                            selected_product_id=product_id,
+                        )
+                        reason = explain_inspector_action_unavailable(
+                            state,
+                            panel_key=panel.key,
+                            section_key=section.key,
+                            command=action.command,
+                            payload=item.payload,
+                            selected_product_id=product_id,
+                        )
+                        if request is None and reason is None:
+                            findings.append(
+                                FlowAuditFinding(
+                                    surface=f"inspector:{panel.key}:{section.key}",
+                                    command=action.command,
+                                    detail=(
+                                        f"{item.title} has no request path or disabled explanation"
+                                    ),
+                                )
+                            )
+    return FlowAuditReport(
+        command_count=len(commands),
+        inspector_action_count=inspector_count,
+        findings=tuple(findings),
+    )
+
+
+def _collect_surfaced_commands(choices) -> set[str]:
+    commands: set[str] = set()
+    for choice in choices:
+        state = create_new_game(
+            "NEXUS TECH",
+            "Nexus One",
+            scenario_id=choice.scenario_id,
+            difficulty_mode=choice.default_difficulty,
+            campaign_goal_id=choice.default_goal_id,
+        )
+        product_id = state.products[0].id.hex
+        guide = build_guided_opening(state)
+        commands.add(guide.current_command)
+        commands.update(step.command for step in guide.steps)
+        commands.update(rec.command for rec in build_turn_coach(state).recommendations)
+        commands.update(item.command for item in build_risk_forecast(state).items)
+        pressure = calculate_endgame_pressure(state, calculate_endgame_readiness(state))
+        commands.update(pressure.path_gate_commands)
+        if pressure.path_gate_command_alert in TurnAction._value2member_map_:
+            commands.add(pressure.path_gate_command_alert)
+        outcome = evaluate_exit_outcome(state)
+        commands.update(outcome.path_gate_commands)
+        if outcome.path_gate_command_alert in TurnAction._value2member_map_:
+            commands.add(outcome.path_gate_command_alert)
+        for panel in build_deep_dive_panel_view_models(state, selected_product_id=product_id):
+            commands.update(action.command for action in panel.actions)
+    return commands
+
+
+def _exercise_scene(scene, surface, frames: int) -> tuple[float, float]:
+    frame_times: list[float] = []
+    for _index in range(frames):
+        frame_start = perf_counter()
+        scene.update(1 / 60)
+        scene.draw(surface)
+        frame_times.append((perf_counter() - frame_start) * 1000)
+    return sum(frame_times) / len(frame_times), max(frame_times)
 
 
 def _build_motion_audit_state(

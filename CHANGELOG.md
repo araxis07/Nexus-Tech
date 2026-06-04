@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.117.0 - 2026-06-04
+
+- Expanded `audit-2d-motion` beyond the live run and turn summary so it now exercises title/menu motion, wizard overlay motion, review-scene motion, inspector overlays, and picker overlays in the same headless audit pass
+- Added a 2D flow request-path audit that checks surfaced commands and inspector item actions before they can fall through to runtime `Needs More 2D Coverage` or `Inspector Action Missing` warnings
+- Upgraded CLI output, regression coverage, release docs, and package/runtime versioning for the broader animation-completeness gate
+
 ## 0.116.0 - 2026-06-04
 
 - Added a deterministic headless `audit-2d-motion` gate that renders stressed live-run and turn-summary animation banks across desktop and compact viewports

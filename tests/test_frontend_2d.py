@@ -17,10 +17,12 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.frontend_2d import (
+    FlowAuditReport,
     MotionAuditCell,
     MotionAuditReport,
     launch_2d_frontend,
     launch_2d_menu,
+    run_2d_flow_audit,
     run_2d_motion_audit,
 )
 from nexus_tech.frontend_2d.catalog import (
@@ -2091,6 +2093,21 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.summary_before_pulses > cell.summary_after_pulses
     assert cell.run_after_pulses <= 18
     assert cell.summary_after_pulses <= 12
+    assert cell.title_before_pulses >= cell.title_after_pulses
+    assert cell.review_before_pulses >= cell.review_after_pulses
+    assert cell.title_after_pulses <= 8
+    assert cell.review_after_pulses <= 6
+    assert cell.max_frame_ms >= cell.average_frame_ms
+    assert report.flow_report.status == "pass"
+
+
+def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
+    report = run_2d_flow_audit(seed=7)
+
+    assert report.status == "pass"
+    assert report.command_count >= 40
+    assert report.inspector_action_count > 0
+    assert report.findings == ()
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
@@ -2111,8 +2128,18 @@ def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
                     run_after_pulses=14,
                     summary_before_pulses=29,
                     summary_after_pulses=12,
+                    title_before_pulses=7,
+                    title_after_pulses=7,
+                    review_before_pulses=4,
+                    review_after_pulses=4,
                     average_frame_ms=4.0,
+                    max_frame_ms=8.0,
                 ),
+            ),
+            flow_report=FlowAuditReport(
+                command_count=43,
+                inspector_action_count=24,
+                findings=(),
             ),
         )
 
@@ -2133,6 +2160,7 @@ def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "2D Motion Audit" in result.output
+    assert "2D flow request paths: PASS" in result.output
     assert calls["scenario_id"] == "founder_journey"
     assert calls["seed"] == 7
     assert calls["frames"] == 2
