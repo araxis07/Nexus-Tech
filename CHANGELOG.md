@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.116.0 - 2026-06-04
+
+- Added a deterministic headless `audit-2d-motion` gate that renders stressed live-run and turn-summary animation banks across desktop and compact viewports
+- The audit now reports before/after pulse-bank counts plus average frame time so long-session motion cooldown can be checked without manual visual playtesting
+- Added regression coverage for the motion audit helper and CLI route, documented the audit in the release notes, and promoted package metadata/runtime versioning to `0.116.0`
+
 ## 0.115.0 - 2026-06-04
 
 - Added pulse-bank pruning so crowded 2D scenes can drop the weakest unprotected highlight pulses instead of letting low-value residual motion accumulate across long sessions

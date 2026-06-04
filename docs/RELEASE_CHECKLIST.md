@@ -20,6 +20,7 @@ uv run nexus-tech doctor
 uv run nexus-tech validate-content
 uv run nexus-tech play-2d --headless --max-frames 4 --scenario founder_journey --seed 11
 uv run nexus-tech menu-2d --headless --max-frames 4
+uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2
 ```
 
 ## Demo Verification
@@ -49,6 +50,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 ## 2D Audit Notes
 
 - Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
+- Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, or staged-summary motion changes.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
 - If founder-pressure openings were retuned, rerun at least one longer `simulate-balance` founder batch so angel-cap, pricing, and cash-guard policies are verified on real seeds instead of only short audits.
 

@@ -58,6 +58,7 @@ from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
     launch_2d_frontend,
     launch_2d_menu,
+    run_2d_motion_audit,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -633,6 +634,75 @@ def play_2d_command(
         headless=headless,
         max_frames=max_frames,
     )
+
+
+@app.command("audit-2d-motion")
+def audit_2d_motion_command(
+    scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed for deterministic 2D motion audit setup.",
+    ),
+    frames: int = typer.Option(
+        90,
+        "--frames",
+        min=1,
+        help="Number of fixed-timestep frames to render per scene and viewport.",
+    ),
+) -> None:
+    """Run a deterministic headless 2D animation stability audit."""
+
+    try:
+        report = run_2d_motion_audit(
+            scenario_id=scenario,
+            difficulty_mode=difficulty,
+            seed=seed,
+            frames=frames,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    table = Table(
+        title=(f"2D Motion Audit | {report.scenario_id} | {report.difficulty} | seed {report.seed}")
+    )
+    table.add_column("Viewport", style="cyan")
+    table.add_column("Run Pulses", justify="right")
+    table.add_column("Summary Pulses", justify="right")
+    table.add_column("Avg Frame", justify="right")
+    table.add_column("Status", justify="center")
+    table.add_column("Notes")
+    for cell in report.cells:
+        table.add_row(
+            f"{cell.width}x{cell.height}",
+            f"{cell.run_before_pulses} -> {cell.run_after_pulses}",
+            f"{cell.summary_before_pulses} -> {cell.summary_after_pulses}",
+            f"{cell.average_frame_ms:.2f} ms",
+            cell.status.upper(),
+            cell.notes,
+        )
+    console.print(table)
+
+    border_style = "green" if report.status == "pass" else "yellow"
+    if report.status == "fail":
+        border_style = "red"
+    console.print(
+        Panel.fit(
+            f"Motion audit status: {report.status.upper()} across {len(report.cells)} viewports.",
+            title="2D Motion Audit",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
 
 
 @app.command("list-scenarios")

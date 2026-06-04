@@ -16,7 +16,13 @@ from nexus_tech.domain.models import (
     Seniority,
     TurnAction,
 )
-from nexus_tech.frontend_2d import launch_2d_frontend, launch_2d_menu
+from nexus_tech.frontend_2d import (
+    MotionAuditCell,
+    MotionAuditReport,
+    launch_2d_frontend,
+    launch_2d_menu,
+    run_2d_motion_audit,
+)
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
     list_scenario_choices,
@@ -2067,6 +2073,69 @@ def test_launch_2d_menu_headless_exits_after_frame_cap(tmp_path: Path) -> None:
 
     assert result.exit_reason == "max_frames"
     assert result.saved_on_exit is False
+
+
+def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
+    report = run_2d_motion_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        frames=2,
+        sizes=((820, 620),),
+    )
+
+    assert report.status == "pass"
+    assert len(report.cells) == 1
+    cell = report.cells[0]
+    assert cell.run_before_pulses > cell.run_after_pulses
+    assert cell.summary_before_pulses > cell.summary_after_pulses
+    assert cell.run_after_pulses <= 18
+    assert cell.summary_after_pulses <= 12
+
+
+def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_motion_audit(**kwargs):
+        calls.update(kwargs)
+        return MotionAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            frames=kwargs["frames"],
+            cells=(
+                MotionAuditCell(
+                    width=820,
+                    height=620,
+                    run_before_pulses=33,
+                    run_after_pulses=14,
+                    summary_before_pulses=29,
+                    summary_after_pulses=12,
+                    average_frame_ms=4.0,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(cli_module, "run_2d_motion_audit", fake_run_2d_motion_audit)
+
+    result = runner.invoke(
+        app,
+        [
+            "audit-2d-motion",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "7",
+            "--frames",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2D Motion Audit" in result.output
+    assert calls["scenario_id"] == "founder_journey"
+    assert calls["seed"] == 7
+    assert calls["frames"] == 2
 
 
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:

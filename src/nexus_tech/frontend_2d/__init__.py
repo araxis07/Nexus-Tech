@@ -6,10 +6,20 @@ from nexus_tech.frontend_2d.app import (
     launch_2d_frontend,
     launch_2d_menu,
 )
+from nexus_tech.frontend_2d.motion_audit import (
+    DEFAULT_MOTION_AUDIT_SIZES,
+    MotionAuditCell,
+    MotionAuditReport,
+    run_2d_motion_audit,
+)
 
 __all__ = [
+    "DEFAULT_MOTION_AUDIT_SIZES",
     "Frontend2DUnavailableError",
     "FrontendRunResult",
+    "MotionAuditCell",
+    "MotionAuditReport",
     "launch_2d_frontend",
     "launch_2d_menu",
+    "run_2d_motion_audit",
 ]
