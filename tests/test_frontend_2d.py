@@ -838,8 +838,15 @@ def test_scene_entry_transition_tracks_motion_mode() -> None:
         assert full_scene.scene_transition_active()
         assert reduced_scene.scene_transition_active()
         assert not off_scene.scene_transition_active()
+        assert full_scene._entity_motion_strength(
+            "panel:products"
+        ) > reduced_scene._entity_motion_strength("panel:products")
+        assert reduced_scene._entity_motion_strength("panel:products") > 0
+        assert off_scene._entity_motion_strength("panel:products") == 0
+        phase_before = full_scene._entity_motion_phase()
         full_scene.update(1.0)
 
+        assert full_scene._entity_motion_phase() > phase_before
         assert full_scene.scene_transition_progress() == 1.0
         assert not full_scene.scene_transition_active()
     finally:
@@ -2243,6 +2250,8 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.long_run_after_pulses <= 18
     assert cell.transition_active_scenes == 4
     assert cell.transition_disabled_scenes == 0
+    assert cell.entity_motion_active_samples == 3
+    assert cell.entity_motion_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2274,6 +2283,8 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.long_run_after_pulses == 0
     assert cell.transition_active_scenes == 0
     assert cell.transition_disabled_scenes == 4
+    assert cell.entity_motion_active_samples == 0
+    assert cell.entity_motion_disabled_samples == 3
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:

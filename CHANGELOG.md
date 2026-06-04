@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.121.0 - 2026-06-05
+
+- Added deterministic shape-based entity motion to the 2D run HUD, including moving stat beads, product data packets, and active panel strips so the game reads less like a static dashboard
+- Wired entity motion strength through `full`, `reduced`, and `off` motion modes, with off mode disabling the new idle entity animation alongside highlight pulses and scene transitions
+- Extended motion-audit telemetry and regression coverage so full/reduced modes expose active entity samples and off mode proves entity motion is disabled
+
 ## 0.120.0 - 2026-06-05
 
 - Added a shared 2D scene-entry transition layer with fade, sweep, scanline, and scene-label treatment for title, live run, turn summary, and review scenes

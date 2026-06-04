@@ -69,6 +69,8 @@ class MotionAuditCell:
     max_frame_ms: float
     transition_active_scenes: int = 0
     transition_disabled_scenes: int = 0
+    entity_motion_active_samples: int = 0
+    entity_motion_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -233,7 +235,14 @@ def run_2d_motion_audit(
                 )
                 transition_active_count = int(run_scene.scene_transition_active())
                 transition_disabled_count = int(not run_scene.scene_transition_active())
+                entity_active_count = int(run_scene._entity_motion_strength("panel:products") > 0)
+                entity_active_count += int(run_scene._entity_motion_strength("panel:stats") > 0)
+                entity_disabled_count = 2 - entity_active_count
                 run_scene._set_deep_panel("pipeline")
+                entity_active_count += int(run_scene._entity_motion_strength("panel:pipeline") > 0)
+                entity_disabled_count += int(
+                    run_scene._entity_motion_strength("panel:pipeline") <= 0
+                )
                 run_scene._open_inspector("pipeline")
                 _exercise_inspector_interactions(run_scene)
                 inspector_before = run_scene._motion_pulses.live_count()
@@ -349,6 +358,8 @@ def run_2d_motion_audit(
                         max_frame_ms=round(max(maxes), 2),
                         transition_active_scenes=transition_active_count,
                         transition_disabled_scenes=transition_disabled_count,
+                        entity_motion_active_samples=entity_active_count,
+                        entity_motion_disabled_samples=entity_disabled_count,
                     )
                 )
         return MotionAuditReport(

@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.120.0`
+Version: `0.121.0`
 
 ## Scope
 
@@ -10,7 +10,8 @@ Version: `0.120.0`
 - Inspector interactions now have explicit section, item, page, sort, filter, actionable-focus, and hotspot-focus pulse lanes.
 - The 2D shell now supports `--motion-mode full|reduced|off` for launchers and `audit-2d-motion`, with reduced/off modes preserving gameplay while lowering or disabling highlight pulses.
 - Scene entry transitions now cover boot, title-to-run, title-to-review, run-to-summary, run-to-review, summary-to-run, summary-to-review, and review-to-title flows.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, average frame time, and max frame spike.
+- Shape-based entity motion now covers stat lanes, product cards, and active deep-panel strips without adding external sprite assets.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 

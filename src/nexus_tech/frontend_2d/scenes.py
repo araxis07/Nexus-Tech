@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from math import sin
 from typing import Callable
 
 from nexus_tech.domain.models import GameState, TurnAction
@@ -2671,6 +2672,7 @@ class RunScene(BaseScene):
         self._inspector_memory: dict[str, InspectorMemoryState] = {}
         self._help_overlay_visible = False
         self._product_index = 0
+        self._motion_elapsed = 0.0
         self._tweens = TweenBank(speed=9.0)
         self._motion_pulses = PulseBank(
             decay=1.8,
@@ -2874,6 +2876,7 @@ class RunScene(BaseScene):
     def update(self, dt: float) -> None:
         """Advance animations and expire transient event cards."""
 
+        self._motion_elapsed += max(0.0, dt)
         self._tweens.update(dt)
         self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
@@ -3320,6 +3323,97 @@ class RunScene(BaseScene):
         if not keys:
             return 0.0
         return max(self._motion_pulses.get(key) for key in keys)
+
+    def _entity_motion_strength(self, *keys: str) -> float:
+        """Return idle gameplay-entity motion strength for the current motion mode."""
+
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        pulse = self._motion_level(*keys) if keys else 0.0
+        idle = 0.12 if self.motion_mode is MotionMode.REDUCED else 0.28
+        scale = 0.45 if self.motion_mode is MotionMode.REDUCED else 1.0
+        return min(1.0, (idle + pulse * 0.58) * scale)
+
+    def _entity_motion_phase(self, *, offset: float = 0.0, speed: float = 1.0) -> float:
+        """Return a deterministic wave phase for shape-based entity animation."""
+
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return self._motion_elapsed * speed + offset
+
+    def _draw_entity_nodes(
+        self,
+        surface,
+        rect,
+        *,
+        accent: tuple[int, int, int],
+        strength: float,
+        count: int = 3,
+        offset: float = 0.0,
+    ) -> None:
+        if strength <= 0 or rect.width <= 20 or rect.height <= 10:
+            return
+        pygame = self.pygame
+        phase = self._entity_motion_phase(offset=offset, speed=1.7)
+        for index in range(count):
+            ratio = (index + 1) / (count + 1)
+            bob = sin(phase + index * 1.8) * 4 * strength
+            node_x = rect.left + int(rect.width * ratio)
+            node_y = rect.centery + int(bob)
+            radius = max(2, int(3 + strength * 3))
+            alpha = min(210, int(88 + strength * 110))
+            pygame.draw.circle(surface, (*accent, alpha), (node_x, node_y), radius)
+            pygame.draw.circle(
+                surface, blend_color(accent, TEXT, 0.18), (node_x, node_y), radius, 1
+            )
+
+    def _draw_panel_entity_strip(
+        self,
+        surface,
+        rect,
+        *,
+        panel_key: str,
+        strength: float,
+    ) -> None:
+        if strength <= 0:
+            return
+        pygame = self.pygame
+        accent = {
+            "team": GOOD,
+            "finance": WARN,
+            "customers": INFO,
+            "partnerships": INFO,
+            "board": WARN,
+            "pipeline": SELECTION,
+            "report": INFO,
+            "endgame": DANGER,
+            "products": SELECTION,
+            "stats": GOOD,
+        }.get(panel_key, INFO)
+        strip_rect = pygame.Rect(rect.left, rect.top, rect.width, min(32, rect.height))
+        pygame.draw.rect(
+            surface,
+            blend_color((13, 22, 34), accent, strength * 0.18),
+            strip_rect,
+            border_radius=14,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, accent, strength * 0.3),
+            strip_rect,
+            width=1,
+            border_radius=14,
+        )
+        self._draw_entity_nodes(
+            surface,
+            pygame.Rect(strip_rect.left + 8, strip_rect.top + 4, strip_rect.width - 16, 22),
+            accent=accent,
+            strength=strength,
+            count=4 if panel_key in {"pipeline", "endgame"} else 3,
+            offset=float(len(panel_key)),
+        )
+        label = self.fonts.small.render(panel_key.upper(), True, blend_color(MUTED, accent, 0.7))
+        surface.blit(label, (strip_rect.left + 10, strip_rect.top + 9))
 
     def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
         pulse = self._overlay_motion_level(overlay_key)
@@ -4281,10 +4375,18 @@ class RunScene(BaseScene):
         )
         header_surface = self.fonts.heading.render("Company Stats", True, TEXT)
         surface.blit(header_surface, (inner.left, inner.top - 24))
+        stats_entity_strength = self._entity_motion_strength("panel:stats")
+        self._draw_panel_entity_strip(
+            surface,
+            pygame.Rect(inner.right - 156, inner.top - 30, 156, 28),
+            panel_key="stats",
+            strength=stats_entity_strength,
+        )
         gauge_height = 44
         for index, gauge in enumerate(self._view_model.stats):
             top = inner.top + index * gauge_height
             gauge_motion = self._motion_level(f"stat:{gauge.key}")
+            entity_strength = self._entity_motion_strength("panel:stats", f"stat:{gauge.key}")
             title_surface = self.fonts.small.render(
                 gauge.title.upper(),
                 True,
@@ -4314,6 +4416,14 @@ class RunScene(BaseScene):
                 ratio=self._tweens.get(gauge.key, gauge.ratio),
                 color=tone_color(gauge.tone),
                 emphasis=gauge_motion,
+            )
+            self._draw_entity_nodes(
+                surface,
+                pygame.Rect(bar_rect.left, bar_rect.top - 2, int(bar_rect.width * gauge.ratio), 18),
+                accent=tone_color(gauge.tone),
+                strength=entity_strength,
+                count=2 if gauge.key == "board_pressure" else 3,
+                offset=float(index) * 0.7,
             )
 
         preview_motion = self._motion_level("stat:runway", "stat:board_pressure")
@@ -4369,6 +4479,12 @@ class RunScene(BaseScene):
         )
         title_surface = self.fonts.heading.render("Product Strip", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
+        self._draw_panel_entity_strip(
+            surface,
+            pygame.Rect(inner.right - 170, inner.top - 30, 170, 28),
+            panel_key="products",
+            strength=self._entity_motion_strength("panel:products"),
+        )
         available_height = inner.height
         spacing = 12
         card_height = max(
@@ -4860,6 +4976,27 @@ class RunScene(BaseScene):
                 (visual_rect.left + 1, visual_rect.top + 1, visual_rect.width - 2, 4),
                 border_radius=4,
             )
+        entity_strength = self._entity_motion_strength(
+            "panel:products",
+            f"product:{product.id}",
+            f"product:{product.id}:quality",
+            f"product:{product.id}:bugs",
+            f"product:{product.id}:fit",
+            f"product:{product.id}:debt",
+        )
+        self._draw_entity_nodes(
+            surface,
+            pygame.Rect(
+                visual_rect.left + 18,
+                visual_rect.bottom - 28,
+                min(180, visual_rect.width - 36),
+                18,
+            ),
+            accent=SELECTION if product.selected else INFO,
+            strength=entity_strength,
+            count=4,
+            offset=float(sum(ord(char) for char in product.id[:6])) * 0.03,
+        )
         if product.selected:
             badge_rect = pygame.Rect(visual_rect.right - 84, visual_rect.top + 10, 70, 18)
             pygame.draw.rect(surface, SELECTION, badge_rect, border_radius=9)
@@ -5169,6 +5306,12 @@ class RunScene(BaseScene):
         )
         title_surface = self.fonts.title.render(panel.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
+        self._draw_panel_entity_strip(
+            surface,
+            pygame.Rect(inner.right - 190, inner.top - 30, 190, 28),
+            panel_key=panel.key,
+            strength=self._entity_motion_strength(f"panel:{panel.key}", "overlay:panel"),
+        )
         draw_wrapped_text(
             surface,
             self.fonts.body,
