@@ -2593,6 +2593,10 @@ class RunScene(BaseScene):
     def _trigger_overlay_motion(self, overlay_key: str, *, intensity: float = 0.7) -> None:
         self._motion_pulses.trigger(f"overlay:{overlay_key}", intensity=intensity, decay=2.2)
 
+    def _trigger_inspector_motion(self, lane_key: str, *, intensity: float = 0.55) -> None:
+        self._trigger_overlay_motion("inspector", intensity=max(0.42, intensity * 0.72))
+        self._motion_pulses.trigger(f"inspector:{lane_key}", intensity=intensity, decay=2.0)
+
     def _set_deep_panel(self, panel_key: str | None) -> None:
         if panel_key == self._deep_panel_key:
             return
@@ -3755,6 +3759,7 @@ class RunScene(BaseScene):
                 self._inspector_section_index = index
                 self._inspector_page = 0
                 self._inspector_item_index = 0
+                self._trigger_inspector_motion("section", intensity=0.62)
                 self._sync_inspector_selection()
                 return
 
@@ -3770,6 +3775,7 @@ class RunScene(BaseScene):
         items_per_page = self._inspector_items_per_page()
         self._inspector_page = absolute_index // items_per_page
         self._inspector_item_index = absolute_index % items_per_page
+        self._trigger_inspector_motion("item", intensity=0.5)
         self._sync_inspector_selection()
 
     def _change_inspector_section(self, direction: int) -> None:
@@ -3781,6 +3787,7 @@ class RunScene(BaseScene):
         )
         self._inspector_page = 0
         self._inspector_item_index = 0
+        self._trigger_inspector_motion("section", intensity=0.58)
         self._sync_inspector_selection()
 
     def _change_inspector_page(self, direction: int) -> None:
@@ -3789,6 +3796,7 @@ class RunScene(BaseScene):
             return
         self._inspector_page = (self._inspector_page + direction) % total_pages
         self._inspector_item_index = 0
+        self._trigger_inspector_motion("page", intensity=0.54)
         self._sync_inspector_selection()
 
     def _change_inspector_item(self, direction: int) -> None:
@@ -3796,6 +3804,7 @@ class RunScene(BaseScene):
         if not page_items:
             return
         self._inspector_item_index = (self._inspector_item_index + direction) % len(page_items)
+        self._trigger_inspector_motion("item", intensity=0.46)
         self._remember_inspector_state()
 
     def _cycle_inspector_sort_mode(self) -> None:
@@ -3804,6 +3813,7 @@ class RunScene(BaseScene):
         )
         self._inspector_page = 0
         self._inspector_item_index = 0
+        self._trigger_inspector_motion("sort", intensity=0.58)
         self._sync_inspector_selection()
 
     def _cycle_inspector_filter_mode(self) -> None:
@@ -3812,6 +3822,7 @@ class RunScene(BaseScene):
         )
         self._inspector_page = 0
         self._inspector_item_index = 0
+        self._trigger_inspector_motion("filter", intensity=0.58)
         self._sync_inspector_selection()
 
     def _sync_inspector_selection(self) -> None:
@@ -3869,9 +3880,11 @@ class RunScene(BaseScene):
         self._sync_inspector_selection()
 
     def _focus_inspector_actionable(self) -> None:
+        self._trigger_inspector_motion("actionable", intensity=0.64)
         self._set_inspector_filter_mode("actionable")
 
     def _focus_inspector_hotspot(self) -> None:
+        self._trigger_inspector_motion("hotspot", intensity=0.68)
         self._set_inspector_sort_mode("risk")
         self._set_inspector_filter_mode("attention")
 
@@ -5139,14 +5152,23 @@ class RunScene(BaseScene):
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=1040, height=600, margin=24)
         panel_motion = self._motion_level(f"panel:{panel.key}")
+        inspector_motion = self._motion_level(
+            "inspector:section",
+            "inspector:item",
+            "inspector:page",
+            "inspector:sort",
+            "inspector:filter",
+            "inspector:actionable",
+            "inspector:hotspot",
+        )
         inner = draw_panel(
             surface,
             pygame,
             modal_rect,
             title=panel.title,
             accent=SELECTION,
-            emphasis=max(panel_motion, overlay_motion),
-            lift=int(max(panel_motion, overlay_motion) * 5),
+            emphasis=max(panel_motion, overlay_motion, inspector_motion),
+            lift=int(max(panel_motion, overlay_motion, inspector_motion) * 5),
         )
         title_surface = self.fonts.title.render(f"{panel.title} Inspector", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))

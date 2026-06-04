@@ -1683,15 +1683,21 @@ def test_run_scene_inspector_sort_filter_and_small_window_draw() -> None:
         base_items = scene._filtered_sorted_inspector_items()
         scene._cycle_inspector_sort_mode()
         scene._cycle_inspector_filter_mode()
+        scene._focus_inspector_actionable()
+        scene._focus_inspector_hotspot()
         filtered_items = scene._filtered_sorted_inspector_items()
         scene._deep_panel_key = "endgame"
         scene._help_overlay_visible = True
         scene.draw(surface)
 
         assert scene._inspector_sort_mode_label() == "Highest Risk"
-        assert scene._inspector_filter_mode_label() == "Actionable"
+        assert scene._inspector_filter_mode_label() == "Attention"
         assert len(filtered_items) <= len(base_items)
         assert scene._active_panel_key() == "pipeline"
+        assert scene._motion_pulses.get("inspector:sort") > 0
+        assert scene._motion_pulses.get("inspector:filter") > 0
+        assert scene._motion_pulses.get("inspector:actionable") > 0
+        assert scene._motion_pulses.get("inspector:hotspot") > 0
     finally:
         pygame.quit()
 
@@ -2095,8 +2101,12 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.summary_after_pulses <= 12
     assert cell.title_before_pulses >= cell.title_after_pulses
     assert cell.review_before_pulses >= cell.review_after_pulses
-    assert cell.title_after_pulses <= 8
+    assert cell.title_after_pulses <= 14
     assert cell.review_after_pulses <= 6
+    assert cell.inspector_before_pulses >= cell.inspector_after_pulses
+    assert cell.long_run_before_pulses > cell.long_run_after_pulses
+    assert cell.inspector_after_pulses <= 12
+    assert cell.long_run_after_pulses <= 18
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2132,6 +2142,10 @@ def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
                     title_after_pulses=7,
                     review_before_pulses=4,
                     review_after_pulses=4,
+                    inspector_before_pulses=10,
+                    inspector_after_pulses=9,
+                    long_run_before_pulses=42,
+                    long_run_after_pulses=14,
                     average_frame_ms=4.0,
                     max_frame_ms=8.0,
                 ),

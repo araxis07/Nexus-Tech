@@ -678,6 +678,7 @@ def audit_2d_motion_command(
     table.add_column("Run Pulses", justify="right")
     table.add_column("Summary Pulses", justify="right")
     table.add_column("Title/Review", justify="right")
+    table.add_column("Inspector/Long", justify="right")
     table.add_column("Avg Frame", justify="right")
     table.add_column("Max Frame", justify="right")
     table.add_column("Status", justify="center")
@@ -690,6 +691,10 @@ def audit_2d_motion_command(
             (
                 f"T {cell.title_before_pulses}->{cell.title_after_pulses} / "
                 f"R {cell.review_before_pulses}->{cell.review_after_pulses}"
+            ),
+            (
+                f"I {cell.inspector_before_pulses}->{cell.inspector_after_pulses} / "
+                f"L {cell.long_run_before_pulses}->{cell.long_run_after_pulses}"
             ),
             f"{cell.average_frame_ms:.2f} ms",
             f"{cell.max_frame_ms:.2f} ms",

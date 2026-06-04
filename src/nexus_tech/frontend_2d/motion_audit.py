@@ -60,6 +60,10 @@ class MotionAuditCell:
     title_after_pulses: int
     review_before_pulses: int
     review_after_pulses: int
+    inspector_before_pulses: int
+    inspector_after_pulses: int
+    long_run_before_pulses: int
+    long_run_after_pulses: int
     average_frame_ms: float
     max_frame_ms: float
 
@@ -70,8 +74,10 @@ class MotionAuditCell:
         if (
             self.run_after_pulses <= 18
             and self.summary_after_pulses <= 12
-            and self.title_after_pulses <= 8
+            and self.title_after_pulses <= 14
             and self.review_after_pulses <= 6
+            and self.inspector_after_pulses <= 12
+            and self.long_run_after_pulses <= 18
             and self.average_frame_ms <= 24.0
             and self.max_frame_ms <= 50.0
         ):
@@ -79,8 +85,10 @@ class MotionAuditCell:
         if (
             self.run_after_pulses <= 24
             and self.summary_after_pulses <= 18
-            and self.title_after_pulses <= 12
+            and self.title_after_pulses <= 18
             and self.review_after_pulses <= 10
+            and self.inspector_after_pulses <= 16
+            and self.long_run_after_pulses <= 24
             and self.average_frame_ms <= 33.0
             and self.max_frame_ms <= 75.0
         ):
@@ -96,10 +104,14 @@ class MotionAuditCell:
             notes.append("run pulse bank above target")
         if self.summary_after_pulses > 12:
             notes.append("summary pulse bank above target")
-        if self.title_after_pulses > 8:
+        if self.title_after_pulses > 14:
             notes.append("title pulse bank above target")
         if self.review_after_pulses > 6:
             notes.append("review pulse bank above target")
+        if self.inspector_after_pulses > 12:
+            notes.append("inspector pulse bank above target")
+        if self.long_run_after_pulses > 18:
+            notes.append("long-run pulse bank above target")
         if self.average_frame_ms > 24.0:
             notes.append("frame budget above target")
         if self.max_frame_ms > 50.0:
@@ -211,12 +223,22 @@ def run_2d_motion_audit(
                     save_callback=lambda *_args: None,
                     show_ready_event=False,
                 )
+                run_scene._set_deep_panel("pipeline")
+                run_scene._open_inspector("pipeline")
+                _exercise_inspector_interactions(run_scene)
+                inspector_before = run_scene._motion_pulses.live_count()
+                inspector_avg, inspector_max = _exercise_scene(run_scene, surface, frames)
+                inspector_after = run_scene._motion_pulses.live_count()
                 run_scene._set_deep_panel("endgame")
-                run_scene._open_inspector("endgame")
                 run_scene._run_command(TurnAction.SET_COMPANY_STRATEGY.value)
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
                 run_avg, run_max = _exercise_scene(run_scene, surface, frames)
+                long_before, long_after, long_avg, long_max = _exercise_long_run_pressure(
+                    run_scene,
+                    surface,
+                    frames,
+                )
 
                 summary_scene = TurnSummaryScene(
                     pygame=pygame,
@@ -244,9 +266,7 @@ def run_2d_motion_audit(
                     coordinator=coordinator,
                     initial_mode="menu",
                 )
-                title_scene._set_mode("meta")
-                title_scene._set_mode("wizard")
-                title_scene._open_wizard_text_modal("company")
+                _exercise_title_subflows(title_scene, coordinator, seed)
                 title_before = title_scene._motion_pulses.live_count()
                 title_avg, title_max = _exercise_scene(title_scene, surface, frames)
 
@@ -271,8 +291,22 @@ def run_2d_motion_audit(
                 review_before = review_scene._motion_pulses.live_count()
                 review_avg, review_max = _exercise_scene(review_scene, surface, frames)
 
-                averages = (run_avg, summary_avg, title_avg, review_avg)
-                maxes = (run_max, summary_max, title_max, review_max)
+                averages = (
+                    run_avg,
+                    summary_avg,
+                    title_avg,
+                    review_avg,
+                    inspector_avg,
+                    long_avg,
+                )
+                maxes = (
+                    run_max,
+                    summary_max,
+                    title_max,
+                    review_max,
+                    inspector_max,
+                    long_max,
+                )
                 cells.append(
                     MotionAuditCell(
                         width=width,
@@ -285,6 +319,10 @@ def run_2d_motion_audit(
                         title_after_pulses=title_scene._motion_pulses.live_count(),
                         review_before_pulses=review_before,
                         review_after_pulses=review_scene._motion_pulses.live_count(),
+                        inspector_before_pulses=inspector_before,
+                        inspector_after_pulses=inspector_after,
+                        long_run_before_pulses=long_before,
+                        long_run_after_pulses=long_after,
                         average_frame_ms=round(sum(averages) / len(averages), 2),
                         max_frame_ms=round(max(maxes), 2),
                     )
@@ -433,6 +471,48 @@ def _exercise_scene(scene, surface, frames: int) -> tuple[float, float]:
         scene.draw(surface)
         frame_times.append((perf_counter() - frame_start) * 1000)
     return sum(frame_times) / len(frame_times), max(frame_times)
+
+
+def _exercise_title_subflows(scene, coordinator: SaveLoadCoordinator, seed: int) -> None:
+    slot_state = create_new_game("NEXUS TECH", "Nexus One")
+    coordinator.save_game("motion-audit-slot", slot_state, RandomSource(seed=seed + 21))
+    archive_state = slot_state.model_copy(deep=True)
+    archive_state.company.game_over = True
+    archive_state.company.cash_on_hand = Decimal("-125.00")
+    coordinator.save_game("motion-audit-archive", archive_state, RandomSource(seed=seed + 22))
+    scene._refresh_lists()
+    scene._handle_menu_action("load_slots")
+    scene._open_slot_detail("motion-audit-slot")
+    scene._handle_slot_action("rename")
+    scene._set_text_input(None)
+    scene._handle_slot_action("delete")
+    scene._set_confirm_delete_slot_name(None)
+    scene._handle_menu_action("archives")
+    scene._handle_menu_action("meta")
+    scene._handle_menu_action("new_wizard")
+    scene._open_wizard_text_modal("company")
+
+
+def _exercise_inspector_interactions(scene) -> None:
+    scene._select_inspector_section("candidates")
+    scene._cycle_inspector_sort_mode()
+    scene._cycle_inspector_filter_mode()
+    scene._focus_inspector_actionable()
+    scene._focus_inspector_hotspot()
+    scene._change_inspector_page(1)
+    scene._change_inspector_item(1)
+
+
+def _exercise_long_run_pressure(scene, surface, frames: int) -> tuple[int, int, float, float]:
+    for index in range(36):
+        scene._motion_pulses.trigger(f"audit:long:{index}", intensity=0.16, decay=1.6)
+        if index % 4 == 0:
+            scene._motion_pulses.trigger("feed", intensity=0.42, decay=1.6)
+        if index % 6 == 0:
+            scene._motion_pulses.trigger("panel:endgame", intensity=0.48, decay=1.8)
+    before = scene._motion_pulses.live_count()
+    average, max_frame = _exercise_scene(scene, surface, max(16, frames * 8))
+    return before, scene._motion_pulses.live_count(), average, max_frame
 
 
 def _build_motion_audit_state(

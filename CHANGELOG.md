@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.118.0 - 2026-06-04
+
+- Expanded the 2D animation audit into title/save/archive subflows, including save-slot detail, rename text overlays, delete confirmation, archive browsing, meta board, and wizard overlays
+- Added explicit inspector interaction motion for section, item, page, sort, filter, actionable focus, and hotspot focus changes, then wired those cues into the inspector overlay emphasis
+- Added long-run pulse-pressure coverage to `audit-2d-motion` so dense repeated highlight banks must cool back under budget before release checks pass
+
 ## 0.117.0 - 2026-06-04
 
 - Expanded `audit-2d-motion` beyond the live run and turn summary so it now exercises title/menu motion, wizard overlay motion, review-scene motion, inspector overlays, and picker overlays in the same headless audit pass
