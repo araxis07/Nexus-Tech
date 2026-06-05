@@ -1521,6 +1521,55 @@ def test_run_scene_action_feedback_respects_motion_off() -> None:
         pygame.quit()
 
 
+def test_run_scene_overlay_transition_tracks_enter_and_exit() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=43),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._set_deep_panel("finance")
+        scene.update(1 / 60)
+        assert scene.overlay_transition_active()
+        scene.update(1.0)
+        assert not scene.overlay_transition_active()
+
+        scene._set_deep_panel(None)
+        assert scene.overlay_transition_active()
+        scene.update(1.0)
+        assert not scene.overlay_transition_active()
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_overlay_transition_respects_motion_off() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=44),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._set_deep_panel("finance")
+        scene.update(1 / 60)
+
+        assert not scene.overlay_transition_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2321,6 +2370,10 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.action_feedback_disabled_samples == 0
     assert cell.impact_cue_active_samples == 1
     assert cell.impact_cue_disabled_samples == 0
+    assert cell.overlay_transition_active_samples == 1
+    assert cell.overlay_transition_disabled_samples == 0
+    assert cell.summary_cinematic_active_samples == 1
+    assert cell.summary_cinematic_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2358,6 +2411,10 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.action_feedback_disabled_samples == 1
     assert cell.impact_cue_active_samples == 0
     assert cell.impact_cue_disabled_samples == 1
+    assert cell.overlay_transition_active_samples == 0
+    assert cell.overlay_transition_disabled_samples == 1
+    assert cell.summary_cinematic_active_samples == 0
+    assert cell.summary_cinematic_disabled_samples == 1
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2402,9 +2459,12 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "impact-cue" in impact.active_layers
     assert "action-feedback" in impact.active_layers
     assert "picker" in picker.active_layers
+    assert "overlay-transition" in picker.active_layers
     assert "action-feedback" in picker.active_layers
     assert "inspector" in inspector.active_layers
+    assert "overlay-transition" in inspector.active_layers
     assert "summary-reveal" in summary.active_layers
+    assert "summary-cinematic" in summary.active_layers
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:

@@ -55,7 +55,6 @@ from nexus_tech.frontend_2d.widgets import (
     GOOD,
     INFO,
     MUTED,
-    OVERLAY,
     SELECTION,
     TEXT,
     WARN,
@@ -137,6 +136,17 @@ class ImpactCue:
     tone: str
     accent: tuple[int, int, int]
     targets: tuple[str, ...]
+    time_left: float
+    duration: float
+
+
+@dataclass(frozen=True)
+class OverlayExitCue:
+    """Short exit shimmer after a modal overlay closes."""
+
+    key: str
+    label: str
+    accent: tuple[int, int, int]
     time_left: float
     duration: float
 
@@ -2688,6 +2698,8 @@ class RunScene(BaseScene):
         self._events: list[TimedFrontendEvent] = []
         self._action_feedback_cues: list[ActionFeedbackCue] = []
         self._impact_cues: list[ImpactCue] = []
+        self._overlay_enter_elapsed: dict[str, float] = {}
+        self._overlay_exit_cues: list[OverlayExitCue] = []
         self._click_targets: list[ClickTarget] = []
         self._context_picker: ContextPicker | None = None
         self._text_input: TextInputModalState | None = None
@@ -2757,6 +2769,106 @@ class RunScene(BaseScene):
     def _trigger_overlay_motion(self, overlay_key: str, *, intensity: float = 0.7) -> None:
         self._motion_pulses.trigger(f"overlay:{overlay_key}", intensity=intensity, decay=2.2)
 
+    def _overlay_transition_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.18 if self.motion_mode is MotionMode.REDUCED else 0.3
+
+    def _active_overlay_keys(self) -> set[str]:
+        keys: set[str] = set()
+        if self.state.pending_event is not None:
+            keys.add("pending")
+        if self._context_picker is not None:
+            keys.add("picker")
+        if self._text_input is not None:
+            keys.add("text_input")
+        if self._deep_panel_key is not None:
+            keys.add("panel")
+        if self._inspector_panel_key is not None:
+            keys.add("inspector")
+        if self._help_overlay_visible:
+            keys.add("help")
+        if self.state.company.game_over or self.state.victory_achieved:
+            keys.add("outcome")
+        return keys
+
+    def _sync_overlay_transitions(self, dt: float) -> None:
+        active_keys = self._active_overlay_keys()
+        for key in tuple(self._overlay_enter_elapsed):
+            if key not in active_keys:
+                self._overlay_enter_elapsed.pop(key, None)
+        for key in active_keys:
+            if key not in self._overlay_enter_elapsed:
+                self._overlay_enter_elapsed[key] = 0.0
+                if key in {"pending", "outcome"}:
+                    self._trigger_overlay_motion(key, intensity=0.76)
+            else:
+                self._overlay_enter_elapsed[key] += dt
+
+    def _overlay_enter_progress(self, overlay_key: str) -> float:
+        duration = self._overlay_transition_duration()
+        if duration <= 0:
+            return 1.0
+        elapsed = (
+            self._overlay_enter_elapsed.get(overlay_key, 0.0)
+            if overlay_key in self._active_overlay_keys()
+            else duration
+        )
+        ratio = max(0.0, min(1.0, elapsed / duration))
+        return 1.0 - (1.0 - ratio) * (1.0 - ratio)
+
+    def overlay_transition_active(self) -> bool:
+        """Return whether a modal overlay enter/exit animation is visible."""
+
+        if self.motion_mode is MotionMode.OFF:
+            return False
+        if self._overlay_exit_cues:
+            return True
+        return any(self._overlay_enter_progress(key) < 1.0 for key in self._active_overlay_keys())
+
+    def _animated_overlay_rect(self, rect, overlay_key: str, *, shift: int = 34):
+        if self.motion_mode is MotionMode.OFF:
+            return rect
+        progress = self._overlay_enter_progress(overlay_key)
+        direction = -1 if overlay_key in {"pending", "outcome"} else 1
+        offset = int((1.0 - progress) * shift * direction)
+        return self.pygame.Rect(rect.left, rect.top + offset, rect.width, rect.height)
+
+    def _trigger_overlay_exit(self, overlay_key: str) -> None:
+        if self.motion_mode is MotionMode.OFF:
+            return
+        duration = 0.26 if self.motion_mode is MotionMode.REDUCED else 0.42
+        accent = {
+            "pending": WARN,
+            "picker": INFO,
+            "text_input": SELECTION,
+            "panel": INFO,
+            "inspector": SELECTION,
+            "help": INFO,
+            "outcome": DANGER,
+        }.get(overlay_key, INFO)
+        label = {
+            "pending": "Pending Closed",
+            "picker": "Picker Closed",
+            "text_input": "Text Closed",
+            "panel": "Panel Closed",
+            "inspector": "Inspector Closed",
+            "help": "Help Closed",
+            "outcome": "Outcome Closed",
+        }.get(overlay_key, "Overlay Closed")
+        self._overlay_exit_cues.insert(
+            0,
+            OverlayExitCue(
+                key=overlay_key,
+                label=label,
+                accent=accent,
+                time_left=duration,
+                duration=duration,
+            ),
+        )
+        self._overlay_exit_cues = self._overlay_exit_cues[:3]
+        self._motion_pulses.trigger("overlay:exit", intensity=0.5, decay=1.4)
+
     def _trigger_inspector_motion(self, lane_key: str, *, intensity: float = 0.55) -> None:
         self._trigger_overlay_motion("inspector", intensity=max(0.42, intensity * 0.72))
         self._motion_pulses.trigger(f"inspector:{lane_key}", intensity=intensity, decay=2.0)
@@ -2764,12 +2876,15 @@ class RunScene(BaseScene):
     def _set_deep_panel(self, panel_key: str | None) -> None:
         if panel_key == self._deep_panel_key:
             return
+        previous_key = self._deep_panel_key
         self._deep_panel_key = panel_key
         if panel_key is not None:
             self._trigger_overlay_motion("panel", intensity=0.75)
             self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.7, decay=2.0)
             if panel_key == "endgame":
                 self._announce_endgame_cockpit()
+        elif previous_key is not None:
+            self._trigger_overlay_exit("panel")
 
     def _announce_endgame_cockpit(self) -> None:
         panel = self.deep_panel
@@ -2843,19 +2958,28 @@ class RunScene(BaseScene):
         )
 
     def _set_context_picker(self, picker: ContextPicker | None) -> None:
+        previous_picker = self._context_picker
         self._context_picker = picker
         if picker is not None:
             self._trigger_overlay_motion("picker", intensity=0.78)
+        elif previous_picker is not None:
+            self._trigger_overlay_exit("picker")
 
     def _set_text_input(self, modal: TextInputModalState | None) -> None:
+        previous_modal = self._text_input
         self._text_input = modal
         if modal is not None:
             self._trigger_overlay_motion("text_input", intensity=0.78)
+        elif previous_modal is not None:
+            self._trigger_overlay_exit("text_input")
 
     def _set_help_overlay_visible(self, visible: bool) -> None:
+        previous_visible = self._help_overlay_visible
         self._help_overlay_visible = visible
         if visible:
             self._trigger_overlay_motion("help", intensity=0.7)
+        elif previous_visible:
+            self._trigger_overlay_exit("help")
 
     def _open_inspector(self, panel_key: str) -> None:
         self._trigger_overlay_motion("inspector", intensity=0.82)
@@ -2889,6 +3013,12 @@ class RunScene(BaseScene):
         if self._inspector_panel_key == panel_key:
             self._queue_action_feedback(f"inspect_{panel_key}")
 
+    def _close_inspector(self) -> None:
+        if self._inspector_panel_key is None:
+            return
+        self._inspector_panel_key = None
+        self._trigger_overlay_exit("inspector")
+
     def _selected_inspector_section(self):
         panel = self.inspector_panel
         if panel is None or not panel.inspectors:
@@ -2907,7 +3037,9 @@ class RunScene(BaseScene):
     def update(self, dt: float) -> None:
         """Advance animations and expire transient event cards."""
 
-        self._motion_elapsed += max(0.0, dt)
+        safe_dt = max(0.0, dt)
+        self._motion_elapsed += safe_dt
+        self._sync_overlay_transitions(safe_dt)
         self._tweens.update(dt)
         self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
@@ -2941,6 +3073,17 @@ class RunScene(BaseScene):
                 duration=cue.duration,
             )
             for cue in self._impact_cues
+            if cue.time_left - dt > 0
+        ]
+        self._overlay_exit_cues = [
+            OverlayExitCue(
+                key=cue.key,
+                label=cue.label,
+                accent=cue.accent,
+                time_left=cue.time_left - dt,
+                duration=cue.duration,
+            )
+            for cue in self._overlay_exit_cues
             if cue.time_left - dt > 0
         ]
 
@@ -2989,7 +3132,7 @@ class RunScene(BaseScene):
                 self._set_context_picker(None)
                 return
             if self._inspector_panel_key is not None:
-                self._inspector_panel_key = None
+                self._close_inspector()
                 return
             if self._deep_panel_key is not None:
                 self._set_deep_panel(None)
@@ -3210,6 +3353,7 @@ class RunScene(BaseScene):
             self._draw_help_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
+        self._draw_overlay_exit_cues(surface)
         self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
         self._draw_hover_tooltip(surface)
@@ -3796,6 +3940,45 @@ class RunScene(BaseScene):
         )
         self._action_feedback_cues = self._action_feedback_cues[:3]
 
+    def _draw_overlay_exit_cues(self, surface) -> None:
+        if not self._overlay_exit_cues or self.motion_mode is MotionMode.OFF:
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        for index, cue in enumerate(self._overlay_exit_cues[:3]):
+            if cue.duration <= 0:
+                continue
+            progress = 1.0 - max(0.0, min(1.0, cue.time_left / cue.duration))
+            eased = 1.0 - (1.0 - progress) * (1.0 - progress)
+            alpha = int((1.0 - progress) * 76)
+            if alpha <= 0:
+                continue
+            y = 104 + index * 34
+            sweep_width = max(150, int(width * 0.24))
+            sweep_x = int(eased * (width + sweep_width)) - sweep_width
+            sweep_rect = pygame.Rect(sweep_x, y, sweep_width, 8)
+            pygame.draw.rect(surface, (*cue.accent, alpha), sweep_rect, border_radius=4)
+            badge = self.fonts.small.render(
+                cue.label.upper(),
+                True,
+                blend_color(MUTED, cue.accent, 0.8),
+            )
+            badge_rect = pygame.Rect(24, y - 9, badge.get_width() + 18, 24)
+            pygame.draw.rect(
+                surface,
+                (*blend_color((13, 22, 34), cue.accent, 0.18), min(210, alpha + 130)),
+                badge_rect,
+                border_radius=12,
+            )
+            pygame.draw.rect(
+                surface,
+                (*blend_color(BORDER, cue.accent, 0.42), min(230, alpha + 120)),
+                badge_rect,
+                width=1,
+                border_radius=12,
+            )
+            surface.blit(badge, (badge_rect.left + 9, badge_rect.top + 6))
+
     def _draw_impact_cues(self, surface) -> None:
         if not self._impact_cues or self.motion_mode is MotionMode.OFF:
             return
@@ -3973,7 +4156,9 @@ class RunScene(BaseScene):
 
     def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
         pulse = self._overlay_motion_level(overlay_key)
+        enter = self._overlay_enter_progress(overlay_key)
         alpha = min(224, 180 + int(pulse * 36))
+        alpha = int(alpha * (0.55 + enter * 0.45))
         return (8, 10, 14, alpha)
 
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
@@ -4034,7 +4219,7 @@ class RunScene(BaseScene):
             self._set_deep_panel(None)
             return
         if target.kind == "close_inspector":
-            self._inspector_panel_key = None
+            self._close_inspector()
             return
         if target.kind == "inspector_section":
             self._select_inspector_section(target.payload)
@@ -5680,6 +5865,7 @@ class RunScene(BaseScene):
         overlay.fill(self._overlay_fill("pending"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=560, height=360, margin=24)
+        modal_rect = self._animated_overlay_rect(modal_rect, "pending", shift=28)
         inner = draw_panel(
             surface,
             pygame,
@@ -5730,6 +5916,7 @@ class RunScene(BaseScene):
         surface.blit(overlay, (0, 0))
         modal_height = 180 + len(picker.options) * 64
         modal_rect = _fit_modal_rect(pygame, surface, width=600, height=modal_height, margin=24)
+        modal_rect = self._animated_overlay_rect(modal_rect, "picker")
         inner = draw_panel(
             surface,
             pygame,
@@ -5788,6 +5975,7 @@ class RunScene(BaseScene):
         overlay.fill(self._overlay_fill("text_input"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=600, height=280, margin=24)
+        modal_rect = self._animated_overlay_rect(modal_rect, "text_input")
         inner = draw_panel(
             surface,
             pygame,
@@ -5858,6 +6046,7 @@ class RunScene(BaseScene):
         overlay.fill(self._overlay_fill("panel"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=940, height=560, margin=24)
+        modal_rect = self._animated_overlay_rect(modal_rect, "panel", shift=38)
         panel_motion = self._motion_level(f"panel:{panel.key}")
         inner = draw_panel(
             surface,
@@ -5997,6 +6186,7 @@ class RunScene(BaseScene):
         overlay.fill(self._overlay_fill("inspector"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=1040, height=600, margin=24)
+        modal_rect = self._animated_overlay_rect(modal_rect, "inspector", shift=42)
         panel_motion = self._motion_level(f"panel:{panel.key}")
         inspector_motion = self._motion_level(
             "inspector:section",
@@ -6438,6 +6628,7 @@ class RunScene(BaseScene):
         overlay.fill(self._overlay_fill("help"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=860, height=520, margin=28)
+        modal_rect = self._animated_overlay_rect(modal_rect, "help", shift=30)
         inner = draw_panel(
             surface,
             pygame,
@@ -6503,12 +6694,22 @@ class RunScene(BaseScene):
 
     def _draw_outcome_overlay(self, surface) -> None:
         pygame = self.pygame
+        overlay_motion = self._overlay_motion_level("outcome")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(OVERLAY)
+        overlay.fill(self._overlay_fill("outcome"))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_modal_rect(pygame, surface, width=520, height=264, margin=24)
+        modal_rect = self._animated_overlay_rect(modal_rect, "outcome", shift=26)
         accent = GOOD if self.state.victory_achieved else DANGER
-        inner = draw_panel(surface, pygame, modal_rect, title="Run Complete", accent=accent)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Run Complete",
+            accent=accent,
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 4),
+        )
         title = "Victory Achieved" if self.state.victory_achieved else "Company Shutdown"
         title_surface = self.fonts.title.render(title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 26))
@@ -6819,6 +7020,7 @@ class TurnSummaryScene(BaseScene):
         self._draw_summary_main(surface, left_rect)
         self._draw_summary_timeline(surface, right_rect)
         self._draw_summary_footer(surface, footer_rect)
+        self._draw_summary_cinematic_overlay(surface)
         self._draw_scene_transition_overlay(surface)
 
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
@@ -6895,6 +7097,86 @@ class TurnSummaryScene(BaseScene):
         if not keys:
             return 0.0
         return max(self._motion_pulses.get(key) for key in keys)
+
+    def _summary_cinematic_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 1.25 if self.motion_mode is MotionMode.REDUCED else 1.9
+
+    def summary_cinematic_active(self) -> bool:
+        """Return whether the turn-summary cinematic rail should be visible."""
+
+        duration = self._summary_cinematic_duration()
+        return duration > 0 and self._elapsed < duration
+
+    def _summary_cinematic_progress(self) -> float:
+        duration = self._summary_cinematic_duration()
+        if duration <= 0:
+            return 1.0
+        return max(0.0, min(1.0, self._elapsed / duration))
+
+    def _draw_summary_cinematic_overlay(self, surface) -> None:
+        if not self.summary_cinematic_active():
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        progress = self._summary_cinematic_progress()
+        eased = 1.0 - (1.0 - progress) * (1.0 - progress)
+        intensity = 0.56 if self.motion_mode is MotionMode.REDUCED else 1.0
+        rail_rect = pygame.Rect(36, 106, width - 72, 8)
+        fill_alpha = int((1.0 - progress * 0.55) * 78 * intensity)
+        pygame.draw.rect(
+            surface,
+            (*blend_color((13, 22, 34), INFO, 0.2), fill_alpha),
+            rail_rect,
+            border_radius=5,
+        )
+        filled_rect = pygame.Rect(
+            rail_rect.left,
+            rail_rect.top,
+            max(8, int(rail_rect.width * eased)),
+            rail_rect.height,
+        )
+        pygame.draw.rect(
+            surface,
+            (*SELECTION, min(180, fill_alpha + 70)),
+            filled_rect,
+            border_radius=5,
+        )
+        phase_labels = self._view_model.phase_labels or ("Input", "Impact", "Next")
+        chip_width = min(136, max(72, int((rail_rect.width - 24) / max(1, len(phase_labels)))))
+        for index, label in enumerate(phase_labels):
+            marker_ratio = index / max(1, len(phase_labels) - 1)
+            marker_x = rail_rect.left + int(rail_rect.width * marker_ratio)
+            active = progress >= marker_ratio * 0.82
+            color = SELECTION if active else BORDER
+            pygame.draw.circle(
+                surface,
+                (*color, min(220, fill_alpha + 100)),
+                (marker_x, rail_rect.centery),
+                6,
+            )
+            chip_rect = pygame.Rect(
+                max(rail_rect.left, min(rail_rect.right - chip_width, marker_x - chip_width // 2)),
+                rail_rect.top - 28,
+                chip_width,
+                22,
+            )
+            pygame.draw.rect(
+                surface,
+                (
+                    *blend_color((20, 31, 45), color, 0.18 if active else 0.06),
+                    min(220, fill_alpha + 110),
+                ),
+                chip_rect,
+                border_radius=11,
+            )
+            chip_surface = self.fonts.small.render(
+                self._compact_summary_text(label, max_length=14),
+                True,
+                TEXT if active else MUTED,
+            )
+            surface.blit(chip_surface, (chip_rect.left + 8, chip_rect.top + 5))
 
     def _build_return_focus_event(self, panel_key: str | None) -> FrontendEvent | None:
         if not self._view_model.focus_command:

@@ -76,6 +76,10 @@ class MotionAuditCell:
     action_feedback_disabled_samples: int = 0
     impact_cue_active_samples: int = 0
     impact_cue_disabled_samples: int = 0
+    overlay_transition_active_samples: int = 0
+    overlay_transition_disabled_samples: int = 0
+    summary_cinematic_active_samples: int = 0
+    summary_cinematic_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -249,6 +253,8 @@ def run_2d_motion_audit(
                     run_scene._entity_motion_strength("panel:pipeline") <= 0
                 )
                 run_scene._open_inspector("pipeline")
+                overlay_transition_active_count = int(run_scene.overlay_transition_active())
+                overlay_transition_disabled_count = int(not run_scene.overlay_transition_active())
                 _exercise_inspector_interactions(run_scene)
                 inspector_before = run_scene._motion_pulses.live_count()
                 inspector_avg, inspector_max = _exercise_scene(run_scene, surface, frames)
@@ -302,6 +308,8 @@ def run_2d_motion_audit(
                 )
                 transition_active_count += int(summary_scene.scene_transition_active())
                 transition_disabled_count += int(not summary_scene.scene_transition_active())
+                summary_cinematic_active_count = int(summary_scene.summary_cinematic_active())
+                summary_cinematic_disabled_count = int(not summary_scene.summary_cinematic_active())
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
                 summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
@@ -391,6 +399,10 @@ def run_2d_motion_audit(
                         action_feedback_disabled_samples=action_feedback_disabled_count,
                         impact_cue_active_samples=impact_cue_active_count,
                         impact_cue_disabled_samples=impact_cue_disabled_count,
+                        overlay_transition_active_samples=overlay_transition_active_count,
+                        overlay_transition_disabled_samples=overlay_transition_disabled_count,
+                        summary_cinematic_active_samples=summary_cinematic_active_count,
+                        summary_cinematic_disabled_samples=summary_cinematic_disabled_count,
                     )
                 )
         return MotionAuditReport(

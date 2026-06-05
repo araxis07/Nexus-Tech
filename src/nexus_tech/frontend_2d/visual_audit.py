@@ -287,6 +287,7 @@ def run_2d_visual_audit(
                             (
                                 "transition",
                                 "motion-pulses",
+                                "overlay-transition",
                                 "deep-panel",
                                 "picker",
                                 "action-feedback",
@@ -320,6 +321,7 @@ def run_2d_visual_audit(
                             (
                                 "transition",
                                 "motion-pulses",
+                                "overlay-transition",
                                 "deep-panel",
                                 "inspector",
                                 "action-feedback",
@@ -351,7 +353,12 @@ def run_2d_visual_audit(
                         summary_scene,
                         scene_key="turn_summary",
                         expected_layers=_expected_layers(
-                            ("transition", "motion-pulses", "summary-reveal"),
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "summary-reveal",
+                                "summary-cinematic",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -484,15 +491,26 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("action-feedback")
     if getattr(scene, "_impact_cues", ()):
         layers.append("impact-cue")
+    if getattr(scene, "overlay_transition_active", lambda: False)():
+        layers.append("overlay-transition")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
+    if getattr(scene, "summary_cinematic_active", lambda: False)():
+        layers.append("summary-cinematic")
     return tuple(layers)
 
 
 def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tuple[str, ...]:
     if motion_mode is not MotionMode.OFF:
         return layers
-    disabled_layers = {"transition", "motion-pulses", "action-feedback", "impact-cue"}
+    disabled_layers = {
+        "transition",
+        "motion-pulses",
+        "action-feedback",
+        "impact-cue",
+        "overlay-transition",
+        "summary-cinematic",
+    }
     return tuple(layer for layer in layers if layer not in disabled_layers)
 
 

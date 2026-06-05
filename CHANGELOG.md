@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.125.0 - 2026-06-06
+
+- Added motion-aware enter transitions for run overlays including pending events, action pickers, text modals, deep panels, inspectors, help, and final outcome dialogs
+- Added overlay exit shimmer cues so closing panels, pickers, text input, help, and inspectors leaves a short visible handoff instead of disappearing instantly
+- Added a turn-summary cinematic rail and audit telemetry for overlay transitions and summary cinematic state while preserving `--motion-mode off`
+
 ## 0.124.0 - 2026-06-06
 
 - Added a 2D impact cue layer that turns successful state changes into short visible delta cards for cash, users, reputation, board pressure, and product metrics

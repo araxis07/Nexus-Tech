@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.124.0`
+Version: `0.125.0`
 
 ## Scope
 
@@ -13,8 +13,10 @@ Version: `0.124.0`
 - Shape-based entity motion now covers stat lanes, product cards, and active deep-panel strips without adding external sprite assets.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
+- Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.
+- Turn summaries now include a cinematic rail that sequences resolution phases before returning to the live run.
 - `audit-2d-visual` now renders title, meta, live run, picker/action-feedback, inspector, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, average frame time, and max frame spike.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, summary-cinematic telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 
