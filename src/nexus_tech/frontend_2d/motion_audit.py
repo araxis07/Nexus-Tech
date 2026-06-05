@@ -80,6 +80,14 @@ class MotionAuditCell:
     overlay_transition_disabled_samples: int = 0
     summary_cinematic_active_samples: int = 0
     summary_cinematic_disabled_samples: int = 0
+    product_drama_active_samples: int = 0
+    product_drama_disabled_samples: int = 0
+    risk_drama_active_samples: int = 0
+    risk_drama_disabled_samples: int = 0
+    pending_choice_active_samples: int = 0
+    pending_choice_disabled_samples: int = 0
+    summary_sequence_active_samples: int = 0
+    summary_sequence_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -255,6 +263,8 @@ def run_2d_motion_audit(
                 run_scene._open_inspector("pipeline")
                 overlay_transition_active_count = int(run_scene.overlay_transition_active())
                 overlay_transition_disabled_count = int(not run_scene.overlay_transition_active())
+                product_drama_active_count = int(run_scene.product_drama_active())
+                product_drama_disabled_count = int(not run_scene.product_drama_active())
                 _exercise_inspector_interactions(run_scene)
                 inspector_before = run_scene._motion_pulses.live_count()
                 inspector_avg, inspector_max = _exercise_scene(run_scene, surface, frames)
@@ -283,6 +293,39 @@ def run_2d_motion_audit(
                 )
                 impact_cue_active_count = int(bool(impact_scene._impact_cues))
                 impact_cue_disabled_count = int(not impact_scene._impact_cues)
+                risk_state = state.model_copy(deep=True)
+                risk_state.company.cash_on_hand = Decimal("900.00")
+                risk_state.finance.board_pressure = 74
+                risk_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=risk_state,
+                    rng=RandomSource(seed=seed + 6),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                risk_drama_active_count = int(risk_scene.risk_drama_active())
+                risk_drama_disabled_count = int(not risk_scene.risk_drama_active())
+                pending_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 8),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                pending_scene._queue_pending_choice_cue(
+                    "Audit Choice",
+                    "Resolved the pending event with a visible consequence flash.",
+                )
+                pending_choice_active_count = int(pending_scene.pending_choice_active())
+                pending_choice_disabled_count = int(not pending_scene.pending_choice_active())
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
                 run_avg, run_max = _exercise_scene(run_scene, surface, frames)
@@ -310,6 +353,10 @@ def run_2d_motion_audit(
                 transition_disabled_count += int(not summary_scene.scene_transition_active())
                 summary_cinematic_active_count = int(summary_scene.summary_cinematic_active())
                 summary_cinematic_disabled_count = int(not summary_scene.summary_cinematic_active())
+                summary_sequence_active_count = int(summary_scene.summary_metric_sequence_active())
+                summary_sequence_disabled_count = int(
+                    not summary_scene.summary_metric_sequence_active()
+                )
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
                 summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
@@ -403,6 +450,14 @@ def run_2d_motion_audit(
                         overlay_transition_disabled_samples=overlay_transition_disabled_count,
                         summary_cinematic_active_samples=summary_cinematic_active_count,
                         summary_cinematic_disabled_samples=summary_cinematic_disabled_count,
+                        product_drama_active_samples=product_drama_active_count,
+                        product_drama_disabled_samples=product_drama_disabled_count,
+                        risk_drama_active_samples=risk_drama_active_count,
+                        risk_drama_disabled_samples=risk_drama_disabled_count,
+                        pending_choice_active_samples=pending_choice_active_count,
+                        pending_choice_disabled_samples=pending_choice_disabled_count,
+                        summary_sequence_active_samples=summary_sequence_active_count,
+                        summary_sequence_disabled_samples=summary_sequence_disabled_count,
                     )
                 )
         return MotionAuditReport(

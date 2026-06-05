@@ -11,6 +11,9 @@ from nexus_tech.cli import app
 from nexus_tech.domain.models import (
     CandidateTrait,
     EmployeeRole,
+    EventCategory,
+    EventOption,
+    PendingEvent,
     ProductReleaseType,
     RoadmapProjectType,
     Seniority,
@@ -1570,6 +1573,85 @@ def test_run_scene_overlay_transition_respects_motion_off() -> None:
         pygame.quit()
 
 
+def test_run_scene_product_and_risk_drama_layers_respect_motion_modes() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.company.cash_on_hand = Decimal("900.00")
+        state.finance.board_pressure = 74
+        state.products[0].quality = 84
+        state.products[0].bug_level = 66
+        state.products[0].technical_debt = 74
+        full_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=46),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=47),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        assert full_scene.product_drama_active()
+        assert full_scene.risk_drama_active()
+        assert not off_scene.product_drama_active()
+        assert not off_scene.risk_drama_active()
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_pending_choice_cue_tracks_resolution_feedback() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.pending_event = PendingEvent(
+            event_id="audit_pending_choice",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            title="Audit Pending Choice",
+            description="A deterministic pending event for 2D feedback coverage.",
+            triggered_turn=state.company.current_turn,
+            cooldown_turns=0,
+            options=[
+                EventOption(
+                    id="stabilize",
+                    label="Stabilize rollout",
+                    description="Choose a lower-risk response path.",
+                )
+            ],
+        )
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=48),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._queue_pending_choice_cue(
+            state.pending_event.options[0].label,
+            "Resolved the event with a visible consequence flash.",
+        )
+
+        assert scene.pending_choice_active()
+        assert scene._motion_pulses.get("overlay:pending_choice") > 0
+        scene.update(2.0)
+        assert not scene.pending_choice_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2046,6 +2128,51 @@ def test_turn_summary_scene_reveals_all_phases_and_draws_small_window() -> None:
         assert scene._phase_index() == 2
         assert scene._visible_metric_count() == len(scene._view_model.metrics)
         assert scene._visible_product_count() == len(scene._view_model.product_lines)
+        assert not scene.summary_metric_sequence_active()
+    finally:
+        pygame.quit()
+
+
+def test_turn_summary_scene_metric_sequence_respects_motion_modes() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = apply_action(
+            previous_state.model_copy(deep=True),
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=previous_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=31))
+        full_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=31),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+        off_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=32),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+            motion_mode=MotionMode.OFF,
+        )
+
+        assert full_scene.summary_metric_sequence_active()
+        assert full_scene._summary_metric_reveal_progress(0) == 0.0
+        assert not off_scene.summary_metric_sequence_active()
+        assert off_scene._summary_metric_reveal_progress(0) == 1.0
     finally:
         pygame.quit()
 
@@ -2374,6 +2501,14 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.overlay_transition_disabled_samples == 0
     assert cell.summary_cinematic_active_samples == 1
     assert cell.summary_cinematic_disabled_samples == 0
+    assert cell.product_drama_active_samples == 1
+    assert cell.product_drama_disabled_samples == 0
+    assert cell.risk_drama_active_samples == 1
+    assert cell.risk_drama_disabled_samples == 0
+    assert cell.pending_choice_active_samples == 1
+    assert cell.pending_choice_disabled_samples == 0
+    assert cell.summary_sequence_active_samples == 1
+    assert cell.summary_sequence_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2415,6 +2550,14 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.overlay_transition_disabled_samples == 1
     assert cell.summary_cinematic_active_samples == 0
     assert cell.summary_cinematic_disabled_samples == 1
+    assert cell.product_drama_active_samples == 0
+    assert cell.product_drama_disabled_samples == 1
+    assert cell.risk_drama_active_samples == 0
+    assert cell.risk_drama_disabled_samples == 1
+    assert cell.pending_choice_active_samples == 0
+    assert cell.pending_choice_disabled_samples == 1
+    assert cell.summary_sequence_active_samples == 0
+    assert cell.summary_sequence_disabled_samples == 1
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2443,6 +2586,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "title_menu",
         "title_meta",
         "run_dashboard",
+        "run_drama_feedback",
         "run_impact_feedback",
         "run_picker_feedback",
         "run_inspector",
@@ -2453,9 +2597,12 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
+    drama = next(cell for cell in report.cells if cell.scene_key == "run_drama_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
+    assert "product-drama" in drama.active_layers
+    assert "risk-drama" in drama.active_layers
     assert "impact-cue" in impact.active_layers
     assert "action-feedback" in impact.active_layers
     assert "picker" in picker.active_layers
@@ -2465,6 +2612,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "overlay-transition" in inspector.active_layers
     assert "summary-reveal" in summary.active_layers
     assert "summary-cinematic" in summary.active_layers
+    assert "summary-sequence" in summary.active_layers
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:

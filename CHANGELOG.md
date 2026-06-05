@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.126.0 - 2026-06-06
+
+- Added product-card drama animation with quality/fit shimmer, bug beacons, debt cracks, and user-flow particles so product state reads as live 2D motion
+- Added finance/board/runway risk drama and pending-event choice consequence cues so danger states and event decisions leave visible feedback
+- Expanded turn-summary metric/product reveal sequencing plus visual and motion audit telemetry for product drama, risk drama, pending-choice cues, and summary sequencing
+
 ## 0.125.0 - 2026-06-06
 
 - Added motion-aware enter transitions for run overlays including pending events, action pickers, text modals, deep panels, inspectors, help, and final outcome dialogs

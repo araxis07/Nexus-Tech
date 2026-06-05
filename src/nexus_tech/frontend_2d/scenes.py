@@ -151,6 +151,17 @@ class OverlayExitCue:
     duration: float
 
 
+@dataclass(frozen=True)
+class PendingChoiceCue:
+    """Short consequence flash after resolving a pending event choice."""
+
+    label: str
+    detail: str
+    accent: tuple[int, int, int]
+    time_left: float
+    duration: float
+
+
 @dataclass
 class TextInputModalState:
     """One live text-input modal used by the 2D frontend."""
@@ -2700,6 +2711,7 @@ class RunScene(BaseScene):
         self._impact_cues: list[ImpactCue] = []
         self._overlay_enter_elapsed: dict[str, float] = {}
         self._overlay_exit_cues: list[OverlayExitCue] = []
+        self._pending_choice_cues: list[PendingChoiceCue] = []
         self._click_targets: list[ClickTarget] = []
         self._context_picker: ContextPicker | None = None
         self._text_input: TextInputModalState | None = None
@@ -2825,6 +2837,36 @@ class RunScene(BaseScene):
         if self._overlay_exit_cues:
             return True
         return any(self._overlay_enter_progress(key) < 1.0 for key in self._active_overlay_keys())
+
+    def product_drama_active(self) -> bool:
+        """Return whether product-card status animation should be visible."""
+
+        if self.motion_mode is MotionMode.OFF:
+            return False
+        return any(
+            product.selected
+            or product.quality_ratio >= 0.72
+            or product.bug_ratio >= 0.35
+            or product.debt_ratio >= 0.45
+            or product.fit_ratio >= 0.7
+            for product in self._view_model.products
+        )
+
+    def risk_drama_active(self) -> bool:
+        """Return whether finance/board/endgame risk drama should be visible."""
+
+        if self.motion_mode is MotionMode.OFF:
+            return False
+        return any(
+            gauge.key in {"cash", "runway", "board_pressure"}
+            and (gauge.tone in {"warning", "danger"} or gauge.ratio <= 0.28)
+            for gauge in self._view_model.stats
+        )
+
+    def pending_choice_active(self) -> bool:
+        """Return whether a pending-choice consequence cue is visible."""
+
+        return self.motion_mode is not MotionMode.OFF and bool(self._pending_choice_cues)
 
     def _animated_overlay_rect(self, rect, overlay_key: str, *, shift: int = 34):
         if self.motion_mode is MotionMode.OFF:
@@ -3084,6 +3126,17 @@ class RunScene(BaseScene):
                 duration=cue.duration,
             )
             for cue in self._overlay_exit_cues
+            if cue.time_left - dt > 0
+        ]
+        self._pending_choice_cues = [
+            PendingChoiceCue(
+                label=cue.label,
+                detail=cue.detail,
+                accent=cue.accent,
+                time_left=cue.time_left - dt,
+                duration=cue.duration,
+            )
+            for cue in self._pending_choice_cues
             if cue.time_left - dt > 0
         ]
 
@@ -3354,6 +3407,7 @@ class RunScene(BaseScene):
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
         self._draw_overlay_exit_cues(surface)
+        self._draw_pending_choice_cues(surface)
         self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
         self._draw_hover_tooltip(surface)
@@ -3798,6 +3852,29 @@ class RunScene(BaseScene):
             duration=duration,
         )
 
+    def _pending_choice_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.72 if self.motion_mode is MotionMode.REDUCED else 1.05
+
+    def _queue_pending_choice_cue(self, label: str, detail: str) -> None:
+        duration = self._pending_choice_duration()
+        if duration <= 0:
+            return
+        self._pending_choice_cues.insert(
+            0,
+            PendingChoiceCue(
+                label=label,
+                detail=detail,
+                accent=WARN,
+                time_left=duration,
+                duration=duration,
+            ),
+        )
+        self._pending_choice_cues = self._pending_choice_cues[:2]
+        self._motion_pulses.trigger("overlay:pending_choice", intensity=0.76, decay=1.6)
+        self._motion_pulses.trigger("feed", intensity=0.42, decay=1.6)
+
     @staticmethod
     def _format_signed_int(value: int, *, suffix: str = "") -> str:
         return f"{'+' if value > 0 else ''}{value}{suffix}"
@@ -3978,6 +4055,71 @@ class RunScene(BaseScene):
                 border_radius=12,
             )
             surface.blit(badge, (badge_rect.left + 9, badge_rect.top + 6))
+
+    def _draw_pending_choice_cues(self, surface) -> None:
+        if not self._pending_choice_cues or self.motion_mode is MotionMode.OFF:
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        card_width = min(460, width - 48)
+        left = int((width - card_width) / 2)
+        top = max(24, int(height * 0.18))
+        for index, cue in enumerate(self._pending_choice_cues[:2]):
+            if cue.duration <= 0:
+                continue
+            age = max(0.0, cue.duration - cue.time_left)
+            enter = min(1.0, age / 0.18)
+            ttl_ratio = max(0.0, min(1.0, cue.time_left / cue.duration))
+            intensity = ttl_ratio * (0.58 if self.motion_mode is MotionMode.REDUCED else 1.0)
+            rect = pygame.Rect(
+                left,
+                top + index * 58 - int((1.0 - enter) * 18),
+                card_width,
+                48,
+            )
+            fill = blend_color((15, 23, 34), cue.accent, 0.16 + intensity * 0.12)
+            panel = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            pygame.draw.rect(panel, (*fill, 226), panel.get_rect(), border_radius=16)
+            pygame.draw.rect(
+                panel,
+                (*blend_color(BORDER, cue.accent, 0.5), 235),
+                panel.get_rect(),
+                width=1,
+                border_radius=16,
+            )
+            surface.blit(panel, rect.topleft)
+            self._draw_entity_nodes(
+                surface,
+                pygame.Rect(rect.left + 12, rect.top + 10, 54, 24),
+                accent=cue.accent,
+                strength=min(1.0, 0.32 + intensity * 0.68),
+                count=2,
+                offset=index + len(cue.label),
+            )
+            title = self.fonts.small.render(
+                f"CHOICE: {self._compact_button_detail(cue.label, max_length=30)}",
+                True,
+                blend_color(TEXT, cue.accent, 0.18),
+            )
+            detail = self.fonts.small.render(
+                self._compact_button_detail(cue.detail, max_length=54),
+                True,
+                MUTED,
+            )
+            surface.blit(title, (rect.left + 76, rect.top + 8))
+            surface.blit(detail, (rect.left + 76, rect.top + 26))
+            progress_rect = pygame.Rect(rect.left + 76, rect.bottom - 6, rect.width - 92, 4)
+            pygame.draw.rect(surface, blend_color(BORDER, cue.accent, 0.22), progress_rect)
+            pygame.draw.rect(
+                surface,
+                cue.accent,
+                pygame.Rect(
+                    progress_rect.left,
+                    progress_rect.top,
+                    int(progress_rect.width * ttl_ratio),
+                    progress_rect.height,
+                ),
+            )
 
     def _draw_impact_cues(self, surface) -> None:
         if not self._impact_cues or self.motion_mode is MotionMode.OFF:
@@ -4322,6 +4464,7 @@ class RunScene(BaseScene):
         option = self.state.pending_event.options[option_index]
         previous_state = self.state.model_copy(deep=True)
         resolution = self._resolve_pending_event(option.id)
+        self._queue_pending_choice_cue(option.label, resolution)
         self._queue_impact_cues(previous_state, self.state)
         self.push_events(
             build_action_events(
@@ -5166,6 +5309,7 @@ class RunScene(BaseScene):
                 color=tone_color(gauge.tone),
                 emphasis=gauge_motion,
             )
+            self._draw_stat_drama_effect(surface, gauge, bar_rect, gauge_motion, index)
             self._draw_entity_nodes(
                 surface,
                 pygame.Rect(bar_rect.left, bar_rect.top - 2, int(bar_rect.width * gauge.ratio), 18),
@@ -5725,6 +5869,7 @@ class RunScene(BaseScene):
                 (visual_rect.left + 1, visual_rect.top + 1, visual_rect.width - 2, 4),
                 border_radius=4,
             )
+        self._draw_product_drama_effects(surface, visual_rect, product, product_motion)
         entity_strength = self._entity_motion_strength(
             "panel:products",
             f"product:{product.id}",
@@ -5811,6 +5956,119 @@ class RunScene(BaseScene):
             draw_progress_bar(
                 surface, pygame, bar_rect, ratio=ratio, color=color, emphasis=emphasis
             )
+
+    def _draw_product_drama_effects(self, surface, rect, product, product_motion: float) -> None:
+        if self.motion_mode is MotionMode.OFF:
+            return
+        pygame = self.pygame
+        phase = self._entity_motion_phase(
+            offset=float(sum(ord(char) for char in product.id[:8])) * 0.02,
+            speed=1.9,
+        )
+        quality_strength = max(0.0, product.quality_ratio - 0.58) + product_motion * 0.26
+        fit_strength = max(0.0, product.fit_ratio - 0.62) + product_motion * 0.2
+        if quality_strength > 0.04 or fit_strength > 0.04:
+            shimmer = min(1.0, quality_strength + fit_strength)
+            sweep_x = rect.left + int(((phase * 42) % max(1, rect.width + 80)) - 70)
+            for offset in range(0, 46, 12):
+                start = (sweep_x + offset, rect.top + 8)
+                end = (sweep_x + offset + 34, rect.bottom - 10)
+                pygame.draw.line(
+                    surface,
+                    blend_color(SELECTION, TEXT, shimmer * 0.2),
+                    start,
+                    end,
+                    max(1, int(1 + shimmer * 2)),
+                )
+        if product.bug_ratio >= 0.34:
+            bug_strength = min(1.0, product.bug_ratio + product_motion * 0.35)
+            blink = 0.55 + ((sin(phase * 2.4) + 1.0) / 2.0) * 0.45
+            for index in range(3):
+                marker_x = rect.right - 34 - index * 18
+                marker_y = rect.bottom - 26 + int(sin(phase + index) * 2)
+                marker_rect = pygame.Rect(marker_x, marker_y, 10, 10)
+                pygame.draw.rect(
+                    surface,
+                    blend_color(DANGER, TEXT, bug_strength * 0.14 * blink),
+                    marker_rect,
+                    border_radius=3,
+                )
+                pygame.draw.rect(surface, DANGER, marker_rect, width=1, border_radius=3)
+        if product.debt_ratio >= 0.45:
+            debt_strength = min(1.0, product.debt_ratio + product_motion * 0.3)
+            crack_left = rect.right - int(rect.width * 0.28)
+            crack_top = rect.top + 48
+            points = [
+                (crack_left, crack_top),
+                (crack_left + 14, crack_top + 10),
+                (crack_left + 6, crack_top + 22),
+                (crack_left + 24, crack_top + 36),
+                (crack_left + 16, crack_top + 50),
+            ]
+            pygame.draw.lines(
+                surface,
+                blend_color(WARN, TEXT, debt_strength * 0.16),
+                False,
+                points,
+                2 if debt_strength > 0.75 else 1,
+            )
+        user_count = int(product.users_text.replace(",", "")) if product.users_text else 0
+        if user_count > 0:
+            flow_strength = min(1.0, 0.2 + min(user_count, 250) / 250 + product_motion * 0.25)
+            flow_rect = pygame.Rect(rect.left + 14, rect.bottom - 18, max(34, rect.width - 96), 8)
+            for index in range(5):
+                ratio = ((phase * 0.28) + index / 5) % 1.0
+                node_x = flow_rect.left + int(flow_rect.width * ratio)
+                node_y = flow_rect.centery + int(sin(phase + index * 0.7) * 2)
+                pygame.draw.circle(
+                    surface,
+                    blend_color(INFO, GOOD, flow_strength * 0.5),
+                    (node_x, node_y),
+                    2,
+                )
+
+    def _draw_stat_drama_effect(
+        self,
+        surface,
+        gauge,
+        bar_rect,
+        gauge_motion: float,
+        index: int,
+    ) -> None:
+        if self.motion_mode is MotionMode.OFF:
+            return
+        if gauge.key not in {"cash", "runway", "board_pressure"}:
+            return
+        risk_active = gauge.tone in {"warning", "danger"} or gauge.ratio <= 0.28
+        if not risk_active:
+            return
+        pygame = self.pygame
+        color = tone_color("danger" if gauge.tone == "danger" else "warning")
+        phase = self._entity_motion_phase(offset=index * 1.3, speed=2.7)
+        beacon = (sin(phase) + 1.0) / 2.0
+        strength = 0.34 + beacon * 0.42 + min(0.28, gauge_motion * 0.28)
+        alert_rect = pygame.Rect(
+            bar_rect.left - 6,
+            bar_rect.top - 6,
+            bar_rect.width + 12,
+            bar_rect.height + 12,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, color, strength * 0.65),
+            alert_rect,
+            width=2,
+            border_radius=10,
+        )
+        for marker_index in range(3):
+            marker_x = bar_rect.right - 8 - marker_index * 14
+            marker_y = bar_rect.top - 5 + int(sin(phase + marker_index * 0.9) * 2)
+            points = (
+                (marker_x, marker_y),
+                (marker_x + 7, marker_y + 11),
+                (marker_x - 7, marker_y + 11),
+            )
+            pygame.draw.polygon(surface, blend_color(color, TEXT, strength * 0.18), points)
 
     def _draw_event_card(self, surface, rect, timed_event: TimedFrontendEvent) -> None:
         pygame = self.pygame
@@ -6936,6 +7194,32 @@ class TurnSummaryScene(BaseScene):
     def _visible_product_count(self) -> int:
         return min(len(self._view_model.product_lines), 1 + self._phase_index())
 
+    def _summary_metric_reveal_progress(self, index: int) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 1.0
+        start = 0.18 + index * (0.1 if self.motion_mode is MotionMode.REDUCED else 0.13)
+        duration = 0.24 if self.motion_mode is MotionMode.REDUCED else 0.34
+        ratio = max(0.0, min(1.0, (self._elapsed - start) / duration))
+        return 1.0 - (1.0 - ratio) * (1.0 - ratio)
+
+    def _summary_product_reveal_progress(self, index: int) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 1.0
+        start = 0.48 + index * (0.14 if self.motion_mode is MotionMode.REDUCED else 0.2)
+        duration = 0.26 if self.motion_mode is MotionMode.REDUCED else 0.38
+        ratio = max(0.0, min(1.0, (self._elapsed - start) / duration))
+        return 1.0 - (1.0 - ratio) * (1.0 - ratio)
+
+    def summary_metric_sequence_active(self) -> bool:
+        """Return whether staged summary metric/product reveal animation is active."""
+
+        if self.motion_mode is MotionMode.OFF:
+            return False
+        metric_count = max(1, len(self._view_model.metrics))
+        product_count = max(1, len(self._view_model.product_lines))
+        sequence_end = 0.48 + product_count * 0.2 + metric_count * 0.05
+        return self._elapsed < sequence_end
+
     def _summary_top_section_ratio(self, width: int) -> float:
         if width < 900:
             return 0.5 if len(self._events) >= 4 else 0.52
@@ -7256,8 +7540,14 @@ class TurnSummaryScene(BaseScene):
             if index and index % cols == 0:
                 top += card_height + 12
                 left = inner.left
-            card_rect = pygame.Rect(left, top, card_width, card_height)
-            self._draw_metric_card(surface, card_rect, metric)
+            reveal = self._summary_metric_reveal_progress(index)
+            card_rect = pygame.Rect(
+                left + int((1.0 - reveal) * 20),
+                top,
+                card_width,
+                card_height,
+            )
+            self._draw_metric_card(surface, card_rect, metric, reveal_ratio=reveal)
             left += card_width + card_gap
 
         product_inner = draw_panel(
@@ -7273,11 +7563,28 @@ class TurnSummaryScene(BaseScene):
         surface.blit(product_title, (product_inner.left, product_inner.top - 24))
         top = product_inner.top
         visible_products = self._view_model.product_lines[: self._visible_product_count()]
-        for product_line in visible_products:
-            line_rect = pygame.Rect(product_inner.left, top, product_inner.width, 56)
+        for index, product_line in enumerate(visible_products):
+            reveal = self._summary_product_reveal_progress(index)
+            line_rect = pygame.Rect(
+                product_inner.left + int((1.0 - reveal) * 22),
+                top,
+                product_inner.width,
+                56,
+            )
             color = tone_color(product_line.tone)
-            pygame.draw.rect(surface, (26, 38, 55), line_rect, border_radius=14)
-            pygame.draw.rect(surface, color, line_rect, width=1, border_radius=14)
+            pygame.draw.rect(
+                surface,
+                blend_color((26, 38, 55), color, (1.0 - reveal) * 0.08),
+                line_rect,
+                border_radius=14,
+            )
+            pygame.draw.rect(
+                surface,
+                blend_color(color, TEXT, (1.0 - reveal) * 0.12),
+                line_rect,
+                width=2 if reveal < 1.0 else 1,
+                border_radius=14,
+            )
             title_surface = self.fonts.body.render(product_line.name, True, TEXT)
             revenue_surface = self.fonts.small.render(product_line.revenue_text, True, INFO)
             cost_surface = self.fonts.small.render(f"cost {product_line.cost_text}", True, MUTED)
@@ -7472,16 +7779,22 @@ class TurnSummaryScene(BaseScene):
         self._click_targets.append(ClickTarget("save", "", save_rect))
         self._click_targets.append(ClickTarget("close_summary", "", close_rect))
 
-    def _draw_metric_card(self, surface, rect, metric) -> None:
+    def _draw_metric_card(self, surface, rect, metric, *, reveal_ratio: float = 1.0) -> None:
         pygame = self.pygame
         color = tone_color(metric.tone)
         metric_motion = self._summary_motion_level("summary:metrics", metric.key)
+        safe_reveal = max(0.0, min(1.0, reveal_ratio))
+        reveal_emphasis = (1.0 - safe_reveal) * 0.35
         visual_rect = pygame.Rect(
             rect.left, rect.top - int(metric_motion * 3), rect.width, rect.height
         )
         pygame.draw.rect(
             surface,
-            blend_color((26, 38, 55), color, metric_motion * 0.14),
+            blend_color(
+                (26, 38, 55),
+                color,
+                min(0.28, metric_motion * 0.14 + reveal_emphasis),
+            ),
             visual_rect,
             border_radius=14,
         )
@@ -7489,7 +7802,7 @@ class TurnSummaryScene(BaseScene):
             surface,
             blend_color(color, TEXT, metric_motion * 0.12),
             visual_rect,
-            width=2 if metric_motion >= 0.4 else 1,
+            width=2 if metric_motion >= 0.4 or safe_reveal < 1.0 else 1,
             border_radius=14,
         )
         label_surface = self.fonts.small.render(

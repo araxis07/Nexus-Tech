@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.125.0`
+Version: `0.126.0`
 
 ## Scope
 
@@ -15,8 +15,11 @@ Version: `0.125.0`
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
 - Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.
 - Turn summaries now include a cinematic rail that sequences resolution phases before returning to the live run.
+- Product cards now render quality/fit shimmer, bug beacons, debt cracks, and user-flow particles from live product ratios.
+- Finance, runway, and board pressure lanes now render risk drama beacons when danger states are active, and pending-event choices produce consequence cues after selection.
+- Turn-summary metrics and product outcomes now use staged reveal sequencing in addition to the cinematic phase rail.
 - `audit-2d-visual` now renders title, meta, live run, picker/action-feedback, inspector, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, summary-cinematic telemetry, average frame time, and max frame spike.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice telemetry, summary-cinematic/sequence telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 

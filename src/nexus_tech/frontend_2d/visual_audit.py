@@ -221,7 +221,54 @@ def run_2d_visual_audit(
                         run_scene,
                         scene_key="run_dashboard",
                         expected_layers=_expected_layers(
-                            ("transition", "motion-pulses"),
+                            ("transition", "motion-pulses", "product-drama"),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                drama_state = state.model_copy(deep=True)
+                drama_state.company.cash_on_hand = Decimal("900.00")
+                drama_state.finance.board_pressure = 72
+                drama_state.products[0].quality = 84
+                drama_state.products[0].bug_level = 66
+                drama_state.products[0].market_fit = 78
+                drama_state.products[0].technical_debt = 74
+                drama_state.products[0].user_count = max(
+                    drama_state.products[0].user_count,
+                    180,
+                )
+                drama_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=drama_state,
+                    rng=RandomSource(seed=seed + 8),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                drama_scene._motion_pulses.trigger("panel:products", intensity=0.6, decay=1.8)
+                drama_scene._motion_pulses.trigger(
+                    "stat:board_pressure",
+                    intensity=0.58,
+                    decay=1.8,
+                )
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        drama_scene,
+                        scene_key="run_drama_feedback",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "product-drama",
+                                "risk-drama",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -358,6 +405,7 @@ def run_2d_visual_audit(
                                 "motion-pulses",
                                 "summary-reveal",
                                 "summary-cinematic",
+                                "summary-sequence",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -493,10 +541,18 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("impact-cue")
     if getattr(scene, "overlay_transition_active", lambda: False)():
         layers.append("overlay-transition")
+    if getattr(scene, "product_drama_active", lambda: False)():
+        layers.append("product-drama")
+    if getattr(scene, "risk_drama_active", lambda: False)():
+        layers.append("risk-drama")
+    if getattr(scene, "pending_choice_active", lambda: False)():
+        layers.append("pending-choice")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
     if getattr(scene, "summary_cinematic_active", lambda: False)():
         layers.append("summary-cinematic")
+    if getattr(scene, "summary_metric_sequence_active", lambda: False)():
+        layers.append("summary-sequence")
     return tuple(layers)
 
 
@@ -509,7 +565,11 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "action-feedback",
         "impact-cue",
         "overlay-transition",
+        "product-drama",
+        "risk-drama",
+        "pending-choice",
         "summary-cinematic",
+        "summary-sequence",
     }
     return tuple(layer for layer in layers if layer not in disabled_layers)
 
