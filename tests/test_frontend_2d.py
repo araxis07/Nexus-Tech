@@ -20,10 +20,13 @@ from nexus_tech.frontend_2d import (
     FlowAuditReport,
     MotionAuditCell,
     MotionAuditReport,
+    VisualAuditCell,
+    VisualAuditReport,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_flow_audit,
     run_2d_motion_audit,
+    run_2d_visual_audit,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -2329,6 +2332,40 @@ def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
     assert report.findings == ()
 
 
+def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
+    report = run_2d_visual_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        sizes=((820, 620),),
+        output_dir=tmp_path,
+    )
+
+    assert report.status == "pass"
+    assert report.motion_mode == MotionMode.FULL.value
+    assert report.output_dir == str(tmp_path)
+    scene_keys = {cell.scene_key for cell in report.cells}
+    assert {
+        "title_menu",
+        "title_meta",
+        "run_dashboard",
+        "run_picker_feedback",
+        "run_inspector",
+        "turn_summary",
+        "review",
+    } <= scene_keys
+    assert all(cell.checksum > 0 for cell in report.cells)
+    assert all(cell.unique_color_samples >= 18 for cell in report.cells)
+    assert all(Path(cell.output_path or "").exists() for cell in report.cells)
+    picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
+    inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
+    summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
+    assert "picker" in picker.active_layers
+    assert "action-feedback" in picker.active_layers
+    assert "inspector" in inspector.active_layers
+    assert "summary-reveal" in summary.active_layers
+
+
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
@@ -2392,6 +2429,60 @@ def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
     assert calls["seed"] == 7
     assert calls["frames"] == 2
     assert calls["motion_mode"] is MotionMode.REDUCED
+
+
+def test_audit_2d_visual_command_reports_scene_matrix(monkeypatch, tmp_path: Path) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_visual_audit(**kwargs):
+        calls.update(kwargs)
+        return VisualAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            motion_mode=kwargs["motion_mode"].value,
+            output_dir=str(kwargs["output_dir"]),
+            cells=(
+                VisualAuditCell(
+                    scene_key="run_picker_feedback",
+                    width=820,
+                    height=620,
+                    checksum=12345,
+                    unique_color_samples=42,
+                    luminance_spread=128,
+                    non_dark_ratio=0.42,
+                    active_layers=("transition", "picker", "action-feedback"),
+                    expected_layers=("transition", "picker", "action-feedback"),
+                    output_path=str(tmp_path / "run_picker_feedback_820x620.png"),
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(cli_module, "run_2d_visual_audit", fake_run_2d_visual_audit)
+
+    result = runner.invoke(
+        app,
+        [
+            "audit-2d-visual",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "7",
+            "--motion-mode",
+            "reduced",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2D Visual Audit" in result.output
+    assert "motion reduced" in result.output
+    assert "Visual audit status: PASS" in result.output
+    assert calls["scenario_id"] == "founder_journey"
+    assert calls["seed"] == 7
+    assert calls["motion_mode"] is MotionMode.REDUCED
+    assert calls["output_dir"] == tmp_path
 
 
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.123.0 - 2026-06-05
+
+- Added a deterministic `audit-2d-visual` QA harness that renders title, meta, live run, picker/action-feedback, inspector, turn-summary, and review captures across core viewport sizes
+- The visual audit now checks frame checksum, sampled color variance, contrast, non-dark coverage, and expected active layers such as transitions, picker/inspector overlays, action feedback, and summary reveal state
+- Added optional PNG export for visual review without committing generated images, plus CLI/reporting coverage and regression tests for the new visual audit path
+
 ## 0.122.0 - 2026-06-05
 
 - Added a command-specific action feedback cue layer to the 2D run scene so successful commands, picker launches, create-product modals, end-turn confirmation, and inspector opens now produce short visual feedback cards

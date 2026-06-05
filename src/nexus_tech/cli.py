@@ -60,6 +60,7 @@ from nexus_tech.frontend_2d import (
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_motion_audit,
+    run_2d_visual_audit,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -240,6 +241,11 @@ MOTION_MODE_2D_OPTION = typer.Option(
     MotionMode.FULL,
     "--motion-mode",
     help="2D animation intensity mode: full, reduced, or off.",
+)
+VISUAL_AUDIT_OUTPUT_DIR_OPTION = typer.Option(
+    None,
+    "--output-dir",
+    help="Optional directory for PNG captures. Omit to keep the audit in-memory only.",
 )
 
 ACTION_KEYS = {
@@ -746,6 +752,86 @@ def audit_2d_motion_command(
         Panel.fit(
             f"Motion audit status: {report.status.upper()} across {len(report.cells)} viewports.",
             title="2D Motion Audit",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@app.command("audit-2d-visual")
+def audit_2d_visual_command(
+    scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed for deterministic 2D visual audit setup.",
+    ),
+    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
+    output_dir: Path | None = VISUAL_AUDIT_OUTPUT_DIR_OPTION,
+) -> None:
+    """Capture deterministic 2D scene frames and verify visual/motion layers."""
+
+    try:
+        report = run_2d_visual_audit(
+            scenario_id=scenario,
+            difficulty_mode=difficulty,
+            seed=seed,
+            motion_mode=motion_mode,
+            output_dir=output_dir,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    table = Table(
+        title=(
+            "2D Visual Audit | "
+            f"{report.scenario_id} | {report.difficulty} | "
+            f"seed {report.seed} | motion {report.motion_mode}"
+        )
+    )
+    table.add_column("Scene", style="cyan")
+    table.add_column("Viewport", justify="right")
+    table.add_column("Checksum", justify="right")
+    table.add_column("Colors", justify="right")
+    table.add_column("Contrast", justify="right")
+    table.add_column("Layers")
+    table.add_column("Status", justify="center")
+    table.add_column("Notes")
+    for cell in report.cells:
+        table.add_row(
+            cell.scene_key,
+            f"{cell.width}x{cell.height}",
+            str(cell.checksum),
+            str(cell.unique_color_samples),
+            str(cell.luminance_spread),
+            ",".join(cell.active_layers),
+            cell.status.upper(),
+            cell.notes,
+        )
+    console.print(table)
+    if report.output_dir is not None:
+        console.print(
+            Panel.fit(
+                f"PNG captures written to {report.output_dir}",
+                title="2D Visual Captures",
+                border_style="cyan",
+            )
+        )
+
+    border_style = "green" if report.status == "pass" else "red"
+    console.print(
+        Panel.fit(
+            f"Visual audit status: {report.status.upper()} across {len(report.cells)} captures.",
+            title="2D Visual Audit",
             border_style=border_style,
         )
     )
