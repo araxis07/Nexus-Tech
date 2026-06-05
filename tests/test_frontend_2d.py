@@ -1461,6 +1461,38 @@ def test_run_scene_action_request_triggers_motion_pulses() -> None:
         assert scene._action_feedback_cues
         assert scene._action_feedback_cues[0].family == "product"
         assert f"product:{state.products[0].id.hex}" in scene._action_feedback_cues[0].targets
+        assert scene._impact_cues
+        assert any("Quality" in cue.label for cue in scene._impact_cues)
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_impact_cues_cover_business_deltas() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        current_state = previous_state.model_copy(deep=True)
+        current_state.company.cash_on_hand += Decimal("1200.00")
+        current_state.company.reputation += 2
+        current_state.finance.board_pressure += 3
+        current_state.products[0].user_count += 25
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=previous_state,
+            rng=RandomSource(seed=42),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._queue_impact_cues(previous_state, current_state)
+
+        labels = {cue.label for cue in scene._impact_cues}
+        assert {"Cash", "Users", "Reputation", "Board"} <= labels
+        assert scene._motion_pulses.get("stat:cash") > 0
+        assert scene._motion_pulses.get("stat:users") > 0
+        assert scene._motion_pulses.get("stat:board_pressure") > 0
     finally:
         pygame.quit()
 
@@ -1484,6 +1516,7 @@ def test_run_scene_action_feedback_respects_motion_off() -> None:
 
         assert scene._context_picker is not None
         assert not scene._action_feedback_cues
+        assert not scene._impact_cues
     finally:
         pygame.quit()
 
@@ -2286,6 +2319,8 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.entity_motion_disabled_samples == 0
     assert cell.action_feedback_active_samples == 1
     assert cell.action_feedback_disabled_samples == 0
+    assert cell.impact_cue_active_samples == 1
+    assert cell.impact_cue_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2321,6 +2356,8 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.entity_motion_disabled_samples == 3
     assert cell.action_feedback_active_samples == 0
     assert cell.action_feedback_disabled_samples == 1
+    assert cell.impact_cue_active_samples == 0
+    assert cell.impact_cue_disabled_samples == 1
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2349,6 +2386,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "title_menu",
         "title_meta",
         "run_dashboard",
+        "run_impact_feedback",
         "run_picker_feedback",
         "run_inspector",
         "turn_summary",
@@ -2357,9 +2395,12 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.checksum > 0 for cell in report.cells)
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
+    impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
+    assert "impact-cue" in impact.active_layers
+    assert "action-feedback" in impact.active_layers
     assert "picker" in picker.active_layers
     assert "action-feedback" in picker.active_layers
     assert "inspector" in inspector.active_layers

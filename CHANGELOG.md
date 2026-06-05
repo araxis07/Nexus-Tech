@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.124.0 - 2026-06-06
+
+- Added a 2D impact cue layer that turns successful state changes into short visible delta cards for cash, users, reputation, board pressure, and product metrics
+- Wired impact cues into direct actions and pending-event resolutions while preserving the existing full/reduced/off motion-mode controls
+- Extended visual and motion audits plus regression coverage so impact cues are captured as expected layers and disabled in `--motion-mode off`
+
 ## 0.123.0 - 2026-06-05
 
 - Added a deterministic `audit-2d-visual` QA harness that renders title, meta, live run, picker/action-feedback, inspector, turn-summary, and review captures across core viewport sizes

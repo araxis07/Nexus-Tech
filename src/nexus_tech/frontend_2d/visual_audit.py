@@ -16,6 +16,7 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.frontend_2d.app import Frontend2DUnavailableError
+from nexus_tech.frontend_2d.context import ActionRequest
 from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import build_run_review_view_model
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
@@ -221,6 +222,43 @@ def run_2d_visual_audit(
                         scene_key="run_dashboard",
                         expected_layers=_expected_layers(
                             ("transition", "motion-pulses"),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                impact_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 6),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                impact_scene._apply_action_request(
+                    ActionRequest(
+                        action=TurnAction.IMPROVE_QUALITY,
+                        context=ActionContext(target_product_id=impact_scene.selected_product.id),
+                        label=TurnAction.IMPROVE_QUALITY.value,
+                    )
+                )
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        impact_scene,
+                        scene_key="run_impact_feedback",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "impact-cue",
+                                "action-feedback",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -444,6 +482,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("inspector")
     if getattr(scene, "_action_feedback_cues", ()):
         layers.append("action-feedback")
+    if getattr(scene, "_impact_cues", ()):
+        layers.append("impact-cue")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
     return tuple(layers)
@@ -452,7 +492,7 @@ def _active_layers(scene) -> tuple[str, ...]:
 def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tuple[str, ...]:
     if motion_mode is not MotionMode.OFF:
         return layers
-    disabled_layers = {"transition", "motion-pulses", "action-feedback"}
+    disabled_layers = {"transition", "motion-pulses", "action-feedback", "impact-cue"}
     return tuple(layer for layer in layers if layer not in disabled_layers)
 
 

@@ -18,6 +18,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.frontend_2d.app import Frontend2DUnavailableError
 from nexus_tech.frontend_2d.catalog import list_scenario_choices
 from nexus_tech.frontend_2d.context import (
+    ActionRequest,
     build_command_request,
     build_inspector_action_request,
     explain_command_unavailable,
@@ -73,6 +74,8 @@ class MotionAuditCell:
     entity_motion_disabled_samples: int = 0
     action_feedback_active_samples: int = 0
     action_feedback_disabled_samples: int = 0
+    impact_cue_active_samples: int = 0
+    impact_cue_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -254,6 +257,26 @@ def run_2d_motion_audit(
                 run_scene._run_command(TurnAction.SET_COMPANY_STRATEGY.value)
                 action_feedback_active_count = int(bool(run_scene._action_feedback_cues))
                 action_feedback_disabled_count = int(not run_scene._action_feedback_cues)
+                impact_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 5),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                impact_scene._apply_action_request(
+                    ActionRequest(
+                        action=TurnAction.IMPROVE_QUALITY,
+                        context=ActionContext(target_product_id=impact_scene.selected_product.id),
+                        label=TurnAction.IMPROVE_QUALITY.value,
+                    )
+                )
+                impact_cue_active_count = int(bool(impact_scene._impact_cues))
+                impact_cue_disabled_count = int(not impact_scene._impact_cues)
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
                 run_avg, run_max = _exercise_scene(run_scene, surface, frames)
@@ -366,6 +389,8 @@ def run_2d_motion_audit(
                         entity_motion_disabled_samples=entity_disabled_count,
                         action_feedback_active_samples=action_feedback_active_count,
                         action_feedback_disabled_samples=action_feedback_disabled_count,
+                        impact_cue_active_samples=impact_cue_active_count,
+                        impact_cue_disabled_samples=impact_cue_disabled_count,
                     )
                 )
         return MotionAuditReport(

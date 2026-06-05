@@ -8,6 +8,7 @@ from math import sin
 from typing import Callable
 
 from nexus_tech.domain.models import GameState, TurnAction
+from nexus_tech.domain.money import format_money
 from nexus_tech.frontend_2d.catalog import (
     CampaignGoalChoice,
     CampaignStartChoice,
@@ -121,6 +122,19 @@ class ActionFeedbackCue:
     command: str
     label: str
     family: str
+    accent: tuple[int, int, int]
+    targets: tuple[str, ...]
+    time_left: float
+    duration: float
+
+
+@dataclass(frozen=True)
+class ImpactCue:
+    """Short-lived visible delta feedback after state-changing actions."""
+
+    label: str
+    value_text: str
+    tone: str
     accent: tuple[int, int, int]
     targets: tuple[str, ...]
     time_left: float
@@ -2673,6 +2687,7 @@ class RunScene(BaseScene):
         )
         self._events: list[TimedFrontendEvent] = []
         self._action_feedback_cues: list[ActionFeedbackCue] = []
+        self._impact_cues: list[ImpactCue] = []
         self._click_targets: list[ClickTarget] = []
         self._context_picker: ContextPicker | None = None
         self._text_input: TextInputModalState | None = None
@@ -2913,6 +2928,19 @@ class RunScene(BaseScene):
                 duration=cue.duration,
             )
             for cue in self._action_feedback_cues
+            if cue.time_left - dt > 0
+        ]
+        self._impact_cues = [
+            ImpactCue(
+                label=cue.label,
+                value_text=cue.value_text,
+                tone=cue.tone,
+                accent=cue.accent,
+                targets=cue.targets,
+                time_left=cue.time_left - dt,
+                duration=cue.duration,
+            )
+            for cue in self._impact_cues
             if cue.time_left - dt > 0
         ]
 
@@ -3182,6 +3210,7 @@ class RunScene(BaseScene):
             self._draw_help_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
+        self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
         self._draw_hover_tooltip(surface)
         self._draw_scene_transition_overlay(surface)
@@ -3445,6 +3474,194 @@ class RunScene(BaseScene):
         label = self.fonts.small.render(panel_key.upper(), True, blend_color(MUTED, accent, 0.7))
         surface.blit(label, (strip_rect.left + 10, strip_rect.top + 9))
 
+    def _impact_cue_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.72 if self.motion_mode is MotionMode.REDUCED else 1.1
+
+    def _queue_impact_cues(self, previous_state: GameState, current_state: GameState) -> None:
+        duration = self._impact_cue_duration()
+        if duration <= 0:
+            return
+        cues = self._build_impact_cues(previous_state, current_state, duration=duration)
+        if not cues:
+            return
+        for cue in reversed(cues):
+            self._impact_cues.insert(0, cue)
+            intensity = 0.5 if cue.tone in {"warning", "danger"} else 0.38
+            motion = "flash" if cue.tone in {"warning", "danger"} else "pulse"
+            for target in cue.targets[:3]:
+                self._trigger_motion_target(target, intensity=intensity, motion=motion)
+        self._impact_cues = self._impact_cues[:4]
+
+    def _build_impact_cues(
+        self,
+        previous_state: GameState,
+        current_state: GameState,
+        *,
+        duration: float,
+    ) -> list[ImpactCue]:
+        cues: list[ImpactCue] = []
+
+        cash_delta = current_state.company.cash_on_hand - previous_state.company.cash_on_hand
+        if cash_delta:
+            cues.append(
+                self._make_impact_cue(
+                    label="Cash",
+                    value_text=f"{'+' if cash_delta > 0 else ''}{format_money(cash_delta)}",
+                    tone="success" if cash_delta > 0 else "warning",
+                    targets=("stat:cash", "panel:finance"),
+                    duration=duration,
+                )
+            )
+
+        user_delta = self._total_users(current_state) - self._total_users(previous_state)
+        if user_delta:
+            cues.append(
+                self._make_impact_cue(
+                    label="Users",
+                    value_text=self._format_signed_int(user_delta, suffix=" users"),
+                    tone="success" if user_delta > 0 else "warning",
+                    targets=("stat:users", "panel:customers"),
+                    duration=duration,
+                )
+            )
+
+        reputation_delta = current_state.company.reputation - previous_state.company.reputation
+        if reputation_delta:
+            cues.append(
+                self._make_impact_cue(
+                    label="Reputation",
+                    value_text=self._format_signed_int(reputation_delta, suffix=" rep"),
+                    tone="success" if reputation_delta > 0 else "warning",
+                    targets=("stat:reputation", "panel:report"),
+                    duration=duration,
+                )
+            )
+
+        board_delta = current_state.finance.board_pressure - previous_state.finance.board_pressure
+        if board_delta:
+            cues.append(
+                self._make_impact_cue(
+                    label="Board",
+                    value_text=self._format_signed_int(board_delta, suffix=" pressure"),
+                    tone="danger" if board_delta > 0 else "success",
+                    targets=("stat:board_pressure", "panel:board", "panel:endgame"),
+                    duration=duration,
+                )
+            )
+
+        previous_products = {product.id: product for product in previous_state.products}
+        for product in current_state.products:
+            previous_product = previous_products.get(product.id)
+            if previous_product is None:
+                continue
+            cues.extend(self._build_product_impact_cues(previous_product, product, duration))
+
+        return cues[:4]
+
+    def _build_product_impact_cues(
+        self,
+        previous_product,
+        current_product,
+        duration: float,
+    ) -> list[ImpactCue]:
+        product_key = f"product:{current_product.id.hex}"
+        product_name = current_product.name
+        product_cues: list[ImpactCue] = []
+        metric_specs = (
+            (
+                "Quality",
+                current_product.quality - previous_product.quality,
+                " quality",
+                "success",
+                "warning",
+                f"{product_key}:quality",
+            ),
+            (
+                "Bugs",
+                current_product.bug_level - previous_product.bug_level,
+                " bugs",
+                "danger",
+                "success",
+                f"{product_key}:bugs",
+            ),
+            (
+                "Fit",
+                current_product.market_fit - previous_product.market_fit,
+                " fit",
+                "success",
+                "warning",
+                f"{product_key}:fit",
+            ),
+            (
+                "Debt",
+                current_product.technical_debt - previous_product.technical_debt,
+                " debt",
+                "warning",
+                "success",
+                f"{product_key}:debt",
+            ),
+            (
+                "Features",
+                current_product.feature_count - previous_product.feature_count,
+                " features",
+                "success",
+                "warning",
+                product_key,
+            ),
+            (
+                "Product Users",
+                current_product.user_count - previous_product.user_count,
+                " users",
+                "success",
+                "warning",
+                product_key,
+            ),
+        )
+        for label, delta, suffix, positive_tone, negative_tone, target in metric_specs:
+            if not delta:
+                continue
+            tone = positive_tone if delta > 0 else negative_tone
+            product_cues.append(
+                self._make_impact_cue(
+                    label=f"{product_name} {label}",
+                    value_text=self._format_signed_int(delta, suffix=suffix),
+                    tone=tone,
+                    targets=(product_key, target),
+                    duration=duration,
+                )
+            )
+        return product_cues[:2]
+
+    def _make_impact_cue(
+        self,
+        *,
+        label: str,
+        value_text: str,
+        tone: str,
+        targets: tuple[str, ...],
+        duration: float,
+    ) -> ImpactCue:
+        accent = tone_color(tone)
+        return ImpactCue(
+            label=label,
+            value_text=value_text,
+            tone=tone,
+            accent=accent,
+            targets=targets,
+            time_left=duration,
+            duration=duration,
+        )
+
+    @staticmethod
+    def _format_signed_int(value: int, *, suffix: str = "") -> str:
+        return f"{'+' if value > 0 else ''}{value}{suffix}"
+
+    @staticmethod
+    def _total_users(state: GameState) -> int:
+        return sum(product.user_count for product in state.products)
+
     def _action_feedback_duration(self) -> float:
         if self.motion_mode is MotionMode.OFF:
             return 0.0
@@ -3578,6 +3795,88 @@ class RunScene(BaseScene):
             ),
         )
         self._action_feedback_cues = self._action_feedback_cues[:3]
+
+    def _draw_impact_cues(self, surface) -> None:
+        if not self._impact_cues or self.motion_mode is MotionMode.OFF:
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        compact = width < 920
+        card_width = min(300, max(190, width - 40))
+        card_height = 42 if compact else 48
+        gap = 8
+        left = 24
+        top = 112 if height < 680 else 146
+        if self._text_input is not None or self._context_picker is not None:
+            top = 24
+        for index, cue in enumerate(self._impact_cues[:4]):
+            if cue.duration <= 0:
+                continue
+            age = max(0.0, cue.duration - cue.time_left)
+            enter_ratio = min(1.0, age / 0.2)
+            ttl_ratio = max(0.0, min(1.0, cue.time_left / cue.duration))
+            intensity = ttl_ratio * (0.55 if self.motion_mode is MotionMode.REDUCED else 1.0)
+            slide_x = int((1.0 - enter_ratio) * -24)
+            wave = sin(self._entity_motion_phase(offset=index * 0.9, speed=2.8)) * 3 * intensity
+            rect = pygame.Rect(
+                left + slide_x,
+                int(top + index * (card_height + gap) + wave),
+                card_width,
+                card_height,
+            )
+            panel = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            fill = blend_color((13, 22, 34), cue.accent, 0.18 + intensity * 0.12)
+            pygame.draw.rect(panel, (*fill, 224), panel.get_rect(), border_radius=16)
+            pygame.draw.rect(
+                panel,
+                (*blend_color(BORDER, cue.accent, 0.46), 230),
+                panel.get_rect(),
+                width=1,
+                border_radius=16,
+            )
+            surface.blit(panel, rect.topleft)
+            node_rect = pygame.Rect(rect.left + 10, rect.top + 8, 44, rect.height - 16)
+            self._draw_entity_nodes(
+                surface,
+                node_rect,
+                accent=cue.accent,
+                strength=min(1.0, 0.3 + intensity * 0.65),
+                count=2,
+                offset=index + len(cue.label),
+            )
+            label_surface = self.fonts.small.render(
+                self._compact_button_detail(cue.label, max_length=26),
+                True,
+                TEXT,
+            )
+            value_surface = self.fonts.heading.render(cue.value_text, True, cue.accent)
+            target_text = " / ".join(
+                target.removeprefix("panel:")
+                .removeprefix("stat:")
+                .removeprefix("product:")
+                .split(":")[-1]
+                for target in cue.targets[:2]
+            )
+            target_surface = self.fonts.small.render(
+                self._compact_button_detail(target_text, max_length=26),
+                True,
+                blend_color(MUTED, cue.accent, 0.55),
+            )
+            surface.blit(label_surface, (rect.left + 58, rect.top + 8))
+            surface.blit(value_surface, (rect.right - value_surface.get_width() - 14, rect.top + 6))
+            surface.blit(target_surface, (rect.left + 58, rect.top + card_height - 18))
+            progress_rect = pygame.Rect(rect.left + 58, rect.bottom - 7, rect.width - 72, 4)
+            pygame.draw.rect(surface, blend_color(BORDER, cue.accent, 0.18), progress_rect)
+            pygame.draw.rect(
+                surface,
+                cue.accent,
+                pygame.Rect(
+                    progress_rect.left,
+                    progress_rect.top,
+                    int(progress_rect.width * ttl_ratio),
+                    progress_rect.height,
+                ),
+            )
 
     def _draw_action_feedback_cues(self, surface) -> None:
         if not self._action_feedback_cues or self.motion_mode is MotionMode.OFF:
@@ -3838,6 +4137,7 @@ class RunScene(BaseScene):
         option = self.state.pending_event.options[option_index]
         previous_state = self.state.model_copy(deep=True)
         resolution = self._resolve_pending_event(option.id)
+        self._queue_impact_cues(previous_state, self.state)
         self.push_events(
             build_action_events(
                 previous_state,
@@ -4120,6 +4420,7 @@ class RunScene(BaseScene):
 
         self._queue_action_feedback(request.action.value)
         self.state = outcome.state
+        self._queue_impact_cues(previous_state, self.state)
         self._dirty = True
         self.push_events(
             build_action_events(
