@@ -114,6 +114,19 @@ class TimedFrontendEvent:
     time_left: float
 
 
+@dataclass(frozen=True)
+class ActionFeedbackCue:
+    """Short-lived command-specific animation feedback."""
+
+    command: str
+    label: str
+    family: str
+    accent: tuple[int, int, int]
+    targets: tuple[str, ...]
+    time_left: float
+    duration: float
+
+
 @dataclass
 class TextInputModalState:
     """One live text-input modal used by the 2D frontend."""
@@ -2659,6 +2672,7 @@ class RunScene(BaseScene):
             entry_transition=entry_transition,
         )
         self._events: list[TimedFrontendEvent] = []
+        self._action_feedback_cues: list[ActionFeedbackCue] = []
         self._click_targets: list[ClickTarget] = []
         self._context_picker: ContextPicker | None = None
         self._text_input: TextInputModalState | None = None
@@ -2857,6 +2871,8 @@ class RunScene(BaseScene):
                     0,
                 )
         self._sync_inspector_selection()
+        if self._inspector_panel_key == panel_key:
+            self._queue_action_feedback(f"inspect_{panel_key}")
 
     def _selected_inspector_section(self):
         panel = self.inspector_panel
@@ -2885,6 +2901,19 @@ class RunScene(BaseScene):
             TimedFrontendEvent(payload=event.payload, time_left=event.time_left - dt)
             for event in self._events
             if event.time_left - dt > 0
+        ]
+        self._action_feedback_cues = [
+            ActionFeedbackCue(
+                command=cue.command,
+                label=cue.label,
+                family=cue.family,
+                accent=cue.accent,
+                targets=cue.targets,
+                time_left=cue.time_left - dt,
+                duration=cue.duration,
+            )
+            for cue in self._action_feedback_cues
+            if cue.time_left - dt > 0
         ]
 
     def _stabilize_motion_bank(self) -> None:
@@ -3153,6 +3182,7 @@ class RunScene(BaseScene):
             self._draw_help_overlay(surface)
         if self.state.company.game_over or self.state.victory_achieved:
             self._draw_outcome_overlay(surface)
+        self._draw_action_feedback_cues(surface)
         self._draw_hover_tooltip(surface)
         self._draw_scene_transition_overlay(surface)
 
@@ -3415,6 +3445,233 @@ class RunScene(BaseScene):
         label = self.fonts.small.render(panel_key.upper(), True, blend_color(MUTED, accent, 0.7))
         surface.blit(label, (strip_rect.left + 10, strip_rect.top + 9))
 
+    def _action_feedback_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.56 if self.motion_mode is MotionMode.REDUCED else 0.9
+
+    def _action_feedback_profile(
+        self,
+        command: str,
+    ) -> tuple[str, str, tuple[int, int, int], tuple[str, ...]]:
+        if command.startswith("inspect_"):
+            panel_key = command.removeprefix("inspect_")
+            return (
+                f"{self._panel_display_name(panel_key)} Inspector",
+                "inspect",
+                SELECTION,
+                (f"panel:{panel_key}", "overlay:inspector"),
+            )
+        if command == TurnAction.END_TURN.value:
+            return (
+                "Turn Resolve",
+                "turn",
+                DANGER,
+                ("summary:timeline", "stat:cash", "stat:runway"),
+            )
+        if command in {
+            TurnAction.IMPROVE_QUALITY.value,
+            TurnAction.ADD_FEATURE.value,
+            TurnAction.MARKET_PRODUCT.value,
+            TurnAction.REDUCE_TECHNICAL_DEBT.value,
+            TurnAction.CREATE_PRODUCT.value,
+        }:
+            return (
+                "Product Work",
+                "product",
+                SELECTION if command != TurnAction.REDUCE_TECHNICAL_DEBT.value else WARN,
+                ("panel:products", f"product:{self.selected_product.id.hex}"),
+            )
+
+        panel_key = self._workspace_panel_key_for_command(command)
+        if command == TurnAction.SET_COMPANY_STRATEGY.value:
+            return ("Strategy Choice", "strategy", INFO, ("panel:report", "panel:team"))
+        if command == TurnAction.SET_ROADMAP.value:
+            return (
+                "Roadmap Choice",
+                "pipeline",
+                SELECTION,
+                ("panel:pipeline", "panel:products"),
+            )
+        if command == TurnAction.SET_BUDGET_STANCE.value:
+            return (
+                "Budget Choice",
+                "finance",
+                WARN,
+                ("panel:finance", "stat:cash"),
+            )
+        if command == TurnAction.SET_SUPPORT_LANE_FOCUS.value:
+            return (
+                "Support Choice",
+                "customers",
+                INFO,
+                ("panel:customers", "stat:users"),
+            )
+        if command in _FINANCE_PANEL_COMMANDS or panel_key == "finance":
+            return (
+                "Capital Move",
+                "finance",
+                WARN,
+                ("panel:finance", "stat:cash", "stat:runway"),
+            )
+        if command in _TEAM_PANEL_COMMANDS or panel_key == "team":
+            return ("Team Move", "team", GOOD, ("panel:team",))
+        if command in _PIPELINE_PANEL_COMMANDS or panel_key == "pipeline":
+            return (
+                "Pipeline Move",
+                "pipeline",
+                SELECTION,
+                ("panel:pipeline", "panel:products"),
+            )
+        if command in _BOARD_PANEL_COMMANDS or panel_key == "board":
+            return (
+                "Board Impact",
+                "board",
+                DANGER,
+                ("panel:board", "panel:endgame", "stat:board_pressure"),
+            )
+        if command in _CUSTOMER_PANEL_COMMANDS or panel_key == "customers":
+            return ("Market Signal", "customers", INFO, ("panel:customers", "stat:users"))
+        if command in _PARTNERSHIP_PANEL_COMMANDS or panel_key == "partnerships":
+            return (
+                "Partner Signal",
+                "partners",
+                INFO,
+                ("panel:partnerships", "stat:users"),
+            )
+        if (
+            panel_key == "endgame"
+            or command.startswith("set_endgame_")
+            or command.startswith("set_exit_")
+            or command.startswith("set_terminal_")
+        ):
+            return (
+                "Endgame Gate",
+                "endgame",
+                DANGER,
+                ("panel:endgame", "stat:board_pressure"),
+            )
+        if panel_key is not None:
+            return (
+                f"{self._panel_display_name(panel_key)} Move",
+                "workspace",
+                INFO,
+                (f"panel:{panel_key}",),
+            )
+        return ("Command Cue", "workspace", INFO, ("feed",))
+
+    def _queue_action_feedback(self, command: str) -> None:
+        duration = self._action_feedback_duration()
+        if duration <= 0:
+            return
+        label, family, accent, targets = self._action_feedback_profile(command)
+        self._action_feedback_cues.insert(
+            0,
+            ActionFeedbackCue(
+                command=command,
+                label=label,
+                family=family,
+                accent=accent,
+                targets=targets,
+                time_left=duration,
+                duration=duration,
+            ),
+        )
+        self._action_feedback_cues = self._action_feedback_cues[:3]
+
+    def _draw_action_feedback_cues(self, surface) -> None:
+        if not self._action_feedback_cues or self.motion_mode is MotionMode.OFF:
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        compact = width < 920
+        card_width = min(330, max(180, width - 40))
+        card_height = 40 if compact else 46
+        gap = 8
+        left = max(20, width - card_width - 24)
+        top = 112 if height < 680 else 146
+        if self._text_input is not None or self._context_picker is not None:
+            top = 24
+        for index, cue in enumerate(self._action_feedback_cues[:3]):
+            if cue.duration <= 0:
+                continue
+            age = max(0.0, cue.duration - cue.time_left)
+            enter_ratio = min(1.0, age / 0.18)
+            ttl_ratio = max(0.0, min(1.0, cue.time_left / cue.duration))
+            intensity = ttl_ratio * (0.62 if self.motion_mode is MotionMode.REDUCED else 1.0)
+            slide_x = int((1.0 - enter_ratio) * 26)
+            wave = sin(self._entity_motion_phase(offset=index * 0.8, speed=2.4)) * 3 * intensity
+            rect = pygame.Rect(
+                left + slide_x,
+                top + index * (card_height + gap) - int(wave),
+                card_width,
+                card_height,
+            )
+            layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            layer_rect = layer.get_rect()
+            fill = blend_color((8, 13, 22), cue.accent, 0.14 + intensity * 0.08)
+            border = blend_color(cue.accent, TEXT, 0.12)
+            alpha = int(min(210, 112 + ttl_ratio * 100))
+            pygame.draw.rect(layer, (*fill, alpha), layer_rect, border_radius=14)
+            pygame.draw.rect(
+                layer,
+                (*border, int(86 + intensity * 110)),
+                layer_rect,
+                width=2 if intensity >= 0.6 else 1,
+                border_radius=14,
+            )
+            pygame.draw.rect(
+                layer,
+                (*cue.accent, int(88 + intensity * 116)),
+                pygame.Rect(0, 0, 5, rect.height),
+                border_radius=3,
+            )
+            self._draw_entity_nodes(
+                layer,
+                pygame.Rect(94, rect.height - 16, max(24, rect.width - 118), 10),
+                accent=cue.accent,
+                strength=0.36 * intensity,
+                count=3,
+                offset=float(index) * 1.3,
+            )
+            surface.blit(layer, rect.topleft)
+
+            label_surface = self.fonts.small.render(cue.label, True, TEXT)
+            family_surface = self.fonts.small.render(
+                cue.family.upper(),
+                True,
+                blend_color(MUTED, cue.accent, 0.82),
+            )
+            target_text = " / ".join(
+                target.removeprefix("panel:")
+                .removeprefix("stat:")
+                .removeprefix("summary:")
+                .removeprefix("overlay:")
+                for target in cue.targets[:2]
+            )
+            target_surface = self.fonts.small.render(
+                self._compact_button_detail(target_text, max_length=28),
+                True,
+                MUTED,
+            )
+            surface.blit(label_surface, (rect.left + 14, rect.top + 8))
+            surface.blit(
+                family_surface, (rect.right - family_surface.get_width() - 14, rect.top + 8)
+            )
+            surface.blit(target_surface, (rect.left + 14, rect.top + 24))
+            progress_rect = pygame.Rect(rect.left + 14, rect.bottom - 7, rect.width - 28, 4)
+            pygame.draw.rect(surface, blend_color(BORDER, cue.accent, 0.2), progress_rect)
+            pygame.draw.rect(
+                surface,
+                cue.accent,
+                pygame.Rect(
+                    progress_rect.left,
+                    progress_rect.top,
+                    int(progress_rect.width * ttl_ratio),
+                    progress_rect.height,
+                ),
+            )
+
     def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
         pulse = self._overlay_motion_level(overlay_key)
         alpha = min(224, 180 + int(pulse * 36))
@@ -3611,6 +3868,7 @@ class RunScene(BaseScene):
     def _open_create_product_modal(self) -> None:
         default_name = f"New Venture {len(self.state.products) + 1}"
         self._trigger_command_choreography(TurnAction.CREATE_PRODUCT.value)
+        self._queue_action_feedback(TurnAction.CREATE_PRODUCT.value)
         self._set_text_input(
             TextInputModalState(
                 title="Create Product",
@@ -3824,6 +4082,7 @@ class RunScene(BaseScene):
             return
         if isinstance(request, ContextPicker):
             self._set_context_picker(request)
+            self._queue_action_feedback(command)
             self._push_workspace_handoff_event(
                 command,
                 source_panel_key=handoff_source_panel_key,
@@ -3859,6 +4118,7 @@ class RunScene(BaseScene):
             )
             return
 
+        self._queue_action_feedback(request.action.value)
         self.state = outcome.state
         self._dirty = True
         self.push_events(
@@ -3915,12 +4175,14 @@ class RunScene(BaseScene):
                     ),
                 )
             )
+            self._queue_action_feedback(TurnAction.END_TURN.value)
             return
 
         self._resolve_end_turn()
 
     def _resolve_end_turn(self) -> None:
         self._trigger_command_choreography(TurnAction.END_TURN.value)
+        self._queue_action_feedback(TurnAction.END_TURN.value)
         previous_state = self.state.model_copy(deep=True)
         try:
             outcome = apply_action(self.state, TurnAction.END_TURN, context=ActionContext())
@@ -4253,6 +4515,7 @@ class RunScene(BaseScene):
             return
         if isinstance(request, ContextPicker):
             self._set_context_picker(request)
+            self._queue_action_feedback(action.command)
             return
         self.push_event(
             FrontendEvent(

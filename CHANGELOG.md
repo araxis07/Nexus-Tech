@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.122.0 - 2026-06-05
+
+- Added a command-specific action feedback cue layer to the 2D run scene so successful commands, picker launches, create-product modals, end-turn confirmation, and inspector opens now produce short visual feedback cards
+- Mapped feedback cues across product, finance, team, customer, partnership, pipeline, board, endgame, inspector, and turn-resolution families while preserving the existing targeted panel/stat/product motion lanes
+- Extended motion-audit telemetry and regression coverage so full motion reports active action-feedback samples and `--motion-mode off` proves the new cue layer is disabled
+
 ## 0.121.0 - 2026-06-05
 
 - Added deterministic shape-based entity motion to the 2D run HUD, including moving stat beads, product data packets, and active panel strips so the game reads less like a static dashboard

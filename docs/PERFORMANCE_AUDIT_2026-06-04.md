@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.121.0`
+Version: `0.122.0`
 
 ## Scope
 
@@ -11,7 +11,8 @@ Version: `0.121.0`
 - The 2D shell now supports `--motion-mode full|reduced|off` for launchers and `audit-2d-motion`, with reduced/off modes preserving gameplay while lowering or disabling highlight pulses.
 - Scene entry transitions now cover boot, title-to-run, title-to-review, run-to-summary, run-to-review, summary-to-run, summary-to-review, and review-to-title flows.
 - Shape-based entity motion now covers stat lanes, product cards, and active deep-panel strips without adding external sprite assets.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, average frame time, and max frame spike.
+- Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 

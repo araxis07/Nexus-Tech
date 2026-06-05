@@ -1421,6 +1421,9 @@ def test_run_scene_routes_capital_plan_command_to_finance_workspace() -> None:
 
         assert scene._deep_panel_key == "finance"
         assert scene._context_picker is not None
+        assert scene._action_feedback_cues
+        assert scene._action_feedback_cues[0].family == "finance"
+        assert "panel:finance" in scene._action_feedback_cues[0].targets
     finally:
         pygame.quit()
 
@@ -1452,6 +1455,32 @@ def test_run_scene_action_request_triggers_motion_pulses() -> None:
         assert scene._motion_pulses.get("panel:products") > 0
         assert scene._motion_pulses.get(product_key) > 0
         assert scene._motion_pulses.get(f"{product_key}:quality") > 0
+        assert scene._action_feedback_cues
+        assert scene._action_feedback_cues[0].family == "product"
+        assert f"product:{state.products[0].id.hex}" in scene._action_feedback_cues[0].targets
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_action_feedback_respects_motion_off() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=42),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._run_command(TurnAction.SET_CAPITAL_PLAN.value)
+
+        assert scene._context_picker is not None
+        assert not scene._action_feedback_cues
     finally:
         pygame.quit()
 
@@ -2252,6 +2281,8 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.transition_disabled_scenes == 0
     assert cell.entity_motion_active_samples == 3
     assert cell.entity_motion_disabled_samples == 0
+    assert cell.action_feedback_active_samples == 1
+    assert cell.action_feedback_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2285,6 +2316,8 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.transition_disabled_scenes == 4
     assert cell.entity_motion_active_samples == 0
     assert cell.entity_motion_disabled_samples == 3
+    assert cell.action_feedback_active_samples == 0
+    assert cell.action_feedback_disabled_samples == 1
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:

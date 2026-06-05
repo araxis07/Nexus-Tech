@@ -71,6 +71,8 @@ class MotionAuditCell:
     transition_disabled_scenes: int = 0
     entity_motion_active_samples: int = 0
     entity_motion_disabled_samples: int = 0
+    action_feedback_active_samples: int = 0
+    action_feedback_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -250,6 +252,8 @@ def run_2d_motion_audit(
                 inspector_after = run_scene._motion_pulses.live_count()
                 run_scene._set_deep_panel("endgame")
                 run_scene._run_command(TurnAction.SET_COMPANY_STRATEGY.value)
+                action_feedback_active_count = int(bool(run_scene._action_feedback_cues))
+                action_feedback_disabled_count = int(not run_scene._action_feedback_cues)
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
                 run_avg, run_max = _exercise_scene(run_scene, surface, frames)
@@ -360,6 +364,8 @@ def run_2d_motion_audit(
                         transition_disabled_scenes=transition_disabled_count,
                         entity_motion_active_samples=entity_active_count,
                         entity_motion_disabled_samples=entity_disabled_count,
+                        action_feedback_active_samples=action_feedback_active_count,
+                        action_feedback_disabled_samples=action_feedback_disabled_count,
                     )
                 )
         return MotionAuditReport(
