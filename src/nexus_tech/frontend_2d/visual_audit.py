@@ -722,6 +722,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("endgame-actor")
     if getattr(scene, "review_actor_active", lambda: False)():
         layers.append("review-actor")
+    if getattr(scene, "actor_readability_clear", lambda: False)():
+        layers.append("actor-readability")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
     if getattr(scene, "summary_cinematic_active", lambda: False)():
@@ -757,6 +759,7 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "inspector-actor",
         "endgame-actor",
         "review-actor",
+        "actor-readability",
     }
     return tuple(layer for layer in layers if layer not in disabled_layers)
 

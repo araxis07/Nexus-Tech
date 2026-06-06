@@ -190,6 +190,18 @@ class ActorSpriteClip:
     phase_offset: float = 0.0
 
 
+@dataclass(frozen=True)
+class ActorSpriteBounds:
+    """One actor sprite footprint from the last draw pass."""
+
+    key: str
+    lane: str
+    left: int
+    top: int
+    width: int
+    height: int
+
+
 @dataclass
 class TextInputModalState:
     """One live text-input modal used by the 2D frontend."""
@@ -583,6 +595,12 @@ def _actor_state_badge(state: str) -> str:
         "success": "+",
         "handoff": ">",
         "build": "#",
+        "blocked": "x",
+        "coaching": "?",
+        "negotiating": "$",
+        "shipping": ">",
+        "firefighting": "!",
+        "celebrating": "+",
     }.get(state, ".")
 
 
@@ -721,6 +739,7 @@ class BaseScene:
         self._scene_transition_key = entry_transition
         self._scene_transition_elapsed = 0.0
         self._scene_transition_duration = self._entry_transition_duration(entry_transition)
+        self._actor_sprite_bounds: list[ActorSpriteBounds] = []
 
     @property
     def scene_transition_key(self) -> str:
@@ -776,6 +795,51 @@ class BaseScene:
             self._scene_transition_duration,
             self._scene_transition_elapsed + max(0.0, dt),
         )
+
+    def _reset_actor_sprite_bounds(self) -> None:
+        self._actor_sprite_bounds = []
+
+    def _record_actor_sprite_bounds(self, clip: ActorSpriteClip, rect) -> None:
+        self._actor_sprite_bounds.append(
+            ActorSpriteBounds(
+                key=clip.key,
+                lane=clip.lane,
+                left=int(rect.left),
+                top=int(rect.top),
+                width=int(rect.width),
+                height=int(rect.height),
+            )
+        )
+
+    def actor_sprite_bounds(self) -> tuple[ActorSpriteBounds, ...]:
+        """Return actor sprite footprints from the most recent draw pass."""
+
+        return tuple(self._actor_sprite_bounds)
+
+    def actor_readability_clear(self) -> bool:
+        """Return whether actor sprites avoid viewport and click-target collisions."""
+
+        return bool(self._actor_sprite_bounds) and not self.actor_readability_violations()
+
+    def actor_readability_violations(self) -> tuple[str, ...]:
+        surface = self.pygame.display.get_surface()
+        if surface is None:
+            return ()
+        width, height = surface.get_size()
+        violations: list[str] = []
+        for bounds in self._actor_sprite_bounds:
+            if (
+                bounds.left < 0
+                or bounds.top < 0
+                or bounds.left + bounds.width > width
+                or bounds.top + bounds.height > height
+            ):
+                violations.append(f"{bounds.key}:viewport")
+            actor_rect = self.pygame.Rect(bounds.left, bounds.top, bounds.width, bounds.height)
+            for target in getattr(self, "_click_targets", ()):
+                if actor_rect.colliderect(target.rect):
+                    violations.append(f"{bounds.key}:{target.kind}")
+        return tuple(violations)
 
     def _draw_scene_transition_overlay(self, surface) -> None:
         if not self.scene_transition_active():
@@ -1033,6 +1097,7 @@ class TitleScene(BaseScene):
         top = anchor_rect.bottom - clip_height - 8
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            self._record_actor_sprite_bounds(clip, clip_rect)
             _draw_actor_sprite_clip(
                 pygame=pygame,
                 fonts=self.fonts,
@@ -1116,6 +1181,7 @@ class TitleScene(BaseScene):
     def draw(self, surface) -> None:
         pygame = self.pygame
         self._click_targets = []
+        self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 24
@@ -2788,6 +2854,7 @@ class ReviewScene(BaseScene):
         top = anchor_rect.bottom - clip_height - 8
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            self._record_actor_sprite_bounds(clip, clip_rect)
             _draw_actor_sprite_clip(
                 pygame=pygame,
                 fonts=self.fonts,
@@ -2824,6 +2891,7 @@ class ReviewScene(BaseScene):
     def draw(self, surface) -> None:
         pygame = self.pygame
         self._click_targets = []
+        self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 28
@@ -3728,6 +3796,7 @@ class RunScene(BaseScene):
 
         pygame = self.pygame
         self._click_targets = []
+        self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 20
@@ -4132,13 +4201,68 @@ class RunScene(BaseScene):
         team_state = "alert" if self.state.action_points_remaining <= 0 else "build"
         board_state = "risk" if board_pressure >= 70 else "handoff"
         customer_state = "success" if total_users >= 120 else "idle"
+        if self._action_feedback_cues:
+            cue = self._action_feedback_cues[0]
+            targets = cue.targets
+            founder_state = "coaching"
+            if cue.family in {"product", "pipeline"} or any(
+                target.startswith(("product:", "panel:pipeline")) for target in targets
+            ):
+                product_state = "shipping"
+            if cue.family == "team" or "panel:team" in targets:
+                team_state = "coaching"
+            if cue.family == "finance" or any(
+                target in {"panel:finance", "stat:cash", "stat:runway"} for target in targets
+            ):
+                founder_state = "negotiating"
+            if cue.family in {"customers", "partners"} or any(
+                target in {"panel:customers", "panel:partnerships", "stat:users"}
+                for target in targets
+            ):
+                customer_state = "negotiating"
+            if cue.family in {"board", "endgame"} or any(
+                target in {"panel:board", "panel:endgame", "stat:board_pressure"}
+                for target in targets
+            ):
+                board_state = "blocked" if board_pressure >= 70 else "negotiating"
+                founder_state = "firefighting" if board_pressure >= 70 else "negotiating"
+
+        critical_targets = tuple(
+            target
+            for cue in self._impact_cues[:3]
+            if cue.tone == "danger"
+            or (
+                cue.tone == "warning"
+                and any(target.startswith("product:") for target in cue.targets)
+            )
+            for target in cue.targets
+        )
+        if critical_targets:
+            founder_state = "firefighting"
+            if any(
+                target.startswith("product:") or target in {"panel:products", "panel:pipeline"}
+                for target in critical_targets
+            ):
+                product_state = "firefighting"
+            if any(target in {"panel:team", "stat:employees"} for target in critical_targets):
+                team_state = "firefighting"
+            if any(
+                target in {"panel:customers", "panel:partnerships", "stat:users"}
+                for target in critical_targets
+            ):
+                customer_state = "firefighting"
+            if any(
+                target in {"panel:board", "panel:endgame", "stat:board_pressure"}
+                for target in critical_targets
+            ):
+                board_state = "firefighting"
         return (
             ActorSpriteClip(
                 key="founder",
                 label="Founder",
                 role="Strategy",
                 state=founder_state,
-                accent=SELECTION,
+                accent=DANGER if founder_state in {"firefighting", "risk"} else SELECTION,
                 lane="command",
                 delay=0.0,
                 phase_offset=0.2,
@@ -4148,7 +4272,7 @@ class RunScene(BaseScene):
                 label="Team",
                 role="Build",
                 state=team_state,
-                accent=GOOD,
+                accent=DANGER if team_state in {"alert", "firefighting"} else GOOD,
                 lane="ops",
                 delay=0.06,
                 phase_offset=1.1,
@@ -4158,7 +4282,7 @@ class RunScene(BaseScene):
                 label="Customer",
                 role="Adoption",
                 state=customer_state,
-                accent=INFO,
+                accent=WARN if customer_state == "negotiating" else INFO,
                 lane="market",
                 delay=0.12,
                 phase_offset=2.0,
@@ -4168,7 +4292,7 @@ class RunScene(BaseScene):
                 label="Board",
                 role="Governance",
                 state=board_state,
-                accent=DANGER if board_state == "risk" else WARN,
+                accent=DANGER if board_state in {"risk", "blocked", "firefighting"} else WARN,
                 lane="risk",
                 delay=0.18,
                 phase_offset=2.9,
@@ -4178,7 +4302,15 @@ class RunScene(BaseScene):
                 label=_short_actor_text(selected_product.name, 14),
                 role="Product",
                 state=product_state,
-                accent=GOOD if product_state == "success" else WARN,
+                accent=(
+                    GOOD
+                    if product_state == "success"
+                    else DANGER
+                    if product_state in {"alert", "firefighting"}
+                    else SELECTION
+                    if product_state == "shipping"
+                    else WARN
+                ),
                 lane="ship",
                 delay=0.24,
                 phase_offset=3.8,
@@ -4214,6 +4346,7 @@ class RunScene(BaseScene):
         surface.blit(stage, stage_rect.topleft)
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            self._record_actor_sprite_bounds(clip, clip_rect)
             _draw_actor_sprite_clip(
                 pygame=pygame,
                 fonts=self.fonts,
@@ -4330,6 +4463,7 @@ class RunScene(BaseScene):
         top = max(anchor_rect.top - 36, 18)
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            self._record_actor_sprite_bounds(clip, clip_rect)
             _draw_actor_sprite_clip(
                 pygame=pygame,
                 fonts=self.fonts,
@@ -8390,6 +8524,7 @@ class TurnSummaryScene(BaseScene):
         surface.blit(stage, stage_rect.topleft)
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            self._record_actor_sprite_bounds(clip, clip_rect)
             _draw_actor_sprite_clip(
                 pygame=pygame,
                 fonts=self.fonts,
@@ -8452,6 +8587,7 @@ class TurnSummaryScene(BaseScene):
     def draw(self, surface) -> None:
         pygame = self.pygame
         self._click_targets = []
+        self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 24

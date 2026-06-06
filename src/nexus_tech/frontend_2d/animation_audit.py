@@ -15,12 +15,26 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "title_menu",
         "Title/Menu Actors",
-        ("transition", "motion-pulses", "actor-timeline", "sprite-clips", "title-actor"),
+        (
+            "transition",
+            "motion-pulses",
+            "actor-timeline",
+            "sprite-clips",
+            "title-actor",
+            "actor-readability",
+        ),
     ),
     (
         "run_dashboard",
         "Run Dashboard",
-        ("transition", "motion-pulses", "product-drama", "actor-timeline", "sprite-clips"),
+        (
+            "transition",
+            "motion-pulses",
+            "product-drama",
+            "actor-timeline",
+            "sprite-clips",
+            "actor-readability",
+        ),
     ),
     ("run_drama_feedback", "Product/Risk Drama", ("product-drama", "risk-drama")),
     (
@@ -43,12 +57,19 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "actor-timeline",
             "sprite-clips",
             "inspector-actor",
+            "actor-readability",
         ),
     ),
     (
         "run_endgame_board",
         "Endgame Board Actors",
-        ("deep-panel", "actor-timeline", "sprite-clips", "endgame-actor"),
+        (
+            "deep-panel",
+            "actor-timeline",
+            "sprite-clips",
+            "endgame-actor",
+            "actor-readability",
+        ),
     ),
     (
         "run_outcome_overlay",
@@ -65,12 +86,20 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "summary-lanes",
             "actor-timeline",
             "sprite-clips",
+            "actor-readability",
         ),
     ),
     (
         "review",
         "Review Actors",
-        ("transition", "motion-pulses", "actor-timeline", "sprite-clips", "review-actor"),
+        (
+            "transition",
+            "motion-pulses",
+            "actor-timeline",
+            "sprite-clips",
+            "review-actor",
+            "actor-readability",
+        ),
     ),
 )
 
@@ -249,12 +278,17 @@ def _build_actor_sprite_cell(
     motion_report: MotionAuditReport,
     off_motion_report: MotionAuditReport,
 ) -> AnimationCoverageCell:
-    required_layers = ("actor-timeline", "sprite-clips", "actor-off-gate")
+    required_layers = (
+        "actor-timeline",
+        "sprite-clips",
+        "actor-readability",
+        "actor-off-gate",
+    )
     visual_actor_layers = {
         layer
         for cell in visual_report.cells
         for layer in cell.active_layers
-        if layer in {"actor-timeline", "sprite-clips"}
+        if layer in {"actor-timeline", "sprite-clips", "actor-readability"}
     }
     full_active = any(
         cell.actor_timeline_active_samples > 0 and cell.sprite_clips_active_samples > 0
@@ -268,10 +302,12 @@ def _build_actor_sprite_cell(
         sorted(visual_actor_layers | ({"actor-off-gate"} if off_disabled else set()))
     )
     missing = tuple(
-        layer for layer in ("actor-timeline", "sprite-clips") if layer not in active_layers
+        layer
+        for layer in ("actor-timeline", "sprite-clips", "actor-readability")
+        if layer not in active_layers
     )
     status = "pass" if not missing and full_active and off_disabled else "fail"
-    notes = "timeline active and off-mode gated"
+    notes = "timeline active, readable, and off-mode gated"
     if missing:
         notes = f"missing {','.join(missing)}"
     elif not full_active:

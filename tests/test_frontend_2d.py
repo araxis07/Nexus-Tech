@@ -137,6 +137,12 @@ def _build_pygame_bundle():
     return pygame, create_fonts(pygame), surface
 
 
+def _assert_actor_readability_clear(scene) -> None:
+    assert scene.actor_sprite_bounds()
+    assert scene.actor_readability_violations() == ()
+    assert scene.actor_readability_clear()
+
+
 def _collect_surfaced_2d_commands(tmp_path: Path) -> set[str]:
     commands: set[str] = set()
     unlocked_choices = [
@@ -1473,6 +1479,35 @@ def test_run_scene_action_request_triggers_motion_pulses() -> None:
         pygame.quit()
 
 
+def test_run_actor_sprite_clips_react_to_action_feedback() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=42),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._apply_action_request(
+            ActionRequest(
+                action=TurnAction.IMPROVE_QUALITY,
+                context=ActionContext(target_product_id=state.products[0].id),
+                label=TurnAction.IMPROVE_QUALITY.value,
+            )
+        )
+
+        actor_states = {clip.key: clip.state for clip in scene._run_actor_sprite_clips()}
+        assert actor_states["founder"] == "coaching"
+        assert actor_states["product"] == "shipping"
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_impact_cues_cover_business_deltas() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1839,8 +1874,10 @@ def test_2d_actor_sprite_layers_respect_motion_modes() -> None:
 
         assert run_scene.actor_timeline_active()
         assert run_scene.sprite_clips_active()
+        _assert_actor_readability_clear(run_scene)
         assert summary_scene.actor_timeline_active()
         assert summary_scene.sprite_clips_active()
+        _assert_actor_readability_clear(summary_scene)
         assert not run_off_scene.actor_timeline_active()
         assert not run_off_scene.sprite_clips_active()
         assert not summary_off_scene.actor_timeline_active()
@@ -1917,9 +1954,11 @@ def test_title_and_review_actor_sprite_layers_respect_motion_modes(tmp_path: Pat
         assert title_scene.actor_timeline_active()
         assert title_scene.sprite_clips_active()
         assert title_scene.title_actor_active()
+        _assert_actor_readability_clear(title_scene)
         assert review_scene.actor_timeline_active()
         assert review_scene.sprite_clips_active()
         assert review_scene.review_actor_active()
+        _assert_actor_readability_clear(review_scene)
         assert not title_off_scene.actor_timeline_active()
         assert not title_off_scene.sprite_clips_active()
         assert not title_off_scene.title_actor_active()
@@ -1958,12 +1997,14 @@ def test_run_overlay_actor_sprite_layers_cover_inspector_and_endgame() -> None:
         scene.update(1 / 60)
         scene.draw(surface)
         assert scene.inspector_actor_active()
+        _assert_actor_readability_clear(scene)
 
         scene._close_inspector()
         scene._set_deep_panel("endgame")
         scene.update(1 / 60)
         scene.draw(surface)
         assert scene.endgame_actor_active()
+        _assert_actor_readability_clear(scene)
 
         off_scene._set_deep_panel("pipeline")
         off_scene._open_inspector("pipeline")
@@ -3006,8 +3047,10 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "title-actor" in title_menu.active_layers
     assert "actor-timeline" in title_menu.active_layers
     assert "sprite-clips" in title_menu.active_layers
+    assert "actor-readability" in title_menu.active_layers
     assert "actor-timeline" in dashboard.active_layers
     assert "sprite-clips" in dashboard.active_layers
+    assert "actor-readability" in dashboard.active_layers
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
     assert "pending" in pending.active_layers
@@ -3023,10 +3066,12 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "inspector-actor" in inspector.active_layers
     assert "actor-timeline" in inspector.active_layers
     assert "sprite-clips" in inspector.active_layers
+    assert "actor-readability" in inspector.active_layers
     assert "endgame-actor" in endgame.active_layers
     assert "deep-panel" in endgame.active_layers
     assert "actor-timeline" in endgame.active_layers
     assert "sprite-clips" in endgame.active_layers
+    assert "actor-readability" in endgame.active_layers
     assert "outcome" in outcome.active_layers
     assert "outcome-cinematic" in outcome.active_layers
     assert "summary-reveal" in summary.active_layers
@@ -3035,9 +3080,11 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "summary-lanes" in summary.active_layers
     assert "actor-timeline" in summary.active_layers
     assert "sprite-clips" in summary.active_layers
+    assert "actor-readability" in summary.active_layers
     assert "review-actor" in review.active_layers
     assert "actor-timeline" in review.active_layers
     assert "sprite-clips" in review.active_layers
+    assert "actor-readability" in review.active_layers
 
 
 def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
@@ -3069,6 +3116,7 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert areas["Sprite/Actor Layer"].status == "pass"
     assert "actor-timeline" in areas["Sprite/Actor Layer"].active_layers
     assert "sprite-clips" in areas["Sprite/Actor Layer"].active_layers
+    assert "actor-readability" in areas["Sprite/Actor Layer"].active_layers
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)

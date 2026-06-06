@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.131.0 - 2026-06-06
+
+- Added actor sprite readability footprints and collision checks so title/menu, run, inspector, endgame, summary, and review actors are verified against viewport and click-target overlap
+- Added the `actor-readability` layer to visual and animation audits, making actor/sprite readability a required automated gate instead of only a manual playtest note
+- Made live-run actor states react to the latest action-feedback and critical impact cues so product, finance, board, customer, team, and founder sprites communicate the current command context
+
 ## 0.130.0 - 2026-06-06
 
 - Expanded deterministic shape-sprite actor coverage to title/menu, inspector overlays, the endgame board, and review scenes so major 2D surfaces now have explicit character motion
