@@ -162,6 +162,20 @@ class PendingChoiceCue:
     duration: float
 
 
+@dataclass(frozen=True)
+class LateGameChoreographyCue:
+    """Short late-game command cue tied to cockpit, capital, and board lanes."""
+
+    command: str
+    label: str
+    detail: str
+    family: str
+    accent: tuple[int, int, int]
+    targets: tuple[str, ...]
+    time_left: float
+    duration: float
+
+
 @dataclass
 class TextInputModalState:
     """One live text-input modal used by the 2D frontend."""
@@ -2712,6 +2726,7 @@ class RunScene(BaseScene):
         self._overlay_enter_elapsed: dict[str, float] = {}
         self._overlay_exit_cues: list[OverlayExitCue] = []
         self._pending_choice_cues: list[PendingChoiceCue] = []
+        self._late_game_choreography_cues: list[LateGameChoreographyCue] = []
         self._click_targets: list[ClickTarget] = []
         self._context_picker: ContextPicker | None = None
         self._text_input: TextInputModalState | None = None
@@ -2814,6 +2829,13 @@ class RunScene(BaseScene):
                 self._overlay_enter_elapsed[key] = 0.0
                 if key in {"pending", "outcome"}:
                     self._trigger_overlay_motion(key, intensity=0.76)
+                    if key == "pending" and self.state.pending_event is not None:
+                        for index, _option in enumerate(self.state.pending_event.options[:3]):
+                            self._motion_pulses.trigger(
+                                f"pending:option:{index}",
+                                intensity=max(0.36, 0.68 - index * 0.08),
+                                decay=2.0,
+                            )
             else:
                 self._overlay_enter_elapsed[key] += dt
 
@@ -2867,6 +2889,16 @@ class RunScene(BaseScene):
         """Return whether a pending-choice consequence cue is visible."""
 
         return self.motion_mode is not MotionMode.OFF and bool(self._pending_choice_cues)
+
+    def pending_choice_preview_active(self) -> bool:
+        """Return whether pending-event options should expose animated previews."""
+
+        return self.motion_mode is not MotionMode.OFF and self.state.pending_event is not None
+
+    def late_game_choreography_active(self) -> bool:
+        """Return whether a late-game command choreography card is visible."""
+
+        return self.motion_mode is not MotionMode.OFF and bool(self._late_game_choreography_cues)
 
     def _animated_overlay_rect(self, rect, overlay_key: str, *, shift: int = 34):
         if self.motion_mode is MotionMode.OFF:
@@ -3139,6 +3171,20 @@ class RunScene(BaseScene):
             for cue in self._pending_choice_cues
             if cue.time_left - dt > 0
         ]
+        self._late_game_choreography_cues = [
+            LateGameChoreographyCue(
+                command=cue.command,
+                label=cue.label,
+                detail=cue.detail,
+                family=cue.family,
+                accent=cue.accent,
+                targets=cue.targets,
+                time_left=cue.time_left - dt,
+                duration=cue.duration,
+            )
+            for cue in self._late_game_choreography_cues
+            if cue.time_left - dt > 0
+        ]
 
     def _stabilize_motion_bank(self) -> None:
         if self._motion_pulses.live_count() <= 18:
@@ -3408,6 +3454,7 @@ class RunScene(BaseScene):
             self._draw_outcome_overlay(surface)
         self._draw_overlay_exit_cues(surface)
         self._draw_pending_choice_cues(surface)
+        self._draw_late_game_choreography_cues(surface)
         self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
         self._draw_hover_tooltip(surface)
@@ -3876,6 +3923,93 @@ class RunScene(BaseScene):
         self._motion_pulses.trigger("feed", intensity=0.42, decay=1.6)
 
     @staticmethod
+    def _pending_option_tone(label: str, description: str) -> str:
+        text = f"{label} {description}".lower()
+        if any(
+            token in text
+            for token in (
+                "risk",
+                "debt",
+                "cost",
+                "pressure",
+                "delay",
+                "stretch",
+                "accept",
+                "cut",
+            )
+        ):
+            return "warning"
+        if any(
+            token in text
+            for token in (
+                "stabilize",
+                "protect",
+                "recover",
+                "quality",
+                "trust",
+                "success",
+                "safe",
+            )
+        ):
+            return "success"
+        return "info"
+
+    @staticmethod
+    def _pending_option_badge(tone: str) -> str:
+        if tone == "warning":
+            return "RISK"
+        if tone == "success":
+            return "SAFE"
+        return "INFO"
+
+    def _draw_pending_option_preview(
+        self,
+        surface,
+        rect,
+        *,
+        tone: str,
+        strength: float,
+        index: int,
+    ) -> None:
+        if self.motion_mode is MotionMode.OFF or strength <= 0:
+            return
+        pygame = self.pygame
+        accent = tone_color(tone)
+        preview_rect = pygame.Rect(rect.right - 102, rect.top + 10, 82, rect.height - 20)
+        pygame.draw.rect(
+            surface,
+            blend_color((13, 22, 34), accent, min(0.2, strength * 0.18)),
+            preview_rect,
+            border_radius=12,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, accent, min(0.5, strength * 0.42)),
+            preview_rect,
+            width=1,
+            border_radius=12,
+        )
+        phase = self._entity_motion_phase(offset=index * 0.9, speed=1.8)
+        y_mid = preview_rect.centery
+        points: list[tuple[int, int]] = []
+        for step in range(4):
+            ratio = step / 3
+            x = preview_rect.left + 10 + int((preview_rect.width - 20) * ratio)
+            direction = -1 if tone == "success" else 1 if tone == "warning" else 0
+            y = y_mid + int((ratio - 0.5) * 14 * direction)
+            y += int(sin(phase + step * 0.7) * 3 * strength)
+            points.append((x, y))
+        if len(points) >= 2:
+            pygame.draw.lines(surface, blend_color(accent, TEXT, 0.12), False, points, 2)
+        for step, point in enumerate(points):
+            radius = 3 + int(strength * 2)
+            pygame.draw.circle(surface, accent, point, radius)
+            if step == len(points) - 1:
+                pygame.draw.circle(surface, blend_color(TEXT, accent, 0.35), point, radius + 2, 1)
+        badge = self.fonts.small.render(self._pending_option_badge(tone), True, accent)
+        surface.blit(badge, (preview_rect.left + 8, preview_rect.bottom - 17))
+
+    @staticmethod
     def _format_signed_int(value: int, *, suffix: str = "") -> str:
         return f"{'+' if value > 0 else ''}{value}{suffix}"
 
@@ -4016,6 +4150,108 @@ class RunScene(BaseScene):
             ),
         )
         self._action_feedback_cues = self._action_feedback_cues[:3]
+
+    def _late_game_choreography_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 0.78 if self.motion_mode is MotionMode.REDUCED else 1.22
+
+    def _late_game_choreography_profile(
+        self,
+        command: str,
+    ) -> tuple[str, str, str, tuple[int, int, int], tuple[str, ...]] | None:
+        normalized = command.lower()
+        if normalized.startswith(("set_terminal_", "set_exit_", "set_endgame_")):
+            return (
+                "Terminal Gate",
+                "endgame",
+                "Route pressure through exit, continuity, and solvency lanes.",
+                DANGER,
+                ("panel:endgame", "stat:board_pressure", "stat:runway"),
+            )
+        if command in {
+            TurnAction.SET_PATH_CASH_WATERFALL.value,
+            TurnAction.SET_PATH_CONTROL_MATRIX.value,
+            TurnAction.SET_PATH_RESILIENCE_GRID.value,
+            TurnAction.SET_BALANCE_SHEET_RECOVERY_MESH.value,
+            TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
+        }:
+            return (
+                "Path Repair",
+                "endgame",
+                "Tie the active path gap back to capital, board, and recovery controls.",
+                WARN,
+                ("panel:endgame", "panel:finance", "stat:board_pressure"),
+            )
+        if (
+            command in _BOARD_PANEL_COMMANDS
+            or "board_reset" in normalized
+            or normalized.startswith("start_board_")
+            or normalized.startswith("execute_board_")
+        ):
+            return (
+                "Board Recovery",
+                "board",
+                "Pull governance heat into the board lane before reset pressure compounds.",
+                DANGER,
+                ("panel:board", "panel:endgame", "stat:board_pressure"),
+            )
+        if command in _FINANCE_PANEL_COMMANDS or any(
+            token in normalized
+            for token in (
+                "capital",
+                "cash",
+                "debt",
+                "liquidity",
+                "reserve",
+                "solvency",
+                "financing",
+            )
+        ):
+            return (
+                "Capital Control",
+                "finance",
+                "Stage runway, cash, and debt signals before the next gate decision.",
+                WARN,
+                ("panel:finance", "stat:cash", "stat:runway"),
+            )
+        if command in _PIPELINE_PANEL_COMMANDS or any(
+            token in normalized for token in ("roadmap", "release", "pipeline")
+        ):
+            return (
+                "Path Build",
+                "pipeline",
+                "Connect delivery work back to product readiness and path momentum.",
+                SELECTION,
+                ("panel:pipeline", "panel:products"),
+            )
+        return None
+
+    def _queue_late_game_choreography(self, command: str) -> None:
+        duration = self._late_game_choreography_duration()
+        if duration <= 0:
+            return
+        profile = self._late_game_choreography_profile(command)
+        if profile is None:
+            return
+        label, family, detail, accent, targets = profile
+        self._late_game_choreography_cues.insert(
+            0,
+            LateGameChoreographyCue(
+                command=command,
+                label=label,
+                detail=detail,
+                family=family,
+                accent=accent,
+                targets=targets,
+                time_left=duration,
+                duration=duration,
+            ),
+        )
+        self._late_game_choreography_cues = self._late_game_choreography_cues[:2]
+        for target in targets[:3]:
+            self._trigger_motion_target(target, intensity=0.58, motion="slide")
+        self._motion_pulses.trigger("late_game:choreography", intensity=0.72, decay=1.8)
 
     def _draw_overlay_exit_cues(self, surface) -> None:
         if not self._overlay_exit_cues or self.motion_mode is MotionMode.OFF:
@@ -4295,6 +4531,91 @@ class RunScene(BaseScene):
                     progress_rect.height,
                 ),
             )
+
+    def _draw_late_game_choreography_cues(self, surface) -> None:
+        if not self._late_game_choreography_cues or self.motion_mode is MotionMode.OFF:
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        card_width = min(440, max(240, width - 48))
+        card_height = 56
+        left = max(24, (width - card_width) // 2)
+        top = 76 if height < 680 else 100
+        if self._context_picker is not None or self._text_input is not None:
+            top = max(24, height - 146)
+        for index, cue in enumerate(self._late_game_choreography_cues[:2]):
+            if cue.duration <= 0:
+                continue
+            age = max(0.0, cue.duration - cue.time_left)
+            enter_ratio = min(1.0, age / 0.2)
+            ttl_ratio = max(0.0, min(1.0, cue.time_left / cue.duration))
+            intensity = ttl_ratio * (0.56 if self.motion_mode is MotionMode.REDUCED else 1.0)
+            lift = int((1.0 - enter_ratio) * 22)
+            wave = sin(self._entity_motion_phase(offset=index * 1.2, speed=2.0)) * 3 * intensity
+            rect = pygame.Rect(
+                left,
+                int(top + index * (card_height + 8) - lift + wave),
+                card_width,
+                card_height,
+            )
+            layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            layer_rect = layer.get_rect()
+            fill = blend_color((8, 13, 22), cue.accent, 0.18 + intensity * 0.12)
+            pygame.draw.rect(layer, (*fill, 226), layer_rect, border_radius=18)
+            pygame.draw.rect(
+                layer,
+                (*blend_color(BORDER, cue.accent, 0.55), 235),
+                layer_rect,
+                width=2 if intensity >= 0.55 else 1,
+                border_radius=18,
+            )
+            rail_rect = pygame.Rect(14, layer_rect.bottom - 9, layer_rect.width - 28, 4)
+            pygame.draw.rect(layer, (*blend_color(BORDER, cue.accent, 0.2), 190), rail_rect)
+            pygame.draw.rect(
+                layer,
+                (*cue.accent, int(120 + intensity * 95)),
+                pygame.Rect(
+                    rail_rect.left,
+                    rail_rect.top,
+                    int(rail_rect.width * ttl_ratio),
+                    rail_rect.height,
+                ),
+            )
+            self._draw_entity_nodes(
+                layer,
+                pygame.Rect(16, 15, 70, 24),
+                accent=cue.accent,
+                strength=min(1.0, 0.32 + intensity * 0.68),
+                count=3,
+                offset=float(index) + len(cue.family),
+            )
+            surface.blit(layer, rect.topleft)
+            label_surface = self.fonts.small.render(cue.label.upper(), True, TEXT)
+            family_surface = self.fonts.small.render(
+                cue.family.upper(),
+                True,
+                blend_color(MUTED, cue.accent, 0.78),
+            )
+            detail_surface = self.fonts.small.render(
+                self._compact_button_detail(cue.detail, max_length=56),
+                True,
+                MUTED,
+            )
+            target_text = " -> ".join(
+                target.removeprefix("panel:").removeprefix("stat:").removeprefix("summary:")
+                for target in cue.targets[:3]
+            )
+            target_surface = self.fonts.small.render(
+                self._compact_button_detail(target_text, max_length=42),
+                True,
+                blend_color(TEXT, cue.accent, 0.2),
+            )
+            surface.blit(label_surface, (rect.left + 96, rect.top + 9))
+            surface.blit(
+                family_surface, (rect.right - family_surface.get_width() - 14, rect.top + 9)
+            )
+            surface.blit(detail_surface, (rect.left + 96, rect.top + 27))
+            surface.blit(target_surface, (rect.left + 14, rect.bottom - 22))
 
     def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
         pulse = self._overlay_motion_level(overlay_key)
@@ -4672,6 +4993,7 @@ class RunScene(BaseScene):
         self._focus_workspace_for_command(command)
         inspector_key = self._inspector_key_for_command(command)
         if inspector_key is not None:
+            self._queue_late_game_choreography(command)
             self._set_deep_panel(inspector_key)
             self._open_inspector(inspector_key)
             self._push_workspace_handoff_event(
@@ -4709,6 +5031,7 @@ class RunScene(BaseScene):
             )
             return
         if isinstance(request, ContextPicker):
+            self._queue_late_game_choreography(command)
             self._set_context_picker(request)
             self._queue_action_feedback(command)
             self._push_workspace_handoff_event(
@@ -4746,6 +5069,7 @@ class RunScene(BaseScene):
             )
             return
 
+        self._queue_late_game_choreography(request.action.value)
         self._queue_action_feedback(request.action.value)
         self.state = outcome.state
         self._queue_impact_cues(previous_state, self.state)
@@ -6150,15 +6474,27 @@ class RunScene(BaseScene):
         top = inner.top + 92
         for index, option in enumerate(event_model.options):
             option_rect = pygame.Rect(inner.left, top, inner.width, 54)
+            option_tone = self._pending_option_tone(option.label, option.description)
+            option_accent = tone_color(option_tone)
+            option_motion = self._motion_level("overlay:pending", f"pending:option:{index}")
             draw_button(
                 surface,
                 pygame,
                 rect=option_rect,
                 title=f"{option.key_hint} {option.label}",
                 detail=option.description,
-                accent=WARN,
+                accent=option_accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                selected=index == 0,
+                emphasis=option_motion,
+            )
+            self._draw_pending_option_preview(
+                surface,
+                option_rect,
+                tone=option_tone,
+                strength=max(0.22, option_motion),
+                index=index,
             )
             self._click_targets.append(ClickTarget("pending_option", str(index), option_rect))
             top += 64
@@ -7220,6 +7556,25 @@ class TurnSummaryScene(BaseScene):
         sequence_end = 0.48 + product_count * 0.2 + metric_count * 0.05
         return self._elapsed < sequence_end
 
+    def _summary_outcome_lanes_duration(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        return 1.35 if self.motion_mode is MotionMode.REDUCED else 2.1
+
+    def summary_outcome_lanes_active(self) -> bool:
+        """Return whether the compact outcome lanes should animate."""
+
+        duration = self._summary_outcome_lanes_duration()
+        return duration > 0 and self._elapsed < duration
+
+    def _summary_outcome_lane_progress(self, index: int) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 1.0
+        start = 0.12 + index * (0.08 if self.motion_mode is MotionMode.REDUCED else 0.12)
+        duration = 0.42 if self.motion_mode is MotionMode.REDUCED else 0.58
+        ratio = max(0.0, min(1.0, (self._elapsed - start) / duration))
+        return 1.0 - (1.0 - ratio) * (1.0 - ratio)
+
     def _summary_top_section_ratio(self, width: int) -> float:
         if width < 900:
             return 0.5 if len(self._events) >= 4 else 0.52
@@ -7304,6 +7659,7 @@ class TurnSummaryScene(BaseScene):
         self._draw_summary_main(surface, left_rect)
         self._draw_summary_timeline(surface, right_rect)
         self._draw_summary_footer(surface, footer_rect)
+        self._draw_summary_outcome_lanes(surface)
         self._draw_summary_cinematic_overlay(surface)
         self._draw_scene_transition_overlay(surface)
 
@@ -7398,6 +7754,75 @@ class TurnSummaryScene(BaseScene):
         if duration <= 0:
             return 1.0
         return max(0.0, min(1.0, self._elapsed / duration))
+
+    def _draw_summary_outcome_lanes(self, surface) -> None:
+        if not self.summary_outcome_lanes_active():
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        metrics_by_key = {metric.key: metric for metric in self._view_model.metrics}
+        lane_metrics = tuple(
+            metric
+            for key in ("net_cash", "users", "board", "gates")
+            if (metric := metrics_by_key.get(key)) is not None
+        )
+        if not lane_metrics:
+            return
+        compact = width < 900
+        lane_height = 18 if compact else 20
+        lane_gap = 6
+        panel_width = min(width - 72, 620)
+        left = (width - panel_width) // 2
+        top = 122 if height >= 680 else 112
+        if compact:
+            top += 8
+        for index, metric in enumerate(lane_metrics):
+            progress = self._summary_outcome_lane_progress(index)
+            if progress <= 0:
+                continue
+            accent = tone_color(metric.tone)
+            lane_rect = pygame.Rect(
+                left,
+                top + index * (lane_height + lane_gap),
+                panel_width,
+                lane_height,
+            )
+            fill_alpha = int(46 + progress * 76)
+            pygame.draw.rect(
+                surface,
+                (*blend_color((13, 22, 34), accent, 0.12), fill_alpha),
+                lane_rect,
+                border_radius=lane_height // 2,
+            )
+            pygame.draw.rect(
+                surface,
+                (*blend_color(BORDER, accent, 0.35), min(210, fill_alpha + 70)),
+                lane_rect,
+                width=1,
+                border_radius=lane_height // 2,
+            )
+            fill_width = max(8, int(lane_rect.width * metric.ratio * progress))
+            pygame.draw.rect(
+                surface,
+                (*accent, min(190, fill_alpha + 70)),
+                pygame.Rect(lane_rect.left, lane_rect.top, fill_width, lane_rect.height),
+                border_radius=lane_height // 2,
+            )
+            label = self.fonts.small.render(
+                self._compact_summary_text(metric.label, max_length=16),
+                True,
+                TEXT,
+            )
+            value = self.fonts.small.render(metric.value_text, True, TEXT)
+            surface.blit(label, (lane_rect.left + 10, lane_rect.top + 3))
+            surface.blit(
+                value,
+                (lane_rect.right - value.get_width() - 10, lane_rect.top + 3),
+            )
+            node_x = lane_rect.left + fill_width
+            node_y = lane_rect.centery
+            pygame.draw.circle(surface, blend_color(TEXT, accent, 0.35), (node_x, node_y), 4)
+            pygame.draw.circle(surface, accent, (node_x, node_y), 6, 1)
 
     def _draw_summary_cinematic_overlay(self, surface) -> None:
         if not self.summary_cinematic_active():

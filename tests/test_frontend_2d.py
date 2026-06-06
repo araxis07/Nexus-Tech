@@ -1652,6 +1652,95 @@ def test_run_scene_pending_choice_cue_tracks_resolution_feedback() -> None:
         pygame.quit()
 
 
+def test_run_scene_pending_choice_preview_respects_motion_modes() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.pending_event = PendingEvent(
+            event_id="audit_pending_preview",
+            category=EventCategory.MARKET_OPPORTUNITY,
+            title="Audit Pending Preview",
+            description="A deterministic pending event for preview motion coverage.",
+            triggered_turn=state.company.current_turn,
+            cooldown_turns=0,
+            options=[
+                EventOption(
+                    id="stabilize",
+                    label="Stabilize rollout",
+                    description="Protect quality and trust before scaling.",
+                ),
+                EventOption(
+                    id="stretch",
+                    label="Stretch the plan",
+                    description="Accept cost risk and pressure to chase upside.",
+                ),
+            ],
+        )
+        full_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=49),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=50),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        assert full_scene.pending_choice_preview_active()
+        assert full_scene._pending_option_tone("Stabilize rollout", "Protect quality") == "success"
+        assert full_scene._pending_option_tone("Stretch the plan", "Accept risk") == "warning"
+        assert not off_scene.pending_choice_preview_active()
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_late_game_choreography_respects_motion_modes() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        full_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=51),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=52),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        full_scene._queue_late_game_choreography(TurnAction.SET_TERMINAL_SOLVENCY_MANDATE.value)
+        off_scene._queue_late_game_choreography(TurnAction.SET_TERMINAL_SOLVENCY_MANDATE.value)
+
+        assert full_scene.late_game_choreography_active()
+        assert full_scene._late_game_choreography_cues[0].family == "endgame"
+        assert full_scene._motion_pulses.get("panel:endgame") > 0
+        assert not off_scene.late_game_choreography_active()
+        full_scene.update(2.0)
+        assert not full_scene.late_game_choreography_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2177,6 +2266,51 @@ def test_turn_summary_scene_metric_sequence_respects_motion_modes() -> None:
         pygame.quit()
 
 
+def test_turn_summary_scene_outcome_lanes_respect_motion_modes() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        previous_state = create_new_game("NEXUS TECH", "Nexus One")
+        working_state = apply_action(
+            previous_state.model_copy(deep=True),
+            TurnAction.IMPROVE_QUALITY,
+            context=ActionContext(target_product_id=previous_state.products[0].id),
+        ).state
+        resolution = resolve_turn(working_state, RandomSource(seed=33))
+        full_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=33),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+        )
+        off_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=34),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=True,
+            motion_mode=MotionMode.OFF,
+        )
+
+        assert full_scene.summary_outcome_lanes_active()
+        assert full_scene._summary_outcome_lane_progress(0) == 0.0
+        assert not off_scene.summary_outcome_lanes_active()
+        full_scene.update(2.3)
+        assert not full_scene.summary_outcome_lanes_active()
+    finally:
+        pygame.quit()
+
+
 def test_turn_summary_scene_event_pacing_helpers_track_window_size() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2507,8 +2641,14 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.risk_drama_disabled_samples == 0
     assert cell.pending_choice_active_samples == 1
     assert cell.pending_choice_disabled_samples == 0
+    assert cell.pending_choice_preview_active_samples == 1
+    assert cell.pending_choice_preview_disabled_samples == 0
+    assert cell.late_game_choreography_active_samples == 1
+    assert cell.late_game_choreography_disabled_samples == 0
     assert cell.summary_sequence_active_samples == 1
     assert cell.summary_sequence_disabled_samples == 0
+    assert cell.summary_lanes_active_samples == 1
+    assert cell.summary_lanes_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2556,8 +2696,14 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.risk_drama_disabled_samples == 1
     assert cell.pending_choice_active_samples == 0
     assert cell.pending_choice_disabled_samples == 1
+    assert cell.pending_choice_preview_active_samples == 0
+    assert cell.pending_choice_preview_disabled_samples == 1
+    assert cell.late_game_choreography_active_samples == 0
+    assert cell.late_game_choreography_disabled_samples == 1
     assert cell.summary_sequence_active_samples == 0
     assert cell.summary_sequence_disabled_samples == 1
+    assert cell.summary_lanes_active_samples == 0
+    assert cell.summary_lanes_disabled_samples == 1
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2587,6 +2733,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "title_meta",
         "run_dashboard",
         "run_drama_feedback",
+        "run_pending_feedback",
         "run_impact_feedback",
         "run_picker_feedback",
         "run_inspector",
@@ -2594,25 +2741,31 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "review",
     } <= scene_keys
     assert all(cell.checksum > 0 for cell in report.cells)
+    assert report.baseline_signature.startswith(f"{len(report.cells)}:")
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
     drama = next(cell for cell in report.cells if cell.scene_key == "run_drama_feedback")
+    pending = next(cell for cell in report.cells if cell.scene_key == "run_pending_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
+    assert "pending" in pending.active_layers
+    assert "pending-choice-preview" in pending.active_layers
     assert "impact-cue" in impact.active_layers
     assert "action-feedback" in impact.active_layers
     assert "picker" in picker.active_layers
     assert "overlay-transition" in picker.active_layers
     assert "action-feedback" in picker.active_layers
+    assert "late-game-choreography" in picker.active_layers
     assert "inspector" in inspector.active_layers
     assert "overlay-transition" in inspector.active_layers
     assert "summary-reveal" in summary.active_layers
     assert "summary-cinematic" in summary.active_layers
     assert "summary-sequence" in summary.active_layers
+    assert "summary-lanes" in summary.active_layers
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:

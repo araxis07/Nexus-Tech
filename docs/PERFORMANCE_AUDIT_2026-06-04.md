@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.126.0`
+Version: `0.127.0`
 
 ## Scope
 
@@ -18,8 +18,11 @@ Version: `0.126.0`
 - Product cards now render quality/fit shimmer, bug beacons, debt cracks, and user-flow particles from live product ratios.
 - Finance, runway, and board pressure lanes now render risk drama beacons when danger states are active, and pending-event choices produce consequence cues after selection.
 - Turn-summary metrics and product outcomes now use staged reveal sequencing in addition to the cinematic phase rail.
-- `audit-2d-visual` now renders title, meta, live run, picker/action-feedback, inspector, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice telemetry, summary-cinematic/sequence telemetry, average frame time, and max frame spike.
+- Late-game command choreography cards now cover terminal, path-repair, board, finance, and pipeline commands while reusing panel/stat targets.
+- Pending-event options now expose preview motion before selection, and turn summaries now add compact outcome lanes for cash, users, board, and gate shifts.
+- `audit-2d-visual` now renders title, meta, live run, pending preview, picker/action-feedback, inspector, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
+- Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 

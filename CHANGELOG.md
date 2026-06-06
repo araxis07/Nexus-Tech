@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.127.0 - 2026-06-06
+
+- Added late-game command choreography cue cards for terminal, path-repair, board, finance, and pipeline commands so cockpit/gate actions read as explicit 2D motion
+- Added pending-event option preview motion and turn-summary outcome lanes so choices and post-turn results animate before and after resolution
+- Extended visual and motion audits with pending-preview, late-game choreography, summary-lane telemetry, and deterministic visual baseline signatures
+
 ## 0.126.0 - 2026-06-06
 
 - Added product-card drama animation with quality/fit shimmer, bug beacons, debt cracks, and user-flow particles so product state reads as live 2D motion

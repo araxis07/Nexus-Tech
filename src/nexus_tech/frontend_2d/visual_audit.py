@@ -11,6 +11,9 @@ from tempfile import TemporaryDirectory
 
 from nexus_tech.domain.models import (
     DifficultyMode,
+    EventCategory,
+    EventOption,
+    PendingEvent,
     ProductReleaseType,
     RoadmapProjectType,
     TurnAction,
@@ -106,6 +109,20 @@ class VisualAuditReport:
         """Return pass only when every captured surface passes visual checks."""
 
         return "pass" if all(cell.status == "pass" for cell in self.cells) else "fail"
+
+    @property
+    def baseline_signature(self) -> str:
+        """Return a stable compact signature for the captured visual baseline."""
+
+        digest = 1
+        for cell in sorted(self.cells, key=lambda item: (item.scene_key, item.width, item.height)):
+            payload = (
+                f"{cell.scene_key}:{cell.width}x{cell.height}:"
+                f"{cell.checksum}:{cell.unique_color_samples}:"
+                f"{cell.luminance_spread}:{cell.non_dark_ratio}"
+            )
+            digest = zlib.adler32(payload.encode("utf-8"), digest)
+        return f"{len(self.cells)}:{digest:08x}"
 
 
 def run_2d_visual_audit(
@@ -275,6 +292,41 @@ def run_2d_visual_audit(
                     )
                 )
 
+                pending_state = state.model_copy(deep=True)
+                pending_state.pending_event = _build_audit_pending_event(
+                    pending_state.company.current_turn
+                )
+                pending_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=pending_state,
+                    rng=RandomSource(seed=seed + 10),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        pending_scene,
+                        scene_key="run_pending_feedback",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "pending",
+                                "pending-choice-preview",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
                 impact_scene = RunScene(
                     pygame=pygame,
                     fonts=fonts,
@@ -338,6 +390,7 @@ def run_2d_visual_audit(
                                 "deep-panel",
                                 "picker",
                                 "action-feedback",
+                                "late-game-choreography",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -406,6 +459,7 @@ def run_2d_visual_audit(
                                 "summary-reveal",
                                 "summary-cinematic",
                                 "summary-sequence",
+                                "summary-lanes",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -533,6 +587,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("deep-panel")
     if getattr(scene, "_context_picker", None) is not None:
         layers.append("picker")
+    if getattr(getattr(scene, "state", None), "pending_event", None) is not None:
+        layers.append("pending")
     if getattr(scene, "_inspector_panel_key", None) is not None:
         layers.append("inspector")
     if getattr(scene, "_action_feedback_cues", ()):
@@ -547,12 +603,18 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("risk-drama")
     if getattr(scene, "pending_choice_active", lambda: False)():
         layers.append("pending-choice")
+    if getattr(scene, "pending_choice_preview_active", lambda: False)():
+        layers.append("pending-choice-preview")
+    if getattr(scene, "late_game_choreography_active", lambda: False)():
+        layers.append("late-game-choreography")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
     if getattr(scene, "summary_cinematic_active", lambda: False)():
         layers.append("summary-cinematic")
     if getattr(scene, "summary_metric_sequence_active", lambda: False)():
         layers.append("summary-sequence")
+    if getattr(scene, "summary_outcome_lanes_active", lambda: False)():
+        layers.append("summary-lanes")
     return tuple(layers)
 
 
@@ -568,10 +630,38 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "product-drama",
         "risk-drama",
         "pending-choice",
+        "pending-choice-preview",
+        "late-game-choreography",
         "summary-cinematic",
         "summary-sequence",
+        "summary-lanes",
     }
     return tuple(layer for layer in layers if layer not in disabled_layers)
+
+
+def _build_audit_pending_event(turn: int) -> PendingEvent:
+    return PendingEvent(
+        event_id="visual_audit_pending_choice",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Audit Pending Choice",
+        description=(
+            "Choose a response path so pending-event preview motion has deterministic data."
+        ),
+        triggered_turn=turn,
+        cooldown_turns=0,
+        options=[
+            EventOption(
+                id="stabilize",
+                label="Stabilize rollout",
+                description="Protect quality and reduce launch risk before scaling.",
+            ),
+            EventOption(
+                id="stretch",
+                label="Stretch the plan",
+                description="Accept pressure and cost risk to chase the upside now.",
+            ),
+        ],
+    )
 
 
 def _build_visual_audit_state(

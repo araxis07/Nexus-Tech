@@ -11,6 +11,9 @@ from time import perf_counter
 
 from nexus_tech.domain.models import (
     DifficultyMode,
+    EventCategory,
+    EventOption,
+    PendingEvent,
     ProductReleaseType,
     RoadmapProjectType,
     TurnAction,
@@ -86,8 +89,14 @@ class MotionAuditCell:
     risk_drama_disabled_samples: int = 0
     pending_choice_active_samples: int = 0
     pending_choice_disabled_samples: int = 0
+    pending_choice_preview_active_samples: int = 0
+    pending_choice_preview_disabled_samples: int = 0
+    late_game_choreography_active_samples: int = 0
+    late_game_choreography_disabled_samples: int = 0
     summary_sequence_active_samples: int = 0
     summary_sequence_disabled_samples: int = 0
+    summary_lanes_active_samples: int = 0
+    summary_lanes_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -326,6 +335,43 @@ def run_2d_motion_audit(
                 )
                 pending_choice_active_count = int(pending_scene.pending_choice_active())
                 pending_choice_disabled_count = int(not pending_scene.pending_choice_active())
+                pending_preview_state = state.model_copy(deep=True)
+                pending_preview_state.pending_event = _build_motion_audit_pending_event(
+                    pending_preview_state.company.current_turn
+                )
+                pending_preview_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=pending_preview_state,
+                    rng=RandomSource(seed=seed + 9),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                pending_preview_active_count = int(
+                    pending_preview_scene.pending_choice_preview_active()
+                )
+                pending_preview_disabled_count = int(
+                    not pending_preview_scene.pending_choice_preview_active()
+                )
+                late_game_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 10),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                late_game_scene._queue_late_game_choreography(
+                    TurnAction.SET_TERMINAL_SOLVENCY_MANDATE.value
+                )
+                late_game_active_count = int(late_game_scene.late_game_choreography_active())
+                late_game_disabled_count = int(not late_game_scene.late_game_choreography_active())
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
                 run_avg, run_max = _exercise_scene(run_scene, surface, frames)
@@ -357,6 +403,8 @@ def run_2d_motion_audit(
                 summary_sequence_disabled_count = int(
                     not summary_scene.summary_metric_sequence_active()
                 )
+                summary_lanes_active_count = int(summary_scene.summary_outcome_lanes_active())
+                summary_lanes_disabled_count = int(not summary_scene.summary_outcome_lanes_active())
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
                 summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
@@ -456,8 +504,14 @@ def run_2d_motion_audit(
                         risk_drama_disabled_samples=risk_drama_disabled_count,
                         pending_choice_active_samples=pending_choice_active_count,
                         pending_choice_disabled_samples=pending_choice_disabled_count,
+                        pending_choice_preview_active_samples=pending_preview_active_count,
+                        pending_choice_preview_disabled_samples=pending_preview_disabled_count,
+                        late_game_choreography_active_samples=late_game_active_count,
+                        late_game_choreography_disabled_samples=late_game_disabled_count,
                         summary_sequence_active_samples=summary_sequence_active_count,
                         summary_sequence_disabled_samples=summary_sequence_disabled_count,
+                        summary_lanes_active_samples=summary_lanes_active_count,
+                        summary_lanes_disabled_samples=summary_lanes_disabled_count,
                     )
                 )
         return MotionAuditReport(
@@ -647,6 +701,29 @@ def _exercise_long_run_pressure(scene, surface, frames: int) -> tuple[int, int, 
     before = scene._motion_pulses.live_count()
     average, max_frame = _exercise_scene(scene, surface, max(16, frames * 8))
     return before, scene._motion_pulses.live_count(), average, max_frame
+
+
+def _build_motion_audit_pending_event(turn: int) -> PendingEvent:
+    return PendingEvent(
+        event_id="motion_audit_pending_choice",
+        category=EventCategory.MARKET_OPPORTUNITY,
+        title="Motion Audit Pending Choice",
+        description="Deterministic pending event for choice-preview motion telemetry.",
+        triggered_turn=turn,
+        cooldown_turns=0,
+        options=[
+            EventOption(
+                id="stabilize",
+                label="Stabilize rollout",
+                description="Protect quality and trust before scaling the launch.",
+            ),
+            EventOption(
+                id="stretch",
+                label="Stretch the plan",
+                description="Accept pressure and cost risk to chase upside now.",
+            ),
+        ],
+    )
 
 
 def _build_motion_audit_state(

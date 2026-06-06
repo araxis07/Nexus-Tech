@@ -830,7 +830,10 @@ def audit_2d_visual_command(
     border_style = "green" if report.status == "pass" else "red"
     console.print(
         Panel.fit(
-            f"Visual audit status: {report.status.upper()} across {len(report.cells)} captures.",
+            (
+                f"Visual audit status: {report.status.upper()} across "
+                f"{len(report.cells)} captures. Baseline {report.baseline_signature}."
+            ),
             title="2D Visual Audit",
             border_style=border_style,
         )
