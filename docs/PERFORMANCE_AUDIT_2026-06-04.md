@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.127.0`
+Version: `0.128.0`
 
 ## Scope
 
@@ -20,9 +20,11 @@ Version: `0.127.0`
 - Turn-summary metrics and product outcomes now use staged reveal sequencing in addition to the cinematic phase rail.
 - Late-game command choreography cards now cover terminal, path-repair, board, finance, and pipeline commands while reusing panel/stat targets.
 - Pending-event options now expose preview motion before selection, and turn summaries now add compact outcome lanes for cash, users, board, and gate shifts.
-- `audit-2d-visual` now renders title, meta, live run, pending preview, picker/action-feedback, inspector, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
+- Outcome overlays now include a dedicated victory/shutdown cinematic layer for final run states.
+- `audit-2d-visual` now renders title, meta, live run, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
+- `audit-2d-animation` now combines visual-layer coverage, motion-budget checks, off-mode checks, and advisory gaps into one animation-completeness gate.
 - Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 
@@ -43,6 +45,7 @@ Version: `0.127.0`
 - `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced`
 - `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode off`
 - `nexus-tech audit-2d-visual --scenario founder_journey --seed 7`
+- `nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1`
 - `pytest -q tests/test_frontend_2d.py -k "motion_audit or audit_2d_motion or visual_audit or audit_2d_visual"`
 
 ## Result

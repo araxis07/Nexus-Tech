@@ -2890,6 +2890,13 @@ class RunScene(BaseScene):
 
         return self.motion_mode is not MotionMode.OFF and bool(self._pending_choice_cues)
 
+    def outcome_cinematic_active(self) -> bool:
+        """Return whether the victory/shutdown outcome cinematic layer is visible."""
+
+        return self.motion_mode is not MotionMode.OFF and (
+            self.state.company.game_over or self.state.victory_achieved
+        )
+
     def pending_choice_preview_active(self) -> bool:
         """Return whether pending-event options should expose animated previews."""
 
@@ -7295,13 +7302,14 @@ class RunScene(BaseScene):
         modal_rect = _fit_modal_rect(pygame, surface, width=520, height=264, margin=24)
         modal_rect = self._animated_overlay_rect(modal_rect, "outcome", shift=26)
         accent = GOOD if self.state.victory_achieved else DANGER
+        self._draw_outcome_cinematic_backdrop(surface, modal_rect, accent)
         inner = draw_panel(
             surface,
             pygame,
             modal_rect,
             title="Run Complete",
             accent=accent,
-            emphasis=overlay_motion,
+            emphasis=max(0.32, overlay_motion),
             lift=int(overlay_motion * 4),
         )
         title = "Victory Achieved" if self.state.victory_achieved else "Company Shutdown"
@@ -7357,6 +7365,72 @@ class RunScene(BaseScene):
         self._click_targets.append(ClickTarget("open_review", "", review_rect))
         self._click_targets.append(ClickTarget("save", "", save_rect))
         self._click_targets.append(ClickTarget("close_outcome", "", close_rect))
+
+    def _draw_outcome_cinematic_backdrop(
+        self,
+        surface,
+        modal_rect,
+        accent: tuple[int, int, int],
+    ) -> None:
+        if not self.outcome_cinematic_active():
+            return
+        pygame = self.pygame
+        width, height = surface.get_size()
+        intensity = 0.52 if self.motion_mode is MotionMode.REDUCED else 1.0
+        phase = self._entity_motion_phase(speed=1.4)
+        rail_alpha = int(50 + intensity * 60)
+        rail_top = max(24, modal_rect.top - 46)
+        rail_bottom = min(height - 24, modal_rect.bottom + 46)
+        left = max(24, modal_rect.left - 82)
+        right = min(width - 24, modal_rect.right + 82)
+        for index, y in enumerate((rail_top, rail_bottom)):
+            progress = (sin(phase + index * 1.7) + 1.0) / 2
+            sweep_width = max(70, int((right - left) * (0.2 + progress * 0.24)))
+            sweep_x = left + int(((right - left) - sweep_width) * progress)
+            base_rect = pygame.Rect(left, y, right - left, 5)
+            sweep_rect = pygame.Rect(sweep_x, y, sweep_width, 5)
+            pygame.draw.rect(
+                surface,
+                (*blend_color(BORDER, accent, 0.22), max(28, rail_alpha // 2)),
+                base_rect,
+                border_radius=4,
+            )
+            pygame.draw.rect(
+                surface,
+                (*accent, rail_alpha),
+                sweep_rect,
+                border_radius=4,
+            )
+        node_count = 5 if self.motion_mode is MotionMode.FULL else 3
+        for index in range(node_count):
+            ratio = (index + 1) / (node_count + 1)
+            x = left + int((right - left) * ratio)
+            drift = sin(phase * 1.3 + index * 0.9) * 8 * intensity
+            y = modal_rect.centery + int(drift)
+            radius = 3 + int(intensity * 2)
+            pygame.draw.circle(
+                surface,
+                (*blend_color(accent, TEXT, 0.16), int(95 + intensity * 80)),
+                (x, y),
+                radius,
+            )
+            pygame.draw.circle(surface, (*accent, int(120 + intensity * 70)), (x, y), radius + 3, 1)
+        status_text = "VICTORY PATH LOCKED" if self.state.victory_achieved else "SHUTDOWN REVIEW"
+        badge = self.fonts.small.render(status_text, True, blend_color(TEXT, accent, 0.16))
+        badge_rect = pygame.Rect(
+            modal_rect.centerx - badge.get_width() // 2 - 12,
+            max(18, modal_rect.top - 34),
+            badge.get_width() + 24,
+            24,
+        )
+        pygame.draw.rect(
+            surface,
+            (*blend_color((13, 22, 34), accent, 0.18), 220),
+            badge_rect,
+            border_radius=12,
+        )
+        pygame.draw.rect(surface, accent, badge_rect, width=1, border_radius=12)
+        surface.blit(badge, (badge_rect.left + 12, badge_rect.top + 6))
 
     def _draw_snapshot_chip(self, surface, rect, label: str, value: str, tone: str) -> None:
         pygame = self.pygame

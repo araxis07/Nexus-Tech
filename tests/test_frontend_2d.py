@@ -20,6 +20,8 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.frontend_2d import (
+    AnimationAuditReport,
+    AnimationCoverageCell,
     FlowAuditReport,
     MotionAuditCell,
     MotionAuditReport,
@@ -27,6 +29,7 @@ from nexus_tech.frontend_2d import (
     VisualAuditReport,
     launch_2d_frontend,
     launch_2d_menu,
+    run_2d_animation_audit,
     run_2d_flow_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
@@ -1741,6 +1744,43 @@ def test_run_scene_late_game_choreography_respects_motion_modes() -> None:
         pygame.quit()
 
 
+def test_run_scene_outcome_cinematic_respects_motion_modes() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.company.game_over = True
+        state.company.cash_on_hand = Decimal("-125.00")
+        full_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=53),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=54),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        full_scene.update(1 / 60)
+        full_scene.draw(surface)
+        off_scene.update(1 / 60)
+        off_scene.draw(surface)
+
+        assert full_scene.outcome_cinematic_active()
+        assert not off_scene.outcome_cinematic_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2633,6 +2673,8 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.impact_cue_disabled_samples == 0
     assert cell.overlay_transition_active_samples == 1
     assert cell.overlay_transition_disabled_samples == 0
+    assert cell.outcome_cinematic_active_samples == 1
+    assert cell.outcome_cinematic_disabled_samples == 0
     assert cell.summary_cinematic_active_samples == 1
     assert cell.summary_cinematic_disabled_samples == 0
     assert cell.product_drama_active_samples == 1
@@ -2688,6 +2730,8 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.impact_cue_disabled_samples == 1
     assert cell.overlay_transition_active_samples == 0
     assert cell.overlay_transition_disabled_samples == 1
+    assert cell.outcome_cinematic_active_samples == 0
+    assert cell.outcome_cinematic_disabled_samples == 1
     assert cell.summary_cinematic_active_samples == 0
     assert cell.summary_cinematic_disabled_samples == 1
     assert cell.product_drama_active_samples == 0
@@ -2737,6 +2781,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "run_impact_feedback",
         "run_picker_feedback",
         "run_inspector",
+        "run_outcome_overlay",
         "turn_summary",
         "review",
     } <= scene_keys
@@ -2749,6 +2794,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     pending = next(cell for cell in report.cells if cell.scene_key == "run_pending_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
+    outcome = next(cell for cell in report.cells if cell.scene_key == "run_outcome_overlay")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
@@ -2762,10 +2808,36 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "late-game-choreography" in picker.active_layers
     assert "inspector" in inspector.active_layers
     assert "overlay-transition" in inspector.active_layers
+    assert "outcome" in outcome.active_layers
+    assert "outcome-cinematic" in outcome.active_layers
     assert "summary-reveal" in summary.active_layers
     assert "summary-cinematic" in summary.active_layers
     assert "summary-sequence" in summary.active_layers
     assert "summary-lanes" in summary.active_layers
+
+
+def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
+    report = run_2d_animation_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        frames=1,
+        sizes=((820, 620),),
+    )
+
+    assert report.status == "pass"
+    assert report.visual_report.baseline_signature.startswith("11:")
+    areas = {cell.area: cell for cell in report.cells}
+    assert areas["Pending Event Preview"].status == "pass"
+    assert "pending-choice-preview" in areas["Pending Event Preview"].active_layers
+    assert areas["Late-Game Command Choreography"].status == "pass"
+    assert "late-game-choreography" in areas["Late-Game Command Choreography"].active_layers
+    assert areas["Outcome Cinematic"].status == "pass"
+    assert "outcome-cinematic" in areas["Outcome Cinematic"].active_layers
+    assert areas["Motion Off Gate"].status == "pass"
+    assert areas["Manual Playtest"].status == "advisory"
+    assert areas["Sprite/Actor Layer"].status == "advisory"
+    assert any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
@@ -2885,6 +2957,93 @@ def test_audit_2d_visual_command_reports_scene_matrix(monkeypatch, tmp_path: Pat
     assert calls["seed"] == 7
     assert calls["motion_mode"] is MotionMode.REDUCED
     assert calls["output_dir"] == tmp_path
+
+
+def test_audit_2d_animation_command_reports_completeness_matrix(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_animation_audit(**kwargs):
+        calls.update(kwargs)
+        visual_report = VisualAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            motion_mode=MotionMode.FULL.value,
+            cells=(
+                VisualAuditCell(
+                    scene_key="run_outcome_overlay",
+                    width=820,
+                    height=620,
+                    checksum=12345,
+                    unique_color_samples=42,
+                    luminance_spread=128,
+                    non_dark_ratio=0.42,
+                    active_layers=("outcome", "outcome-cinematic"),
+                    expected_layers=("outcome", "outcome-cinematic"),
+                ),
+            ),
+        )
+        motion_report = MotionAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            frames=kwargs["frames"],
+            cells=(),
+            flow_report=FlowAuditReport(
+                command_count=44,
+                inspector_action_count=82,
+                findings=(),
+            ),
+        )
+        return AnimationAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            cells=(
+                AnimationCoverageCell(
+                    area="Outcome Cinematic",
+                    required_layers=("outcome-cinematic",),
+                    active_layers=("outcome-cinematic",),
+                    status="pass",
+                    notes="captured",
+                ),
+                AnimationCoverageCell(
+                    area="Manual Playtest",
+                    required_layers=("open-window-readability",),
+                    active_layers=("advisory",),
+                    status="advisory",
+                    notes="manual timing still required",
+                ),
+            ),
+            visual_report=visual_report,
+            motion_report=motion_report,
+            off_motion_report=motion_report,
+            advisory_gaps=("Manual open-window playtest is still required.",),
+        )
+
+    monkeypatch.setattr(cli_module, "run_2d_animation_audit", fake_run_2d_animation_audit)
+
+    result = runner.invoke(
+        app,
+        [
+            "audit-2d-animation",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "7",
+            "--frames",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2D Animation Audit" in result.output
+    assert "Outcome Cinematic" in result.output
+    assert "Animation Advisory Gaps" in result.output
+    assert "Animation audit status: PASS" in result.output
+    assert calls["scenario_id"] == "founder_journey"
+    assert calls["seed"] == 7
+    assert calls["frames"] == 1
 
 
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:

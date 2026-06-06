@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.128.0 - 2026-06-06
+
+- Added an outcome cinematic layer for victory/shutdown overlays so final run states have dedicated 2D motion instead of a static modal only
+- Added `audit-2d-animation`, a combined animation-completeness gate that checks required visual layers, motion budgets, off-mode behavior, and advisory gaps
+- Extended visual and motion audits with outcome-cinematic coverage and documented the remaining manual playtest and sprite/actor-layer gaps explicitly
+
 ## 0.127.0 - 2026-06-06
 
 - Added late-game command choreography cue cards for terminal, path-repair, board, finance, and pipeline commands so cockpit/gate actions read as explicit 2D motion

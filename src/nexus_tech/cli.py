@@ -59,6 +59,7 @@ from nexus_tech.frontend_2d import (
     MotionMode,
     launch_2d_frontend,
     launch_2d_menu,
+    run_2d_animation_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
 )
@@ -835,6 +836,86 @@ def audit_2d_visual_command(
                 f"{len(report.cells)} captures. Baseline {report.baseline_signature}."
             ),
             title="2D Visual Audit",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@app.command("audit-2d-animation")
+def audit_2d_animation_command(
+    scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed for deterministic 2D animation completeness audit setup.",
+    ),
+    frames: int = typer.Option(
+        1,
+        "--frames",
+        min=1,
+        help="Number of fixed-timestep frames for the embedded motion gates.",
+    ),
+) -> None:
+    """Run the combined 2D animation completeness gate."""
+
+    try:
+        report = run_2d_animation_audit(
+            scenario_id=scenario,
+            difficulty_mode=difficulty,
+            seed=seed,
+            frames=frames,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    table = Table(
+        title=(
+            f"2D Animation Audit | {report.scenario_id} | {report.difficulty} | seed {report.seed}"
+        )
+    )
+    table.add_column("Area", style="cyan", no_wrap=True)
+    table.add_column("Required")
+    table.add_column("Active")
+    table.add_column("Status", justify="center")
+    table.add_column("Notes")
+    for cell in report.cells:
+        status_text = cell.status.upper()
+        table.add_row(
+            cell.area,
+            ",".join(cell.required_layers),
+            ",".join(cell.active_layers),
+            status_text,
+            cell.notes,
+        )
+    console.print(table)
+
+    if report.advisory_gaps:
+        console.print(
+            Panel.fit(
+                "\n".join(f"- {gap}" for gap in report.advisory_gaps),
+                title="Animation Advisory Gaps",
+                border_style="yellow",
+            )
+        )
+
+    border_style = "green" if report.status == "pass" else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Animation audit status: {report.status.upper()}. "
+                f"Visual baseline {report.visual_report.baseline_signature}."
+            ),
+            title="2D Animation Audit",
             border_style=border_style,
         )
     )

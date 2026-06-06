@@ -81,6 +81,8 @@ class MotionAuditCell:
     impact_cue_disabled_samples: int = 0
     overlay_transition_active_samples: int = 0
     overlay_transition_disabled_samples: int = 0
+    outcome_cinematic_active_samples: int = 0
+    outcome_cinematic_disabled_samples: int = 0
     summary_cinematic_active_samples: int = 0
     summary_cinematic_disabled_samples: int = 0
     product_drama_active_samples: int = 0
@@ -372,6 +374,23 @@ def run_2d_motion_audit(
                 )
                 late_game_active_count = int(late_game_scene.late_game_choreography_active())
                 late_game_disabled_count = int(not late_game_scene.late_game_choreography_active())
+                outcome_state = resolution.state.model_copy(deep=True)
+                outcome_state.pending_event = None
+                outcome_state.company.game_over = True
+                outcome_state.company.cash_on_hand = Decimal("-125.00")
+                outcome_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=outcome_state,
+                    rng=RandomSource(seed=seed + 12),
+                    slot_name="motion-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="run_to_review",
+                )
+                outcome_cinematic_active_count = int(outcome_scene.outcome_cinematic_active())
+                outcome_cinematic_disabled_count = int(not outcome_scene.outcome_cinematic_active())
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
                 run_avg, run_max = _exercise_scene(run_scene, surface, frames)
@@ -496,6 +515,8 @@ def run_2d_motion_audit(
                         impact_cue_disabled_samples=impact_cue_disabled_count,
                         overlay_transition_active_samples=overlay_transition_active_count,
                         overlay_transition_disabled_samples=overlay_transition_disabled_count,
+                        outcome_cinematic_active_samples=outcome_cinematic_active_count,
+                        outcome_cinematic_disabled_samples=outcome_cinematic_disabled_count,
                         summary_cinematic_active_samples=summary_cinematic_active_count,
                         summary_cinematic_disabled_samples=summary_cinematic_disabled_count,
                         product_drama_active_samples=product_drama_active_count,

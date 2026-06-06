@@ -432,6 +432,41 @@ def run_2d_visual_audit(
                     )
                 )
 
+                outcome_state = resolution.state.model_copy(deep=True)
+                outcome_state.pending_event = None
+                outcome_state.company.game_over = True
+                outcome_state.company.cash_on_hand = Decimal("-125.00")
+                outcome_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=outcome_state,
+                    rng=RandomSource(seed=seed + 11),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="run_to_review",
+                )
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        outcome_scene,
+                        scene_key="run_outcome_overlay",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "outcome",
+                                "outcome-cinematic",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
                 summary_scene = TurnSummaryScene(
                     pygame=pygame,
                     fonts=fonts,
@@ -589,6 +624,9 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("picker")
     if getattr(getattr(scene, "state", None), "pending_event", None) is not None:
         layers.append("pending")
+    scene_state = getattr(scene, "state", None)
+    if scene_state is not None and (scene_state.company.game_over or scene_state.victory_achieved):
+        layers.append("outcome")
     if getattr(scene, "_inspector_panel_key", None) is not None:
         layers.append("inspector")
     if getattr(scene, "_action_feedback_cues", ()):
@@ -603,6 +641,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("risk-drama")
     if getattr(scene, "pending_choice_active", lambda: False)():
         layers.append("pending-choice")
+    if getattr(scene, "outcome_cinematic_active", lambda: False)():
+        layers.append("outcome-cinematic")
     if getattr(scene, "pending_choice_preview_active", lambda: False)():
         layers.append("pending-choice-preview")
     if getattr(scene, "late_game_choreography_active", lambda: False)():
@@ -630,6 +670,7 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "product-drama",
         "risk-drama",
         "pending-choice",
+        "outcome-cinematic",
         "pending-choice-preview",
         "late-game-choreography",
         "summary-cinematic",
