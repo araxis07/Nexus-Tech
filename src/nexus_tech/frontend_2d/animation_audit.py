@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from nexus_tech.domain.models import DifficultyMode
 from nexus_tech.frontend_2d.motion_audit import MotionAuditReport, run_2d_motion_audit
 from nexus_tech.frontend_2d.tween import MotionMode
-from nexus_tech.frontend_2d.visual_audit import VisualAuditReport, run_2d_visual_audit
+from nexus_tech.frontend_2d.visual_audit import (
+    MAX_BRIGHT_RATIO,
+    MAX_EDGE_DENSITY,
+    VisualAuditReport,
+    run_2d_visual_audit,
+)
 
 DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
 
@@ -180,6 +185,7 @@ def run_2d_animation_audit(
     cells.append(_build_motion_budget_cell(motion_report))
     cells.append(_build_motion_off_cell(off_motion_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
+    cells.append(_build_visual_fatigue_cell(visual_report))
     cells.extend(_build_advisory_cells())
     return AnimationAuditReport(
         scenario_id=scenario_id,
@@ -190,7 +196,7 @@ def run_2d_animation_audit(
         motion_report=motion_report,
         off_motion_report=off_motion_report,
         advisory_gaps=(
-            "Manual open-window playtest is still required for human read speed and overlap.",
+            "Manual open-window playtest is still required for human read speed and rhythm.",
         ),
     )
 
@@ -323,6 +329,33 @@ def _build_actor_sprite_cell(
     )
 
 
+def _build_visual_fatigue_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    max_edge_density = max((cell.edge_density for cell in visual_report.cells), default=0.0)
+    max_bright_ratio = max((cell.bright_ratio for cell in visual_report.cells), default=0.0)
+    active_layers = (
+        f"edge:{max_edge_density:.2f}",
+        f"bright:{max_bright_ratio:.2f}",
+        "visual-health",
+    )
+    status = (
+        "pass"
+        if max_edge_density <= MAX_EDGE_DENSITY and max_bright_ratio <= MAX_BRIGHT_RATIO
+        else "fail"
+    )
+    notes = (
+        f"edge <= {MAX_EDGE_DENSITY:.2f}, bright <= {MAX_BRIGHT_RATIO:.2f}"
+        if status == "pass"
+        else f"edge {max_edge_density:.2f} / bright {max_bright_ratio:.2f}"
+    )
+    return AnimationCoverageCell(
+        area="Visual Fatigue Budget",
+        required_layers=("edge-density", "bright-ratio", "visual-health"),
+        active_layers=active_layers,
+        status=status,
+        notes=notes,
+    )
+
+
 def _build_advisory_cells() -> tuple[AnimationCoverageCell, ...]:
     return (
         AnimationCoverageCell(
@@ -330,6 +363,6 @@ def _build_advisory_cells() -> tuple[AnimationCoverageCell, ...]:
             required_layers=("open-window-readability",),
             active_layers=("advisory",),
             status="advisory",
-            notes="headless audits cannot judge human timing or visual fatigue",
+            notes="headless audits cannot judge subjective timing or control feel",
         ),
     )

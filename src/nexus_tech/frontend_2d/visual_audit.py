@@ -38,6 +38,8 @@ DEFAULT_VISUAL_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
 MIN_UNIQUE_COLOR_SAMPLES = 18
 MIN_LUMINANCE_SPREAD = 28
 MIN_NON_DARK_RATIO = 0.05
+MAX_EDGE_DENSITY = 0.72
+MAX_BRIGHT_RATIO = 0.42
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,8 @@ class VisualAuditCell:
     non_dark_ratio: float
     active_layers: tuple[str, ...]
     expected_layers: tuple[str, ...]
+    edge_density: float = 0.0
+    bright_ratio: float = 0.0
     output_path: str | None = None
 
     @property
@@ -73,6 +77,10 @@ class VisualAuditCell:
             return "fail"
         if self.non_dark_ratio < MIN_NON_DARK_RATIO:
             return "fail"
+        if self.edge_density > MAX_EDGE_DENSITY:
+            return "fail"
+        if self.bright_ratio > MAX_BRIGHT_RATIO:
+            return "fail"
         return "pass"
 
     @property
@@ -90,6 +98,10 @@ class VisualAuditCell:
             notes.append("low contrast")
         if self.non_dark_ratio < MIN_NON_DARK_RATIO:
             notes.append("mostly dark")
+        if self.edge_density > MAX_EDGE_DENSITY:
+            notes.append("visual clutter")
+        if self.bright_ratio > MAX_BRIGHT_RATIO:
+            notes.append("high flash pressure")
         return "; ".join(notes)
 
 
@@ -119,7 +131,8 @@ class VisualAuditReport:
             payload = (
                 f"{cell.scene_key}:{cell.width}x{cell.height}:"
                 f"{cell.checksum}:{cell.unique_color_samples}:"
-                f"{cell.luminance_spread}:{cell.non_dark_ratio}"
+                f"{cell.luminance_spread}:{cell.non_dark_ratio}:"
+                f"{cell.edge_density}:{cell.bright_ratio}"
             )
             digest = zlib.adler32(payload.encode("utf-8"), digest)
         return f"{len(self.cells)}:{digest:08x}"
@@ -626,9 +639,13 @@ def _capture_visual_cell(
     active_layers = _active_layers(scene)
     raw = pygame.image.tobytes(surface, "RGB")
     checksum = zlib.adler32(raw)
-    unique_color_samples, luminance_spread, non_dark_ratio = _sample_frame_metrics(
-        raw, width, height
-    )
+    (
+        unique_color_samples,
+        luminance_spread,
+        non_dark_ratio,
+        edge_density,
+        bright_ratio,
+    ) = _sample_frame_metrics(raw, width, height)
     output_path = None
     if output_dir is not None:
         output_path = output_dir / f"{scene_key}_{width}x{height}.png"
@@ -643,34 +660,63 @@ def _capture_visual_cell(
         non_dark_ratio=round(non_dark_ratio, 4),
         active_layers=active_layers,
         expected_layers=expected_layers,
+        edge_density=round(edge_density, 4),
+        bright_ratio=round(bright_ratio, 4),
         output_path=str(output_path) if output_path is not None else None,
     )
 
 
-def _sample_frame_metrics(raw: bytes, width: int, height: int) -> tuple[int, int, float]:
+def _sample_frame_metrics(
+    raw: bytes,
+    width: int,
+    height: int,
+) -> tuple[int, int, float, float, float]:
     pixel_count = width * height
-    stride = max(1, pixel_count // 3200)
+    step = max(1, int((pixel_count / 3200) ** 0.5))
     unique_colors: set[bytes] = set()
     min_luminance = 255
     max_luminance = 0
     non_dark = 0
+    bright = 0
     sample_count = 0
-    for pixel_index in range(0, pixel_count, stride):
-        offset = pixel_index * 3
-        red = raw[offset]
-        green = raw[offset + 1]
-        blue = raw[offset + 2]
-        unique_colors.add(raw[offset : offset + 3])
-        luminance = int(red * 0.2126 + green * 0.7152 + blue * 0.0722)
-        min_luminance = min(min_luminance, luminance)
-        max_luminance = max(max_luminance, luminance)
-        if luminance > 32:
-            non_dark += 1
-        sample_count += 1
+    edge_changes = 0
+    edge_checks = 0
+
+    def luminance_at(x: int, y: int) -> int:
+        offset = (y * width + x) * 3
+        return int(raw[offset] * 0.2126 + raw[offset + 1] * 0.7152 + raw[offset + 2] * 0.0722)
+
+    for y in range(0, height, step):
+        for x in range(0, width, step):
+            offset = (y * width + x) * 3
+            red = raw[offset]
+            green = raw[offset + 1]
+            blue = raw[offset + 2]
+            unique_colors.add(raw[offset : offset + 3])
+            luminance = int(red * 0.2126 + green * 0.7152 + blue * 0.0722)
+            min_luminance = min(min_luminance, luminance)
+            max_luminance = max(max_luminance, luminance)
+            if luminance > 32:
+                non_dark += 1
+            if luminance >= 210:
+                bright += 1
+            next_x = x + step
+            if next_x < width:
+                edge_checks += 1
+                if abs(luminance - luminance_at(next_x, y)) >= 32:
+                    edge_changes += 1
+            next_y = y + step
+            if next_y < height:
+                edge_checks += 1
+                if abs(luminance - luminance_at(x, next_y)) >= 32:
+                    edge_changes += 1
+            sample_count += 1
     return (
         len(unique_colors),
         max_luminance - min_luminance,
         non_dark / max(1, sample_count),
+        edge_changes / max(1, edge_checks),
+        bright / max(1, sample_count),
     )
 
 

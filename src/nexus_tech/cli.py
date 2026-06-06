@@ -804,6 +804,8 @@ def audit_2d_visual_command(
     table.add_column("Checksum", justify="right")
     table.add_column("Colors", justify="right")
     table.add_column("Contrast", justify="right")
+    table.add_column("Clutter", justify="right")
+    table.add_column("Bright", justify="right")
     table.add_column("Layers")
     table.add_column("Status", justify="center")
     table.add_column("Notes")
@@ -814,6 +816,8 @@ def audit_2d_visual_command(
             str(cell.checksum),
             str(cell.unique_color_samples),
             str(cell.luminance_spread),
+            f"{cell.edge_density:.2f}",
+            f"{cell.bright_ratio:.2f}",
             ",".join(cell.active_layers),
             cell.status.upper(),
             cell.notes,

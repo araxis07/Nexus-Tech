@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.131.0`
-- Focus: 2D actor/sprite timeline, automated actor-readability guard, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.132.0`
+- Focus: 2D actor/sprite timeline, automated actor-readability and visual-fatigue guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
 
@@ -21,6 +21,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Title/menu flow: wizard, save slots, archive/meta, and title transitions remain readable.
 - Run dashboard: founder/team/customer/board/product actor clips are visible without covering snapshot chips, stat bars, product cards, or action buttons.
 - Automated guard: `audit-2d-animation` reports `actor-readability` for actor scenes before the manual open-window pass.
+- Automated guard: `audit-2d-animation` reports `Visual Fatigue Budget` so clutter and bright-pixel pressure stay within deterministic limits before the manual pass.
 - Title/menu: founder/save/archive/coach actor clips do not hide menu copy, save metadata, or wizard rows.
 - Pending event: option preview motion stays readable and actor clips do not distract from choice text.
 - Action picker: picker, late-game choreography, and actor clips do not stack into unreadable motion.

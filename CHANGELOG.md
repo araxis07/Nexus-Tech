@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.132.0 - 2026-06-07
+
+- Added deterministic visual-fatigue metrics to `audit-2d-visual`, including edge-density and bright-pixel pressure checks so overly cluttered or flashy 2D captures can fail automatically
+- Added a `Visual Fatigue Budget` cell to `audit-2d-animation`, keeping animation completeness tied to both scene/layer coverage and visual health budgets
+- Updated CLI output and regression coverage so visual audit captures report clutter/brightness pressure alongside color, contrast, expected layers, and actor-readability gates
+
 ## 0.131.0 - 2026-06-06
 
 - Added actor sprite readability footprints and collision checks so title/menu, run, inspector, endgame, summary, and review actors are verified against viewport and click-target overlap

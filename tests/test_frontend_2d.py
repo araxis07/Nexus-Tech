@@ -68,6 +68,7 @@ from nexus_tech.frontend_2d.viewmodels import (
     build_run_review_view_model,
     build_turn_summary_view_model,
 )
+from nexus_tech.frontend_2d.visual_audit import MAX_BRIGHT_RATIO, MAX_EDGE_DENSITY
 from nexus_tech.frontend_2d.widgets import DANGER, create_fonts
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.endgame import (
@@ -3032,6 +3033,8 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.checksum > 0 for cell in report.cells)
     assert report.baseline_signature.startswith(f"{len(report.cells)}:")
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
+    assert all(0.0 <= cell.edge_density <= MAX_EDGE_DENSITY for cell in report.cells)
+    assert all(0.0 <= cell.bright_ratio <= MAX_BRIGHT_RATIO for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     title_menu = next(cell for cell in report.cells if cell.scene_key == "title_menu")
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
@@ -3087,6 +3090,26 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-readability" in review.active_layers
 
 
+def test_visual_audit_cell_fails_visual_fatigue_thresholds() -> None:
+    cluttered = VisualAuditCell(
+        scene_key="run_dashboard",
+        width=820,
+        height=620,
+        checksum=12345,
+        unique_color_samples=42,
+        luminance_spread=128,
+        non_dark_ratio=0.42,
+        active_layers=("transition",),
+        expected_layers=("transition",),
+        edge_density=MAX_EDGE_DENSITY + 0.01,
+        bright_ratio=MAX_BRIGHT_RATIO + 0.01,
+    )
+
+    assert cluttered.status == "fail"
+    assert "visual clutter" in cluttered.notes
+    assert "high flash pressure" in cluttered.notes
+
+
 def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     report = run_2d_animation_audit(
         scenario_id="founder_journey",
@@ -3117,6 +3140,8 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "actor-timeline" in areas["Sprite/Actor Layer"].active_layers
     assert "sprite-clips" in areas["Sprite/Actor Layer"].active_layers
     assert "actor-readability" in areas["Sprite/Actor Layer"].active_layers
+    assert areas["Visual Fatigue Budget"].status == "pass"
+    assert "visual-health" in areas["Visual Fatigue Budget"].active_layers
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
