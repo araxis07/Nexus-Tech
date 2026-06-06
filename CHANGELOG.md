@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.130.0 - 2026-06-06
+
+- Expanded deterministic shape-sprite actor coverage to title/menu, inspector overlays, the endgame board, and review scenes so major 2D surfaces now have explicit character motion
+- Upgraded visual, motion, and animation audits with scene-specific actor layers for title, inspector, endgame, and review surfaces while preserving `--motion-mode off` gates
+- Added regression coverage for the broader actor surface matrix and kept manual open-window readability checks as the remaining human QA step
+
 ## 0.129.0 - 2026-06-06
 
 - Added a deterministic shape-sprite actor timeline for the live run and turn-summary scenes, covering founder, team, customer, board, finance, product, and exit-gate roles without external image assets

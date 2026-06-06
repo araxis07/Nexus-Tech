@@ -187,7 +187,13 @@ def run_2d_visual_audit(
                         title_menu,
                         scene_key="title_menu",
                         expected_layers=_expected_layers(
-                            ("transition", "motion-pulses"),
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "actor-timeline",
+                                "sprite-clips",
+                                "title-actor",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -213,7 +219,13 @@ def run_2d_visual_audit(
                         title_meta,
                         scene_key="title_meta",
                         expected_layers=_expected_layers(
-                            ("transition", "motion-pulses"),
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "actor-timeline",
+                                "sprite-clips",
+                                "title-actor",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -431,6 +443,43 @@ def run_2d_visual_audit(
                                 "deep-panel",
                                 "inspector",
                                 "action-feedback",
+                                "actor-timeline",
+                                "sprite-clips",
+                                "inspector-actor",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                endgame_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 12),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                endgame_scene._set_deep_panel("endgame")
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        endgame_scene,
+                        scene_key="run_endgame_board",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "deep-panel",
+                                "actor-timeline",
+                                "sprite-clips",
+                                "endgame-actor",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -537,7 +586,13 @@ def run_2d_visual_audit(
                         review_scene,
                         scene_key="review",
                         expected_layers=_expected_layers(
-                            ("transition", "motion-pulses"),
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "actor-timeline",
+                                "sprite-clips",
+                                "review-actor",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -659,6 +714,14 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("actor-timeline")
     if getattr(scene, "sprite_clips_active", lambda: False)():
         layers.append("sprite-clips")
+    if getattr(scene, "title_actor_active", lambda: False)():
+        layers.append("title-actor")
+    if getattr(scene, "inspector_actor_active", lambda: False)():
+        layers.append("inspector-actor")
+    if getattr(scene, "endgame_actor_active", lambda: False)():
+        layers.append("endgame-actor")
+    if getattr(scene, "review_actor_active", lambda: False)():
+        layers.append("review-actor")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
     if getattr(scene, "summary_cinematic_active", lambda: False)():
@@ -690,6 +753,10 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "summary-lanes",
         "actor-timeline",
         "sprite-clips",
+        "title-actor",
+        "inspector-actor",
+        "endgame-actor",
+        "review-actor",
     }
     return tuple(layer for layer in layers if layer not in disabled_layers)
 

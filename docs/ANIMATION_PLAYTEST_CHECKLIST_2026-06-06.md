@@ -4,7 +4,7 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.129.0`
+- Version: `0.130.0`
 - Focus: 2D actor/sprite timeline, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
@@ -20,9 +20,11 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 
 - Title/menu flow: wizard, save slots, archive/meta, and title transitions remain readable.
 - Run dashboard: founder/team/customer/board/product actor clips are visible without covering snapshot chips, stat bars, product cards, or action buttons.
+- Title/menu: founder/save/archive/coach actor clips do not hide menu copy, save metadata, or wizard rows.
 - Pending event: option preview motion stays readable and actor clips do not distract from choice text.
 - Action picker: picker, late-game choreography, and actor clips do not stack into unreadable motion.
 - Turn summary: founder/finance/customer/board/gate actor clips support the metric reveal instead of hiding timeline cards.
+- Inspector/endgame/review: actor clips clarify record routing, exit-gate pressure, and postmortem handoff without hiding primary actions.
 - Outcome overlay: outcome cinematic remains the dominant final-state animation.
 - Compact window: repeat the run and summary checks around `820x620`.
 - Reduced motion: animation is present but calmer than full mode.

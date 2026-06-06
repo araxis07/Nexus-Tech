@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.129.0`
+Version: `0.130.0`
 
 ## Scope
 
@@ -12,6 +12,7 @@ Version: `0.129.0`
 - Scene entry transitions now cover boot, title-to-run, title-to-review, run-to-summary, run-to-review, summary-to-run, summary-to-review, and review-to-title flows.
 - Shape-based entity motion now covers stat lanes, product cards, and active deep-panel strips without adding external sprite assets.
 - Deterministic shape-sprite actor timelines now cover live-run founder/team/customer/board/product beats and turn-summary founder/finance/customer/board/gate beats without adding external image assets.
+- Scene-specific actor clips now also cover title/menu guidance, inspector record routing, the endgame cockpit board, and review/postmortem handoffs.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
 - Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.
@@ -25,7 +26,7 @@ Version: `0.129.0`
 - `audit-2d-visual` now renders title, meta, live run, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
 - `audit-2d-animation` now combines visual-layer coverage, actor/sprite coverage, motion-budget checks, off-mode checks, and advisory gaps into one animation-completeness gate.
 - Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
-- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, actor-timeline/sprite-clip active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
+- Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, broader actor-timeline/sprite-clip active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
 
 ## Stability Budgets
 

@@ -1849,6 +1849,132 @@ def test_2d_actor_sprite_layers_respect_motion_modes() -> None:
         pygame.quit()
 
 
+def test_title_and_review_actor_sprite_layers_respect_motion_modes(tmp_path: Path) -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.company.game_over = True
+        state.company.cash_on_hand = Decimal("-125.00")
+        coordinator = SaveLoadCoordinator(tmp_path / "actor-scenes.db")
+        title_scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=60),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+        )
+        title_off_scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=61),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+            motion_mode=MotionMode.OFF,
+        )
+        review_scene = ReviewScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=62),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            view_model=build_run_review_view_model(state),
+            accent=DANGER,
+            primary_title="Esc Close",
+            primary_detail="Leave the 2D shell.",
+            return_scene_factory=None,
+            allow_save=False,
+            dirty=False,
+        )
+        review_off_scene = ReviewScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=63),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            view_model=build_run_review_view_model(state),
+            accent=DANGER,
+            primary_title="Esc Close",
+            primary_detail="Leave the 2D shell.",
+            return_scene_factory=None,
+            allow_save=False,
+            dirty=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        title_scene.update(1 / 60)
+        title_scene.draw(surface)
+        review_scene.update(1 / 60)
+        review_scene.draw(surface)
+
+        assert title_scene.actor_timeline_active()
+        assert title_scene.sprite_clips_active()
+        assert title_scene.title_actor_active()
+        assert review_scene.actor_timeline_active()
+        assert review_scene.sprite_clips_active()
+        assert review_scene.review_actor_active()
+        assert not title_off_scene.actor_timeline_active()
+        assert not title_off_scene.sprite_clips_active()
+        assert not title_off_scene.title_actor_active()
+        assert not review_off_scene.actor_timeline_active()
+        assert not review_off_scene.sprite_clips_active()
+        assert not review_off_scene.review_actor_active()
+    finally:
+        pygame.quit()
+
+
+def test_run_overlay_actor_sprite_layers_cover_inspector_and_endgame() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=64),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=65),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._set_deep_panel("pipeline")
+        scene._open_inspector("pipeline")
+        scene.update(1 / 60)
+        scene.draw(surface)
+        assert scene.inspector_actor_active()
+
+        scene._close_inspector()
+        scene._set_deep_panel("endgame")
+        scene.update(1 / 60)
+        scene.draw(surface)
+        assert scene.endgame_actor_active()
+
+        off_scene._set_deep_panel("pipeline")
+        off_scene._open_inspector("pipeline")
+        assert not off_scene.inspector_actor_active()
+        off_scene._close_inspector()
+        off_scene._set_deep_panel("endgame")
+        assert not off_scene.endgame_actor_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2759,9 +2885,9 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.summary_sequence_disabled_samples == 0
     assert cell.summary_lanes_active_samples == 1
     assert cell.summary_lanes_disabled_samples == 0
-    assert cell.actor_timeline_active_samples == 2
+    assert cell.actor_timeline_active_samples == 6
     assert cell.actor_timeline_disabled_samples == 0
-    assert cell.sprite_clips_active_samples == 2
+    assert cell.sprite_clips_active_samples == 6
     assert cell.sprite_clips_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
@@ -2821,9 +2947,9 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.summary_lanes_active_samples == 0
     assert cell.summary_lanes_disabled_samples == 1
     assert cell.actor_timeline_active_samples == 0
-    assert cell.actor_timeline_disabled_samples == 2
+    assert cell.actor_timeline_disabled_samples == 6
     assert cell.sprite_clips_active_samples == 0
-    assert cell.sprite_clips_disabled_samples == 2
+    assert cell.sprite_clips_disabled_samples == 6
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2857,6 +2983,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "run_impact_feedback",
         "run_picker_feedback",
         "run_inspector",
+        "run_endgame_board",
         "run_outcome_overlay",
         "turn_summary",
         "review",
@@ -2865,14 +2992,20 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert report.baseline_signature.startswith(f"{len(report.cells)}:")
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
+    title_menu = next(cell for cell in report.cells if cell.scene_key == "title_menu")
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
     dashboard = next(cell for cell in report.cells if cell.scene_key == "run_dashboard")
     drama = next(cell for cell in report.cells if cell.scene_key == "run_drama_feedback")
     pending = next(cell for cell in report.cells if cell.scene_key == "run_pending_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
+    endgame = next(cell for cell in report.cells if cell.scene_key == "run_endgame_board")
     outcome = next(cell for cell in report.cells if cell.scene_key == "run_outcome_overlay")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
+    review = next(cell for cell in report.cells if cell.scene_key == "review")
+    assert "title-actor" in title_menu.active_layers
+    assert "actor-timeline" in title_menu.active_layers
+    assert "sprite-clips" in title_menu.active_layers
     assert "actor-timeline" in dashboard.active_layers
     assert "sprite-clips" in dashboard.active_layers
     assert "product-drama" in drama.active_layers
@@ -2887,6 +3020,13 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "late-game-choreography" in picker.active_layers
     assert "inspector" in inspector.active_layers
     assert "overlay-transition" in inspector.active_layers
+    assert "inspector-actor" in inspector.active_layers
+    assert "actor-timeline" in inspector.active_layers
+    assert "sprite-clips" in inspector.active_layers
+    assert "endgame-actor" in endgame.active_layers
+    assert "deep-panel" in endgame.active_layers
+    assert "actor-timeline" in endgame.active_layers
+    assert "sprite-clips" in endgame.active_layers
     assert "outcome" in outcome.active_layers
     assert "outcome-cinematic" in outcome.active_layers
     assert "summary-reveal" in summary.active_layers
@@ -2895,6 +3035,9 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "summary-lanes" in summary.active_layers
     assert "actor-timeline" in summary.active_layers
     assert "sprite-clips" in summary.active_layers
+    assert "review-actor" in review.active_layers
+    assert "actor-timeline" in review.active_layers
+    assert "sprite-clips" in review.active_layers
 
 
 def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
@@ -2907,14 +3050,22 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     )
 
     assert report.status == "pass"
-    assert report.visual_report.baseline_signature.startswith("11:")
+    assert report.visual_report.baseline_signature.startswith("12:")
     areas = {cell.area: cell for cell in report.cells}
+    assert areas["Title/Menu Actors"].status == "pass"
+    assert "title-actor" in areas["Title/Menu Actors"].active_layers
     assert areas["Pending Event Preview"].status == "pass"
     assert "pending-choice-preview" in areas["Pending Event Preview"].active_layers
     assert areas["Late-Game Command Choreography"].status == "pass"
     assert "late-game-choreography" in areas["Late-Game Command Choreography"].active_layers
     assert areas["Outcome Cinematic"].status == "pass"
     assert "outcome-cinematic" in areas["Outcome Cinematic"].active_layers
+    assert areas["Inspector Actors"].status == "pass"
+    assert "inspector-actor" in areas["Inspector Actors"].active_layers
+    assert areas["Endgame Board Actors"].status == "pass"
+    assert "endgame-actor" in areas["Endgame Board Actors"].active_layers
+    assert areas["Review Actors"].status == "pass"
+    assert "review-actor" in areas["Review Actors"].active_layers
     assert areas["Sprite/Actor Layer"].status == "pass"
     assert "actor-timeline" in areas["Sprite/Actor Layer"].active_layers
     assert "sprite-clips" in areas["Sprite/Actor Layer"].active_layers

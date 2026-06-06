@@ -13,6 +13,11 @@ DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
 
 _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
+        "title_menu",
+        "Title/Menu Actors",
+        ("transition", "motion-pulses", "actor-timeline", "sprite-clips", "title-actor"),
+    ),
+    (
         "run_dashboard",
         "Run Dashboard",
         ("transition", "motion-pulses", "product-drama", "actor-timeline", "sprite-clips"),
@@ -30,6 +35,22 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("picker", "action-feedback", "late-game-choreography"),
     ),
     (
+        "run_inspector",
+        "Inspector Actors",
+        (
+            "inspector",
+            "overlay-transition",
+            "actor-timeline",
+            "sprite-clips",
+            "inspector-actor",
+        ),
+    ),
+    (
+        "run_endgame_board",
+        "Endgame Board Actors",
+        ("deep-panel", "actor-timeline", "sprite-clips", "endgame-actor"),
+    ),
+    (
         "run_outcome_overlay",
         "Outcome Cinematic",
         ("outcome", "overlay-transition", "outcome-cinematic"),
@@ -45,6 +66,11 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "actor-timeline",
             "sprite-clips",
         ),
+    ),
+    (
+        "review",
+        "Review Actors",
+        ("transition", "motion-pulses", "actor-timeline", "sprite-clips", "review-actor"),
     ),
 )
 

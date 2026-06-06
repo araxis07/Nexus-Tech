@@ -860,6 +860,7 @@ class TitleScene(BaseScene):
         self._mode = initial_mode
         self._click_targets: list[ClickTarget] = []
         self._events: list[TimedFrontendEvent] = []
+        self._motion_elapsed = 0.0
         self._motion_pulses = PulseBank(
             decay=1.9,
             intensity_scale=self.motion_mode.pulse_scale,
@@ -901,6 +902,7 @@ class TitleScene(BaseScene):
             )
 
     def update(self, dt: float) -> None:
+        self._motion_elapsed += max(0.0, dt)
         self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
         self._events = [
@@ -921,6 +923,125 @@ class TitleScene(BaseScene):
         pulse = self._overlay_motion_level(overlay_key)
         alpha = min(224, 180 + int(pulse * 36))
         return (8, 10, 14, alpha)
+
+    def _title_actor_sprite_strength(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        base = 0.14 if self.motion_mode is MotionMode.REDUCED else 0.32
+        scale = 0.58 if self.motion_mode is MotionMode.REDUCED else 1.0
+        pulse = self._motion_level(
+            "title:header",
+            "title:content",
+            "title:feed",
+            f"title:mode:{self._mode}",
+        )
+        return min(1.0, (base + pulse * 0.34) * scale)
+
+    def actor_timeline_active(self) -> bool:
+        """Return whether title/menu actor timelines should be animated."""
+
+        return self._title_actor_sprite_strength() > 0 and bool(self._title_actor_sprite_clips())
+
+    def sprite_clips_active(self) -> bool:
+        """Return whether title/menu shape sprite clips are visible."""
+
+        return self.actor_timeline_active()
+
+    def title_actor_active(self) -> bool:
+        """Return whether title/menu-specific actor clips are visible."""
+
+        return self.actor_timeline_active()
+
+    def _title_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
+        mode_label = {
+            "menu": "Menu",
+            "meta": "Meta",
+            "slots": "Saves",
+            "slot_detail": "Slot",
+            "wizard": "Wizard",
+            "archives": "Archive",
+        }.get(self._mode, "Archive")
+        mode_state = {
+            "menu": "handoff",
+            "meta": "success",
+            "slots": "build",
+            "slot_detail": "build",
+            "wizard": "success",
+            "archives": "handoff",
+        }.get(self._mode, "handoff")
+        archive_state = "success" if self._archive_cards else "idle"
+        save_state = "success" if self._save_cards else "build"
+        return (
+            ActorSpriteClip(
+                key="title-founder",
+                label="Founder",
+                role=mode_label,
+                state=mode_state,
+                accent=SELECTION,
+                lane="start",
+                delay=0.0,
+                phase_offset=0.3,
+            ),
+            ActorSpriteClip(
+                key="title-save",
+                label="Saves",
+                role="Slots",
+                state=save_state,
+                accent=GOOD,
+                lane="load",
+                delay=0.08,
+                phase_offset=1.2,
+            ),
+            ActorSpriteClip(
+                key="title-archive",
+                label="Archive",
+                role="Meta",
+                state=archive_state,
+                accent=WARN,
+                lane="review",
+                delay=0.16,
+                phase_offset=2.1,
+            ),
+            ActorSpriteClip(
+                key="title-coach",
+                label="Coach",
+                role="Guide",
+                state="handoff",
+                accent=INFO,
+                lane="next",
+                delay=0.24,
+                phase_offset=3.0,
+            ),
+        )
+
+    def _draw_title_actor_sprite_layer(self, surface, anchor_rect) -> None:
+        strength = self._title_actor_sprite_strength()
+        if strength <= 0:
+            return
+        clips = self._title_actor_sprite_clips()
+        if not clips:
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        visible_count = 2 if width < 900 else 3
+        visible_clips = clips[:visible_count]
+        gap = 8
+        clip_height = 44
+        clip_width = 126 if width >= 1060 else 112
+        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
+        left = max(anchor_rect.left + 10, anchor_rect.right - total_width - 12)
+        top = anchor_rect.bottom - clip_height - 8
+        for index, clip in enumerate(visible_clips):
+            clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            _draw_actor_sprite_clip(
+                pygame=pygame,
+                fonts=self.fonts,
+                surface=surface,
+                rect=clip_rect,
+                clip=clip,
+                elapsed=self._motion_elapsed,
+                intensity=strength,
+            )
 
     def _trigger_title_motion(self, section_key: str, *, intensity: float = 0.6) -> None:
         self._motion_pulses.trigger(f"title:{section_key}", intensity=intensity, decay=2.1)
@@ -1029,6 +1150,7 @@ class TitleScene(BaseScene):
             )
 
         self._draw_title_header(surface, header_rect)
+        self._draw_title_actor_sprite_layer(surface, header_rect)
         if self._mode == "menu":
             self._draw_title_menu(surface, left_rect)
         elif self._mode == "meta":
@@ -2560,6 +2682,7 @@ class ReviewScene(BaseScene):
         self._return_scene_factory = return_scene_factory
         self._allow_save = allow_save
         self._click_targets: list[ClickTarget] = []
+        self._motion_elapsed = 0.0
         self._motion_pulses = PulseBank(
             decay=1.9,
             intensity_scale=self.motion_mode.pulse_scale,
@@ -2570,6 +2693,7 @@ class ReviewScene(BaseScene):
         self._trigger_review_motion("footer", intensity=0.5)
 
     def update(self, dt: float) -> None:
+        self._motion_elapsed += max(0.0, dt)
         self._update_scene_transition(dt)
         self._motion_pulses.update(dt)
 
@@ -2580,6 +2704,99 @@ class ReviewScene(BaseScene):
         if not keys:
             return 0.0
         return max(self._motion_pulses.get(key) for key in keys)
+
+    def _review_actor_sprite_strength(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        base = 0.16 if self.motion_mode is MotionMode.REDUCED else 0.34
+        scale = 0.58 if self.motion_mode is MotionMode.REDUCED else 1.0
+        pulse = self._motion_level(
+            "review:header",
+            "review:findings",
+            "review:sidebar",
+            "review:footer",
+        )
+        return min(1.0, (base + pulse * 0.3) * scale)
+
+    def actor_timeline_active(self) -> bool:
+        """Return whether review actor timelines should be animated."""
+
+        return self._review_actor_sprite_strength() > 0 and bool(self._review_actor_sprite_clips())
+
+    def sprite_clips_active(self) -> bool:
+        """Return whether review shape sprite clips are visible."""
+
+        return self.actor_timeline_active()
+
+    def review_actor_active(self) -> bool:
+        """Return whether review-specific actor clips are visible."""
+
+        return self.actor_timeline_active()
+
+    def _review_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
+        finding_state = "alert" if self._view_model.findings else "success"
+        outcome_state = "success" if self.state.victory_achieved else "risk"
+        return (
+            ActorSpriteClip(
+                key="review-founder",
+                label="Founder",
+                role="Postmortem",
+                state=outcome_state,
+                accent=self._accent,
+                lane="result",
+                delay=0.0,
+                phase_offset=0.5,
+            ),
+            ActorSpriteClip(
+                key="review-analyst",
+                label="Analyst",
+                role="Findings",
+                state=finding_state,
+                accent=WARN if finding_state == "alert" else GOOD,
+                lane="learn",
+                delay=0.08,
+                phase_offset=1.4,
+            ),
+            ActorSpriteClip(
+                key="review-coach",
+                label="Coach",
+                role="Next Focus",
+                state="handoff",
+                accent=INFO,
+                lane="next",
+                delay=0.16,
+                phase_offset=2.3,
+            ),
+        )
+
+    def _draw_review_actor_sprite_layer(self, surface, anchor_rect) -> None:
+        strength = self._review_actor_sprite_strength()
+        if strength <= 0:
+            return
+        clips = self._review_actor_sprite_clips()
+        if not clips:
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        visible_count = 2 if width < 960 else 3
+        visible_clips = clips[:visible_count]
+        gap = 8
+        clip_height = 44
+        clip_width = 128 if width >= 1080 else 112
+        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
+        left = max(anchor_rect.left + 10, anchor_rect.right - total_width - 12)
+        top = anchor_rect.bottom - clip_height - 8
+        for index, clip in enumerate(visible_clips):
+            clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            _draw_actor_sprite_clip(
+                pygame=pygame,
+                fonts=self.fonts,
+                surface=surface,
+                rect=clip_rect,
+                clip=clip,
+                elapsed=self._motion_elapsed,
+                intensity=strength,
+            )
 
     def handle_event(self, event) -> None:
         if event.type == self.pygame.QUIT:
@@ -2629,6 +2846,7 @@ class ReviewScene(BaseScene):
         )
 
         self._draw_review_header(surface, header_rect)
+        self._draw_review_actor_sprite_layer(surface, header_rect)
         self._draw_review_findings(surface, left_rect)
         self._draw_review_sidebar(surface, right_rect)
         self._draw_review_footer(surface, footer_rect)
@@ -3862,12 +4080,13 @@ class RunScene(BaseScene):
         label = self.fonts.small.render(panel_key.upper(), True, blend_color(MUTED, accent, 0.7))
         surface.blit(label, (strip_rect.left + 10, strip_rect.top + 9))
 
-    def _actor_sprite_strength(self) -> float:
+    def _actor_sprite_strength(self, *keys: str) -> float:
         if self.motion_mode is MotionMode.OFF:
             return 0.0
         base = 0.18 if self.motion_mode is MotionMode.REDUCED else 0.36
         scale = 0.62 if self.motion_mode is MotionMode.REDUCED else 1.0
-        pulse = self._motion_level("panel:products", "panel:stats", "footer", "overlay:outcome")
+        pulse_keys = keys or ("panel:products", "panel:stats", "footer", "overlay:outcome")
+        pulse = self._motion_level(*pulse_keys)
         return min(1.0, (base + pulse * 0.28) * scale)
 
     def actor_timeline_active(self) -> bool:
@@ -3879,6 +4098,24 @@ class RunScene(BaseScene):
         """Return whether run-scene shape sprite clips are visible."""
 
         return self.actor_timeline_active()
+
+    def inspector_actor_active(self) -> bool:
+        """Return whether inspector-specific actor clips are visible."""
+
+        return (
+            self.motion_mode is not MotionMode.OFF
+            and self._inspector_panel_key is not None
+            and self.inspector_panel is not None
+        )
+
+    def endgame_actor_active(self) -> bool:
+        """Return whether endgame-board actor clips are visible."""
+
+        return (
+            self.motion_mode is not MotionMode.OFF
+            and self._deep_panel_key == "endgame"
+            and self.deep_panel is not None
+        )
 
     def _run_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
         selected_product = self.selected_product
@@ -3975,6 +4212,122 @@ class RunScene(BaseScene):
             border_radius=16,
         )
         surface.blit(stage, stage_rect.topleft)
+        for index, clip in enumerate(visible_clips):
+            clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            _draw_actor_sprite_clip(
+                pygame=pygame,
+                fonts=self.fonts,
+                surface=surface,
+                rect=clip_rect,
+                clip=clip,
+                elapsed=self._motion_elapsed,
+                intensity=strength,
+            )
+
+    def _inspector_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
+        panel = self.inspector_panel
+        section = self._selected_inspector_section()
+        item = self._selected_inspector_item()
+        panel_label = panel.title if panel is not None else "Inspector"
+        section_label = section.title if section is not None else "Records"
+        action_state = "idle"
+        action_accent = INFO
+        if item is not None:
+            badge = self._inspector_item_action_badge(item)
+            if badge is not None:
+                label, action_accent = badge
+                action_state = "success" if label == "READY" else "alert"
+        return (
+            ActorSpriteClip(
+                key="inspector-analyst",
+                label="Analyst",
+                role=_short_actor_text(panel_label, 12),
+                state="handoff",
+                accent=SELECTION,
+                lane="records",
+                delay=0.0,
+                phase_offset=0.7,
+            ),
+            ActorSpriteClip(
+                key="inspector-router",
+                label="Router",
+                role=_short_actor_text(section_label, 12),
+                state=action_state,
+                accent=action_accent,
+                lane="action",
+                delay=0.08,
+                phase_offset=1.6,
+            ),
+            ActorSpriteClip(
+                key="inspector-hotspot",
+                label="Hotspot",
+                role="Risk",
+                state="alert" if self._inspector_filter_mode_label() == "attention" else "build",
+                accent=DANGER,
+                lane="focus",
+                delay=0.16,
+                phase_offset=2.5,
+            ),
+        )
+
+    def _endgame_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
+        board_state = "risk" if self.state.finance.board_pressure >= 70 else "handoff"
+        cash_state = "risk" if self.state.company.cash_on_hand <= 1200 else "success"
+        gate_state = "alert" if self.state.finance.board_pressure >= 70 else "build"
+        return (
+            ActorSpriteClip(
+                key="endgame-cockpit",
+                label="Cockpit",
+                role="Exit",
+                state=gate_state,
+                accent=SELECTION,
+                lane="path",
+                delay=0.0,
+                phase_offset=0.9,
+            ),
+            ActorSpriteClip(
+                key="endgame-board",
+                label="Board",
+                role="Gates",
+                state=board_state,
+                accent=DANGER if board_state == "risk" else WARN,
+                lane="pressure",
+                delay=0.08,
+                phase_offset=1.8,
+            ),
+            ActorSpriteClip(
+                key="endgame-capital",
+                label="Capital",
+                role="Runway",
+                state=cash_state,
+                accent=GOOD if cash_state == "success" else DANGER,
+                lane="cash",
+                delay=0.16,
+                phase_offset=2.7,
+            ),
+        )
+
+    def _draw_overlay_actor_sprite_layer(
+        self,
+        surface,
+        anchor_rect,
+        *,
+        clips: tuple[ActorSpriteClip, ...],
+        strength: float,
+        max_count: int = 3,
+    ) -> None:
+        if strength <= 0 or not clips:
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        visible_count = min(max_count, 2 if width < 940 else 3, len(clips))
+        visible_clips = clips[:visible_count]
+        gap = 8
+        clip_height = 42
+        clip_width = 124 if width >= 1040 else 108
+        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
+        left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 10)
+        top = max(anchor_rect.top - 36, 18)
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
             _draw_actor_sprite_clip(
@@ -6927,6 +7280,13 @@ class RunScene(BaseScene):
             panel_key=panel.key,
             strength=self._entity_motion_strength(f"panel:{panel.key}", "overlay:panel"),
         )
+        if panel.key == "endgame":
+            self._draw_overlay_actor_sprite_layer(
+                surface,
+                inner,
+                clips=self._endgame_actor_sprite_clips(),
+                strength=self._actor_sprite_strength("panel:endgame", "overlay:panel"),
+            )
         draw_wrapped_text(
             surface,
             self.fonts.body,
@@ -7070,6 +7430,12 @@ class RunScene(BaseScene):
         )
         title_surface = self.fonts.title.render(f"{panel.title} Inspector", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 28))
+        self._draw_overlay_actor_sprite_layer(
+            surface,
+            inner,
+            clips=self._inspector_actor_sprite_clips(),
+            strength=self._actor_sprite_strength(f"panel:{panel.key}", "overlay:inspector"),
+        )
         draw_wrapped_text(
             surface,
             self.fonts.body,
