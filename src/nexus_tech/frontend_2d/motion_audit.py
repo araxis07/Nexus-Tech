@@ -99,6 +99,10 @@ class MotionAuditCell:
     summary_sequence_disabled_samples: int = 0
     summary_lanes_active_samples: int = 0
     summary_lanes_disabled_samples: int = 0
+    actor_timeline_active_samples: int = 0
+    actor_timeline_disabled_samples: int = 0
+    sprite_clips_active_samples: int = 0
+    sprite_clips_disabled_samples: int = 0
 
     @property
     def status(self) -> str:
@@ -266,6 +270,10 @@ def run_2d_motion_audit(
                 entity_active_count = int(run_scene._entity_motion_strength("panel:products") > 0)
                 entity_active_count += int(run_scene._entity_motion_strength("panel:stats") > 0)
                 entity_disabled_count = 2 - entity_active_count
+                actor_timeline_active_count = int(run_scene.actor_timeline_active())
+                actor_timeline_disabled_count = int(not run_scene.actor_timeline_active())
+                sprite_clips_active_count = int(run_scene.sprite_clips_active())
+                sprite_clips_disabled_count = int(not run_scene.sprite_clips_active())
                 run_scene._set_deep_panel("pipeline")
                 entity_active_count += int(run_scene._entity_motion_strength("panel:pipeline") > 0)
                 entity_disabled_count += int(
@@ -424,6 +432,10 @@ def run_2d_motion_audit(
                 )
                 summary_lanes_active_count = int(summary_scene.summary_outcome_lanes_active())
                 summary_lanes_disabled_count = int(not summary_scene.summary_outcome_lanes_active())
+                actor_timeline_active_count += int(summary_scene.actor_timeline_active())
+                actor_timeline_disabled_count += int(not summary_scene.actor_timeline_active())
+                sprite_clips_active_count += int(summary_scene.sprite_clips_active())
+                sprite_clips_disabled_count += int(not summary_scene.sprite_clips_active())
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
                 summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
@@ -533,6 +545,10 @@ def run_2d_motion_audit(
                         summary_sequence_disabled_samples=summary_sequence_disabled_count,
                         summary_lanes_active_samples=summary_lanes_active_count,
                         summary_lanes_disabled_samples=summary_lanes_disabled_count,
+                        actor_timeline_active_samples=actor_timeline_active_count,
+                        actor_timeline_disabled_samples=actor_timeline_disabled_count,
+                        sprite_clips_active_samples=sprite_clips_active_count,
+                        sprite_clips_disabled_samples=sprite_clips_disabled_count,
                     )
                 )
         return MotionAuditReport(

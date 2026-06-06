@@ -238,7 +238,13 @@ def run_2d_visual_audit(
                         run_scene,
                         scene_key="run_dashboard",
                         expected_layers=_expected_layers(
-                            ("transition", "motion-pulses", "product-drama"),
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "product-drama",
+                                "actor-timeline",
+                                "sprite-clips",
+                            ),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -495,6 +501,8 @@ def run_2d_visual_audit(
                                 "summary-cinematic",
                                 "summary-sequence",
                                 "summary-lanes",
+                                "actor-timeline",
+                                "sprite-clips",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -647,6 +655,10 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("pending-choice-preview")
     if getattr(scene, "late_game_choreography_active", lambda: False)():
         layers.append("late-game-choreography")
+    if getattr(scene, "actor_timeline_active", lambda: False)():
+        layers.append("actor-timeline")
+    if getattr(scene, "sprite_clips_active", lambda: False)():
+        layers.append("sprite-clips")
     if getattr(scene, "_visible_event_count", 0) > 0:
         layers.append("summary-reveal")
     if getattr(scene, "summary_cinematic_active", lambda: False)():
@@ -676,6 +688,8 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "summary-cinematic",
         "summary-sequence",
         "summary-lanes",
+        "actor-timeline",
+        "sprite-clips",
     }
     return tuple(layer for layer in layers if layer not in disabled_layers)
 

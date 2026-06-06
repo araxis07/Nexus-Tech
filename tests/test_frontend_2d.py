@@ -1781,6 +1781,74 @@ def test_run_scene_outcome_cinematic_respects_motion_modes() -> None:
         pygame.quit()
 
 
+def test_2d_actor_sprite_layers_respect_motion_modes() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        previous_state = state.model_copy(deep=True)
+        resolution = resolve_turn(state.model_copy(deep=True), RandomSource(seed=55))
+        run_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=56),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        run_off_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=57),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+        summary_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=58),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=False,
+        )
+        summary_off_scene = TurnSummaryScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=resolution.state,
+            rng=RandomSource(seed=59),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            previous_state=previous_state,
+            resolution=resolution,
+            selected_product_id=resolution.state.products[0].id.hex,
+            dirty=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        run_scene.update(1 / 60)
+        run_scene.draw(surface)
+        summary_scene.update(1 / 60)
+        summary_scene.draw(surface)
+
+        assert run_scene.actor_timeline_active()
+        assert run_scene.sprite_clips_active()
+        assert summary_scene.actor_timeline_active()
+        assert summary_scene.sprite_clips_active()
+        assert not run_off_scene.actor_timeline_active()
+        assert not run_off_scene.sprite_clips_active()
+        assert not summary_off_scene.actor_timeline_active()
+        assert not summary_off_scene.sprite_clips_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_event_queue_visible_count_drops_when_overlay_is_open() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2691,6 +2759,10 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.summary_sequence_disabled_samples == 0
     assert cell.summary_lanes_active_samples == 1
     assert cell.summary_lanes_disabled_samples == 0
+    assert cell.actor_timeline_active_samples == 2
+    assert cell.actor_timeline_disabled_samples == 0
+    assert cell.sprite_clips_active_samples == 2
+    assert cell.sprite_clips_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
     assert report.flow_report.status == "pass"
 
@@ -2748,6 +2820,10 @@ def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:
     assert cell.summary_sequence_disabled_samples == 1
     assert cell.summary_lanes_active_samples == 0
     assert cell.summary_lanes_disabled_samples == 1
+    assert cell.actor_timeline_active_samples == 0
+    assert cell.actor_timeline_disabled_samples == 2
+    assert cell.sprite_clips_active_samples == 0
+    assert cell.sprite_clips_disabled_samples == 2
 
 
 def test_run_2d_flow_audit_reports_no_missing_request_paths() -> None:
@@ -2790,12 +2866,15 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
+    dashboard = next(cell for cell in report.cells if cell.scene_key == "run_dashboard")
     drama = next(cell for cell in report.cells if cell.scene_key == "run_drama_feedback")
     pending = next(cell for cell in report.cells if cell.scene_key == "run_pending_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
     outcome = next(cell for cell in report.cells if cell.scene_key == "run_outcome_overlay")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
+    assert "actor-timeline" in dashboard.active_layers
+    assert "sprite-clips" in dashboard.active_layers
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
     assert "pending" in pending.active_layers
@@ -2814,6 +2893,8 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "summary-cinematic" in summary.active_layers
     assert "summary-sequence" in summary.active_layers
     assert "summary-lanes" in summary.active_layers
+    assert "actor-timeline" in summary.active_layers
+    assert "sprite-clips" in summary.active_layers
 
 
 def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
@@ -2834,10 +2915,12 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "late-game-choreography" in areas["Late-Game Command Choreography"].active_layers
     assert areas["Outcome Cinematic"].status == "pass"
     assert "outcome-cinematic" in areas["Outcome Cinematic"].active_layers
+    assert areas["Sprite/Actor Layer"].status == "pass"
+    assert "actor-timeline" in areas["Sprite/Actor Layer"].active_layers
+    assert "sprite-clips" in areas["Sprite/Actor Layer"].active_layers
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
-    assert areas["Sprite/Actor Layer"].status == "advisory"
-    assert any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
+    assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:

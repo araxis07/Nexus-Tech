@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.129.0 - 2026-06-06
+
+- Added a deterministic shape-sprite actor timeline for the live run and turn-summary scenes, covering founder, team, customer, board, finance, product, and exit-gate roles without external image assets
+- Promoted the sprite/actor animation gap from advisory to a required `audit-2d-animation` gate with visual-layer coverage, motion telemetry, and `--motion-mode off` validation
+- Added regression coverage and playtest checklist documentation for actor/sprite animation while keeping manual open-window readability review explicit
+
 ## 0.128.0 - 2026-06-06
 
 - Added an outcome cinematic layer for victory/shutdown overlays so final run states have dedicated 2D motion instead of a static modal only

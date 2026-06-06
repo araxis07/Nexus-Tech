@@ -176,6 +176,20 @@ class LateGameChoreographyCue:
     duration: float
 
 
+@dataclass(frozen=True)
+class ActorSpriteClip:
+    """One deterministic shape-sprite actor beat rendered by the 2D frontend."""
+
+    key: str
+    label: str
+    role: str
+    state: str
+    accent: tuple[int, int, int]
+    lane: str
+    delay: float = 0.0
+    phase_offset: float = 0.0
+
+
 @dataclass
 class TextInputModalState:
     """One live text-input modal used by the 2D frontend."""
@@ -554,6 +568,127 @@ def _workspace_panel_key_for_command(command: str) -> str | None:
     ):
         return "partnerships"
     return None
+
+
+def _short_actor_text(value: str, max_length: int) -> str:
+    if len(value) <= max_length:
+        return value
+    return f"{value[: max(1, max_length - 1)]}."
+
+
+def _actor_state_badge(state: str) -> str:
+    return {
+        "alert": "!",
+        "risk": "!",
+        "success": "+",
+        "handoff": ">",
+        "build": "#",
+    }.get(state, ".")
+
+
+def _draw_actor_sprite_clip(
+    *,
+    pygame,
+    fonts: FontPack,
+    surface,
+    rect,
+    clip: ActorSpriteClip,
+    elapsed: float,
+    intensity: float,
+) -> None:
+    """Draw one lightweight actor sprite without external image assets."""
+
+    if intensity <= 0 or rect.width < 72 or rect.height < 40:
+        return
+    enter = 1.0
+    if clip.delay > 0:
+        enter = max(0.0, min(1.0, (elapsed - clip.delay) / 0.32))
+        enter = 1.0 - (1.0 - enter) * (1.0 - enter)
+    if enter <= 0:
+        return
+    local = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    local_rect = local.get_rect()
+    alpha = int((138 + intensity * 72) * enter)
+    panel_color = blend_color((8, 13, 22), clip.accent, 0.12 + intensity * 0.08)
+    pygame.draw.rect(local, (*panel_color, alpha), local_rect, border_radius=14)
+    pygame.draw.rect(
+        local,
+        (*blend_color(BORDER, clip.accent, 0.38), min(230, alpha + 28)),
+        local_rect,
+        width=1,
+        border_radius=14,
+    )
+
+    phase = elapsed * (2.0 + intensity * 0.8) + clip.phase_offset
+    bob = sin(phase) * 4.0 * intensity
+    slide = int((1.0 - enter) * 12)
+    center_x = 24 + slide
+    feet_y = int(local_rect.bottom - 9 + bob * 0.2)
+    torso_y = int(feet_y - 20 + bob)
+    head_y = int(torso_y - 10)
+    accent = clip.accent
+    shadow_rect = pygame.Rect(center_x - 13, local_rect.bottom - 11, 28, 5)
+    pygame.draw.ellipse(local, (*blend_color(BACKGROUND, accent, 0.18), 130), shadow_rect)
+    pygame.draw.circle(local, (*blend_color(TEXT, accent, 0.18), 235), (center_x, head_y), 7)
+    pygame.draw.circle(local, (*BACKGROUND, 210), (center_x + 2, head_y - 1), 2)
+    body_rect = pygame.Rect(center_x - 7, torso_y - 1, 14, 18)
+    pygame.draw.rect(local, (*accent, 220), body_rect, border_radius=6)
+    arm_swing = sin(phase + 0.8) * 5 * intensity
+    pygame.draw.line(
+        local,
+        (*blend_color(TEXT, accent, 0.2), 220),
+        (center_x - 7, torso_y + 5),
+        (int(center_x - 15), int(torso_y + 12 + arm_swing)),
+        2,
+    )
+    pygame.draw.line(
+        local,
+        (*blend_color(TEXT, accent, 0.2), 220),
+        (center_x + 7, torso_y + 5),
+        (int(center_x + 15), int(torso_y + 12 - arm_swing)),
+        2,
+    )
+    leg_swing = sin(phase + 1.7) * 4 * intensity
+    pygame.draw.line(
+        local,
+        (*blend_color(TEXT, accent, 0.22), 220),
+        (center_x - 4, torso_y + 16),
+        (int(center_x - 9 - leg_swing), feet_y),
+        2,
+    )
+    pygame.draw.line(
+        local,
+        (*blend_color(TEXT, accent, 0.22), 220),
+        (center_x + 4, torso_y + 16),
+        (int(center_x + 9 + leg_swing), feet_y),
+        2,
+    )
+
+    badge_radius = 8
+    badge_center = (local_rect.right - 14, 14)
+    badge_color = (
+        DANGER if clip.state in {"alert", "risk"} else GOOD if clip.state == "success" else accent
+    )
+    pygame.draw.circle(local, (*badge_color, 225), badge_center, badge_radius)
+    badge = fonts.small.render(_actor_state_badge(clip.state), True, BACKGROUND)
+    local.blit(
+        badge,
+        (
+            badge_center[0] - badge.get_width() // 2,
+            badge_center[1] - badge.get_height() // 2,
+        ),
+    )
+
+    text_left = 48
+    label = fonts.small.render(_short_actor_text(clip.label, 15), True, TEXT)
+    role = fonts.small.render(
+        _short_actor_text(f"{clip.role} / {clip.lane}", 18),
+        True,
+        blend_color(MUTED, accent, 0.45),
+    )
+    local.blit(label, (text_left, 10))
+    local.blit(role, (text_left, 28))
+    surface.blit(local, rect.topleft)
 
 
 class BaseScene:
@@ -3440,6 +3575,7 @@ class RunScene(BaseScene):
             )
 
         self._draw_header(surface, header_rect)
+        self._draw_actor_sprite_layer(surface, header_rect)
         self._draw_left_column(surface, left_rect)
         self._draw_center_column(surface, center_rect)
         self._draw_right_column(surface, right_rect)
@@ -3725,6 +3861,131 @@ class RunScene(BaseScene):
         )
         label = self.fonts.small.render(panel_key.upper(), True, blend_color(MUTED, accent, 0.7))
         surface.blit(label, (strip_rect.left + 10, strip_rect.top + 9))
+
+    def _actor_sprite_strength(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        base = 0.18 if self.motion_mode is MotionMode.REDUCED else 0.36
+        scale = 0.62 if self.motion_mode is MotionMode.REDUCED else 1.0
+        pulse = self._motion_level("panel:products", "panel:stats", "footer", "overlay:outcome")
+        return min(1.0, (base + pulse * 0.28) * scale)
+
+    def actor_timeline_active(self) -> bool:
+        """Return whether run-scene actor timelines should be animated."""
+
+        return self._actor_sprite_strength() > 0 and bool(self._run_actor_sprite_clips())
+
+    def sprite_clips_active(self) -> bool:
+        """Return whether run-scene shape sprite clips are visible."""
+
+        return self.actor_timeline_active()
+
+    def _run_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
+        selected_product = self.selected_product
+        board_pressure = self.state.finance.board_pressure
+        total_users = sum(product.user_count for product in self.state.products)
+        founder_state = "risk" if self.state.company.cash_on_hand <= 1000 else "handoff"
+        product_state = (
+            "alert"
+            if selected_product.bug_level >= 55 or selected_product.technical_debt >= 70
+            else "success"
+            if selected_product.market_fit >= 70 or selected_product.quality >= 78
+            else "build"
+        )
+        team_state = "alert" if self.state.action_points_remaining <= 0 else "build"
+        board_state = "risk" if board_pressure >= 70 else "handoff"
+        customer_state = "success" if total_users >= 120 else "idle"
+        return (
+            ActorSpriteClip(
+                key="founder",
+                label="Founder",
+                role="Strategy",
+                state=founder_state,
+                accent=SELECTION,
+                lane="command",
+                delay=0.0,
+                phase_offset=0.2,
+            ),
+            ActorSpriteClip(
+                key="team",
+                label="Team",
+                role="Build",
+                state=team_state,
+                accent=GOOD,
+                lane="ops",
+                delay=0.06,
+                phase_offset=1.1,
+            ),
+            ActorSpriteClip(
+                key="customer",
+                label="Customer",
+                role="Adoption",
+                state=customer_state,
+                accent=INFO,
+                lane="market",
+                delay=0.12,
+                phase_offset=2.0,
+            ),
+            ActorSpriteClip(
+                key="board",
+                label="Board",
+                role="Governance",
+                state=board_state,
+                accent=DANGER if board_state == "risk" else WARN,
+                lane="risk",
+                delay=0.18,
+                phase_offset=2.9,
+            ),
+            ActorSpriteClip(
+                key="product",
+                label=_short_actor_text(selected_product.name, 14),
+                role="Product",
+                state=product_state,
+                accent=GOOD if product_state == "success" else WARN,
+                lane="ship",
+                delay=0.24,
+                phase_offset=3.8,
+            ),
+        )
+
+    def _draw_actor_sprite_layer(self, surface, anchor_rect) -> None:
+        strength = self._actor_sprite_strength()
+        if strength <= 0:
+            return
+        clips = self._run_actor_sprite_clips()
+        if not clips:
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        visible_count = 3 if width < 980 else 4
+        visible_clips = clips[:visible_count]
+        gap = 8
+        clip_height = 48
+        available = max(120, anchor_rect.width - 26)
+        clip_width = min(142, max(98, int((available - gap * (visible_count - 1)) / visible_count)))
+        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
+        left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 12)
+        top = max(anchor_rect.top + 48, anchor_rect.bottom - clip_height - 8)
+        stage_rect = pygame.Rect(left - 8, top - 6, total_width + 16, clip_height + 12)
+        stage = pygame.Surface((stage_rect.width, stage_rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(
+            stage,
+            (*blend_color((8, 13, 22), SELECTION, 0.08), int(70 + strength * 46)),
+            stage.get_rect(),
+            border_radius=16,
+        )
+        surface.blit(stage, stage_rect.topleft)
+        for index, clip in enumerate(visible_clips):
+            clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            _draw_actor_sprite_clip(
+                pygame=pygame,
+                fonts=self.fonts,
+                surface=surface,
+                rect=clip_rect,
+                clip=clip,
+                elapsed=self._motion_elapsed,
+                intensity=strength,
+            )
 
     def _impact_cue_duration(self) -> float:
         if self.motion_mode is MotionMode.OFF:
@@ -7641,6 +7902,91 @@ class TurnSummaryScene(BaseScene):
         duration = self._summary_outcome_lanes_duration()
         return duration > 0 and self._elapsed < duration
 
+    def _summary_actor_sprite_strength(self) -> float:
+        if self.motion_mode is MotionMode.OFF:
+            return 0.0
+        base = 0.16 if self.motion_mode is MotionMode.REDUCED else 0.34
+        scale = 0.58 if self.motion_mode is MotionMode.REDUCED else 1.0
+        pulse = self._summary_motion_level("summary:timeline", "summary:metrics")
+        return min(1.0, (base + pulse * 0.3) * scale)
+
+    def actor_timeline_active(self) -> bool:
+        """Return whether turn-summary actor timelines should be animated."""
+
+        return self._summary_actor_sprite_strength() > 0 and bool(
+            self._summary_actor_sprite_clips()
+        )
+
+    def sprite_clips_active(self) -> bool:
+        """Return whether turn-summary shape sprite clips are visible."""
+
+        return self.actor_timeline_active()
+
+    def _summary_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
+        metrics = {metric.key: metric for metric in self._view_model.metrics}
+        net_cash = metrics.get("net_cash")
+        users = metrics.get("users")
+        board = metrics.get("board")
+        gates = metrics.get("gates")
+        cash_state = "success" if net_cash is not None and net_cash.tone == "success" else "risk"
+        user_state = "success" if users is not None and users.tone == "success" else "handoff"
+        board_state = "risk" if board is not None and board.tone == "danger" else "handoff"
+        gate_state = (
+            "alert" if gates is not None and gates.tone in {"danger", "warning"} else "build"
+        )
+        return (
+            ActorSpriteClip(
+                key="founder-summary",
+                label="Founder",
+                role="Decide",
+                state="handoff",
+                accent=SELECTION,
+                lane="next",
+                delay=0.0,
+                phase_offset=0.4,
+            ),
+            ActorSpriteClip(
+                key="finance-summary",
+                label="Finance",
+                role="Cash",
+                state=cash_state,
+                accent=GOOD if cash_state == "success" else DANGER,
+                lane="flow",
+                delay=0.08,
+                phase_offset=1.3,
+            ),
+            ActorSpriteClip(
+                key="customer-summary",
+                label="Customer",
+                role="Users",
+                state=user_state,
+                accent=INFO,
+                lane="market",
+                delay=0.16,
+                phase_offset=2.2,
+            ),
+            ActorSpriteClip(
+                key="board-summary",
+                label="Board",
+                role="Pressure",
+                state=board_state,
+                accent=DANGER if board_state == "risk" else WARN,
+                lane="risk",
+                delay=0.24,
+                phase_offset=3.1,
+            ),
+            ActorSpriteClip(
+                key="gate-summary",
+                label="Gates",
+                role="Exit",
+                state=gate_state,
+                accent=WARN if gate_state == "alert" else SELECTION,
+                lane="path",
+                delay=0.32,
+                phase_offset=4.0,
+            ),
+        )
+
     def _summary_outcome_lane_progress(self, index: int) -> float:
         if self.motion_mode is MotionMode.OFF:
             return 1.0
@@ -7648,6 +7994,45 @@ class TurnSummaryScene(BaseScene):
         duration = 0.42 if self.motion_mode is MotionMode.REDUCED else 0.58
         ratio = max(0.0, min(1.0, (self._elapsed - start) / duration))
         return 1.0 - (1.0 - ratio) * (1.0 - ratio)
+
+    def _draw_summary_actor_sprite_layer(self, surface, anchor_rect) -> None:
+        strength = self._summary_actor_sprite_strength()
+        if strength <= 0:
+            return
+        clips = self._summary_actor_sprite_clips()
+        if not clips:
+            return
+        pygame = self.pygame
+        width, _height = surface.get_size()
+        visible_count = 3 if width < 940 else 4
+        visible_clips = clips[:visible_count]
+        gap = 8
+        clip_height = 46
+        available = max(120, anchor_rect.width - 24)
+        clip_width = min(138, max(96, int((available - gap * (visible_count - 1)) / visible_count)))
+        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
+        left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 12)
+        top = max(anchor_rect.top + 42, anchor_rect.bottom - clip_height - 8)
+        stage_rect = pygame.Rect(left - 8, top - 6, total_width + 16, clip_height + 12)
+        stage = pygame.Surface((stage_rect.width, stage_rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(
+            stage,
+            (*blend_color((8, 13, 22), INFO, 0.08), int(66 + strength * 42)),
+            stage.get_rect(),
+            border_radius=16,
+        )
+        surface.blit(stage, stage_rect.topleft)
+        for index, clip in enumerate(visible_clips):
+            clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+            _draw_actor_sprite_clip(
+                pygame=pygame,
+                fonts=self.fonts,
+                surface=surface,
+                rect=clip_rect,
+                clip=clip,
+                elapsed=self._elapsed,
+                intensity=strength,
+            )
 
     def _summary_top_section_ratio(self, width: int) -> float:
         if width < 900:
@@ -7730,6 +8115,7 @@ class TurnSummaryScene(BaseScene):
             )
 
         self._draw_summary_header(surface, header_rect)
+        self._draw_summary_actor_sprite_layer(surface, header_rect)
         self._draw_summary_main(surface, left_rect)
         self._draw_summary_timeline(surface, right_rect)
         self._draw_summary_footer(surface, footer_rect)
