@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.133.0 - 2026-06-07
+
+- Added blocked-action animation feedback cards with a distinct warning outcome, shake treatment, reason detail, and targeted flash pulses so failed/disabled commands no longer look like successful action feedback
+- Added `blocked-action-feedback` visual coverage to `audit-2d-visual` and a required `Blocked Action Feedback` cell to `audit-2d-animation`
+- Updated actor reactions and regression coverage so blocked product/team/board/customer command families can put the relevant sprites into a `blocked` state
+
 ## 0.132.0 - 2026-06-07
 
 - Added deterministic visual-fatigue metrics to `audit-2d-visual`, including edge-density and bright-pixel pressure checks so overly cluttered or flashy 2D captures can fail automatically

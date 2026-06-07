@@ -125,6 +125,8 @@ class ActionFeedbackCue:
     targets: tuple[str, ...]
     time_left: float
     duration: float
+    outcome: str = "success"
+    detail: str = ""
 
 
 @dataclass(frozen=True)
@@ -3560,6 +3562,8 @@ class RunScene(BaseScene):
                 targets=cue.targets,
                 time_left=cue.time_left - dt,
                 duration=cue.duration,
+                outcome=cue.outcome,
+                detail=cue.detail,
             )
             for cue in self._action_feedback_cues
             if cue.time_left - dt > 0
@@ -4204,28 +4208,48 @@ class RunScene(BaseScene):
         if self._action_feedback_cues:
             cue = self._action_feedback_cues[0]
             targets = cue.targets
-            founder_state = "coaching"
-            if cue.family in {"product", "pipeline"} or any(
-                target.startswith(("product:", "panel:pipeline")) for target in targets
-            ):
-                product_state = "shipping"
-            if cue.family == "team" or "panel:team" in targets:
-                team_state = "coaching"
-            if cue.family == "finance" or any(
-                target in {"panel:finance", "stat:cash", "stat:runway"} for target in targets
-            ):
-                founder_state = "negotiating"
-            if cue.family in {"customers", "partners"} or any(
-                target in {"panel:customers", "panel:partnerships", "stat:users"}
-                for target in targets
-            ):
-                customer_state = "negotiating"
-            if cue.family in {"board", "endgame"} or any(
-                target in {"panel:board", "panel:endgame", "stat:board_pressure"}
-                for target in targets
-            ):
-                board_state = "blocked" if board_pressure >= 70 else "negotiating"
-                founder_state = "firefighting" if board_pressure >= 70 else "negotiating"
+            if cue.outcome == "blocked":
+                founder_state = "blocked"
+                if cue.family in {"product", "pipeline"} or any(
+                    target.startswith(("product:", "panel:products", "panel:pipeline"))
+                    for target in targets
+                ):
+                    product_state = "blocked"
+                if cue.family == "team" or "panel:team" in targets:
+                    team_state = "blocked"
+                if cue.family in {"customers", "partners"} or any(
+                    target in {"panel:customers", "panel:partnerships", "stat:users"}
+                    for target in targets
+                ):
+                    customer_state = "blocked"
+                if cue.family in {"board", "endgame"} or any(
+                    target in {"panel:board", "panel:endgame", "stat:board_pressure"}
+                    for target in targets
+                ):
+                    board_state = "blocked"
+            else:
+                founder_state = "coaching"
+                if cue.family in {"product", "pipeline"} or any(
+                    target.startswith(("product:", "panel:pipeline")) for target in targets
+                ):
+                    product_state = "shipping"
+                if cue.family == "team" or "panel:team" in targets:
+                    team_state = "coaching"
+                if cue.family == "finance" or any(
+                    target in {"panel:finance", "stat:cash", "stat:runway"} for target in targets
+                ):
+                    founder_state = "negotiating"
+                if cue.family in {"customers", "partners"} or any(
+                    target in {"panel:customers", "panel:partnerships", "stat:users"}
+                    for target in targets
+                ):
+                    customer_state = "negotiating"
+                if cue.family in {"board", "endgame"} or any(
+                    target in {"panel:board", "panel:endgame", "stat:board_pressure"}
+                    for target in targets
+                ):
+                    board_state = "blocked" if board_pressure >= 70 else "negotiating"
+                    founder_state = "firefighting" if board_pressure >= 70 else "negotiating"
 
         critical_targets = tuple(
             target
@@ -4262,7 +4286,9 @@ class RunScene(BaseScene):
                 label="Founder",
                 role="Strategy",
                 state=founder_state,
-                accent=DANGER if founder_state in {"firefighting", "risk"} else SELECTION,
+                accent=(
+                    DANGER if founder_state in {"blocked", "firefighting", "risk"} else SELECTION
+                ),
                 lane="command",
                 delay=0.0,
                 phase_offset=0.2,
@@ -4272,7 +4298,7 @@ class RunScene(BaseScene):
                 label="Team",
                 role="Build",
                 state=team_state,
-                accent=DANGER if team_state in {"alert", "firefighting"} else GOOD,
+                accent=DANGER if team_state in {"alert", "blocked", "firefighting"} else GOOD,
                 lane="ops",
                 delay=0.06,
                 phase_offset=1.1,
@@ -4282,7 +4308,13 @@ class RunScene(BaseScene):
                 label="Customer",
                 role="Adoption",
                 state=customer_state,
-                accent=WARN if customer_state == "negotiating" else INFO,
+                accent=(
+                    DANGER
+                    if customer_state in {"blocked", "firefighting"}
+                    else WARN
+                    if customer_state == "negotiating"
+                    else INFO
+                ),
                 lane="market",
                 delay=0.12,
                 phase_offset=2.0,
@@ -4306,7 +4338,7 @@ class RunScene(BaseScene):
                     GOOD
                     if product_state == "success"
                     else DANGER
-                    if product_state in {"alert", "firefighting"}
+                    if product_state in {"alert", "blocked", "firefighting"}
                     else SELECTION
                     if product_state == "shipping"
                     else WARN
@@ -4906,6 +4938,30 @@ class RunScene(BaseScene):
         )
         self._action_feedback_cues = self._action_feedback_cues[:3]
 
+    def _queue_blocked_action_feedback(self, command: str, reason: str) -> None:
+        duration = self._action_feedback_duration()
+        if duration <= 0:
+            return
+        label, family, _accent, targets = self._action_feedback_profile(command)
+        blocked_targets = ("feed", *targets)
+        self._action_feedback_cues.insert(
+            0,
+            ActionFeedbackCue(
+                command=command,
+                label=f"Blocked: {label}",
+                family=family,
+                accent=DANGER,
+                targets=blocked_targets,
+                time_left=duration,
+                duration=duration,
+                outcome="blocked",
+                detail=reason,
+            ),
+        )
+        self._action_feedback_cues = self._action_feedback_cues[:3]
+        for target in blocked_targets[:3]:
+            self._trigger_motion_target(target, intensity=0.64, motion="flash")
+
     def _late_game_choreography_duration(self) -> float:
         if self.motion_mode is MotionMode.OFF:
             return 0.0
@@ -5214,7 +5270,10 @@ class RunScene(BaseScene):
             enter_ratio = min(1.0, age / 0.18)
             ttl_ratio = max(0.0, min(1.0, cue.time_left / cue.duration))
             intensity = ttl_ratio * (0.62 if self.motion_mode is MotionMode.REDUCED else 1.0)
+            blocked = cue.outcome == "blocked"
             slide_x = int((1.0 - enter_ratio) * 26)
+            if blocked:
+                slide_x += int(sin(self._entity_motion_phase(offset=index + 0.35, speed=7.2)) * 5)
             wave = sin(self._entity_motion_phase(offset=index * 0.8, speed=2.4)) * 3 * intensity
             rect = pygame.Rect(
                 left + slide_x,
@@ -5224,50 +5283,66 @@ class RunScene(BaseScene):
             )
             layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             layer_rect = layer.get_rect()
-            fill = blend_color((8, 13, 22), cue.accent, 0.14 + intensity * 0.08)
-            border = blend_color(cue.accent, TEXT, 0.12)
+            fill = blend_color(
+                (8, 13, 22),
+                cue.accent,
+                (0.2 if blocked else 0.14) + intensity * 0.08,
+            )
+            border = DANGER if blocked else blend_color(cue.accent, TEXT, 0.12)
             alpha = int(min(210, 112 + ttl_ratio * 100))
             pygame.draw.rect(layer, (*fill, alpha), layer_rect, border_radius=14)
             pygame.draw.rect(
                 layer,
                 (*border, int(86 + intensity * 110)),
                 layer_rect,
-                width=2 if intensity >= 0.6 else 1,
+                width=2 if blocked or intensity >= 0.6 else 1,
                 border_radius=14,
             )
             pygame.draw.rect(
                 layer,
                 (*cue.accent, int(88 + intensity * 116)),
-                pygame.Rect(0, 0, 5, rect.height),
+                pygame.Rect(0, 0, 7 if blocked else 5, rect.height),
                 border_radius=3,
             )
             self._draw_entity_nodes(
                 layer,
                 pygame.Rect(94, rect.height - 16, max(24, rect.width - 118), 10),
                 accent=cue.accent,
-                strength=0.36 * intensity,
-                count=3,
+                strength=(0.48 if blocked else 0.36) * intensity,
+                count=2 if blocked else 3,
                 offset=float(index) * 1.3,
             )
+            if blocked:
+                notch_width = max(20, int(rect.width * 0.18 * ttl_ratio))
+                pygame.draw.rect(
+                    layer,
+                    (*DANGER, int(80 + intensity * 80)),
+                    pygame.Rect(rect.right - rect.left - notch_width - 10, 7, notch_width, 4),
+                    border_radius=2,
+                )
             surface.blit(layer, rect.topleft)
 
             label_surface = self.fonts.small.render(cue.label, True, TEXT)
+            family_text = "BLOCKED" if blocked else cue.family.upper()
             family_surface = self.fonts.small.render(
-                cue.family.upper(),
+                family_text,
                 True,
                 blend_color(MUTED, cue.accent, 0.82),
             )
-            target_text = " / ".join(
-                target.removeprefix("panel:")
-                .removeprefix("stat:")
-                .removeprefix("summary:")
-                .removeprefix("overlay:")
-                for target in cue.targets[:2]
-            )
+            if blocked and cue.detail:
+                target_text = cue.detail
+            else:
+                target_text = " / ".join(
+                    target.removeprefix("panel:")
+                    .removeprefix("stat:")
+                    .removeprefix("summary:")
+                    .removeprefix("overlay:")
+                    for target in cue.targets[:2]
+                )
             target_surface = self.fonts.small.render(
                 self._compact_button_detail(target_text, max_length=28),
                 True,
-                MUTED,
+                blend_color(MUTED, DANGER, 0.55) if blocked else MUTED,
             )
             surface.blit(label_surface, (rect.left + 14, rect.top + 8))
             surface.blit(
@@ -5496,6 +5571,7 @@ class RunScene(BaseScene):
         )
 
     def _push_action_blocked_event(self, command: str, reason: str) -> None:
+        self._queue_blocked_action_feedback(command, reason)
         self.push_event(
             FrontendEvent(
                 title="Action Not Ready",
@@ -5814,6 +5890,7 @@ class RunScene(BaseScene):
         try:
             outcome = apply_action(self.state, request.action, context=request.context)
         except ValueError as error:
+            self._queue_blocked_action_feedback(request.action.value, str(error))
             self.push_event(
                 FrontendEvent(
                     title="Action Rejected",

@@ -49,6 +49,11 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     ("run_impact_feedback", "Impact Feedback", ("impact-cue", "action-feedback")),
     (
+        "run_blocked_feedback",
+        "Blocked Action Feedback",
+        ("action-feedback", "blocked-action-feedback"),
+    ),
+    (
         "run_picker_feedback",
         "Late-Game Command Choreography",
         ("picker", "action-feedback", "late-game-choreography"),

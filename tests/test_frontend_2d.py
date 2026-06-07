@@ -1480,6 +1480,36 @@ def test_run_scene_action_request_triggers_motion_pulses() -> None:
         pygame.quit()
 
 
+def test_run_scene_blocked_action_triggers_blocked_feedback() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=43),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene._run_command(TurnAction.SCREEN_CANDIDATE.value)
+
+        assert scene._action_feedback_cues
+        cue = scene._action_feedback_cues[0]
+        assert cue.outcome == "blocked"
+        assert cue.label.startswith("Blocked:")
+        assert cue.detail.startswith("Source candidates first")
+        assert "feed" in cue.targets
+        assert scene._motion_pulses.get("feed") > 0
+        actor_states = {clip.key: clip.state for clip in scene._run_actor_sprite_clips()}
+        assert actor_states["founder"] == "blocked"
+        assert actor_states["product"] == "blocked"
+    finally:
+        pygame.quit()
+
+
 def test_run_actor_sprite_clips_react_to_action_feedback() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -3023,6 +3053,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "run_drama_feedback",
         "run_pending_feedback",
         "run_impact_feedback",
+        "run_blocked_feedback",
         "run_picker_feedback",
         "run_inspector",
         "run_endgame_board",
@@ -3038,6 +3069,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     title_menu = next(cell for cell in report.cells if cell.scene_key == "title_menu")
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
+    blocked = next(cell for cell in report.cells if cell.scene_key == "run_blocked_feedback")
     dashboard = next(cell for cell in report.cells if cell.scene_key == "run_dashboard")
     drama = next(cell for cell in report.cells if cell.scene_key == "run_drama_feedback")
     pending = next(cell for cell in report.cells if cell.scene_key == "run_pending_feedback")
@@ -3060,6 +3092,8 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "pending-choice-preview" in pending.active_layers
     assert "impact-cue" in impact.active_layers
     assert "action-feedback" in impact.active_layers
+    assert "action-feedback" in blocked.active_layers
+    assert "blocked-action-feedback" in blocked.active_layers
     assert "picker" in picker.active_layers
     assert "overlay-transition" in picker.active_layers
     assert "action-feedback" in picker.active_layers
@@ -3120,12 +3154,14 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     )
 
     assert report.status == "pass"
-    assert report.visual_report.baseline_signature.startswith("12:")
+    assert report.visual_report.baseline_signature.startswith("13:")
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers
     assert areas["Pending Event Preview"].status == "pass"
     assert "pending-choice-preview" in areas["Pending Event Preview"].active_layers
+    assert areas["Blocked Action Feedback"].status == "pass"
+    assert "blocked-action-feedback" in areas["Blocked Action Feedback"].active_layers
     assert areas["Late-Game Command Choreography"].status == "pass"
     assert "late-game-choreography" in areas["Late-Game Command Choreography"].active_layers
     assert areas["Outcome Cinematic"].status == "pass"

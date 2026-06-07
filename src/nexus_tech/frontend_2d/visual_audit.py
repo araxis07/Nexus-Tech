@@ -395,6 +395,37 @@ def run_2d_visual_audit(
                     )
                 )
 
+                blocked_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 13),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                blocked_scene._run_command(TurnAction.PROMOTE_EMPLOYEE.value)
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        blocked_scene,
+                        scene_key="run_blocked_feedback",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "action-feedback",
+                                "blocked-action-feedback",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
                 picker_scene = RunScene(
                     pygame=pygame,
                     fonts=fonts,
@@ -740,6 +771,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("inspector")
     if getattr(scene, "_action_feedback_cues", ()):
         layers.append("action-feedback")
+        if any(cue.outcome == "blocked" for cue in scene._action_feedback_cues):
+            layers.append("blocked-action-feedback")
     if getattr(scene, "_impact_cues", ()):
         layers.append("impact-cue")
     if getattr(scene, "overlay_transition_active", lambda: False)():
@@ -788,6 +821,7 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "transition",
         "motion-pulses",
         "action-feedback",
+        "blocked-action-feedback",
         "impact-cue",
         "overlay-transition",
         "product-drama",

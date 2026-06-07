@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.132.0`
+Version: `0.133.0`
 
 ## Scope
 
@@ -15,6 +15,7 @@ Version: `0.132.0`
 - Scene-specific actor clips now also cover title/menu guidance, inspector record routing, the endgame cockpit board, and review/postmortem handoffs.
 - Actor sprite footprints now feed an automated `actor-readability` layer that checks viewport bounds and click-target collisions across actor scenes before manual playtesting.
 - Visual captures now also report edge-density and bright-pixel pressure, giving the audits a deterministic first-pass guard against cluttered or overly flashy animation frames.
+- Blocked or rejected 2D commands now emit distinct blocked-action feedback cards, targeted flash pulses, and matching actor blocked states instead of sharing the same visual language as successful commands.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
 - Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.
@@ -25,7 +26,7 @@ Version: `0.132.0`
 - Late-game command choreography cards now cover terminal, path-repair, board, finance, and pipeline commands while reusing panel/stat targets.
 - Pending-event options now expose preview motion before selection, and turn summaries now add compact outcome lanes for cash, users, board, and gate shifts.
 - Outcome overlays now include a dedicated victory/shutdown cinematic layer for final run states.
-- `audit-2d-visual` now renders title, meta, live run, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
+- `audit-2d-visual` now renders title, meta, live run, blocked-action feedback, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
 - `audit-2d-animation` now combines visual-layer coverage, actor/sprite coverage, actor-readability checks, visual-fatigue budgets, motion-budget checks, off-mode checks, and advisory gaps into one animation-completeness gate.
 - Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
 - Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, broader actor-timeline/sprite-clip active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
@@ -42,6 +43,7 @@ Version: `0.132.0`
 - Max frame target: avoid spikes above `50 ms`.
 - Watch threshold: up to `33 ms` or slightly elevated pulse banks without failing the release gate.
 - Visual fatigue target: sampled edge density and bright-pixel pressure must stay below the visual audit budgets before open-window playtesting.
+- Blocked feedback target: blocked/rejected command cards must expose `blocked-action-feedback` and stay disabled in `--motion-mode off`.
 - Flow target: every surfaced 2D command and inspector item action must either build a request path or return a concrete disabled explanation.
 
 ## Verification Commands
