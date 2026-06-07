@@ -64,10 +64,12 @@ Record `pass`, `watch`, or `fail` for each scene:
 - Any hidden primary action is a release blocker.
 - Any unreadable disabled reason is a release blocker.
 - Any actor/readability collision at `820x620` is a release blocker.
-- Any `Animation Pacing Budget`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
+- Any `Readability Guard`, `Animation Pacing Budget`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.
 
 ## Result Template
+
+Use `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md` for the full report. The compact template below is only for quick notes during a live pass.
 
 ```text
 Build:

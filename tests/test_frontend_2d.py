@@ -3187,6 +3187,11 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert areas["Scene Motion Profile"].status == "pass"
     assert "scene-profile-map" in areas["Scene Motion Profile"].required_layers
     assert "unprofiled:0" in areas["Scene Motion Profile"].active_layers
+    assert areas["Readability Guard"].status == "pass"
+    assert "compact-viewport" in areas["Readability Guard"].required_layers
+    assert any(
+        layer.startswith("compact-captures:") for layer in areas["Readability Guard"].active_layers
+    )
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)

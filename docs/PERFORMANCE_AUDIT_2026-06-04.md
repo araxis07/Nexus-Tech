@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.136.0`
+Version: `0.137.0`
 
 ## Scope
 
@@ -17,6 +17,7 @@ Version: `0.136.0`
 - Visual captures now also report edge-density and bright-pixel pressure, giving the audits a deterministic first-pass guard against cluttered or overly flashy animation frames.
 - `audit-2d-animation` now includes an `Animation Pacing Budget` cell that gates active animation sample density, pulse cooldown, and frame timing before manual open-window review.
 - `audit-2d-animation` now includes a `Scene Motion Profile` cell that requires every captured scene to have an explicit motion-layer budget before new scene animation can ship.
+- `audit-2d-animation` now includes a `Readability Guard` cell that checks compact captures, actor-readability, overlay density, and visual pass status before manual playtesting.
 - Blocked or rejected 2D commands now emit distinct blocked-action feedback cards, targeted flash pulses, and matching actor blocked states instead of sharing the same visual language as successful commands.
 - GitHub Actions now runs 2D headless smoke plus motion, visual, and animation-completeness gates and uploads full/off visual captures so local release checks and pull request checks catch animation regressions the same way.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
@@ -48,6 +49,7 @@ Version: `0.136.0`
 - Visual fatigue target: sampled edge density and bright-pixel pressure must stay below the visual audit budgets before open-window playtesting.
 - Animation pacing target: full-mode active animation sample density must stay at or below `36` per audit viewport while pulse cooldown and frame budgets stay green.
 - Scene profile target: every visual audit scene must be declared in the scene motion-profile map, and each scene must stay within its explicit motion-layer budget.
+- Readability target: compact `820px` captures must pass visual health, actor scenes must expose `actor-readability`, and overlay scenes must stay under the compact overlay density budget.
 - Blocked feedback target: blocked/rejected command cards must expose `blocked-action-feedback` and stay disabled in `--motion-mode off`.
 - Flow target: every surfaced 2D command and inspector item action must either build a request path or return a concrete disabled explanation.
 
@@ -63,4 +65,4 @@ Version: `0.136.0`
 
 ## Result
 
-The audit makes animation stability, scene-profile coverage, pacing, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.
+The audit makes animation stability, compact readability, scene-profile coverage, pacing, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.

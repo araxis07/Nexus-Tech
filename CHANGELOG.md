@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.137.0 - 2026-06-07
+
+- Added a `Readability Guard` cell to `audit-2d-animation` so compact viewport captures, actor-readability, overlay density, and visual pass status are release-gated before manual playtesting
+- Added `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md` for recording real open-window animation playtest results across windows, motion modes, scenes, blockers, and release decisions
+- Updated release and playtest documentation so readability, scene-profile, pacing, visual-fatigue, and actor-readability blockers are reviewed together before presenting the 2D build
+
 ## 0.136.0 - 2026-06-07
 
 - Added a `Scene Motion Profile` cell to `audit-2d-animation` so every captured 2D scene must have an explicit motion-layer budget and unprofiled scenes fail the release gate

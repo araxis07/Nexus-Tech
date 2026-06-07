@@ -20,6 +20,8 @@ from nexus_tech.frontend_2d.visual_audit import (
 
 DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
+COMPACT_READABILITY_WIDTH = 820
+MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
 
 _MOTION_PROFILE_LAYERS = {
     "action-feedback",
@@ -60,6 +62,23 @@ _SCENE_MOTION_PROFILES: tuple[tuple[str, str, int], ...] = (
     ("turn_summary", "turn-summary reveal", 7),
     ("review", "post-run review", 5),
 )
+
+_READABILITY_ACTOR_SCENES = {
+    "title_menu",
+    "run_dashboard",
+    "run_inspector",
+    "run_endgame_board",
+    "turn_summary",
+    "review",
+}
+
+_READABILITY_OVERLAY_SCENES = {
+    "run_pending_feedback",
+    "run_blocked_feedback",
+    "run_picker_feedback",
+    "run_inspector",
+    "run_outcome_overlay",
+}
 
 _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
@@ -238,6 +257,7 @@ def run_2d_animation_audit(
     cells.append(_build_visual_fatigue_cell(visual_report))
     cells.append(_build_animation_pacing_cell(motion_report))
     cells.append(_build_scene_motion_profile_cell(visual_report))
+    cells.append(_build_readability_guard_cell(visual_report))
     cells.extend(_build_advisory_cells())
     return AnimationAuditReport(
         scenario_id=scenario_id,
@@ -496,6 +516,60 @@ def _build_scene_motion_profile_cell(visual_report: VisualAuditReport) -> Animat
         status="pass" if not findings else "fail",
         notes=(
             f"{len(_SCENE_MOTION_PROFILES)} scene profiles, max motion layers {max_observed}"
+            if not findings
+            else "; ".join(findings[:4])
+        ),
+    )
+
+
+def _build_readability_guard_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    compact_cells = tuple(
+        cell for cell in visual_report.cells if cell.width <= COMPACT_READABILITY_WIDTH
+    )
+    findings: list[str] = []
+    if not compact_cells:
+        findings.append(f"missing {COMPACT_READABILITY_WIDTH}px compact captures")
+
+    actor_checks = 0
+    overlay_checks = 0
+    max_edge_density = 0.0
+    for cell in compact_cells:
+        max_edge_density = max(max_edge_density, cell.edge_density)
+        if cell.status != "pass":
+            findings.append(f"{cell.scene_key} visual {cell.notes}")
+        if cell.scene_key in _READABILITY_ACTOR_SCENES:
+            actor_checks += 1
+            if "actor-readability" not in cell.active_layers:
+                findings.append(f"{cell.scene_key} missing actor-readability")
+        if cell.scene_key in _READABILITY_OVERLAY_SCENES:
+            overlay_checks += 1
+            if cell.edge_density > MAX_COMPACT_READABILITY_EDGE_DENSITY:
+                findings.append(
+                    f"{cell.scene_key} edge {cell.edge_density:.2f}>"
+                    f"{MAX_COMPACT_READABILITY_EDGE_DENSITY:.2f}"
+                )
+
+    active_layers = (
+        f"compact-captures:{len(compact_cells)}",
+        f"actor-scenes:{actor_checks}",
+        f"overlay-scenes:{overlay_checks}",
+        f"max-edge:{max_edge_density:.2f}",
+    )
+    return AnimationCoverageCell(
+        area="Readability Guard",
+        required_layers=(
+            "compact-viewport",
+            "actor-readability",
+            "overlay-density",
+            "visual-status",
+        ),
+        active_layers=active_layers,
+        status="pass" if not findings else "fail",
+        notes=(
+            (
+                f"{len(compact_cells)} compact captures, {actor_checks} actor checks, "
+                f"max edge {max_edge_density:.2f}"
+            )
             if not findings
             else "; ".join(findings[:4])
         ),
