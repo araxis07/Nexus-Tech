@@ -19,7 +19,7 @@ Use this template when completing the open-window animation pass. Keep completed
 | `pytest -q` |  |  |
 | `audit-2d-motion` full/reduced/off |  |  |
 | `audit-2d-visual` full/off |  |  |
-| `audit-2d-animation` |  | Confirm `Readability Guard`, `Scene Motion Profile`, `Animation Pacing Budget`, `Visual Fatigue Budget`, and `actor-readability` pass |
+| `audit-2d-animation` |  | Confirm `Readability Guard`, `Scene Motion Profile`, `Animation Pacing Budget`, `Long Session Motion Stress`, `Visual Fatigue Budget`, and `actor-readability` pass |
 | Headless `menu-2d` / `play-2d` |  |  |
 | Open-window `menu-2d` / `play-2d` smoke |  |  |
 
@@ -51,6 +51,7 @@ Use this template when completing the open-window animation pass. Keep completed
 - Actor, tooltip, footer, modal, or button collisions:
 - Motion-mode regressions:
 - CI artifact anomalies:
+- `visual-audit-summary.md` anomalies:
 
 ## Decision
 

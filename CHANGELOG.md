@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.138.0 - 2026-06-07
+
+- Added `visual-audit-summary.md` output whenever `audit-2d-visual --output-dir` is used so CI visual artifacts include a readable capture index, baseline signature, status counts, and visual-health metrics
+- Added a `Long Session Motion Stress` cell to `audit-2d-animation` so dense long-run pulse recovery and frame timing are release-gated separately from short smoke checks
+- Updated animation release and playtest documentation so CI artifact summaries and long-session stress checks are reviewed before presenting the 2D build
+
 ## 0.137.0 - 2026-06-07
 
 - Added a `Readability Guard` cell to `audit-2d-animation` so compact viewport captures, actor-readability, overlay density, and visual pass status are release-gated before manual playtesting

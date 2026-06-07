@@ -68,7 +68,11 @@ from nexus_tech.frontend_2d.viewmodels import (
     build_run_review_view_model,
     build_turn_summary_view_model,
 )
-from nexus_tech.frontend_2d.visual_audit import MAX_BRIGHT_RATIO, MAX_EDGE_DENSITY
+from nexus_tech.frontend_2d.visual_audit import (
+    MAX_BRIGHT_RATIO,
+    MAX_EDGE_DENSITY,
+    VISUAL_AUDIT_SUMMARY_NAME,
+)
 from nexus_tech.frontend_2d.widgets import DANGER, create_fonts
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.endgame import (
@@ -3067,6 +3071,12 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(0.0 <= cell.edge_density <= MAX_EDGE_DENSITY for cell in report.cells)
     assert all(0.0 <= cell.bright_ratio <= MAX_BRIGHT_RATIO for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
+    summary_path = tmp_path / VISUAL_AUDIT_SUMMARY_NAME
+    assert summary_path.exists()
+    summary = summary_path.read_text(encoding="utf-8")
+    assert "NEXUS TECH 2D Visual Audit" in summary
+    assert report.baseline_signature in summary
+    assert "`run_dashboard`" in summary
     title_menu = next(cell for cell in report.cells if cell.scene_key == "title_menu")
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
     blocked = next(cell for cell in report.cells if cell.scene_key == "run_blocked_feedback")
@@ -3158,6 +3168,8 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers
+    assert areas["Long Session Motion Stress"].status == "pass"
+    assert "long-run-pulse-recovery" in areas["Long Session Motion Stress"].required_layers
     assert areas["Pending Event Preview"].status == "pass"
     assert "pending-choice-preview" in areas["Pending Event Preview"].active_layers
     assert areas["Blocked Action Feedback"].status == "pass"

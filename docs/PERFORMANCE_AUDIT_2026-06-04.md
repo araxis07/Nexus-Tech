@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.137.0`
+Version: `0.138.0`
 
 ## Scope
 
@@ -16,6 +16,7 @@ Version: `0.137.0`
 - Actor sprite footprints now feed an automated `actor-readability` layer that checks viewport bounds and click-target collisions across actor scenes before manual playtesting.
 - Visual captures now also report edge-density and bright-pixel pressure, giving the audits a deterministic first-pass guard against cluttered or overly flashy animation frames.
 - `audit-2d-animation` now includes an `Animation Pacing Budget` cell that gates active animation sample density, pulse cooldown, and frame timing before manual open-window review.
+- `audit-2d-animation` now includes a `Long Session Motion Stress` cell that gates dense long-run pulse recovery and frame timing separately from short smoke checks.
 - `audit-2d-animation` now includes a `Scene Motion Profile` cell that requires every captured scene to have an explicit motion-layer budget before new scene animation can ship.
 - `audit-2d-animation` now includes a `Readability Guard` cell that checks compact captures, actor-readability, overlay density, and visual pass status before manual playtesting.
 - Blocked or rejected 2D commands now emit distinct blocked-action feedback cards, targeted flash pulses, and matching actor blocked states instead of sharing the same visual language as successful commands.
@@ -30,7 +31,7 @@ Version: `0.137.0`
 - Late-game command choreography cards now cover terminal, path-repair, board, finance, and pipeline commands while reusing panel/stat targets.
 - Pending-event options now expose preview motion before selection, and turn summaries now add compact outcome lanes for cash, users, board, and gate shifts.
 - Outcome overlays now include a dedicated victory/shutdown cinematic layer for final run states.
-- `audit-2d-visual` now renders title, meta, live run, blocked-action feedback, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review.
+- `audit-2d-visual` now renders title, meta, live run, blocked-action feedback, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review, and writes a Markdown summary next to PNG captures when `--output-dir` is used.
 - `audit-2d-animation` now combines visual-layer coverage, actor/sprite coverage, actor-readability checks, visual-fatigue budgets, motion-budget checks, off-mode checks, and advisory gaps into one animation-completeness gate.
 - Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
 - Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, broader actor-timeline/sprite-clip active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
@@ -48,6 +49,7 @@ Version: `0.137.0`
 - Watch threshold: up to `33 ms` or slightly elevated pulse banks without failing the release gate.
 - Visual fatigue target: sampled edge density and bright-pixel pressure must stay below the visual audit budgets before open-window playtesting.
 - Animation pacing target: full-mode active animation sample density must stay at or below `36` per audit viewport while pulse cooldown and frame budgets stay green.
+- Long-session target: dense long-run pulse banks must cool back to `<= 18` pulses while average and max frame budgets remain green.
 - Scene profile target: every visual audit scene must be declared in the scene motion-profile map, and each scene must stay within its explicit motion-layer budget.
 - Readability target: compact `820px` captures must pass visual health, actor scenes must expose `actor-readability`, and overlay scenes must stay under the compact overlay density budget.
 - Blocked feedback target: blocked/rejected command cards must expose `blocked-action-feedback` and stay disabled in `--motion-mode off`.
@@ -65,4 +67,4 @@ Version: `0.137.0`
 
 ## Result
 
-The audit makes animation stability, compact readability, scene-profile coverage, pacing, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.
+The audit makes animation stability, long-session stress recovery, compact readability, scene-profile coverage, pacing, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.

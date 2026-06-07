@@ -40,6 +40,7 @@ MIN_LUMINANCE_SPREAD = 28
 MIN_NON_DARK_RATIO = 0.05
 MAX_EDGE_DENSITY = 0.72
 MAX_BRIGHT_RATIO = 0.42
+VISUAL_AUDIT_SUMMARY_NAME = "visual-audit-summary.md"
 
 
 @dataclass(frozen=True)
@@ -642,7 +643,7 @@ def run_2d_visual_audit(
                         output_dir=output_dir,
                     )
                 )
-        return VisualAuditReport(
+        report = VisualAuditReport(
             scenario_id=scenario_id,
             difficulty=difficulty_mode.value if difficulty_mode is not None else "scenario",
             seed=seed,
@@ -650,6 +651,9 @@ def run_2d_visual_audit(
             cells=tuple(cells),
             output_dir=output_dir_text,
         )
+        if output_dir is not None:
+            _write_visual_audit_summary(report, output_dir)
+        return report
     finally:
         pygame.quit()
 
@@ -748,6 +752,45 @@ def _sample_frame_metrics(
         non_dark / max(1, sample_count),
         edge_changes / max(1, edge_checks),
         bright / max(1, sample_count),
+    )
+
+
+def _write_visual_audit_summary(report: VisualAuditReport, output_dir: Path) -> None:
+    passed = sum(1 for cell in report.cells if cell.status == "pass")
+    failed = len(report.cells) - passed
+    max_edge_density = max((cell.edge_density for cell in report.cells), default=0.0)
+    max_bright_ratio = max((cell.bright_ratio for cell in report.cells), default=0.0)
+    lines = [
+        "# NEXUS TECH 2D Visual Audit",
+        "",
+        f"- Scenario: `{report.scenario_id}`",
+        f"- Difficulty: `{report.difficulty}`",
+        f"- Seed: `{report.seed}`",
+        f"- Motion mode: `{report.motion_mode}`",
+        f"- Status: `{report.status}`",
+        f"- Baseline: `{report.baseline_signature}`",
+        f"- Captures: `{len(report.cells)}` total, `{passed}` pass, `{failed}` fail",
+        f"- Max edge density: `{max_edge_density:.2f}`",
+        f"- Max bright ratio: `{max_bright_ratio:.2f}`",
+        "",
+        "| Scene | Viewport | Status | Clutter | Bright | Capture | Notes |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for cell in report.cells:
+        capture = Path(cell.output_path).name if cell.output_path is not None else "-"
+        lines.append(
+            "| "
+            f"`{cell.scene_key}` | "
+            f"`{cell.width}x{cell.height}` | "
+            f"`{cell.status}` | "
+            f"`{cell.edge_density:.2f}` | "
+            f"`{cell.bright_ratio:.2f}` | "
+            f"`{capture}` | "
+            f"{cell.notes} |"
+        )
+    (output_dir / VISUAL_AUDIT_SUMMARY_NAME).write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
     )
 
 

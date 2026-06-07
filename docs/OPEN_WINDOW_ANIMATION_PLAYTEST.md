@@ -15,7 +15,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-m
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 ```
 
-Do not commit generated PNG captures. Use `/tmp/nexus-tech-visual-audit` locally or the `nexus-tech-2d-visual-audit` GitHub Actions artifact for review.
+Do not commit generated PNG captures. Use `/tmp/nexus-tech-visual-audit` locally or the `nexus-tech-2d-visual-audit` GitHub Actions artifact for review. Start with `visual-audit-summary.md` before opening individual PNG captures.
 
 ## Window Matrix
 
@@ -64,7 +64,7 @@ Record `pass`, `watch`, or `fail` for each scene:
 - Any hidden primary action is a release blocker.
 - Any unreadable disabled reason is a release blocker.
 - Any actor/readability collision at `820x620` is a release blocker.
-- Any `Readability Guard`, `Animation Pacing Budget`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
+- Any `Readability Guard`, `Animation Pacing Budget`, `Long Session Motion Stress`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.
 
 ## Result Template

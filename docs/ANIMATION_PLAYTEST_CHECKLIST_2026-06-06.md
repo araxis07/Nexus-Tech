@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.137.0`
-- Focus: 2D actor/sprite timeline, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.138.0`
+- Focus: 2D actor/sprite timeline, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
 
@@ -23,6 +23,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Automated guard: `audit-2d-animation` reports `actor-readability` for actor scenes before the manual open-window pass.
 - Automated guard: `audit-2d-animation` reports `Visual Fatigue Budget` so clutter and bright-pixel pressure stay within deterministic limits before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Animation Pacing Budget` so active motion density, pulse cooldown, and frame timing stay within release limits before the manual pass.
+- Automated guard: `audit-2d-animation` reports `Long Session Motion Stress` so dense long-run pulse banks cool down before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Scene Motion Profile` so new scenes cannot ship without explicit motion-layer budgets.
 - Automated guard: `audit-2d-animation` reports `Readability Guard` so compact captures, actor-readable scenes, overlay density, and visual pass status are verified before the manual pass.
 - CI guard: GitHub Actions runs headless 2D smoke checks plus motion, visual, and animation-completeness audits before the manual pass.

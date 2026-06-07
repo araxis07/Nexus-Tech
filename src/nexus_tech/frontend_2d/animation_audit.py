@@ -252,6 +252,7 @@ def run_2d_animation_audit(
     )
     cells = list(_build_visual_coverage_cells(visual_report))
     cells.append(_build_motion_budget_cell(motion_report))
+    cells.append(_build_long_session_motion_cell(motion_report))
     cells.append(_build_motion_off_cell(off_motion_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_visual_fatigue_cell(visual_report))
@@ -323,6 +324,44 @@ def _build_motion_budget_cell(motion_report: MotionAuditReport) -> AnimationCove
             f"{len(motion_report.cells)} viewport(s), "
             f"{motion_report.flow_report.command_count} commands"
         ),
+    )
+
+
+def _build_long_session_motion_cell(motion_report: MotionAuditReport) -> AnimationCoverageCell:
+    max_before = max((cell.long_run_before_pulses for cell in motion_report.cells), default=0)
+    max_after = max((cell.long_run_after_pulses for cell in motion_report.cells), default=0)
+    min_recovery = min(
+        (cell.long_run_before_pulses - cell.long_run_after_pulses for cell in motion_report.cells),
+        default=0,
+    )
+    max_average_frame = max((cell.average_frame_ms for cell in motion_report.cells), default=0.0)
+    max_frame_spike = max((cell.max_frame_ms for cell in motion_report.cells), default=0.0)
+    status = (
+        "pass"
+        if max_after <= 18 and max_average_frame <= 24.0 and max_frame_spike <= 50.0
+        else "fail"
+    )
+    active_layers = (
+        f"before:{max_before}",
+        f"after:{max_after}",
+        f"recovered:{min_recovery}",
+        f"avg-frame:{max_average_frame:.2f}ms",
+        f"max-frame:{max_frame_spike:.2f}ms",
+    )
+    notes = (
+        f"long-run pulses cooled to {max_after} after dense stress"
+        if status == "pass"
+        else (
+            f"long-run after {max_after}, avg {max_average_frame:.2f} ms, "
+            f"max {max_frame_spike:.2f} ms"
+        )
+    )
+    return AnimationCoverageCell(
+        area="Long Session Motion Stress",
+        required_layers=("long-run-pulse-recovery", "frame-budget", "stress-cooldown"),
+        active_layers=active_layers,
+        status=status,
+        notes=notes,
     )
 
 

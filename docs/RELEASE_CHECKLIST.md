@@ -61,10 +61,11 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.
 - Treat `Animation Pacing Budget` failures as release blockers before adding more full-mode motion layers.
+- Treat `Long Session Motion Stress` failures as release blockers before presenting longer 2D playthroughs.
 - Treat `Scene Motion Profile` failures as release blockers before shipping new scenes or adding denser scene-specific motion.
 - Treat `Readability Guard` failures as release blockers before opening the manual playtest pass.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.
-- Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, and review the uploaded `nexus-tech-2d-visual-audit` artifact when CI captures show a regression.
+- Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, and review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures when CI shows a regression.
 - Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md`, and `docs/ANIMATION_PLAYTEST_CHECKLIST_2026-06-06.md` for the remaining open-window readability pass before presenting the 2D build.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
 - If founder-pressure openings were retuned, rerun at least one longer `simulate-balance` founder batch so angel-cap, pricing, and cash-guard policies are verified on real seeds instead of only short audits.
