@@ -21,6 +21,46 @@ from nexus_tech.frontend_2d.visual_audit import (
 DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 
+_MOTION_PROFILE_LAYERS = {
+    "action-feedback",
+    "actor-timeline",
+    "blocked-action-feedback",
+    "endgame-actor",
+    "impact-cue",
+    "inspector-actor",
+    "late-game-choreography",
+    "motion-pulses",
+    "outcome-cinematic",
+    "overlay-transition",
+    "pending-choice",
+    "pending-choice-preview",
+    "product-drama",
+    "review-actor",
+    "risk-drama",
+    "sprite-clips",
+    "summary-cinematic",
+    "summary-lanes",
+    "summary-sequence",
+    "title-actor",
+    "transition",
+}
+
+_SCENE_MOTION_PROFILES: tuple[tuple[str, str, int], ...] = (
+    ("title_menu", "title onboarding", 5),
+    ("title_meta", "meta/archive board", 5),
+    ("run_dashboard", "live dashboard", 6),
+    ("run_drama_feedback", "product and risk drama", 6),
+    ("run_pending_feedback", "pending-event preview", 8),
+    ("run_impact_feedback", "impact feedback", 8),
+    ("run_blocked_feedback", "blocked-action feedback", 9),
+    ("run_picker_feedback", "picker choreography", 9),
+    ("run_inspector", "inspector routing", 9),
+    ("run_endgame_board", "endgame cockpit", 8),
+    ("run_outcome_overlay", "outcome cinematic", 8),
+    ("turn_summary", "turn-summary reveal", 7),
+    ("review", "post-run review", 5),
+)
+
 _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "title_menu",
@@ -197,6 +237,7 @@ def run_2d_animation_audit(
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_visual_fatigue_cell(visual_report))
     cells.append(_build_animation_pacing_cell(motion_report))
+    cells.append(_build_scene_motion_profile_cell(visual_report))
     cells.extend(_build_advisory_cells())
     return AnimationAuditReport(
         scenario_id=scenario_id,
@@ -422,6 +463,45 @@ def _build_animation_pacing_cell(motion_report: MotionAuditReport) -> AnimationC
     )
 
 
+def _build_scene_motion_profile_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    profile_by_scene = {
+        scene_key: (label, max_layers) for scene_key, label, max_layers in _SCENE_MOTION_PROFILES
+    }
+    observed_scene_keys = {cell.scene_key for cell in visual_report.cells}
+    unprofiled = tuple(sorted(observed_scene_keys - set(profile_by_scene)))
+    findings: list[str] = []
+    scene_layer_counts: list[int] = []
+    for scene_key, (label, max_layers) in profile_by_scene.items():
+        matching_cells = tuple(cell for cell in visual_report.cells if cell.scene_key == scene_key)
+        if not matching_cells:
+            findings.append(f"missing {scene_key}")
+            continue
+        scene_max = max(_scene_motion_layer_count(cell) for cell in matching_cells)
+        scene_layer_counts.append(scene_max)
+        if scene_max > max_layers:
+            findings.append(f"{label} {scene_max}>{max_layers}")
+    if unprofiled:
+        findings.append(f"unprofiled {','.join(unprofiled)}")
+
+    max_observed = max(scene_layer_counts, default=0)
+    active_layers = (
+        f"profiles:{len(_SCENE_MOTION_PROFILES)}",
+        f"max-scene-layers:{max_observed}",
+        f"unprofiled:{len(unprofiled)}",
+    )
+    return AnimationCoverageCell(
+        area="Scene Motion Profile",
+        required_layers=("scene-profile-map", "max-motion-layers", "unprofiled-scene-gate"),
+        active_layers=active_layers,
+        status="pass" if not findings else "fail",
+        notes=(
+            f"{len(_SCENE_MOTION_PROFILES)} scene profiles, max motion layers {max_observed}"
+            if not findings
+            else "; ".join(findings[:4])
+        ),
+    )
+
+
 def _animation_active_sample_count(cell: MotionAuditCell) -> int:
     return (
         cell.transition_active_scenes
@@ -441,6 +521,10 @@ def _animation_active_sample_count(cell: MotionAuditCell) -> int:
         + cell.actor_timeline_active_samples
         + cell.sprite_clips_active_samples
     )
+
+
+def _scene_motion_layer_count(cell) -> int:
+    return sum(1 for layer in cell.active_layers if layer in _MOTION_PROFILE_LAYERS)
 
 
 def _build_advisory_cells() -> tuple[AnimationCoverageCell, ...]:

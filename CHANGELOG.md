@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.136.0 - 2026-06-07
+
+- Added a `Scene Motion Profile` cell to `audit-2d-animation` so every captured 2D scene must have an explicit motion-layer budget and unprofiled scenes fail the release gate
+- Added `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, a manual open-window animation framework for compact, small, and presentation windows across full, reduced, and off motion modes
+- Updated release and animation documentation so scene-profile, pacing, visual-fatigue, actor-readability, and manual playtest blockers are reviewed together before presenting the 2D build
+
 ## 0.135.0 - 2026-06-07
 
 - Added an `Animation Pacing Budget` cell to `audit-2d-animation` so animation density, residual pulse cooldown, and frame timing are release-gated before manual open-window playtesting
