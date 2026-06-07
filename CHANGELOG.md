@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.134.0 - 2026-06-07
+
+- Added GitHub Actions release gates for 2D headless smoke checks, motion audits, visual audits, and animation-completeness audits so actor-readability, visual-fatigue, and blocked-action feedback regressions fail CI
+- Added CI runtime checks for package version and doctor output alongside catalog validation and the full test suite
+- Updated release documentation so local checks and GitHub checks cover the same 2D animation gates before manual open-window playtesting
+
 ## 0.133.0 - 2026-06-07
 
 - Added blocked-action animation feedback cards with a distinct warning outcome, shake treatment, reason detail, and targeted flash pulses so failed/disabled commands no longer look like successful action feedback

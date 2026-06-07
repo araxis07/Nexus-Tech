@@ -288,7 +288,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Fast deterministic test suite with `pytest`
 - Centralized linting and formatting with `Ruff`
 - `uv`-based project workflow for dependency and run management
-- GitHub Actions CI to run lint and tests on pushes and pull requests
+- GitHub Actions CI to run lint, formatting, content validation, tests, and 2D animation audit gates on pushes and pull requests
 
 ## 🧱 Tech Stack
 
@@ -596,7 +596,17 @@ Run the local CI-equivalent checks:
 
 ```bash
 uv run ruff check src tests
+uv run ruff format --check src tests
 uv run pytest -q
+uv run nexus-tech validate-content
+uv run nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced
+uv run nexus-tech menu-2d --headless --max-frames 2 --motion-mode reduced
+uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2
+uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced
+uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode off
+uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7
+uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off
+uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 ```
 
 ## 🧹 Linting and Formatting

@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.133.0`
+Version: `0.134.0`
 
 ## Scope
 
@@ -16,6 +16,7 @@ Version: `0.133.0`
 - Actor sprite footprints now feed an automated `actor-readability` layer that checks viewport bounds and click-target collisions across actor scenes before manual playtesting.
 - Visual captures now also report edge-density and bright-pixel pressure, giving the audits a deterministic first-pass guard against cluttered or overly flashy animation frames.
 - Blocked or rejected 2D commands now emit distinct blocked-action feedback cards, targeted flash pulses, and matching actor blocked states instead of sharing the same visual language as successful commands.
+- GitHub Actions now runs 2D headless smoke plus motion, visual, and animation-completeness gates so local release checks and pull request checks catch animation regressions the same way.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
 - Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.
@@ -52,9 +53,10 @@ Version: `0.133.0`
 - `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced`
 - `nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode off`
 - `nexus-tech audit-2d-visual --scenario founder_journey --seed 7`
+- `nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off`
 - `nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1`
 - `pytest -q tests/test_frontend_2d.py -k "motion_audit or audit_2d_motion or visual_audit or audit_2d_visual"`
 
 ## Result
 
-The audit makes animation stability and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.
+The audit makes animation stability, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.
