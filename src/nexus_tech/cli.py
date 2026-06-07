@@ -55,11 +55,14 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.frontend_2d import (
+    DEFAULT_ANIMATION_MATRIX_SCENARIOS,
+    DEFAULT_ANIMATION_MATRIX_SEEDS,
     Frontend2DUnavailableError,
     MotionMode,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_animation_audit,
+    run_2d_animation_matrix_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
 )
@@ -201,6 +204,14 @@ COMPARE_SCENARIOS_OPTION = typer.Option(
         "Defaults to all scenarios."
     ),
 )
+ANIMATION_MATRIX_SCENARIOS_OPTION = typer.Option(
+    None,
+    "--scenario",
+    help=(
+        "Scenario ids for broad animation readiness. Repeat to include multiple scenarios. "
+        f"Defaults to {', '.join(DEFAULT_ANIMATION_MATRIX_SCENARIOS)}."
+    ),
+)
 DIFFICULTY_OPTION = typer.Option(
     None,
     "--difficulty",
@@ -247,6 +258,14 @@ VISUAL_AUDIT_OUTPUT_DIR_OPTION = typer.Option(
     None,
     "--output-dir",
     help="Optional directory for PNG captures. Omit to keep the audit in-memory only.",
+)
+ANIMATION_MATRIX_SEED_OPTION = typer.Option(
+    None,
+    "--seed",
+    help=(
+        "Seed for broad animation readiness. Repeat to include multiple seeds. "
+        f"Defaults to {', '.join(str(seed) for seed in DEFAULT_ANIMATION_MATRIX_SEEDS)}."
+    ),
 )
 
 ACTION_KEYS = {
@@ -920,6 +939,80 @@ def audit_2d_animation_command(
                 f"Visual baseline {report.visual_report.baseline_signature}."
             ),
             title="2D Animation Audit",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@app.command("audit-2d-animation-matrix")
+def audit_2d_animation_matrix_command(
+    scenario: Optional[list[str]] = ANIMATION_MATRIX_SCENARIOS_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: Optional[list[int]] = ANIMATION_MATRIX_SEED_OPTION,
+    frames: int = typer.Option(
+        1,
+        "--frames",
+        min=1,
+        help="Number of fixed-timestep frames for each embedded motion gate.",
+    ),
+) -> None:
+    """Run broad 2D animation readiness across multiple scenarios and seeds."""
+
+    scenario_ids = tuple(scenario) if scenario is not None else DEFAULT_ANIMATION_MATRIX_SCENARIOS
+    for scenario_id in scenario_ids:
+        validate_scenario_id(scenario_id)
+    seeds = tuple(seed) if seed is not None else DEFAULT_ANIMATION_MATRIX_SEEDS
+    try:
+        report = run_2d_animation_matrix_audit(
+            scenario_ids=scenario_ids,
+            difficulty_mode=difficulty,
+            seeds=seeds,
+            frames=frames,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    table = Table(
+        title=(
+            "2D Animation Matrix | "
+            f"{len(report.scenario_ids)} scenarios | {len(report.seeds)} seeds | "
+            f"{report.difficulty}"
+        )
+    )
+    table.add_column("Scenario", style="cyan")
+    table.add_column("Seed", justify="right")
+    table.add_column("Baseline")
+    table.add_column("Status", justify="center")
+    table.add_column("Failed Areas")
+    table.add_column("Advisory")
+    for cell in report.cells:
+        table.add_row(
+            cell.scenario_id,
+            str(cell.seed),
+            cell.visual_baseline,
+            cell.status.upper(),
+            ", ".join(cell.failed_areas) if cell.failed_areas else "-",
+            str(len(cell.advisory_gaps)),
+        )
+    console.print(table)
+
+    border_style = "green" if report.status == "pass" else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Animation matrix status: {report.status.upper()} across "
+                f"{len(report.cells)} scenario/seed cells."
+            ),
+            title="2D Animation Matrix",
             border_style=border_style,
         )
     )

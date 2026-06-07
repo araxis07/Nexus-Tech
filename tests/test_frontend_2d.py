@@ -6,6 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
+import nexus_tech.frontend_2d.animation_audit as animation_audit_module
 import nexus_tech.frontend_2d.scenes as scenes_module
 from nexus_tech.cli import app
 from nexus_tech.domain.models import (
@@ -22,6 +23,8 @@ from nexus_tech.domain.models import (
 from nexus_tech.frontend_2d import (
     AnimationAuditReport,
     AnimationCoverageCell,
+    AnimationMatrixCell,
+    AnimationMatrixReport,
     FlowAuditReport,
     MotionAuditCell,
     MotionAuditReport,
@@ -30,6 +33,7 @@ from nexus_tech.frontend_2d import (
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_animation_audit,
+    run_2d_animation_matrix_audit,
     run_2d_flow_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
@@ -3093,9 +3097,11 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-timeline" in title_menu.active_layers
     assert "sprite-clips" in title_menu.active_layers
     assert "actor-readability" in title_menu.active_layers
+    assert any(layer.startswith("actor-state:") for layer in title_menu.active_layers)
     assert "actor-timeline" in dashboard.active_layers
     assert "sprite-clips" in dashboard.active_layers
     assert "actor-readability" in dashboard.active_layers
+    assert "actor-state:handoff" in dashboard.active_layers
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
     assert "pending" in pending.active_layers
@@ -3104,6 +3110,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "action-feedback" in impact.active_layers
     assert "action-feedback" in blocked.active_layers
     assert "blocked-action-feedback" in blocked.active_layers
+    assert "actor-state:blocked" in blocked.active_layers
     assert "picker" in picker.active_layers
     assert "overlay-transition" in picker.active_layers
     assert "action-feedback" in picker.active_layers
@@ -3188,6 +3195,11 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "actor-timeline" in areas["Sprite/Actor Layer"].active_layers
     assert "sprite-clips" in areas["Sprite/Actor Layer"].active_layers
     assert "actor-readability" in areas["Sprite/Actor Layer"].active_layers
+    assert areas["Actor State Coverage"].status == "pass"
+    assert "actor-state:blocked" in areas["Actor State Coverage"].required_layers
+    assert "state-group:baseline" in areas["Actor State Coverage"].active_layers
+    assert "state-group:positive" in areas["Actor State Coverage"].active_layers
+    assert "state-group:pressure" in areas["Actor State Coverage"].active_layers
     assert areas["Visual Fatigue Budget"].status == "pass"
     assert "visual-health" in areas["Visual Fatigue Budget"].active_layers
     assert areas["Animation Pacing Budget"].status == "pass"
@@ -3207,6 +3219,82 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
+
+
+def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(monkeypatch) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def fake_run_2d_animation_audit(**kwargs):
+        calls.append((kwargs["scenario_id"], kwargs["seed"]))
+        visual_report = VisualAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            motion_mode=MotionMode.FULL.value,
+            cells=(
+                VisualAuditCell(
+                    scene_key="run_dashboard",
+                    width=820,
+                    height=620,
+                    checksum=kwargs["seed"],
+                    unique_color_samples=42,
+                    luminance_spread=128,
+                    non_dark_ratio=0.42,
+                    active_layers=("actor-state:handoff",),
+                    expected_layers=(),
+                ),
+            ),
+        )
+        motion_report = MotionAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            frames=kwargs["frames"],
+            cells=(),
+        )
+        return AnimationAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            cells=(
+                AnimationCoverageCell(
+                    area="Actor State Coverage",
+                    required_layers=("actor-state:blocked",),
+                    active_layers=("actor-state:handoff",),
+                    status="pass",
+                    notes="mocked",
+                ),
+            ),
+            visual_report=visual_report,
+            motion_report=motion_report,
+            off_motion_report=motion_report,
+            advisory_gaps=("Manual open-window playtest is still required.",),
+        )
+
+    monkeypatch.setattr(
+        animation_audit_module,
+        "run_2d_animation_audit",
+        fake_run_2d_animation_audit,
+    )
+
+    report = run_2d_animation_matrix_audit(
+        scenario_ids=("founder_journey", "bootstrap_studio"),
+        difficulty_mode=None,
+        seeds=(7, 13),
+        frames=1,
+    )
+
+    assert report.status == "pass"
+    assert report.scenario_ids == ("founder_journey", "bootstrap_studio")
+    assert report.seeds == (7, 13)
+    assert len(report.cells) == 4
+    assert calls == [
+        ("founder_journey", 7),
+        ("founder_journey", 13),
+        ("bootstrap_studio", 7),
+        ("bootstrap_studio", 13),
+    ]
+    assert all(cell.visual_baseline.startswith("1:") for cell in report.cells)
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
@@ -3412,6 +3500,71 @@ def test_audit_2d_animation_command_reports_completeness_matrix(monkeypatch) -> 
     assert "Animation audit status: PASS" in result.output
     assert calls["scenario_id"] == "founder_journey"
     assert calls["seed"] == 7
+    assert calls["frames"] == 1
+
+
+def test_audit_2d_animation_matrix_command_reports_broad_readiness(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_animation_matrix_audit(**kwargs):
+        calls.update(kwargs)
+        return AnimationMatrixReport(
+            scenario_ids=kwargs["scenario_ids"],
+            difficulty="scenario",
+            seeds=kwargs["seeds"],
+            frames=kwargs["frames"],
+            cells=(
+                AnimationMatrixCell(
+                    scenario_id="founder_journey",
+                    difficulty="scenario",
+                    seed=7,
+                    status="pass",
+                    visual_baseline="13:abc12345",
+                    failed_areas=(),
+                    advisory_gaps=("Manual open-window playtest is still required.",),
+                ),
+                AnimationMatrixCell(
+                    scenario_id="bootstrap_studio",
+                    difficulty="scenario",
+                    seed=13,
+                    status="pass",
+                    visual_baseline="13:def67890",
+                    failed_areas=(),
+                    advisory_gaps=("Manual open-window playtest is still required.",),
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "run_2d_animation_matrix_audit",
+        fake_run_2d_animation_matrix_audit,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "audit-2d-animation-matrix",
+            "--scenario",
+            "founder_journey",
+            "--scenario",
+            "bootstrap_studio",
+            "--seed",
+            "7",
+            "--seed",
+            "13",
+            "--frames",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2D Animation Matrix" in result.output
+    assert "founder_journey" in result.output
+    assert "bootstrap_studio" in result.output
+    assert "Animation matrix status: PASS" in result.output
+    assert calls["scenario_ids"] == ("founder_journey", "bootstrap_studio")
+    assert calls["seeds"] == (7, 13)
     assert calls["frames"] == 1
 
 

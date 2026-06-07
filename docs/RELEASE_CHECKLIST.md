@@ -27,6 +27,7 @@ uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
+uv run nexus-tech audit-2d-animation-matrix --scenario founder_journey --scenario bootstrap_studio --seed 7 --seed 13 --frames 1
 ```
 
 ## Demo Verification
@@ -58,12 +59,15 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
 - Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, staged-summary motion, or 2D request-path coverage changes.
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.
+- Run `audit-2d-animation-matrix` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
+- Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.
 - Treat `Animation Pacing Budget` failures as release blockers before adding more full-mode motion layers.
 - Treat `Long Session Motion Stress` failures as release blockers before presenting longer 2D playthroughs.
 - Treat `Scene Motion Profile` failures as release blockers before shipping new scenes or adding denser scene-specific motion.
 - Treat `Readability Guard` failures as release blockers before opening the manual playtest pass.
+- Treat `audit-2d-animation-matrix` failures as release blockers for the scenario/seed set being presented.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.
 - Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, and review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures when CI shows a regression.
 - Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md`, and `docs/ANIMATION_PLAYTEST_CHECKLIST_2026-06-06.md` for the remaining open-window readability pass before presenting the 2D build.

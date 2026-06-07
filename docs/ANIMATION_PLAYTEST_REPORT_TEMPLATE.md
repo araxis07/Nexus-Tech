@@ -19,7 +19,8 @@ Use this template when completing the open-window animation pass. Keep completed
 | `pytest -q` |  |  |
 | `audit-2d-motion` full/reduced/off |  |  |
 | `audit-2d-visual` full/off |  |  |
-| `audit-2d-animation` |  | Confirm `Readability Guard`, `Scene Motion Profile`, `Animation Pacing Budget`, `Long Session Motion Stress`, `Visual Fatigue Budget`, and `actor-readability` pass |
+| `audit-2d-animation` |  | Confirm `Actor State Coverage`, `Readability Guard`, `Scene Motion Profile`, `Animation Pacing Budget`, `Long Session Motion Stress`, `Visual Fatigue Budget`, and `actor-readability` pass |
+| `audit-2d-animation-matrix` |  | Confirm presentation scenario/seed cells pass before manual timing review |
 | Headless `menu-2d` / `play-2d` |  |  |
 | Open-window `menu-2d` / `play-2d` smoke |  |  |
 
@@ -49,6 +50,7 @@ Use this template when completing the open-window animation pass. Keep completed
 - Hidden primary actions:
 - Unreadable disabled reasons:
 - Actor, tooltip, footer, modal, or button collisions:
+- Missing or unclear actor state reactions:
 - Motion-mode regressions:
 - CI artifact anomalies:
 - `visual-audit-summary.md` anomalies:

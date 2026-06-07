@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.138.0`
-- Focus: 2D actor/sprite timeline, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.139.0`
+- Focus: 2D actor/sprite timeline, actor-state coverage, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
 
@@ -21,11 +21,13 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Title/menu flow: wizard, save slots, archive/meta, and title transitions remain readable.
 - Run dashboard: founder/team/customer/board/product actor clips are visible without covering snapshot chips, stat bars, product cards, or action buttons.
 - Automated guard: `audit-2d-animation` reports `actor-readability` for actor scenes before the manual open-window pass.
+- Automated guard: `audit-2d-animation` reports `Actor State Coverage` so baseline, positive, pressure, and blocked sprite reactions are present before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Visual Fatigue Budget` so clutter and bright-pixel pressure stay within deterministic limits before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Animation Pacing Budget` so active motion density, pulse cooldown, and frame timing stay within release limits before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Long Session Motion Stress` so dense long-run pulse banks cool down before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Scene Motion Profile` so new scenes cannot ship without explicit motion-layer budgets.
 - Automated guard: `audit-2d-animation` reports `Readability Guard` so compact captures, actor-readable scenes, overlay density, and visual pass status are verified before the manual pass.
+- Matrix guard: `audit-2d-animation-matrix` passes across the presentation scenario/seed set before relying on the single founder seed.
 - CI guard: GitHub Actions runs headless 2D smoke checks plus motion, visual, and animation-completeness audits before the manual pass.
 - Blocked commands: disabled or rejected actions show a distinct blocked card, warning pulse, and matching actor state instead of looking like a successful command.
 - Title/menu: founder/save/archive/coach actor clips do not hide menu copy, save metadata, or wizard rows.

@@ -19,9 +19,22 @@ from nexus_tech.frontend_2d.visual_audit import (
 )
 
 DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
+DEFAULT_ANIMATION_MATRIX_SCENARIOS: tuple[str, ...] = (
+    "founder_journey",
+    "bootstrap_studio",
+    "enterprise_compliance",
+)
+DEFAULT_ANIMATION_MATRIX_SEEDS: tuple[int, ...] = (7, 13, 29)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
+MIN_ACTOR_STATE_VARIANTS = 7
+
+_ACTOR_STATE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
+    ("baseline", frozenset({"idle", "build", "handoff"})),
+    ("positive", frozenset({"success", "shipping", "coaching", "negotiating"})),
+    ("pressure", frozenset({"risk", "alert", "blocked", "firefighting"})),
+)
 
 _MOTION_PROFILE_LAYERS = {
     "action-feedback",
@@ -217,6 +230,36 @@ class AnimationAuditReport:
         return "pass"
 
 
+@dataclass(frozen=True)
+class AnimationMatrixCell:
+    """One scenario/seed result from the broad 2D animation readiness matrix."""
+
+    scenario_id: str
+    difficulty: str
+    seed: int
+    status: str
+    visual_baseline: str
+    failed_areas: tuple[str, ...]
+    advisory_gaps: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AnimationMatrixReport:
+    """Broad animation readiness report across multiple scenarios and seeds."""
+
+    scenario_ids: tuple[str, ...]
+    difficulty: str
+    seeds: tuple[int, ...]
+    frames: int
+    cells: tuple[AnimationMatrixCell, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when every scenario/seed animation gate passes."""
+
+        return "pass" if all(cell.status == "pass" for cell in self.cells) else "fail"
+
+
 def run_2d_animation_audit(
     *,
     scenario_id: str,
@@ -255,6 +298,7 @@ def run_2d_animation_audit(
     cells.append(_build_long_session_motion_cell(motion_report))
     cells.append(_build_motion_off_cell(off_motion_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
+    cells.append(_build_actor_state_coverage_cell(visual_report))
     cells.append(_build_visual_fatigue_cell(visual_report))
     cells.append(_build_animation_pacing_cell(motion_report))
     cells.append(_build_scene_motion_profile_cell(visual_report))
@@ -271,6 +315,47 @@ def run_2d_animation_audit(
         advisory_gaps=(
             "Manual open-window playtest is still required for human read speed and rhythm.",
         ),
+    )
+
+
+def run_2d_animation_matrix_audit(
+    *,
+    scenario_ids: tuple[str, ...] = DEFAULT_ANIMATION_MATRIX_SCENARIOS,
+    difficulty_mode: DifficultyMode | None,
+    seeds: tuple[int, ...] = DEFAULT_ANIMATION_MATRIX_SEEDS,
+    frames: int = 1,
+    sizes: tuple[tuple[int, int], ...] = DEFAULT_ANIMATION_AUDIT_SIZES,
+) -> AnimationMatrixReport:
+    """Run the animation-completeness gate across a scenario/seed matrix."""
+
+    cells: list[AnimationMatrixCell] = []
+    for scenario_id in scenario_ids:
+        for seed in seeds:
+            report = run_2d_animation_audit(
+                scenario_id=scenario_id,
+                difficulty_mode=difficulty_mode,
+                seed=seed,
+                frames=frames,
+                sizes=sizes,
+            )
+            failed_areas = tuple(cell.area for cell in report.cells if cell.status == "fail")
+            cells.append(
+                AnimationMatrixCell(
+                    scenario_id=scenario_id,
+                    difficulty=report.difficulty,
+                    seed=seed,
+                    status=report.status,
+                    visual_baseline=report.visual_report.baseline_signature,
+                    failed_areas=failed_areas,
+                    advisory_gaps=report.advisory_gaps,
+                )
+            )
+    return AnimationMatrixReport(
+        scenario_ids=scenario_ids,
+        difficulty=difficulty_mode.value if difficulty_mode is not None else "scenario",
+        seeds=seeds,
+        frames=frames,
+        cells=tuple(cells),
     )
 
 
@@ -436,6 +521,51 @@ def _build_actor_sprite_cell(
         required_layers=required_layers,
         active_layers=active_layers,
         status=status,
+        notes=notes,
+    )
+
+
+def _build_actor_state_coverage_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    states = tuple(
+        sorted(
+            {
+                layer.removeprefix("actor-state:")
+                for cell in visual_report.cells
+                for layer in cell.active_layers
+                if layer.startswith("actor-state:")
+            }
+        )
+    )
+    state_set = set(states)
+    active_layers = tuple(f"actor-state:{state}" for state in states)
+    active_layers += tuple(
+        f"state-group:{group_name}"
+        for group_name, allowed_states in _ACTOR_STATE_GROUPS
+        if state_set & allowed_states
+    )
+    findings: list[str] = []
+    if len(states) < MIN_ACTOR_STATE_VARIANTS:
+        findings.append(f"only {len(states)} actor states")
+    for group_name, allowed_states in _ACTOR_STATE_GROUPS:
+        if not state_set & allowed_states:
+            findings.append(f"missing {group_name} state")
+    if "blocked" not in state_set:
+        findings.append("missing blocked actor reaction")
+
+    notes = f"{len(states)} states: {','.join(states[:10])}"
+    if findings:
+        notes = "; ".join(findings[:4])
+    return AnimationCoverageCell(
+        area="Actor State Coverage",
+        required_layers=(
+            "state-group:baseline",
+            "state-group:positive",
+            "state-group:pressure",
+            "actor-state:blocked",
+            f"state-variants:{MIN_ACTOR_STATE_VARIANTS}",
+        ),
+        active_layers=active_layers,
+        status="pass" if not findings else "fail",
         notes=notes,
     )
 

@@ -396,10 +396,12 @@ def run_2d_visual_audit(
                     )
                 )
 
+                blocked_state = state.model_copy(deep=True)
+                blocked_state.employees = []
                 blocked_scene = RunScene(
                     pygame=pygame,
                     fonts=fonts,
-                    state=state.model_copy(deep=True),
+                    state=blocked_state,
                     rng=RandomSource(seed=seed + 13),
                     slot_name="visual-audit",
                     save_callback=lambda *_args: None,
@@ -834,6 +836,7 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("late-game-choreography")
     if getattr(scene, "actor_timeline_active", lambda: False)():
         layers.append("actor-timeline")
+        layers.extend(_actor_state_layers(scene))
     if getattr(scene, "sprite_clips_active", lambda: False)():
         layers.append("sprite-clips")
     if getattr(scene, "title_actor_active", lambda: False)():
@@ -855,6 +858,24 @@ def _active_layers(scene) -> tuple[str, ...]:
     if getattr(scene, "summary_outcome_lanes_active", lambda: False)():
         layers.append("summary-lanes")
     return tuple(layers)
+
+
+def _actor_state_layers(scene) -> tuple[str, ...]:
+    states: set[str] = set()
+    for method_name in (
+        "_title_actor_sprite_clips",
+        "_run_actor_sprite_clips",
+        "_inspector_actor_sprite_clips",
+        "_endgame_actor_sprite_clips",
+        "_review_actor_sprite_clips",
+        "_summary_actor_sprite_clips",
+    ):
+        method = getattr(scene, method_name, None)
+        if not callable(method):
+            continue
+        for clip in method():
+            states.add(f"actor-state:{clip.state}")
+    return tuple(sorted(states))
 
 
 def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tuple[str, ...]:

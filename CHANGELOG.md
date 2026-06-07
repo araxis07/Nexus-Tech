@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.139.0 - 2026-06-07
+
+- Added actor-state telemetry to visual captures and a required `Actor State Coverage` cell to `audit-2d-animation` so baseline, positive, pressure, and blocked sprite reactions are release-gated instead of only confirming that sprites exist
+- Added `audit-2d-animation-matrix` for broad animation readiness across multiple scenarios and seeds, including visual baselines, failed areas, and advisory counts per scenario/seed cell
+- Updated release and playtest documentation so actor-state coverage and scenario/seed animation matrix checks are reviewed before manual open-window presentation
+
 ## 0.138.0 - 2026-06-07
 
 - Added `visual-audit-summary.md` output whenever `audit-2d-visual --output-dir` is used so CI visual artifacts include a readable capture index, baseline signature, status counts, and visual-health metrics
