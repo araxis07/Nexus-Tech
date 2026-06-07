@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from nexus_tech.domain.models import DifficultyMode
-from nexus_tech.frontend_2d.motion_audit import MotionAuditReport, run_2d_motion_audit
+from nexus_tech.frontend_2d.motion_audit import (
+    MotionAuditCell,
+    MotionAuditReport,
+    run_2d_motion_audit,
+)
 from nexus_tech.frontend_2d.tween import MotionMode
 from nexus_tech.frontend_2d.visual_audit import (
     MAX_BRIGHT_RATIO,
@@ -15,6 +19,7 @@ from nexus_tech.frontend_2d.visual_audit import (
 )
 
 DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
+MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 
 _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
@@ -191,6 +196,7 @@ def run_2d_animation_audit(
     cells.append(_build_motion_off_cell(off_motion_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_visual_fatigue_cell(visual_report))
+    cells.append(_build_animation_pacing_cell(motion_report))
     cells.extend(_build_advisory_cells())
     return AnimationAuditReport(
         scenario_id=scenario_id,
@@ -358,6 +364,82 @@ def _build_visual_fatigue_cell(visual_report: VisualAuditReport) -> AnimationCov
         active_layers=active_layers,
         status=status,
         notes=notes,
+    )
+
+
+def _build_animation_pacing_cell(motion_report: MotionAuditReport) -> AnimationCoverageCell:
+    max_active_samples = max(
+        (_animation_active_sample_count(cell) for cell in motion_report.cells),
+        default=0,
+    )
+    max_average_frame = max((cell.average_frame_ms for cell in motion_report.cells), default=0.0)
+    max_frame_spike = max((cell.max_frame_ms for cell in motion_report.cells), default=0.0)
+    max_residual_pulses = max(
+        (
+            max(
+                cell.run_after_pulses,
+                cell.summary_after_pulses,
+                cell.title_after_pulses,
+                cell.review_after_pulses,
+                cell.inspector_after_pulses,
+                cell.long_run_after_pulses,
+            )
+            for cell in motion_report.cells
+        ),
+        default=0,
+    )
+    density_ok = max_active_samples <= MAX_ANIMATION_PACING_ACTIVE_SAMPLES
+    frame_ok = max_average_frame <= 24.0 and max_frame_spike <= 50.0
+    cooldown_ok = motion_report.status == "pass"
+    status = "pass" if density_ok and frame_ok and cooldown_ok else "fail"
+    active_layers = (
+        f"active-samples:{max_active_samples}",
+        f"residual-pulses:{max_residual_pulses}",
+        f"avg-frame:{max_average_frame:.2f}ms",
+        f"max-frame:{max_frame_spike:.2f}ms",
+    )
+    notes = f"samples <= {MAX_ANIMATION_PACING_ACTIVE_SAMPLES}, frames and cooldowns in budget"
+    if not density_ok:
+        notes = (
+            f"animation sample density {max_active_samples} exceeds "
+            f"{MAX_ANIMATION_PACING_ACTIVE_SAMPLES}"
+        )
+    elif not frame_ok:
+        notes = f"frame budget avg {max_average_frame:.2f} ms / spike {max_frame_spike:.2f} ms"
+    elif not cooldown_ok:
+        notes = f"motion report status {motion_report.status}"
+    return AnimationCoverageCell(
+        area="Animation Pacing Budget",
+        required_layers=(
+            "sample-density",
+            "pulse-cooldown",
+            "frame-budget",
+            "open-window-readiness",
+        ),
+        active_layers=active_layers,
+        status=status,
+        notes=notes,
+    )
+
+
+def _animation_active_sample_count(cell: MotionAuditCell) -> int:
+    return (
+        cell.transition_active_scenes
+        + cell.entity_motion_active_samples
+        + cell.action_feedback_active_samples
+        + cell.impact_cue_active_samples
+        + cell.overlay_transition_active_samples
+        + cell.outcome_cinematic_active_samples
+        + cell.summary_cinematic_active_samples
+        + cell.product_drama_active_samples
+        + cell.risk_drama_active_samples
+        + cell.pending_choice_active_samples
+        + cell.pending_choice_preview_active_samples
+        + cell.late_game_choreography_active_samples
+        + cell.summary_sequence_active_samples
+        + cell.summary_lanes_active_samples
+        + cell.actor_timeline_active_samples
+        + cell.sprite_clips_active_samples
     )
 
 

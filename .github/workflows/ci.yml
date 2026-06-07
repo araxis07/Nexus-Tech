@@ -58,6 +58,15 @@ jobs:
 
       - name: Run 2D visual and animation audit gates
         run: |
-          uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7
-          uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off
+          uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --output-dir /tmp/nexus-tech-visual-audit/full
+          uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off --output-dir /tmp/nexus-tech-visual-audit/off
           uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
+
+      - name: Upload 2D visual audit captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-2d-visual-audit
+          path: /tmp/nexus-tech-visual-audit
+          if-no-files-found: ignore
+          retention-days: 7

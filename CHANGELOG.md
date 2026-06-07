@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.135.0 - 2026-06-07
+
+- Added an `Animation Pacing Budget` cell to `audit-2d-animation` so animation density, residual pulse cooldown, and frame timing are release-gated before manual open-window playtesting
+- Added GitHub Actions upload of full/off visual audit PNG captures as a short-retention artifact so CI failures can be reviewed visually without committing generated images
+- Updated animation playtest and release documentation to align manual readability checks with the new pacing and CI capture gates
+
 ## 0.134.0 - 2026-06-07
 
 - Added GitHub Actions release gates for 2D headless smoke checks, motion audits, visual audits, and animation-completeness audits so actor-readability, visual-fatigue, and blocked-action feedback regressions fail CI

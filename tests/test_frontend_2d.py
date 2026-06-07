@@ -3178,6 +3178,12 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "actor-readability" in areas["Sprite/Actor Layer"].active_layers
     assert areas["Visual Fatigue Budget"].status == "pass"
     assert "visual-health" in areas["Visual Fatigue Budget"].active_layers
+    assert areas["Animation Pacing Budget"].status == "pass"
+    assert "sample-density" in areas["Animation Pacing Budget"].required_layers
+    assert any(
+        layer.startswith("active-samples:")
+        for layer in areas["Animation Pacing Budget"].active_layers
+    )
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
