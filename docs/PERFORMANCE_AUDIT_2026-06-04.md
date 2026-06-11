@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.141.0`
+Version: `0.142.0`
 
 ## Scope
 
@@ -21,7 +21,7 @@ Version: `0.141.0`
 - `audit-2d-animation` now includes a `Scene Motion Profile` cell that requires every captured scene to have an explicit motion-layer budget before new scene animation can ship.
 - `audit-2d-animation` now includes a `Readability Guard` cell that checks compact captures, actor-readability, overlay density, and visual pass status before manual playtesting.
 - Blocked or rejected 2D commands now emit distinct blocked-action feedback cards, targeted flash pulses, and matching actor blocked states instead of sharing the same visual language as successful commands.
-- GitHub Actions now runs 2D headless smoke plus motion, visual, animation-completeness, and default animation-matrix gates and uploads full/off visual captures plus the broad readiness matrix so local release checks and pull request checks catch animation regressions the same way.
+- GitHub Actions now runs 2D headless smoke plus motion, visual, animation-completeness, default animation-matrix, and playtest-prep gates and uploads full/off visual captures plus the broad readiness matrix and manual window/motion checklist so local release checks and pull request checks catch animation regressions the same way.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
 - Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.
@@ -36,6 +36,7 @@ Version: `0.141.0`
 - `audit-2d-animation` now combines visual-layer coverage, actor/sprite coverage, actor-state coverage, actor-readability checks, visual-fatigue budgets, motion-budget checks, off-mode checks, and advisory gaps into one animation-completeness gate.
 - `audit-2d-animation-matrix` now repeats the animation-completeness gate across the default seven-scenario, three-seed presentation matrix and reports visual baselines plus failed areas for each cell.
 - `audit-2d-animation-matrix --output` writes `animation-readiness-matrix.md` so manual playtest prep has a reviewable scenario/seed baseline artifact before opening windows.
+- `prepare-2d-animation-playtest --output` writes `animation-playtest-prep.md` so the manual window/motion pass starts from automated matrix evidence while still marking human judgment as incomplete.
 - Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
 - Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, broader actor-timeline/sprite-clip active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
 
@@ -69,6 +70,7 @@ Version: `0.141.0`
 - `nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off`
 - `nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1`
 - `nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md`
+- `nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md`
 - `pytest -q tests/test_frontend_2d.py -k "motion_audit or audit_2d_motion or visual_audit or audit_2d_visual"`
 
 ## Result

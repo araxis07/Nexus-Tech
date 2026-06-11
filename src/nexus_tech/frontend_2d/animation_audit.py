@@ -31,6 +31,13 @@ DEFAULT_ANIMATION_MATRIX_SCENARIOS: tuple[str, ...] = (
 )
 DEFAULT_ANIMATION_MATRIX_SEEDS: tuple[int, ...] = (7, 13, 29)
 ANIMATION_MATRIX_REPORT_NAME = "animation-readiness-matrix.md"
+ANIMATION_PLAYTEST_PREP_REPORT_NAME = "animation-playtest-prep.md"
+DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS: tuple[tuple[int, int], ...] = (
+    (820, 620),
+    (960, 640),
+    (1440, 900),
+)
+DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES: tuple[str, ...] = ("full", "reduced", "off")
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
@@ -266,6 +273,25 @@ class AnimationMatrixReport:
         return "pass" if all(cell.status == "pass" for cell in self.cells) else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestPrepReport:
+    """Automated preflight package for the human open-window animation pass."""
+
+    version: str
+    matrix_report: AnimationMatrixReport
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES
+    visual_artifact_name: str = "nexus-tech-2d-visual-audit"
+    matrix_artifact_name: str = "nexus-tech-2d-animation-matrix"
+    playtest_artifact_name: str = "nexus-tech-2d-animation-playtest-prep"
+
+    @property
+    def status(self) -> str:
+        """Return ready only when the automated scenario/seed matrix passes."""
+
+        return "ready" if self.matrix_report.status == "pass" else "blocked"
+
+
 def run_2d_animation_audit(
     *,
     scenario_id: str,
@@ -399,6 +425,156 @@ def write_2d_animation_matrix_report(
             f"{failed_areas} | "
             f"`{len(cell.advisory_gaps)}` |"
         )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def build_2d_animation_playtest_prep_report(
+    *,
+    version: str,
+    matrix_report: AnimationMatrixReport,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+) -> AnimationPlaytestPrepReport:
+    """Build the report shell used before the real open-window animation pass."""
+
+    return AnimationPlaytestPrepReport(
+        version=version,
+        matrix_report=matrix_report,
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+
+
+def write_2d_animation_playtest_prep_report(
+    report: AnimationPlaytestPrepReport,
+    output_path: Path,
+) -> None:
+    """Write a Markdown playtest prep artifact with automated evidence and human checks."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    matrix = report.matrix_report
+    passed = sum(1 for cell in matrix.cells if cell.status == "pass")
+    failed = len(matrix.cells) - passed
+    lines = [
+        "# NEXUS TECH 2D Animation Playtest Prep",
+        "",
+        f"- Status: `{report.status}`",
+        f"- Version: `{report.version}`",
+        f"- Automated matrix: `{matrix.status}`",
+        f"- Matrix cells: `{len(matrix.cells)}` total, `{passed}` pass, `{failed}` fail",
+        f"- Scenarios: `{', '.join(matrix.scenario_ids)}`",
+        f"- Seeds: `{', '.join(str(seed) for seed in matrix.seeds)}`",
+        f"- Frames per matrix cell: `{matrix.frames}`",
+        "- Manual result: `not completed by automation`",
+        f"- CI visual artifact: `{report.visual_artifact_name}`",
+        f"- CI matrix artifact: `{report.matrix_artifact_name}`",
+        f"- CI playtest prep artifact: `{report.playtest_artifact_name}`",
+        "",
+        "## Required Local Preflight",
+        "",
+        "```bash",
+        "uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2",
+        (
+            "uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 "
+            "--frames 1 --motion-mode reduced"
+        ),
+        (
+            "uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 "
+            "--frames 1 --motion-mode off"
+        ),
+        (
+            "uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 "
+            "--output-dir /tmp/nexus-tech-visual-audit/full"
+        ),
+        (
+            "uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 "
+            "--motion-mode off --output-dir /tmp/nexus-tech-visual-audit/off"
+        ),
+        "uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1",
+        (
+            "uv run nexus-tech audit-2d-animation-matrix --frames 1 "
+            "--output /tmp/nexus-tech-animation-matrix.md"
+        ),
+        "```",
+        "",
+        "## Open-Window Commands",
+        "",
+        "Resize the visible window to each target size and repeat the scene checks.",
+        "",
+        "```bash",
+    ]
+    for mode in report.motion_modes:
+        lines.append(f"uv run nexus-tech menu-2d --motion-mode {mode}")
+        lines.append(
+            f"uv run nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode {mode}"
+        )
+    lines.extend(
+        [
+            "```",
+            "",
+            "## Window And Motion Matrix",
+            "",
+            "| Window | Full | Reduced | Off | Required Check |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for width, height in report.windows:
+        lines.append(
+            f"| `{width}x{height}` | `todo` | `todo` | `todo` | "
+            "No hidden primary action, unreadable disabled reason, or actor collision |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Scene Checklist",
+            "",
+            "| Scene | Required Human Judgment | Result |",
+            "| --- | --- | --- |",
+            "| Title/Menu | Wizard, saves, archive, meta, and actors stay readable | `todo` |",
+            "| Live Dashboard | Actors and product motion do not hide "
+            "metrics/cards/actions | `todo` |",
+            "| Action Picker | Picker cards, choreography, and cues do not compete "
+            "for focus | `todo` |",
+            "| Pending Event | Option preview motion clarifies choices without hiding "
+            "text | `todo` |",
+            "| Inspector | Selected row, pager, chips, actor routing, and footer "
+            "stay readable | `todo` |",
+            "| Endgame Board | Path-fix buttons stay primary while cockpit motion "
+            "stays secondary | `todo` |",
+            "| Turn Summary | Timeline cards reveal readably and actors do not hide "
+            "metrics | `todo` |",
+            "| Outcome/Review | Final cinematic and review actors do not hide notes | `todo` |",
+            "",
+            "## Matrix Cells",
+            "",
+            "| Scenario | Seed | Status | Baseline | Failed Areas | Advisory Gaps |",
+            "| --- | ---: | --- | --- | --- | ---: |",
+        ]
+    )
+    for cell in matrix.cells:
+        failed_areas = ", ".join(cell.failed_areas) if cell.failed_areas else "-"
+        lines.append(
+            "| "
+            f"`{cell.scenario_id}` | "
+            f"`{cell.seed}` | "
+            f"`{cell.status}` | "
+            f"`{cell.visual_baseline}` | "
+            f"{failed_areas} | "
+            f"`{len(cell.advisory_gaps)}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Manual Result",
+            "",
+            "- Tester:",
+            "- Date:",
+            "- Platform:",
+            "- Release decision: `pass` / `watch` / `fail`",
+            "- Blockers:",
+            "- Follow-up fixes:",
+        ]
+    )
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

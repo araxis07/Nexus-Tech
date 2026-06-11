@@ -22,6 +22,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.frontend_2d import (
     ANIMATION_MATRIX_REPORT_NAME,
+    ANIMATION_PLAYTEST_PREP_REPORT_NAME,
     AnimationAuditReport,
     AnimationCoverageCell,
     AnimationMatrixCell,
@@ -31,6 +32,7 @@ from nexus_tech.frontend_2d import (
     MotionAuditReport,
     VisualAuditCell,
     VisualAuditReport,
+    build_2d_animation_playtest_prep_report,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_animation_audit,
@@ -39,6 +41,7 @@ from nexus_tech.frontend_2d import (
     run_2d_motion_audit,
     run_2d_visual_audit,
     write_2d_animation_matrix_report,
+    write_2d_animation_playtest_prep_report,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -3309,6 +3312,54 @@ def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(
     assert "- Cells: `4` total, `4` pass, `0` fail" in report_text
 
 
+def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Path) -> None:
+    matrix_report = AnimationMatrixReport(
+        scenario_ids=("founder_journey", "bootstrap_studio"),
+        difficulty="scenario",
+        seeds=(7, 13),
+        frames=1,
+        cells=(
+            AnimationMatrixCell(
+                scenario_id="founder_journey",
+                difficulty="scenario",
+                seed=7,
+                status="pass",
+                visual_baseline="13:abc12345",
+                failed_areas=(),
+                advisory_gaps=("Manual open-window playtest is still required.",),
+            ),
+            AnimationMatrixCell(
+                scenario_id="bootstrap_studio",
+                difficulty="scenario",
+                seed=13,
+                status="pass",
+                visual_baseline="13:def67890",
+                failed_areas=(),
+                advisory_gaps=("Manual open-window playtest is still required.",),
+            ),
+        ),
+    )
+    report = build_2d_animation_playtest_prep_report(
+        version="0.142.0",
+        matrix_report=matrix_report,
+    )
+    output_path = tmp_path / ANIMATION_PLAYTEST_PREP_REPORT_NAME
+
+    write_2d_animation_playtest_prep_report(report, output_path)
+
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Status: `ready`" in report_text
+    assert "- Version: `0.142.0`" in report_text
+    assert "- Manual result: `not completed by automation`" in report_text
+    assert "`820x620`" in report_text
+    assert "`960x640`" in report_text
+    assert "`1440x900`" in report_text
+    assert "nexus-tech-2d-visual-audit" in report_text
+    assert "nexus-tech-2d-animation-matrix" in report_text
+    assert "nexus-tech-2d-animation-playtest-prep" in report_text
+    assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
+
+
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
@@ -3589,6 +3640,67 @@ def test_audit_2d_animation_matrix_command_reports_broad_readiness(
     assert calls["frames"] == 1
 
 
+def test_prepare_2d_animation_playtest_command_writes_prep_report(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_animation_matrix_audit(**kwargs):
+        calls.update(kwargs)
+        return AnimationMatrixReport(
+            scenario_ids=kwargs["scenario_ids"],
+            difficulty="scenario",
+            seeds=kwargs["seeds"],
+            frames=kwargs["frames"],
+            cells=(
+                AnimationMatrixCell(
+                    scenario_id="founder_journey",
+                    difficulty="scenario",
+                    seed=7,
+                    status="pass",
+                    visual_baseline="13:abc12345",
+                    failed_areas=(),
+                    advisory_gaps=("Manual open-window playtest is still required.",),
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "run_2d_animation_matrix_audit",
+        fake_run_2d_animation_matrix_audit,
+    )
+
+    output_path = tmp_path / ANIMATION_PLAYTEST_PREP_REPORT_NAME
+    result = runner.invoke(
+        app,
+        [
+            "prepare-2d-animation-playtest",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "7",
+            "--frames",
+            "1",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2D Animation Playtest Prep" in result.output
+    assert "Playtest prep status: READY" in result.output
+    assert "Animation playtest prep report written" in result.output
+    assert output_path.exists()
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Manual result: `not completed by automation`" in report_text
+    assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
+    assert calls["scenario_ids"] == ("founder_journey",)
+    assert calls["seeds"] == (7,)
+    assert calls["frames"] == 1
+
+
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 
@@ -3598,6 +3710,11 @@ def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     ) in workflow
     assert "nexus-tech-2d-animation-matrix" in workflow
     assert "path: /tmp/nexus-tech-animation-matrix.md" in workflow
+    assert (
+        "uv run nexus-tech prepare-2d-animation-playtest --frames 1 "
+        "--output /tmp/nexus-tech-animation-playtest-prep.md"
+    ) in workflow
+    assert "nexus-tech-2d-animation-playtest-prep" in workflow
 
 
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:

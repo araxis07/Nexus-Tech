@@ -4,7 +4,7 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.141.0`
+- Version: `0.142.0`
 - Focus: 2D actor/sprite timeline, actor-state coverage, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
@@ -28,7 +28,8 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Automated guard: `audit-2d-animation` reports `Scene Motion Profile` so new scenes cannot ship without explicit motion-layer budgets.
 - Automated guard: `audit-2d-animation` reports `Readability Guard` so compact captures, actor-readable scenes, overlay density, and visual pass status are verified before the manual pass.
 - Matrix guard: `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` passes across the default seven-scenario, three-seed presentation matrix before relying on the single founder seed.
-- CI guard: GitHub Actions runs headless 2D smoke checks plus motion, visual, animation-completeness, and broad animation-matrix audits before the manual pass, then uploads `nexus-tech-2d-visual-audit` and `nexus-tech-2d-animation-matrix` for review.
+- Playtest prep guard: `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` writes the window/motion checklist from the same matrix evidence before the human pass starts.
+- CI guard: GitHub Actions runs headless 2D smoke checks plus motion, visual, animation-completeness, broad animation-matrix, and playtest-prep gates before the manual pass, then uploads `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` for review.
 - Blocked commands: disabled or rejected actions show a distinct blocked card, warning pulse, and matching actor state instead of looking like a successful command.
 - Title/menu: founder/save/archive/coach actor clips do not hide menu copy, save metadata, or wizard rows.
 - Pending event: option preview motion stays readable and actor clips do not distract from choice text.

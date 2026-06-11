@@ -65,6 +65,9 @@ jobs:
       - name: Run 2D animation matrix audit
         run: uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 
+      - name: Prepare 2D animation playtest report
+        run: uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+
       - name: Upload 2D visual audit captures
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,5 +83,14 @@ jobs:
         with:
           name: nexus-tech-2d-animation-matrix
           path: /tmp/nexus-tech-animation-matrix.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload 2D animation playtest prep artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-2d-animation-playtest-prep
+          path: /tmp/nexus-tech-animation-playtest-prep.md
           if-no-files-found: warn
           retention-days: 7

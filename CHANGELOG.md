@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.142.0 - 2026-06-11
+
+- Added `prepare-2d-animation-playtest`, a CLI command that turns the broad animation matrix into a ready/blocked manual playtest prep report
+- Added a GitHub Actions playtest-prep artifact so CI now publishes visual captures, the readiness matrix, and the manual window/motion checklist together
+- Updated animation release and playtest docs so the remaining human pass starts from generated evidence instead of an empty report template
+
 ## 0.141.0 - 2026-06-11
 
 - Added the default seven-scenario, three-seed `audit-2d-animation-matrix --output` run to GitHub Actions so broad animation readiness fails CI before manual playtesting

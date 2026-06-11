@@ -59,6 +59,7 @@ from nexus_tech.frontend_2d import (
     DEFAULT_ANIMATION_MATRIX_SEEDS,
     Frontend2DUnavailableError,
     MotionMode,
+    build_2d_animation_playtest_prep_report,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_animation_audit,
@@ -66,6 +67,7 @@ from nexus_tech.frontend_2d import (
     run_2d_motion_audit,
     run_2d_visual_audit,
     write_2d_animation_matrix_report,
+    write_2d_animation_playtest_prep_report,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -272,6 +274,11 @@ ANIMATION_MATRIX_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the broad animation readiness matrix artifact.",
+)
+ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-prep.md"),
+    "--output",
+    help="Markdown path for the open-window animation playtest prep artifact.",
 )
 
 ACTION_KEYS = {
@@ -1033,6 +1040,81 @@ def audit_2d_animation_matrix_command(
             )
         )
     if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@app.command("prepare-2d-animation-playtest")
+def prepare_2d_animation_playtest_command(
+    scenario: Optional[list[str]] = ANIMATION_MATRIX_SCENARIOS_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: Optional[list[int]] = ANIMATION_MATRIX_SEED_OPTION,
+    output: Path = ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION,
+    frames: int = typer.Option(
+        1,
+        "--frames",
+        min=1,
+        help="Number of fixed-timestep frames for each embedded matrix gate.",
+    ),
+) -> None:
+    """Prepare the automated evidence and checklist for manual 2D animation playtest."""
+
+    scenario_ids = tuple(scenario) if scenario is not None else DEFAULT_ANIMATION_MATRIX_SCENARIOS
+    for scenario_id in scenario_ids:
+        validate_scenario_id(scenario_id)
+    seeds = tuple(seed) if seed is not None else DEFAULT_ANIMATION_MATRIX_SEEDS
+    try:
+        matrix_report = run_2d_animation_matrix_audit(
+            scenario_ids=scenario_ids,
+            difficulty_mode=difficulty,
+            seeds=seeds,
+            frames=frames,
+        )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    prep_report = build_2d_animation_playtest_prep_report(
+        version=__version__,
+        matrix_report=matrix_report,
+    )
+    write_2d_animation_playtest_prep_report(prep_report, output)
+    passed = sum(1 for cell in matrix_report.cells if cell.status == "pass")
+
+    table = Table(title="2D Animation Playtest Prep")
+    table.add_column("Window", style="cyan")
+    table.add_column("Full")
+    table.add_column("Reduced")
+    table.add_column("Off")
+    for width, height in prep_report.windows:
+        table.add_row(f"{width}x{height}", "todo", "todo", "todo")
+    console.print(table)
+
+    border_style = "green" if prep_report.status == "ready" else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Playtest prep status: {prep_report.status.upper()}. "
+                f"Automated matrix {matrix_report.status.upper()} "
+                f"({passed}/{len(matrix_report.cells)} pass)."
+            ),
+            title="2D Animation Playtest Prep",
+            border_style=border_style,
+        )
+    )
+    console.print(
+        Panel.fit(
+            f"Animation playtest prep report written to {output}",
+            title="2D Animation Playtest Artifact",
+            border_style="cyan",
+        )
+    )
+    if prep_report.status != "ready":
         raise typer.Exit(code=1)
 
 
