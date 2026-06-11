@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.146.0 - 2026-06-12
+
+- Added persistent top navigation rails across the 2D title, run, summary, and review scenes so Back, Pause, Continue, Save, Help, and Close actions are visible instead of hidden behind keyboard memory
+- Added an in-run pause overlay with Resume, Save, Menu, and Quit controls; `Esc` now backs out of overlays before opening pause instead of quitting the run immediately
+- Moved the partnership shortcut from `P` to `O` so `P` can consistently mean Pause, then added regression coverage for pause/back/menu behavior and the new binding
+
 ## 0.145.0 - 2026-06-12
 
 - Added clipped text-fitting helpers for 2D buttons, keycaps, wrapped copy, actor labels, HUD chips, product cards, event cards, and feedback cues so compact layouts stop bleeding copy outside their panels

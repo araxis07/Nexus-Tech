@@ -392,7 +392,7 @@ _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
         TurnAction.SET_SUPPORT_LANE_FOCUS.value,
     ),
     ActionButtonSpec(
-        "P",
+        "O",
         "Partner",
         "Open a partner channel for the selected product.",
         INFO,
@@ -434,6 +434,7 @@ _SCENE_TRANSITION_LABELS = {
     "boot_title": ("Title Boot", INFO),
     "boot_run": ("Run Boot", INFO),
     "title_to_run": ("Entering Run", GOOD),
+    "run_to_title": ("Back To Menu", INFO),
     "title_to_review": ("Archive Review", INFO),
     "review_to_title": ("Back To Archives", INFO),
     "run_to_summary": ("Resolving Turn", WARN),
@@ -852,6 +853,34 @@ class BaseScene:
                     violations.append(f"{bounds.key}:{target.kind}")
         return tuple(violations)
 
+    def _draw_nav_rail(self, surface, items: tuple[tuple[str, str, str, str, object], ...]) -> None:
+        """Draw persistent top-left navigation pills and register click targets."""
+
+        if not items:
+            return
+        pygame = self.pygame
+        left = 20
+        top = 6
+        gap = 8
+        height = 34
+        for title, detail, kind, payload, accent in items:
+            width = min(190, max(104, self.fonts.small.size(title)[0] + 42))
+            rect = pygame.Rect(left, top, width, height)
+            draw_button(
+                surface,
+                pygame,
+                rect=rect,
+                title=title,
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            click_targets = getattr(self, "_click_targets", None)
+            if click_targets is not None:
+                click_targets.append(ClickTarget(kind, payload, rect))
+            left += width + gap
+
     def _draw_scene_transition_overlay(self, surface) -> None:
         if not self.scene_transition_active():
             return
@@ -1249,6 +1278,19 @@ class TitleScene(BaseScene):
             self._draw_archive_browser(surface, left_rect)
         self._draw_title_sidebar(surface, right_rect)
         self._draw_title_footer(surface, footer_rect)
+        if self._text_input is None and self._confirm_delete_slot_name is None:
+            self._draw_nav_rail(
+                surface,
+                (
+                    (
+                        "Esc Quit" if self._mode == "menu" else "Back Menu",
+                        "Close the shell." if self._mode == "menu" else "Return to title menu.",
+                        "menu",
+                        "quit" if self._mode == "menu" else "menu",
+                        DANGER if self._mode == "menu" else INFO,
+                    ),
+                ),
+            )
         if self._confirm_delete_slot_name is not None:
             self._draw_delete_confirmation_overlay(surface)
         if self._text_input is not None:
@@ -1458,6 +1500,10 @@ class TitleScene(BaseScene):
             save_callback=self._save_callback,
             motion_mode=self.motion_mode,
             entry_transition="title_to_run",
+            return_scene_factory=lambda: self._spawn_scene(
+                "menu",
+                entry_transition="run_to_title",
+            ),
         )
 
     def _open_archive_review(self, archive_key: str) -> None:
@@ -2958,6 +3004,18 @@ class ReviewScene(BaseScene):
         self._draw_review_findings(surface, left_rect)
         self._draw_review_sidebar(surface, right_rect)
         self._draw_review_footer(surface, footer_rect)
+        items = [
+            (
+                "Back",
+                "Return to the previous screen.",
+                "review_primary",
+                "",
+                self._accent,
+            )
+        ]
+        if self._allow_save:
+            items.append(("S Save", "Persist this run.", "review_save", "", GOOD))
+        self._draw_nav_rail(surface, tuple(items))
         self._draw_scene_transition_overlay(surface)
 
     def _dispatch_click_target(self, target: ClickTarget) -> None:
@@ -3169,6 +3227,7 @@ class RunScene(BaseScene):
         show_ready_event: bool = True,
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "boot_run",
+        return_scene_factory: Callable[[], BaseScene] | None = None,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -3200,6 +3259,8 @@ class RunScene(BaseScene):
         self._inspector_filter_mode_index = 0
         self._inspector_memory: dict[str, InspectorMemoryState] = {}
         self._help_overlay_visible = False
+        self._pause_overlay_visible = False
+        self._return_scene_factory = return_scene_factory
         self._product_index = 0
         self._motion_elapsed = 0.0
         self._tweens = TweenBank(speed=9.0)
@@ -3276,6 +3337,8 @@ class RunScene(BaseScene):
             keys.add("inspector")
         if self._help_overlay_visible:
             keys.add("help")
+        if self._pause_overlay_visible:
+            keys.add("pause")
         if self.state.company.game_over or self.state.victory_achieved:
             keys.add("outcome")
         return keys
@@ -3387,6 +3450,7 @@ class RunScene(BaseScene):
             "panel": INFO,
             "inspector": SELECTION,
             "help": INFO,
+            "pause": WARN,
             "outcome": DANGER,
         }.get(overlay_key, INFO)
         label = {
@@ -3396,6 +3460,7 @@ class RunScene(BaseScene):
             "panel": "Panel Closed",
             "inspector": "Inspector Closed",
             "help": "Help Closed",
+            "pause": "Pause Closed",
             "outcome": "Outcome Closed",
         }.get(overlay_key, "Overlay Closed")
         self._overlay_exit_cues.insert(
@@ -3519,9 +3584,19 @@ class RunScene(BaseScene):
         previous_visible = self._help_overlay_visible
         self._help_overlay_visible = visible
         if visible:
+            self._pause_overlay_visible = False
             self._trigger_overlay_motion("help", intensity=0.7)
         elif previous_visible:
             self._trigger_overlay_exit("help")
+
+    def _set_pause_overlay_visible(self, visible: bool) -> None:
+        previous_visible = self._pause_overlay_visible
+        self._pause_overlay_visible = visible
+        if visible:
+            self._help_overlay_visible = False
+            self._trigger_overlay_motion("pause", intensity=0.76)
+        elif previous_visible:
+            self._trigger_overlay_exit("pause")
 
     def _open_inspector(self, panel_key: str) -> None:
         self._trigger_overlay_motion("inspector", intensity=0.82)
@@ -3584,6 +3659,8 @@ class RunScene(BaseScene):
         self._sync_overlay_transitions(safe_dt)
         self._tweens.update(dt)
         self._update_scene_transition(dt)
+        if self._pause_overlay_visible:
+            return
         self._motion_pulses.update(dt)
         self._stabilize_motion_bank()
         self._events = [
@@ -3686,6 +3763,10 @@ class RunScene(BaseScene):
         if event.type != self.pygame.KEYDOWN:
             return
 
+        if event.key == self.pygame.K_p and self._text_input is None:
+            self._set_pause_overlay_visible(not self._pause_overlay_visible)
+            return
+
         if event.key == self.pygame.K_F1 or event.unicode == "?":
             self._set_help_overlay_visible(not self._help_overlay_visible)
             return
@@ -3693,6 +3774,9 @@ class RunScene(BaseScene):
         if event.key == self.pygame.K_ESCAPE:
             if self._help_overlay_visible:
                 self._set_help_overlay_visible(False)
+                return
+            if self._pause_overlay_visible:
+                self._set_pause_overlay_visible(False)
                 return
             if self._text_input is not None:
                 self._set_text_input(None)
@@ -3706,8 +3790,17 @@ class RunScene(BaseScene):
             if self._deep_panel_key is not None:
                 self._set_deep_panel(None)
                 return
-            self.should_exit = True
-            self.exit_reason = "quit"
+            self._set_pause_overlay_visible(True)
+            return
+
+        if self._pause_overlay_visible:
+            if event.key == self.pygame.K_s:
+                self._save_current_run()
+            elif event.key == self.pygame.K_m:
+                self._return_to_menu_or_quit()
+            elif event.key == self.pygame.K_q:
+                self.should_exit = True
+                self.exit_reason = "quit"
             return
 
         if self._help_overlay_visible:
@@ -3929,6 +4022,17 @@ class RunScene(BaseScene):
         self._draw_late_game_choreography_cues(surface)
         self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
+        if not self._pause_overlay_visible:
+            self._draw_nav_rail(
+                surface,
+                (
+                    ("P Pause", "Open pause, save, and menu controls.", "pause_toggle", "", WARN),
+                    ("Esc Back", "Close overlay or open pause.", "run_back", "", INFO),
+                    ("F1 Help", "Show the controls guide.", "open_help", "", SELECTION),
+                ),
+            )
+        if self._pause_overlay_visible:
+            self._draw_pause_overlay(surface)
         self._draw_hover_tooltip(surface)
         self._draw_scene_transition_overlay(surface)
 
@@ -3960,6 +4064,7 @@ class RunScene(BaseScene):
             or self._inspector_panel_key is not None
             or self._context_picker is not None
             or self._text_input is not None
+            or self._pause_overlay_visible
             or self.state.pending_event is not None
         )
 
@@ -5527,10 +5632,34 @@ class RunScene(BaseScene):
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
         for target in reversed(self._click_targets):
             if target.rect.collidepoint(position):
+                if self._pause_overlay_visible and not target.kind.startswith("pause_"):
+                    return
                 self._dispatch_click_target(target)
                 return
 
     def _dispatch_click_target(self, target: ClickTarget) -> None:
+        if target.kind == "pause_toggle":
+            self._set_pause_overlay_visible(True)
+            return
+        if target.kind == "run_back":
+            self._handle_back_navigation()
+            return
+        if target.kind == "open_help":
+            self._set_help_overlay_visible(True)
+            return
+        if target.kind == "pause_resume":
+            self._set_pause_overlay_visible(False)
+            return
+        if target.kind == "pause_save":
+            self._save_current_run()
+            return
+        if target.kind == "pause_menu":
+            self._return_to_menu_or_quit()
+            return
+        if target.kind == "pause_quit":
+            self.should_exit = True
+            self.exit_reason = "quit"
+            return
         if target.kind == "select_product":
             self._set_selected_product(target.payload)
             self._refresh_view_model()
@@ -5630,6 +5759,36 @@ class RunScene(BaseScene):
         if target.kind == "close_help":
             self._set_help_overlay_visible(False)
             return
+
+    def _handle_back_navigation(self) -> None:
+        if self._help_overlay_visible:
+            self._set_help_overlay_visible(False)
+            return
+        if self._pause_overlay_visible:
+            self._set_pause_overlay_visible(False)
+            return
+        if self._text_input is not None:
+            self._set_text_input(None)
+            return
+        if self._context_picker is not None:
+            self._set_context_picker(None)
+            return
+        if self._inspector_panel_key is not None:
+            self._close_inspector()
+            return
+        if self._deep_panel_key is not None:
+            self._set_deep_panel(None)
+            return
+        self._set_pause_overlay_visible(True)
+
+    def _return_to_menu_or_quit(self) -> None:
+        if self._return_scene_factory is None:
+            self.should_exit = True
+            self.exit_reason = "quit"
+            return
+        if self._dirty:
+            self._persist_current_run()
+        self._next_scene = self._return_scene_factory()
 
     def _command_disabled_reason(self, command: str) -> str | None:
         if self.state.company.game_over or self.state.victory_achieved:
@@ -5784,7 +5943,7 @@ class RunScene(BaseScene):
             pygame.K_a: FrontendIntent.ASSIGN_EMPLOYEE,
             pygame.K_l: FrontendIntent.TAKE_LOAN,
             pygame.K_g: FrontendIntent.RAISE_ANGEL,
-            pygame.K_p: FrontendIntent.CREATE_PARTNERSHIP,
+            pygame.K_o: FrontendIntent.CREATE_PARTNERSHIP,
             pygame.K_y: FrontendIntent.OPEN_STRATEGY,
             pygame.K_r: FrontendIntent.OPEN_ROADMAP,
             pygame.K_b: FrontendIntent.OPEN_BUDGET,
@@ -6069,6 +6228,7 @@ class RunScene(BaseScene):
             dirty=True,
             motion_mode=self.motion_mode,
             entry_transition="run_to_summary",
+            return_scene_factory=self._return_scene_factory,
         )
 
     def _save_current_run(self) -> None:
@@ -6091,9 +6251,13 @@ class RunScene(BaseScene):
             save_callback=self._save_callback,
             view_model=build_run_review_view_model(self.state),
             accent=GOOD if self.state.victory_achieved else DANGER,
-            primary_title="Esc Close",
-            primary_detail="Leave the 2D shell.",
-            return_scene_factory=None,
+            primary_title="Back to Menu" if self._return_scene_factory is not None else "Esc Close",
+            primary_detail=(
+                "Return to the title menu."
+                if self._return_scene_factory is not None
+                else "Leave the 2D shell."
+            ),
+            return_scene_factory=self._return_scene_factory,
             allow_save=True,
             dirty=self._dirty,
             motion_mode=self.motion_mode,
@@ -8221,13 +8385,106 @@ class RunScene(BaseScene):
     def _inspector_hint_line(self) -> str:
         return "Tab/Arrows move | Z/X sort-filter | A/H focus | PgUp/PgDn page | Enter action"
 
+    def _draw_pause_overlay(self, surface) -> None:
+        pygame = self.pygame
+        overlay_motion = self._overlay_motion_level("pause")
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(self._overlay_fill("pause"))
+        surface.blit(overlay, (0, 0))
+        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=352, margin=26)
+        modal_rect = self._animated_overlay_rect(modal_rect, "pause", shift=24)
+        inner = draw_panel(
+            surface,
+            pygame,
+            modal_rect,
+            title="Pause",
+            accent=WARN,
+            emphasis=overlay_motion,
+            lift=int(overlay_motion * 4),
+        )
+        draw_text_line(
+            surface,
+            self.fonts.title,
+            "Game Paused",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 30, inner.width, 30),
+            valign="top",
+        )
+        menu_available = self._return_scene_factory is not None
+        detail = (
+            f"Turn {self.state.company.turn} | Actions left {self.state.action_points_remaining} | "
+            f"Slot {self.slot_name}"
+        )
+        draw_wrapped_text(
+            surface,
+            self.fonts.body,
+            detail,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 24),
+            line_height=18,
+            max_lines=1,
+        )
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            (
+                "Use P or Esc to resume. Save before leaving if you want to keep the current "
+                "run state. Menu is available when the run was launched from the 2D title shell."
+            ),
+            TEXT,
+            pygame.Rect(inner.left, inner.top + 34, inner.width, 52),
+            line_height=17,
+            max_lines=3,
+        )
+        button_top = inner.top + 106
+        button_gap = 12
+        button_height = 46
+        button_width = int((inner.width - button_gap) / 2)
+        buttons = (
+            ("Resume", "Return to the run.", "pause_resume", "", GOOD, True),
+            ("S Save", "Persist the run.", "pause_save", "", INFO, True),
+            (
+                "M Menu" if menu_available else "Menu Unavailable",
+                "Save and return to title."
+                if menu_available
+                else "Direct play has no title shell.",
+                "pause_menu",
+                "",
+                WARN,
+                menu_available,
+            ),
+            ("Q Quit", "Close the 2D shell.", "pause_quit", "", DANGER, True),
+        )
+        for index, (title, button_detail, kind, payload, accent, enabled) in enumerate(buttons):
+            row = index // 2
+            col = index % 2
+            rect = pygame.Rect(
+                inner.left + col * (button_width + button_gap),
+                button_top + row * (button_height + button_gap),
+                button_width,
+                button_height,
+            )
+            draw_button(
+                surface,
+                pygame,
+                rect=rect,
+                title=title,
+                detail=button_detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+                enabled=enabled,
+            )
+            if enabled:
+                self._click_targets.append(ClickTarget(kind, payload, rect))
+
     def _draw_help_overlay(self, surface) -> None:
         pygame = self.pygame
         overlay_motion = self._overlay_motion_level("help")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("help"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=860, height=520, margin=28)
+        modal_rect = _fit_modal_rect(pygame, surface, width=860, height=580, margin=28)
         modal_rect = self._animated_overlay_rect(modal_rect, "help", shift=30)
         inner = draw_panel(
             surface,
@@ -8245,7 +8502,7 @@ class RunScene(BaseScene):
             self.fonts.body,
             (
                 "This frontend is now self-contained for the main run loop. "
-                "Use these controls to move between products, panels, inspectors, "
+                "Use these controls to move between products, panels, inspectors, pause/menu, "
                 "the endgame board, and turn resolution without dropping back to the CLI."
             ),
             MUTED,
@@ -8259,8 +8516,11 @@ class RunScene(BaseScene):
             ("I", "Inspect the current deep panel"),
             ("C", "Run primary coach command"),
             ("Q/F/M/D", "Product actions"),
-            ("H/A/Y/R/B/U", "Team / strategy / budget / support"),
+            ("H/A/O", "Hire / assign / partner"),
+            ("Y/R/B/U", "Strategy / roadmap / budget / support"),
             ("Space", "End turn"),
+            ("P", "Pause with resume, save, menu, and quit"),
+            ("Esc", "Back out of overlay, then pause"),
             ("Z/X", "Inspector sort / filter"),
             ("A/H", "Inspector actionable / hotspot focus"),
             ("PgUp/PgDn", "Inspector page"),
@@ -8269,7 +8529,7 @@ class RunScene(BaseScene):
         )
         top = inner.top + 72
         for key_text, label in keycaps:
-            keycap_rect = pygame.Rect(inner.left, top, inner.width, 28)
+            keycap_rect = pygame.Rect(inner.left, top, inner.width, 25)
             draw_keycap(
                 surface,
                 pygame,
@@ -8278,7 +8538,7 @@ class RunScene(BaseScene):
                 key_text=key_text,
                 label=label,
             )
-            top += 36
+            top += 31
         close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 36)
         draw_button(
             surface,
@@ -8553,6 +8813,7 @@ class TurnSummaryScene(BaseScene):
         dirty: bool,
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "run_to_summary",
+        return_scene_factory: Callable[[], BaseScene] | None = None,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -8568,6 +8829,7 @@ class TurnSummaryScene(BaseScene):
         self._previous_state = previous_state
         self._resolution = resolution
         self._selected_product_id = selected_product_id
+        self._return_scene_factory = return_scene_factory
         self._click_targets: list[ClickTarget] = []
         self._events = build_turn_resolution_events(previous_state, resolution)
         self._visible_event_count = 1
@@ -8876,6 +9138,14 @@ class TurnSummaryScene(BaseScene):
         self._draw_summary_main(surface, left_rect)
         self._draw_summary_timeline(surface, right_rect)
         self._draw_summary_footer(surface, footer_rect)
+        self._draw_nav_rail(
+            surface,
+            (
+                ("Space Continue", "Return to the live run.", "continue", "", GOOD),
+                ("S Save", "Persist the run.", "save", "", INFO),
+                ("Esc Close", "Leave the 2D shell.", "close_summary", "", DANGER),
+            ),
+        )
         self._draw_summary_outcome_lanes(surface)
         self._draw_summary_cinematic_overlay(surface)
         self._draw_scene_transition_overlay(surface)
@@ -8905,9 +9175,15 @@ class TurnSummaryScene(BaseScene):
                 save_callback=self._save_callback,
                 view_model=build_run_review_view_model(self.state),
                 accent=GOOD if self.state.victory_achieved else DANGER,
-                primary_title="Esc Close",
-                primary_detail="Leave the 2D shell.",
-                return_scene_factory=None,
+                primary_title=(
+                    "Back to Menu" if self._return_scene_factory is not None else "Esc Close"
+                ),
+                primary_detail=(
+                    "Return to the title menu."
+                    if self._return_scene_factory is not None
+                    else "Leave the 2D shell."
+                ),
+                return_scene_factory=self._return_scene_factory,
                 allow_save=True,
                 dirty=self._dirty,
                 motion_mode=self.motion_mode,
@@ -8933,6 +9209,7 @@ class TurnSummaryScene(BaseScene):
             show_ready_event=False,
             motion_mode=self.motion_mode,
             entry_transition="summary_to_run",
+            return_scene_factory=self._return_scene_factory,
         )
 
     def _trigger_summary_event_motion(self, event: FrontendEvent) -> None:

@@ -27,6 +27,7 @@ class FrontendIntent(Enum):
     OPEN_SUPPORT = auto()
     END_TURN = auto()
     SAVE_GAME = auto()
+    PAUSE_MENU = auto()
     QUIT = auto()
 
 
@@ -108,10 +109,16 @@ DEFAULT_BINDINGS: tuple[InputBinding, ...] = (
         FrontendIntent.RAISE_ANGEL,
     ),
     InputBinding(
-        "P",
+        "O",
         "Partner",
         "Open a reseller partnership on the selected product.",
         FrontendIntent.CREATE_PARTNERSHIP,
+    ),
+    InputBinding(
+        "P",
+        "Pause",
+        "Pause the run and open resume/save/menu controls.",
+        FrontendIntent.PAUSE_MENU,
     ),
     InputBinding(
         "Y",
@@ -149,7 +156,9 @@ DEFAULT_BINDINGS: tuple[InputBinding, ...] = (
         "Write the current run back to SQLite.",
         FrontendIntent.SAVE_GAME,
     ),
-    InputBinding("Esc", "Quit", "Close the 2D frontend.", FrontendIntent.QUIT),
+    InputBinding(
+        "Esc", "Back/Pause", "Close the current overlay or pause the run.", FrontendIntent.QUIT
+    ),
 )
 
 
@@ -171,5 +180,7 @@ def pending_event_bindings(option_count: int) -> tuple[InputBinding, ...]:
             "Write the current run back to SQLite.",
             FrontendIntent.SAVE_GAME,
         ),
-        InputBinding("Esc", "Quit", "Close the 2D frontend.", FrontendIntent.QUIT),
+        InputBinding(
+            "Esc", "Back/Pause", "Close the current overlay or pause the run.", FrontendIntent.QUIT
+        ),
     )

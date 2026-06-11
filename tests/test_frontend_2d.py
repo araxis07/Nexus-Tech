@@ -62,6 +62,7 @@ from nexus_tech.frontend_2d.event_queue import (
     build_turn_resolution_events,
     describe_action_motion_profile,
 )
+from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
     ReviewScene,
@@ -1487,6 +1488,99 @@ def test_run_scene_can_open_endgame_panel_inspector_from_hotkey() -> None:
 
         assert scene._inspector_panel_key == "endgame"
         assert scene._selected_inspector_section().key == "paths"
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_pause_and_back_hotkeys_are_distinct() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=71),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_p, unicode="p"))
+        assert scene._pause_overlay_visible
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
+        assert not scene._pause_overlay_visible
+
+        scene._set_deep_panel("finance")
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
+        assert scene._deep_panel_key is None
+        assert not scene._pause_overlay_visible
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
+        assert scene._pause_overlay_visible
+        assert not scene.should_exit
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_pause_menu_returns_to_title_shell(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        saved_slots: list[str] = []
+        coordinator = SaveLoadCoordinator(tmp_path / "pause-menu.db")
+
+        def save_callback(state, rng, slot_name):
+            saved_slots.append(slot_name)
+
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=72),
+            slot_name="active",
+            save_callback=save_callback,
+            dirty=True,
+            show_ready_event=False,
+            return_scene_factory=lambda: TitleScene(
+                pygame=pygame,
+                fonts=fonts,
+                state=create_new_game("NEXUS TECH", "Nexus One"),
+                rng=RandomSource(seed=73),
+                slot_name="active",
+                save_callback=save_callback,
+                coordinator=coordinator,
+                initial_mode="menu",
+            ),
+        )
+
+        scene._set_pause_overlay_visible(True)
+        scene._dispatch_click_target(ClickTarget("pause_menu", "", _surface.get_rect()))
+        next_scene = scene.pop_next_scene()
+
+        assert saved_slots == ["active"]
+        assert isinstance(next_scene, TitleScene)
+        assert not scene.should_exit
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_partner_binding_moves_to_o_so_p_can_pause() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=74),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        assert scene._intent_for_key(pygame.K_o) is FrontendIntent.CREATE_PARTNERSHIP
+        assert scene._intent_for_key(pygame.K_p) is None
+        assert any(
+            button.key_hint == "O" and button.title == "Partner"
+            for button in scenes_module._ACTION_BUTTONS
+        )
     finally:
         pygame.quit()
 
