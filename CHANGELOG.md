@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.145.0 - 2026-06-12
+
+- Added clipped text-fitting helpers for 2D buttons, keycaps, wrapped copy, actor labels, HUD chips, product cards, event cards, and feedback cues so compact layouts stop bleeding copy outside their panels
+- Tuned the 2D visual palette and background grid toward stronger readability with clearer borders, brighter muted text, and lower grid noise during live play
+- Ignored local `*.db` and `*.sqlite` gameplay databases so real play sessions do not leave risky save files ready to be staged accidentally
+
 ## 0.144.0 - 2026-06-12
 
 - Added a `Motion Mode Differentiation` cell to `audit-2d-animation` so full, reduced, and off motion modes are checked together before manual open-window playtesting

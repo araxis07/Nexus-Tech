@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-BACKGROUND = (12, 18, 28)
-GRID = (20, 32, 48)
-PANEL = (22, 30, 43)
-PANEL_ALT = (17, 24, 35)
-BORDER = (58, 75, 99)
+BACKGROUND = (8, 14, 23)
+GRID = (14, 25, 39)
+PANEL = (18, 28, 42)
+PANEL_ALT = (13, 22, 34)
+BORDER = (74, 98, 128)
 TEXT = (232, 239, 245)
-MUTED = (143, 160, 184)
-GOOD = (60, 190, 120)
-WARN = (240, 184, 64)
-DANGER = (237, 91, 91)
-INFO = (88, 166, 255)
+MUTED = (169, 184, 205)
+GOOD = (72, 210, 139)
+WARN = (250, 199, 83)
+DANGER = (248, 104, 104)
+INFO = (97, 181, 255)
 SELECTION = (115, 207, 255)
 OVERLAY = (8, 10, 14, 180)
 
@@ -72,9 +72,9 @@ def draw_grid(surface, pygame) -> None:
 
     width, height = surface.get_size()
     surface.fill(BACKGROUND)
-    for x_pos in range(0, width, 48):
+    for x_pos in range(0, width, 64):
         pygame.draw.line(surface, GRID, (x_pos, 0), (x_pos, height), 1)
-    for y_pos in range(0, height, 48):
+    for y_pos in range(0, height, 64):
         pygame.draw.line(surface, GRID, (0, y_pos), (width, y_pos), 1)
 
 
@@ -172,12 +172,16 @@ def draw_wrapped_text(
 ) -> int:
     """Draw wrapped text and return the consumed height."""
 
+    rect = surface.get_clip().clip(rect)
+    if rect.width <= 0 or rect.height <= 0:
+        return 0
     words = text.split()
     if not words:
         return 0
     lines: list[str] = []
-    current_line = words[0]
-    for word in words[1:]:
+    current_line = _fit_word(font, words[0], rect.width)
+    for raw_word in words[1:]:
+        word = _fit_word(font, raw_word, rect.width)
         candidate = f"{current_line} {word}"
         if font.size(candidate)[0] <= rect.width:
             current_line = candidate
@@ -185,14 +189,94 @@ def draw_wrapped_text(
         lines.append(current_line)
         current_line = word
     lines.append(current_line)
-    if max_lines is not None and len(lines) > max_lines:
-        lines = lines[:max_lines]
-        if not lines[-1].endswith("..."):
-            lines[-1] = f"{lines[-1].rstrip('.')}..."
-    for index, line in enumerate(lines):
-        text_surface = font.render(line, True, color)
-        surface.blit(text_surface, (rect.left, rect.top + index * line_height))
-    return len(lines) * line_height
+    height_limit = max(0, rect.height // max(1, line_height))
+    line_limit = height_limit if max_lines is None else min(max_lines, height_limit)
+    if line_limit <= 0:
+        return 0
+    truncated = len(lines) > line_limit
+    visible_lines = lines[:line_limit]
+    if truncated and visible_lines:
+        visible_lines[-1] = fit_text_line(font, f"{visible_lines[-1].rstrip('. ')}...", rect.width)
+    previous_clip = surface.get_clip()
+    surface.set_clip(rect.clip(previous_clip))
+    try:
+        for index, line in enumerate(visible_lines):
+            text_surface = font.render(line, True, color)
+            surface.blit(text_surface, (rect.left, rect.top + index * line_height))
+    finally:
+        surface.set_clip(previous_clip)
+    return len(visible_lines) * line_height
+
+
+def fit_text_line(font, text: str, max_width: int) -> str:
+    """Return a single line that fits inside max_width, using ASCII ellipsis."""
+
+    clean_text = " ".join(text.split())
+    if max_width <= 0 or not clean_text:
+        return ""
+    if font.size(clean_text)[0] <= max_width:
+        return clean_text
+    suffix = "..."
+    if font.size(suffix)[0] > max_width:
+        return ""
+    low = 0
+    high = len(clean_text)
+    best = ""
+    while low <= high:
+        middle = (low + high) // 2
+        candidate = f"{clean_text[:middle].rstrip()}{suffix}"
+        if font.size(candidate)[0] <= max_width:
+            best = candidate
+            low = middle + 1
+        else:
+            high = middle - 1
+    return best
+
+
+def draw_text_line(
+    surface,
+    font,
+    text: str,
+    color: tuple[int, int, int],
+    rect,
+    *,
+    align: str = "left",
+    valign: str = "center",
+) -> int:
+    """Draw one clipped, fitted text line and return its rendered width."""
+
+    rect = surface.get_clip().clip(rect)
+    if rect.width <= 0 or rect.height <= 0:
+        return 0
+    line = fit_text_line(font, text, rect.width)
+    if not line:
+        return 0
+    text_surface = font.render(line, True, color)
+    if align == "right":
+        x_pos = rect.right - text_surface.get_width()
+    elif align == "center":
+        x_pos = rect.left + max(0, (rect.width - text_surface.get_width()) // 2)
+    else:
+        x_pos = rect.left
+    if valign == "top":
+        y_pos = rect.top
+    elif valign == "bottom":
+        y_pos = rect.bottom - text_surface.get_height()
+    else:
+        y_pos = rect.top + max(0, (rect.height - text_surface.get_height()) // 2)
+    previous_clip = surface.get_clip()
+    surface.set_clip(rect.clip(previous_clip))
+    try:
+        surface.blit(text_surface, (x_pos, y_pos))
+    finally:
+        surface.set_clip(previous_clip)
+    return text_surface.get_width()
+
+
+def _fit_word(font, word: str, max_width: int) -> str:
+    if font.size(word)[0] <= max_width:
+        return word
+    return fit_text_line(font, word, max_width)
 
 
 def draw_keycap(surface, pygame, font, *, rect, key_text: str, label: str) -> None:
@@ -200,10 +284,20 @@ def draw_keycap(surface, pygame, font, *, rect, key_text: str, label: str) -> No
 
     pygame.draw.rect(surface, PANEL_ALT, rect, border_radius=12)
     pygame.draw.rect(surface, BORDER, rect, width=1, border_radius=12)
-    key_surface = font.render(key_text, True, TEXT)
-    label_surface = font.render(label, True, MUTED)
-    surface.blit(key_surface, (rect.left + 10, rect.top + 7))
-    surface.blit(label_surface, (rect.left + 62, rect.top + 7))
+    draw_text_line(
+        surface,
+        font,
+        key_text,
+        TEXT,
+        pygame.Rect(rect.left + 10, rect.top + 5, 44, rect.height - 10),
+    )
+    draw_text_line(
+        surface,
+        font,
+        label,
+        MUTED,
+        pygame.Rect(rect.left + 62, rect.top + 5, rect.width - 72, rect.height - 10),
+    )
 
 
 def draw_button(
@@ -252,14 +346,28 @@ def draw_button(
             (visual_rect.left + 1, visual_rect.bottom - 5, visual_rect.width - 2, 3),
             border_radius=3,
         )
-    title_surface = title_font.render(title, True, title_color)
     show_detail = bool(detail) and visual_rect.height >= 46
-    title_top = (
-        visual_rect.top + 10
-        if show_detail
-        else visual_rect.top + max(8, int((visual_rect.height - title_surface.get_height()) / 2))
+    title_rect = pygame.Rect(
+        visual_rect.left + 12,
+        visual_rect.top + (8 if show_detail else 6),
+        visual_rect.width - 24,
+        22 if show_detail else visual_rect.height - 12,
     )
-    surface.blit(title_surface, (visual_rect.left + 12, title_top))
+    draw_text_line(surface, title_font, title, title_color, title_rect)
     if show_detail:
-        detail_surface = detail_font.render(detail, True, detail_color)
-        surface.blit(detail_surface, (visual_rect.left + 12, visual_rect.top + 34))
+        detail_top = visual_rect.top + 28
+        detail_rect = pygame.Rect(
+            visual_rect.left + 12,
+            detail_top,
+            visual_rect.width - 24,
+            max(0, visual_rect.bottom - detail_top - 5),
+        )
+        draw_wrapped_text(
+            surface,
+            detail_font,
+            detail,
+            detail_color,
+            detail_rect,
+            line_height=13 if visual_rect.height < 58 else 15,
+            max_lines=2 if visual_rect.height >= 58 else 1,
+        )

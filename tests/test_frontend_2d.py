@@ -82,7 +82,13 @@ from nexus_tech.frontend_2d.visual_audit import (
     MAX_EDGE_DENSITY,
     VISUAL_AUDIT_SUMMARY_NAME,
 )
-from nexus_tech.frontend_2d.widgets import DANGER, create_fonts
+from nexus_tech.frontend_2d.widgets import (
+    DANGER,
+    create_fonts,
+    draw_button,
+    draw_wrapped_text,
+    fit_text_line,
+)
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
@@ -149,6 +155,50 @@ def _build_pygame_bundle():
     pygame.font.init()
     surface = pygame.display.set_mode((960, 640), pygame.HIDDEN)
     return pygame, create_fonts(pygame), surface
+
+
+def test_2d_widget_text_fit_ellipsizes_to_available_width() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        fitted = fit_text_line(
+            fonts.small,
+            "This dashboard command description is intentionally too long",
+            118,
+        )
+
+        assert fitted.endswith("...")
+        assert fonts.small.size(fitted)[0] <= 118
+        assert fit_text_line(fonts.small, "Short label", 118) == "Short label"
+    finally:
+        pygame.quit()
+
+
+def test_2d_widget_wrapping_and_buttons_stay_inside_compact_rects() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        text_rect = pygame.Rect(12, 12, 126, 16)
+        consumed = draw_wrapped_text(
+            surface,
+            fonts.small,
+            "Long unbroken-dashboard-command-copy should still stay inside the panel",
+            DANGER,
+            text_rect,
+            line_height=16,
+        )
+        draw_button(
+            surface,
+            pygame,
+            rect=pygame.Rect(20, 44, 128, 44),
+            title="Space End Turn With Preview",
+            detail="Resolve this turn with warning gates and consequence previews.",
+            accent=DANGER,
+            title_font=fonts.small,
+            detail_font=fonts.small,
+        )
+
+        assert consumed == 16
+    finally:
+        pygame.quit()
 
 
 def _assert_actor_readability_clear(scene) -> None:
@@ -1235,15 +1285,24 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
             show_ready_event=False,
         )
 
-        detail = scene._footer_button_detail(
+        compact_detail = scene._footer_button_detail(
             scenes_module._ACTION_BUTTONS[0],
             enabled=True,
             button_cols=4,
         )
-        _, _, footer_band_height = scene._footer_layout_metrics(820, 320)
+        narrow_detail = scene._footer_button_detail(
+            scenes_module._ACTION_BUTTONS[0],
+            enabled=True,
+            button_cols=5,
+        )
+        button_cols, button_height, footer_band_height = scene._footer_layout_metrics(820, 320)
+        rows = max(1, (len(scenes_module._ACTION_BUTTONS) + button_cols - 1) // button_cols)
 
-        assert len(detail) <= 30
-        assert footer_band_height == 52
+        assert len(compact_detail) <= 24
+        assert len(narrow_detail) <= 28
+        assert button_cols == 5
+        assert footer_band_height == 48
+        assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
     finally:
         pygame.quit()
 

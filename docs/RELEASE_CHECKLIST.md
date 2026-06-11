@@ -71,6 +71,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `Long Session Visual Readiness` failures as release blockers before presenting longer 2D playthroughs.
 - Treat `Scene Motion Profile` failures as release blockers before shipping new scenes or adding denser scene-specific motion.
 - Treat `Readability Guard` failures as release blockers before opening the manual playtest pass.
+- Treat text clipping, unreadable compact buttons, or local gameplay database files appearing in `git status` as release blockers before presenting the 2D build.
 - Treat `audit-2d-animation-matrix` failures as release blockers for the default seven-scenario, three-seed presentation matrix.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.
 - Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures, and review the uploaded `nexus-tech-2d-animation-matrix` and `nexus-tech-2d-animation-playtest-prep` artifacts before manual presentation playtests.

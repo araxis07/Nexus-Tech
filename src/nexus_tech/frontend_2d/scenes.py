@@ -65,6 +65,7 @@ from nexus_tech.frontend_2d.widgets import (
     draw_keycap,
     draw_panel,
     draw_progress_bar,
+    draw_text_line,
     draw_wrapped_text,
     tone_color,
 )
@@ -700,14 +701,22 @@ def _draw_actor_sprite_clip(
     )
 
     text_left = 48
-    label = fonts.small.render(_short_actor_text(clip.label, 15), True, TEXT)
-    role = fonts.small.render(
-        _short_actor_text(f"{clip.role} / {clip.lane}", 18),
-        True,
-        blend_color(MUTED, accent, 0.45),
+    draw_text_line(
+        local,
+        fonts.small,
+        _short_actor_text(clip.label, 18),
+        TEXT,
+        pygame.Rect(text_left, 8, local_rect.width - text_left - 12, 18),
+        valign="top",
     )
-    local.blit(label, (text_left, 10))
-    local.blit(role, (text_left, 28))
+    draw_text_line(
+        local,
+        fonts.small,
+        _short_actor_text(f"{clip.role} / {clip.lane}", 22),
+        blend_color(MUTED, accent, 0.45),
+        pygame.Rect(text_left, 27, local_rect.width - text_left - 12, 18),
+        valign="top",
+    )
     surface.blit(local, rect.topleft)
 
 
@@ -878,19 +887,26 @@ class BaseScene:
 
         surface.blit(overlay, (0, 0))
         if progress < 0.62 and intensity > 0.5:
-            badge = self.fonts.small.render(label, True, TEXT)
-            badge_rect = badge.get_rect()
-            badge_rect.topright = (width - 28, 28)
+            badge_width = min(140, max(80, self.fonts.small.size(label)[0] + 18))
+            badge_rect = self.pygame.Rect(width - badge_width - 28, 28, badge_width, 24)
             pad = 9
             panel_rect = pygame.Rect(
-                badge_rect.left - pad,
-                badge_rect.top - 5,
-                badge_rect.width + pad * 2,
-                badge_rect.height + 10,
+                badge_rect.left,
+                badge_rect.top,
+                badge_rect.width,
+                badge_rect.height,
             )
             pygame.draw.rect(surface, (8, 13, 22), panel_rect, border_radius=12)
             pygame.draw.rect(surface, accent, panel_rect, width=1, border_radius=12)
-            surface.blit(badge, badge_rect)
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                label,
+                TEXT,
+                pygame.Rect(
+                    panel_rect.left + pad, panel_rect.top + 2, panel_rect.width - pad * 2, 20
+                ),
+            )
 
 
 class TitleScene(BaseScene):
@@ -1911,8 +1927,14 @@ class TitleScene(BaseScene):
             emphasis=header_motion,
             lift=int(header_motion * 3),
         )
-        title_surface = self.fonts.title.render("NEXUS TECH 2D", True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 28))
+        draw_text_line(
+            surface,
+            self.fonts.title,
+            "NEXUS TECH 2D",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 32, inner.width - 120, 30),
+            valign="top",
+        )
         subtitle = (
             "Self-contained frontend shell with loadable saves, archive reviews, "
             "and live run handoff."
@@ -1926,12 +1948,14 @@ class TitleScene(BaseScene):
             line_height=18,
             max_lines=2,
         )
-        meta_surface = self.fonts.small.render(
+        draw_text_line(
+            surface,
+            self.fonts.small,
             f"Save slots {len(self._save_cards)} | archives {len(self._archive_cards)}",
-            True,
             TEXT,
+            pygame.Rect(inner.left, inner.top + 38, inner.width, 18),
+            valign="top",
         )
-        surface.blit(meta_surface, (inner.left, inner.top + 38))
 
     def _draw_title_menu(self, surface, rect) -> None:
         pygame = self.pygame
@@ -1945,8 +1969,14 @@ class TitleScene(BaseScene):
             emphasis=menu_motion,
             lift=int(menu_motion * 3),
         )
-        title_surface = self.fonts.heading.render("Title Menu", True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Title Menu",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
         buttons = (
             ("1 Continue Last", "Open the newest save slot directly.", "continue", INFO),
             (
@@ -2692,8 +2722,16 @@ class TitleScene(BaseScene):
             width=2 if event_motion >= 0.4 else 1,
             border_radius=14,
         )
-        title_surface = self.fonts.body.render(timed_event.payload.title, True, TEXT)
-        surface.blit(title_surface, (animated_rect.left + 12, animated_rect.top + 10))
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            timed_event.payload.title,
+            TEXT,
+            pygame.Rect(
+                animated_rect.left + 12, animated_rect.top + 8, animated_rect.width - 24, 22
+            ),
+            valign="top",
+        )
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -4150,8 +4188,13 @@ class RunScene(BaseScene):
             count=4 if panel_key in {"pipeline", "endgame"} else 3,
             offset=float(len(panel_key)),
         )
-        label = self.fonts.small.render(panel_key.upper(), True, blend_color(MUTED, accent, 0.7))
-        surface.blit(label, (strip_rect.left + 10, strip_rect.top + 9))
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            panel_key.upper(),
+            blend_color(MUTED, accent, 0.7),
+            pygame.Rect(strip_rect.left + 10, strip_rect.top + 6, strip_rect.width - 20, 20),
+        )
 
     def _actor_sprite_strength(self, *keys: str) -> float:
         if self.motion_mode is MotionMode.OFF:
@@ -5143,18 +5186,23 @@ class RunScene(BaseScene):
                 count=2,
                 offset=index + len(cue.label),
             )
-            title = self.fonts.small.render(
-                f"CHOICE: {self._compact_button_detail(cue.label, max_length=30)}",
-                True,
+            text_rect = pygame.Rect(rect.left + 76, rect.top + 6, rect.width - 88, 20)
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                f"CHOICE: {cue.label}",
                 blend_color(TEXT, cue.accent, 0.18),
+                text_rect,
+                valign="top",
             )
-            detail = self.fonts.small.render(
-                self._compact_button_detail(cue.detail, max_length=54),
-                True,
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                cue.detail,
                 MUTED,
+                pygame.Rect(rect.left + 76, rect.top + 24, rect.width - 88, 18),
+                valign="top",
             )
-            surface.blit(title, (rect.left + 76, rect.top + 8))
-            surface.blit(detail, (rect.left + 76, rect.top + 26))
             progress_rect = pygame.Rect(rect.left + 76, rect.bottom - 6, rect.width - 92, 4)
             pygame.draw.rect(surface, blend_color(BORDER, cue.accent, 0.22), progress_rect)
             pygame.draw.rect(
@@ -5216,12 +5264,6 @@ class RunScene(BaseScene):
                 count=2,
                 offset=index + len(cue.label),
             )
-            label_surface = self.fonts.small.render(
-                self._compact_button_detail(cue.label, max_length=26),
-                True,
-                TEXT,
-            )
-            value_surface = self.fonts.heading.render(cue.value_text, True, cue.accent)
             target_text = " / ".join(
                 target.removeprefix("panel:")
                 .removeprefix("stat:")
@@ -5229,14 +5271,32 @@ class RunScene(BaseScene):
                 .split(":")[-1]
                 for target in cue.targets[:2]
             )
-            target_surface = self.fonts.small.render(
-                self._compact_button_detail(target_text, max_length=26),
-                True,
-                blend_color(MUTED, cue.accent, 0.55),
+            value_width = min(96, max(54, rect.width // 3))
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                cue.label,
+                TEXT,
+                pygame.Rect(rect.left + 58, rect.top + 6, rect.width - value_width - 78, 18),
+                valign="top",
             )
-            surface.blit(label_surface, (rect.left + 58, rect.top + 8))
-            surface.blit(value_surface, (rect.right - value_surface.get_width() - 14, rect.top + 6))
-            surface.blit(target_surface, (rect.left + 58, rect.top + card_height - 18))
+            draw_text_line(
+                surface,
+                self.fonts.heading,
+                cue.value_text,
+                cue.accent,
+                pygame.Rect(rect.right - value_width - 14, rect.top + 4, value_width, 22),
+                align="right",
+                valign="top",
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                target_text,
+                blend_color(MUTED, cue.accent, 0.55),
+                pygame.Rect(rect.left + 58, rect.top + card_height - 21, rect.width - 72, 16),
+                valign="top",
+            )
             progress_rect = pygame.Rect(rect.left + 58, rect.bottom - 7, rect.width - 72, 4)
             pygame.draw.rect(surface, blend_color(BORDER, cue.accent, 0.18), progress_rect)
             pygame.draw.rect(
@@ -5322,13 +5382,7 @@ class RunScene(BaseScene):
                 )
             surface.blit(layer, rect.topleft)
 
-            label_surface = self.fonts.small.render(cue.label, True, TEXT)
             family_text = "BLOCKED" if blocked else cue.family.upper()
-            family_surface = self.fonts.small.render(
-                family_text,
-                True,
-                blend_color(MUTED, cue.accent, 0.82),
-            )
             if blocked and cue.detail:
                 target_text = cue.detail
             else:
@@ -5339,16 +5393,32 @@ class RunScene(BaseScene):
                     .removeprefix("overlay:")
                     for target in cue.targets[:2]
                 )
-            target_surface = self.fonts.small.render(
-                self._compact_button_detail(target_text, max_length=28),
-                True,
+            family_width = min(86, max(62, rect.width // 4))
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                cue.label,
+                TEXT,
+                pygame.Rect(rect.left + 14, rect.top + 6, rect.width - family_width - 36, 18),
+                valign="top",
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                family_text,
+                blend_color(MUTED, cue.accent, 0.82),
+                pygame.Rect(rect.right - family_width - 14, rect.top + 6, family_width, 18),
+                align="right",
+                valign="top",
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                target_text,
                 blend_color(MUTED, DANGER, 0.55) if blocked else MUTED,
+                pygame.Rect(rect.left + 14, rect.top + 23, rect.width - 28, 16),
+                valign="top",
             )
-            surface.blit(label_surface, (rect.left + 14, rect.top + 8))
-            surface.blit(
-                family_surface, (rect.right - family_surface.get_width() - 14, rect.top + 8)
-            )
-            surface.blit(target_surface, (rect.left + 14, rect.top + 24))
             progress_rect = pygame.Rect(rect.left + 14, rect.bottom - 7, rect.width - 28, 4)
             pygame.draw.rect(surface, blend_color(BORDER, cue.accent, 0.2), progress_rect)
             pygame.draw.rect(
@@ -6351,12 +6421,14 @@ class RunScene(BaseScene):
     def _draw_header(self, surface, rect) -> None:
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Run Header", accent=INFO)
-        title_surface = self.fonts.title.render(
+        draw_text_line(
+            surface,
+            self.fonts.title,
             f"{self._view_model.company_name} | {self._view_model.turn_label}",
-            True,
             TEXT,
+            pygame.Rect(inner.left, inner.top - 32, inner.width - 112, 30),
+            valign="top",
         )
-        surface.blit(title_surface, (inner.left, inner.top - 28))
         meta_text = (
             f"{self._view_model.scenario_title} | difficulty {self._view_model.difficulty_label} | "
             f"score {self._view_model.score_label} | market {self._view_model.market_label}"
@@ -6421,8 +6493,14 @@ class RunScene(BaseScene):
             emphasis=stats_motion,
             lift=int(stats_motion * 3),
         )
-        header_surface = self.fonts.heading.render("Company Stats", True, TEXT)
-        surface.blit(header_surface, (inner.left, inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Company Stats",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, max(120, inner.width - 166), 24),
+            valign="top",
+        )
         stats_entity_strength = self._entity_motion_strength("panel:stats")
         self._draw_panel_entity_strip(
             surface,
@@ -6435,18 +6513,24 @@ class RunScene(BaseScene):
             top = inner.top + index * gauge_height
             gauge_motion = self._motion_level(f"stat:{gauge.key}")
             entity_strength = self._entity_motion_strength("panel:stats", f"stat:{gauge.key}")
-            title_surface = self.fonts.small.render(
+            value_width = min(120, max(72, inner.width // 2))
+            draw_text_line(
+                surface,
+                self.fonts.small,
                 gauge.title.upper(),
-                True,
                 blend_color(MUTED, tone_color(gauge.tone), gauge_motion * 0.7),
+                pygame.Rect(inner.left, top - 1, inner.width - value_width - 8, 18),
+                valign="top",
             )
-            value_surface = self.fonts.mono.render(
+            draw_text_line(
+                surface,
+                self.fonts.mono,
                 gauge.value_text,
-                True,
                 blend_color(TEXT, tone_color(gauge.tone), gauge_motion * 0.18),
+                pygame.Rect(inner.right - value_width, top - 1, value_width, 18),
+                align="right",
+                valign="top",
             )
-            surface.blit(title_surface, (inner.left, top))
-            surface.blit(value_surface, (inner.right - value_surface.get_width(), top))
             bar_rect = pygame.Rect(inner.left, top + 18, inner.width, 14)
             if gauge_motion >= 0.08:
                 lane_rect = pygame.Rect(inner.left - 6, top - 4, inner.width + 12, 36)
@@ -6485,20 +6569,30 @@ class RunScene(BaseScene):
             emphasis=preview_motion,
             lift=int(preview_motion * 2),
         )
-        preview_header = self.fonts.heading.render("End-Turn Preview", True, TEXT)
-        surface.blit(preview_header, (preview_inner.left, preview_inner.top - 24))
-        warning_surface = self.fonts.body.render(
-            f"Warning: {self._view_model.preview_warning}",
-            True,
-            tone_color("danger" if self._view_model.preview_warning == "critical" else "warning"),
-        )
-        surface.blit(warning_surface, (preview_inner.left, preview_inner.top))
-        outcome_surface = self.fonts.small.render(
-            f"Outcome: {self._view_model.preview_outcome}",
-            True,
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "End-Turn Preview",
             TEXT,
+            pygame.Rect(preview_inner.left, preview_inner.top - 28, preview_inner.width, 24),
+            valign="top",
         )
-        surface.blit(outcome_surface, (preview_inner.left, preview_inner.top + 24))
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            f"Warning: {self._view_model.preview_warning}",
+            tone_color("danger" if self._view_model.preview_warning == "critical" else "warning"),
+            pygame.Rect(preview_inner.left, preview_inner.top, preview_inner.width, 20),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            f"Outcome: {self._view_model.preview_outcome}",
+            TEXT,
+            pygame.Rect(preview_inner.left, preview_inner.top + 24, preview_inner.width, 18),
+            valign="top",
+        )
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -6526,8 +6620,14 @@ class RunScene(BaseScene):
             emphasis=products_motion,
             lift=int(products_motion * 3),
         )
-        title_surface = self.fonts.heading.render("Product Strip", True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Product Strip",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, max(130, inner.width - 180), 24),
+            valign="top",
+        )
         self._draw_panel_entity_strip(
             surface,
             pygame.Rect(inner.right - 170, inner.top - 30, 170, 28),
@@ -6570,8 +6670,14 @@ class RunScene(BaseScene):
             emphasis=coach_motion,
             lift=int(coach_motion * 2),
         )
-        title_surface = self.fonts.heading.render("Turn Coach / Control Tower", True, TEXT)
-        surface.blit(title_surface, (coach_inner.left, coach_inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Turn Coach / Control Tower",
+            TEXT,
+            pygame.Rect(coach_inner.left, coach_inner.top - 28, coach_inner.width, 24),
+            valign="top",
+        )
         top = coach_inner.top
         for line in self._view_model.coach_lines:
             card_rect = pygame.Rect(coach_inner.left, top, coach_inner.width, 66)
@@ -6603,8 +6709,14 @@ class RunScene(BaseScene):
             )
             top += 76
 
-        deferred_title = self.fonts.small.render("Not Now", True, WARN)
-        surface.blit(deferred_title, (coach_inner.left, top + 4))
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            "Not Now",
+            WARN,
+            pygame.Rect(coach_inner.left, top + 2, coach_inner.width, 18),
+            valign="top",
+        )
         deferred_top = top + 24
         for deferred_line in self._view_model.deferred_lines[:2]:
             consumed = draw_wrapped_text(
@@ -6617,8 +6729,14 @@ class RunScene(BaseScene):
                 max_lines=2,
             )
             deferred_top += max(22, consumed)
-        risk_title = self.fonts.small.render("Risk Forecast", True, DANGER)
-        surface.blit(risk_title, (coach_inner.left, deferred_top + 8))
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            "Risk Forecast",
+            DANGER,
+            pygame.Rect(coach_inner.left, deferred_top + 6, coach_inner.width, 18),
+            valign="top",
+        )
         risk_top = deferred_top + 28
         for risk_line in self._view_model.risk_lines[:2]:
             consumed = draw_wrapped_text(
@@ -6642,11 +6760,23 @@ class RunScene(BaseScene):
             emphasis=feed_motion,
             lift=int(feed_motion * 2),
         )
-        event_title = self.fonts.heading.render("Animated Event Queue", True, TEXT)
-        surface.blit(event_title, (event_inner.left, event_inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Animated Event Queue",
+            TEXT,
+            pygame.Rect(event_inner.left, event_inner.top - 28, event_inner.width, 24),
+            valign="top",
+        )
         if not self._events:
-            idle_surface = self.fonts.body.render("No transient events yet.", True, MUTED)
-            surface.blit(idle_surface, (event_inner.left, event_inner.top))
+            draw_text_line(
+                surface,
+                self.fonts.body,
+                "No transient events yet.",
+                MUTED,
+                pygame.Rect(event_inner.left, event_inner.top, event_inner.width, 22),
+                valign="top",
+            )
             return
         event_top = event_inner.top
         for timed_event in self._events[: self._event_queue_visible_count(event_rect.height)]:
@@ -6666,8 +6796,14 @@ class RunScene(BaseScene):
             emphasis=footer_motion,
             lift=int(footer_motion * 2),
         )
-        title_surface = self.fonts.heading.render("Action Bar", True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Action Bar",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
         button_cols, button_height, footer_band_height = self._footer_layout_metrics(
             inner.width,
             inner.height,
@@ -6728,11 +6864,11 @@ class RunScene(BaseScene):
         )
 
     def _footer_layout_metrics(self, inner_width: int, inner_height: int) -> tuple[int, int, int]:
-        if inner_width < 860:
+        if inner_width < 700:
             button_cols = 4
-        elif inner_width < 1040:
+        elif inner_width < 980:
             button_cols = 5
-        elif inner_width < 1240:
+        elif inner_width < 1220:
             button_cols = 6
         else:
             button_cols = 7
@@ -6740,10 +6876,15 @@ class RunScene(BaseScene):
         footer_band_height = 52 if button_cols <= 4 else 48
         button_gap = 10
         button_area_height = max(
-            50,
+            36,
             inner_height - footer_band_height - button_gap * max(0, rows - 1),
         )
-        button_height = min(62, max(50, int(button_area_height / rows)))
+        available_per_row = int(button_area_height / rows)
+        min_button_height = 40 if button_cols <= 5 else 46
+        if available_per_row < min_button_height:
+            button_height = max(34, available_per_row)
+        else:
+            button_height = min(62, max(min_button_height, available_per_row))
         return button_cols, button_height, footer_band_height
 
     def _footer_button_detail(
@@ -6758,7 +6899,7 @@ class RunScene(BaseScene):
             button.detail,
             enabled=enabled,
         )
-        max_length = 30 if button_cols <= 4 else 34 if button_cols == 5 else 40
+        max_length = 24 if button_cols <= 4 else 28 if button_cols == 5 else 36
         return self._compact_button_detail(detail, max_length=max_length)
 
     def _footer_status_lines(self) -> tuple[str, str]:
@@ -7052,22 +7193,34 @@ class RunScene(BaseScene):
             pygame.draw.rect(surface, SELECTION, badge_rect, border_radius=9)
             badge_surface = self.fonts.small.render("ACTIVE", True, BACKGROUND)
             surface.blit(badge_surface, (badge_rect.left + 10, badge_rect.top + 3))
-        title_surface = self.fonts.heading.render(product.name, True, TEXT)
-        subtitle_surface = self.fonts.small.render(
+        revenue_width = min(132, max(80, visual_rect.width // 3))
+        title_width = max(80, visual_rect.width - revenue_width - 42)
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            product.name,
+            TEXT,
+            pygame.Rect(visual_rect.left + 14, visual_rect.top + 10, title_width, 24),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
             f"{product.stage} | {product.segment} | users {product.users_text}",
-            True,
             blend_color(MUTED, INFO, product_motion * 0.22),
+            pygame.Rect(visual_rect.left + 14, visual_rect.top + 36, visual_rect.width - 28, 18),
+            valign="top",
         )
-        revenue_surface = self.fonts.small.render(
+        draw_text_line(
+            surface,
+            self.fonts.small,
             product.revenue_text,
-            True,
             blend_color(INFO, TEXT, product_motion * 0.18),
-        )
-        surface.blit(title_surface, (visual_rect.left + 14, visual_rect.top + 12))
-        surface.blit(subtitle_surface, (visual_rect.left + 14, visual_rect.top + 36))
-        surface.blit(
-            revenue_surface,
-            (visual_rect.right - revenue_surface.get_width() - 14, visual_rect.top + 14),
+            pygame.Rect(
+                visual_rect.right - revenue_width - 14, visual_rect.top + 12, revenue_width, 20
+            ),
+            align="right",
+            valign="top",
         )
         metrics = (
             (
@@ -7097,12 +7250,14 @@ class RunScene(BaseScene):
         )
         start_y = visual_rect.top + 68
         for index, (label, ratio, color, emphasis) in enumerate(metrics):
-            label_surface = self.fonts.small.render(
+            draw_text_line(
+                surface,
+                self.fonts.small,
                 label,
-                True,
                 blend_color(MUTED, color, emphasis * 0.5),
+                pygame.Rect(visual_rect.left + 14, start_y + index * 20 - 1, 58, 16),
+                valign="top",
             )
-            surface.blit(label_surface, (visual_rect.left + 14, start_y + index * 20))
             bar_rect = pygame.Rect(
                 visual_rect.left + 78,
                 start_y + 2 + index * 20,
@@ -7246,8 +7401,14 @@ class RunScene(BaseScene):
             width=2 if event_motion >= 0.45 else 1,
             border_radius=14,
         )
-        title_surface = self.fonts.body.render(timed_event.payload.title, True, TEXT)
-        surface.blit(title_surface, (visual_rect.left + 12, visual_rect.top + 10))
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            timed_event.payload.title,
+            TEXT,
+            pygame.Rect(visual_rect.left + 12, visual_rect.top + 8, visual_rect.width - 24, 22),
+            valign="top",
+        )
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -8293,10 +8454,27 @@ class RunScene(BaseScene):
             (rect.left + 1, rect.top + 1, rect.width - 2, 4),
             border_radius=4,
         )
-        label_surface = self.fonts.small.render(label.upper(), True, MUTED)
-        value_surface = self.fonts.small.render(value, True, TEXT)
-        surface.blit(label_surface, (rect.left + 10, rect.top + 8))
-        surface.blit(value_surface, (rect.right - value_surface.get_width() - 10, rect.top + 8))
+        label_width = max(46, int(rect.width * 0.42))
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            label.upper(),
+            MUTED,
+            pygame.Rect(rect.left + 10, rect.top + 5, label_width, rect.height - 10),
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            value,
+            TEXT,
+            pygame.Rect(
+                rect.left + label_width + 12,
+                rect.top + 5,
+                rect.width - label_width - 22,
+                rect.height - 10,
+            ),
+            align="right",
+        )
 
     def _digit_index(self, event) -> int | None:
         if event.unicode and event.unicode.isdigit():
