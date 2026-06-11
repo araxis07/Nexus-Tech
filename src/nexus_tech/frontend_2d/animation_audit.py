@@ -106,6 +106,14 @@ _READABILITY_OVERLAY_SCENES = {
     "run_outcome_overlay",
 }
 
+_LONG_SESSION_VISUAL_SCENES = {
+    "run_dashboard",
+    "run_inspector",
+    "run_endgame_board",
+    "turn_summary",
+    "review",
+}
+
 _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "title_menu",
@@ -335,6 +343,7 @@ def run_2d_animation_audit(
     cells.append(_build_animation_pacing_cell(motion_report))
     cells.append(_build_scene_motion_profile_cell(visual_report))
     cells.append(_build_readability_guard_cell(visual_report))
+    cells.append(_build_long_session_visual_readiness_cell(visual_report))
     cells.extend(_build_advisory_cells())
     return AnimationAuditReport(
         scenario_id=scenario_id,
@@ -957,6 +966,64 @@ def _build_readability_guard_cell(visual_report: VisualAuditReport) -> Animation
             (
                 f"{len(compact_cells)} compact captures, {actor_checks} actor checks, "
                 f"max edge {max_edge_density:.2f}"
+            )
+            if not findings
+            else "; ".join(findings[:4])
+        ),
+    )
+
+
+def _build_long_session_visual_readiness_cell(
+    visual_report: VisualAuditReport,
+) -> AnimationCoverageCell:
+    important_cells = tuple(
+        cell for cell in visual_report.cells if cell.scene_key in _LONG_SESSION_VISUAL_SCENES
+    )
+    compact_cells = tuple(
+        cell for cell in important_cells if cell.width <= COMPACT_READABILITY_WIDTH
+    )
+    captured_scenes = {cell.scene_key for cell in compact_cells}
+    missing_scenes = tuple(sorted(_LONG_SESSION_VISUAL_SCENES - captured_scenes))
+    max_edge_density = max((cell.edge_density for cell in compact_cells), default=0.0)
+    max_bright_ratio = max((cell.bright_ratio for cell in compact_cells), default=0.0)
+
+    findings: list[str] = []
+    if missing_scenes:
+        findings.append(f"missing compact scenes {','.join(missing_scenes)}")
+    for cell in compact_cells:
+        if cell.status != "pass":
+            findings.append(f"{cell.scene_key} visual {cell.notes}")
+        if cell.edge_density > MAX_COMPACT_READABILITY_EDGE_DENSITY:
+            findings.append(
+                f"{cell.scene_key} edge {cell.edge_density:.2f}>"
+                f"{MAX_COMPACT_READABILITY_EDGE_DENSITY:.2f}"
+            )
+        if (
+            cell.scene_key in _READABILITY_ACTOR_SCENES
+            and "actor-readability" not in cell.active_layers
+        ):
+            findings.append(f"{cell.scene_key} missing actor-readability")
+
+    active_layers = (
+        f"scenes:{len(captured_scenes)}",
+        f"compact-captures:{len(compact_cells)}",
+        f"max-edge:{max_edge_density:.2f}",
+        f"max-bright:{max_bright_ratio:.2f}",
+    )
+    return AnimationCoverageCell(
+        area="Long Session Visual Readiness",
+        required_layers=(
+            "late-session-scenes",
+            "compact-readability",
+            "visual-health",
+            "actor-readability",
+        ),
+        active_layers=active_layers,
+        status="pass" if not findings else "fail",
+        notes=(
+            (
+                f"{len(captured_scenes)} scenes, max edge {max_edge_density:.2f}, "
+                f"bright {max_bright_ratio:.2f}"
             )
             if not findings
             else "; ".join(findings[:4])

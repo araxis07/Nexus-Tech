@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.143.0 - 2026-06-12
+
+- Added a `Long Session Visual Readiness` cell to `audit-2d-animation` so late-session dashboard, inspector, endgame, summary, and review scenes stay compact-readable before manual playtesting
+- Tied the new visual readiness gate to existing actor-readability, visual-health, and compact edge-density data instead of relying only on subjective open-window review
+- Updated animation release and playtest documentation so long-session visual readiness failures are treated as blockers before adding more motion polish
+
 ## 0.142.0 - 2026-06-11
 
 - Added `prepare-2d-animation-playtest`, a CLI command that turns the broad animation matrix into a ready/blocked manual playtest prep report
