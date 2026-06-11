@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.143.0`
+Version: `0.144.0`
 
 ## Scope
 
@@ -16,6 +16,7 @@ Version: `0.143.0`
 - Actor sprite footprints now feed an automated `actor-readability` layer that checks viewport bounds and click-target collisions across actor scenes before manual playtesting.
 - Visual captures now also report edge-density and bright-pixel pressure, giving the audits a deterministic first-pass guard against cluttered or overly flashy animation frames.
 - `audit-2d-animation` now includes an `Animation Pacing Budget` cell that gates active animation sample density, pulse cooldown, and frame timing before manual open-window review.
+- `audit-2d-animation` now includes a `Motion Mode Differentiation` cell that gates full/reduced/off motion behavior before manual open-window review.
 - `audit-2d-animation` now includes a `Long Session Motion Stress` cell that gates dense long-run pulse recovery and frame timing separately from short smoke checks.
 - `audit-2d-animation` now includes a `Long Session Visual Readiness` cell that gates compact late-session dashboard, inspector, endgame, summary, and review readability before manual open-window review.
 - `audit-2d-animation` now includes an `Actor State Coverage` cell that gates baseline, positive, pressure, and blocked actor reactions instead of only checking that actor clips exist.
@@ -54,6 +55,7 @@ Version: `0.143.0`
 - Watch threshold: up to `33 ms` or slightly elevated pulse banks without failing the release gate.
 - Visual fatigue target: sampled edge density and bright-pixel pressure must stay below the visual audit budgets before open-window playtesting.
 - Animation pacing target: full-mode active animation sample density must stay at or below `36` per audit viewport while pulse cooldown and frame budgets stay green.
+- Motion-mode target: full mode must keep active state-change motion, reduced mode must remain active but no heavier than full, and off mode must have no active residual motion samples.
 - Long-session target: dense long-run pulse banks must cool back to `<= 18` pulses while average and max frame budgets remain green, and late-session compact visual scenes must remain readable.
 - Actor-state target: visual captures must include baseline, positive, pressure, and blocked actor reactions with at least seven distinct actor state variants.
 - Matrix target: the default animation matrix must pass across `founder_journey`, `bootstrap_studio`, `enterprise_compliance`, `debt_crunch`, `market_shock`, `renewal_crunch`, and `late_scale_drag` on seeds `7`, `13`, and `29`.
@@ -76,4 +78,4 @@ Version: `0.143.0`
 
 ## Result
 
-The audit makes animation stability, actor-state coverage, scenario/seed readiness, long-session stress recovery, long-session visual readiness, compact readability, scene-profile coverage, pacing, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.
+The audit makes animation stability, actor-state coverage, scenario/seed readiness, motion-mode differentiation, long-session stress recovery, long-session visual readiness, compact readability, scene-profile coverage, pacing, visual quality, and runtime 2D request coverage repeatable in CI/local release checks instead of relying only on manual visual playtesting.

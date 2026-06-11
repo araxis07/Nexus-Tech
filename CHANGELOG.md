@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.144.0 - 2026-06-12
+
+- Added a `Motion Mode Differentiation` cell to `audit-2d-animation` so full, reduced, and off motion modes are checked together before manual open-window playtesting
+- Verified reduced motion keeps state-change cues while staying no heavier than full mode, and that off mode has no active residual motion samples
+- Updated release and playtest documentation so motion-mode regressions block animation polish before presentation builds
+
 ## 0.143.0 - 2026-06-12
 
 - Added a `Long Session Visual Readiness` cell to `audit-2d-animation` so late-session dashboard, inspector, endgame, summary, and review scenes stay compact-readable before manual playtesting

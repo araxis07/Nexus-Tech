@@ -325,6 +325,14 @@ def run_2d_animation_audit(
         sizes=sizes,
         motion_mode=MotionMode.FULL,
     )
+    reduced_motion_report = run_2d_motion_audit(
+        scenario_id=scenario_id,
+        difficulty_mode=difficulty_mode,
+        seed=seed,
+        frames=frames,
+        sizes=sizes,
+        motion_mode=MotionMode.REDUCED,
+    )
     off_motion_report = run_2d_motion_audit(
         scenario_id=scenario_id,
         difficulty_mode=difficulty_mode,
@@ -337,6 +345,13 @@ def run_2d_animation_audit(
     cells.append(_build_motion_budget_cell(motion_report))
     cells.append(_build_long_session_motion_cell(motion_report))
     cells.append(_build_motion_off_cell(off_motion_report))
+    cells.append(
+        _build_motion_mode_differentiation_cell(
+            motion_report,
+            reduced_motion_report,
+            off_motion_report,
+        )
+    )
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_actor_state_coverage_cell(visual_report))
     cells.append(_build_visual_fatigue_cell(visual_report))
@@ -703,6 +718,74 @@ def _build_motion_off_cell(off_motion_report: MotionAuditReport) -> AnimationCov
     )
 
 
+def _build_motion_mode_differentiation_cell(
+    motion_report: MotionAuditReport,
+    reduced_motion_report: MotionAuditReport,
+    off_motion_report: MotionAuditReport,
+) -> AnimationCoverageCell:
+    full_active = max(
+        (_animation_active_sample_count(cell) for cell in motion_report.cells),
+        default=0,
+    )
+    reduced_active = max(
+        (_animation_active_sample_count(cell) for cell in reduced_motion_report.cells),
+        default=0,
+    )
+    off_active = max(
+        (_animation_active_sample_count(cell) for cell in off_motion_report.cells),
+        default=0,
+    )
+    full_residual = _max_residual_motion_pulses(motion_report)
+    reduced_residual = _max_residual_motion_pulses(reduced_motion_report)
+    off_residual = _max_residual_motion_pulses(off_motion_report)
+
+    findings: list[str] = []
+    if motion_report.status != "pass":
+        findings.append(f"full status {motion_report.status}")
+    if reduced_motion_report.status != "pass":
+        findings.append(f"reduced status {reduced_motion_report.status}")
+    if off_motion_report.status != "pass":
+        findings.append(f"off status {off_motion_report.status}")
+    if full_active <= 0:
+        findings.append("full mode has no active motion samples")
+    if reduced_active <= 0:
+        findings.append("reduced mode lost all state-change motion")
+    if reduced_active > full_active:
+        findings.append(f"reduced active {reduced_active}>{full_active}")
+    if reduced_residual > full_residual:
+        findings.append(f"reduced residual {reduced_residual}>{full_residual}")
+    if off_active > 0 or off_residual > 0:
+        findings.append(f"off still active {off_active}/{off_residual}")
+
+    active_layers = (
+        f"full-active:{full_active}",
+        f"reduced-active:{reduced_active}",
+        f"off-active:{off_active}",
+        f"full-residual:{full_residual}",
+        f"reduced-residual:{reduced_residual}",
+        f"off-residual:{off_residual}",
+    )
+    return AnimationCoverageCell(
+        area="Motion Mode Differentiation",
+        required_layers=(
+            "full-motion",
+            "reduced-motion",
+            "off-motion",
+            "mode-distinction",
+        ),
+        active_layers=active_layers,
+        status="pass" if not findings else "fail",
+        notes=(
+            (
+                f"full {full_active}, reduced {reduced_active}, off {off_active}; "
+                f"residual {full_residual}/{reduced_residual}/{off_residual}"
+            )
+            if not findings
+            else "; ".join(findings[:4])
+        ),
+    )
+
+
 def _build_actor_sprite_cell(
     visual_report: VisualAuditReport,
     motion_report: MotionAuditReport,
@@ -1049,6 +1132,23 @@ def _animation_active_sample_count(cell: MotionAuditCell) -> int:
         + cell.summary_lanes_active_samples
         + cell.actor_timeline_active_samples
         + cell.sprite_clips_active_samples
+    )
+
+
+def _max_residual_motion_pulses(report: MotionAuditReport) -> int:
+    return max(
+        (
+            max(
+                cell.run_after_pulses,
+                cell.summary_after_pulses,
+                cell.title_after_pulses,
+                cell.review_after_pulses,
+                cell.inspector_after_pulses,
+                cell.long_run_after_pulses,
+            )
+            for cell in report.cells
+        ),
+        default=0,
     )
 
 

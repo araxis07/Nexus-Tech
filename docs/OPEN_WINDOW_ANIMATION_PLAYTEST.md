@@ -67,7 +67,7 @@ Record `pass`, `watch`, or `fail` for each scene:
 - Any unreadable disabled reason is a release blocker.
 - Any actor/readability collision at `820x620` is a release blocker.
 - Any missing/unclear blocked actor state is a release blocker.
-- Any `Actor State Coverage`, `Readability Guard`, `Animation Pacing Budget`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
+- Any `Actor State Coverage`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
 - Any `audit-2d-animation-matrix` failure in the default seven-scenario, three-seed presentation set is a release blocker.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.
 

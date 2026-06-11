@@ -66,6 +66,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.
 - Treat `Animation Pacing Budget` failures as release blockers before adding more full-mode motion layers.
+- Treat `Motion Mode Differentiation` failures as release blockers before changing full/reduced/off animation behavior.
 - Treat `Long Session Motion Stress` failures as release blockers before presenting longer 2D playthroughs.
 - Treat `Long Session Visual Readiness` failures as release blockers before presenting longer 2D playthroughs.
 - Treat `Scene Motion Profile` failures as release blockers before shipping new scenes or adding denser scene-specific motion.

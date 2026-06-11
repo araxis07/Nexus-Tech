@@ -3227,6 +3227,12 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
         layer.startswith("scenes:")
         for layer in areas["Long Session Visual Readiness"].active_layers
     )
+    assert areas["Motion Mode Differentiation"].status == "pass"
+    assert "mode-distinction" in areas["Motion Mode Differentiation"].required_layers
+    assert any(
+        layer.startswith("reduced-active:")
+        for layer in areas["Motion Mode Differentiation"].active_layers
+    )
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
