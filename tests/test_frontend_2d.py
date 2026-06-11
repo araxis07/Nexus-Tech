@@ -3589,6 +3589,17 @@ def test_audit_2d_animation_matrix_command_reports_broad_readiness(
     assert calls["frames"] == 1
 
 
+def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
+    workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert (
+        "uv run nexus-tech audit-2d-animation-matrix --frames 1 "
+        "--output /tmp/nexus-tech-animation-matrix.md"
+    ) in workflow
+    assert "nexus-tech-2d-animation-matrix" in workflow
+    assert "path: /tmp/nexus-tech-animation-matrix.md" in workflow
+
+
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

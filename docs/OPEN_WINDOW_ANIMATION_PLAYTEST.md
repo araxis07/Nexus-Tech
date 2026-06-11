@@ -16,7 +16,7 @@ uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frame
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 ```
 
-Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit` and `/tmp/nexus-tech-animation-matrix.md` locally or the `nexus-tech-2d-visual-audit` GitHub Actions artifact for review. Start with `visual-audit-summary.md` and the animation matrix Markdown before opening individual PNG captures.
+Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit` and `/tmp/nexus-tech-animation-matrix.md` locally or the `nexus-tech-2d-visual-audit` and `nexus-tech-2d-animation-matrix` GitHub Actions artifacts for review. Start with `visual-audit-summary.md` and the animation matrix Markdown before opening individual PNG captures.
 
 ## Window Matrix
 

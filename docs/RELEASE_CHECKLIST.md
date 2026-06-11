@@ -69,7 +69,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `Readability Guard` failures as release blockers before opening the manual playtest pass.
 - Treat `audit-2d-animation-matrix` failures as release blockers for the default seven-scenario, three-seed presentation matrix.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.
-- Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, and review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures when CI shows a regression.
+- Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures, and review the uploaded `nexus-tech-2d-animation-matrix` artifact before manual presentation playtests.
 - Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md`, and `docs/ANIMATION_PLAYTEST_CHECKLIST_2026-06-06.md` for the remaining open-window readability pass before presenting the 2D build.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
 - If founder-pressure openings were retuned, rerun at least one longer `simulate-balance` founder batch so angel-cap, pricing, and cash-guard policies are verified on real seeds instead of only short audits.

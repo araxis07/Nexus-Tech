@@ -20,7 +20,7 @@ Use this template when completing the open-window animation pass. Keep completed
 | `audit-2d-motion` full/reduced/off |  |  |
 | `audit-2d-visual` full/off |  |  |
 | `audit-2d-animation` |  | Confirm `Actor State Coverage`, `Readability Guard`, `Scene Motion Profile`, `Animation Pacing Budget`, `Long Session Motion Stress`, `Visual Fatigue Budget`, and `actor-readability` pass |
-| `audit-2d-animation-matrix --output` |  | Confirm the seven-scenario, three-seed readiness artifact passes before manual timing review |
+| `audit-2d-animation-matrix --output` |  | Confirm the seven-scenario, three-seed local or CI readiness artifact passes before manual timing review |
 | Headless `menu-2d` / `play-2d` |  |  |
 | Open-window `menu-2d` / `play-2d` smoke |  |  |
 

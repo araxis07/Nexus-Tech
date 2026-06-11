@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.140.0`
+Version: `0.141.0`
 
 ## Scope
 
@@ -21,7 +21,7 @@ Version: `0.140.0`
 - `audit-2d-animation` now includes a `Scene Motion Profile` cell that requires every captured scene to have an explicit motion-layer budget before new scene animation can ship.
 - `audit-2d-animation` now includes a `Readability Guard` cell that checks compact captures, actor-readability, overlay density, and visual pass status before manual playtesting.
 - Blocked or rejected 2D commands now emit distinct blocked-action feedback cards, targeted flash pulses, and matching actor blocked states instead of sharing the same visual language as successful commands.
-- GitHub Actions now runs 2D headless smoke plus motion, visual, and animation-completeness gates and uploads full/off visual captures so local release checks and pull request checks catch animation regressions the same way.
+- GitHub Actions now runs 2D headless smoke plus motion, visual, animation-completeness, and default animation-matrix gates and uploads full/off visual captures plus the broad readiness matrix so local release checks and pull request checks catch animation regressions the same way.
 - Command-specific action feedback cues now cover successful commands, picker launches, create-product modals, inspector opens, and end-turn confirmation while respecting reduced/off motion modes.
 - State-delta impact cue cards now cover successful action results for cash, users, reputation, board pressure, and product metrics while respecting reduced/off motion modes.
 - Modal overlay enter/exit transitions now cover pending events, action pickers, text modals, deep panels, inspectors, help, and outcome dialogs.

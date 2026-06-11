@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.141.0 - 2026-06-11
+
+- Added the default seven-scenario, three-seed `audit-2d-animation-matrix --output` run to GitHub Actions so broad animation readiness fails CI before manual playtesting
+- Uploaded `animation-readiness-matrix.md` as a short-retention CI artifact alongside visual captures for presentation-build review
+- Updated release and playtest documentation so CI, local release checks, and manual open-window prep all review the same broad matrix artifact
+
 ## 0.140.0 - 2026-06-11
 
 - Expanded the default `audit-2d-animation-matrix` readiness set to seven presentation-critical scenarios across seeds `7`, `13`, and `29`
