@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from nexus_tech.domain.models import DifficultyMode
 from nexus_tech.frontend_2d.motion_audit import (
@@ -23,8 +24,13 @@ DEFAULT_ANIMATION_MATRIX_SCENARIOS: tuple[str, ...] = (
     "founder_journey",
     "bootstrap_studio",
     "enterprise_compliance",
+    "debt_crunch",
+    "market_shock",
+    "renewal_crunch",
+    "late_scale_drag",
 )
 DEFAULT_ANIMATION_MATRIX_SEEDS: tuple[int, ...] = (7, 13, 29)
+ANIMATION_MATRIX_REPORT_NAME = "animation-readiness-matrix.md"
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
@@ -357,6 +363,43 @@ def run_2d_animation_matrix_audit(
         frames=frames,
         cells=tuple(cells),
     )
+
+
+def write_2d_animation_matrix_report(
+    report: AnimationMatrixReport,
+    output_path: Path,
+) -> None:
+    """Write a Markdown readiness artifact for a broad animation matrix run."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    passed = sum(1 for cell in report.cells if cell.status == "pass")
+    failed = len(report.cells) - passed
+    lines = [
+        "# NEXUS TECH 2D Animation Matrix",
+        "",
+        f"- Status: `{report.status}`",
+        f"- Difficulty: `{report.difficulty}`",
+        f"- Scenarios: `{', '.join(report.scenario_ids)}`",
+        f"- Seeds: `{', '.join(str(seed) for seed in report.seeds)}`",
+        f"- Frames: `{report.frames}`",
+        f"- Cells: `{len(report.cells)}` total, `{passed}` pass, `{failed}` fail",
+        "- Manual playtest: `required for human read speed and control feel`",
+        "",
+        "| Scenario | Seed | Status | Baseline | Failed Areas | Advisory Gaps |",
+        "| --- | ---: | --- | --- | --- | ---: |",
+    ]
+    for cell in report.cells:
+        failed_areas = ", ".join(cell.failed_areas) if cell.failed_areas else "-"
+        lines.append(
+            "| "
+            f"`{cell.scenario_id}` | "
+            f"`{cell.seed}` | "
+            f"`{cell.status}` | "
+            f"`{cell.visual_baseline}` | "
+            f"{failed_areas} | "
+            f"`{len(cell.advisory_gaps)}` |"
+        )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _build_visual_coverage_cells(

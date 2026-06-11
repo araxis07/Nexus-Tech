@@ -1,6 +1,6 @@
 # Performance Audit - 2026-06-04
 
-Version: `0.139.0`
+Version: `0.140.0`
 
 ## Scope
 
@@ -34,7 +34,8 @@ Version: `0.139.0`
 - Outcome overlays now include a dedicated victory/shutdown cinematic layer for final run states.
 - `audit-2d-visual` now renders title, meta, live run, blocked-action feedback, pending preview, picker/action-feedback, inspector, outcome overlay, turn-summary, and review captures to verify non-empty frames plus expected active visual layers before manual review, and writes a Markdown summary next to PNG captures when `--output-dir` is used.
 - `audit-2d-animation` now combines visual-layer coverage, actor/sprite coverage, actor-state coverage, actor-readability checks, visual-fatigue budgets, motion-budget checks, off-mode checks, and advisory gaps into one animation-completeness gate.
-- `audit-2d-animation-matrix` now repeats the animation-completeness gate across a scenario/seed set and reports visual baselines plus failed areas for each cell.
+- `audit-2d-animation-matrix` now repeats the animation-completeness gate across the default seven-scenario, three-seed presentation matrix and reports visual baselines plus failed areas for each cell.
+- `audit-2d-animation-matrix --output` writes `animation-readiness-matrix.md` so manual playtest prep has a reviewable scenario/seed baseline artifact before opening windows.
 - Visual reports now include a deterministic baseline signature so capture sets can be compared without committing generated PNGs.
 - Each viewport reports pulse-bank cooldown before/after counts, transition active/disabled telemetry, entity-motion active/disabled telemetry, broader actor-timeline/sprite-clip active/disabled telemetry, action-feedback active/disabled telemetry, impact-cue active/disabled telemetry, overlay-transition telemetry, product/risk drama telemetry, pending-choice and pending-preview telemetry, outcome-cinematic telemetry, late-game choreography telemetry, summary-cinematic/sequence/lane telemetry, average frame time, and max frame spike.
 
@@ -53,6 +54,7 @@ Version: `0.139.0`
 - Animation pacing target: full-mode active animation sample density must stay at or below `36` per audit viewport while pulse cooldown and frame budgets stay green.
 - Long-session target: dense long-run pulse banks must cool back to `<= 18` pulses while average and max frame budgets remain green.
 - Actor-state target: visual captures must include baseline, positive, pressure, and blocked actor reactions with at least seven distinct actor state variants.
+- Matrix target: the default animation matrix must pass across `founder_journey`, `bootstrap_studio`, `enterprise_compliance`, `debt_crunch`, `market_shock`, `renewal_crunch`, and `late_scale_drag` on seeds `7`, `13`, and `29`.
 - Scene profile target: every visual audit scene must be declared in the scene motion-profile map, and each scene must stay within its explicit motion-layer budget.
 - Readability target: compact `820px` captures must pass visual health, actor scenes must expose `actor-readability`, and overlay scenes must stay under the compact overlay density budget.
 - Blocked feedback target: blocked/rejected command cards must expose `blocked-action-feedback` and stay disabled in `--motion-mode off`.
@@ -66,7 +68,7 @@ Version: `0.139.0`
 - `nexus-tech audit-2d-visual --scenario founder_journey --seed 7`
 - `nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off`
 - `nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1`
-- `nexus-tech audit-2d-animation-matrix --scenario founder_journey --scenario bootstrap_studio --seed 7 --seed 13 --frames 1`
+- `nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md`
 - `pytest -q tests/test_frontend_2d.py -k "motion_audit or audit_2d_motion or visual_audit or audit_2d_visual"`
 
 ## Result

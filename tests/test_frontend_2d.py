@@ -21,6 +21,7 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.frontend_2d import (
+    ANIMATION_MATRIX_REPORT_NAME,
     AnimationAuditReport,
     AnimationCoverageCell,
     AnimationMatrixCell,
@@ -37,6 +38,7 @@ from nexus_tech.frontend_2d import (
     run_2d_flow_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
+    write_2d_animation_matrix_report,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -3221,7 +3223,10 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
 
 
-def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(monkeypatch) -> None:
+def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     calls: list[tuple[str, int]] = []
 
     def fake_run_2d_animation_audit(**kwargs):
@@ -3295,6 +3300,13 @@ def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(monkeypatch) 
         ("bootstrap_studio", 13),
     ]
     assert all(cell.visual_baseline.startswith("1:") for cell in report.cells)
+    report_path = tmp_path / ANIMATION_MATRIX_REPORT_NAME
+    write_2d_animation_matrix_report(report, report_path)
+    report_text = report_path.read_text(encoding="utf-8")
+    assert "NEXUS TECH 2D Animation Matrix" in report_text
+    assert "`founder_journey`" in report_text
+    assert "`bootstrap_studio`" in report_text
+    assert "- Cells: `4` total, `4` pass, `0` fail" in report_text
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
@@ -3503,7 +3515,10 @@ def test_audit_2d_animation_command_reports_completeness_matrix(monkeypatch) -> 
     assert calls["frames"] == 1
 
 
-def test_audit_2d_animation_matrix_command_reports_broad_readiness(monkeypatch) -> None:
+def test_audit_2d_animation_matrix_command_reports_broad_readiness(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     calls: dict[str, object] = {}
 
     def fake_run_2d_animation_matrix_audit(**kwargs):
@@ -3541,6 +3556,7 @@ def test_audit_2d_animation_matrix_command_reports_broad_readiness(monkeypatch) 
         fake_run_2d_animation_matrix_audit,
     )
 
+    output_path = tmp_path / ANIMATION_MATRIX_REPORT_NAME
     result = runner.invoke(
         app,
         [
@@ -3555,6 +3571,8 @@ def test_audit_2d_animation_matrix_command_reports_broad_readiness(monkeypatch) 
             "13",
             "--frames",
             "1",
+            "--output",
+            str(output_path),
         ],
     )
 
@@ -3563,6 +3581,9 @@ def test_audit_2d_animation_matrix_command_reports_broad_readiness(monkeypatch) 
     assert "founder_journey" in result.output
     assert "bootstrap_studio" in result.output
     assert "Animation matrix status: PASS" in result.output
+    assert "Animation matrix report written" in result.output
+    assert output_path.exists()
+    assert "13:abc12345" in output_path.read_text(encoding="utf-8")
     assert calls["scenario_ids"] == ("founder_journey", "bootstrap_studio")
     assert calls["seeds"] == (7, 13)
     assert calls["frames"] == 1

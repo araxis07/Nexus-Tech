@@ -65,6 +65,7 @@ from nexus_tech.frontend_2d import (
     run_2d_animation_matrix_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
+    write_2d_animation_matrix_report,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -266,6 +267,11 @@ ANIMATION_MATRIX_SEED_OPTION = typer.Option(
         "Seed for broad animation readiness. Repeat to include multiple seeds. "
         f"Defaults to {', '.join(str(seed) for seed in DEFAULT_ANIMATION_MATRIX_SEEDS)}."
     ),
+)
+ANIMATION_MATRIX_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the broad animation readiness matrix artifact.",
 )
 
 ACTION_KEYS = {
@@ -951,6 +957,7 @@ def audit_2d_animation_matrix_command(
     scenario: Optional[list[str]] = ANIMATION_MATRIX_SCENARIOS_OPTION,
     difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
     seed: Optional[list[int]] = ANIMATION_MATRIX_SEED_OPTION,
+    output: Path | None = ANIMATION_MATRIX_OUTPUT_OPTION,
     frames: int = typer.Option(
         1,
         "--frames",
@@ -1016,6 +1023,15 @@ def audit_2d_animation_matrix_command(
             border_style=border_style,
         )
     )
+    if output is not None:
+        write_2d_animation_matrix_report(report, output)
+        console.print(
+            Panel.fit(
+                f"Animation matrix report written to {output}",
+                title="2D Animation Matrix Artifact",
+                border_style="cyan",
+            )
+        )
     if report.status == "fail":
         raise typer.Exit(code=1)
 

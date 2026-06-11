@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.140.0 - 2026-06-11
+
+- Expanded the default `audit-2d-animation-matrix` readiness set to seven presentation-critical scenarios across seeds `7`, `13`, and `29`
+- Added optional Markdown artifact output for `audit-2d-animation-matrix --output`, giving manual playtest prep a reviewable scenario/seed baseline report
+- Updated release, performance, and open-window playtest documentation so the broad matrix artifact is checked before presentation smoke and manual timing review
+
 ## 0.139.0 - 2026-06-07
 
 - Added actor-state telemetry to visual captures and a required `Actor State Coverage` cell to `audit-2d-animation` so baseline, positive, pressure, and blocked sprite reactions are release-gated instead of only confirming that sprites exist

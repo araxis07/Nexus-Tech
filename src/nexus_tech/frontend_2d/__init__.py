@@ -1,6 +1,7 @@
 """Minimal 2D frontend for the NEXUS TECH simulation."""
 
 from nexus_tech.frontend_2d.animation_audit import (
+    ANIMATION_MATRIX_REPORT_NAME,
     DEFAULT_ANIMATION_AUDIT_SIZES,
     DEFAULT_ANIMATION_MATRIX_SCENARIOS,
     DEFAULT_ANIMATION_MATRIX_SEEDS,
@@ -10,6 +11,7 @@ from nexus_tech.frontend_2d.animation_audit import (
     AnimationMatrixReport,
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
+    write_2d_animation_matrix_report,
 )
 from nexus_tech.frontend_2d.app import (
     Frontend2DUnavailableError,
@@ -41,6 +43,7 @@ __all__ = [
     "DEFAULT_MOTION_AUDIT_SIZES",
     "DEFAULT_VISUAL_AUDIT_SIZES",
     "AnimationAuditReport",
+    "ANIMATION_MATRIX_REPORT_NAME",
     "AnimationCoverageCell",
     "AnimationMatrixCell",
     "AnimationMatrixReport",
@@ -56,6 +59,7 @@ __all__ = [
     "normalize_motion_mode",
     "run_2d_animation_audit",
     "run_2d_animation_matrix_audit",
+    "write_2d_animation_matrix_report",
     "run_2d_flow_audit",
     "run_2d_motion_audit",
     "run_2d_visual_audit",
