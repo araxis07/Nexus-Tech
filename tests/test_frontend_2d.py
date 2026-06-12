@@ -1578,6 +1578,36 @@ def test_run_scene_pause_menu_returns_to_title_shell(tmp_path: Path) -> None:
         pygame.quit()
 
 
+def test_run_scene_hover_hints_cover_pause_back_help_controls() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=73),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        rect = surface.get_rect()
+
+        assert "open Pause" in scene._describe_click_target(ClickTarget("pause_toggle", "", rect))
+        assert "close the current overlay" in scene._describe_click_target(
+            ClickTarget("run_back", "", rect)
+        )
+        assert "control guide" in scene._describe_click_target(ClickTarget("open_help", "", rect))
+        assert "save the current run" in scene._describe_click_target(
+            ClickTarget("pause_save", "", rect)
+        )
+        assert "return to the 2D title menu" in scene._describe_click_target(
+            ClickTarget("pause_menu", "", rect)
+        )
+        assert "close Help" in scene._describe_click_target(ClickTarget("close_help", "", rect))
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_partner_binding_moves_to_o_so_p_can_pause() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -3535,6 +3565,11 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "`820x620`" in report_text
     assert "`960x640`" in report_text
     assert "`1440x900`" in report_text
+    assert "## Control Clarity Checklist" in report_text
+    assert "Pause / Resume" in report_text
+    assert "Back / Escape" in report_text
+    assert "## Manual Completion Gate" in report_text
+    assert "manual signoff required before calling animation complete" in report_text
     assert "nexus-tech-2d-visual-audit" in report_text
     assert "nexus-tech-2d-animation-matrix" in report_text
     assert "nexus-tech-2d-animation-playtest-prep" in report_text
@@ -3871,11 +3906,16 @@ def test_prepare_2d_animation_playtest_command_writes_prep_report(
 
     assert result.exit_code == 0
     assert "2D Animation Playtest Prep" in result.output
-    assert "Playtest prep status: READY" in result.output
+    assert "Manual Control Clarity Gate" in result.output
+    assert "Manual Scene Animation Gate" in result.output
+    assert "Manual Signoff Required" in result.output
+    assert "Status READY" in result.output
     assert "Animation playtest prep report written" in result.output
     assert output_path.exists()
     report_text = output_path.read_text(encoding="utf-8")
     assert "- Manual result: `not completed by automation`" in report_text
+    assert "Control Clarity Checklist" in report_text
+    assert "Manual Completion Gate" in report_text
     assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
     assert calls["scenario_ids"] == ("founder_journey",)
     assert calls["seeds"] == (7,)

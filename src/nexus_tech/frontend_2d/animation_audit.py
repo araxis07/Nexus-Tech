@@ -38,6 +38,38 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS: tuple[tuple[int, int], ...] = (
     (1440, 900),
 )
 DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES: tuple[str, ...] = ("full", "reduced", "off")
+DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
+    (
+        "Pause / Resume",
+        "P and the Pause rail open the pause modal; Resume returns to the same run state.",
+    ),
+    (
+        "Back / Escape",
+        "Esc closes overlays first, then opens pause; it does not accidentally quit live play.",
+    ),
+    (
+        "Menu Return",
+        "Pause -> Menu saves and returns to the 2D title shell when a title shell exists.",
+    ),
+    (
+        "Help / Hover",
+        "F1, ?, and hover hints explain the current controls without hiding primary actions.",
+    ),
+    (
+        "Motion Modes",
+        "Full, reduced, and off modes keep the same clickable actions and readable labels.",
+    ),
+)
+DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS: tuple[tuple[str, str], ...] = (
+    ("Title/Menu", "Wizard, saves, archive, meta board, and title actors stay readable."),
+    ("Live Dashboard", "Actors and product motion do not hide metrics, cards, or actions."),
+    ("Action Picker", "Picker cards, choreography, and cues do not compete for focus."),
+    ("Pending Event", "Option preview motion clarifies choices without hiding text."),
+    ("Inspector", "Selected row, pager, chips, actor routing, and footer stay readable."),
+    ("Endgame Board", "Path-fix buttons stay primary while cockpit motion stays secondary."),
+    ("Turn Summary", "Timeline cards reveal readably and actors do not hide metrics."),
+    ("Outcome/Review", "Final cinematic and review actors do not hide after-action notes."),
+)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
@@ -289,6 +321,8 @@ class AnimationPlaytestPrepReport:
     matrix_report: AnimationMatrixReport
     windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS
     motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES
+    control_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS
+    scene_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS
     visual_artifact_name: str = "nexus-tech-2d-visual-audit"
     matrix_artifact_name: str = "nexus-tech-2d-animation-matrix"
     playtest_artifact_name: str = "nexus-tech-2d-animation-playtest-prep"
@@ -458,6 +492,8 @@ def build_2d_animation_playtest_prep_report(
     matrix_report: AnimationMatrixReport,
     windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
     motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    control_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS,
+    scene_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS,
 ) -> AnimationPlaytestPrepReport:
     """Build the report shell used before the real open-window animation pass."""
 
@@ -466,6 +502,8 @@ def build_2d_animation_playtest_prep_report(
         matrix_report=matrix_report,
         windows=windows,
         motion_modes=motion_modes,
+        control_checks=control_checks,
+        scene_checks=scene_checks,
     )
 
 
@@ -493,6 +531,7 @@ def write_2d_animation_playtest_prep_report(
         f"- CI visual artifact: `{report.visual_artifact_name}`",
         f"- CI matrix artifact: `{report.matrix_artifact_name}`",
         f"- CI playtest prep artifact: `{report.playtest_artifact_name}`",
+        "- Completion gate: `manual signoff required before calling animation complete`",
         "",
         "## Required Local Preflight",
         "",
@@ -550,24 +589,40 @@ def write_2d_animation_playtest_prep_report(
     lines.extend(
         [
             "",
+            "## Control Clarity Checklist",
+            "",
+            "| Control Area | Required Human Judgment | Result |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for area, required_judgment in report.control_checks:
+        lines.append(f"| {area} | {required_judgment} | `todo` |")
+    lines.extend(
+        [
+            "",
             "## Scene Checklist",
             "",
             "| Scene | Required Human Judgment | Result |",
             "| --- | --- | --- |",
-            "| Title/Menu | Wizard, saves, archive, meta, and actors stay readable | `todo` |",
-            "| Live Dashboard | Actors and product motion do not hide "
-            "metrics/cards/actions | `todo` |",
-            "| Action Picker | Picker cards, choreography, and cues do not compete "
-            "for focus | `todo` |",
-            "| Pending Event | Option preview motion clarifies choices without hiding "
-            "text | `todo` |",
-            "| Inspector | Selected row, pager, chips, actor routing, and footer "
-            "stay readable | `todo` |",
-            "| Endgame Board | Path-fix buttons stay primary while cockpit motion "
-            "stays secondary | `todo` |",
-            "| Turn Summary | Timeline cards reveal readably and actors do not hide "
-            "metrics | `todo` |",
-            "| Outcome/Review | Final cinematic and review actors do not hide notes | `todo` |",
+        ]
+    )
+    for scene, required_judgment in report.scene_checks:
+        lines.append(f"| {scene} | {required_judgment} | `todo` |")
+    lines.extend(
+        [
+            "",
+            "## Manual Completion Gate",
+            "",
+            "- Every window/motion cell must be `pass` or an accepted `watch` with a named owner.",
+            (
+                "- Every control row must be `pass`; unclear pause, back, help, save, "
+                "or menu behavior is a blocker."
+            ),
+            "- Every scene row must be `pass` before adding more animation layers.",
+            (
+                "- Keep generated PNGs and local readiness reports out of git; commit only "
+                "source, tests, and docs."
+            ),
             "",
             "## Matrix Cells",
             "",

@@ -33,6 +33,16 @@ Use this template when completing the open-window animation pass. Keep completed
 | `960x640` |  |  |  |  |
 | `1440x900` |  |  |  |  |
 
+## Control Clarity Results
+
+| Control Area | Result | Notes | Follow-up |
+| --- | --- | --- | --- |
+| Pause / Resume |  |  |  |
+| Back / Escape |  |  |  |
+| Menu Return |  |  |  |
+| Help / Hover |  |  |  |
+| Motion Modes |  |  |  |
+
 ## Scene Results
 
 | Scene | Result | Readability Notes | Motion Notes | Follow-up |
@@ -52,6 +62,7 @@ Use this template when completing the open-window animation pass. Keep completed
 - Unreadable disabled reasons:
 - Actor, tooltip, footer, modal, or button collisions:
 - Missing or unclear actor state reactions:
+- Unclear pause, back, help, save, or menu behavior:
 - Motion-mode regressions:
 - CI artifact anomalies:
 - `visual-audit-summary.md` anomalies:

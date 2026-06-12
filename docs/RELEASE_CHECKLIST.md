@@ -61,7 +61,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, staged-summary motion, or 2D request-path coverage changes.
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
-- Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion checklist starts from the same matrix baselines as CI.
+- Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.
@@ -72,7 +72,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `Scene Motion Profile` failures as release blockers before shipping new scenes or adding denser scene-specific motion.
 - Treat `Readability Guard` failures as release blockers before opening the manual playtest pass.
 - Treat text clipping, unreadable compact buttons, or local gameplay database files appearing in `git status` as release blockers before presenting the 2D build.
-- Treat missing visible Back/Pause/Menu controls or `Esc` quitting the run without pause confirmation as release blockers before presenting the 2D build.
+- Treat missing visible Back/Pause/Menu controls, missing hover/cursor affordance on primary controls, or `Esc` quitting the run without pause confirmation as release blockers before presenting the 2D build.
 - Treat 820x620 title/run/summary/review captures with overlapping navigation, cut-off cards, or action buttons spilling outside their panels as release blockers before presenting the 2D build.
 - Treat `audit-2d-animation-matrix` failures as release blockers for the default seven-scenario, three-seed presentation matrix.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.

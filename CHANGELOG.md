@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.150.0 - 2026-06-13
+
+- Added explicit manual control-clarity gates to the 2D animation playtest prep report so pause, back, help, hover, menu return, and motion-mode behavior are checked before calling animation complete
+- Improved in-run hover/cursor affordance for Pause, Back, Help, pause-menu, overlay-close, summary, and outcome controls so clickable targets communicate what will happen before the player clicks
+- Reworked the help overlay key guide into a responsive two-column layout on wider windows, reducing compact-screen density while keeping keyboard and mouse controls visible
+
 ## 0.149.0 - 2026-06-12
 
 - Polished compact 2D layouts by reserving header text space for actor badges across title, run, summary, and review scenes so sprite cards no longer sit on top of copy

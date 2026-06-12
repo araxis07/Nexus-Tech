@@ -669,10 +669,11 @@ def _capture_visual_cell(
     expected_layers: tuple[str, ...],
     output_dir: Path | None,
 ) -> VisualAuditCell:
+    width, height = surface.get_size()
+    _set_visual_audit_mouse_safe_point(pygame, width, height)
     for _index in range(2):
         scene.update(1 / 60)
     scene.draw(surface)
-    width, height = surface.get_size()
     active_layers = _active_layers(scene)
     raw = pygame.image.tobytes(surface, "RGB")
     checksum = zlib.adler32(raw)
@@ -701,6 +702,14 @@ def _capture_visual_cell(
         bright_ratio=round(bright_ratio, 4),
         output_path=str(output_path) if output_path is not None else None,
     )
+
+
+def _set_visual_audit_mouse_safe_point(pygame, width: int, height: int) -> None:
+    pygame_error = getattr(pygame, "error", RuntimeError)
+    try:
+        pygame.mouse.set_pos((max(0, width - 1), max(0, height - 1)))
+    except (AttributeError, pygame_error):
+        return
 
 
 def _sample_frame_metrics(

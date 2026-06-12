@@ -61,12 +61,25 @@ Record `pass`, `watch`, or `fail` for each scene:
 | Turn Summary | Timeline cards reveal at a readable pace and actor clips support rather than cover metrics |
 | Outcome/Review | Victory/shutdown cinematic reads as the final state and review actors do not hide after-action notes |
 
+## Control Clarity Checks
+
+Record `pass`, `watch`, or `fail` for each control area before calling the animation pass complete:
+
+| Control Area | Check |
+| --- | --- |
+| Pause / Resume | `P` and the Pause rail open the pause modal; Resume returns to the same run state |
+| Back / Escape | `Esc` closes overlays first, then opens pause; it does not accidentally quit live play |
+| Menu Return | Pause -> Menu saves and returns to the 2D title shell when the run has a title shell |
+| Help / Hover | `F1`, `?`, hover tooltips, and hand cursor feedback make clickable controls obvious |
+| Motion Modes | Full, reduced, and off modes keep the same clickable actions and readable labels |
+
 ## Failure Rules
 
 - Any hidden primary action is a release blocker.
 - Any unreadable disabled reason is a release blocker.
 - Any actor/readability collision at `820x620` is a release blocker.
 - Any missing/unclear blocked actor state is a release blocker.
+- Any unclear pause, back, help, save, or menu behavior is a release blocker.
 - Any `Actor State Coverage`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
 - Any `audit-2d-animation-matrix` failure in the default seven-scenario, three-seed presentation set is a release blocker.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.

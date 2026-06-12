@@ -1095,16 +1095,38 @@ def prepare_2d_animation_playtest_command(
         table.add_row(f"{width}x{height}", "todo", "todo", "todo")
     console.print(table)
 
+    controls_table = Table(title="Manual Control Clarity Gate")
+    controls_table.add_column("Control", style="cyan")
+    controls_table.add_column("Required Check")
+    controls_table.add_column("Result", justify="center")
+    for area, required_check in prep_report.control_checks:
+        controls_table.add_row(area, required_check, "todo")
+    console.print(controls_table)
+
+    scenes_table = Table(title="Manual Scene Animation Gate")
+    scenes_table.add_column("Scene", style="cyan")
+    scenes_table.add_column("Required Check")
+    scenes_table.add_column("Result", justify="center")
+    for scene, required_check in prep_report.scene_checks:
+        scenes_table.add_row(scene, required_check, "todo")
+    console.print(scenes_table)
+
     border_style = "green" if prep_report.status == "ready" else "red"
     console.print(
         Panel.fit(
             (
-                f"Playtest prep status: {prep_report.status.upper()}. "
-                f"Automated matrix {matrix_report.status.upper()} "
-                f"({passed}/{len(matrix_report.cells)} pass)."
+                f"Status {prep_report.status.upper()} | Matrix {matrix_report.status.upper()} "
+                f"| {passed}/{len(matrix_report.cells)} pass | Manual signoff required"
             ),
             title="2D Animation Playtest Prep",
             border_style=border_style,
+        )
+    )
+    console.print(
+        Panel.fit(
+            "Finish the checklist before marking animation complete.",
+            title="Manual Signoff Required",
+            border_style="yellow",
         )
     )
     console.print(

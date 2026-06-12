@@ -881,6 +881,25 @@ class BaseScene:
                 click_targets.append(ClickTarget(kind, payload, rect))
             left += width + gap
 
+    def _hover_target_for_position(self, position: tuple[int, int]) -> ClickTarget | None:
+        for target in reversed(getattr(self, "_click_targets", ())):
+            if target.rect.collidepoint(position):
+                return target
+        return None
+
+    def _sync_mouse_cursor(self) -> None:
+        pygame_error = getattr(self.pygame, "error", RuntimeError)
+        try:
+            target = self._hover_target_for_position(self.pygame.mouse.get_pos())
+            cursor = (
+                self.pygame.SYSTEM_CURSOR_HAND
+                if target is not None
+                else self.pygame.SYSTEM_CURSOR_ARROW
+            )
+            self.pygame.mouse.set_cursor(cursor)
+        except (AttributeError, pygame_error):
+            return
+
     def _draw_scene_transition_overlay(self, surface) -> None:
         if not self.scene_transition_active():
             return
@@ -1312,6 +1331,7 @@ class TitleScene(BaseScene):
             self._draw_delete_confirmation_overlay(surface)
         if self._text_input is not None:
             self._draw_text_input_overlay(surface)
+        self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
 
     def push_event(self, payload: FrontendEvent) -> None:
@@ -3176,6 +3196,7 @@ class ReviewScene(BaseScene):
         if self._allow_save:
             items.append(("S Save", "Persist this run.", "review_save", "", GOOD))
         self._draw_nav_rail(surface, tuple(items))
+        self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
 
     def _dispatch_click_target(self, target: ClickTarget) -> None:
@@ -4274,6 +4295,7 @@ class RunScene(BaseScene):
             )
         if self._pause_overlay_visible:
             self._draw_pause_overlay(surface)
+        self._sync_mouse_cursor()
         self._draw_hover_tooltip(surface)
         self._draw_scene_transition_overlay(surface)
 
@@ -7516,11 +7538,7 @@ class RunScene(BaseScene):
         return self._inspector_panel_key or self._deep_panel_key
 
     def _hover_target(self) -> ClickTarget | None:
-        mouse_pos = self.pygame.mouse.get_pos()
-        for target in reversed(self._click_targets):
-            if target.rect.collidepoint(mouse_pos):
-                return target
-        return None
+        return self._hover_target_for_position(self.pygame.mouse.get_pos())
 
     def _draw_hover_tooltip(self, surface) -> None:
         if self._help_overlay_visible or self._text_input is not None:
@@ -7614,6 +7632,34 @@ class RunScene(BaseScene):
             return "Hover: focus this record and expose item-level actions."
         if target.kind == "save":
             return "Hover: persist the current run to the active slot."
+        if target.kind == "continue":
+            return "Hover: continue from the summary back into the live run."
+        if target.kind == "close_summary":
+            return "Hover: close the 2D shell from the turn summary."
+        if target.kind == "pause_toggle":
+            return "Hover: open Pause for resume, save, menu return, or quit controls."
+        if target.kind == "run_back":
+            return "Hover: close the current overlay first; with no overlay open, show Pause."
+        if target.kind == "open_help":
+            return "Hover: open the control guide for keyboard, mouse, pause, and inspector hints."
+        if target.kind == "pause_resume":
+            return "Hover: resume the run without changing the current state."
+        if target.kind == "pause_save":
+            return "Hover: save the current run to the active slot and stay paused."
+        if target.kind == "pause_menu":
+            return "Hover: save and return to the 2D title menu when this run has a title shell."
+        if target.kind == "pause_quit":
+            return "Hover: close the 2D shell after saving dirty run state on exit."
+        if target.kind == "close_help":
+            return "Hover: close Help and return to the current run screen."
+        if target.kind == "close_picker":
+            return "Hover: close this picker without running an option."
+        if target.kind in {"close_panel", "close_inspector"}:
+            return "Hover: close this detail view and return to the live dashboard."
+        if target.kind == "open_review":
+            return "Hover: open the post-run review with final findings and next-focus notes."
+        if target.kind == "close_outcome":
+            return "Hover: close the outcome overlay and return to the run shell."
         if target.kind == "pending_option":
             return "Hover: resolve the pending event with this option."
         return ""
@@ -8860,19 +8906,57 @@ class RunScene(BaseScene):
             ("Enter", "Run selected inspector action"),
             ("F1/?", "Toggle this help"),
         )
-        top = inner.top + 72
-        for key_text, label in keycaps:
-            keycap_rect = pygame.Rect(inner.left, top, inner.width, 25)
-            draw_keycap(
-                surface,
-                pygame,
-                self.fonts.small,
-                rect=keycap_rect,
-                key_text=key_text,
-                label=label,
-            )
-            top += 31
         close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 36)
+        keycap_top = inner.top + 76
+        keycap_bottom = close_rect.top - 14
+        keycap_height = 25
+        two_columns = inner.width >= 620
+        if two_columns:
+            col_gap = 14
+            rows = (len(keycaps) + 1) // 2
+            row_gap = max(5, min(8, (keycap_bottom - keycap_top - keycap_height * rows) // rows))
+            col_width = int((inner.width - col_gap) / 2)
+            for index, (key_text, label) in enumerate(keycaps):
+                col = index // rows
+                row = index % rows
+                keycap_rect = pygame.Rect(
+                    inner.left + col * (col_width + col_gap),
+                    keycap_top + row * (keycap_height + row_gap),
+                    col_width,
+                    keycap_height,
+                )
+                draw_keycap(
+                    surface,
+                    pygame,
+                    self.fonts.small,
+                    rect=keycap_rect,
+                    key_text=key_text,
+                    label=label,
+                )
+        else:
+            row_gap = max(
+                2,
+                min(
+                    6,
+                    (keycap_bottom - keycap_top - keycap_height * len(keycaps))
+                    // max(1, len(keycaps) - 1),
+                ),
+            )
+            for index, (key_text, label) in enumerate(keycaps):
+                keycap_rect = pygame.Rect(
+                    inner.left,
+                    keycap_top + index * (keycap_height + row_gap),
+                    inner.width,
+                    keycap_height,
+                )
+                draw_keycap(
+                    surface,
+                    pygame,
+                    self.fonts.small,
+                    rect=keycap_rect,
+                    key_text=key_text,
+                    label=label,
+                )
         draw_button(
             surface,
             pygame,
@@ -9490,6 +9574,7 @@ class TurnSummaryScene(BaseScene):
         )
         self._draw_summary_outcome_lanes(surface)
         self._draw_summary_cinematic_overlay(surface)
+        self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
 
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
