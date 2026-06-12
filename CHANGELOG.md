@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.149.0 - 2026-06-12
+
+- Polished compact 2D layouts by reserving header text space for actor badges across title, run, summary, and review scenes so sprite cards no longer sit on top of copy
+- Moved turn-summary cinematic lanes and timeline chips below the header area on small windows, reducing headline and narrative overlap during resolution animation
+- Tightened pending-event modal sizing and centered review footer actions so compact overlays and postmortem controls feel balanced instead of leaving uneven empty panels
+
 ## 0.148.0 - 2026-06-12
 
 - Switched the 2D frontend font pack to bundled pygame fonts with deterministic metrics so compact layouts render consistently across local macOS sessions and Ubuntu CI runners
