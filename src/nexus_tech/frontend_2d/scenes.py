@@ -859,8 +859,8 @@ class BaseScene:
         if not items:
             return
         pygame = self.pygame
-        left = 20
-        top = 6
+        left = 24
+        top = 12
         gap = 8
         height = 34
         for title, detail, kind, payload, accent in items:
@@ -895,21 +895,21 @@ class BaseScene:
         )
 
         overlay = pygame.Surface((width, height), pygame.SRCALPHA)
-        fade_alpha = int((1.0 - eased) * 150 * intensity)
+        fade_alpha = int((1.0 - eased) * 62 * intensity)
         if fade_alpha > 0:
             overlay.fill((3, 6, 12, fade_alpha))
 
-        sweep_width = max(80, int(width * 0.14))
-        sweep_x = int((eased * (width + sweep_width * 2)) - sweep_width * 1.4)
-        sweep_alpha = int(max(0.0, 1.0 - abs(progress - 0.48) * 2.1) * 80 * intensity)
+        sweep_width = max(80, int(width * 0.24))
+        sweep_x = int(eased * max(1, width - sweep_width))
+        sweep_alpha = int(max(0.0, 1.0 - abs(progress - 0.48) * 2.1) * 42 * intensity)
         if sweep_alpha > 0:
-            sweep_rect = pygame.Rect(sweep_x, 0, sweep_width, height)
+            sweep_rect = pygame.Rect(sweep_x, 4, sweep_width, 5)
             pygame.draw.rect(overlay, (*accent, sweep_alpha), sweep_rect)
-            edge_rect = pygame.Rect(sweep_rect.right - 4, 0, 4, height)
-            pygame.draw.rect(overlay, (*TEXT, min(160, sweep_alpha + 36)), edge_rect)
+            edge_rect = pygame.Rect(sweep_rect.right - 18, sweep_rect.top, 18, sweep_rect.height)
+            pygame.draw.rect(overlay, (*TEXT, min(120, sweep_alpha + 20)), edge_rect)
 
         line_gap = 26 if self.motion_mode is MotionMode.FULL else 38
-        line_alpha = int((1.0 - progress) * 42 * intensity)
+        line_alpha = int((1.0 - progress) * 18 * intensity)
         if line_alpha > 0:
             for y in range(0, height, line_gap):
                 pygame.draw.line(overlay, (*accent, line_alpha), (0, y), (width, y), 1)
@@ -1231,14 +1231,30 @@ class TitleScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 24
-        gap = 16
-        header_rect = pygame.Rect(margin, margin, width - margin * 2, 104)
-        footer_rect = pygame.Rect(margin, height - 92 - margin, width - margin * 2, 92)
+        margin = 20 if width < 900 else 24
+        gap = 12 if height < 700 else 16
+        nav_band = 46 if self._text_input is None and self._confirm_delete_slot_name is None else 0
+        header_height = 92 if height < 700 else 104
+        footer_height = 72 if height < 700 else 92
+        header_rect = pygame.Rect(
+            margin,
+            margin + nav_band,
+            width - margin * 2,
+            header_height,
+        )
+        footer_rect = pygame.Rect(
+            margin,
+            height - footer_height - margin,
+            width - margin * 2,
+            footer_height,
+        )
         content_top = header_rect.bottom + gap
-        content_height = footer_rect.top - gap - content_top
-        if width < 1180:
-            left_share = 0.62 if self._mode == "meta" else 0.56
+        content_height = max(80, footer_rect.top - gap - content_top)
+        if width < 980:
+            left_rect = pygame.Rect(margin, content_top, width - margin * 2, content_height)
+            right_rect = pygame.Rect(0, 0, 0, 0)
+        elif width < 1180:
+            left_share = 0.68 if self._mode == "menu" else 0.62 if self._mode == "meta" else 0.6
             left_rect = pygame.Rect(
                 margin,
                 content_top,
@@ -1276,7 +1292,8 @@ class TitleScene(BaseScene):
             self._draw_new_game_wizard(surface, left_rect)
         else:
             self._draw_archive_browser(surface, left_rect)
-        self._draw_title_sidebar(surface, right_rect)
+        if right_rect.width > 0 and right_rect.height > 0:
+            self._draw_title_sidebar(surface, right_rect)
         self._draw_title_footer(surface, footer_rect)
         if self._text_input is None and self._confirm_delete_slot_name is None:
             self._draw_nav_rail(
@@ -2046,21 +2063,36 @@ class TitleScene(BaseScene):
             ),
             ("6 Quit", "Leave the frontend shell.", "quit", DANGER),
         )
-        top = inner.top
-        for title, detail, payload, accent in buttons:
-            button_rect = pygame.Rect(inner.left, top, inner.width, 62)
+        gap = 10
+        use_grid = inner.width >= 640 and inner.height < 430
+        cols = 2 if use_grid else 1
+        rows = max(1, (len(buttons) + cols - 1) // cols)
+        button_height = max(
+            44,
+            min(72, int((inner.height - gap * max(0, rows - 1)) / rows)),
+        )
+        button_width = int((inner.width - gap * max(0, cols - 1)) / cols)
+        for index, (title, detail, payload, accent) in enumerate(buttons):
+            row = index // cols
+            col = index % cols
+            button_rect = pygame.Rect(
+                inner.left + col * (button_width + gap),
+                inner.top + row * (button_height + gap),
+                button_width,
+                button_height,
+            )
+            compact_detail = self._compact_text(detail, 42 if use_grid else 56)
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
                 title=title,
-                detail=detail,
+                detail=compact_detail,
                 accent=accent,
                 title_font=self.fonts.body,
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget("menu", payload, button_rect))
-            top += 74
 
     def _draw_meta_board(self, surface, rect) -> None:
         pygame = self.pygame
@@ -2201,14 +2233,31 @@ class TitleScene(BaseScene):
         title_surface = self.fonts.heading.render(title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         if not cards:
-            empty_surface = self.fonts.body.render("Nothing is stored here yet.", True, MUTED)
-            surface.blit(empty_surface, (inner.left, inner.top))
-            note_surface = self.fonts.small.render(back_detail, True, MUTED)
-            surface.blit(note_surface, (inner.left, inner.top + 26))
+            draw_text_line(
+                surface,
+                self.fonts.body,
+                "Nothing is stored here yet.",
+                MUTED,
+                pygame.Rect(inner.left, inner.top, inner.width, 24),
+                valign="top",
+            )
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                back_detail,
+                MUTED,
+                pygame.Rect(inner.left, inner.top + 28, inner.width, 42),
+                line_height=16,
+                max_lines=2,
+            )
             return
         top = inner.top
-        for index, card in enumerate(cards[:8]):
-            card_rect = pygame.Rect(inner.left, top, inner.width, 74)
+        footer_note_height = 28
+        gap = 8
+        card_height = 64 if inner.height < 360 else 74
+        visible_limit = max(1, int((inner.height - footer_note_height + gap) / (card_height + gap)))
+        for index, card in enumerate(cards[: min(8, visible_limit)]):
+            card_rect = pygame.Rect(inner.left, top, inner.width, card_height)
             accent = tone_color(card.tone)
             draw_button(
                 surface,
@@ -2220,20 +2269,29 @@ class TitleScene(BaseScene):
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
             )
-            draw_wrapped_text(
-                surface,
-                self.fonts.small,
-                " | ".join(card.detail_lines[1:]),
-                MUTED,
-                pygame.Rect(card_rect.left + 12, card_rect.top + 34, card_rect.width - 24, 28),
-                line_height=14,
-                max_lines=2,
-            )
+            if card_height >= 70:
+                draw_wrapped_text(
+                    surface,
+                    self.fonts.small,
+                    " | ".join(card.detail_lines[1:]),
+                    MUTED,
+                    pygame.Rect(card_rect.left + 12, card_rect.top + 34, card_rect.width - 24, 28),
+                    line_height=14,
+                    max_lines=2,
+                )
             payload = card.slot_name if hasattr(card, "slot_name") else card.archive_key
             self._click_targets.append(ClickTarget(click_kind, payload, card_rect))
-            top += 86
-        back_surface = self.fonts.small.render(back_detail, True, MUTED)
-        surface.blit(back_surface, (inner.left, rect.bottom - 26))
+            top += card_height + gap
+        remaining = max(0, len(cards) - min(8, visible_limit))
+        note = back_detail if remaining == 0 else f"{back_detail} {remaining} more stored."
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            note,
+            MUTED,
+            pygame.Rect(inner.left, inner.bottom - 20, inner.width, 18),
+            valign="top",
+        )
 
     def _draw_slot_detail(self, surface, rect) -> None:
         pygame = self.pygame
@@ -2251,8 +2309,14 @@ class TitleScene(BaseScene):
         title_surface = self.fonts.heading.render("Save Slot Actions", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
         if summary is None:
-            empty_surface = self.fonts.body.render("Select a save slot first.", True, MUTED)
-            surface.blit(empty_surface, (inner.left, inner.top))
+            draw_text_line(
+                surface,
+                self.fonts.body,
+                "Select a save slot first.",
+                MUTED,
+                pygame.Rect(inner.left, inner.top, inner.width, 24),
+                valign="top",
+            )
             return
         lines = (
             f"Slot: {summary.slot_name}",
@@ -2287,20 +2351,36 @@ class TitleScene(BaseScene):
             ("9 Back", "Return to the save-slot browser.", "back", BORDER),
         )
         top += 10
-        for title, detail, payload, accent in buttons:
-            button_rect = pygame.Rect(inner.left, top, inner.width, 54)
+        available = max(44, inner.bottom - top)
+        button_gap = 8
+        compact_grid = inner.width >= 640 and available < 320
+        cols = 2 if compact_grid else 1
+        rows_count = max(1, (len(buttons) + cols - 1) // cols)
+        button_height = max(
+            40,
+            min(54, int((available - button_gap * max(0, rows_count - 1)) / rows_count)),
+        )
+        button_width = int((inner.width - button_gap * max(0, cols - 1)) / cols)
+        for index, (title, detail, payload, accent) in enumerate(buttons):
+            row = index // cols
+            col = index % cols
+            button_rect = pygame.Rect(
+                inner.left + col * (button_width + button_gap),
+                top + row * (button_height + button_gap),
+                button_width,
+                button_height,
+            )
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
                 title=title,
-                detail=detail,
+                detail=self._compact_text(detail, 38 if compact_grid else 56),
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget("slot_action", payload, button_rect))
-            top += 66
 
     def _draw_new_game_wizard(self, surface, rect) -> None:
         pygame = self.pygame
@@ -2386,27 +2466,45 @@ class TitleScene(BaseScene):
                 INFO,
             ),
         )
-        top = inner.top
-        for label, value, detail, payload, kind, accent in rows:
-            button_rect = pygame.Rect(inner.left, top, inner.width, 56)
+        launch_height = 44
+        launch_gap = 12
+        grid_gap = 8
+        compact_grid = inner.width >= 700 and inner.height < 540
+        cols = 2 if compact_grid else 1
+        row_count = max(1, (len(rows) + cols - 1) // cols)
+        grid_height = max(44, inner.height - launch_height - launch_gap)
+        button_height = max(
+            42,
+            min(56, int((grid_height - grid_gap * max(0, row_count - 1)) / row_count)),
+        )
+        button_width = int((inner.width - grid_gap * max(0, cols - 1)) / cols)
+        for index, (label, value, detail, payload, kind, accent) in enumerate(rows):
+            row = index // cols
+            col = index % cols
+            button_rect = pygame.Rect(
+                inner.left + col * (button_width + grid_gap),
+                inner.top + row * (button_height + grid_gap),
+                button_width,
+                button_height,
+            )
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
                 title=f"{label}: {value}",
-                detail=detail,
+                detail=self._compact_text(detail, 40 if compact_grid else 58),
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget(kind, payload, button_rect))
-            top += 66
-        launch_rect = pygame.Rect(inner.left, rect.bottom - 86, inner.width // 2 - 8, 44)
+        launch_top = inner.bottom - launch_height
+        launch_rect = pygame.Rect(inner.left, launch_top, inner.width // 2 - 8, launch_height)
         back_rect = pygame.Rect(
             launch_rect.right + 16,
-            rect.bottom - 86,
+            launch_top,
             inner.width // 2 - 8,
-            44,
+            launch_height,
         )
         draw_button(
             surface,
@@ -2515,8 +2613,14 @@ class TitleScene(BaseScene):
             message = "Wizard: click rows to cycle/edit. Enter launches. Esc returns to menu."
         else:
             message = "Archives: click a card to inspect it. Press 9 or Esc to return."
-        footer_surface = self.fonts.small.render(message, True, TEXT)
-        surface.blit(footer_surface, (inner.left, inner.top + 10))
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            message,
+            TEXT,
+            pygame.Rect(inner.left, inner.top + 8, inner.width, 20),
+            valign="top",
+        )
 
     def _title_sidebar_lines(self) -> tuple[str, ...]:
         meta = self._meta_progression
@@ -2980,10 +3084,17 @@ class ReviewScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 28
-        gap = 16
-        header_rect = pygame.Rect(margin, margin, width - margin * 2, 104)
-        footer_rect = pygame.Rect(margin, height - 104 - margin, width - margin * 2, 104)
+        margin = 20 if width < 900 else 28
+        gap = 12 if height < 700 else 16
+        nav_band = 46
+        header_rect = pygame.Rect(margin, margin + nav_band, width - margin * 2, 104)
+        footer_height = 116 if height < 700 else 104
+        footer_rect = pygame.Rect(
+            margin,
+            height - footer_height - margin,
+            width - margin * 2,
+            footer_height,
+        )
         content_rect = pygame.Rect(
             margin,
             header_rect.bottom + gap,
@@ -3044,12 +3155,30 @@ class ReviewScene(BaseScene):
             emphasis=header_motion,
             lift=int(header_motion * 3),
         )
-        title_surface = self.fonts.title.render(self._view_model.title, True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 28))
-        headline_surface = self.fonts.body.render(self._view_model.headline, True, TEXT)
-        surface.blit(headline_surface, (inner.left, inner.top))
-        summary_surface = self.fonts.small.render(self._view_model.summary_line, True, MUTED)
-        surface.blit(summary_surface, (inner.left, inner.top + 26))
+        draw_text_line(
+            surface,
+            self.fonts.title,
+            self._view_model.title,
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 30, inner.width - 150, 30),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            self._view_model.headline,
+            TEXT,
+            pygame.Rect(inner.left, inner.top, inner.width, 22),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            self._view_model.summary_line,
+            MUTED,
+            pygame.Rect(inner.left, inner.top + 26, inner.width, 18),
+            valign="top",
+        )
 
     def _draw_review_findings(self, surface, rect) -> None:
         pygame = self.pygame
@@ -3070,8 +3199,12 @@ class ReviewScene(BaseScene):
             surface.blit(idle_surface, (inner.left, inner.top))
             return
         top = inner.top
-        for finding in self._view_model.findings:
-            card_rect = pygame.Rect(inner.left, top, inner.width, 98)
+        card_gap = 10
+        card_height = 92 if inner.height < 300 else 98
+        visible_limit = max(1, int((inner.height + card_gap) / (card_height + card_gap)))
+        visible_findings = self._view_model.findings[:visible_limit]
+        for finding in visible_findings:
+            card_rect = pygame.Rect(inner.left, top, inner.width, card_height)
             accent = tone_color(finding.severity)
             finding_motion = max(
                 findings_motion * 0.65, 0.18 if finding.rank_label == "#1" else 0.0
@@ -3095,12 +3228,19 @@ class ReviewScene(BaseScene):
                 width=2 if finding_motion >= 0.42 else 1,
                 border_radius=16,
             )
-            title_surface = self.fonts.body.render(
+            draw_text_line(
+                surface,
+                self.fonts.body,
                 f"{finding.rank_label} {finding.area} | {finding.command}",
-                True,
                 TEXT,
+                pygame.Rect(
+                    animated_rect.left + 12,
+                    animated_rect.top + 10,
+                    animated_rect.width - 24,
+                    22,
+                ),
+                valign="top",
             )
-            surface.blit(title_surface, (animated_rect.left + 12, animated_rect.top + 10))
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
@@ -3129,7 +3269,17 @@ class ReviewScene(BaseScene):
                 line_height=15,
                 max_lines=1,
             )
-            top += 110
+            top += card_height + card_gap
+        remaining = len(self._view_model.findings) - len(visible_findings)
+        if remaining > 0:
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                f"{remaining} more finding(s) available in larger layouts.",
+                MUTED,
+                pygame.Rect(inner.left, inner.bottom - 18, inner.width, 18),
+                valign="top",
+            )
 
     def _draw_review_sidebar(self, surface, rect) -> None:
         pygame = self.pygame
@@ -3145,10 +3295,22 @@ class ReviewScene(BaseScene):
         )
         title_surface = self.fonts.heading.render("Next Focus", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
-        focus_surface = self.fonts.body.render(self._view_model.next_focus, True, INFO)
-        surface.blit(focus_surface, (inner.left, inner.top))
-        badges_title = self.fonts.small.render("Badges", True, MUTED)
-        surface.blit(badges_title, (inner.left, inner.top + 30))
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            self._view_model.next_focus,
+            INFO,
+            pygame.Rect(inner.left, inner.top, inner.width, 22),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            "Badges",
+            MUTED,
+            pygame.Rect(inner.left, inner.top + 30, inner.width, 18),
+            valign="top",
+        )
         top = inner.top + 52
         for badge in self._view_model.badges[:6]:
             chip_rect = pygame.Rect(inner.left, top, inner.width, 28)
@@ -3165,8 +3327,13 @@ class ReviewScene(BaseScene):
                 width=1,
                 border_radius=12,
             )
-            badge_surface = self.fonts.small.render(badge.replace("_", " "), True, TEXT)
-            surface.blit(badge_surface, (chip_rect.left + 10, chip_rect.top + 7))
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                badge.replace("_", " "),
+                TEXT,
+                pygame.Rect(chip_rect.left + 10, chip_rect.top + 5, chip_rect.width - 20, 18),
+            )
             top += 36
 
     def _draw_review_footer(self, surface, rect) -> None:
@@ -3935,9 +4102,16 @@ class RunScene(BaseScene):
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 20
-        gap = 16
-        header_rect = pygame.Rect(margin, margin, width - margin * 2, 118)
-        footer_height = 388 if width < 980 else 348 if width < 1180 else 332
+        gap = 12 if height < 700 else 16
+        nav_band = 46 if not self._pause_overlay_visible else 0
+        header_height = 124 if height < 700 else 132
+        header_rect = pygame.Rect(
+            margin,
+            margin + nav_band,
+            width - margin * 2,
+            header_height,
+        )
+        footer_height = self._footer_outer_height(width, height)
         footer_rect = pygame.Rect(
             margin,
             height - footer_height - margin,
@@ -3945,8 +4119,19 @@ class RunScene(BaseScene):
             footer_height,
         )
         content_top = header_rect.bottom + gap
-        content_height = footer_rect.top - gap - content_top
-        if width < 940:
+        content_height = max(80, footer_rect.top - gap - content_top)
+        content_rect = pygame.Rect(
+            margin,
+            content_top,
+            width - margin * 2,
+            max(0, content_height),
+        )
+        use_compact_focus = content_rect.height < 170
+        if use_compact_focus:
+            left_rect = content_rect
+            center_rect = pygame.Rect(0, 0, 0, 0)
+            right_rect = pygame.Rect(0, 0, 0, 0)
+        elif width < 940:
             section_height = int((content_height - gap * 2) / 3)
             left_rect = pygame.Rect(margin, content_top, width - margin * 2, section_height)
             center_rect = pygame.Rect(
@@ -3998,9 +4183,12 @@ class RunScene(BaseScene):
 
         self._draw_header(surface, header_rect)
         self._draw_actor_sprite_layer(surface, header_rect)
-        self._draw_left_column(surface, left_rect)
-        self._draw_center_column(surface, center_rect)
-        self._draw_right_column(surface, right_rect)
+        if use_compact_focus:
+            self._draw_compact_run_focus(surface, content_rect)
+        else:
+            self._draw_left_column(surface, left_rect)
+            self._draw_center_column(surface, center_rect)
+            self._draw_right_column(surface, right_rect)
         self._draw_footer(surface, footer_rect)
 
         if self.state.pending_event is not None:
@@ -4506,15 +4694,15 @@ class RunScene(BaseScene):
             return
         pygame = self.pygame
         width, _height = surface.get_size()
-        visible_count = 3 if width < 980 else 4
+        visible_count = 1 if width < 980 else 2
         visible_clips = clips[:visible_count]
         gap = 8
-        clip_height = 48
-        available = max(120, anchor_rect.width - 26)
+        clip_height = 42
+        available = min(330, max(120, anchor_rect.width - 26))
         clip_width = min(142, max(98, int((available - gap * (visible_count - 1)) / visible_count)))
         total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
         left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 12)
-        top = max(anchor_rect.top + 48, anchor_rect.bottom - clip_height - 8)
+        top = min(anchor_rect.top + 52, anchor_rect.bottom - clip_height - 42)
         stage_rect = pygame.Rect(left - 8, top - 6, total_width + 16, clip_height + 12)
         stage = pygame.Surface((stage_rect.width, stage_rect.height), pygame.SRCALPHA)
         pygame.draw.rect(
@@ -6585,6 +6773,7 @@ class RunScene(BaseScene):
     def _draw_header(self, surface, rect) -> None:
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Run Header", accent=INFO)
+        compact = rect.height < 130 or inner.width < 760
         draw_text_line(
             surface,
             self.fonts.title,
@@ -6615,23 +6804,31 @@ class RunScene(BaseScene):
             line_height=15,
             max_lines=1,
         )
-        draw_wrapped_text(
-            surface,
-            self.fonts.small,
-            self._view_model.difficulty_summary,
-            MUTED,
-            pygame.Rect(inner.left, inner.top + 42, inner.width, 18),
-            line_height=15,
-            max_lines=1,
-        )
+        if not compact:
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                self._view_model.difficulty_summary,
+                MUTED,
+                pygame.Rect(inner.left, inner.top + 42, inner.width, 18),
+                line_height=15,
+                max_lines=1,
+            )
         chip_width = int((inner.width - 24) / 3)
-        chip_height = 28
-        top = inner.top + 66
+        chip_height = 24 if compact else 28
+        top = min(
+            inner.top + (58 if compact else 66),
+            rect.bottom - chip_height - 10,
+        )
+        if top <= inner.top + 42:
+            return
         left = inner.left
         for index, chip in enumerate(self._view_model.snapshot_chips):
             if index and index % 3 == 0:
                 top += chip_height + 8
                 left = inner.left
+            if top + chip_height > rect.bottom - 8:
+                break
             chip_rect = pygame.Rect(left, top, chip_width, chip_height)
             self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
             left += chip_width + 12
@@ -6948,6 +7145,66 @@ class RunScene(BaseScene):
             self._draw_event_card(surface, card_rect, timed_event)
             event_top += 76
 
+    def _draw_compact_run_focus(self, surface, rect) -> None:
+        if rect.height <= 0:
+            return
+        pygame = self.pygame
+        focus_motion = self._motion_level("panel:coach", "panel:products", "panel:stats")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Run Focus",
+            accent=SELECTION,
+            emphasis=focus_motion,
+            lift=int(focus_motion * 2),
+        )
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Current Focus",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
+        workspace_key = self._active_panel_key()
+        workspace_title = (
+            self._panel_display_name(workspace_key) if workspace_key is not None else "Core HUD"
+        )
+        focus_line = (
+            f"{workspace_title} | {self.selected_product.name} | "
+            f"{self.state.action_points_remaining} actions left"
+        )
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            focus_line,
+            TEXT,
+            pygame.Rect(inner.left, inner.top, inner.width, 22),
+            valign="top",
+        )
+        note_top = inner.top + 24
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            self._hover_hint_line() or self._view_model.watch_for,
+            MUTED,
+            pygame.Rect(inner.left, note_top, inner.width, max(18, inner.height - 54)),
+            line_height=16,
+            max_lines=2,
+        )
+        chip_top = inner.bottom - 28
+        chips = self._view_model.snapshot_chips[:3]
+        if chip_top <= note_top + 20 or not chips:
+            return
+        gap = 8
+        chip_width = int((inner.width - gap * (len(chips) - 1)) / len(chips))
+        left = inner.left
+        for chip in chips:
+            chip_rect = pygame.Rect(left, chip_top, chip_width, 26)
+            self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
+            left += chip_width + gap
+
     def _draw_footer(self, surface, rect) -> None:
         pygame = self.pygame
         footer_motion = self._motion_level("footer")
@@ -6978,7 +7235,7 @@ class RunScene(BaseScene):
         left = inner.left
         for index, button in enumerate(_ACTION_BUTTONS):
             if index and index % button_cols == 0:
-                top += button_height + 10
+                top += button_height + button_gap
                 left = inner.left
             button_rect = pygame.Rect(left, top, button_width, button_height)
             enabled = self._button_is_enabled(button)
@@ -7027,8 +7284,27 @@ class RunScene(BaseScene):
             max_lines=1,
         )
 
+    def _footer_outer_height(self, width: int, height: int) -> int:
+        usable_width = width - 40 - 32
+        if usable_width < 620:
+            button_cols = 4
+        elif usable_width < 980:
+            button_cols = 5
+        elif usable_width < 1220:
+            button_cols = 6
+        else:
+            button_cols = 7
+        rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
+        button_gap = 10
+        button_height = 34 if height < 700 else 40 if button_cols <= 5 else 44
+        footer_band_height = 38 if height < 700 else 46
+        panel_chrome = 60
+        return (
+            panel_chrome + rows * button_height + button_gap * max(0, rows - 1) + footer_band_height
+        )
+
     def _footer_layout_metrics(self, inner_width: int, inner_height: int) -> tuple[int, int, int]:
-        if inner_width < 700:
+        if inner_width < 620:
             button_cols = 4
         elif inner_width < 980:
             button_cols = 5
@@ -7037,18 +7313,18 @@ class RunScene(BaseScene):
         else:
             button_cols = 7
         rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
-        footer_band_height = 52 if button_cols <= 4 else 48
+        footer_band_height = 42 if inner_height < 300 else 48 if button_cols >= 5 else 52
         button_gap = 10
         button_area_height = max(
             36,
             inner_height - footer_band_height - button_gap * max(0, rows - 1),
         )
         available_per_row = int(button_area_height / rows)
-        min_button_height = 40 if button_cols <= 5 else 46
+        min_button_height = 34 if inner_height < 300 else 38 if button_cols <= 5 else 42
         if available_per_row < min_button_height:
-            button_height = max(34, available_per_row)
+            button_height = max(30, available_per_row)
         else:
-            button_height = min(62, max(min_button_height, available_per_row))
+            button_height = min(58, max(min_button_height, available_per_row))
         return button_cols, button_height, footer_band_height
 
     def _footer_button_detail(
@@ -8412,8 +8688,8 @@ class RunScene(BaseScene):
         )
         menu_available = self._return_scene_factory is not None
         detail = (
-            f"Turn {self.state.company.turn} | Actions left {self.state.action_points_remaining} | "
-            f"Slot {self.slot_name}"
+            f"Turn {self.state.company.current_turn} | Actions left "
+            f"{self.state.action_points_remaining} | Slot {self.slot_name}"
         )
         draw_wrapped_text(
             surface,
@@ -9107,12 +9383,19 @@ class TurnSummaryScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 24
-        gap = 16
-        header_rect = pygame.Rect(margin, margin, width - margin * 2, 96)
-        footer_rect = pygame.Rect(margin, height - 94 - margin, width - margin * 2, 94)
+        margin = 20 if width < 900 else 24
+        gap = 12 if height < 700 else 16
+        nav_band = 46
+        header_rect = pygame.Rect(margin, margin + nav_band, width - margin * 2, 96)
+        footer_height = 118 if height < 700 else 94
+        footer_rect = pygame.Rect(
+            margin,
+            height - footer_height - margin,
+            width - margin * 2,
+            footer_height,
+        )
         content_top = header_rect.bottom + gap
-        content_height = footer_rect.top - gap - content_top
+        content_height = max(80, footer_rect.top - gap - content_top)
         if width < 1100:
             top_height = int((content_height - gap) * self._summary_top_section_ratio(width))
             left_rect = pygame.Rect(margin, content_top, width - margin * 2, top_height)
@@ -9322,11 +9605,12 @@ class TurnSummaryScene(BaseScene):
         if not self.summary_cinematic_active():
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width, height = surface.get_size()
         progress = self._summary_cinematic_progress()
         eased = 1.0 - (1.0 - progress) * (1.0 - progress)
         intensity = 0.56 if self.motion_mode is MotionMode.REDUCED else 1.0
-        rail_rect = pygame.Rect(36, 106, width - 72, 8)
+        rail_top = min(height - 52, 164 if height < 700 else 150)
+        rail_rect = pygame.Rect(36, rail_top, width - 72, 8)
         fill_alpha = int((1.0 - progress * 0.55) * 78 * intensity)
         pygame.draw.rect(
             surface,
@@ -9401,20 +9685,39 @@ class TurnSummaryScene(BaseScene):
     def _draw_summary_header(self, surface, rect) -> None:
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Turn Summary", accent=INFO)
-        title_surface = self.fonts.title.render(self._view_model.title, True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 28))
-        headline_surface = self.fonts.body.render(self._view_model.headline, True, INFO)
-        surface.blit(headline_surface, (inner.left, inner.top))
-        phase_left = inner.right - 310
+        phase_left = inner.right - 310 if inner.width >= 620 else inner.right
+        draw_text_line(
+            surface,
+            self.fonts.title,
+            self._view_model.title,
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 30, max(120, phase_left - inner.left - 12), 30),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            self._view_model.headline,
+            INFO,
+            pygame.Rect(inner.left, inner.top, max(120, phase_left - inner.left - 12), 22),
+            valign="top",
+        )
         for index, label in enumerate(self._view_model.phase_labels):
+            if inner.width < 620:
+                break
             chip_rect = pygame.Rect(phase_left + index * 100, inner.top, 92, 20)
             color = SELECTION if index <= self._phase_index() else BORDER
             fill = (34, 47, 66) if index <= self._phase_index() else (24, 35, 50)
             pygame.draw.rect(surface, fill, chip_rect, border_radius=10)
             pygame.draw.rect(surface, color, chip_rect, width=1, border_radius=10)
             chip_text_color = TEXT if index <= self._phase_index() else MUTED
-            chip_surface = self.fonts.small.render(label, True, chip_text_color)
-            surface.blit(chip_surface, (chip_rect.left + 8, chip_rect.top + 4))
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                label,
+                chip_text_color,
+                pygame.Rect(chip_rect.left + 8, chip_rect.top + 3, chip_rect.width - 16, 16),
+            )
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -9426,6 +9729,9 @@ class TurnSummaryScene(BaseScene):
         )
 
     def _draw_summary_main(self, surface, rect) -> None:
+        if rect.height < 240:
+            self._draw_summary_compact_main(surface, rect)
+            return
         pygame = self.pygame
         visible_metrics = self._view_model.metrics[: self._visible_metric_count()]
         metric_rows = max(1, (len(visible_metrics) + 2) // 3)
@@ -9530,7 +9836,93 @@ class TurnSummaryScene(BaseScene):
             idle_surface = self.fonts.body.render("No live product delta surfaced.", True, MUTED)
             surface.blit(idle_surface, (product_inner.left, product_inner.top))
 
+    def _draw_summary_compact_main(self, surface, rect) -> None:
+        pygame = self.pygame
+        metrics_motion = self._summary_motion_level("summary:metrics")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Metrics",
+            accent=GOOD,
+            emphasis=metrics_motion,
+            lift=int(metrics_motion * 2),
+        )
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Resolution Delta",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
+        visible_metrics = self._view_model.metrics[:2]
+        if not visible_metrics:
+            draw_text_line(
+                surface,
+                self.fonts.body,
+                "No metric delta surfaced.",
+                MUTED,
+                pygame.Rect(inner.left, inner.top, inner.width, 22),
+                valign="top",
+            )
+            return
+        gap = 10
+        cols = 2 if inner.width >= 520 and len(visible_metrics) > 1 else 1
+        card_width = int((inner.width - gap * (cols - 1)) / cols)
+        card_height = max(48, min(64, inner.height - 6))
+        for index, metric in enumerate(visible_metrics):
+            row = index // cols
+            col = index % cols
+            card_rect = pygame.Rect(
+                inner.left + col * (card_width + gap),
+                inner.top + row * (card_height + gap),
+                card_width,
+                card_height,
+            )
+            color = tone_color(metric.tone)
+            pygame.draw.rect(
+                surface,
+                blend_color((26, 38, 55), color, metrics_motion * 0.14),
+                card_rect,
+                border_radius=14,
+            )
+            pygame.draw.rect(surface, color, card_rect, width=1, border_radius=14)
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                metric.label.upper(),
+                blend_color(MUTED, color, metrics_motion * 0.45),
+                pygame.Rect(card_rect.left + 12, card_rect.top + 8, card_rect.width - 24, 16),
+                valign="top",
+            )
+            draw_text_line(
+                surface,
+                self.fonts.body,
+                metric.value_text,
+                TEXT,
+                pygame.Rect(card_rect.left + 12, card_rect.top + 26, card_rect.width - 24, 20),
+                valign="top",
+            )
+            if card_rect.height >= 58:
+                draw_progress_bar(
+                    surface,
+                    pygame,
+                    pygame.Rect(
+                        card_rect.left + 12,
+                        card_rect.bottom - 12,
+                        card_rect.width - 24,
+                        8,
+                    ),
+                    ratio=self._tweens.get(metric.key, metric.ratio),
+                    color=color,
+                    emphasis=metrics_motion,
+                )
+
     def _draw_summary_timeline(self, surface, rect) -> None:
+        if rect.height < 220:
+            self._draw_summary_compact_timeline(surface, rect)
+            return
         pygame = self.pygame
         strategy_height = self._summary_strategy_height(rect.height)
         strategy_rect = pygame.Rect(rect.left, rect.top, rect.width, strategy_height)
@@ -9565,6 +9957,49 @@ class TurnSummaryScene(BaseScene):
             top += 80
             if top + 70 > inner.bottom:
                 break
+
+    def _draw_summary_compact_timeline(self, surface, rect) -> None:
+        pygame = self.pygame
+        timeline_motion = self._summary_motion_level("summary:timeline")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Next",
+            accent=WARN,
+            emphasis=timeline_motion,
+            lift=int(timeline_motion * 2),
+        )
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Next Step",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.body,
+            self._summary_focus_command_title(max_length=26),
+            INFO,
+            pygame.Rect(inner.left, inner.top, inner.width, 22),
+            valign="top",
+        )
+        event_text = (
+            self._events[0].detail
+            if self._events
+            else self._view_model.strategic_headline or self._view_model.footer
+        )
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            event_text,
+            MUTED,
+            pygame.Rect(inner.left, inner.top + 26, inner.width, max(20, inner.height - 30)),
+            line_height=15,
+            max_lines=2,
+        )
 
     def _summary_strategy_height(self, total_height: int) -> int:
         if total_height < 220:
@@ -9655,15 +10090,21 @@ class TurnSummaryScene(BaseScene):
         pygame = self.pygame
         inner = draw_panel(surface, pygame, rect, title="Continue", accent=INFO)
         compact = rect.width < 760
-        footer_surface = self.fonts.small.render(
+        draw_text_line(
+            surface,
+            self.fonts.small,
             "Press Space or click Continue." if compact else self._view_model.footer,
-            True,
             TEXT,
+            pygame.Rect(inner.left, inner.top - 2, inner.width, 18),
+            valign="top",
         )
-        surface.blit(footer_surface, (inner.left, inner.top - 2))
-        continue_rect = pygame.Rect(inner.left, inner.top + 24, 200, 38)
-        save_rect = pygame.Rect(inner.left + 216, inner.top + 24, 170, 38)
-        close_rect = pygame.Rect(inner.left + 402, inner.top + 24, 170, 38)
+        button_gap = 10
+        button_top = inner.top + 24
+        available_width = inner.width
+        button_width = int((available_width - button_gap * 2) / 3)
+        continue_rect = pygame.Rect(inner.left, button_top, button_width, 38)
+        save_rect = pygame.Rect(continue_rect.right + button_gap, button_top, button_width, 38)
+        close_rect = pygame.Rect(save_rect.right + button_gap, button_top, button_width, 38)
         draw_button(
             surface,
             pygame,

@@ -1507,6 +1507,7 @@ def test_run_scene_pause_and_back_hotkeys_are_distinct() -> None:
 
         scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_p, unicode="p"))
         assert scene._pause_overlay_visible
+        scene.draw(_surface)
         scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
         assert not scene._pause_overlay_visible
 
@@ -1516,6 +1517,7 @@ def test_run_scene_pause_and_back_hotkeys_are_distinct() -> None:
         assert not scene._pause_overlay_visible
         scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
         assert scene._pause_overlay_visible
+        scene.draw(_surface)
         assert not scene.should_exit
     finally:
         pygame.quit()

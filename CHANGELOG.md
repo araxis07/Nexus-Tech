@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.147.0 - 2026-06-12
+
+- Reworked the 2D title, run, summary, and review layouts with reserved navigation space so persistent Back/Pause/Menu controls no longer overlap scene headers
+- Added compact 820x620 render paths for title menu grids, run focus strips, turn-summary metrics, and review findings so cards and buttons stop spilling outside their panels
+- Reduced transition and actor-sprite visual interference so motion accents support readability instead of cutting through text, chips, or action controls
+- Fixed the pause overlay turn label to use the real `current_turn` field and added draw-path regression coverage so opening Pause no longer crashes with a missing `Company.turn` attribute
+
 ## 0.146.0 - 2026-06-12
 
 - Added persistent top navigation rails across the 2D title, run, summary, and review scenes so Back, Pause, Continue, Save, Help, and Close actions are visible instead of hidden behind keyboard memory
