@@ -2178,6 +2178,13 @@ class TitleScene(BaseScene):
                     detail_font=self.fonts.small,
                 )
                 self._click_targets.append(ClickTarget("menu", payload, button_rect))
+            guide_top = max(top + 8, action_rect.top + button_height * 2 + button_gap + 14)
+            guide_height = min(96, max(0, inner.bottom - guide_top))
+            if guide_height >= 52:
+                self._draw_meta_compact_guides(
+                    surface,
+                    pygame.Rect(inner.left, guide_top, inner.width, guide_height),
+                )
         else:
             top = action_rect.top
             for title, detail, payload, accent in buttons:
@@ -2194,6 +2201,45 @@ class TitleScene(BaseScene):
                 )
                 self._click_targets.append(ClickTarget("menu", payload, button_rect))
                 top += 70
+
+    def _draw_meta_compact_guides(self, surface, rect) -> None:
+        pygame = self.pygame
+        cards = (
+            ("Current", f"{len(self._save_cards)} saves ready", INFO),
+            ("Archive", f"{len(self._archive_cards)} runs reviewed", GOOD),
+            ("Next", self._compact_text(self._meta_progression.next_reward, 34), WARN),
+        )
+        gap = 10
+        card_width = int((rect.width - gap * (len(cards) - 1)) / len(cards))
+        left = rect.left
+        for title, detail, accent in cards:
+            card_rect = pygame.Rect(left, rect.top, card_width, rect.height)
+            pygame.draw.rect(surface, (22, 34, 52), card_rect, border_radius=12)
+            pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=12)
+            pygame.draw.rect(
+                surface,
+                accent,
+                (card_rect.left + 1, card_rect.top + 1, card_rect.width - 2, 4),
+                border_radius=4,
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                title,
+                TEXT,
+                pygame.Rect(card_rect.left + 10, card_rect.top + 10, card_rect.width - 20, 16),
+                valign="top",
+            )
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                detail,
+                MUTED,
+                pygame.Rect(card_rect.left + 10, card_rect.top + 28, card_rect.width - 20, 36),
+                line_height=14,
+                max_lines=2,
+            )
+            left += card_width + gap
 
     def _draw_save_slot_browser(self, surface, rect) -> None:
         self._draw_card_browser(

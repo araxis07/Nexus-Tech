@@ -174,6 +174,20 @@ def test_2d_widget_text_fit_ellipsizes_to_available_width() -> None:
         pygame.quit()
 
 
+def test_2d_font_pack_keeps_compact_layout_metrics_stable() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        assert fonts.title.get_height() <= 28
+        assert fonts.heading.get_height() <= 20
+        assert fonts.body.get_height() <= 16
+        assert fonts.small.get_height() <= 13
+        assert fonts.mono.get_height() <= 14
+        assert fonts.heading.size("Action Bar")[0] <= 120
+        assert fonts.small.size("Space End Turn")[0] <= 120
+    finally:
+        pygame.quit()
+
+
 def test_2d_widget_wrapping_and_buttons_stay_inside_compact_rects() -> None:
     pygame, fonts, surface = _build_pygame_bundle()
     try:

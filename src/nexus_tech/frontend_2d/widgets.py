@@ -31,15 +31,21 @@ class FontPack:
 
 
 def create_fonts(pygame) -> FontPack:
-    """Build a compact font set with system fallbacks."""
+    """Build a compact font set with deterministic metrics across OS runners."""
 
     return FontPack(
-        title=pygame.font.SysFont("Avenir Next, Helvetica Neue, Arial", 28, bold=True),
-        heading=pygame.font.SysFont("Avenir Next, Helvetica Neue, Arial", 18, bold=True),
-        body=pygame.font.SysFont("Avenir Next, Helvetica Neue, Arial", 15),
-        small=pygame.font.SysFont("Avenir Next, Helvetica Neue, Arial", 12),
-        mono=pygame.font.SysFont("Menlo, Monaco, Courier New", 14),
+        title=_default_font(pygame, 34, bold=True),
+        heading=_default_font(pygame, 24, bold=True),
+        body=_default_font(pygame, 20),
+        small=_default_font(pygame, 17),
+        mono=_default_font(pygame, 18),
     )
+
+
+def _default_font(pygame, size: int, *, bold: bool = False):
+    font = pygame.font.Font(None, size)
+    font.set_bold(bold)
+    return font
 
 
 def tone_color(tone: str) -> tuple[int, int, int]:

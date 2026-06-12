@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.148.0 - 2026-06-12
+
+- Switched the 2D frontend font pack to bundled pygame fonts with deterministic metrics so compact layouts render consistently across local macOS sessions and Ubuntu CI runners
+- Added font-metric regression coverage to keep title, heading, body, small, and mono text from growing large enough to overlap compact 2D panels
+- Rechecked the 2D visual and animation audit gates after the layout hardening so follow-up pushes catch renderer-specific UI regressions earlier
+
 ## 0.147.0 - 2026-06-12
 
 - Reworked the 2D title, run, summary, and review layouts with reserved navigation space so persistent Back/Pause/Menu controls no longer overlap scene headers
