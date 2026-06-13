@@ -3301,11 +3301,15 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-timeline" in title_menu.active_layers
     assert "sprite-clips" in title_menu.active_layers
     assert "actor-readability" in title_menu.active_layers
+    assert "actor-pose-depth" in title_menu.active_layers
     assert any(layer.startswith("actor-state:") for layer in title_menu.active_layers)
+    assert any(layer.startswith("actor-pose:") for layer in title_menu.active_layers)
     assert "actor-timeline" in dashboard.active_layers
     assert "sprite-clips" in dashboard.active_layers
     assert "actor-readability" in dashboard.active_layers
+    assert "actor-pose-depth" in dashboard.active_layers
     assert "actor-state:handoff" in dashboard.active_layers
+    assert "actor-pose:handoff" in dashboard.active_layers
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
     assert "pending" in pending.active_layers
@@ -3325,11 +3329,13 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-timeline" in inspector.active_layers
     assert "sprite-clips" in inspector.active_layers
     assert "actor-readability" in inspector.active_layers
+    assert "actor-pose-depth" in inspector.active_layers
     assert "endgame-actor" in endgame.active_layers
     assert "deep-panel" in endgame.active_layers
     assert "actor-timeline" in endgame.active_layers
     assert "sprite-clips" in endgame.active_layers
     assert "actor-readability" in endgame.active_layers
+    assert "actor-pose-depth" in endgame.active_layers
     assert "outcome" in outcome.active_layers
     assert "outcome-cinematic" in outcome.active_layers
     assert "summary-reveal" in summary.active_layers
@@ -3339,10 +3345,35 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-timeline" in summary.active_layers
     assert "sprite-clips" in summary.active_layers
     assert "actor-readability" in summary.active_layers
+    assert "actor-pose-depth" in summary.active_layers
     assert "review-actor" in review.active_layers
     assert "actor-timeline" in review.active_layers
     assert "sprite-clips" in review.active_layers
     assert "actor-readability" in review.active_layers
+    assert "actor-pose-depth" in review.active_layers
+
+
+def test_actor_sprite_pose_key_defaults_to_state_depth() -> None:
+    blocked = scenes_module.ActorSpriteClip(
+        key="blocked",
+        label="Blocked Ops",
+        role="Ops",
+        state="blocked",
+        accent=DANGER,
+        lane="risk",
+    )
+    custom = scenes_module.ActorSpriteClip(
+        key="custom",
+        label="Coach",
+        role="Advisor",
+        state="idle",
+        accent=DANGER,
+        lane="team",
+        pose="coach",
+    )
+
+    assert blocked.pose_key == "block"
+    assert custom.pose_key == "coach"
 
 
 def test_visual_audit_cell_fails_visual_fatigue_thresholds() -> None:
@@ -3399,6 +3430,8 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "actor-timeline" in areas["Sprite/Actor Layer"].active_layers
     assert "sprite-clips" in areas["Sprite/Actor Layer"].active_layers
     assert "actor-readability" in areas["Sprite/Actor Layer"].active_layers
+    assert "actor-pose-depth" in areas["Sprite/Actor Layer"].active_layers
+    assert "actor-pose-depth" in areas["Sprite/Actor Layer"].required_layers
     assert areas["Actor State Coverage"].status == "pass"
     assert "actor-state:blocked" in areas["Actor State Coverage"].required_layers
     assert "state-group:baseline" in areas["Actor State Coverage"].active_layers

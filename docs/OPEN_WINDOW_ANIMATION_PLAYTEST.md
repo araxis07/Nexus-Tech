@@ -72,6 +72,7 @@ Record `pass`, `watch`, or `fail` for each control area before calling the anima
 | Menu Return | Pause -> Menu saves and returns to the 2D title shell when the run has a title shell |
 | Help / Hover | `F1`, `?`, hover tooltips, and hand cursor feedback make clickable controls obvious |
 | Motion Modes | Full, reduced, and off modes keep the same clickable actions and readable labels |
+| Actor Poses | Actor cards show distinct blocked, warning, build, handoff, coaching, deal, and win poses without covering card copy |
 
 ## Failure Rules
 
@@ -79,8 +80,9 @@ Record `pass`, `watch`, or `fail` for each control area before calling the anima
 - Any unreadable disabled reason is a release blocker.
 - Any actor/readability collision at `820x620` is a release blocker.
 - Any missing/unclear blocked actor state is a release blocker.
+- Any missing `actor-pose-depth` cue or unclear actor body-language cue is a release blocker.
 - Any unclear pause, back, help, save, or menu behavior is a release blocker.
-- Any `Actor State Coverage`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, or `actor-readability` audit failure is a release blocker.
+- Any `Actor State Coverage`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, `actor-pose-depth`, or `actor-readability` audit failure is a release blocker.
 - Any `audit-2d-animation-matrix` failure in the default seven-scenario, three-seed presentation set is a release blocker.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.
 

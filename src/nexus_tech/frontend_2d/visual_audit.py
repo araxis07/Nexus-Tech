@@ -846,6 +846,7 @@ def _active_layers(scene) -> tuple[str, ...]:
     if getattr(scene, "actor_timeline_active", lambda: False)():
         layers.append("actor-timeline")
         layers.extend(_actor_state_layers(scene))
+        layers.extend(_actor_pose_layers(scene))
     if getattr(scene, "sprite_clips_active", lambda: False)():
         layers.append("sprite-clips")
     if getattr(scene, "title_actor_active", lambda: False)():
@@ -871,6 +872,23 @@ def _active_layers(scene) -> tuple[str, ...]:
 
 def _actor_state_layers(scene) -> tuple[str, ...]:
     states: set[str] = set()
+    for clip in _iter_actor_sprite_clips(scene):
+        states.add(f"actor-state:{clip.state}")
+    return tuple(sorted(states))
+
+
+def _actor_pose_layers(scene) -> tuple[str, ...]:
+    poses: set[str] = set()
+    for clip in _iter_actor_sprite_clips(scene):
+        pose_key = getattr(clip, "pose_key", None)
+        if isinstance(pose_key, str) and pose_key:
+            poses.add(f"actor-pose:{pose_key}")
+    if not poses:
+        return ()
+    return ("actor-pose-depth", *tuple(sorted(poses)))
+
+
+def _iter_actor_sprite_clips(scene):
     for method_name in (
         "_title_actor_sprite_clips",
         "_run_actor_sprite_clips",
@@ -883,8 +901,7 @@ def _actor_state_layers(scene) -> tuple[str, ...]:
         if not callable(method):
             continue
         for clip in method():
-            states.add(f"actor-state:{clip.state}")
-    return tuple(sorted(states))
+            yield clip
 
 
 def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tuple[str, ...]:
@@ -913,6 +930,7 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "endgame-actor",
         "review-actor",
         "actor-readability",
+        "actor-pose-depth",
     }
     return tuple(layer for layer in layers if layer not in disabled_layers)
 

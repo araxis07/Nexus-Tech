@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.144.0`
-- Focus: 2D actor/sprite timeline, actor-state coverage, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.151.0`
+- Focus: 2D actor/sprite timeline, actor-state coverage, actor-pose-depth, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
 
@@ -21,6 +21,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Title/menu flow: wizard, save slots, archive/meta, and title transitions remain readable.
 - Run dashboard: founder/team/customer/board/product actor clips are visible without covering snapshot chips, stat bars, product cards, or action buttons.
 - Automated guard: `audit-2d-animation` reports `actor-readability` for actor scenes before the manual open-window pass.
+- Automated guard: `audit-2d-animation` reports `actor-pose-depth` so blocked, warning, build, handoff, coaching, deal, and win poses are visible before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Actor State Coverage` so baseline, positive, pressure, and blocked sprite reactions are present before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Visual Fatigue Budget` so clutter and bright-pixel pressure stay within deterministic limits before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Animation Pacing Budget` so active motion density, pulse cooldown, and frame timing stay within release limits before the manual pass.

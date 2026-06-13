@@ -157,6 +157,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sprite-clips",
             "title-actor",
             "actor-readability",
+            "actor-pose-depth",
         ),
     ),
     (
@@ -169,6 +170,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "actor-timeline",
             "sprite-clips",
             "actor-readability",
+            "actor-pose-depth",
         ),
     ),
     ("run_drama_feedback", "Product/Risk Drama", ("product-drama", "risk-drama")),
@@ -198,6 +200,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sprite-clips",
             "inspector-actor",
             "actor-readability",
+            "actor-pose-depth",
         ),
     ),
     (
@@ -209,6 +212,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sprite-clips",
             "endgame-actor",
             "actor-readability",
+            "actor-pose-depth",
         ),
     ),
     (
@@ -227,6 +231,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "actor-timeline",
             "sprite-clips",
             "actor-readability",
+            "actor-pose-depth",
         ),
     ),
     (
@@ -239,6 +244,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sprite-clips",
             "review-actor",
             "actor-readability",
+            "actor-pose-depth",
         ),
     ),
 )
@@ -850,13 +856,14 @@ def _build_actor_sprite_cell(
         "actor-timeline",
         "sprite-clips",
         "actor-readability",
+        "actor-pose-depth",
         "actor-off-gate",
     )
     visual_actor_layers = {
         layer
         for cell in visual_report.cells
         for layer in cell.active_layers
-        if layer in {"actor-timeline", "sprite-clips", "actor-readability"}
+        if layer in {"actor-timeline", "sprite-clips", "actor-readability", "actor-pose-depth"}
     }
     full_active = any(
         cell.actor_timeline_active_samples > 0 and cell.sprite_clips_active_samples > 0
@@ -871,7 +878,7 @@ def _build_actor_sprite_cell(
     )
     missing = tuple(
         layer
-        for layer in ("actor-timeline", "sprite-clips", "actor-readability")
+        for layer in ("actor-timeline", "sprite-clips", "actor-readability", "actor-pose-depth")
         if layer not in active_layers
     )
     status = "pass" if not missing and full_active and off_disabled else "fail"

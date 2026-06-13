@@ -63,6 +63,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
 - Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
+- Treat missing `actor-pose-depth` layers as release blockers before presenting new actor/sprite reactions.
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.
 - Treat `Animation Pacing Budget` failures as release blockers before adding more full-mode motion layers.

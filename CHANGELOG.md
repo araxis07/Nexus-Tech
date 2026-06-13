@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.151.0 - 2026-06-13
+
+- Added actor pose-depth cues inside existing 2D sprite cards so blocked, warning, build, handoff, coaching, deal, and win states read as distinct body language without expanding compact layouts
+- Added `actor-pose-depth` visual telemetry and required animation audit coverage so actor pose clarity is checked alongside actor-state and actor-readability gates
+- Updated animation playtest and release documentation so missing actor pose-depth cues are treated as blockers before manual open-window review
+
 ## 0.150.0 - 2026-06-13
 
 - Added explicit manual control-clarity gates to the 2D animation playtest prep report so pause, back, help, hover, menu return, and motion-mode behavior are checked before calling animation complete

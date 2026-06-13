@@ -191,6 +191,13 @@ class ActorSpriteClip:
     lane: str
     delay: float = 0.0
     phase_offset: float = 0.0
+    pose: str | None = None
+
+    @property
+    def pose_key(self) -> str:
+        """Return the readable pose cue used by the lightweight sprite renderer."""
+
+        return _actor_pose_key(self.state, self.pose)
 
 
 @dataclass(frozen=True)
@@ -608,6 +615,50 @@ def _actor_state_badge(state: str) -> str:
     }.get(state, ".")
 
 
+_ACTOR_STATE_POSES: dict[str, str] = {
+    "idle": "steady",
+    "build": "build",
+    "handoff": "handoff",
+    "shipping": "handoff",
+    "success": "win",
+    "celebrating": "win",
+    "coaching": "coach",
+    "negotiating": "deal",
+    "risk": "warn",
+    "alert": "warn",
+    "blocked": "block",
+    "firefighting": "fire",
+}
+
+_ACTOR_POSE_BADGES: dict[str, str] = {
+    "steady": "I",
+    "build": "B",
+    "handoff": ">",
+    "win": "+",
+    "coach": "?",
+    "deal": "$",
+    "warn": "!",
+    "block": "X",
+    "fire": "!",
+}
+
+
+def _actor_pose_key(state: str, pose: str | None = None) -> str:
+    return pose or _ACTOR_STATE_POSES.get(state, "steady")
+
+
+def _actor_pose_badge(pose: str) -> str:
+    return _ACTOR_POSE_BADGES.get(pose, ".")
+
+
+def _actor_pose_color(pose: str, accent: tuple[int, int, int]) -> tuple[int, int, int]:
+    if pose in {"warn", "fire", "block"}:
+        return DANGER if pose == "block" else WARN
+    if pose == "win":
+        return GOOD
+    return blend_color(accent, INFO if pose in {"coach", "handoff"} else TEXT, 0.22)
+
+
 def _draw_actor_sprite_clip(
     *,
     pygame,
@@ -649,6 +700,7 @@ def _draw_actor_sprite_clip(
     torso_y = int(feet_y - 20 + bob)
     head_y = int(torso_y - 10)
     accent = clip.accent
+    pose = clip.pose_key
     shadow_rect = pygame.Rect(center_x - 13, local_rect.bottom - 11, 28, 5)
     pygame.draw.ellipse(local, (*blend_color(BACKGROUND, accent, 0.18), 130), shadow_rect)
     pygame.draw.circle(local, (*blend_color(TEXT, accent, 0.18), 235), (center_x, head_y), 7)
@@ -656,20 +708,53 @@ def _draw_actor_sprite_clip(
     body_rect = pygame.Rect(center_x - 7, torso_y - 1, 14, 18)
     pygame.draw.rect(local, (*accent, 220), body_rect, border_radius=6)
     arm_swing = sin(phase + 0.8) * 5 * intensity
+    left_arm_end = (int(center_x - 15), int(torso_y + 12 + arm_swing))
+    right_arm_end = (int(center_x + 15), int(torso_y + 12 - arm_swing))
+    if pose in {"warn", "fire", "win"}:
+        left_arm_end = (center_x - 13, int(torso_y - 5))
+        right_arm_end = (center_x + 13, int(torso_y - 5))
+    elif pose in {"handoff", "deal"}:
+        right_arm_end = (center_x + 19, int(torso_y + 4))
+    elif pose == "coach":
+        right_arm_end = (center_x + 12, int(torso_y - 4))
+    elif pose == "build":
+        right_arm_end = (center_x + 16, int(torso_y + 14))
+    elif pose == "block":
+        left_arm_end = (center_x + 10, int(torso_y + 13))
+        right_arm_end = (center_x - 10, int(torso_y + 13))
     pygame.draw.line(
         local,
         (*blend_color(TEXT, accent, 0.2), 220),
         (center_x - 7, torso_y + 5),
-        (int(center_x - 15), int(torso_y + 12 + arm_swing)),
+        left_arm_end,
         2,
     )
     pygame.draw.line(
         local,
         (*blend_color(TEXT, accent, 0.2), 220),
         (center_x + 7, torso_y + 5),
-        (int(center_x + 15), int(torso_y + 12 - arm_swing)),
+        right_arm_end,
         2,
     )
+    if pose == "block":
+        pygame.draw.line(
+            local,
+            (*DANGER, 230),
+            (center_x - 9, torso_y + 2),
+            (center_x + 9, torso_y + 17),
+            2,
+        )
+        pygame.draw.line(
+            local,
+            (*DANGER, 230),
+            (center_x + 9, torso_y + 2),
+            (center_x - 9, torso_y + 17),
+            2,
+        )
+    elif pose == "build":
+        pygame.draw.circle(local, (*blend_color(WARN, accent, 0.18), 220), right_arm_end, 3)
+    elif pose == "deal":
+        pygame.draw.circle(local, (*WARN, 220), right_arm_end, 3)
     leg_swing = sin(phase + 1.7) * 4 * intensity
     pygame.draw.line(
         local,
@@ -698,6 +783,22 @@ def _draw_actor_sprite_clip(
         (
             badge_center[0] - badge.get_width() // 2,
             badge_center[1] - badge.get_height() // 2,
+        ),
+    )
+
+    pose_color = _actor_pose_color(pose, accent)
+    pose_center = (38, max(15, local_rect.bottom - 13))
+    pose_rect = pygame.Rect(pose_center[0] - 6, pose_center[1] - 6, 12, 12)
+    pygame.draw.rect(
+        local, (*blend_color(BACKGROUND, pose_color, 0.18), 235), pose_rect, border_radius=4
+    )
+    pygame.draw.rect(local, (*pose_color, 235), pose_rect, width=1, border_radius=4)
+    pose_badge = fonts.small.render(_actor_pose_badge(pose), True, pose_color)
+    local.blit(
+        pose_badge,
+        (
+            pose_center[0] - pose_badge.get_width() // 2,
+            pose_center[1] - pose_badge.get_height() // 2,
         ),
     )
 
