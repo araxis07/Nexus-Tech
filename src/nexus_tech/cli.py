@@ -1111,6 +1111,14 @@ def prepare_2d_animation_playtest_command(
         scenes_table.add_row(scene, required_check, "todo")
     console.print(scenes_table)
 
+    feedback_table = Table(title="Manual Game Feel Gate")
+    feedback_table.add_column("Feedback", style="cyan")
+    feedback_table.add_column("Required Check")
+    feedback_table.add_column("Result", justify="center")
+    for area, required_check in prep_report.feedback_checks:
+        feedback_table.add_row(area, required_check, "todo")
+    console.print(feedback_table)
+
     border_style = "green" if prep_report.status == "ready" else "red"
     console.print(
         Panel.fit(

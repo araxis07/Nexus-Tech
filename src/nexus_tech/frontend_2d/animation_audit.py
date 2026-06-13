@@ -70,6 +70,27 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS: tuple[tuple[str, str], ...] = (
     ("Turn Summary", "Timeline cards reveal readably and actors do not hide metrics."),
     ("Outcome/Review", "Final cinematic and review actors do not hide after-action notes."),
 )
+DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS: tuple[tuple[str, str], ...] = (
+    (
+        "Success Feedback",
+        "After a successful command, the player can tell which workspace or product changed.",
+    ),
+    (
+        "Blocked Feedback",
+        (
+            "Blocked commands show a readable reason and a clear target "
+            "without hiding primary actions."
+        ),
+    ),
+    (
+        "Impact Values",
+        "Cash, users, reputation, board, and product deltas are readable before the cue fades.",
+    ),
+    (
+        "Actor + Feedback Match",
+        "Actor pose, action cue, and metric pulse describe the same outcome instead of competing.",
+    ),
+)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
@@ -179,11 +200,26 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Pending Event Preview",
         ("pending", "overlay-transition", "pending-choice-preview"),
     ),
-    ("run_impact_feedback", "Impact Feedback", ("impact-cue", "action-feedback")),
+    (
+        "run_impact_feedback",
+        "Impact Feedback",
+        (
+            "impact-cue",
+            "impact-cue-targets",
+            "impact-value-label",
+            "action-feedback",
+            "action-feedback-targets",
+        ),
+    ),
     (
         "run_blocked_feedback",
         "Blocked Action Feedback",
-        ("action-feedback", "blocked-action-feedback"),
+        (
+            "action-feedback",
+            "action-feedback-targets",
+            "blocked-action-feedback",
+            "blocked-action-reason",
+        ),
     ),
     (
         "run_picker_feedback",
@@ -329,6 +365,7 @@ class AnimationPlaytestPrepReport:
     motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES
     control_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS
     scene_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS
+    feedback_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS
     visual_artifact_name: str = "nexus-tech-2d-visual-audit"
     matrix_artifact_name: str = "nexus-tech-2d-animation-matrix"
     playtest_artifact_name: str = "nexus-tech-2d-animation-playtest-prep"
@@ -394,6 +431,7 @@ def run_2d_animation_audit(
     )
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_actor_state_coverage_cell(visual_report))
+    cells.append(_build_action_feedback_clarity_cell(visual_report))
     cells.append(_build_visual_fatigue_cell(visual_report))
     cells.append(_build_animation_pacing_cell(motion_report))
     cells.append(_build_scene_motion_profile_cell(visual_report))
@@ -500,6 +538,7 @@ def build_2d_animation_playtest_prep_report(
     motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
     control_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS,
     scene_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS,
+    feedback_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS,
 ) -> AnimationPlaytestPrepReport:
     """Build the report shell used before the real open-window animation pass."""
 
@@ -510,6 +549,7 @@ def build_2d_animation_playtest_prep_report(
         motion_modes=motion_modes,
         control_checks=control_checks,
         scene_checks=scene_checks,
+        feedback_checks=feedback_checks,
     )
 
 
@@ -617,6 +657,17 @@ def write_2d_animation_playtest_prep_report(
     lines.extend(
         [
             "",
+            "## Game Feel Checklist",
+            "",
+            "| Feedback Area | Required Human Judgment | Result |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for area, required_judgment in report.feedback_checks:
+        lines.append(f"| {area} | {required_judgment} | `todo` |")
+    lines.extend(
+        [
+            "",
             "## Manual Completion Gate",
             "",
             "- Every window/motion cell must be `pass` or an accepted `watch` with a named owner.",
@@ -625,6 +676,10 @@ def write_2d_animation_playtest_prep_report(
                 "or menu behavior is a blocker."
             ),
             "- Every scene row must be `pass` before adding more animation layers.",
+            (
+                "- Every game-feel row must be `pass`; unclear success, blocked, "
+                "or impact feedback is a blocker."
+            ),
             (
                 "- Keep generated PNGs and local readiness reports out of git; commit only "
                 "source, tests, and docs."
@@ -939,6 +994,43 @@ def _build_actor_state_coverage_cell(visual_report: VisualAuditReport) -> Animat
         ),
         active_layers=active_layers,
         status="pass" if not findings else "fail",
+        notes=notes,
+    )
+
+
+def _build_action_feedback_clarity_cell(
+    visual_report: VisualAuditReport,
+) -> AnimationCoverageCell:
+    required_layers = (
+        "action-feedback",
+        "action-feedback-targets",
+        "blocked-action-feedback",
+        "blocked-action-reason",
+        "impact-cue",
+        "impact-cue-targets",
+        "impact-value-label",
+    )
+    interesting_layers = set(required_layers)
+    active_layers = tuple(
+        sorted(
+            {
+                layer
+                for cell in visual_report.cells
+                for layer in cell.active_layers
+                if layer in interesting_layers or layer.startswith("action-family:")
+            }
+        )
+    )
+    missing = tuple(layer for layer in required_layers if layer not in active_layers)
+    status = "pass" if not missing else "fail"
+    notes = "success, blocked, and impact cues expose targets, values, and reasons"
+    if missing:
+        notes = f"missing {','.join(missing)}"
+    return AnimationCoverageCell(
+        area="Action Feedback Clarity",
+        required_layers=required_layers,
+        active_layers=active_layers,
+        status=status,
         notes=notes,
     )
 

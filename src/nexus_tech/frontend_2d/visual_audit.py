@@ -825,10 +825,21 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("inspector")
     if getattr(scene, "_action_feedback_cues", ()):
         layers.append("action-feedback")
+        if any(cue.targets for cue in scene._action_feedback_cues):
+            layers.append("action-feedback-targets")
+        layers.extend(
+            sorted({f"action-family:{cue.family}" for cue in scene._action_feedback_cues})
+        )
         if any(cue.outcome == "blocked" for cue in scene._action_feedback_cues):
             layers.append("blocked-action-feedback")
+        if any(cue.outcome == "blocked" and cue.detail for cue in scene._action_feedback_cues):
+            layers.append("blocked-action-reason")
     if getattr(scene, "_impact_cues", ()):
         layers.append("impact-cue")
+        if any(cue.targets for cue in scene._impact_cues):
+            layers.append("impact-cue-targets")
+        if any(cue.value_text for cue in scene._impact_cues):
+            layers.append("impact-value-label")
     if getattr(scene, "overlay_transition_active", lambda: False)():
         layers.append("overlay-transition")
     if getattr(scene, "product_drama_active", lambda: False)():
@@ -911,8 +922,12 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "transition",
         "motion-pulses",
         "action-feedback",
+        "action-feedback-targets",
         "blocked-action-feedback",
+        "blocked-action-reason",
         "impact-cue",
+        "impact-cue-targets",
+        "impact-value-label",
         "overlay-transition",
         "product-drama",
         "risk-drama",

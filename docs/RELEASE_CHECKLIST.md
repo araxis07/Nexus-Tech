@@ -65,6 +65,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat missing `actor-pose-depth` layers as release blockers before presenting new actor/sprite reactions.
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.
+- Treat `Action Feedback Clarity` failures as release blockers before presenting new action, blocked-action, or impact feedback.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.
 - Treat `Animation Pacing Budget` failures as release blockers before adding more full-mode motion layers.
 - Treat `Motion Mode Differentiation` failures as release blockers before changing full/reduced/off animation behavior.

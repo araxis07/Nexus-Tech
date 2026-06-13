@@ -3316,8 +3316,14 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "pending-choice-preview" in pending.active_layers
     assert "impact-cue" in impact.active_layers
     assert "action-feedback" in impact.active_layers
+    assert "impact-cue-targets" in impact.active_layers
+    assert "impact-value-label" in impact.active_layers
+    assert "action-feedback-targets" in impact.active_layers
+    assert "action-family:product" in impact.active_layers
     assert "action-feedback" in blocked.active_layers
+    assert "action-feedback-targets" in blocked.active_layers
     assert "blocked-action-feedback" in blocked.active_layers
+    assert "blocked-action-reason" in blocked.active_layers
     assert "actor-state:blocked" in blocked.active_layers
     assert "picker" in picker.active_layers
     assert "overlay-transition" in picker.active_layers
@@ -3437,6 +3443,11 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "state-group:baseline" in areas["Actor State Coverage"].active_layers
     assert "state-group:positive" in areas["Actor State Coverage"].active_layers
     assert "state-group:pressure" in areas["Actor State Coverage"].active_layers
+    assert areas["Action Feedback Clarity"].status == "pass"
+    assert "action-feedback-targets" in areas["Action Feedback Clarity"].active_layers
+    assert "blocked-action-reason" in areas["Action Feedback Clarity"].active_layers
+    assert "impact-value-label" in areas["Action Feedback Clarity"].active_layers
+    assert "impact-cue-targets" in areas["Action Feedback Clarity"].required_layers
     assert areas["Visual Fatigue Budget"].status == "pass"
     assert "visual-health" in areas["Visual Fatigue Budget"].active_layers
     assert areas["Animation Pacing Budget"].status == "pass"
@@ -3601,7 +3612,12 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "## Control Clarity Checklist" in report_text
     assert "Pause / Resume" in report_text
     assert "Back / Escape" in report_text
+    assert "## Game Feel Checklist" in report_text
+    assert "Success Feedback" in report_text
+    assert "Blocked Feedback" in report_text
+    assert "Impact Values" in report_text
     assert "## Manual Completion Gate" in report_text
+    assert "Every game-feel row must be `pass`" in report_text
     assert "manual signoff required before calling animation complete" in report_text
     assert "nexus-tech-2d-visual-audit" in report_text
     assert "nexus-tech-2d-animation-matrix" in report_text
@@ -3941,6 +3957,7 @@ def test_prepare_2d_animation_playtest_command_writes_prep_report(
     assert "2D Animation Playtest Prep" in result.output
     assert "Manual Control Clarity Gate" in result.output
     assert "Manual Scene Animation Gate" in result.output
+    assert "Manual Game Feel Gate" in result.output
     assert "Manual Signoff Required" in result.output
     assert "Status READY" in result.output
     assert "Animation playtest prep report written" in result.output

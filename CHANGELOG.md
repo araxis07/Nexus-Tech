@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.152.0 - 2026-06-13
+
+- Added `Action Feedback Clarity` to the 2D animation audit so successful actions, blocked commands, and impact deltas must expose readable targets, values, and blocked reasons
+- Expanded visual audit telemetry with action-family, action-target, impact-target, impact-value, and blocked-reason layers so game-feel feedback can be release-gated instead of only seen in manual play
+- Added a manual Game Feel checklist to the animation playtest prep report so open-window passes explicitly judge success feedback, blocked feedback, impact values, and actor/feedback alignment
+
 ## 0.151.0 - 2026-06-13
 
 - Added actor pose-depth cues inside existing 2D sprite cards so blocked, warning, build, handoff, coaching, deal, and win states read as distinct body language without expanding compact layouts
