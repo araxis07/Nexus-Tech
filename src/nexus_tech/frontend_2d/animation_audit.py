@@ -69,6 +69,10 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS: tuple[tuple[str, str], ...] = (
     ("Endgame Board", "Path-fix buttons stay primary while cockpit motion stays secondary."),
     ("Turn Summary", "Timeline cards reveal readably and actors do not hide metrics."),
     ("Outcome/Review", "Final cinematic and review actors do not hide after-action notes."),
+    (
+        "Scene Handoffs",
+        ("Boot, run, summary, and review transitions feel purposeful without hiding navigation."),
+    ),
 )
 DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS: tuple[tuple[str, str], ...] = (
     (
@@ -100,6 +104,13 @@ _ACTOR_STATE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("baseline", frozenset({"idle", "build", "handoff"})),
     ("positive", frozenset({"success", "shipping", "coaching", "negotiating"})),
     ("pressure", frozenset({"risk", "alert", "blocked", "firefighting"})),
+)
+
+_REQUIRED_TRANSITION_KEYS: tuple[str, ...] = (
+    "transition-key:boot_title",
+    "transition-key:boot_run",
+    "transition-key:run_to_summary",
+    "transition-key:run_to_review",
 )
 
 _MOTION_PROFILE_LAYERS = {
@@ -428,6 +439,9 @@ def run_2d_animation_audit(
             reduced_motion_report,
             off_motion_report,
         )
+    )
+    cells.append(
+        _build_scene_transition_handoff_cell(visual_report, motion_report, off_motion_report)
     )
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_actor_state_coverage_cell(visual_report))
@@ -899,6 +913,55 @@ def _build_motion_mode_differentiation_cell(
             if not findings
             else "; ".join(findings[:4])
         ),
+    )
+
+
+def _build_scene_transition_handoff_cell(
+    visual_report: VisualAuditReport,
+    motion_report: MotionAuditReport,
+    off_motion_report: MotionAuditReport,
+) -> AnimationCoverageCell:
+    transition_layers = tuple(
+        sorted(
+            {
+                layer
+                for cell in visual_report.cells
+                for layer in cell.active_layers
+                if layer == "transition" or layer.startswith("transition-key:")
+            }
+        )
+    )
+    full_transition_samples = max(
+        (cell.transition_active_scenes for cell in motion_report.cells),
+        default=0,
+    )
+    off_disabled = all(cell.transition_active_scenes == 0 for cell in off_motion_report.cells)
+    active_layers = tuple(
+        sorted(
+            set(transition_layers)
+            | {f"transition-samples:{full_transition_samples}"}
+            | ({"transition-off-gate"} if off_disabled else set())
+        )
+    )
+    missing = tuple(layer for layer in _REQUIRED_TRANSITION_KEYS if layer not in active_layers)
+    status = "pass" if not missing and full_transition_samples > 0 and off_disabled else "fail"
+    notes = "boot, run, summary, and review handoff transitions covered and off-mode gated"
+    if missing:
+        notes = f"missing {','.join(missing)}"
+    elif full_transition_samples <= 0:
+        notes = "motion audit did not see scene transitions"
+    elif not off_disabled:
+        notes = "scene transitions still active in motion-mode off"
+    return AnimationCoverageCell(
+        area="Scene Transition Handoff",
+        required_layers=(
+            *_REQUIRED_TRANSITION_KEYS,
+            "transition-samples",
+            "transition-off-gate",
+        ),
+        active_layers=active_layers,
+        status=status,
+        notes=notes,
     )
 
 

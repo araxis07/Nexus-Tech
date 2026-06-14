@@ -3298,6 +3298,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
     review = next(cell for cell in report.cells if cell.scene_key == "review")
     assert "title-actor" in title_menu.active_layers
+    assert "transition-key:boot_title" in title_menu.active_layers
     assert "actor-timeline" in title_menu.active_layers
     assert "sprite-clips" in title_menu.active_layers
     assert "actor-readability" in title_menu.active_layers
@@ -3305,6 +3306,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert any(layer.startswith("actor-state:") for layer in title_menu.active_layers)
     assert any(layer.startswith("actor-pose:") for layer in title_menu.active_layers)
     assert "actor-timeline" in dashboard.active_layers
+    assert "transition-key:boot_run" in dashboard.active_layers
     assert "sprite-clips" in dashboard.active_layers
     assert "actor-readability" in dashboard.active_layers
     assert "actor-pose-depth" in dashboard.active_layers
@@ -3344,10 +3346,12 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-pose-depth" in endgame.active_layers
     assert "outcome" in outcome.active_layers
     assert "outcome-cinematic" in outcome.active_layers
+    assert "transition-key:run_to_review" in outcome.active_layers
     assert "summary-reveal" in summary.active_layers
     assert "summary-cinematic" in summary.active_layers
     assert "summary-sequence" in summary.active_layers
     assert "summary-lanes" in summary.active_layers
+    assert "transition-key:run_to_summary" in summary.active_layers
     assert "actor-timeline" in summary.active_layers
     assert "sprite-clips" in summary.active_layers
     assert "actor-readability" in summary.active_layers
@@ -3476,6 +3480,12 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
         layer.startswith("reduced-active:")
         for layer in areas["Motion Mode Differentiation"].active_layers
     )
+    assert areas["Scene Transition Handoff"].status == "pass"
+    assert "transition-key:boot_title" in areas["Scene Transition Handoff"].active_layers
+    assert "transition-key:boot_run" in areas["Scene Transition Handoff"].active_layers
+    assert "transition-key:run_to_summary" in areas["Scene Transition Handoff"].active_layers
+    assert "transition-key:run_to_review" in areas["Scene Transition Handoff"].active_layers
+    assert "transition-off-gate" in areas["Scene Transition Handoff"].active_layers
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)

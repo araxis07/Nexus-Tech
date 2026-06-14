@@ -809,6 +809,9 @@ def _active_layers(scene) -> tuple[str, ...]:
     layers: list[str] = []
     if scene.scene_transition_active():
         layers.append("transition")
+        transition_key = getattr(scene, "scene_transition_key", "")
+        if transition_key:
+            layers.append(f"transition-key:{transition_key}")
     motion_bank = getattr(scene, "_motion_pulses", None)
     if motion_bank is not None and motion_bank.live_count() > 0:
         layers.append("motion-pulses")

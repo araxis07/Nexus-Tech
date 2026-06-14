@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.153.0 - 2026-06-15
+
+- Added scene transition key telemetry to visual audit captures so boot, run, summary, and review handoffs are tracked separately instead of only reporting a generic transition layer
+- Added `Scene Transition Handoff` to the 2D animation audit so required transition keys and motion-mode-off behavior are release-gated together
+- Updated animation playtest and release documentation so transition handoff regressions block presentation builds before manual open-window review
+
 ## 0.152.0 - 2026-06-13
 
 - Added `Action Feedback Clarity` to the 2D animation audit so successful actions, blocked commands, and impact deltas must expose readable targets, values, and blocked reasons
