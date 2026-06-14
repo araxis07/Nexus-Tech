@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.154.0 - 2026-06-15
+
+- Added control-affordance telemetry to 2D visual audit captures so title, run, outcome, summary, review, pause, back, help, save, and flow controls are tracked from real click targets
+- Added `Control Affordance Coverage` to the 2D animation audit so missing navigation and control affordances fail before manual open-window review
+- Updated animation playtest and release documentation so unclear Pause/Back/Help/save/flow controls remain explicit release blockers while layout polish continues
+
 ## 0.153.0 - 2026-06-15
 
 - Added scene transition key telemetry to visual audit captures so boot, run, summary, and review handoffs are tracked separately instead of only reporting a generic transition layer

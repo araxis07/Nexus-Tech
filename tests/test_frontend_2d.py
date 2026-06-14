@@ -3299,6 +3299,8 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     review = next(cell for cell in report.cells if cell.scene_key == "review")
     assert "title-actor" in title_menu.active_layers
     assert "transition-key:boot_title" in title_menu.active_layers
+    assert "click-targets" in title_menu.active_layers
+    assert "title-nav-controls" in title_menu.active_layers
     assert "actor-timeline" in title_menu.active_layers
     assert "sprite-clips" in title_menu.active_layers
     assert "actor-readability" in title_menu.active_layers
@@ -3312,6 +3314,11 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-pose-depth" in dashboard.active_layers
     assert "actor-state:handoff" in dashboard.active_layers
     assert "actor-pose:handoff" in dashboard.active_layers
+    assert "click-targets" in dashboard.active_layers
+    assert "pause-control" in dashboard.active_layers
+    assert "back-control" in dashboard.active_layers
+    assert "help-control" in dashboard.active_layers
+    assert "run-nav-controls" in dashboard.active_layers
     assert "product-drama" in drama.active_layers
     assert "risk-drama" in drama.active_layers
     assert "pending" in pending.active_layers
@@ -3347,6 +3354,9 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "outcome" in outcome.active_layers
     assert "outcome-cinematic" in outcome.active_layers
     assert "transition-key:run_to_review" in outcome.active_layers
+    assert "save-control" in outcome.active_layers
+    assert "flow-control" in outcome.active_layers
+    assert "outcome-nav-controls" in outcome.active_layers
     assert "summary-reveal" in summary.active_layers
     assert "summary-cinematic" in summary.active_layers
     assert "summary-sequence" in summary.active_layers
@@ -3356,11 +3366,16 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "sprite-clips" in summary.active_layers
     assert "actor-readability" in summary.active_layers
     assert "actor-pose-depth" in summary.active_layers
+    assert "save-control" in summary.active_layers
+    assert "flow-control" in summary.active_layers
+    assert "summary-nav-controls" in summary.active_layers
     assert "review-actor" in review.active_layers
     assert "actor-timeline" in review.active_layers
     assert "sprite-clips" in review.active_layers
     assert "actor-readability" in review.active_layers
     assert "actor-pose-depth" in review.active_layers
+    assert "back-control" in review.active_layers
+    assert "review-nav-controls" in review.active_layers
 
 
 def test_actor_sprite_pose_key_defaults_to_state_depth() -> None:
@@ -3486,6 +3501,10 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "transition-key:run_to_summary" in areas["Scene Transition Handoff"].active_layers
     assert "transition-key:run_to_review" in areas["Scene Transition Handoff"].active_layers
     assert "transition-off-gate" in areas["Scene Transition Handoff"].active_layers
+    assert areas["Control Affordance Coverage"].status == "pass"
+    assert "pause-control" in areas["Control Affordance Coverage"].active_layers
+    assert "run-nav-controls" in areas["Control Affordance Coverage"].required_layers
+    assert "summary-nav-controls" in areas["Control Affordance Coverage"].active_layers
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)

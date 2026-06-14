@@ -42,6 +42,31 @@ MAX_EDGE_DENSITY = 0.72
 MAX_BRIGHT_RATIO = 0.42
 VISUAL_AUDIT_SUMMARY_NAME = "visual-audit-summary.md"
 
+_CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
+    ("pause-control", frozenset({"pause_toggle", "pause_resume"})),
+    (
+        "back-control",
+        frozenset(
+            {
+                "run_back",
+                "review_primary",
+                "wizard_back",
+                "close_help",
+                "close_picker",
+                "close_panel",
+                "close_inspector",
+                "close_outcome",
+                "close_summary",
+                "cancel_text",
+                "cancel_delete",
+            }
+        ),
+    ),
+    ("help-control", frozenset({"open_help", "close_help"})),
+    ("save-control", frozenset({"save", "pause_save", "review_save"})),
+    ("flow-control", frozenset({"continue", "open_review", "close_outcome", "close_summary"})),
+)
+
 
 @dataclass(frozen=True)
 class VisualAuditCell:
@@ -812,6 +837,7 @@ def _active_layers(scene) -> tuple[str, ...]:
         transition_key = getattr(scene, "scene_transition_key", "")
         if transition_key:
             layers.append(f"transition-key:{transition_key}")
+    layers.extend(_control_affordance_layers(scene))
     motion_bank = getattr(scene, "_motion_pulses", None)
     if motion_bank is not None and motion_bank.live_count() > 0:
         layers.append("motion-pulses")
@@ -882,6 +908,42 @@ def _active_layers(scene) -> tuple[str, ...]:
     if getattr(scene, "summary_outcome_lanes_active", lambda: False)():
         layers.append("summary-lanes")
     return tuple(layers)
+
+
+def _control_affordance_layers(scene) -> tuple[str, ...]:
+    target_kinds = {
+        kind
+        for target in getattr(scene, "_click_targets", ())
+        if isinstance((kind := getattr(target, "kind", "")), str) and kind
+    }
+    if not target_kinds:
+        return ()
+
+    layers = {"click-targets"}
+    for layer, kinds in _CONTROL_TARGET_LAYER_GROUPS:
+        if target_kinds & kinds:
+            layers.add(layer)
+
+    scene_name = scene.__class__.__name__
+    if scene_name == "TitleScene" and target_kinds & {
+        "archive",
+        "menu",
+        "slot",
+        "slot_action",
+        "wizard_back",
+        "wizard_launch",
+    }:
+        layers.add("title-nav-controls")
+    if scene_name == "RunScene" and {"pause_toggle", "run_back", "open_help"} <= target_kinds:
+        layers.add("run-nav-controls")
+    if scene_name == "RunScene" and {"open_review", "save", "close_outcome"} <= target_kinds:
+        layers.add("outcome-nav-controls")
+    if scene_name == "TurnSummaryScene" and {"continue", "save", "close_summary"} <= target_kinds:
+        layers.add("summary-nav-controls")
+    if scene_name == "ReviewScene" and "review_primary" in target_kinds:
+        layers.add("review-nav-controls")
+
+    return tuple(sorted(layers))
 
 
 def _actor_state_layers(scene) -> tuple[str, ...]:

@@ -56,6 +56,13 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
         "F1, ?, and hover hints explain the current controls without hiding primary actions.",
     ),
     (
+        "Control Affordance Coverage",
+        (
+            "Visual and animation audits expose title, run, outcome, summary, review, "
+            "pause, back, help, save, and flow controls before manual feel checks."
+        ),
+    ),
+    (
         "Motion Modes",
         "Full, reduced, and off modes keep the same clickable actions and readable labels.",
     ),
@@ -111,6 +118,20 @@ _REQUIRED_TRANSITION_KEYS: tuple[str, ...] = (
     "transition-key:boot_run",
     "transition-key:run_to_summary",
     "transition-key:run_to_review",
+)
+
+_REQUIRED_CONTROL_AFFORDANCE_LAYERS: tuple[str, ...] = (
+    "click-targets",
+    "title-nav-controls",
+    "pause-control",
+    "back-control",
+    "help-control",
+    "save-control",
+    "flow-control",
+    "run-nav-controls",
+    "outcome-nav-controls",
+    "summary-nav-controls",
+    "review-nav-controls",
 )
 
 _MOTION_PROFILE_LAYERS = {
@@ -443,6 +464,7 @@ def run_2d_animation_audit(
     cells.append(
         _build_scene_transition_handoff_cell(visual_report, motion_report, off_motion_report)
     )
+    cells.append(_build_control_affordance_cell(visual_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_actor_state_coverage_cell(visual_report))
     cells.append(_build_action_feedback_clarity_cell(visual_report))
@@ -961,6 +983,36 @@ def _build_scene_transition_handoff_cell(
         ),
         active_layers=active_layers,
         status=status,
+        notes=notes,
+    )
+
+
+def _build_control_affordance_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    active_layers = tuple(
+        sorted(
+            {
+                layer
+                for cell in visual_report.cells
+                for layer in cell.active_layers
+                if layer in _REQUIRED_CONTROL_AFFORDANCE_LAYERS
+                or layer.endswith("-control")
+                or layer.endswith("-controls")
+            }
+        )
+    )
+    missing = tuple(
+        layer for layer in _REQUIRED_CONTROL_AFFORDANCE_LAYERS if layer not in active_layers
+    )
+    notes = (
+        "title, run, outcome, summary, review, pause, back, help, save, and flow controls covered"
+    )
+    if missing:
+        notes = f"missing {','.join(missing)}"
+    return AnimationCoverageCell(
+        area="Control Affordance Coverage",
+        required_layers=_REQUIRED_CONTROL_AFFORDANCE_LAYERS,
+        active_layers=active_layers,
+        status="pass" if not missing else "fail",
         notes=notes,
     )
 
