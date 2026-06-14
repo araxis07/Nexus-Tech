@@ -3278,6 +3278,10 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.unique_color_samples >= 18 for cell in report.cells)
     assert all(0.0 <= cell.edge_density <= MAX_EDGE_DENSITY for cell in report.cells)
     assert all(0.0 <= cell.bright_ratio <= MAX_BRIGHT_RATIO for cell in report.cells)
+    assert all(cell.layout_violations == () for cell in report.cells)
+    assert all(cell.click_target_count > 0 for cell in report.cells)
+    assert all(cell.min_click_target_size[0] >= 28 for cell in report.cells)
+    assert all(cell.min_click_target_size[1] >= 24 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     summary_path = tmp_path / VISUAL_AUDIT_SUMMARY_NAME
     assert summary_path.exists()
@@ -3421,6 +3425,26 @@ def test_visual_audit_cell_fails_visual_fatigue_thresholds() -> None:
     assert "high flash pressure" in cluttered.notes
 
 
+def test_visual_audit_cell_fails_layout_safety_violations() -> None:
+    unsafe = VisualAuditCell(
+        scene_key="run_dashboard",
+        width=820,
+        height=620,
+        checksum=12345,
+        unique_color_samples=42,
+        luminance_spread=128,
+        non_dark_ratio=0.42,
+        active_layers=("click-targets",),
+        expected_layers=("click-targets",),
+        layout_violations=("target-too-small:pause_toggle:20x18",),
+        click_target_count=1,
+        min_click_target_size=(20, 18),
+    )
+
+    assert unsafe.status == "fail"
+    assert "layout target-too-small:pause_toggle:20x18" in unsafe.notes
+
+
 def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     report = run_2d_animation_audit(
         scenario_id="founder_journey",
@@ -3505,6 +3529,10 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "pause-control" in areas["Control Affordance Coverage"].active_layers
     assert "run-nav-controls" in areas["Control Affordance Coverage"].required_layers
     assert "summary-nav-controls" in areas["Control Affordance Coverage"].active_layers
+    assert areas["UI Layout Safety"].status == "pass"
+    assert "layout-pass" in areas["UI Layout Safety"].active_layers
+    assert "target-size" in areas["UI Layout Safety"].required_layers
+    assert "actor-control-clearance" in areas["UI Layout Safety"].active_layers
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)

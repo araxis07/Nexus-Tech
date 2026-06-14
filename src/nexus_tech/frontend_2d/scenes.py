@@ -8568,8 +8568,21 @@ class RunScene(BaseScene):
         self._click_targets.append(ClickTarget("inspector_focus_actionable", "", actionable_rect))
         self._click_targets.append(ClickTarget("inspector_focus_hotspot", "", hotspot_rect))
         top = nav_inner.top + 148
+        section_gap = 6 if nav_inner.height < 430 else 10
+        section_count = max(1, len(panel.inspectors))
+        section_area_height = max(0, nav_inner.bottom - top)
+        section_height = max(
+            32,
+            min(
+                56,
+                int(
+                    (section_area_height - section_gap * max(0, section_count - 1)) / section_count
+                ),
+            ),
+        )
+        compact_sections = section_height < 44
         for index, section in enumerate(panel.inspectors):
-            button_rect = pygame.Rect(nav_inner.left, top, nav_inner.width, 56)
+            button_rect = pygame.Rect(nav_inner.left, top, nav_inner.width, section_height)
             selected = index == self._inspector_section_index
             accent = SELECTION if selected else tone_color(section.tone)
             draw_button(
@@ -8577,13 +8590,17 @@ class RunScene(BaseScene):
                 pygame,
                 rect=button_rect,
                 title=section.title,
-                detail=self._section_button_detail(section, selected=selected),
+                detail=(
+                    ""
+                    if compact_sections
+                    else self._section_button_detail(section, selected=selected)
+                ),
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget("inspector_section", section.key, button_rect))
-            top += 66
+            top += section_height + section_gap
 
     def _draw_inspector_focus(self, surface, rect) -> None:
         pygame = self.pygame

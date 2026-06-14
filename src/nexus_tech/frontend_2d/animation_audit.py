@@ -15,6 +15,8 @@ from nexus_tech.frontend_2d.tween import MotionMode
 from nexus_tech.frontend_2d.visual_audit import (
     MAX_BRIGHT_RATIO,
     MAX_EDGE_DENSITY,
+    MIN_CLICK_TARGET_HEIGHT,
+    MIN_CLICK_TARGET_WIDTH,
     VisualAuditReport,
     run_2d_visual_audit,
 )
@@ -60,6 +62,13 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
         (
             "Visual and animation audits expose title, run, outcome, summary, review, "
             "pause, back, help, save, and flow controls before manual feel checks."
+        ),
+    ),
+    (
+        "UI Layout Safety",
+        (
+            "Visual and animation audits keep click targets in-bounds, large enough, "
+            "non-overlapping, and clear of actor sprites before manual feel checks."
         ),
     ),
     (
@@ -465,6 +474,7 @@ def run_2d_animation_audit(
         _build_scene_transition_handoff_cell(visual_report, motion_report, off_motion_report)
     )
     cells.append(_build_control_affordance_cell(visual_report))
+    cells.append(_build_ui_layout_safety_cell(visual_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_actor_state_coverage_cell(visual_report))
     cells.append(_build_action_feedback_clarity_cell(visual_report))
@@ -1014,6 +1024,60 @@ def _build_control_affordance_cell(visual_report: VisualAuditReport) -> Animatio
         active_layers=active_layers,
         status="pass" if not missing else "fail",
         notes=notes,
+    )
+
+
+def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    target_cells = tuple(cell for cell in visual_report.cells if cell.click_target_count > 0)
+    violations = tuple(
+        f"{cell.scene_key}:{violation}"
+        for cell in visual_report.cells
+        for violation in cell.layout_violations
+    )
+    min_width = min((cell.min_click_target_size[0] for cell in target_cells), default=0)
+    min_height = min((cell.min_click_target_size[1] for cell in target_cells), default=0)
+    actor_clear = all(
+        not any(violation.startswith("actor:") for violation in cell.layout_violations)
+        for cell in visual_report.cells
+    )
+    findings: list[str] = []
+    if not target_cells:
+        findings.append("missing click target captures")
+    if violations:
+        findings.extend(violations[:4])
+    if min_width and min_width < MIN_CLICK_TARGET_WIDTH:
+        findings.append(f"min target width {min_width}<{MIN_CLICK_TARGET_WIDTH}")
+    if min_height and min_height < MIN_CLICK_TARGET_HEIGHT:
+        findings.append(f"min target height {min_height}<{MIN_CLICK_TARGET_HEIGHT}")
+    if not actor_clear:
+        findings.append("actor/control collision")
+
+    active_layers = (
+        "layout-pass" if not violations else f"layout-violations:{len(violations)}",
+        f"target-cells:{len(target_cells)}",
+        f"min-target:{min_width}x{min_height}",
+        "target-bounds",
+        "target-size",
+        "actor-control-clearance" if actor_clear else "actor-control-collision",
+    )
+    return AnimationCoverageCell(
+        area="UI Layout Safety",
+        required_layers=(
+            "layout-pass",
+            "target-bounds",
+            "target-size",
+            "actor-control-clearance",
+        ),
+        active_layers=active_layers,
+        status="pass" if not findings else "fail",
+        notes=(
+            (
+                f"{len(target_cells)} target captures, min target {min_width}x{min_height}, "
+                "actor/control clear"
+            )
+            if not findings
+            else "; ".join(findings[:4])
+        ),
     )
 
 

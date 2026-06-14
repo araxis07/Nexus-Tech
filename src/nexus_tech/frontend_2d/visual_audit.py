@@ -41,6 +41,8 @@ MIN_NON_DARK_RATIO = 0.05
 MAX_EDGE_DENSITY = 0.72
 MAX_BRIGHT_RATIO = 0.42
 VISUAL_AUDIT_SUMMARY_NAME = "visual-audit-summary.md"
+MIN_CLICK_TARGET_WIDTH = 28
+MIN_CLICK_TARGET_HEIGHT = 24
 
 _CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("pause-control", frozenset({"pause_toggle", "pause_resume"})),
@@ -66,6 +68,17 @@ _CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("save-control", frozenset({"save", "pause_save", "review_save"})),
     ("flow-control", frozenset({"continue", "open_review", "close_outcome", "close_summary"})),
 )
+_CRITICAL_TARGET_OVERLAP_KINDS = frozenset(
+    {kind for _layer, kinds in _CONTROL_TARGET_LAYER_GROUPS for kind in kinds}
+    | {
+        "pause_menu",
+        "pause_quit",
+        "review_primary",
+        "run_back",
+        "open_help",
+        "pause_toggle",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -83,6 +96,9 @@ class VisualAuditCell:
     expected_layers: tuple[str, ...]
     edge_density: float = 0.0
     bright_ratio: float = 0.0
+    layout_violations: tuple[str, ...] = ()
+    click_target_count: int = 0
+    min_click_target_size: tuple[int, int] = (0, 0)
     output_path: str | None = None
 
     @property
@@ -107,6 +123,8 @@ class VisualAuditCell:
             return "fail"
         if self.bright_ratio > MAX_BRIGHT_RATIO:
             return "fail"
+        if self.layout_violations:
+            return "fail"
         return "pass"
 
     @property
@@ -128,6 +146,8 @@ class VisualAuditCell:
             notes.append("visual clutter")
         if self.bright_ratio > MAX_BRIGHT_RATIO:
             notes.append("high flash pressure")
+        if self.layout_violations:
+            notes.append(f"layout {','.join(self.layout_violations[:3])}")
         return "; ".join(notes)
 
 
@@ -158,7 +178,9 @@ class VisualAuditReport:
                 f"{cell.scene_key}:{cell.width}x{cell.height}:"
                 f"{cell.checksum}:{cell.unique_color_samples}:"
                 f"{cell.luminance_spread}:{cell.non_dark_ratio}:"
-                f"{cell.edge_density}:{cell.bright_ratio}"
+                f"{cell.edge_density}:{cell.bright_ratio}:"
+                f"{cell.click_target_count}:{cell.min_click_target_size}:"
+                f"{','.join(cell.layout_violations)}"
             )
             digest = zlib.adler32(payload.encode("utf-8"), digest)
         return f"{len(self.cells)}:{digest:08x}"
@@ -700,6 +722,11 @@ def _capture_visual_cell(
         scene.update(1 / 60)
     scene.draw(surface)
     active_layers = _active_layers(scene)
+    layout_violations, click_target_count, min_click_target_size = _layout_safety_metrics(
+        scene,
+        width,
+        height,
+    )
     raw = pygame.image.tobytes(surface, "RGB")
     checksum = zlib.adler32(raw)
     (
@@ -725,7 +752,75 @@ def _capture_visual_cell(
         expected_layers=expected_layers,
         edge_density=round(edge_density, 4),
         bright_ratio=round(bright_ratio, 4),
+        layout_violations=layout_violations,
+        click_target_count=click_target_count,
+        min_click_target_size=min_click_target_size,
         output_path=str(output_path) if output_path is not None else None,
+    )
+
+
+def _layout_safety_metrics(
+    scene, width: int, height: int
+) -> tuple[tuple[str, ...], int, tuple[int, int]]:
+    targets = tuple(getattr(scene, "_click_targets", ()))
+    violations: list[str] = []
+    min_width = 0
+    min_height = 0
+
+    for target in targets:
+        rect = getattr(target, "rect", None)
+        kind = getattr(target, "kind", "target")
+        if rect is None:
+            violations.append(f"target-missing-rect:{kind}")
+            continue
+        target_width = int(getattr(rect, "width", 0))
+        target_height = int(getattr(rect, "height", 0))
+        min_width = target_width if min_width == 0 else min(min_width, target_width)
+        min_height = target_height if min_height == 0 else min(min_height, target_height)
+        if target_width < MIN_CLICK_TARGET_WIDTH or target_height < MIN_CLICK_TARGET_HEIGHT:
+            violations.append(f"target-too-small:{kind}:{target_width}x{target_height}")
+        if (
+            int(getattr(rect, "left", 0)) < 0
+            or int(getattr(rect, "top", 0)) < 0
+            or int(getattr(rect, "right", 0)) > width
+            or int(getattr(rect, "bottom", 0)) > height
+        ):
+            violations.append(f"target-offscreen:{kind}")
+
+    for index, first in enumerate(targets):
+        first_rect = getattr(first, "rect", None)
+        first_kind = getattr(first, "kind", "target")
+        if first_rect is None:
+            continue
+        for second in targets[index + 1 :]:
+            second_rect = getattr(second, "rect", None)
+            second_kind = getattr(second, "kind", "target")
+            if second_rect is None or not _should_check_target_overlap(first_kind, second_kind):
+                continue
+            if _rects_overlap(first_rect, second_rect):
+                violations.append(f"target-overlap:{first_kind}:{second_kind}")
+
+    actor_layout_violations = getattr(scene, "actor_sprite_layout_violations", None)
+    if callable(actor_layout_violations):
+        violations.extend(f"actor:{violation}" for violation in actor_layout_violations())
+
+    return tuple(sorted(set(violations))), len(targets), (min_width, min_height)
+
+
+def _should_check_target_overlap(first_kind: str, second_kind: str) -> bool:
+    if first_kind == second_kind:
+        return True
+    return (
+        first_kind in _CRITICAL_TARGET_OVERLAP_KINDS
+        and second_kind in _CRITICAL_TARGET_OVERLAP_KINDS
+    )
+
+
+def _rects_overlap(first_rect, second_rect) -> bool:
+    return max(int(getattr(first_rect, "left", 0)), int(getattr(second_rect, "left", 0))) < min(
+        int(getattr(first_rect, "right", 0)), int(getattr(second_rect, "right", 0))
+    ) and max(int(getattr(first_rect, "top", 0)), int(getattr(second_rect, "top", 0))) < min(
+        int(getattr(first_rect, "bottom", 0)), int(getattr(second_rect, "bottom", 0))
     )
 
 

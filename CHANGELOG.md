@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.155.0 - 2026-06-15
+
+- Added layout-safety telemetry to 2D visual audit captures so offscreen controls, too-small click targets, target overlap, and actor/control collisions are recorded per scene
+- Added `UI Layout Safety` to the 2D animation audit so compact layout regressions block presentation builds before manual open-window playtesting
+- Updated animation playtest and release documentation so button size, target bounds, and actor/control clearance are explicit release gates alongside readability and control-affordance checks
+
 ## 0.154.0 - 2026-06-15
 
 - Added control-affordance telemetry to 2D visual audit captures so title, run, outcome, summary, review, pause, back, help, save, and flow controls are tracked from real click targets
