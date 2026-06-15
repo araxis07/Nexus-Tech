@@ -30,6 +30,34 @@ class FontPack:
     mono: object
 
 
+@dataclass(frozen=True)
+class TypographyAuditEvent:
+    """One fitted or clamped text draw observed during a visual audit."""
+
+    kind: str
+    ratio: float
+    severe: bool = False
+
+
+_TYPOGRAPHY_AUDIT_EVENTS: list[TypographyAuditEvent] | None = None
+
+
+def start_typography_audit() -> None:
+    """Start recording fitted/clamped text draw calls for one frame."""
+
+    global _TYPOGRAPHY_AUDIT_EVENTS
+    _TYPOGRAPHY_AUDIT_EVENTS = []
+
+
+def finish_typography_audit() -> tuple[TypographyAuditEvent, ...]:
+    """Return recorded text draw calls and stop the current frame audit."""
+
+    global _TYPOGRAPHY_AUDIT_EVENTS
+    events = tuple(_TYPOGRAPHY_AUDIT_EVENTS or ())
+    _TYPOGRAPHY_AUDIT_EVENTS = None
+    return events
+
+
 def create_fonts(pygame) -> FontPack:
     """Build a compact font set with deterministic metrics across OS runners."""
 
@@ -198,11 +226,17 @@ def draw_wrapped_text(
     height_limit = max(0, rect.height // max(1, line_height))
     line_limit = height_limit if max_lines is None else min(max_lines, height_limit)
     if line_limit <= 0:
+        _record_typography_event("wrapped-hidden", 0.0, severe=True)
         return 0
     truncated = len(lines) > line_limit
     visible_lines = lines[:line_limit]
     if truncated and visible_lines:
         visible_lines[-1] = fit_text_line(font, f"{visible_lines[-1].rstrip('. ')}...", rect.width)
+        _record_typography_event(
+            "wrapped-clamp",
+            line_limit / max(1, len(lines)),
+            severe=False,
+        )
     previous_clip = surface.get_clip()
     surface.set_clip(rect.clip(previous_clip))
     try:
@@ -256,7 +290,10 @@ def draw_text_line(
         return 0
     line = fit_text_line(font, text, rect.width)
     if not line:
+        if text.strip():
+            _record_typography_event("line-hidden", 0.0, severe=True)
         return 0
+    _record_text_fit_event("line-fit", font, text, line, rect.width, severe_threshold=0.36)
     text_surface = font.render(line, True, color)
     if align == "right":
         x_pos = rect.right - text_surface.get_width()
@@ -359,6 +396,15 @@ def draw_button(
         visual_rect.width - 24,
         22 if show_detail else visual_rect.height - 12,
     )
+    fitted_title = fit_text_line(title_font, title, title_rect.width)
+    _record_text_fit_event(
+        "button-title-fit",
+        title_font,
+        title,
+        fitted_title,
+        title_rect.width,
+        severe_threshold=0.58,
+    )
     draw_text_line(surface, title_font, title, title_color, title_rect)
     if show_detail:
         detail_top = visual_rect.top + 28
@@ -377,3 +423,36 @@ def draw_button(
             line_height=13 if visual_rect.height < 58 else 15,
             max_lines=2 if visual_rect.height >= 58 else 1,
         )
+
+
+def _record_text_fit_event(
+    kind: str,
+    font,
+    text: str,
+    fitted_text: str,
+    max_width: int,
+    *,
+    severe_threshold: float,
+) -> None:
+    clean_text = " ".join(text.split())
+    if _TYPOGRAPHY_AUDIT_EVENTS is None or not clean_text:
+        return
+    original_width = font.size(clean_text)[0]
+    if original_width <= max_width:
+        return
+    fitted_width = font.size(fitted_text)[0] if fitted_text else 0
+    ratio = fitted_width / max(1, original_width)
+    severe = ratio < severe_threshold or fitted_text in {"", "..."}
+    _record_typography_event(kind, ratio, severe=severe)
+
+
+def _record_typography_event(kind: str, ratio: float, *, severe: bool) -> None:
+    if _TYPOGRAPHY_AUDIT_EVENTS is None:
+        return
+    _TYPOGRAPHY_AUDIT_EVENTS.append(
+        TypographyAuditEvent(
+            kind=kind,
+            ratio=round(max(0.0, min(1.0, ratio)), 3),
+            severe=severe,
+        )
+    )

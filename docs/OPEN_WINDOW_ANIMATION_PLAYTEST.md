@@ -73,6 +73,7 @@ Record `pass`, `watch`, or `fail` for each control area before calling the anima
 | Help / Hover | `F1`, `?`, hover tooltips, and hand cursor feedback make clickable controls obvious |
 | Control Affordance Coverage | Visual and animation audits expose title, run, outcome, summary, review, pause, back, help, save, and flow controls from click targets |
 | UI Layout Safety | Visual and animation audits confirm click targets stay in-bounds, large enough, non-overlapping, and clear of actor sprites |
+| Typography Safety | Visual and animation audits flag severe button-title fitting, hidden text lines, and wrapped-text clamps before human readability review |
 | Motion Modes | Full, reduced, and off modes keep the same clickable actions and readable labels |
 | Actor Poses | Actor cards show distinct blocked, warning, build, handoff, coaching, deal, and win poses without covering card copy |
 | Game Feel | Success, blocked, and impact feedback identify the changed target before the cue fades |
@@ -88,7 +89,7 @@ Record `pass`, `watch`, or `fail` for each control area before calling the anima
 - Any unclear success target, blocked reason, impact value, or actor/feedback mismatch is a release blocker.
 - Any missing/unclear scene handoff transition or transition active in motion-mode off is a release blocker.
 - Any unclear pause, back, help, save, or menu behavior is a release blocker.
-- Any `Actor State Coverage`, `Action Feedback Clarity`, `Scene Transition Handoff`, `Control Affordance Coverage`, `UI Layout Safety`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, `actor-pose-depth`, or `actor-readability` audit failure is a release blocker.
+- Any `Actor State Coverage`, `Action Feedback Clarity`, `Scene Transition Handoff`, `Control Affordance Coverage`, `UI Layout Safety`, `Typography Safety`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, `actor-pose-depth`, or `actor-readability` audit failure is a release blocker.
 - Any `audit-2d-animation-matrix` failure in the default seven-scenario, three-seed presentation set is a release blocker.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.
 

@@ -21,7 +21,11 @@ from nexus_tech.frontend_2d.visual_audit import (
     run_2d_visual_audit,
 )
 
-DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = ((820, 620),)
+DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
+    (820, 620),
+    (960, 640),
+    (1440, 900),
+)
 DEFAULT_ANIMATION_MATRIX_SCENARIOS: tuple[str, ...] = (
     "founder_journey",
     "bootstrap_studio",
@@ -69,6 +73,13 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
         (
             "Visual and animation audits keep click targets in-bounds, large enough, "
             "non-overlapping, and clear of actor sprites before manual feel checks."
+        ),
+    ),
+    (
+        "Typography Safety",
+        (
+            "Visual and animation audits flag severe button-title fitting and hidden text before "
+            "manual readability checks."
         ),
     ),
     (
@@ -475,6 +486,7 @@ def run_2d_animation_audit(
     )
     cells.append(_build_control_affordance_cell(visual_report))
     cells.append(_build_ui_layout_safety_cell(visual_report))
+    cells.append(_build_typography_safety_cell(visual_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
     cells.append(_build_actor_state_coverage_cell(visual_report))
     cells.append(_build_action_feedback_clarity_cell(visual_report))
@@ -1077,6 +1089,41 @@ def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationC
             )
             if not findings
             else "; ".join(findings[:4])
+        ),
+    )
+
+
+def _build_typography_safety_cell(visual_report: VisualAuditReport) -> AnimationCoverageCell:
+    violations = tuple(
+        f"{cell.scene_key}:{violation}"
+        for cell in visual_report.cells
+        for violation in cell.typography_violations
+    )
+    fit_events = sum(cell.text_fit_count for cell in visual_report.cells)
+    wrapped_clamps = sum(cell.wrapped_clamp_count for cell in visual_report.cells)
+    min_ratio = min((cell.min_text_fit_ratio for cell in visual_report.cells), default=1.0)
+    active_layers = (
+        "text-overflow-clear" if not violations else f"text-overflow:{len(violations)}",
+        f"text-fit-events:{fit_events}",
+        f"wrapped-clamps:{wrapped_clamps}",
+        f"min-fit-ratio:{min_ratio:.2f}",
+        "button-title-fit",
+        "wrapped-text-budget",
+    )
+    return AnimationCoverageCell(
+        area="Typography Safety",
+        required_layers=(
+            "text-overflow-clear",
+            "button-title-fit",
+            "wrapped-text-budget",
+        ),
+        active_layers=active_layers,
+        status="pass" if not violations else "fail",
+        notes=(
+            f"{fit_events} fitted text draws, {wrapped_clamps} wrapped clamps, "
+            f"min fit ratio {min_ratio:.2f}"
+            if not violations
+            else "; ".join(violations[:4])
         ),
     )
 

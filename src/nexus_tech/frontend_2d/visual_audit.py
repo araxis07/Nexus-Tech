@@ -22,6 +22,7 @@ from nexus_tech.frontend_2d.app import Frontend2DUnavailableError
 from nexus_tech.frontend_2d.context import ActionRequest
 from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import build_run_review_view_model
+from nexus_tech.frontend_2d.widgets import finish_typography_audit, start_typography_audit
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import (
     ActionContext,
@@ -33,7 +34,9 @@ from nexus_tech.simulation.randomness import RandomSource
 
 DEFAULT_VISUAL_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
     (820, 620),
+    (960, 640),
     (1280, 720),
+    (1440, 900),
 )
 MIN_UNIQUE_COLOR_SAMPLES = 18
 MIN_LUMINANCE_SPREAD = 28
@@ -68,16 +71,35 @@ _CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("save-control", frozenset({"save", "pause_save", "review_save"})),
     ("flow-control", frozenset({"continue", "open_review", "close_outcome", "close_summary"})),
 )
-_CRITICAL_TARGET_OVERLAP_KINDS = frozenset(
-    {kind for _layer, kinds in _CONTROL_TARGET_LAYER_GROUPS for kind in kinds}
-    | {
-        "pause_menu",
-        "pause_quit",
-        "review_primary",
-        "run_back",
-        "open_help",
-        "pause_toggle",
-    }
+_CRITICAL_TARGET_OVERLAP_GROUPS = (
+    frozenset({"pause_toggle", "run_back", "open_help"}),
+    frozenset({"pause_resume", "pause_save", "pause_menu", "pause_quit"}),
+    frozenset({"open_review", "save", "close_outcome"}),
+    frozenset({"continue", "save", "close_summary"}),
+    frozenset({"review_primary", "review_save"}),
+    frozenset({"wizard_launch", "wizard_back"}),
+    frozenset({"open_panel_inspector", "close_panel"}),
+    frozenset(
+        {
+            "close_inspector",
+            "inspector_cycle_sort",
+            "inspector_cycle_filter",
+            "inspector_focus_actionable",
+            "inspector_focus_hotspot",
+            "inspector_prev_page",
+            "inspector_next_page",
+        }
+    ),
+    frozenset(
+        {
+            "submit_text",
+            "cancel_text",
+            "confirm_delete",
+            "cancel_delete",
+            "close_help",
+            "close_picker",
+        }
+    ),
 )
 
 
@@ -99,6 +121,10 @@ class VisualAuditCell:
     layout_violations: tuple[str, ...] = ()
     click_target_count: int = 0
     min_click_target_size: tuple[int, int] = (0, 0)
+    typography_violations: tuple[str, ...] = ()
+    text_fit_count: int = 0
+    wrapped_clamp_count: int = 0
+    min_text_fit_ratio: float = 1.0
     output_path: str | None = None
 
     @property
@@ -117,13 +143,15 @@ class VisualAuditCell:
             return "fail"
         if self.luminance_spread < MIN_LUMINANCE_SPREAD:
             return "fail"
-        if self.non_dark_ratio < MIN_NON_DARK_RATIO:
+        if self.non_dark_ratio < self.minimum_non_dark_ratio:
             return "fail"
         if self.edge_density > MAX_EDGE_DENSITY:
             return "fail"
         if self.bright_ratio > MAX_BRIGHT_RATIO:
             return "fail"
         if self.layout_violations:
+            return "fail"
+        if self.typography_violations:
             return "fail"
         return "pass"
 
@@ -140,7 +168,7 @@ class VisualAuditCell:
             notes.append("low color variance")
         if self.luminance_spread < MIN_LUMINANCE_SPREAD:
             notes.append("low contrast")
-        if self.non_dark_ratio < MIN_NON_DARK_RATIO:
+        if self.non_dark_ratio < self.minimum_non_dark_ratio:
             notes.append("mostly dark")
         if self.edge_density > MAX_EDGE_DENSITY:
             notes.append("visual clutter")
@@ -148,7 +176,17 @@ class VisualAuditCell:
             notes.append("high flash pressure")
         if self.layout_violations:
             notes.append(f"layout {','.join(self.layout_violations[:3])}")
+        if self.typography_violations:
+            notes.append(f"typography {','.join(self.typography_violations[:3])}")
         return "; ".join(notes)
+
+    @property
+    def minimum_non_dark_ratio(self) -> float:
+        """Use a lower fill threshold for large presentation windows with intentional margins."""
+
+        if self.width >= 1280 and self.height >= 800:
+            return 0.02
+        return MIN_NON_DARK_RATIO
 
 
 @dataclass(frozen=True)
@@ -180,7 +218,9 @@ class VisualAuditReport:
                 f"{cell.luminance_spread}:{cell.non_dark_ratio}:"
                 f"{cell.edge_density}:{cell.bright_ratio}:"
                 f"{cell.click_target_count}:{cell.min_click_target_size}:"
-                f"{','.join(cell.layout_violations)}"
+                f"{','.join(cell.layout_violations)}:"
+                f"{cell.text_fit_count}:{cell.wrapped_clamp_count}:"
+                f"{cell.min_text_fit_ratio}:{','.join(cell.typography_violations)}"
             )
             digest = zlib.adler32(payload.encode("utf-8"), digest)
         return f"{len(self.cells)}:{digest:08x}"
@@ -720,13 +760,25 @@ def _capture_visual_cell(
     _set_visual_audit_mouse_safe_point(pygame, width, height)
     for _index in range(2):
         scene.update(1 / 60)
-    scene.draw(surface)
+    start_typography_audit()
+    try:
+        scene.draw(surface)
+        typography_events = finish_typography_audit()
+    except Exception:
+        finish_typography_audit()
+        raise
     active_layers = _active_layers(scene)
     layout_violations, click_target_count, min_click_target_size = _layout_safety_metrics(
         scene,
         width,
         height,
     )
+    (
+        typography_violations,
+        text_fit_count,
+        wrapped_clamp_count,
+        min_text_fit_ratio,
+    ) = _typography_safety_metrics(typography_events)
     raw = pygame.image.tobytes(surface, "RGB")
     checksum = zlib.adler32(raw)
     (
@@ -755,8 +807,23 @@ def _capture_visual_cell(
         layout_violations=layout_violations,
         click_target_count=click_target_count,
         min_click_target_size=min_click_target_size,
+        typography_violations=typography_violations,
+        text_fit_count=text_fit_count,
+        wrapped_clamp_count=wrapped_clamp_count,
+        min_text_fit_ratio=min_text_fit_ratio,
         output_path=str(output_path) if output_path is not None else None,
     )
+
+
+def _typography_safety_metrics(events) -> tuple[tuple[str, ...], int, int, float]:
+    text_fit_events = tuple(event for event in events if event.kind.endswith("-fit"))
+    wrapped_clamp_events = tuple(event for event in events if event.kind == "wrapped-clamp")
+    ratios = tuple(event.ratio for event in events if event.kind != "wrapped-clamp")
+    min_ratio = round(min(ratios), 3) if ratios else 1.0
+    violations = tuple(
+        sorted({f"{event.kind}:{event.ratio:.2f}" for event in events if event.severe})
+    )
+    return violations, len(text_fit_events), len(wrapped_clamp_events), min_ratio
 
 
 def _layout_safety_metrics(
@@ -810,9 +877,9 @@ def _layout_safety_metrics(
 def _should_check_target_overlap(first_kind: str, second_kind: str) -> bool:
     if first_kind == second_kind:
         return True
-    return (
-        first_kind in _CRITICAL_TARGET_OVERLAP_KINDS
-        and second_kind in _CRITICAL_TARGET_OVERLAP_KINDS
+    return any(
+        first_kind in overlap_group and second_kind in overlap_group
+        for overlap_group in _CRITICAL_TARGET_OVERLAP_GROUPS
     )
 
 

@@ -3282,6 +3282,8 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.click_target_count > 0 for cell in report.cells)
     assert all(cell.min_click_target_size[0] >= 28 for cell in report.cells)
     assert all(cell.min_click_target_size[1] >= 24 for cell in report.cells)
+    assert all(cell.typography_violations == () for cell in report.cells)
+    assert all(0.0 <= cell.min_text_fit_ratio <= 1.0 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     summary_path = tmp_path / VISUAL_AUDIT_SUMMARY_NAME
     assert summary_path.exists()
@@ -3445,6 +3447,26 @@ def test_visual_audit_cell_fails_layout_safety_violations() -> None:
     assert "layout target-too-small:pause_toggle:20x18" in unsafe.notes
 
 
+def test_visual_audit_cell_fails_typography_safety_violations() -> None:
+    unsafe = VisualAuditCell(
+        scene_key="title_menu",
+        width=820,
+        height=620,
+        checksum=12345,
+        unique_color_samples=42,
+        luminance_spread=128,
+        non_dark_ratio=0.42,
+        active_layers=("click-targets",),
+        expected_layers=("click-targets",),
+        typography_violations=("button-title-fit:0.20",),
+        text_fit_count=1,
+        min_text_fit_ratio=0.2,
+    )
+
+    assert unsafe.status == "fail"
+    assert "typography button-title-fit:0.20" in unsafe.notes
+
+
 def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     report = run_2d_animation_audit(
         scenario_id="founder_journey",
@@ -3533,6 +3555,12 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "layout-pass" in areas["UI Layout Safety"].active_layers
     assert "target-size" in areas["UI Layout Safety"].required_layers
     assert "actor-control-clearance" in areas["UI Layout Safety"].active_layers
+    assert areas["Typography Safety"].status == "pass"
+    assert "text-overflow-clear" in areas["Typography Safety"].active_layers
+    assert "button-title-fit" in areas["Typography Safety"].required_layers
+    assert any(
+        layer.startswith("min-fit-ratio:") for layer in areas["Typography Safety"].active_layers
+    )
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)

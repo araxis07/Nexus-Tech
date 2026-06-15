@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.156.0 - 2026-06-15
+
+- Added typography-fit telemetry to 2D visual captures so severe button-title compression, hidden lines, and wrapped-text clamps are recorded from the shared widget renderer
+- Added `Typography Safety` to the 2D animation audit so severe text overflow and unreadable fitted labels block presentation builds before manual open-window review
+- Expanded the default visual and animation audit window matrix to cover compact, small, and presentation-sized windows used by the manual animation playtest checklist
+
 ## 0.155.0 - 2026-06-15
 
 - Added layout-safety telemetry to 2D visual audit captures so offscreen controls, too-small click targets, target overlap, and actor/control collisions are recorded per scene
