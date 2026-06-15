@@ -3551,6 +3551,12 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "pause-control" in areas["Control Affordance Coverage"].active_layers
     assert "run-nav-controls" in areas["Control Affordance Coverage"].required_layers
     assert "summary-nav-controls" in areas["Control Affordance Coverage"].active_layers
+    assert areas["Control Replay Safety"].status == "pass"
+    assert "pause-key-open" in areas["Control Replay Safety"].active_layers
+    assert "pause-resume-click" in areas["Control Replay Safety"].active_layers
+    assert "back-opens-pause" in areas["Control Replay Safety"].active_layers
+    assert "hover-hints" in areas["Control Replay Safety"].active_layers
+    assert "pause-menu-return" in areas["Control Replay Safety"].active_layers
     assert areas["UI Layout Safety"].status == "pass"
     assert "layout-pass" in areas["UI Layout Safety"].active_layers
     assert "target-size" in areas["UI Layout Safety"].required_layers
@@ -3697,6 +3703,7 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "## Control Clarity Checklist" in report_text
     assert "Pause / Resume" in report_text
     assert "Back / Escape" in report_text
+    assert "Control Replay Safety" in report_text
     assert "## Game Feel Checklist" in report_text
     assert "Success Feedback" in report_text
     assert "Blocked Feedback" in report_text

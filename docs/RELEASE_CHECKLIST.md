@@ -68,6 +68,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `Action Feedback Clarity` failures as release blockers before presenting new action, blocked-action, or impact feedback.
 - Treat `Scene Transition Handoff` failures as release blockers before presenting scene-to-scene animation polish.
 - Treat `Control Affordance Coverage` failures as release blockers before presenting navigation, pause, back, help, save, or summary/outcome flow changes.
+- Treat `Control Replay Safety` failures as release blockers before presenting pause, Escape/back, help, save, hover-copy, or menu-return behavior.
 - Treat `UI Layout Safety` failures as release blockers before presenting compact layouts, navigation rails, modal buttons, or actor-heavy scenes.
 - Treat `Typography Safety` failures as release blockers before presenting compact buttons, modal copy, summary cards, or inspector-heavy scenes.
 - Treat `Visual Fatigue Budget` failures as release blockers before adding more animation density.

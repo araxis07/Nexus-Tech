@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.156.0`
-- Focus: 2D actor/sprite timeline, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.157.0`
+- Focus: 2D actor/sprite timeline, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
 
@@ -26,6 +26,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Automated guard: `audit-2d-animation` reports `Action Feedback Clarity` so success targets, blocked reasons, impact targets, and impact values are present before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Scene Transition Handoff` so boot, run, summary, and review transitions are covered and motion-mode off disables them.
 - Automated guard: `audit-2d-animation` reports `Control Affordance Coverage` so title, run, outcome, summary, review, pause, back, help, save, and flow controls are present before the manual pass.
+- Automated guard: `audit-2d-animation` reports `Control Replay Safety` so pause, resume, Escape/back, help, hover-copy, save, and title-menu return regressions fail before manual control-feel review.
 - Automated guard: `audit-2d-animation` reports `UI Layout Safety` so click targets stay in-bounds, large enough, non-overlapping, and clear of actor sprites before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Typography Safety` so severe button-title fitting, hidden lines, and wrapped-text clamps are visible before the manual pass.
 - Automated guard: `audit-2d-animation` reports `Visual Fatigue Budget` so clutter and bright-pixel pressure stay within deterministic limits before the manual pass.

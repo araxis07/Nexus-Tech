@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.157.0 - 2026-06-16
+
+- Added `Control Replay Safety` to the 2D animation audit so pause, resume, Escape/back, help, hover hints, save, and menu-return behavior are replayed before manual open-window checks
+- Added the replay gate to the open-window playtest checklist so control-feel review starts after deterministic key/click regressions are already blocked
+- Kept manual playtest signoff explicit because automation still cannot judge subjective timing, rhythm, and human read speed
+
 ## 0.156.0 - 2026-06-15
 
 - Added typography-fit telemetry to 2D visual captures so severe button-title compression, hidden lines, and wrapped-text clamps are recorded from the shared widget renderer

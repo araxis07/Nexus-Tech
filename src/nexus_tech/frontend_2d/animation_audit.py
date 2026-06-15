@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from nexus_tech.domain.models import DifficultyMode
 from nexus_tech.frontend_2d.motion_audit import (
@@ -20,6 +22,9 @@ from nexus_tech.frontend_2d.visual_audit import (
     VisualAuditReport,
     run_2d_visual_audit,
 )
+from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
+from nexus_tech.simulation.engine import create_new_game
+from nexus_tech.simulation.randomness import RandomSource
 
 DEFAULT_ANIMATION_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
     (820, 620),
@@ -60,6 +65,13 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
     (
         "Help / Hover",
         "F1, ?, and hover hints explain the current controls without hiding primary actions.",
+    ),
+    (
+        "Control Replay Safety",
+        (
+            "Automated key/click replay verifies pause, resume, back, help, hover copy, "
+            "and title-menu return before manual control-feel checks."
+        ),
     ),
     (
         "Control Affordance Coverage",
@@ -485,6 +497,7 @@ def run_2d_animation_audit(
         _build_scene_transition_handoff_cell(visual_report, motion_report, off_motion_report)
     )
     cells.append(_build_control_affordance_cell(visual_report))
+    cells.append(_build_control_replay_safety_cell(seed=seed))
     cells.append(_build_ui_layout_safety_cell(visual_report))
     cells.append(_build_typography_safety_cell(visual_report))
     cells.append(_build_actor_sprite_cell(visual_report, motion_report, off_motion_report))
@@ -1036,6 +1049,182 @@ def _build_control_affordance_cell(visual_report: VisualAuditReport) -> Animatio
         active_layers=active_layers,
         status="pass" if not missing else "fail",
         notes=notes,
+    )
+
+
+def _build_control_replay_safety_cell(*, seed: int) -> AnimationCoverageCell:
+    findings: list[str] = []
+    active_layers: list[str] = []
+
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+    try:
+        import pygame
+    except ModuleNotFoundError:
+        return AnimationCoverageCell(
+            area="Control Replay Safety",
+            required_layers=(
+                "pause-key-open",
+                "pause-resume-click",
+                "back-closes-overlay",
+                "back-opens-pause",
+                "help-key-toggle",
+                "hover-hints",
+                "pause-menu-return",
+            ),
+            active_layers=("pygame-unavailable",),
+            status="fail",
+            notes="pygame-ce is not installed",
+        )
+
+    from nexus_tech.frontend_2d.scenes import ClickTarget, RunScene, TitleScene
+    from nexus_tech.frontend_2d.widgets import create_fonts
+
+    pygame.init()
+    pygame.font.init()
+    try:
+        surface = pygame.display.set_mode((960, 640), pygame.HIDDEN)
+        fonts = create_fonts(pygame)
+        rect = surface.get_rect()
+
+        with TemporaryDirectory(prefix="nexus-tech-control-replay-") as tmpdir:
+            coordinator = SaveLoadCoordinator(Path(tmpdir) / "control-replay.db")
+            saved_slots: list[str] = []
+
+            def save_callback(_state, _rng, slot_name):
+                saved_slots.append(slot_name)
+
+            def make_title_scene():
+                return TitleScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=create_new_game("NEXUS TECH", "Nexus One"),
+                    rng=RandomSource(seed=seed + 100),
+                    slot_name="active",
+                    save_callback=save_callback,
+                    coordinator=coordinator,
+                    initial_mode="menu",
+                    motion_mode=MotionMode.FULL,
+                    entry_transition="boot_title",
+                )
+
+            def make_run_scene(*, dirty: bool = False):
+                return RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=create_new_game("NEXUS TECH", "Nexus One"),
+                    rng=RandomSource(seed=seed + 101),
+                    slot_name="active",
+                    save_callback=save_callback,
+                    dirty=dirty,
+                    show_ready_event=False,
+                    return_scene_factory=make_title_scene,
+                    motion_mode=MotionMode.FULL,
+                    entry_transition="boot_run",
+                )
+
+            pause_scene = make_run_scene()
+            pause_scene.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_p, unicode="p")
+            )
+            if pause_scene._pause_overlay_visible and not pause_scene.should_exit:
+                active_layers.append("pause-key-open")
+            else:
+                findings.append("P did not open pause safely")
+            pause_scene.draw(surface)
+            pause_scene._dispatch_click_target(ClickTarget("pause_resume", "", rect))
+            if not pause_scene._pause_overlay_visible and not pause_scene.should_exit:
+                active_layers.append("pause-resume-click")
+            else:
+                findings.append("Pause resume did not return to run")
+
+            back_scene = make_run_scene()
+            back_scene._set_deep_panel("finance")
+            back_scene.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="")
+            )
+            if back_scene._deep_panel_key is None and not back_scene._pause_overlay_visible:
+                active_layers.append("back-closes-overlay")
+            else:
+                findings.append("Esc did not close the active overlay first")
+            back_scene.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="")
+            )
+            if back_scene._pause_overlay_visible and not back_scene.should_exit:
+                active_layers.append("back-opens-pause")
+            else:
+                findings.append("Esc did not open pause after overlays were closed")
+
+            help_scene = make_run_scene()
+            help_scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F1, unicode=""))
+            help_opened = help_scene._help_overlay_visible and not help_scene._pause_overlay_visible
+            help_scene.handle_event(
+                pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="")
+            )
+            help_closed = not help_scene._help_overlay_visible and not help_scene.should_exit
+            if help_opened and help_closed:
+                active_layers.append("help-key-toggle")
+            else:
+                findings.append("F1/Esc help overlay replay failed")
+
+            hint_scene = make_run_scene()
+            hover_expectations = (
+                (ClickTarget("pause_toggle", "", rect), "open Pause"),
+                (ClickTarget("run_back", "", rect), "close the current overlay"),
+                (ClickTarget("open_help", "", rect), "control guide"),
+                (ClickTarget("pause_save", "", rect), "save the current run"),
+                (ClickTarget("pause_menu", "", rect), "return to the 2D title menu"),
+                (ClickTarget("close_help", "", rect), "close Help"),
+            )
+            hint_misses = tuple(
+                expected
+                for target, expected in hover_expectations
+                if expected not in hint_scene._describe_click_target(target)
+            )
+            if not hint_misses:
+                active_layers.append("hover-hints")
+            else:
+                findings.append(f"missing hover copy: {','.join(hint_misses[:2])}")
+
+            menu_scene = make_run_scene(dirty=True)
+            menu_scene._set_pause_overlay_visible(True)
+            menu_scene._dispatch_click_target(ClickTarget("pause_menu", "", rect))
+            next_scene = menu_scene.pop_next_scene()
+            if (
+                isinstance(next_scene, TitleScene)
+                and saved_slots
+                and saved_slots[-1] == "active"
+                and not menu_scene.should_exit
+            ):
+                active_layers.append("pause-menu-return")
+                active_layers.append("pause-save-before-menu")
+            else:
+                findings.append("Pause menu did not save and return to title shell")
+    finally:
+        pygame.quit()
+
+    required_layers = (
+        "pause-key-open",
+        "pause-resume-click",
+        "back-closes-overlay",
+        "back-opens-pause",
+        "help-key-toggle",
+        "hover-hints",
+        "pause-menu-return",
+    )
+    missing = tuple(layer for layer in required_layers if layer not in active_layers)
+    if missing:
+        findings.append(f"missing replay layers: {','.join(missing)}")
+    return AnimationCoverageCell(
+        area="Control Replay Safety",
+        required_layers=required_layers,
+        active_layers=tuple(active_layers),
+        status="pass" if not findings else "fail",
+        notes=(
+            "pause, resume, back, help, hover hints, save, and menu return replayed"
+            if not findings
+            else "; ".join(findings[:4])
+        ),
     )
 
 
