@@ -1187,11 +1187,7 @@ class TitleScene(BaseScene):
     def archive_comparison_active(self) -> bool:
         """Return whether archive/meta comparison motion should be visible."""
 
-        return (
-            self.motion_mode is not MotionMode.OFF
-            and self._mode in {"archives", "meta"}
-            and self._motion_level("title:archive:comparison", f"title:mode:{self._mode}") > 0
-        )
+        return self.motion_mode is not MotionMode.OFF and self._mode in {"archives", "meta"}
 
     def _title_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
         mode_label = {

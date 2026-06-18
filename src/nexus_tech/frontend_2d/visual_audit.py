@@ -1171,6 +1171,7 @@ def _expected_layers(layers: tuple[str, ...], *, motion_mode: MotionMode) -> tup
         "actor-timeline",
         "sprite-clips",
         "title-actor",
+        "archive-comparison",
         "inspector-actor",
         "endgame-actor",
         "review-actor",

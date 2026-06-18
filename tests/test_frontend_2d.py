@@ -3441,6 +3441,23 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "review-nav-controls" in review.active_layers
 
 
+def test_run_2d_visual_audit_motion_off_drops_archive_comparison_layer() -> None:
+    report = run_2d_visual_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        sizes=((820, 620),),
+        motion_mode=MotionMode.OFF,
+    )
+
+    title_meta = next(cell for cell in report.cells if cell.scene_key == "title_meta")
+
+    assert report.status == "pass"
+    assert report.motion_mode == MotionMode.OFF.value
+    assert "archive-comparison" not in title_meta.expected_layers
+    assert "archive-comparison" not in title_meta.active_layers
+
+
 def test_actor_sprite_pose_key_defaults_to_state_depth() -> None:
     blocked = scenes_module.ActorSpriteClip(
         key="blocked",
