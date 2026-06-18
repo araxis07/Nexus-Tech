@@ -44,6 +44,9 @@ Use this template when completing the open-window animation pass. Keep completed
 | Menu Return |  |  |  |
 | Help / Hover |  |  |  |
 | Control Replay Safety |  |  |  |
+| Control Affordance Coverage |  |  |  |
+| UI Layout Safety |  |  |  |
+| Typography Safety |  |  |  |
 | Motion Modes |  |  |  |
 
 ## Scene Results
@@ -58,6 +61,16 @@ Use this template when completing the open-window animation pass. Keep completed
 | Endgame Board |  |  |  |  |
 | Turn Summary |  |  |  |  |
 | Outcome/Review |  |  |  |  |
+| Scene Handoffs |  |  |  |  |
+
+## Game Feel Results
+
+| Feedback Area | Result | Notes | Follow-up |
+| --- | --- | --- | --- |
+| Success Feedback |  |  |  |
+| Blocked Feedback |  |  |  |
+| Impact Values |  |  |  |
+| Actor + Feedback Match |  |  |  |
 
 ## Release Blockers
 
@@ -78,3 +91,5 @@ Use this template when completing the open-window animation pass. Keep completed
 - Required fixes before presenting:
 - Nice-to-have polish:
 - Validator result:
+
+Run `validate-animation-playtest-report` only after every automated gate, window/motion cell, control row, scene row, and game-feel row is filled with real evidence. For a `pass` release decision, validator expects these rows to be `pass`; use `watch` or `fail` only when the build is not being cleared for presentation.

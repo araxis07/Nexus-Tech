@@ -158,6 +158,44 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS: tuple[str, ...] = (
         "--scenario founder_journey --runs 1 --turns 3 --seed-base 7"
     ),
 )
+REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES: tuple[str, ...] = (
+    "ruff check src tests",
+    "pytest tests/test_frontend_2d.py -q",
+    "pytest -q",
+    "audit-2d-motion full/reduced/off",
+    "audit-2d-visual full/off",
+    "audit-2d-animation",
+    "audit-2d-animation-matrix --output",
+    "prepare-2d-animation-playtest --output",
+    "Balance / long-session preflight",
+    "validate-animation-playtest-report",
+    "Headless menu-2d / play-2d",
+    "Open-window menu-2d / play-2d smoke",
+)
+REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS: tuple[str, ...] = (
+    "Version",
+    "Commit",
+    "Tester",
+    "Date",
+    "Platform",
+)
+REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS: tuple[str, ...] = (
+    "Hidden primary actions",
+    "Unreadable disabled reasons",
+    "Actor, tooltip, footer, modal, or button collisions",
+    "Missing or unclear actor state reactions",
+    "Unclear pause, back, help, save, or menu behavior",
+    "Motion-mode regressions",
+    "CI artifact anomalies",
+    "visual-audit-summary.md anomalies",
+    "animation-readiness-matrix.md anomalies",
+    "Balance preflight warnings",
+)
+REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS: tuple[str, ...] = (
+    "Required fixes before presenting",
+    "Nice-to-have polish",
+    "Validator result",
+)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
@@ -497,10 +535,41 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
     text = report_path.read_text(encoding="utf-8")
     findings: list[str] = []
     normalized = text.lower()
+    rows = _extract_markdown_table_rows(text)
     if "`todo`" in normalized or re.search(r"\|\s*todo\s*\|", normalized):
         findings.append("report still contains todo cells")
     if re.search(r"\|[ \t]*\|", text):
         findings.append("report still contains blank table cells")
+
+    for label in REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS:
+        if not _extract_report_field(text, label):
+            findings.append(f"missing {label.lower()} field")
+
+    _validate_required_result_rows(
+        findings,
+        rows,
+        REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES,
+        "automated gate",
+    )
+    _validate_required_window_matrix(findings, rows)
+    _validate_required_result_rows(
+        findings,
+        rows,
+        tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
+        "control result",
+    )
+    _validate_required_result_rows(
+        findings,
+        rows,
+        tuple(scene for scene, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
+        "scene result",
+    )
+    _validate_required_result_rows(
+        findings,
+        rows,
+        tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
+        "game-feel result",
+    )
 
     release_decision = _extract_report_field(text, "Release decision")
     decision = release_decision.strip("` ").lower()
@@ -512,12 +581,8 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         findings.append(f"release decision is {decision}, not pass")
 
     for label in (
-        "Tester",
-        "Date",
-        "Platform",
-        "Blockers",
-        "Balance preflight warnings",
-        "Follow-up fixes",
+        *REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS,
+        *REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS,
     ):
         value = _extract_report_field(text, label)
         if not value:
@@ -527,6 +592,101 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         path=str(report_path),
         release_decision=decision if release_decision else "",
         findings=tuple(findings),
+    )
+
+
+def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
+    rows: list[tuple[str, ...]] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|") or not stripped.endswith("|"):
+            continue
+        cells = tuple(cell.strip() for cell in stripped.strip("|").split("|"))
+        if not cells or _is_markdown_separator_row(cells):
+            continue
+        rows.append(cells)
+    return tuple(rows)
+
+
+def _is_markdown_separator_row(cells: tuple[str, ...]) -> bool:
+    return all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells)
+
+
+def _validate_required_window_matrix(
+    findings: list[str],
+    rows: tuple[tuple[str, ...], ...],
+) -> None:
+    for width, height in DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS:
+        label = f"{width}x{height}"
+        row = _find_report_table_row(rows, label)
+        if row is None:
+            findings.append(f"missing window matrix row: {label}")
+            continue
+        for index, mode in enumerate(("Full", "Reduced", "Off"), start=1):
+            if len(row) <= index or _is_placeholder_result(row[index]):
+                findings.append(f"incomplete window matrix result: {label} {mode}")
+                continue
+            if not _is_passing_result(row[index]):
+                result = _normalize_report_result(row[index]) or "blank"
+                findings.append(f"window matrix {label} {mode} is {result}, not pass")
+
+
+def _validate_required_result_rows(
+    findings: list[str],
+    rows: tuple[tuple[str, ...], ...],
+    labels: tuple[str, ...],
+    category: str,
+) -> None:
+    for label in labels:
+        row = _find_report_table_row(rows, label)
+        if row is None:
+            findings.append(f"missing {category} row: {label}")
+            continue
+        if len(row) <= 1 or _is_placeholder_result(row[1]):
+            findings.append(f"incomplete {category} result: {label}")
+            continue
+        if not _is_passing_result(row[1]):
+            result = _normalize_report_result(row[1]) or "blank"
+            findings.append(f"{category} {label} is {result}, not pass")
+
+
+def _find_report_table_row(
+    rows: tuple[tuple[str, ...], ...],
+    label: str,
+) -> tuple[str, ...] | None:
+    key = _normalize_report_key(label)
+    for row in rows:
+        if row and _normalize_report_key(row[0]) == key:
+            return row
+    return None
+
+
+def _normalize_report_key(value: str) -> str:
+    value = value.strip().strip("` ")
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def _normalize_report_result(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().strip("` ")).lower()
+
+
+def _is_placeholder_result(value: str) -> bool:
+    normalized = _normalize_report_result(value)
+    return (
+        not normalized
+        or normalized in {"-", "n/a", "na", "pending", "tbd", "todo"}
+        or "pass / watch / fail" in normalized
+        or "pass/watch/fail" in normalized
+    )
+
+
+def _is_passing_result(value: str) -> bool:
+    normalized = _normalize_report_result(value)
+    return (
+        normalized in {"ok", "pass", "passed", "success", "completed success", "green"}
+        or normalized.startswith("pass ")
+        or normalized.startswith("passed ")
+        or normalized.startswith("success ")
     )
 
 
@@ -736,6 +896,10 @@ def write_2d_animation_playtest_prep_report(
     matrix = report.matrix_report
     passed = sum(1 for cell in matrix.cells if cell.status == "pass")
     failed = len(matrix.cells) - passed
+    release_blocker_fields = (
+        *REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS,
+        *REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS,
+    )
     lines = [
         "# NEXUS TECH 2D Animation Playtest Prep",
         "",
@@ -875,6 +1039,39 @@ def write_2d_animation_playtest_prep_report(
                 "- Keep generated PNGs and local readiness reports out of git; commit only "
                 "source, tests, and docs."
             ),
+            (
+                "- The completed report must include every automated gate, every window/motion "
+                "cell, every control row, every scene row, and every game-feel row as `pass`."
+            ),
+            (
+                "- Run `validate-animation-playtest-report` after filling the report; "
+                "fail means no presentation signoff."
+            ),
+            "",
+            "## Required Report Sections",
+            "",
+            "| Section | Required Rows Or Fields |",
+            "| --- | --- |",
+            (
+                "| Build | "
+                f"{', '.join(REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS)}, Release decision |"
+            ),
+            (
+                "| Automated Gate Summary | "
+                f"{', '.join(REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES)} |"
+            ),
+            (
+                "| Window Matrix | "
+                + ", ".join(f"{width}x{height}" for width, height in report.windows)
+                + " across Full, Reduced, and Off |"
+            ),
+            (
+                "| Control Clarity Results | "
+                f"{', '.join(area for area, _ in report.control_checks)} |"
+            ),
+            f"| Scene Results | {', '.join(scene for scene, _ in report.scene_checks)} |",
+            f"| Game Feel Results | {', '.join(area for area, _ in report.feedback_checks)} |",
+            (f"| Release Blockers + Decision | {', '.join(release_blocker_fields)} |"),
             "",
             "## Matrix Cells",
             "",

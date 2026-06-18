@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.161.0 - 2026-06-19
+
+- Tightened `validate-animation-playtest-report` so animation signoff must include every automated gate, window/motion cell, control row, scene row, game-feel row, release-blocker field, and decision field before a presentation pass is accepted
+- Updated the animation playtest prep artifact to list the exact report sections the validator requires, making manual signoff gaps visible before the open-window pass starts
+- Expanded the animation playtest template and release checklist so UI layout, typography, scene handoff, and game-feel rows cannot be skipped during final animation review
+
 ## 0.160.0 - 2026-06-19
 
 - Added archive/meta comparison motion telemetry so title meta-board captures must expose an `archive-comparison` layer before animation readiness passes

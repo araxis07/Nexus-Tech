@@ -68,6 +68,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.
+- Treat any missing automated gate row, window/motion cell, control row, scene row, game-feel row, release-blocker field, or validator PASS in the manual report as a release blocker.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat missing `actor-pose-depth` layers as release blockers before presenting new actor/sprite reactions.
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.

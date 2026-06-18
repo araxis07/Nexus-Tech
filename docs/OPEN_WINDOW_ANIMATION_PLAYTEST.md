@@ -27,6 +27,12 @@ After filling the manual report, validate it before calling animation complete:
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
 
+The validator is strict for presentation signoff: every automated gate row, every
+window/motion cell, every control row, every scene row, every game-feel row, and
+every release-blocker field in the report template must be filled. A `pass`
+release decision requires those rows to be `pass`; use `watch` or `fail` when
+any item still needs owner follow-up.
+
 ## Window Matrix
 
 Test these windows before presenting the 2D build:

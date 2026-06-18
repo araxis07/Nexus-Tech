@@ -3854,11 +3854,111 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "balance-report --output /tmp/nexus-tech-balance-report.md" in report_text
     assert "## Manual Completion Gate" in report_text
     assert "Every game-feel row must be `pass`" in report_text
+    assert "## Required Report Sections" in report_text
+    assert "Window Matrix | 820x620, 960x640, 1440x900 across Full, Reduced, and Off" in report_text
+    assert "Game Feel Results | Success Feedback, Blocked Feedback, Impact Values" in report_text
     assert "manual signoff required before calling animation complete" in report_text
     assert "nexus-tech-2d-visual-audit" in report_text
     assert "nexus-tech-2d-animation-matrix" in report_text
     assert "nexus-tech-2d-animation-playtest-prep" in report_text
     assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
+
+
+def _completed_animation_playtest_report_text() -> str:
+    lines = [
+        "# Animation Playtest Report",
+        "",
+        "## Build",
+        "",
+        "- Version: 0.161.0",
+        "- Commit: abc1234",
+        "- Tester: araxis07",
+        "- Date: 2026-06-19",
+        "- Platform: macOS local",
+        "",
+        "## Automated Gate Summary",
+        "",
+        "| Gate | Result | Notes |",
+        "| --- | --- | --- |",
+        "| ruff check src tests | `pass` | ok |",
+        "| pytest tests/test_frontend_2d.py -q | `pass` | ok |",
+        "| pytest -q | `pass` | ok |",
+        "| audit-2d-motion full/reduced/off | `pass` | ok |",
+        "| audit-2d-visual full/off | `pass` | ok |",
+        "| audit-2d-animation | `pass` | ok |",
+        "| audit-2d-animation-matrix --output | `pass` | ok |",
+        "| prepare-2d-animation-playtest --output | `pass` | ok |",
+        "| Balance / long-session preflight | `pass` | ok |",
+        "| validate-animation-playtest-report | `pass` | ok |",
+        "| Headless menu-2d / play-2d | `pass` | ok |",
+        "| Open-window menu-2d / play-2d smoke | `pass` | ok |",
+        "",
+        "## Window Matrix",
+        "",
+        "| Window | Full | Reduced | Off | Notes |",
+        "| --- | --- | --- | --- | --- |",
+        "| `820x620` | `pass` | `pass` | `pass` | readable |",
+        "| `960x640` | `pass` | `pass` | `pass` | readable |",
+        "| `1440x900` | `pass` | `pass` | `pass` | readable |",
+        "",
+        "## Control Clarity Results",
+        "",
+        "| Control Area | Result | Notes | Follow-up |",
+        "| --- | --- | --- | --- |",
+        "| Pause / Resume | `pass` | clear | none |",
+        "| Back / Escape | `pass` | clear | none |",
+        "| Menu Return | `pass` | clear | none |",
+        "| Help / Hover | `pass` | clear | none |",
+        "| Control Replay Safety | `pass` | clear | none |",
+        "| Control Affordance Coverage | `pass` | clear | none |",
+        "| UI Layout Safety | `pass` | clear | none |",
+        "| Typography Safety | `pass` | clear | none |",
+        "| Motion Modes | `pass` | clear | none |",
+        "",
+        "## Scene Results",
+        "",
+        "| Scene | Result | Readability Notes | Motion Notes | Follow-up |",
+        "| --- | --- | --- | --- | --- |",
+        "| Title/Menu | `pass` | readable | stable | none |",
+        "| Live Dashboard | `pass` | readable | stable | none |",
+        "| Action Picker | `pass` | readable | stable | none |",
+        "| Pending Event | `pass` | readable | stable | none |",
+        "| Inspector | `pass` | readable | stable | none |",
+        "| Endgame Board | `pass` | readable | stable | none |",
+        "| Turn Summary | `pass` | readable | stable | none |",
+        "| Outcome/Review | `pass` | readable | stable | none |",
+        "| Scene Handoffs | `pass` | readable | stable | none |",
+        "",
+        "## Game Feel Results",
+        "",
+        "| Feedback Area | Result | Notes | Follow-up |",
+        "| --- | --- | --- | --- |",
+        "| Success Feedback | `pass` | clear | none |",
+        "| Blocked Feedback | `pass` | clear | none |",
+        "| Impact Values | `pass` | clear | none |",
+        "| Actor + Feedback Match | `pass` | clear | none |",
+        "",
+        "## Release Blockers",
+        "",
+        "- Hidden primary actions: none",
+        "- Unreadable disabled reasons: none",
+        "- Actor, tooltip, footer, modal, or button collisions: none",
+        "- Missing or unclear actor state reactions: none",
+        "- Unclear pause, back, help, save, or menu behavior: none",
+        "- Motion-mode regressions: none",
+        "- CI artifact anomalies: none",
+        "- visual-audit-summary.md anomalies: none",
+        "- animation-readiness-matrix.md anomalies: none",
+        "- Balance preflight warnings: none",
+        "",
+        "## Decision",
+        "",
+        "- Release decision: `pass`",
+        "- Required fixes before presenting: none",
+        "- Nice-to-have polish: none",
+        "- Validator result: pass",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def test_validate_2d_animation_playtest_report_rejects_unsigned_template(
@@ -3900,33 +4000,32 @@ def test_validate_2d_animation_playtest_report_accepts_signed_pass(
     tmp_path: Path,
 ) -> None:
     report_path = tmp_path / "signed-animation-report.md"
-    report_path.write_text(
-        "\n".join(
-            [
-                "# Animation Playtest Report",
-                "",
-                "| Window | Full |",
-                "| --- | --- |",
-                "| `820x620` | `pass` |",
-                "",
-                "- Tester: araxis07",
-                "- Date: 2026-06-18",
-                "- Platform: macOS local",
-                "- Release decision: `pass`",
-                "- Blockers: none",
-                "- Balance preflight warnings: none",
-                "- Follow-up fixes: none",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
 
     validation = validate_2d_animation_playtest_report(report_path)
 
     assert validation.status == "pass"
     assert validation.release_decision == "pass"
     assert validation.findings == ()
+
+
+def test_validate_2d_animation_playtest_report_rejects_missing_required_rows(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "partial-animation-report.md"
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        "| `960x640` | `pass` | `pass` | `pass` | readable |\n",
+        "",
+    )
+    report_text = report_text.replace("| Inspector | `pass` | readable | stable | none |\n", "")
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "missing window matrix row: 960x640" in validation.findings
+    assert "missing scene result row: Inspector" in validation.findings
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
@@ -4280,27 +4379,7 @@ def test_validate_animation_playtest_report_command_accepts_completed_report(
     tmp_path: Path,
 ) -> None:
     report_path = tmp_path / "completed-animation-report.md"
-    report_path.write_text(
-        "\n".join(
-            [
-                "# Animation Playtest Report",
-                "",
-                "| Control | Result |",
-                "| --- | --- |",
-                "| Pause / Resume | `pass` |",
-                "",
-                "- Tester: araxis07",
-                "- Date: 2026-06-18",
-                "- Platform: macOS local",
-                "- Release decision: `pass`",
-                "- Blockers: none",
-                "- Balance preflight warnings: none",
-                "- Follow-up fixes: none",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
 
     result = runner.invoke(app, ["validate-animation-playtest-report", str(report_path)])
 
