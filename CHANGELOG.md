@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.159.0 - 2026-06-18
+
+- Added `validate-animation-playtest-report` so completed manual animation reports must have no `todo` cells, a `pass` release decision, filled signoff fields, and balance warning notes before presentation signoff
+- Exported manual animation report validation helpers for tests and future release tooling
+- Updated playtest and release docs so manual animation signoff requires validator evidence instead of relying on an unchecked Markdown template
+
 ## 0.158.0 - 2026-06-18
 
 - Added balance and long-session preflight commands to the 2D animation playtest prep artifact so manual animation signoff starts with current tuning evidence

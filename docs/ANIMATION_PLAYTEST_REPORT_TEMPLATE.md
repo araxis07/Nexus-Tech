@@ -23,6 +23,7 @@ Use this template when completing the open-window animation pass. Keep completed
 | `audit-2d-animation-matrix --output` |  | Confirm the seven-scenario, three-seed, three-window local or CI readiness artifact passes before manual timing review |
 | `prepare-2d-animation-playtest --output` |  | Confirm the generated window/motion checklist marks manual result as not completed by automation |
 | Balance / long-session preflight |  | Run the balance commands listed in the playtest prep artifact and record whether warnings are intentional pressure or fixes |
+| `validate-animation-playtest-report` |  | Run this on the completed report and require PASS before presentation signoff |
 | Headless `menu-2d` / `play-2d` |  |  |
 | Open-window `menu-2d` / `play-2d` smoke |  |  |
 
@@ -76,3 +77,4 @@ Use this template when completing the open-window animation pass. Keep completed
 - Release decision: `pass` / `watch` / `fail`
 - Required fixes before presenting:
 - Nice-to-have polish:
+- Validator result:

@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     run_2d_animation_matrix_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
+    validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
 )
@@ -279,6 +280,12 @@ ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-prep.md"),
     "--output",
     help="Markdown path for the open-window animation playtest prep artifact.",
+)
+ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Completed manual animation playtest report Markdown file.",
 )
 
 ACTION_KEYS = {
@@ -1146,6 +1153,45 @@ def prepare_2d_animation_playtest_command(
     )
     if prep_report.status != "ready":
         raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-report")
+def validate_animation_playtest_report_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+) -> None:
+    """Validate that a manual animation playtest report is complete and signed off."""
+
+    validation = validate_2d_animation_playtest_report(report_path)
+    table = Table(title="Animation Playtest Report Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Report", validation.path)
+    table.add_row("Release Decision", validation.release_decision or "-")
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Validation Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Manual animation signoff is incomplete.",
+                title="Animation Playtest Report",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Manual animation signoff report is complete.",
+            title="Animation Playtest Report",
+            border_style="green",
+        )
+    )
 
 
 @app.command("list-scenarios")

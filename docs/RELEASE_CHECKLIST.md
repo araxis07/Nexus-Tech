@@ -31,6 +31,8 @@ uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
+# After the manual report is filled:
+uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
 
 ## Demo Verification
@@ -65,6 +67,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
 - Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
+- Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat missing `actor-pose-depth` layers as release blockers before presenting new actor/sprite reactions.
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.
@@ -90,6 +93,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md`, and `docs/ANIMATION_PLAYTEST_CHECKLIST_2026-06-06.md` for the remaining open-window readability pass before presenting the 2D build.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.
 - Treat unexplained balance preflight `watch` or `fail` cells as blockers for presentation builds, even when animation gates are green.
+- Treat incomplete manual reports, blank result cells, `todo` cells, or missing validator PASS as blockers for presentation builds.
 - If founder-pressure openings were retuned, rerun at least one longer `simulate-balance` founder batch so angel-cap, pricing, and cash-guard policies are verified on real seeds instead of only short audits.
 
 ## Scope Guardrails

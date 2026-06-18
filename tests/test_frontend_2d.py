@@ -27,6 +27,7 @@ from nexus_tech.frontend_2d import (
     AnimationCoverageCell,
     AnimationMatrixCell,
     AnimationMatrixReport,
+    AnimationPlaytestReportValidation,
     FlowAuditReport,
     MotionAuditCell,
     MotionAuditReport,
@@ -40,6 +41,7 @@ from nexus_tech.frontend_2d import (
     run_2d_flow_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
+    validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
 )
@@ -3721,6 +3723,74 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
 
 
+def test_validate_2d_animation_playtest_report_rejects_unsigned_template(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "unsigned-animation-report.md"
+    report_path.write_text(
+        "\n".join(
+            [
+                "# Animation Playtest Report",
+                "",
+                "| Window | Full |",
+                "| --- | --- |",
+                "| `820x620` | `todo` |",
+                "",
+                "- Tester:",
+                "- Date:",
+                "- Platform:",
+                "- Release decision: `pass` / `watch` / `fail`",
+                "- Blockers:",
+                "- Balance preflight warnings:",
+                "- Follow-up fixes:",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert isinstance(validation, AnimationPlaytestReportValidation)
+    assert validation.status == "fail"
+    assert "report still contains todo cells" in validation.findings
+    assert "release decision is still the template placeholder" in validation.findings
+    assert "missing tester field" in validation.findings
+
+
+def test_validate_2d_animation_playtest_report_accepts_signed_pass(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "signed-animation-report.md"
+    report_path.write_text(
+        "\n".join(
+            [
+                "# Animation Playtest Report",
+                "",
+                "| Window | Full |",
+                "| --- | --- |",
+                "| `820x620` | `pass` |",
+                "",
+                "- Tester: araxis07",
+                "- Date: 2026-06-18",
+                "- Platform: macOS local",
+                "- Release decision: `pass`",
+                "- Blockers: none",
+                "- Balance preflight warnings: none",
+                "- Follow-up fixes: none",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "pass"
+    assert validation.release_decision == "pass"
+    assert validation.findings == ()
+
+
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
@@ -4066,6 +4136,73 @@ def test_prepare_2d_animation_playtest_command_writes_prep_report(
     assert calls["scenario_ids"] == ("founder_journey",)
     assert calls["seeds"] == (7,)
     assert calls["frames"] == 1
+
+
+def test_validate_animation_playtest_report_command_accepts_completed_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "completed-animation-report.md"
+    report_path.write_text(
+        "\n".join(
+            [
+                "# Animation Playtest Report",
+                "",
+                "| Control | Result |",
+                "| --- | --- |",
+                "| Pause / Resume | `pass` |",
+                "",
+                "- Tester: araxis07",
+                "- Date: 2026-06-18",
+                "- Platform: macOS local",
+                "- Release decision: `pass`",
+                "- Blockers: none",
+                "- Balance preflight warnings: none",
+                "- Follow-up fixes: none",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["validate-animation-playtest-report", str(report_path)])
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Report Validation" in result.output
+    assert "Status" in result.output
+    assert "PASS" in result.output
+
+
+def test_validate_animation_playtest_report_command_rejects_incomplete_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "incomplete-animation-report.md"
+    report_path.write_text(
+        "\n".join(
+            [
+                "# Animation Playtest Report",
+                "",
+                "| Control | Result |",
+                "| --- | --- |",
+                "| Pause / Resume | `todo` |",
+                "",
+                "- Tester:",
+                "- Date:",
+                "- Platform:",
+                "- Release decision: `pass` / `watch` / `fail`",
+                "- Blockers:",
+                "- Balance preflight warnings:",
+                "- Follow-up fixes:",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["validate-animation-playtest-report", str(report_path)])
+
+    assert result.exit_code == 1
+    assert "Validation Findings" in result.output
+    assert "Manual animation signoff is incomplete" in result.output
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

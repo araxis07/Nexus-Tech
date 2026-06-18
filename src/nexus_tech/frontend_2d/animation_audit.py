@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -454,6 +455,71 @@ class AnimationPlaytestPrepReport:
         """Return ready only when the automated scenario/seed matrix passes."""
 
         return "ready" if self.matrix_report.status == "pass" else "blocked"
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestReportValidation:
+    """Validation result for a completed manual 2D animation playtest report."""
+
+    path: str
+    release_decision: str
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the report is completed and signed off."""
+
+        return "pass" if not self.findings else "fail"
+
+
+def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytestReportValidation:
+    """Validate that a manual animation playtest report is completed, not still a template."""
+
+    text = report_path.read_text(encoding="utf-8")
+    findings: list[str] = []
+    normalized = text.lower()
+    if "`todo`" in normalized or re.search(r"\|\s*todo\s*\|", normalized):
+        findings.append("report still contains todo cells")
+    if re.search(r"\|[ \t]*\|", text):
+        findings.append("report still contains blank table cells")
+
+    release_decision = _extract_report_field(text, "Release decision")
+    decision = release_decision.strip("` ").lower()
+    if not release_decision:
+        findings.append("missing release decision")
+    elif "/" in release_decision or decision not in {"pass", "watch", "fail"}:
+        findings.append("release decision is still the template placeholder")
+    elif decision != "pass":
+        findings.append(f"release decision is {decision}, not pass")
+
+    for label in (
+        "Tester",
+        "Date",
+        "Platform",
+        "Blockers",
+        "Balance preflight warnings",
+        "Follow-up fixes",
+    ):
+        value = _extract_report_field(text, label)
+        if not value:
+            findings.append(f"missing {label.lower()} field")
+
+    return AnimationPlaytestReportValidation(
+        path=str(report_path),
+        release_decision=decision if release_decision else "",
+        findings=tuple(findings),
+    )
+
+
+def _extract_report_field(text: str, label: str) -> str:
+    pattern = re.compile(rf"^\s*-?\s*{re.escape(label)}:\s*(.+?)\s*$", re.IGNORECASE)
+    for line in text.splitlines():
+        match = pattern.match(line)
+        if match is None:
+            continue
+        value = match.group(1).strip()
+        return value.strip("` ")
+    return ""
 
 
 def run_2d_animation_audit(
