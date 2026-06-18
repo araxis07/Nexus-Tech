@@ -3708,6 +3708,10 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "Success Feedback" in report_text
     assert "Blocked Feedback" in report_text
     assert "Impact Values" in report_text
+    assert "## Balance And Long-Session Preflight" in report_text
+    assert "balance-audit --scenario founder_journey --scenario debt_crunch" in report_text
+    assert "simulate-balance --scenario founder_journey --difficulty founder" in report_text
+    assert "balance-report --output /tmp/nexus-tech-balance-report.md" in report_text
     assert "## Manual Completion Gate" in report_text
     assert "Every game-feel row must be `pass`" in report_text
     assert "manual signoff required before calling animation complete" in report_text

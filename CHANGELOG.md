@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.158.0 - 2026-06-18
+
+- Added balance and long-session preflight commands to the 2D animation playtest prep artifact so manual animation signoff starts with current tuning evidence
+- Documented that balance warnings must be named as intentional pressure or fixed before adding more animation layers
+- Updated playtest and release checklists to keep simulation tuning evidence attached to presentation builds
+
 ## 0.157.0 - 2026-06-16
 
 - Added `Control Replay Safety` to the 2D animation audit so pause, resume, Escape/back, help, hover hints, save, and menu-return behavior are replayed before manual open-window checks

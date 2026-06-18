@@ -19,6 +19,8 @@ uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-t
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
 
+The generated playtest prep report also lists balance and long-session preflight commands. Run those before the visible-window pass; any balance `watch` or `fail` should be fixed or explicitly named as intentional scenario pressure before adding more animation layers.
+
 ## Window Matrix
 
 Test these windows before presenting the 2D build:
@@ -92,6 +94,7 @@ Record `pass`, `watch`, or `fail` for each control area before calling the anima
 - Any unclear pause, back, help, save, or menu behavior is a release blocker.
 - Any `Actor State Coverage`, `Action Feedback Clarity`, `Scene Transition Handoff`, `Control Affordance Coverage`, `Control Replay Safety`, `UI Layout Safety`, `Typography Safety`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, `actor-pose-depth`, or `actor-readability` audit failure is a release blocker.
 - Any `audit-2d-animation-matrix` failure in the default seven-scenario, three-seed presentation set is a release blocker.
+- Any unexplained balance preflight `watch` or `fail` is a release blocker for presentation builds.
 - Repeated `watch` notes in the same scene should be fixed before adding more animation layers.
 
 ## Result Template

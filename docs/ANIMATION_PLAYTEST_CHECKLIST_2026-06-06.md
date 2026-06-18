@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.157.0`
-- Focus: 2D actor/sprite timeline, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.158.0`
+- Focus: 2D actor/sprite timeline, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, balance preflight evidence, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 
 ## Commands
 
@@ -38,6 +38,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
 - Automated guard: `audit-2d-animation` reports `Readability Guard` so compact captures, actor-readable scenes, overlay density, and visual pass status are verified before the manual pass.
 - Matrix guard: `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` passes across the default seven-scenario, three-seed, three-window presentation matrix before relying on the single founder seed.
 - Playtest prep guard: `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` writes the window/motion checklist from the same matrix evidence before the human pass starts.
+- Balance preflight: run the balance/long-session commands listed in the playtest prep artifact and either fix any `balance-audit` warning or name it as intentional pressure before adding more animation layers.
 - CI guard: GitHub Actions runs headless 2D smoke checks plus motion, visual, animation-completeness, broad animation-matrix, and playtest-prep gates before the manual pass, then uploads `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` for review.
 - Blocked commands: disabled or rejected actions show a distinct blocked card, warning pulse, and matching actor state instead of looking like a successful command.
 - Title/menu: founder/save/archive/coach actor clips do not hide menu copy, save metadata, or wizard rows.

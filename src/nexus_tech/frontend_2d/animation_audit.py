@@ -134,6 +134,20 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS: tuple[tuple[str, str], ...] = (
         "Actor pose, action cue, and metric pulse describe the same outcome instead of competing.",
     ),
 )
+DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS: tuple[str, ...] = (
+    (
+        "uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch "
+        "--runs 1 --turns 6 --seed-base 7"
+    ),
+    (
+        "uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder "
+        "--runs 2 --turns 10 --seed-base 700"
+    ),
+    (
+        "uv run nexus-tech balance-report --output /tmp/nexus-tech-balance-report.md "
+        "--scenario founder_journey --runs 1 --turns 3 --seed-base 7"
+    ),
+)
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
@@ -430,6 +444,7 @@ class AnimationPlaytestPrepReport:
     control_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS
     scene_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS
     feedback_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS
+    balance_commands: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS
     visual_artifact_name: str = "nexus-tech-2d-visual-audit"
     matrix_artifact_name: str = "nexus-tech-2d-animation-matrix"
     playtest_artifact_name: str = "nexus-tech-2d-animation-playtest-prep"
@@ -610,6 +625,7 @@ def build_2d_animation_playtest_prep_report(
     control_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS,
     scene_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS,
     feedback_checks: tuple[tuple[str, str], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS,
+    balance_commands: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS,
 ) -> AnimationPlaytestPrepReport:
     """Build the report shell used before the real open-window animation pass."""
 
@@ -621,6 +637,7 @@ def build_2d_animation_playtest_prep_report(
         control_checks=control_checks,
         scene_checks=scene_checks,
         feedback_checks=feedback_checks,
+        balance_commands=balance_commands,
     )
 
 
@@ -675,14 +692,32 @@ def write_2d_animation_playtest_prep_report(
             "uv run nexus-tech audit-2d-animation-matrix --frames 1 "
             "--output /tmp/nexus-tech-animation-matrix.md"
         ),
+        (
+            "uv run nexus-tech prepare-2d-animation-playtest --frames 1 "
+            "--output /tmp/nexus-tech-animation-playtest-prep.md"
+        ),
         "```",
         "",
-        "## Open-Window Commands",
+        "## Balance And Long-Session Preflight",
         "",
-        "Resize the visible window to each target size and repeat the scene checks.",
+        "Run these before marking the manual animation pass ready for presentation. "
+        "Balance warnings should be named as intentional pressure or fixed before adding "
+        "more animation layers.",
         "",
         "```bash",
     ]
+    lines.extend(report.balance_commands)
+    lines.extend(
+        [
+            "```",
+            "",
+            "## Open-Window Commands",
+            "",
+            "Resize the visible window to each target size and repeat the scene checks.",
+            "",
+            "```bash",
+        ]
+    )
     for mode in report.motion_modes:
         lines.append(f"uv run nexus-tech menu-2d --motion-mode {mode}")
         lines.append(
