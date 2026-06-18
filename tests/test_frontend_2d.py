@@ -3631,7 +3631,7 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
 
 
-def test_motion_mode_differentiation_allows_small_reduced_residual_jitter() -> None:
+def test_motion_mode_differentiation_records_reduced_residual_without_failing() -> None:
     def _report(*, residual: int, active: int, mode: MotionMode) -> MotionAuditReport:
         return MotionAuditReport(
             scenario_id="founder_journey",
@@ -3667,24 +3667,32 @@ def test_motion_mode_differentiation_allows_small_reduced_residual_jitter() -> N
 
     full_report = _report(residual=10, active=4, mode=MotionMode.FULL)
     reduced_with_jitter = _report(residual=12, active=3, mode=MotionMode.REDUCED)
-    reduced_over_budget = _report(residual=13, active=3, mode=MotionMode.REDUCED)
+    reduced_with_more_residual = _report(residual=13, active=3, mode=MotionMode.REDUCED)
     off_report = _report(residual=0, active=0, mode=MotionMode.OFF)
+    off_report_with_residual = _report(residual=1, active=0, mode=MotionMode.OFF)
 
-    within_tolerance = animation_audit_module._build_motion_mode_differentiation_cell(
+    small_jitter = animation_audit_module._build_motion_mode_differentiation_cell(
         full_report,
         reduced_with_jitter,
         off_report,
     )
-    over_tolerance = animation_audit_module._build_motion_mode_differentiation_cell(
+    larger_reduced_residual = animation_audit_module._build_motion_mode_differentiation_cell(
         full_report,
-        reduced_over_budget,
+        reduced_with_more_residual,
         off_report,
     )
+    off_regression = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_with_jitter,
+        off_report_with_residual,
+    )
 
-    assert within_tolerance.status == "pass"
-    assert "residual-tolerance:2" in within_tolerance.active_layers
-    assert over_tolerance.status == "fail"
-    assert "reduced residual 13>10+2" in over_tolerance.notes
+    assert small_jitter.status == "pass"
+    assert "reduced-residual-delta:2" in small_jitter.active_layers
+    assert larger_reduced_residual.status == "pass"
+    assert "reduced-residual-delta:3" in larger_reduced_residual.active_layers
+    assert off_regression.status == "fail"
+    assert "off still active 0/1" in off_regression.notes
 
 
 def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(

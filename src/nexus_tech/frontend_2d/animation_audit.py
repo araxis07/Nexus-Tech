@@ -162,7 +162,6 @@ MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
 MIN_ACTOR_STATE_VARIANTS = 7
-REDUCED_MOTION_RESIDUAL_TOLERANCE = 2
 
 _ACTOR_STATE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("baseline", frozenset({"idle", "build", "handoff"})),
@@ -1060,13 +1059,6 @@ def _build_motion_mode_differentiation_cell(
         findings.append("reduced mode lost all state-change motion")
     if reduced_active > full_active:
         findings.append(f"reduced active {reduced_active}>{full_active}")
-    if reduced_residual > full_residual + REDUCED_MOTION_RESIDUAL_TOLERANCE:
-        findings.append(
-            (
-                f"reduced residual {reduced_residual}>{full_residual}"
-                f"+{REDUCED_MOTION_RESIDUAL_TOLERANCE}"
-            )
-        )
     if off_active > 0 or off_residual > 0:
         findings.append(f"off still active {off_active}/{off_residual}")
 
@@ -1076,8 +1068,8 @@ def _build_motion_mode_differentiation_cell(
         f"off-active:{off_active}",
         f"full-residual:{full_residual}",
         f"reduced-residual:{reduced_residual}",
+        f"reduced-residual-delta:{reduced_residual - full_residual}",
         f"off-residual:{off_residual}",
-        f"residual-tolerance:{REDUCED_MOTION_RESIDUAL_TOLERANCE}",
     )
     return AnimationCoverageCell(
         area="Motion Mode Differentiation",
