@@ -60,9 +60,9 @@ Record `pass`, `watch`, or `fail` for each scene:
 
 | Scene | Check |
 | --- | --- |
-| Title/Menu | Wizard, save slots, archives, meta board, and title actors never hide copy or actions |
+| Title/Menu | Wizard, save slots, archives, meta board, archive comparison signals, and title actors never hide copy or actions |
 | Live Dashboard | Founder/team/customer/board/product actors do not cover stat chips, product cards, or action buttons |
-| Action Picker | Picker cards, late-game choreography, and action feedback do not compete for the same focal point |
+| Action Picker | Picker cards, path-specific late-game choreography, and action feedback do not compete for the same focal point |
 | Pending Event | Preview motion clarifies the choice instead of distracting from option text |
 | Inspector | Selected row, pager, status chips, item action, actor routing, and footer line remain readable |
 | Endgame Board | Path-fix buttons and hotspot review remain primary while cockpit motion stays secondary |
@@ -96,6 +96,7 @@ Record `pass`, `watch`, or `fail` for each control area before calling the anima
 - Any missing/unclear blocked actor state is a release blocker.
 - Any missing `actor-pose-depth` cue or unclear actor body-language cue is a release blocker.
 - Any unclear success target, blocked reason, impact value, or actor/feedback mismatch is a release blocker.
+- Any late-game repair cue that does not identify the correct IPO, M&A, independence, or reset target lane is a release blocker.
 - Any missing/unclear scene handoff transition or transition active in motion-mode off is a release blocker.
 - Any unclear pause, back, help, save, or menu behavior is a release blocker.
 - Any `Actor State Coverage`, `Action Feedback Clarity`, `Scene Transition Handoff`, `Control Affordance Coverage`, `Control Replay Safety`, `UI Layout Safety`, `Typography Safety`, `Readability Guard`, `Animation Pacing Budget`, `Motion Mode Differentiation`, `Long Session Motion Stress`, `Long Session Visual Readiness`, `Scene Motion Profile`, `Visual Fatigue Budget`, `actor-pose-depth`, or `actor-readability` audit failure is a release blocker.

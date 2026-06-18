@@ -6,7 +6,9 @@ This pass extended the animated frontend beyond the run scene so the 2D shell re
 
 - Expanded action choreography coverage for capital, board, customer/support, partner/channel, pipeline, roadmap, and hiring command families.
 - Added motion emphasis to `TitleScene` and `ReviewScene`, including mode transitions, feed emphasis, and overlay transitions for text input and delete confirmation.
+- Added archive/meta comparison motion so archive coverage and dominant-path signals read as part of the title shell instead of static sidebar copy.
 - Tightened run-scene pre-action choreography so finance, board, report, customer, and pipeline commands pulse the most relevant stats and late-game panels before the state update lands.
+- Split late-game repair choreography into path-specific cues for IPO controls, M&A resilience, independence cash repair, and reset buffers.
 
 ## Outcome
 
@@ -16,6 +18,6 @@ This pass extended the animated frontend beyond the run scene so the 2D shell re
 
 ## Remaining gaps
 
-- Advanced archive comparison screens still use lighter motion than the live run.
-- Some late-game repair commands can still use more specific per-command choreography instead of family-level cues.
+- Archive comparison motion still needs open-window timing review against real archive history volume.
+- Less common terminal-chain commands can still receive deeper copy polish after the main path-repair cues are manually signed off.
 - Manual playtests are still needed to trim noise and confirm that the expanded motion pass stays readable over long sessions.

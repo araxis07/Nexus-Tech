@@ -1164,6 +1164,7 @@ class TitleScene(BaseScene):
             "title:header",
             "title:content",
             "title:feed",
+            "title:archive:comparison",
             f"title:mode:{self._mode}",
         )
         return min(1.0, (base + pulse * 0.34) * scale)
@@ -1182,6 +1183,15 @@ class TitleScene(BaseScene):
         """Return whether title/menu-specific actor clips are visible."""
 
         return self.actor_timeline_active()
+
+    def archive_comparison_active(self) -> bool:
+        """Return whether archive/meta comparison motion should be visible."""
+
+        return (
+            self.motion_mode is not MotionMode.OFF
+            and self._mode in {"archives", "meta"}
+            and self._motion_level("title:archive:comparison", f"title:mode:{self._mode}") > 0
+        )
 
     def _title_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
         mode_label = {
@@ -1282,6 +1292,17 @@ class TitleScene(BaseScene):
         self._motion_pulses.trigger(f"title:mode:{mode}", intensity=intensity, decay=2.4)
         self._trigger_title_motion("content", intensity=max(0.44, intensity * 0.7))
         self._trigger_title_motion("footer", intensity=max(0.32, intensity * 0.5))
+        if mode in {"archives", "meta"}:
+            self._motion_pulses.trigger(
+                "title:archive:comparison",
+                intensity=max(0.4, intensity * 0.86),
+                decay=2.6,
+            )
+            self._motion_pulses.trigger(
+                "title:archive:coverage",
+                intensity=max(0.32, intensity * 0.62),
+                decay=2.4,
+            )
 
     def _trigger_overlay_motion(self, overlay_key: str, *, intensity: float = 0.76) -> None:
         self._motion_pulses.trigger(
@@ -2221,7 +2242,11 @@ class TitleScene(BaseScene):
     def _draw_meta_board(self, surface, rect) -> None:
         pygame = self.pygame
         compact = self._meta_board_compact_layout(rect)
-        meta_motion = self._motion_level("title:mode:meta", "title:content")
+        meta_motion = self._motion_level(
+            "title:mode:meta",
+            "title:content",
+            "title:archive:comparison",
+        )
         inner = draw_panel(
             surface,
             pygame,
@@ -2271,6 +2296,12 @@ class TitleScene(BaseScene):
                     max_lines=1,
                 )
                 top += max(18, consumed)
+        if not compact and self.archive_comparison_active():
+            self._draw_archive_comparison_strip(
+                surface,
+                pygame.Rect(summary_rect.left, inner.bottom - 56, summary_rect.width, 46),
+                compact=compact,
+            )
 
         buttons = (
             ("1 Open Archives", "Jump into completed-run reviews.", "archives", WARN),
@@ -2365,6 +2396,81 @@ class TitleScene(BaseScene):
             )
             left += card_width + gap
 
+    def _draw_archive_comparison_strip(self, surface, rect, *, compact: bool) -> None:
+        if rect.width < 220 or rect.height < 38:
+            return
+        pygame = self.pygame
+        comparison = self._archive_comparison
+        pulse = self._motion_level("title:archive:comparison", "title:archive:coverage")
+        strength = 0.28 + pulse * (0.44 if self.motion_mode is MotionMode.REDUCED else 0.72)
+        fill = blend_color((12, 18, 30), WARN, min(0.28, 0.08 + pulse * 0.16))
+        pygame.draw.rect(surface, fill, rect, border_radius=14)
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, WARN, min(0.85, 0.32 + pulse * 0.42)),
+            rect,
+            width=1,
+            border_radius=14,
+        )
+        self._draw_title_entity_nodes(
+            surface,
+            pygame.Rect(rect.left + 10, rect.top + 10, 58, rect.height - 20),
+            accent=WARN,
+            strength=min(1.0, strength),
+            count=3,
+            offset=float(comparison.compared_runs),
+        )
+        label = "Archive Signal" if not compact else "Archive"
+        detail = (
+            f"{comparison.compared_runs} runs | {comparison.dominant_path} | "
+            f"{self._compact_text(comparison.next_gap, 28)}"
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            label,
+            TEXT,
+            pygame.Rect(rect.left + 78, rect.top + 7, rect.width - 92, 16),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            self._compact_text(detail, 56 if not compact else 42),
+            MUTED,
+            pygame.Rect(rect.left + 78, rect.top + 24, rect.width - 92, 16),
+            valign="top",
+        )
+
+    def _draw_title_entity_nodes(
+        self,
+        surface,
+        rect,
+        *,
+        accent: tuple[int, int, int],
+        strength: float,
+        count: int = 3,
+        offset: float = 0.0,
+    ) -> None:
+        if strength <= 0 or rect.width <= 20 or rect.height <= 10:
+            return
+        phase = self._motion_elapsed * 1.7 + offset
+        for index in range(count):
+            ratio = (index + 1) / (count + 1)
+            bob = sin(phase + index * 1.8) * 4 * strength
+            node_x = rect.left + int(rect.width * ratio)
+            node_y = rect.centery + int(bob)
+            radius = max(2, int(3 + strength * 3))
+            alpha = min(210, int(88 + strength * 110))
+            self.pygame.draw.circle(surface, (*accent, alpha), (node_x, node_y), radius)
+            self.pygame.draw.circle(
+                surface,
+                blend_color(accent, TEXT, 0.18),
+                (node_x, node_y),
+                radius,
+                1,
+            )
+
     def _draw_save_slot_browser(self, surface, rect) -> None:
         self._draw_card_browser(
             surface,
@@ -2390,7 +2496,11 @@ class TitleScene(BaseScene):
     ) -> None:
         pygame = self.pygame
         mode_key = "archives" if click_kind == "archive" else "slots"
-        browser_motion = self._motion_level(f"title:mode:{mode_key}", "title:content")
+        browser_motion = self._motion_level(
+            f"title:mode:{mode_key}",
+            "title:content",
+            "title:archive:comparison" if click_kind == "archive" else "title:content",
+        )
         inner = draw_panel(
             surface,
             pygame,
@@ -2402,6 +2512,13 @@ class TitleScene(BaseScene):
         )
         title_surface = self.fonts.heading.render(title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
+        if click_kind == "archive" and self.archive_comparison_active() and inner.height >= 170:
+            self._draw_archive_comparison_strip(
+                surface,
+                pygame.Rect(inner.left, inner.top, inner.width, 44),
+                compact=inner.width < 620,
+            )
+            inner = pygame.Rect(inner.left, inner.top + 54, inner.width, inner.height - 54)
         if not cards:
             draw_text_line(
                 surface,
@@ -5484,6 +5601,45 @@ class RunScene(BaseScene):
         command: str,
     ) -> tuple[str, str, str, tuple[int, int, int], tuple[str, ...]] | None:
         normalized = command.lower()
+        path_specific_profiles = {
+            TurnAction.SET_PATH_CONTROL_MATRIX.value: (
+                "IPO Controls",
+                "ipo",
+                "Lock operating controls, reference proof, and public-market readiness.",
+                INFO,
+                ("panel:endgame", "panel:customers", "stat:reputation"),
+            ),
+            TurnAction.SET_PATH_RESILIENCE_GRID.value: (
+                "M&A Resilience",
+                "m&a",
+                "Stabilize partner exposure and resilience before buyer diligence tightens.",
+                SELECTION,
+                ("panel:endgame", "panel:partnerships", "stat:users"),
+            ),
+            TurnAction.SET_PATH_CASH_WATERFALL.value: (
+                "Independence Cash",
+                "cash",
+                "Route reserve, runway, and renewal pressure into the independent path.",
+                WARN,
+                ("panel:endgame", "panel:finance", "stat:cash"),
+            ),
+            TurnAction.SET_BALANCE_SHEET_RECOVERY_MESH.value: (
+                "Reset Recovery",
+                "reset",
+                "Bind reset controls to board pressure, cash repair, and recovery timing.",
+                DANGER,
+                ("panel:endgame", "panel:board", "stat:board_pressure"),
+            ),
+            TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value: (
+                "Reset Buffer",
+                "reset",
+                "Raise reserves before board reset risk blocks the recovery lane.",
+                DANGER,
+                ("panel:endgame", "panel:finance", "stat:board_pressure"),
+            ),
+        }
+        if command in path_specific_profiles:
+            return path_specific_profiles[command]
         if normalized.startswith(("set_terminal_", "set_exit_", "set_endgame_")):
             return (
                 "Terminal Gate",

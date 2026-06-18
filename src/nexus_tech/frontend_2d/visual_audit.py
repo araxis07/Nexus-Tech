@@ -326,6 +326,7 @@ def run_2d_visual_audit(
                                 "actor-timeline",
                                 "sprite-clips",
                                 "title-actor",
+                                "archive-comparison",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -1053,6 +1054,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("sprite-clips")
     if getattr(scene, "title_actor_active", lambda: False)():
         layers.append("title-actor")
+    if getattr(scene, "archive_comparison_active", lambda: False)():
+        layers.append("archive-comparison")
     if getattr(scene, "inspector_actor_active", lambda: False)():
         layers.append("inspector-actor")
     if getattr(scene, "endgame_actor_active", lambda: False)():

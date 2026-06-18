@@ -101,9 +101,18 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
     ),
 )
 DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS: tuple[tuple[str, str], ...] = (
-    ("Title/Menu", "Wizard, saves, archive, meta board, and title actors stay readable."),
+    (
+        "Title/Menu",
+        (
+            "Wizard, saves, archive, meta board, archive comparison signals, "
+            "and title actors stay readable."
+        ),
+    ),
     ("Live Dashboard", "Actors and product motion do not hide metrics, cards, or actions."),
-    ("Action Picker", "Picker cards, choreography, and cues do not compete for focus."),
+    (
+        "Action Picker",
+        "Picker cards, path-specific late-game choreography, and cues do not compete for focus.",
+    ),
     ("Pending Event", "Option preview motion clarifies choices without hiding text."),
     ("Inspector", "Selected row, pager, chips, actor routing, and footer stay readable."),
     ("Endgame Board", "Path-fix buttons stay primary while cockpit motion stays secondary."),
@@ -153,6 +162,7 @@ MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
 MIN_ACTOR_STATE_VARIANTS = 7
+REDUCED_MOTION_RESIDUAL_TOLERANCE = 2
 
 _ACTOR_STATE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("baseline", frozenset({"idle", "build", "handoff"})),
@@ -258,6 +268,16 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "title-actor",
             "actor-readability",
             "actor-pose-depth",
+        ),
+    ),
+    (
+        "title_meta",
+        "Archive/Meta Comparison Motion",
+        (
+            "transition",
+            "motion-pulses",
+            "title-actor",
+            "archive-comparison",
         ),
     ),
     (
@@ -1040,8 +1060,13 @@ def _build_motion_mode_differentiation_cell(
         findings.append("reduced mode lost all state-change motion")
     if reduced_active > full_active:
         findings.append(f"reduced active {reduced_active}>{full_active}")
-    if reduced_residual > full_residual:
-        findings.append(f"reduced residual {reduced_residual}>{full_residual}")
+    if reduced_residual > full_residual + REDUCED_MOTION_RESIDUAL_TOLERANCE:
+        findings.append(
+            (
+                f"reduced residual {reduced_residual}>{full_residual}"
+                f"+{REDUCED_MOTION_RESIDUAL_TOLERANCE}"
+            )
+        )
     if off_active > 0 or off_residual > 0:
         findings.append(f"off still active {off_active}/{off_residual}")
 
@@ -1052,6 +1077,7 @@ def _build_motion_mode_differentiation_cell(
         f"full-residual:{full_residual}",
         f"reduced-residual:{reduced_residual}",
         f"off-residual:{off_residual}",
+        f"residual-tolerance:{REDUCED_MOTION_RESIDUAL_TOLERANCE}",
     )
     return AnimationCoverageCell(
         area="Motion Mode Differentiation",

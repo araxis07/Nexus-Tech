@@ -2024,6 +2024,59 @@ def test_run_scene_late_game_choreography_respects_motion_modes() -> None:
         pygame.quit()
 
 
+def test_run_scene_late_game_path_repairs_use_specific_choreography() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state.model_copy(deep=True),
+            rng=RandomSource(seed=53),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        expectations = (
+            (
+                TurnAction.SET_PATH_CONTROL_MATRIX.value,
+                "IPO Controls",
+                "ipo",
+                "panel:customers",
+            ),
+            (
+                TurnAction.SET_PATH_RESILIENCE_GRID.value,
+                "M&A Resilience",
+                "m&a",
+                "panel:partnerships",
+            ),
+            (
+                TurnAction.SET_PATH_CASH_WATERFALL.value,
+                "Independence Cash",
+                "cash",
+                "panel:finance",
+            ),
+            (
+                TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
+                "Reset Buffer",
+                "reset",
+                "panel:finance",
+            ),
+        )
+        for command, label, family, target in expectations:
+            scene._late_game_choreography_cues.clear()
+            scene._queue_late_game_choreography(command)
+            cue = scene._late_game_choreography_cues[0]
+
+            assert cue.label == label
+            assert cue.family == family
+            assert "panel:endgame" in cue.targets
+            assert target in cue.targets
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_outcome_cinematic_respects_motion_modes() -> None:
     pygame, fonts, surface = _build_pygame_bundle()
     try:
@@ -3294,6 +3347,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert report.baseline_signature in summary
     assert "`run_dashboard`" in summary
     title_menu = next(cell for cell in report.cells if cell.scene_key == "title_menu")
+    title_meta = next(cell for cell in report.cells if cell.scene_key == "title_meta")
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
     blocked = next(cell for cell in report.cells if cell.scene_key == "run_blocked_feedback")
     dashboard = next(cell for cell in report.cells if cell.scene_key == "run_dashboard")
@@ -3315,6 +3369,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-pose-depth" in title_menu.active_layers
     assert any(layer.startswith("actor-state:") for layer in title_menu.active_layers)
     assert any(layer.startswith("actor-pose:") for layer in title_menu.active_layers)
+    assert "archive-comparison" in title_meta.active_layers
     assert "actor-timeline" in dashboard.active_layers
     assert "transition-key:boot_run" in dashboard.active_layers
     assert "sprite-clips" in dashboard.active_layers
@@ -3483,6 +3538,8 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers
+    assert areas["Archive/Meta Comparison Motion"].status == "pass"
+    assert "archive-comparison" in areas["Archive/Meta Comparison Motion"].active_layers
     assert areas["Long Session Motion Stress"].status == "pass"
     assert "long-run-pulse-recovery" in areas["Long Session Motion Stress"].required_layers
     assert areas["Pending Event Preview"].status == "pass"
@@ -3572,6 +3629,62 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert areas["Motion Off Gate"].status == "pass"
     assert areas["Manual Playtest"].status == "advisory"
     assert not any("Sprite/actor animation" in gap for gap in report.advisory_gaps)
+
+
+def test_motion_mode_differentiation_allows_small_reduced_residual_jitter() -> None:
+    def _report(*, residual: int, active: int, mode: MotionMode) -> MotionAuditReport:
+        return MotionAuditReport(
+            scenario_id="founder_journey",
+            difficulty="scenario",
+            seed=7,
+            frames=1,
+            motion_mode=mode.value,
+            flow_report=FlowAuditReport(command_count=1, inspector_action_count=1, findings=()),
+            cells=(
+                MotionAuditCell(
+                    width=820,
+                    height=620,
+                    run_before_pulses=residual + 4,
+                    run_after_pulses=residual,
+                    summary_before_pulses=0,
+                    summary_after_pulses=0,
+                    title_before_pulses=0,
+                    title_after_pulses=0,
+                    review_before_pulses=0,
+                    review_after_pulses=0,
+                    inspector_before_pulses=0,
+                    inspector_after_pulses=0,
+                    long_run_before_pulses=0,
+                    long_run_after_pulses=0,
+                    average_frame_ms=1.0,
+                    max_frame_ms=2.0,
+                    action_feedback_active_samples=active,
+                    actor_timeline_active_samples=active,
+                    sprite_clips_active_samples=active,
+                ),
+            ),
+        )
+
+    full_report = _report(residual=10, active=4, mode=MotionMode.FULL)
+    reduced_with_jitter = _report(residual=12, active=3, mode=MotionMode.REDUCED)
+    reduced_over_budget = _report(residual=13, active=3, mode=MotionMode.REDUCED)
+    off_report = _report(residual=0, active=0, mode=MotionMode.OFF)
+
+    within_tolerance = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_with_jitter,
+        off_report,
+    )
+    over_tolerance = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_over_budget,
+        off_report,
+    )
+
+    assert within_tolerance.status == "pass"
+    assert "residual-tolerance:2" in within_tolerance.active_layers
+    assert over_tolerance.status == "fail"
+    assert "reduced residual 13>10+2" in over_tolerance.notes
 
 
 def test_run_2d_animation_matrix_audit_records_scenario_seed_cells(

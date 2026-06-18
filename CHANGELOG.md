@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.160.0 - 2026-06-19
+
+- Added archive/meta comparison motion telemetry so title meta-board captures must expose an `archive-comparison` layer before animation readiness passes
+- Added path-specific late-game choreography cues for IPO controls, M&A resilience, independence cash repair, and reset buffer commands instead of routing all repair actions through one generic path cue
+- Updated animation playtest documentation so manual checks explicitly verify archive comparison readability and path-specific late-game repair cues
+
 ## 0.159.0 - 2026-06-18
 
 - Added `validate-animation-playtest-report` so completed manual animation reports must have no `todo` cells, a `pass` release decision, filled signoff fields, and balance warning notes before presentation signoff
