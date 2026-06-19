@@ -3916,6 +3916,35 @@ def test_write_2d_animation_playtest_report_template_matches_validator_contract(
     assert "incomplete window matrix result: 820x620 Full" in validation.findings
 
 
+def test_write_2d_animation_playtest_report_template_can_prefill_automated_gates(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.163.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-19",
+        prefill_automated_gates=True,
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "| audit-2d-animation-matrix --output | `pass`" in report_text
+    assert "| prepare-2d-animation-playtest --output | `pass`" in report_text
+    assert "| `820x620` | `todo` | `todo` | `todo`" in report_text
+
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert validation.status == "fail"
+    assert "incomplete automated gate result: audit-2d-animation-matrix --output" not in (
+        validation.findings
+    )
+    assert "incomplete window matrix result: 820x620 Full" in validation.findings
+
+
 def _completed_animation_playtest_report_text() -> str:
     lines = [
         "# Animation Playtest Report",
@@ -4045,7 +4074,7 @@ def test_validate_2d_animation_playtest_report_rejects_unsigned_template(
     assert validation.status == "fail"
     assert "report still contains todo cells" in validation.findings
     assert "release decision is still the template placeholder" in validation.findings
-    assert "missing tester field" in validation.findings
+    assert "missing field: Tester" in validation.findings
 
 
 def test_validate_2d_animation_playtest_report_accepts_signed_pass(
@@ -4457,6 +4486,36 @@ def test_draft_animation_playtest_report_command_writes_strict_template(
     assert "| Pause / Resume | `todo`" in report_text
     assert "| Outcome/Review | `todo`" in report_text
     assert "| Actor + Feedback Match | `todo`" in report_text
+
+
+def test_draft_animation_playtest_report_command_prefills_automated_gates(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+
+    result = runner.invoke(
+        app,
+        [
+            "draft-animation-playtest-report",
+            "--output",
+            str(output_path),
+            "--commit",
+            "abc1234",
+            "--tester",
+            "araxis07",
+            "--platform",
+            "macOS local",
+            "--date",
+            "2026-06-19",
+            "--prefill-automated-gates",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "| ruff check src tests | `pass`" in report_text
+    assert "| Open-window menu-2d / play-2d smoke | `pass`" in report_text
+    assert "| Pause / Resume | `todo`" in report_text
 
 
 def test_validate_animation_playtest_report_command_accepts_completed_report(

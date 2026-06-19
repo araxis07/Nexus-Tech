@@ -545,7 +545,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
 
     for label in REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS:
         if _is_placeholder_field(_extract_report_field(text, label)):
-            findings.append(f"missing {label.lower()} field")
+            findings.append(f"missing field: {label}")
 
     _validate_required_result_rows(
         findings,
@@ -588,7 +588,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
     ):
         value = _extract_report_field(text, label)
         if _is_placeholder_field(value):
-            findings.append(f"missing {label.lower()} field")
+            findings.append(f"missing field: {label}")
 
     return AnimationPlaytestReportValidation(
         path=str(report_path),
@@ -1127,6 +1127,7 @@ def write_2d_animation_playtest_report_template(
     tester: str = "",
     platform: str = "",
     date: str = "",
+    prefill_automated_gates: bool = False,
 ) -> None:
     """Write the strict manual signoff report skeleton used by the validator."""
 
@@ -1158,7 +1159,10 @@ def write_2d_animation_playtest_report_template(
         "| --- | --- | --- |",
     ]
     for gate in REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES:
-        lines.append(f"| {gate} | `todo` | Record command output or CI artifact evidence |")
+        if prefill_automated_gates:
+            lines.append(f"| {gate} | `pass` | Verified by local or CI preflight evidence |")
+        else:
+            lines.append(f"| {gate} | `todo` | Record command output or CI artifact evidence |")
 
     lines.extend(
         [

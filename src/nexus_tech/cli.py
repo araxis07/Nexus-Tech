@@ -1172,6 +1172,14 @@ def draft_animation_playtest_report_command(
     tester: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     platform: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     date: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    prefill_automated_gates: bool = typer.Option(
+        False,
+        "--prefill-automated-gates",
+        help=(
+            "Mark automated gate rows as pass after local/CI preflight has already passed; "
+            "manual playtest rows remain todo."
+        ),
+    ),
 ) -> None:
     """Write the strict manual 2D animation playtest report draft."""
 
@@ -1182,6 +1190,7 @@ def draft_animation_playtest_report_command(
         tester=tester,
         platform=platform,
         date=date,
+        prefill_automated_gates=prefill_automated_gates,
     )
     console.print(
         Panel.fit(

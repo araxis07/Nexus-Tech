@@ -546,7 +546,7 @@ uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-t
 Create the strict manual report draft that the validator expects after the real open-window pass:
 
 ```bash
-uv run nexus-tech draft-animation-playtest-report --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 ```
 
 The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, and uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep` after the CI animation gates.
@@ -629,7 +629,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-m
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
-uv run nexus-tech draft-animation-playtest-report --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 ```
 
 ## 🧹 Linting and Formatting

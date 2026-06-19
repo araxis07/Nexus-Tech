@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.163.0 - 2026-06-19
+
+- Added `--prefill-automated-gates` to `draft-animation-playtest-report` so passed local/CI preflight evidence can be written into the report without marking manual window, control, scene, or game-feel rows complete
+- Kept manual signoff protected by leaving open-window rows as `todo` until a real visible-window playtest is performed
+- Added regression coverage to ensure prefilled automated gates reduce duplicate report work while the validator still blocks incomplete manual animation signoff
+
 ## 0.162.0 - 2026-06-19
 
 - Added `draft-animation-playtest-report` so the remaining manual open-window animation pass starts from a validator-aligned report with every automated gate, window, control, scene, game-feel, blocker, and decision row already present
