@@ -4722,6 +4722,53 @@ def test_animation_playtest_commands_command_writes_queue(tmp_path: Path) -> Non
     assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
 
 
+def test_prepare_animation_playtest_session_command_writes_draft_and_queue(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-animation-playtest-session",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "17",
+            "--report-output",
+            str(report_path),
+            "--commands-output",
+            str(commands_path),
+            "--commit",
+            "abc1234",
+            "--tester",
+            "araxis07",
+            "--platform",
+            "macOS local",
+            "--date",
+            "2026-06-20",
+            "--prefill-automated-gates",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Session" in result.output
+    assert "Animation Playtest Status" in result.output
+    assert "Status FAIL" in result.output
+    assert report_path.exists()
+    assert commands_path.exists()
+    report_text = report_path.read_text(encoding="utf-8")
+    commands_text = commands_path.read_text(encoding="utf-8")
+    assert "- Commit: abc1234" in report_text
+    assert "- Tester: araxis07" in report_text
+    assert "| ruff check src tests | `pass`" in report_text
+    assert "| `820x620` | `todo` | `todo` | `todo`" in report_text
+    assert "- Manual result: `not completed by automation`" in commands_text
+    assert "play-2d --scenario founder_journey --seed 17" in commands_text
+    assert "menu-2d --window-size 1440x900 --motion-mode off" in commands_text
+
+
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 

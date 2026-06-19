@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.167.0 - 2026-06-20
+
+- Added `prepare-animation-playtest-session` to create the strict manual report draft, visible-window command queue, and grouped status summary in one setup step
+- Kept the session setup non-signing by leaving manual window, control, scene, game-feel, blocker, and decision rows incomplete until real tester notes are recorded
+- Added regression coverage and docs for the one-command manual animation QA setup flow
+
 ## 0.166.0 - 2026-06-20
 
 - Added `animation-playtest-commands` to print or export the exact visible-window manual animation QA command queue across every required window size and motion mode

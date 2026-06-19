@@ -57,6 +57,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.frontend_2d import (
     DEFAULT_ANIMATION_MATRIX_SCENARIOS,
     DEFAULT_ANIMATION_MATRIX_SEEDS,
+    AnimationPlaytestReportValidation,
     Frontend2DUnavailableError,
     MotionMode,
     build_2d_animation_playtest_command_queue,
@@ -296,6 +297,16 @@ ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the manual animation playtest command queue.",
+)
+ANIMATION_PLAYTEST_SESSION_REPORT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-report.md"),
+    "--report-output",
+    help="Markdown path for the strict manual animation playtest report draft.",
+)
+ANIMATION_PLAYTEST_SESSION_COMMANDS_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-commands.md"),
+    "--commands-output",
+    help="Markdown path for the manual animation playtest command queue.",
 )
 ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-report.md"),
@@ -1303,6 +1314,14 @@ def animation_playtest_status_command(
     """Show grouped manual animation playtest report progress without hiding details."""
 
     validation = validate_2d_animation_playtest_report(report_path)
+    print_animation_playtest_status(validation)
+    if fail_on_incomplete and validation.status != "pass":
+        raise typer.Exit(code=1)
+
+
+def print_animation_playtest_status(validation: AnimationPlaytestReportValidation) -> None:
+    """Print grouped manual animation report status for CLI commands."""
+
     summary = summarize_2d_animation_playtest_report(validation)
 
     table = Table(title="Animation Playtest Status")
@@ -1327,8 +1346,6 @@ def animation_playtest_status_command(
             border_style=border_style,
         )
     )
-    if fail_on_incomplete and validation.status != "pass":
-        raise typer.Exit(code=1)
 
 
 @app.command("animation-playtest-commands")
@@ -1383,6 +1400,72 @@ def animation_playtest_commands_command(
                 "this does not mark animation signoff complete."
             ),
             title="Animation Playtest Commands",
+            border_style="yellow",
+        )
+    )
+
+
+@app.command("prepare-animation-playtest-session")
+def prepare_animation_playtest_session_command(
+    report_output: Path = ANIMATION_PLAYTEST_SESSION_REPORT_OUTPUT_OPTION,
+    commands_output: Path = ANIMATION_PLAYTEST_SESSION_COMMANDS_OUTPUT_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed used for the visible play-2d manual animation pass.",
+    ),
+    commit: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    tester: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    platform: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    date: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    prefill_automated_gates: bool = typer.Option(
+        False,
+        "--prefill-automated-gates",
+        help=(
+            "Mark automated gate rows as pass after local/CI preflight has already passed; "
+            "manual playtest rows remain todo."
+        ),
+    ),
+) -> None:
+    """Prepare report and command queue files for the manual animation playtest session."""
+
+    validate_scenario_id(scenario)
+    write_2d_animation_playtest_report_template(
+        report_output,
+        version=__version__,
+        commit=commit,
+        tester=tester,
+        platform=platform,
+        date=date,
+        prefill_automated_gates=prefill_automated_gates,
+    )
+    queue = build_2d_animation_playtest_command_queue(
+        scenario_id=scenario,
+        seed=seed,
+    )
+    write_2d_animation_playtest_command_queue(queue, commands_output)
+
+    session_table = Table(title="Animation Playtest Session")
+    session_table.add_column("Field", style="cyan")
+    session_table.add_column("Value")
+    session_table.add_row("Report", str(report_output))
+    session_table.add_row("Commands", str(commands_output))
+    session_table.add_row("Scenario", scenario)
+    session_table.add_row("Seed", str(seed))
+    session_table.add_row("Command Queue", f"{len(queue)} visible-window command(s)")
+    console.print(session_table)
+
+    validation = validate_2d_animation_playtest_report(report_output)
+    print_animation_playtest_status(validation)
+    console.print(
+        Panel.fit(
+            (
+                "Manual animation signoff is still incomplete. "
+                "Run the visible-window queue, fill the report with real notes, "
+                "then validate it."
+            ),
+            title="Animation Playtest Session",
             border_style="yellow",
         )
     )

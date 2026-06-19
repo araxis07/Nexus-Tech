@@ -18,6 +18,7 @@ uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-t
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
 ```
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
@@ -35,6 +36,9 @@ without failing by default. Use `validate-animation-playtest-report` as the fina
 blocking gate after the visible-window rows and signoff fields are filled.
 Use `animation-playtest-commands` to print or export the exact visible-window
 command queue; it does not mark any manual row complete.
+Use `prepare-animation-playtest-session` when you want the strict report draft,
+command queue, and grouped status summary created together before handing the
+manual pass to a tester.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 
