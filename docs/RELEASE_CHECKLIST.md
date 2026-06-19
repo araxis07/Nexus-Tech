@@ -31,6 +31,7 @@ uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
 # After the manual report is filled:
@@ -40,6 +41,9 @@ uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-p
 Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command
 is being used as a release gate.
+Run `animation-playtest-commands` to export the exact visible-window queue before
+the manual pass; keep the generated queue in `/tmp` unless it contains real
+release notes.
 
 ## Demo Verification
 
@@ -73,6 +77,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
 - Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
 - Use visible `menu-2d` and `play-2d` with `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` during the human pass instead of hand-resizing windows.
+- Run `animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md` when handing the remaining manual QA to a tester so no required window or motion mode is skipped.
 - Run `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` after automated gates pass so the completed report starts from the same validator-required rows while manual window/control/scene/game-feel rows still require real tester input.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.

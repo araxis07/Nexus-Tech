@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.166.0 - 2026-06-20
+
+- Added `animation-playtest-commands` to print or export the exact visible-window manual animation QA command queue across every required window size and motion mode
+- Reused the same command queue in the playtest prep artifact so docs, reports, and CLI output stay aligned for the remaining manual signoff
+- Added regression coverage to keep the manual command queue complete while still marking human animation signoff as incomplete until a real tester fills the report
+
 ## 0.165.0 - 2026-06-19
 
 - Added `--window-size WIDTHxHEIGHT` to the visible 2D launch commands so manual animation QA can open the exact compact, small, and presentation windows without relying on hand-resizing

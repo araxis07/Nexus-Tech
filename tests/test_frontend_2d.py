@@ -34,6 +34,7 @@ from nexus_tech.frontend_2d import (
     MotionAuditReport,
     VisualAuditCell,
     VisualAuditReport,
+    build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_prep_report,
     launch_2d_frontend,
     launch_2d_menu,
@@ -45,6 +46,7 @@ from nexus_tech.frontend_2d import (
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
+    write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_report_template,
 )
@@ -3888,6 +3890,42 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
 
 
+def test_build_2d_animation_playtest_command_queue_covers_manual_matrix() -> None:
+    queue = build_2d_animation_playtest_command_queue(
+        scenario_id="debt_crunch",
+        seed=99,
+    )
+
+    assert len(queue) == 18
+    assert queue[0].target == "menu"
+    assert queue[0].window_size == "820x620"
+    assert queue[0].motion_mode == "full"
+    assert queue[0].command == (
+        "uv run nexus-tech menu-2d --window-size 820x620 --motion-mode full"
+    )
+    assert queue[1].target == "play"
+    assert "--scenario debt_crunch" in queue[1].command
+    assert "--seed 99" in queue[1].command
+    assert queue[-1].window_size == "1440x900"
+    assert queue[-1].motion_mode == "off"
+    assert sum(1 for item in queue if item.target == "menu") == 9
+    assert sum(1 for item in queue if item.target == "play") == 9
+
+
+def test_write_2d_animation_playtest_command_queue_keeps_manual_scope(tmp_path: Path) -> None:
+    queue = build_2d_animation_playtest_command_queue()
+    output_path = tmp_path / "manual-animation-commands.md"
+
+    write_2d_animation_playtest_command_queue(queue, output_path)
+
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "NEXUS TECH 2D Manual Animation Playtest Commands" in report_text
+    assert "- Manual result: `not completed by automation`" in report_text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in report_text
+    assert "play-2d --scenario founder_journey --seed 7" in report_text
+    assert "play-2d --scenario founder_journey --seed 7 --window-size 1440x900" in (report_text)
+
+
 def test_write_2d_animation_playtest_report_template_matches_validator_contract(
     tmp_path: Path,
 ) -> None:
@@ -4655,6 +4693,33 @@ def test_animation_playtest_status_command_accepts_completed_report(
     assert result.exit_code == 0
     assert "Complete" in result.output
     assert "Status PASS" in result.output
+
+
+def test_animation_playtest_commands_command_writes_queue(tmp_path: Path) -> None:
+    output_path = tmp_path / "manual-animation-commands.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-commands",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "11",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Command Queue" in result.output
+    assert "18 command(s) queued" in result.output
+    assert "Animation playtest command queue written" in result.output
+    assert output_path.exists()
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Manual result: `not completed by automation`" in report_text
+    assert "play-2d --scenario founder_journey --seed 11" in report_text
+    assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

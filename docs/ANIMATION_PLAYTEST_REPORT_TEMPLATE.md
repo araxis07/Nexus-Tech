@@ -5,11 +5,14 @@ Use this template when completing the open-window animation pass. Prefer generat
 ```bash
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 ```
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in
 each row before filling the window matrix.
+The exported command queue is a tester aid only and does not count as manual
+signoff evidence by itself.
 
 ## Build
 

@@ -517,6 +517,16 @@ class AnimationPlaytestPrepReport:
 
 
 @dataclass(frozen=True)
+class AnimationPlaytestCommand:
+    """One visible-window command that must be run during manual animation QA."""
+
+    target: str
+    window_size: str
+    motion_mode: str
+    command: str
+
+
+@dataclass(frozen=True)
 class AnimationPlaytestReportValidation:
     """Validation result for a completed manual 2D animation playtest report."""
 
@@ -990,6 +1000,70 @@ def build_2d_animation_playtest_prep_report(
     )
 
 
+def build_2d_animation_playtest_command_queue(
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> tuple[AnimationPlaytestCommand, ...]:
+    """Return the visible-window command queue required for manual animation QA."""
+
+    queue: list[AnimationPlaytestCommand] = []
+    for width, height in windows:
+        window_size = f"{width}x{height}"
+        for mode in motion_modes:
+            menu_command = (
+                f"{command_prefix} menu-2d --window-size {window_size} --motion-mode {mode}"
+            )
+            queue.append(
+                AnimationPlaytestCommand(
+                    target="menu",
+                    window_size=window_size,
+                    motion_mode=mode,
+                    command=menu_command,
+                )
+            )
+            play_command = (
+                f"{command_prefix} play-2d --scenario {scenario_id} --seed {seed} "
+                f"--window-size {window_size} --motion-mode {mode}"
+            )
+            queue.append(
+                AnimationPlaytestCommand(
+                    target="play",
+                    window_size=window_size,
+                    motion_mode=mode,
+                    command=play_command,
+                )
+            )
+    return tuple(queue)
+
+
+def write_2d_animation_playtest_command_queue(
+    queue: tuple[AnimationPlaytestCommand, ...],
+    output_path: Path,
+) -> None:
+    """Write the manual animation QA command queue without marking signoff complete."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH 2D Manual Animation Playtest Commands",
+        "",
+        "- Manual result: `not completed by automation`",
+        "- Fill the strict playtest report with real tester observations after running these.",
+        "",
+        "| Step | Target | Window | Motion | Command |",
+        "| ---: | --- | --- | --- | --- |",
+    ]
+    for index, item in enumerate(queue, start=1):
+        lines.append(
+            f"| {index} | `{item.target}` | `{item.window_size}` | "
+            f"`{item.motion_mode}` | `{item.command}` |"
+        )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def write_2d_animation_playtest_prep_report(
     report: AnimationPlaytestPrepReport,
     output_path: Path,
@@ -1071,16 +1145,11 @@ def write_2d_animation_playtest_prep_report(
             "```bash",
         ]
     )
-    for width, height in report.windows:
-        window_size = f"{width}x{height}"
-        for mode in report.motion_modes:
-            lines.append(
-                f"uv run nexus-tech menu-2d --window-size {window_size} --motion-mode {mode}"
-            )
-            lines.append(
-                "uv run nexus-tech play-2d --scenario founder_journey --seed 7 "
-                f"--window-size {window_size} --motion-mode {mode}"
-            )
+    for item in build_2d_animation_playtest_command_queue(
+        windows=report.windows,
+        motion_modes=report.motion_modes,
+    ):
+        lines.append(item.command)
     lines.extend(
         [
             "```",

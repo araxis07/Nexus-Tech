@@ -59,6 +59,7 @@ from nexus_tech.frontend_2d import (
     DEFAULT_ANIMATION_MATRIX_SEEDS,
     Frontend2DUnavailableError,
     MotionMode,
+    build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_prep_report,
     launch_2d_frontend,
     launch_2d_menu,
@@ -69,6 +70,7 @@ from nexus_tech.frontend_2d import (
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
+    write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_report_template,
 )
@@ -289,6 +291,11 @@ ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-prep.md"),
     "--output",
     help="Markdown path for the open-window animation playtest prep artifact.",
+)
+ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the manual animation playtest command queue.",
 )
 ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-report.md"),
@@ -1322,6 +1329,63 @@ def animation_playtest_status_command(
     )
     if fail_on_incomplete and validation.status != "pass":
         raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-commands")
+def animation_playtest_commands_command(
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed used for the visible play-2d manual animation pass.",
+    ),
+    output: Path | None = ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION,
+) -> None:
+    """Print the visible-window command queue for manual 2D animation QA."""
+
+    validate_scenario_id(scenario)
+    queue = build_2d_animation_playtest_command_queue(
+        scenario_id=scenario,
+        seed=seed,
+    )
+
+    table = Table(title="Animation Playtest Command Queue")
+    table.add_column("Step", justify="right")
+    table.add_column("Target", style="cyan")
+    table.add_column("Window")
+    table.add_column("Motion")
+    table.add_column("Command")
+    for index, item in enumerate(queue, start=1):
+        table.add_row(
+            str(index),
+            item.target,
+            item.window_size,
+            item.motion_mode,
+            item.command,
+        )
+    console.print(table)
+
+    if output is not None:
+        write_2d_animation_playtest_command_queue(queue, output)
+        console.print(
+            Panel.fit(
+                f"Animation playtest command queue written to {output}",
+                title="Animation Playtest Commands",
+                border_style="cyan",
+            )
+        )
+
+    console.print(
+        Panel.fit(
+            (
+                f"{len(queue)} command(s) queued. "
+                "Run them in a visible window and fill the manual report; "
+                "this does not mark animation signoff complete."
+            ),
+            title="Animation Playtest Commands",
+            border_style="yellow",
+        )
+    )
 
 
 @app.command("list-scenarios")
