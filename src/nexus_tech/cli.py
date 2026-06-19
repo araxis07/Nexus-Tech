@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     run_2d_animation_matrix_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
+    summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
@@ -296,6 +297,11 @@ ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT = typer.Argument(
     exists=True,
     dir_okay=False,
     help="Completed manual animation playtest report Markdown file.",
+)
+ANIMATION_PLAYTEST_STATUS_FAIL_OPTION = typer.Option(
+    False,
+    "--fail-on-incomplete",
+    help="Exit with code 1 when the report is not fully signed off.",
 )
 
 ACTION_KEYS = {
@@ -1241,6 +1247,42 @@ def validate_animation_playtest_report_command(
             border_style="green",
         )
     )
+
+
+@app.command("animation-playtest-status")
+def animation_playtest_status_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_STATUS_FAIL_OPTION,
+) -> None:
+    """Show grouped manual animation playtest report progress without hiding details."""
+
+    validation = validate_2d_animation_playtest_report(report_path)
+    summary = summarize_2d_animation_playtest_report(validation)
+
+    table = Table(title="Animation Playtest Status")
+    table.add_column("Area", style="cyan")
+    table.add_column("Open Items", justify="right")
+    table.add_column("Next Step")
+    if summary:
+        for area in summary:
+            table.add_row(area.area, str(area.incomplete_count), area.next_step)
+    else:
+        table.add_row("Complete", "0", "Report is ready for presentation signoff.")
+    console.print(table)
+
+    border_style = "green" if validation.status == "pass" else "yellow"
+    console.print(
+        Panel.fit(
+            (
+                f"Status {validation.status.upper()} | "
+                f"{len(validation.findings)} open validation item(s)"
+            ),
+            title="Animation Playtest Status",
+            border_style=border_style,
+        )
+    )
+    if fail_on_incomplete and validation.status != "pass":
+        raise typer.Exit(code=1)
 
 
 @app.command("list-scenarios")

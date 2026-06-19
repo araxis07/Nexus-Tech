@@ -4,6 +4,7 @@ Use this template when completing the open-window animation pass. Prefer generat
 
 ```bash
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 ```
 
 Keep completed reports as dated copies only when they contain real tester observations.

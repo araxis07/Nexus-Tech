@@ -42,6 +42,7 @@ from nexus_tech.frontend_2d import (
     run_2d_flow_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
+    summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
@@ -3945,6 +3946,31 @@ def test_write_2d_animation_playtest_report_template_can_prefill_automated_gates
     assert "incomplete window matrix result: 820x620 Full" in validation.findings
 
 
+def test_summarize_2d_animation_playtest_report_groups_manual_gaps(tmp_path: Path) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.164.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-19",
+        prefill_automated_gates=True,
+    )
+
+    validation = validate_2d_animation_playtest_report(output_path)
+    summary = summarize_2d_animation_playtest_report(validation)
+    areas = {area.area: area for area in summary}
+
+    assert "Automated Gates" not in areas
+    assert areas["Manual Window Matrix"].incomplete_count == 9
+    assert areas["Manual Control Checks"].incomplete_count == 9
+    assert areas["Manual Scene Checks"].incomplete_count == 9
+    assert areas["Manual Game Feel"].incomplete_count == 4
+    assert areas["Signoff Fields"].incomplete_count >= 1
+    assert areas["Template Cleanup"].incomplete_count == 1
+
+
 def _completed_animation_playtest_report_text() -> str:
     lines = [
         "# Animation Playtest Report",
@@ -4563,6 +4589,67 @@ def test_validate_animation_playtest_report_command_rejects_incomplete_report(
     assert result.exit_code == 1
     assert "Validation Findings" in result.output
     assert "Manual animation signoff is incomplete" in result.output
+
+
+def test_animation_playtest_status_command_groups_incomplete_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.164.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-19",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(app, ["animation-playtest-status", str(report_path)])
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Status" in result.output
+    assert "Manual Window Matrix" in result.output
+    assert "Manual Control Checks" in result.output
+    assert "Manual Scene Checks" in result.output
+    assert "Manual Game Feel" in result.output
+    assert "Status FAIL" in result.output
+
+
+def test_animation_playtest_status_command_can_fail_on_incomplete(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.164.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-19",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(
+        app,
+        ["animation-playtest-status", str(report_path), "--fail-on-incomplete"],
+    )
+
+    assert result.exit_code == 1
+    assert "Status FAIL" in result.output
+
+
+def test_animation_playtest_status_command_accepts_completed_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
+
+    result = runner.invoke(app, ["animation-playtest-status", str(report_path)])
+
+    assert result.exit_code == 0
+    assert "Complete" in result.output
+    assert "Status PASS" in result.output
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

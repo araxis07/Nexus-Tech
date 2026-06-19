@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.164.0 - 2026-06-19
+
+- Added `animation-playtest-status` to group incomplete manual animation report items by automated gates, window matrix, controls, scenes, game feel, signoff fields, and template cleanup without failing by default
+- Added `--fail-on-incomplete` for release gates that need status checks to fail on incomplete animation signoff
+- Updated docs and regression coverage so visible-window progress can be inspected without marking subjective manual playtest rows complete
+
 ## 0.163.0 - 2026-06-19
 
 - Added `--prefill-automated-gates` to `draft-animation-playtest-report` so passed local/CI preflight evidence can be written into the report without marking manual window, control, scene, or game-feel rows complete

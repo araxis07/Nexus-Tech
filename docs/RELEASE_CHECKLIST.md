@@ -30,11 +30,16 @@ uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frame
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
 # After the manual report is filled:
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
+
+Run `animation-playtest-status` while the manual pass is in progress to see the
+remaining grouped rows. Add `--fail-on-incomplete` only when the status command
+is being used as a release gate.
 
 ## Demo Verification
 

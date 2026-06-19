@@ -16,6 +16,7 @@ uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frame
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 ```
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
@@ -27,6 +28,10 @@ After filling the generated manual report draft, validate it before calling anim
 ```bash
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
+
+Use `animation-playtest-status` during the manual pass to group remaining work
+without failing by default. Use `validate-animation-playtest-report` as the final
+blocking gate after the visible-window rows and signoff fields are filled.
 
 The draft command can prefill automated gate rows only after local or CI preflight
 has passed. The validator is strict for presentation signoff: every window/motion

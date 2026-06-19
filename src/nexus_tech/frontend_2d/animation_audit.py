@@ -531,6 +531,60 @@ class AnimationPlaytestReportValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestReportStatusArea:
+    """Grouped status for one section of the manual animation playtest report."""
+
+    area: str
+    findings: tuple[str, ...]
+    next_step: str
+
+    @property
+    def incomplete_count(self) -> int:
+        """Return how many validation findings remain in this section."""
+
+        return len(self.findings)
+
+
+_ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    (
+        "Automated Gates",
+        ("automated gate",),
+        "Rerun local/CI preflight or draft with --prefill-automated-gates after it passes.",
+    ),
+    (
+        "Manual Window Matrix",
+        ("window matrix",),
+        "Test 820x620, 960x640, and 1440x900 in full, reduced, and off modes.",
+    ),
+    (
+        "Manual Control Checks",
+        ("control check",),
+        "Verify pause/resume, back/escape, menu return, help/hover, layout, typography, and modes.",
+    ),
+    (
+        "Manual Scene Checks",
+        ("scene check",),
+        "Review title, dashboard, picker, pending event, inspector, endgame, summary, and review.",
+    ),
+    (
+        "Manual Game Feel",
+        ("game-feel check",),
+        "Confirm success, blocked, impact, and actor/feedback cues are readable and aligned.",
+    ),
+    (
+        "Signoff Fields",
+        ("missing field", "release decision"),
+        "Fill release blocker notes, decision fields, validator result, and final pass decision.",
+    ),
+    (
+        "Template Cleanup",
+        ("todo cells", "blank table cells"),
+        "Replace template placeholders with pass/watch/fail and real tester notes.",
+    ),
+)
+
+
 def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytestReportValidation:
     """Validate that a manual animation playtest report is completed, not still a template."""
 
@@ -595,6 +649,43 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         release_decision=decision if release_decision else "",
         findings=tuple(findings),
     )
+
+
+def summarize_2d_animation_playtest_report(
+    validation: AnimationPlaytestReportValidation,
+) -> tuple[AnimationPlaytestReportStatusArea, ...]:
+    """Group manual animation report validation findings into actionable areas."""
+
+    grouped: list[AnimationPlaytestReportStatusArea] = []
+    matched: set[str] = set()
+    for area, markers, next_step in _ANIMATION_PLAYTEST_STATUS_AREAS:
+        findings = tuple(
+            finding
+            for finding in validation.findings
+            if any(marker in finding.lower() for marker in markers)
+        )
+        if not findings:
+            continue
+        matched.update(findings)
+        grouped.append(
+            AnimationPlaytestReportStatusArea(
+                area=area,
+                findings=findings,
+                next_step=next_step,
+            )
+        )
+
+    uncategorized = tuple(finding for finding in validation.findings if finding not in matched)
+    if uncategorized:
+        grouped.append(
+            AnimationPlaytestReportStatusArea(
+                area="Other Findings",
+                findings=uncategorized,
+                next_step="Review the remaining validator findings directly.",
+            )
+        )
+
+    return tuple(grouped)
 
 
 def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
