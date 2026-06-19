@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.162.0 - 2026-06-19
+
+- Added `draft-animation-playtest-report` so the remaining manual open-window animation pass starts from a validator-aligned report with every automated gate, window, control, scene, game-feel, blocker, and decision row already present
+- Added a reusable strict manual report template writer and exported it for tests/release tooling
+- Tightened placeholder handling so `fill-me` values cannot accidentally satisfy manual animation signoff fields
+
 ## 0.161.0 - 2026-06-19
 
 - Tightened `validate-animation-playtest-report` so animation signoff must include every automated gate, window/motion cell, control row, scene row, game-feel row, release-blocker field, and decision field before a presentation pass is accepted

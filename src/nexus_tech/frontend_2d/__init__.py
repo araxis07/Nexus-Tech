@@ -3,6 +3,7 @@
 from nexus_tech.frontend_2d.animation_audit import (
     ANIMATION_MATRIX_REPORT_NAME,
     ANIMATION_PLAYTEST_PREP_REPORT_NAME,
+    ANIMATION_PLAYTEST_REPORT_NAME,
     DEFAULT_ANIMATION_AUDIT_SIZES,
     DEFAULT_ANIMATION_MATRIX_SCENARIOS,
     DEFAULT_ANIMATION_MATRIX_SEEDS,
@@ -22,6 +23,7 @@ from nexus_tech.frontend_2d.animation_audit import (
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_report_template,
 )
 from nexus_tech.frontend_2d.app import (
     Frontend2DUnavailableError,
@@ -59,6 +61,7 @@ __all__ = [
     "AnimationAuditReport",
     "ANIMATION_MATRIX_REPORT_NAME",
     "ANIMATION_PLAYTEST_PREP_REPORT_NAME",
+    "ANIMATION_PLAYTEST_REPORT_NAME",
     "AnimationCoverageCell",
     "AnimationMatrixCell",
     "AnimationMatrixReport",
@@ -80,6 +83,7 @@ __all__ = [
     "validate_2d_animation_playtest_report",
     "write_2d_animation_matrix_report",
     "write_2d_animation_playtest_prep_report",
+    "write_2d_animation_playtest_report_template",
     "run_2d_flow_audit",
     "run_2d_motion_audit",
     "run_2d_visual_audit",

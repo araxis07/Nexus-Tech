@@ -23,6 +23,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.frontend_2d import (
     ANIMATION_MATRIX_REPORT_NAME,
     ANIMATION_PLAYTEST_PREP_REPORT_NAME,
+    ANIMATION_PLAYTEST_REPORT_NAME,
     AnimationAuditReport,
     AnimationCoverageCell,
     AnimationMatrixCell,
@@ -44,6 +45,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_report_template,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -3685,6 +3687,8 @@ def test_motion_mode_differentiation_records_reduced_residual_without_failing() 
     full_report = _report(residual=10, active=4, mode=MotionMode.FULL)
     reduced_with_jitter = _report(residual=12, active=3, mode=MotionMode.REDUCED)
     reduced_with_more_residual = _report(residual=13, active=3, mode=MotionMode.REDUCED)
+    reduced_with_active_jitter = _report(residual=12, active=5, mode=MotionMode.REDUCED)
+    reduced_with_active_regression = _report(residual=12, active=6, mode=MotionMode.REDUCED)
     off_report = _report(residual=0, active=0, mode=MotionMode.OFF)
     off_report_with_residual = _report(residual=1, active=0, mode=MotionMode.OFF)
 
@@ -3698,6 +3702,16 @@ def test_motion_mode_differentiation_records_reduced_residual_without_failing() 
         reduced_with_more_residual,
         off_report,
     )
+    active_jitter = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_with_active_jitter,
+        off_report,
+    )
+    active_regression = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_with_active_regression,
+        off_report,
+    )
     off_regression = animation_audit_module._build_motion_mode_differentiation_cell(
         full_report,
         reduced_with_jitter,
@@ -3708,6 +3722,10 @@ def test_motion_mode_differentiation_records_reduced_residual_without_failing() 
     assert "reduced-residual-delta:2" in small_jitter.active_layers
     assert larger_reduced_residual.status == "pass"
     assert "reduced-residual-delta:3" in larger_reduced_residual.active_layers
+    assert active_jitter.status == "pass"
+    assert "reduced-active-overrun:3" in active_jitter.active_layers
+    assert active_regression.status == "fail"
+    assert "reduced active 18>12" in active_regression.notes
     assert off_regression.status == "fail"
     assert "off still active 0/1" in off_regression.notes
 
@@ -3862,6 +3880,40 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "nexus-tech-2d-animation-matrix" in report_text
     assert "nexus-tech-2d-animation-playtest-prep" in report_text
     assert "`founder_journey` | `7` | `pass` | `13:abc12345`" in report_text
+
+
+def test_write_2d_animation_playtest_report_template_matches_validator_contract(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.162.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-19",
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Version: 0.162.0" in report_text
+    assert "- Commit: abc1234" in report_text
+    assert "| audit-2d-animation-matrix --output | `todo`" in report_text
+    assert "| `820x620` | `todo` | `todo` | `todo`" in report_text
+    assert "| UI Layout Safety | `todo`" in report_text
+    assert "| Scene Handoffs | `todo`" in report_text
+    assert "| Actor + Feedback Match | `todo`" in report_text
+    assert "- visual-audit-summary.md anomalies: todo" in report_text
+
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert validation.status == "fail"
+    assert "report still contains todo cells" in validation.findings
+    assert "incomplete automated gate result: audit-2d-animation-matrix --output" in (
+        validation.findings
+    )
+    assert "incomplete window matrix result: 820x620 Full" in validation.findings
 
 
 def _completed_animation_playtest_report_text() -> str:
@@ -4025,7 +4077,7 @@ def test_validate_2d_animation_playtest_report_rejects_missing_required_rows(
 
     assert validation.status == "fail"
     assert "missing window matrix row: 960x640" in validation.findings
-    assert "missing scene result row: Inspector" in validation.findings
+    assert "missing scene check row: Inspector" in validation.findings
 
 
 def test_audit_2d_motion_command_reports_matrix(monkeypatch) -> None:
@@ -4373,6 +4425,38 @@ def test_prepare_2d_animation_playtest_command_writes_prep_report(
     assert calls["scenario_ids"] == ("founder_journey",)
     assert calls["seeds"] == (7,)
     assert calls["frames"] == 1
+
+
+def test_draft_animation_playtest_report_command_writes_strict_template(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+
+    result = runner.invoke(
+        app,
+        [
+            "draft-animation-playtest-report",
+            "--output",
+            str(output_path),
+            "--commit",
+            "abc1234",
+            "--tester",
+            "araxis07",
+            "--platform",
+            "macOS local",
+            "--date",
+            "2026-06-19",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Report Draft" in result.output
+    assert output_path.exists()
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Commit: abc1234" in report_text
+    assert "| Pause / Resume | `todo`" in report_text
+    assert "| Outcome/Review | `todo`" in report_text
+    assert "| Actor + Feedback Match | `todo`" in report_text
 
 
 def test_validate_animation_playtest_report_command_accepts_completed_report(

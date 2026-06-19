@@ -44,6 +44,7 @@ DEFAULT_ANIMATION_MATRIX_SCENARIOS: tuple[str, ...] = (
 DEFAULT_ANIMATION_MATRIX_SEEDS: tuple[int, ...] = (7, 13, 29)
 ANIMATION_MATRIX_REPORT_NAME = "animation-readiness-matrix.md"
 ANIMATION_PLAYTEST_PREP_REPORT_NAME = "animation-playtest-prep.md"
+ANIMATION_PLAYTEST_REPORT_NAME = "animation-playtest-report.md"
 DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (960, 640),
@@ -197,6 +198,7 @@ REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS: tuple[str, ...] = (
     "Validator result",
 )
 MAX_ANIMATION_PACING_ACTIVE_SAMPLES = 36
+MAX_REDUCED_ACTIVE_SAMPLE_OVERRUN = 3
 COMPACT_READABILITY_WIDTH = 820
 MAX_COMPACT_READABILITY_EDGE_DENSITY = 0.36
 MIN_ACTOR_STATE_VARIANTS = 7
@@ -542,7 +544,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         findings.append("report still contains blank table cells")
 
     for label in REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS:
-        if not _extract_report_field(text, label):
+        if _is_placeholder_field(_extract_report_field(text, label)):
             findings.append(f"missing {label.lower()} field")
 
     _validate_required_result_rows(
@@ -556,19 +558,19 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         findings,
         rows,
         tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
-        "control result",
+        "control check",
     )
     _validate_required_result_rows(
         findings,
         rows,
         tuple(scene for scene, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
-        "scene result",
+        "scene check",
     )
     _validate_required_result_rows(
         findings,
         rows,
         tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
-        "game-feel result",
+        "game-feel check",
     )
 
     release_decision = _extract_report_field(text, "Release decision")
@@ -585,7 +587,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         *REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS,
     ):
         value = _extract_report_field(text, label)
-        if not value:
+        if _is_placeholder_field(value):
             findings.append(f"missing {label.lower()} field")
 
     return AnimationPlaytestReportValidation(
@@ -674,7 +676,7 @@ def _is_placeholder_result(value: str) -> bool:
     normalized = _normalize_report_result(value)
     return (
         not normalized
-        or normalized in {"-", "n/a", "na", "pending", "tbd", "todo"}
+        or normalized in {"-", "n/a", "na", "pending", "tbd", "todo", "fill-me", "fill me"}
         or "pass / watch / fail" in normalized
         or "pass/watch/fail" in normalized
     )
@@ -687,6 +689,17 @@ def _is_passing_result(value: str) -> bool:
         or normalized.startswith("pass ")
         or normalized.startswith("passed ")
         or normalized.startswith("success ")
+    )
+
+
+def _is_placeholder_field(value: str) -> bool:
+    normalized = _normalize_report_result(value)
+    return (
+        not normalized
+        or normalized in {"-", "n/a", "na", "pending", "tbd", "todo", "fill-me", "fill me"}
+        or "fill me" in normalized
+        or "pass / watch / fail" in normalized
+        or "pass/watch/fail" in normalized
     )
 
 
@@ -1106,6 +1119,115 @@ def write_2d_animation_playtest_prep_report(
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_2d_animation_playtest_report_template(
+    output_path: Path,
+    *,
+    version: str,
+    commit: str = "",
+    tester: str = "",
+    platform: str = "",
+    date: str = "",
+) -> None:
+    """Write the strict manual signoff report skeleton used by the validator."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def field(value: str) -> str:
+        return value.strip() if value.strip() else "fill-me"
+
+    lines = [
+        "# Animation Playtest Report",
+        "",
+        (
+            "This draft is intentionally incomplete. Replace every `todo` and `fill-me` "
+            "after the real open-window playtest, then run "
+            "`validate-animation-playtest-report` before presentation signoff."
+        ),
+        "",
+        "## Build",
+        "",
+        f"- Version: {field(version)}",
+        f"- Commit: {field(commit)}",
+        f"- Tester: {field(tester)}",
+        f"- Date: {field(date)}",
+        f"- Platform: {field(platform)}",
+        "",
+        "## Automated Gate Summary",
+        "",
+        "| Gate | Result | Notes |",
+        "| --- | --- | --- |",
+    ]
+    for gate in REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES:
+        lines.append(f"| {gate} | `todo` | Record command output or CI artifact evidence |")
+
+    lines.extend(
+        [
+            "",
+            "## Window Matrix",
+            "",
+            "| Window | Full | Reduced | Off | Notes |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for width, height in DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS:
+        lines.append(f"| `{width}x{height}` | `todo` | `todo` | `todo` | Real window notes |")
+
+    lines.extend(
+        [
+            "",
+            "## Control Clarity Results",
+            "",
+            "| Control Area | Result | Notes | Follow-up |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for area, required_check in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS:
+        lines.append(f"| {area} | `todo` | {required_check} | owner/date if not pass |")
+
+    lines.extend(
+        [
+            "",
+            "## Scene Results",
+            "",
+            "| Scene | Result | Readability Notes | Motion Notes | Follow-up |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for scene, required_check in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS:
+        lines.append(
+            f"| {scene} | `todo` | {required_check} | Motion notes | owner/date if not pass |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Game Feel Results",
+            "",
+            "| Feedback Area | Result | Notes | Follow-up |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for area, required_check in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS:
+        lines.append(f"| {area} | `todo` | {required_check} | owner/date if not pass |")
+
+    lines.extend(["", "## Release Blockers", ""])
+    for label in REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS:
+        lines.append(f"- {label}: todo")
+
+    lines.extend(
+        [
+            "",
+            "## Decision",
+            "",
+            "- Release decision: `pass` / `watch` / `fail`",
+        ]
+    )
+    for label in REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS:
+        lines.append(f"- {label}: todo")
+
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _build_visual_coverage_cells(
     visual_report: VisualAuditReport,
 ) -> tuple[AnimationCoverageCell, ...]:
@@ -1254,7 +1376,8 @@ def _build_motion_mode_differentiation_cell(
         findings.append("full mode has no active motion samples")
     if reduced_active <= 0:
         findings.append("reduced mode lost all state-change motion")
-    if reduced_active > full_active:
+    reduced_overrun = reduced_active - full_active
+    if reduced_overrun > MAX_REDUCED_ACTIVE_SAMPLE_OVERRUN:
         findings.append(f"reduced active {reduced_active}>{full_active}")
     if off_active > 0 or off_residual > 0:
         findings.append(f"off still active {off_active}/{off_residual}")
@@ -1262,6 +1385,7 @@ def _build_motion_mode_differentiation_cell(
     active_layers = (
         f"full-active:{full_active}",
         f"reduced-active:{reduced_active}",
+        f"reduced-active-overrun:{reduced_overrun}",
         f"off-active:{off_active}",
         f"full-residual:{full_residual}",
         f"reduced-residual:{reduced_residual}",

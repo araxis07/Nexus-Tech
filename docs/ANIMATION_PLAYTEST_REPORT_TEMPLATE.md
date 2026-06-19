@@ -1,6 +1,12 @@
 # Animation Playtest Report Template
 
-Use this template when completing the open-window animation pass. Keep completed reports as dated copies only when they contain real tester observations.
+Use this template when completing the open-window animation pass. Prefer generating a fresh strict draft first:
+
+```bash
+uv run nexus-tech draft-animation-playtest-report --output /tmp/nexus-tech-animation-playtest-report.md
+```
+
+Keep completed reports as dated copies only when they contain real tester observations.
 
 ## Build
 

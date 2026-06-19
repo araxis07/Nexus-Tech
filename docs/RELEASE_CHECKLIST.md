@@ -29,6 +29,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-m
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+uv run nexus-tech draft-animation-playtest-report --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
 # After the manual report is filled:
@@ -66,6 +67,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
 - Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
+- Run `draft-animation-playtest-report --output /tmp/nexus-tech-animation-playtest-report.md` before the human pass so the completed report starts from the same validator-required rows every time.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.
 - Treat any missing automated gate row, window/motion cell, control row, scene row, game-feel row, release-blocker field, or validator PASS in the manual report as a release blocker.

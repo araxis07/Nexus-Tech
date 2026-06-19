@@ -69,6 +69,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_report_template,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -280,6 +281,15 @@ ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-prep.md"),
     "--output",
     help="Markdown path for the open-window animation playtest prep artifact.",
+)
+ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-report.md"),
+    "--output",
+    help="Markdown path for the strict manual animation playtest report draft.",
+)
+ANIMATION_PLAYTEST_REPORT_METADATA_OPTION = typer.Option(
+    "",
+    help="Optional metadata value to prefill in the manual animation playtest report draft.",
 )
 ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT = typer.Argument(
     ...,
@@ -1153,6 +1163,36 @@ def prepare_2d_animation_playtest_command(
     )
     if prep_report.status != "ready":
         raise typer.Exit(code=1)
+
+
+@app.command("draft-animation-playtest-report")
+def draft_animation_playtest_report_command(
+    output: Path = ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION,
+    commit: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    tester: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    platform: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    date: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+) -> None:
+    """Write the strict manual 2D animation playtest report draft."""
+
+    write_2d_animation_playtest_report_template(
+        output,
+        version=__version__,
+        commit=commit,
+        tester=tester,
+        platform=platform,
+        date=date,
+    )
+    console.print(
+        Panel.fit(
+            (
+                f"Animation playtest report draft written to {output}\n"
+                "Replace every `todo` and `fill-me`, then validate before signoff."
+            ),
+            title="Animation Playtest Report Draft",
+            border_style="cyan",
+        )
+    )
 
 
 @app.command("validate-animation-playtest-report")
