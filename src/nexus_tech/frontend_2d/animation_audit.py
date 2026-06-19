@@ -1066,16 +1066,21 @@ def write_2d_animation_playtest_prep_report(
             "",
             "## Open-Window Commands",
             "",
-            "Resize the visible window to each target size and repeat the scene checks.",
+            "Launch each target size directly and repeat the scene checks.",
             "",
             "```bash",
         ]
     )
-    for mode in report.motion_modes:
-        lines.append(f"uv run nexus-tech menu-2d --motion-mode {mode}")
-        lines.append(
-            f"uv run nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode {mode}"
-        )
+    for width, height in report.windows:
+        window_size = f"{width}x{height}"
+        for mode in report.motion_modes:
+            lines.append(
+                f"uv run nexus-tech menu-2d --window-size {window_size} --motion-mode {mode}"
+            )
+            lines.append(
+                "uv run nexus-tech play-2d --scenario founder_journey --seed 7 "
+                f"--window-size {window_size} --motion-mode {mode}"
+            )
     lines.extend(
         [
             "```",
@@ -1265,7 +1270,11 @@ def write_2d_animation_playtest_report_template(
         ]
     )
     for width, height in DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS:
-        lines.append(f"| `{width}x{height}` | `todo` | `todo` | `todo` | Real window notes |")
+        window_size = f"{width}x{height}"
+        lines.append(
+            f"| `{window_size}` | `todo` | `todo` | `todo` | "
+            f"Launch with `--window-size {window_size}` and record real window notes |"
+        )
 
     lines.extend(
         [

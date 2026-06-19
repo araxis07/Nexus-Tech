@@ -250,6 +250,13 @@ HEADLESS_2D_OPTION = typer.Option(
     "--headless",
     help="Run the 2D frontend with SDL dummy drivers and no visible window.",
 )
+DEFAULT_2D_WINDOW_SIZE = (1440, 900)
+DEFAULT_2D_WINDOW_SIZE_TEXT = f"{DEFAULT_2D_WINDOW_SIZE[0]}x{DEFAULT_2D_WINDOW_SIZE[1]}"
+WINDOW_SIZE_2D_OPTION = typer.Option(
+    DEFAULT_2D_WINDOW_SIZE_TEXT,
+    "--window-size",
+    help="Visible 2D window size as WIDTHxHEIGHT, for example 820x620.",
+)
 MAX_FRAMES_2D_OPTION = typer.Option(
     None,
     "--max-frames",
@@ -303,6 +310,36 @@ ANIMATION_PLAYTEST_STATUS_FAIL_OPTION = typer.Option(
     "--fail-on-incomplete",
     help="Exit with code 1 when the report is not fully signed off.",
 )
+
+
+def parse_2d_window_size(value: str) -> tuple[int, int]:
+    """Parse a WIDTHxHEIGHT string into a safe 2D frontend window size."""
+
+    normalized = value.strip().lower()
+    parts = normalized.split("x")
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        raise ValueError("Use WIDTHxHEIGHT, for example 820x620.")
+    width, height = (int(parts[0]), int(parts[1]))
+    if width < 640 or height < 480:
+        raise ValueError("2D window size must be at least 640x480.")
+    return (width, height)
+
+
+def resolve_2d_window_size(value: str) -> tuple[int, int]:
+    """Return a parsed 2D window size or exit with a user-facing error."""
+
+    try:
+        return parse_2d_window_size(value)
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Invalid 2D Window Size",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
 
 ACTION_KEYS = {
     "1": TurnAction.CREATE_PRODUCT,
@@ -685,6 +722,7 @@ def play_2d_command(
     db_path: Path = DB_PATH_OPTION,
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Default save slot name."),
     headless: bool = HEADLESS_2D_OPTION,
+    window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
@@ -701,6 +739,7 @@ def play_2d_command(
         db_path=db_path,
         slot_name=slot,
         headless=headless,
+        window_size=resolve_2d_window_size(window_size),
         max_frames=max_frames,
         motion_mode=motion_mode,
     )
@@ -1854,6 +1893,7 @@ def load_game_2d_command(
     db_path: Path = DB_PATH_OPTION,
     slot: str = typer.Option(DEFAULT_SAVE_SLOT, "--slot", help="Save slot name."),
     headless: bool = HEADLESS_2D_OPTION,
+    window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
@@ -1871,6 +1911,7 @@ def load_game_2d_command(
         db_path=db_path,
         slot_name=loaded_game.slot_name,
         headless=headless,
+        window_size=resolve_2d_window_size(window_size),
         max_frames=max_frames,
         motion_mode=motion_mode,
     )
@@ -1907,6 +1948,7 @@ def continue_last_game_command(
 def continue_last_game_2d_command(
     db_path: Path = DB_PATH_OPTION,
     headless: bool = HEADLESS_2D_OPTION,
+    window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
@@ -1924,6 +1966,7 @@ def continue_last_game_2d_command(
         db_path=db_path,
         slot_name=loaded_game.slot_name,
         headless=headless,
+        window_size=resolve_2d_window_size(window_size),
         max_frames=max_frames,
         motion_mode=motion_mode,
     )
@@ -1933,6 +1976,7 @@ def continue_last_game_2d_command(
 def menu_2d_command(
     db_path: Path = DB_PATH_OPTION,
     headless: bool = HEADLESS_2D_OPTION,
+    window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
 ) -> None:
@@ -1942,6 +1986,7 @@ def menu_2d_command(
         result = launch_2d_menu(
             db_path=db_path,
             headless=headless,
+            window_size=resolve_2d_window_size(window_size),
             max_frames=max_frames,
             motion_mode=motion_mode,
         )
@@ -2027,6 +2072,7 @@ def start_new_game_2d(
     slot_name: str,
     *,
     headless: bool,
+    window_size: tuple[int, int],
     max_frames: int | None,
     motion_mode: MotionMode,
 ) -> None:
@@ -2051,6 +2097,7 @@ def start_new_game_2d(
         db_path=db_path,
         slot_name=slot_name,
         headless=headless,
+        window_size=window_size,
         max_frames=max_frames,
         motion_mode=motion_mode,
     )
@@ -2063,6 +2110,7 @@ def launch_2d_session(
     db_path: Path,
     slot_name: str,
     headless: bool,
+    window_size: tuple[int, int],
     max_frames: int | None,
     motion_mode: MotionMode,
 ) -> None:
@@ -2075,6 +2123,7 @@ def launch_2d_session(
             db_path=db_path,
             slot_name=slot_name,
             headless=headless,
+            window_size=window_size,
             max_frames=max_frames,
             motion_mode=motion_mode,
         )

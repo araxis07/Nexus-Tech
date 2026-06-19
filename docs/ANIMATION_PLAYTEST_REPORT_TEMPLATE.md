@@ -8,6 +8,8 @@ uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-r
 ```
 
 Keep completed reports as dated copies only when they contain real tester observations.
+Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in
+each row before filling the window matrix.
 
 ## Build
 

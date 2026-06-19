@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.165.0 - 2026-06-19
+
+- Added `--window-size WIDTHxHEIGHT` to the visible 2D launch commands so manual animation QA can open the exact compact, small, and presentation windows without relying on hand-resizing
+- Updated animation playtest prep output to generate explicit open-window command matrices across every required window and motion mode
+- Updated docs and regression coverage so the remaining manual animation signoff can be executed from reproducible window-size commands
+
 ## 0.164.0 - 2026-06-19
 
 - Added `animation-playtest-status` to group incomplete manual animation report items by automated gates, window matrix, controls, scenes, game feel, signoff fields, and template cleanup without failing by default

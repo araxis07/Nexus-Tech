@@ -33,6 +33,15 @@ Use `animation-playtest-status` during the manual pass to group remaining work
 without failing by default. Use `validate-animation-playtest-report` as the final
 blocking gate after the visible-window rows and signoff fields are filled.
 
+Use `--window-size` instead of hand-resizing windows during the manual pass:
+
+```bash
+uv run nexus-tech menu-2d --window-size 820x620 --motion-mode full
+uv run nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 820x620 --motion-mode full
+uv run nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 960x640 --motion-mode reduced
+uv run nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 1440x900 --motion-mode off
+```
+
 The draft command can prefill automated gate rows only after local or CI preflight
 has passed. The validator is strict for presentation signoff: every window/motion
 cell, every control row, every scene row, every game-feel row, and every

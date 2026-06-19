@@ -3859,6 +3859,11 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert "`820x620`" in report_text
     assert "`960x640`" in report_text
     assert "`1440x900`" in report_text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in report_text
+    assert (
+        "play-2d --scenario founder_journey --seed 7 --window-size 960x640 --motion-mode reduced"
+    ) in report_text
+    assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
     assert "## Control Clarity Checklist" in report_text
     assert "Pause / Resume" in report_text
     assert "Back / Escape" in report_text
@@ -4687,6 +4692,8 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
             "--headless",
             "--max-frames",
             "2",
+            "--window-size",
+            "820x620",
             "--motion-mode",
             "off",
         ],
@@ -4696,8 +4703,26 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
     assert captured["scenario_id"] == "founder_journey"
     assert captured["seed"] == 7
     assert captured["headless"] is True
+    assert captured["window_size"] == (820, 620)
     assert captured["max_frames"] == 2
     assert captured["motion_mode"] is MotionMode.OFF
+
+
+def test_play_2d_command_rejects_invalid_window_size(monkeypatch) -> None:
+    called = False
+
+    def fake_start_new_game_2d(**_kwargs) -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(cli_module, "start_new_game_2d", fake_start_new_game_2d)
+
+    result = runner.invoke(app, ["play-2d", "--window-size", "tiny"])
+
+    assert result.exit_code == 1
+    assert "Invalid 2D Window Size" in result.output
+    assert "Use WIDTHxHEIGHT" in result.output
+    assert called is False
 
 
 def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
@@ -4721,6 +4746,8 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
             "--headless",
             "--max-frames",
             "2",
+            "--window-size",
+            "960x640",
             "--motion-mode",
             "reduced",
         ],
@@ -4728,5 +4755,6 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert captured["headless"] is True
+    assert captured["window_size"] == (960, 640)
     assert captured["max_frames"] == 2
     assert captured["motion_mode"] is MotionMode.REDUCED

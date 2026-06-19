@@ -72,6 +72,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
 - Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
+- Use visible `menu-2d` and `play-2d` with `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` during the human pass instead of hand-resizing windows.
 - Run `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` after automated gates pass so the completed report starts from the same validator-required rows while manual window/control/scene/game-feel rows still require real tester input.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.

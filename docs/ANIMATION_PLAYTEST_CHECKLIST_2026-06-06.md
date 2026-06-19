@@ -4,17 +4,18 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.164.0`
+- Version: `0.165.0`
 - Focus: 2D actor/sprite timeline, archive/meta comparison motion, path-specific late-game repair cues, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, balance preflight evidence, strict manual signoff validation, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 - Status guard: `animation-playtest-status` groups remaining manual rows while the report is incomplete; use `--fail-on-incomplete` only for release gate checks.
+- Window guard: visible `menu-2d` and `play-2d` runs support `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` so the manual matrix starts at the exact target dimensions.
 
 ## Commands
 
 ```bash
-nexus-tech menu-2d --motion-mode full
-nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode full
-nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode reduced
-nexus-tech play-2d --scenario founder_journey --seed 7 --motion-mode off
+nexus-tech menu-2d --window-size 820x620 --motion-mode full
+nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 820x620 --motion-mode full
+nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 960x640 --motion-mode reduced
+nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 1440x900 --motion-mode off
 ```
 
 ## Required Checks
