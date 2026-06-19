@@ -571,6 +571,41 @@ class AnimationPlaytestReportStatusArea:
         return len(self.findings)
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestPlanStep:
+    """One actionable manual animation QA step derived from current artifacts."""
+
+    area: str
+    status: str
+    next_step: str
+    open_items: int
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestReadinessPlan:
+    """Combined readiness plan for command queue and manual animation report."""
+
+    report: AnimationPlaytestReportValidation
+    commands: AnimationPlaytestCommandQueueValidation
+    steps: tuple[AnimationPlaytestPlanStep, ...]
+
+    @property
+    def status(self) -> str:
+        """Return the current handoff status without faking manual signoff."""
+
+        if self.commands.status != "pass":
+            return "blocked"
+        if self.report.status != "pass":
+            return "manual-required"
+        return "pass"
+
+    @property
+    def open_item_count(self) -> int:
+        """Return total unresolved queue and report issues."""
+
+        return len(self.report.findings) + len(self.commands.findings)
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -711,6 +746,71 @@ def summarize_2d_animation_playtest_report(
         )
 
     return tuple(grouped)
+
+
+def build_2d_animation_playtest_readiness_plan(
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestReadinessPlan:
+    """Build an actionable handoff plan from the current manual QA artifacts."""
+
+    report = validate_2d_animation_playtest_report(report_path)
+    commands = validate_2d_animation_playtest_command_queue(
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    steps: list[AnimationPlaytestPlanStep] = []
+    if commands.findings:
+        steps.append(
+            AnimationPlaytestPlanStep(
+                area="Command Queue",
+                status="blocked",
+                next_step=(
+                    "Regenerate the visible-window queue, then rerun "
+                    "validate-animation-playtest-commands before manual testing."
+                ),
+                open_items=len(commands.findings),
+            )
+        )
+
+    for area in summarize_2d_animation_playtest_report(report):
+        steps.append(
+            AnimationPlaytestPlanStep(
+                area=area.area,
+                status="manual-required",
+                next_step=area.next_step,
+                open_items=area.incomplete_count,
+            )
+        )
+
+    if not steps:
+        steps.append(
+            AnimationPlaytestPlanStep(
+                area="Release Signoff",
+                status="pass",
+                next_step=(
+                    "Manual animation signoff report is complete; attach validator "
+                    "evidence before presentation."
+                ),
+                open_items=0,
+            )
+        )
+
+    return AnimationPlaytestReadinessPlan(
+        report=report,
+        commands=commands,
+        steps=tuple(steps),
+    )
 
 
 def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:

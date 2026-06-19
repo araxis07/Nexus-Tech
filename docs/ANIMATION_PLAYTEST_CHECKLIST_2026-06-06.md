@@ -4,12 +4,13 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.168.0`
+- Version: `0.169.0`
 - Focus: 2D actor/sprite timeline, archive/meta comparison motion, path-specific late-game repair cues, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, balance preflight evidence, strict manual signoff validation, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 - Status guard: `animation-playtest-status` groups remaining manual rows while the report is incomplete; use `--fail-on-incomplete` only for release gate checks.
 - Window guard: visible `menu-2d` and `play-2d` runs support `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` so the manual matrix starts at the exact target dimensions.
 - Command queue guard: `animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md` exports every required visible-window command while keeping manual signoff incomplete.
 - Command queue validation guard: `validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md` fails when any required menu/play window or motion mode is missing.
+- Plan guard: `animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md` combines queue status and report gaps into one next-step view.
 - Session guard: `prepare-animation-playtest-session --prefill-automated-gates` creates the strict report draft, visible command queue, and grouped status summary together without completing manual signoff.
 
 ## Commands
@@ -46,6 +47,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 1440x900 --
 - Playtest prep guard: `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` writes the window/motion checklist from the same matrix evidence before the human pass starts.
 - Command queue guard: `animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md` lists every visible `menu-2d` and `play-2d` command for the required window/motion matrix.
 - Command queue validation guard: `validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md` passes before a tester uses an exported queue.
+- Playtest plan guard: `animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md` reports whether the handoff is blocked by the queue, still manual-required, or ready for signoff.
 - Session setup guard: `prepare-animation-playtest-session --prefill-automated-gates` refreshes the report draft, command queue, and grouped open-item summary for handoff.
 - Report draft guard: `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` writes the validator-required manual report rows and prefilled automated gate evidence before the human pass starts.
 - Signoff guard: `validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md` passes before calling the manual animation pass complete; every automated gate row, window/motion cell, control row, scene row, game-feel row, release-blocker field, and decision field must be filled.

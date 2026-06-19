@@ -62,6 +62,7 @@ from nexus_tech.frontend_2d import (
     MotionMode,
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_prep_report,
+    build_2d_animation_playtest_readiness_plan,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_animation_audit,
@@ -334,6 +335,11 @@ ANIMATION_PLAYTEST_STATUS_FAIL_OPTION = typer.Option(
     False,
     "--fail-on-incomplete",
     help="Exit with code 1 when the report is not fully signed off.",
+)
+ANIMATION_PLAYTEST_PLAN_FAIL_OPTION = typer.Option(
+    False,
+    "--fail-on-incomplete",
+    help="Exit with code 1 when the queue or report still has open items.",
 )
 
 
@@ -1461,6 +1467,68 @@ def validate_animation_playtest_commands_command(
             border_style="green",
         )
     )
+
+
+@app.command("animation-playtest-plan")
+def animation_playtest_plan_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the next manual animation QA steps from the current artifacts."""
+
+    validate_scenario_id(scenario)
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+    )
+
+    table = Table(title="Animation Playtest Plan")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Report Path", plan.report.path)
+    table.add_row("Commands Path", plan.commands.path)
+    table.add_row("Command Queue Status", plan.commands.status.upper())
+    table.add_row("Report Status", plan.report.status.upper())
+    table.add_row("Status", plan.status.upper())
+    table.add_row("Open Items", str(plan.open_item_count))
+    console.print(table)
+
+    steps_table = Table(title="Next Animation QA Steps")
+    steps_table.add_column("Area", style="cyan")
+    steps_table.add_column("Status")
+    steps_table.add_column("Open Items", justify="right")
+    steps_table.add_column("Next Step")
+    for step in plan.steps:
+        steps_table.add_row(
+            step.area,
+            step.status.upper(),
+            str(step.open_items),
+            step.next_step,
+        )
+    console.print(steps_table)
+
+    border_style = "green" if plan.status == "pass" else "yellow"
+    console.print(
+        Panel.fit(
+            (
+                f"Animation playtest plan status: {plan.status.upper()} "
+                f"({plan.open_item_count} open item(s))."
+            ),
+            title="Animation Playtest Plan",
+            border_style=border_style,
+        )
+    )
+    if fail_on_incomplete and plan.status != "pass":
+        raise typer.Exit(code=1)
 
 
 @app.command("prepare-animation-playtest-session")

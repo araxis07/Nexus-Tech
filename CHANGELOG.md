@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.169.0 - 2026-06-20
+
+- Added `animation-playtest-plan` to combine manual report status and command queue validation into one grouped next-step view
+- Added reusable readiness-plan models so release tooling can distinguish blocked command queues, manual-required report gaps, and completed animation signoff
+- Updated docs and regression coverage so animation QA handoffs can see what remains before calling the open-window pass complete
+
 ## 0.168.0 - 2026-06-20
 
 - Added `validate-animation-playtest-commands` so exported manual animation QA command queues fail fast when any required window, motion mode, menu run, or play run is missing

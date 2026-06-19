@@ -28,6 +28,7 @@ from nexus_tech.frontend_2d import (
     AnimationCoverageCell,
     AnimationMatrixCell,
     AnimationMatrixReport,
+    AnimationPlaytestReadinessPlan,
     AnimationPlaytestReportValidation,
     FlowAuditReport,
     MotionAuditCell,
@@ -36,6 +37,7 @@ from nexus_tech.frontend_2d import (
     VisualAuditReport,
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_prep_report,
+    build_2d_animation_playtest_readiness_plan,
     launch_2d_frontend,
     launch_2d_menu,
     run_2d_animation_audit,
@@ -4047,6 +4049,78 @@ def test_summarize_2d_animation_playtest_report_groups_manual_gaps(tmp_path: Pat
     assert areas["Template Cleanup"].incomplete_count == 1
 
 
+def test_build_2d_animation_playtest_readiness_plan_blocks_missing_queue(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.169.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    queue = build_2d_animation_playtest_command_queue()
+    write_2d_animation_playtest_command_queue(queue[:-1], commands_path)
+
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path)
+
+    assert isinstance(plan, AnimationPlaytestReadinessPlan)
+    assert plan.status == "blocked"
+    assert plan.commands.status == "fail"
+    assert plan.report.status == "fail"
+    assert any(step.area == "Command Queue" for step in plan.steps)
+    assert plan.open_item_count > len(plan.report.findings)
+
+
+def test_build_2d_animation_playtest_readiness_plan_tracks_manual_gaps(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.169.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    queue = build_2d_animation_playtest_command_queue(seed=13)
+    write_2d_animation_playtest_command_queue(queue, commands_path)
+
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=13)
+    areas = {step.area: step for step in plan.steps}
+
+    assert plan.status == "manual-required"
+    assert plan.commands.status == "pass"
+    assert areas["Manual Window Matrix"].open_items == 9
+    assert areas["Manual Control Checks"].status == "manual-required"
+    assert "Command Queue" not in areas
+
+
+def test_build_2d_animation_playtest_readiness_plan_accepts_signed_pass(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "signed-animation-report.md"
+    commands_path = tmp_path / "manual-animation-commands.md"
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path)
+
+    assert plan.status == "pass"
+    assert plan.open_item_count == 0
+    assert plan.steps[0].area == "Release Signoff"
+
+
 def _completed_animation_playtest_report_text() -> str:
     lines = [
         "# Animation Playtest Report",
@@ -4793,6 +4867,98 @@ def test_validate_animation_playtest_commands_command_rejects_missing_queue_row(
     assert result.exit_code == 1
     assert "Command Queue Findings" in result.output
     assert "expected 18 command rows, found 17" in result.output
+
+
+def test_animation_playtest_plan_command_reports_manual_required(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.169.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-plan",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Plan" in result.output
+    assert "MANUAL-REQUIRED" in result.output
+    assert "Manual Window Matrix" in result.output
+    assert "Next Animation QA Steps" in result.output
+
+
+def test_animation_playtest_plan_command_can_fail_on_incomplete(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.169.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-plan",
+            str(report_path),
+            str(commands_path),
+            "--fail-on-incomplete",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "MANUAL-REQUIRED" in result.output
+
+
+def test_animation_playtest_plan_command_accepts_completed_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "signed-animation-report.md"
+    commands_path = tmp_path / "manual-animation-commands.md"
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        ["animation-playtest-plan", str(report_path), str(commands_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "Status" in result.output
+    assert "PASS" in result.output
+    assert "Release Signoff" in result.output
 
 
 def test_prepare_animation_playtest_session_command_writes_draft_and_queue(
