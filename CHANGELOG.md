@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.168.0 - 2026-06-20
+
+- Added `validate-animation-playtest-commands` so exported manual animation QA command queues fail fast when any required window, motion mode, menu run, or play run is missing
+- Added reusable command-queue validation for release tooling while keeping manual animation signoff separate from queue completeness
+- Updated docs and regression coverage for validating tester handoff command queues before the visible-window pass starts
+
 ## 0.167.0 - 2026-06-20
 
 - Added `prepare-animation-playtest-session` to create the strict manual report draft, visible-window command queue, and grouped status summary in one setup step

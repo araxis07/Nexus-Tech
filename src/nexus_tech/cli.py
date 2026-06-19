@@ -69,6 +69,7 @@ from nexus_tech.frontend_2d import (
     run_2d_motion_audit,
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
+    validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -297,6 +298,12 @@ ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the manual animation playtest command queue.",
+)
+ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Manual animation playtest command queue Markdown file.",
 )
 ANIMATION_PLAYTEST_SESSION_REPORT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-report.md"),
@@ -1401,6 +1408,57 @@ def animation_playtest_commands_command(
             ),
             title="Animation Playtest Commands",
             border_style="yellow",
+        )
+    )
+
+
+@app.command("validate-animation-playtest-commands")
+def validate_animation_playtest_commands_command(
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+) -> None:
+    """Validate that the manual animation command queue covers every required run."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_command_queue(
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+    )
+
+    table = Table(title="Animation Playtest Command Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Commands", validation.path)
+    table.add_row("Expected Commands", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Command Queue Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Manual animation command queue is incomplete.",
+                title="Animation Playtest Commands",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Manual animation command queue covers every required visible-window run.",
+            title="Animation Playtest Commands",
+            border_style="green",
         )
     )
 

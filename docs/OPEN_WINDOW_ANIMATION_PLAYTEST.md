@@ -18,6 +18,7 @@ uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-t
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
+uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
 ```
 
@@ -36,6 +37,8 @@ without failing by default. Use `validate-animation-playtest-report` as the fina
 blocking gate after the visible-window rows and signoff fields are filled.
 Use `animation-playtest-commands` to print or export the exact visible-window
 command queue; it does not mark any manual row complete.
+Use `validate-animation-playtest-commands` before handoff so an edited queue
+cannot silently skip a window size, motion mode, menu run, or play run.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, and grouped status summary created together before handing the
 manual pass to a tester.

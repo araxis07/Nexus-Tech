@@ -44,6 +44,7 @@ from nexus_tech.frontend_2d import (
     run_2d_motion_audit,
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
+    validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -3926,6 +3927,38 @@ def test_write_2d_animation_playtest_command_queue_keeps_manual_scope(tmp_path: 
     assert "play-2d --scenario founder_journey --seed 7 --window-size 1440x900" in (report_text)
 
 
+def test_validate_2d_animation_playtest_command_queue_accepts_complete_queue(
+    tmp_path: Path,
+) -> None:
+    queue = build_2d_animation_playtest_command_queue(scenario_id="debt_crunch", seed=99)
+    output_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_command_queue(queue, output_path)
+
+    validation = validate_2d_animation_playtest_command_queue(
+        output_path,
+        scenario_id="debt_crunch",
+        seed=99,
+    )
+
+    assert validation.status == "pass"
+    assert validation.expected_count == 18
+    assert validation.findings == ()
+
+
+def test_validate_2d_animation_playtest_command_queue_rejects_missing_command(
+    tmp_path: Path,
+) -> None:
+    queue = build_2d_animation_playtest_command_queue()
+    output_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_command_queue(queue[:-1], output_path)
+
+    validation = validate_2d_animation_playtest_command_queue(output_path)
+
+    assert validation.status == "fail"
+    assert "expected 18 command rows, found 17" in validation.findings
+    assert any("missing command:" in finding for finding in validation.findings)
+
+
 def test_write_2d_animation_playtest_report_template_matches_validator_contract(
     tmp_path: Path,
 ) -> None:
@@ -4720,6 +4753,46 @@ def test_animation_playtest_commands_command_writes_queue(tmp_path: Path) -> Non
     assert "- Manual result: `not completed by automation`" in report_text
     assert "play-2d --scenario founder_journey --seed 11" in report_text
     assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
+
+
+def test_validate_animation_playtest_commands_command_accepts_complete_queue(
+    tmp_path: Path,
+) -> None:
+    queue = build_2d_animation_playtest_command_queue(seed=11)
+    output_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_command_queue(queue, output_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-commands",
+            str(output_path),
+            "--seed",
+            "11",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Command Validation" in result.output
+    assert "Status" in result.output
+    assert "PASS" in result.output
+
+
+def test_validate_animation_playtest_commands_command_rejects_missing_queue_row(
+    tmp_path: Path,
+) -> None:
+    queue = build_2d_animation_playtest_command_queue()
+    output_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_command_queue(queue[:-1], output_path)
+
+    result = runner.invoke(
+        app,
+        ["validate-animation-playtest-commands", str(output_path)],
+    )
+
+    assert result.exit_code == 1
+    assert "Command Queue Findings" in result.output
+    assert "expected 18 command rows, found 17" in result.output
 
 
 def test_prepare_animation_playtest_session_command_writes_draft_and_queue(

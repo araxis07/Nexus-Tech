@@ -527,6 +527,21 @@ class AnimationPlaytestCommand:
 
 
 @dataclass(frozen=True)
+class AnimationPlaytestCommandQueueValidation:
+    """Validation result for a manual animation playtest command queue artifact."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the queue covers every required command exactly."""
+
+        return "pass" if not self.findings else "fail"
+
+
+@dataclass(frozen=True)
 class AnimationPlaytestReportValidation:
     """Validation result for a completed manual 2D animation playtest report."""
 
@@ -709,6 +724,10 @@ def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
             continue
         rows.append(cells)
     return tuple(rows)
+
+
+def _strip_markdown_code(value: str) -> str:
+    return value.strip().strip("` ")
 
 
 def _is_markdown_separator_row(cells: tuple[str, ...]) -> bool:
@@ -1062,6 +1081,55 @@ def write_2d_animation_playtest_command_queue(
             f"`{item.motion_mode}` | `{item.command}` |"
         )
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_command_queue(
+    queue_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestCommandQueueValidation:
+    """Validate that an exported manual animation QA command queue is complete."""
+
+    text = queue_path.read_text(encoding="utf-8")
+    findings: list[str] = []
+    if "- Manual result: `not completed by automation`" not in text:
+        findings.append("manual result guard is missing")
+
+    rows = _extract_markdown_table_rows(text)
+    command_rows = tuple(row for row in rows if len(row) >= 5 and row[0].isdigit())
+    expected_queue = build_2d_animation_playtest_command_queue(
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    expected_commands = {item.command for item in expected_queue}
+    actual_commands = tuple(_strip_markdown_code(row[4]) for row in command_rows)
+    actual_command_set = set(actual_commands)
+
+    if len(command_rows) != len(expected_queue):
+        findings.append(f"expected {len(expected_queue)} command rows, found {len(command_rows)}")
+    if len(actual_commands) != len(actual_command_set):
+        findings.append("command queue contains duplicate commands")
+
+    for item in expected_queue:
+        if item.command not in actual_command_set:
+            findings.append(f"missing command: {item.command}")
+
+    for command in actual_commands:
+        if command not in expected_commands:
+            findings.append(f"unexpected command: {command}")
+
+    return AnimationPlaytestCommandQueueValidation(
+        path=str(queue_path),
+        expected_count=len(expected_queue),
+        findings=tuple(findings),
+    )
 
 
 def write_2d_animation_playtest_prep_report(
