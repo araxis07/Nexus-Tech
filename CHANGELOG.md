@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.170.0 - 2026-06-20
+
+- Added Markdown export for `animation-playtest-plan` so grouped manual animation QA next steps can be saved as a handoff artifact
+- Added a reusable readiness-plan writer that records queue status, report status, open items, report findings, and command queue findings without marking manual signoff complete
+- Updated docs and regression coverage so release handoffs can attach the current animation playtest plan alongside the report and command queue
+
 ## 0.169.0 - 2026-06-20
 
 - Added `animation-playtest-plan` to combine manual report status and command queue validation into one grouped next-step view

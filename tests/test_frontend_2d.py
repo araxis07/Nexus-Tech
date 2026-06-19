@@ -51,6 +51,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_report_template,
 )
 from nexus_tech.frontend_2d.catalog import (
@@ -4103,6 +4104,38 @@ def test_build_2d_animation_playtest_readiness_plan_tracks_manual_gaps(
     assert "Command Queue" not in areas
 
 
+def test_write_2d_animation_playtest_readiness_plan_exports_handoff_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.170.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=23),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=23)
+
+    write_2d_animation_playtest_readiness_plan(plan, output_path)
+
+    plan_text = output_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH 2D Animation Playtest Plan" in plan_text
+    assert "- Status: `manual-required`" in plan_text
+    assert "- Release decision: `-`" in plan_text
+    assert "- Manual result: `not completed by automation`" in plan_text
+    assert "| Manual Window Matrix | `manual-required` | `9` |" in plan_text
+    assert "## Report Findings" in plan_text
+
+
 def test_build_2d_animation_playtest_readiness_plan_accepts_signed_pass(
     tmp_path: Path,
 ) -> None:
@@ -4904,6 +4937,47 @@ def test_animation_playtest_plan_command_reports_manual_required(
     assert "MANUAL-REQUIRED" in result.output
     assert "Manual Window Matrix" in result.output
     assert "Next Animation QA Steps" in result.output
+
+
+def test_animation_playtest_plan_command_writes_markdown_output(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.170.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=19),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-plan",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "19",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation playtest plan written" in result.output
+    plan_text = output_path.read_text(encoding="utf-8")
+    assert "- Status: `manual-required`" in plan_text
+    assert "- Manual result: `not completed by automation`" in plan_text
+    assert "## Next Animation QA Steps" in plan_text
 
 
 def test_animation_playtest_plan_command_can_fail_on_incomplete(

@@ -7,7 +7,7 @@ uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --ou
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
-uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
+uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
 ```
 
@@ -19,7 +19,8 @@ signoff evidence by itself.
 Validate the exported queue before handoff so missing command rows are fixed
 before anyone starts the visible-window pass.
 Run the playtest plan command after queue validation to see the remaining manual
-areas and signoff fields without digging through raw validator findings.
+areas and signoff fields without digging through raw validator findings. Use
+`--output` when the current grouped plan should be attached to the handoff.
 The session setup command creates both files together but still leaves manual
 rows incomplete until real observations are entered.
 

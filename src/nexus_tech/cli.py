@@ -75,6 +75,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_report_template,
 )
 from nexus_tech.persistence.errors import PersistenceError
@@ -340,6 +341,11 @@ ANIMATION_PLAYTEST_PLAN_FAIL_OPTION = typer.Option(
     False,
     "--fail-on-incomplete",
     help="Exit with code 1 when the queue or report still has open items.",
+)
+ANIMATION_PLAYTEST_PLAN_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the grouped animation playtest plan.",
 )
 
 
@@ -1479,6 +1485,7 @@ def animation_playtest_plan_command(
         "--seed",
         help="Seed expected in the visible play-2d command queue.",
     ),
+    output: Path | None = ANIMATION_PLAYTEST_PLAN_OUTPUT_OPTION,
     fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
 ) -> None:
     """Show the next manual animation QA steps from the current artifacts."""
@@ -1527,6 +1534,15 @@ def animation_playtest_plan_command(
             border_style=border_style,
         )
     )
+    if output is not None:
+        write_2d_animation_playtest_readiness_plan(plan, output)
+        console.print(
+            Panel.fit(
+                f"Animation playtest plan written to {output}",
+                title="Animation Playtest Plan",
+                border_style="cyan",
+            )
+        )
     if fail_on_incomplete and plan.status != "pass":
         raise typer.Exit(code=1)
 

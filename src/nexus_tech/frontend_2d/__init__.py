@@ -33,6 +33,7 @@ from nexus_tech.frontend_2d.animation_audit import (
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_report_template,
 )
 from nexus_tech.frontend_2d.app import (
@@ -103,6 +104,7 @@ __all__ = [
     "write_2d_animation_matrix_report",
     "write_2d_animation_playtest_command_queue",
     "write_2d_animation_playtest_prep_report",
+    "write_2d_animation_playtest_readiness_plan",
     "write_2d_animation_playtest_report_template",
     "run_2d_flow_audit",
     "run_2d_motion_audit",

@@ -813,6 +813,80 @@ def build_2d_animation_playtest_readiness_plan(
     )
 
 
+def write_2d_animation_playtest_readiness_plan(
+    plan: AnimationPlaytestReadinessPlan,
+    output_path: Path,
+) -> None:
+    """Write the grouped manual animation QA plan as a Markdown handoff artifact."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    manual_result = (
+        "report validator passed before this plan was written"
+        if plan.status == "pass"
+        else "not completed by automation"
+    )
+    raw_release_decision = plan.report.release_decision
+    release_decision = (
+        "-"
+        if "/" in raw_release_decision or _is_placeholder_field(raw_release_decision)
+        else raw_release_decision or "-"
+    )
+    lines = [
+        "# NEXUS TECH 2D Animation Playtest Plan",
+        "",
+        f"- Status: `{plan.status}`",
+        f"- Report: `{plan.report.path}`",
+        f"- Commands: `{plan.commands.path}`",
+        f"- Command queue status: `{plan.commands.status}`",
+        f"- Report status: `{plan.report.status}`",
+        f"- Release decision: `{release_decision}`",
+        f"- Open items: `{plan.open_item_count}`",
+        f"- Manual result: `{manual_result}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        "",
+        "## Next Animation QA Steps",
+        "",
+        "| Area | Status | Open Items | Next Step |",
+        "| --- | --- | ---: | --- |",
+    ]
+    for step in plan.steps:
+        lines.append(
+            "| "
+            f"{_markdown_table_cell(step.area)} | "
+            f"`{step.status}` | "
+            f"`{step.open_items}` | "
+            f"{_markdown_table_cell(step.next_step)} |"
+        )
+
+    if plan.commands.findings:
+        lines.extend(
+            [
+                "",
+                "## Command Queue Findings",
+                "",
+                "| Finding |",
+                "| --- |",
+            ]
+        )
+        for finding in plan.commands.findings:
+            lines.append(f"| {_markdown_table_cell(finding)} |")
+
+    if plan.report.findings:
+        lines.extend(
+            [
+                "",
+                "## Report Findings",
+                "",
+                "| Finding |",
+                "| --- |",
+            ]
+        )
+        for finding in plan.report.findings:
+            lines.append(f"| {_markdown_table_cell(finding)} |")
+
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
     rows: list[tuple[str, ...]] = []
     for line in text.splitlines():
@@ -828,6 +902,10 @@ def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
 
 def _strip_markdown_code(value: str) -> str:
     return value.strip().strip("` ")
+
+
+def _markdown_table_cell(value: str) -> str:
+    return re.sub(r"\s+", " ", value.replace("|", r"\|")).strip()
 
 
 def _is_markdown_separator_row(cells: tuple[str, ...]) -> bool:
