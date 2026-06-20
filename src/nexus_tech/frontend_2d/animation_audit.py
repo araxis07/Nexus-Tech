@@ -588,6 +588,7 @@ class AnimationPlaytestReadinessPlan:
     report: AnimationPlaytestReportValidation
     commands: AnimationPlaytestCommandQueueValidation
     steps: tuple[AnimationPlaytestPlanStep, ...]
+    visible_route: tuple[AnimationPlaytestCommand, ...]
 
     @property
     def status(self) -> str:
@@ -785,6 +786,13 @@ def build_2d_animation_playtest_readiness_plan(
     """Build an actionable handoff plan from the current manual QA artifacts."""
 
     report = validate_2d_animation_playtest_report(report_path)
+    visible_route = build_2d_animation_playtest_command_queue(
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
     commands = validate_2d_animation_playtest_command_queue(
         command_path,
         scenario_id=scenario_id,
@@ -834,6 +842,7 @@ def build_2d_animation_playtest_readiness_plan(
         report=report,
         commands=commands,
         steps=tuple(steps),
+        visible_route=visible_route,
     )
 
 
@@ -871,6 +880,26 @@ def write_2d_animation_playtest_readiness_plan(
             f"`{step.status}` | "
             f"`{step.open_items}` | "
             f"{_markdown_table_cell(step.next_step)} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Visible Test Route",
+            "",
+            "| Step | Target | Window | Motion | Evidence To Record | Command |",
+            "| ---: | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for index, item in enumerate(plan.visible_route, start=1):
+        lines.append(
+            "| "
+            f"{index} | "
+            f"`{item.target}` | "
+            f"`{item.window_size}` | "
+            f"`{item.motion_mode}` | "
+            f"{_markdown_table_cell(_animation_playtest_route_evidence(item))} | "
+            f"`{_markdown_table_cell(item.command)}` |"
         )
 
     if plan.commands.findings:
@@ -963,6 +992,50 @@ def validate_2d_animation_playtest_readiness_plan(
         if _normalize_report_key(next_step) != _normalize_report_key(step.next_step):
             findings.append(f"plan step {step.area} next step is stale")
 
+    if "## Visible Test Route" not in text:
+        findings.append("missing visible test route section")
+
+    route_rows = tuple(row for row in rows if len(row) >= 6 and row[0].isdigit())
+    if len(route_rows) != len(plan.visible_route):
+        findings.append(
+            f"expected {len(plan.visible_route)} visible test route rows, found {len(route_rows)}"
+        )
+    route_by_step: dict[int, tuple[str, ...]] = {}
+    for row in route_rows:
+        step = int(row[0])
+        if step in route_by_step:
+            findings.append(f"duplicate visible test route step: {step}")
+            continue
+        route_by_step[step] = row
+
+    for index, item in enumerate(plan.visible_route, start=1):
+        row = route_by_step.get(index)
+        if row is None:
+            findings.append(f"missing visible test route row: {index}")
+            continue
+        target = _strip_markdown_code(row[1])
+        window = _strip_markdown_code(row[2])
+        motion = _strip_markdown_code(row[3])
+        evidence = row[4].replace(r"\|", "|").strip()
+        command = _strip_markdown_code(row[5]).replace(r"\|", "|")
+        expected_evidence = _animation_playtest_route_evidence(item)
+        if target != item.target:
+            findings.append(
+                f"visible test route row {index} target is {target}, expected {item.target}"
+            )
+        if window != item.window_size:
+            findings.append(
+                f"visible test route row {index} window is {window}, expected {item.window_size}"
+            )
+        if motion != item.motion_mode:
+            findings.append(
+                f"visible test route row {index} motion is {motion}, expected {item.motion_mode}"
+            )
+        if _normalize_report_key(evidence) != _normalize_report_key(expected_evidence):
+            findings.append(f"visible test route row {index} evidence prompt is stale")
+        if command != item.command:
+            findings.append(f"visible test route row {index} command is stale")
+
     for finding in plan.commands.findings:
         if finding not in text:
             findings.append(f"missing command queue finding: {finding}")
@@ -990,6 +1063,21 @@ def _plan_release_decision(plan: AnimationPlaytestReadinessPlan) -> str:
     if "/" in raw_release_decision or _is_placeholder_field(raw_release_decision):
         return "-"
     return raw_release_decision or "-"
+
+
+def _animation_playtest_route_evidence(item: AnimationPlaytestCommand) -> str:
+    """Return the human evidence prompt for one visible-window route step."""
+
+    window_context = f"{item.window_size} {item.motion_mode}"
+    if item.target == "menu":
+        return (
+            "Record title/menu, wizard, save-slot, archive, meta-board, hover, "
+            f"and text-fit observations for {window_context}."
+        )
+    return (
+        "Record dashboard, action picker, pending event, inspector, endgame, "
+        f"summary, pause/back, and motion-feel observations for {window_context}."
+    )
 
 
 def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.174.0 - 2026-06-20
+
+- Added a validated `Visible Test Route` section to animation playtest plans so the 18 required menu/play window and motion runs include explicit evidence prompts
+- Tightened plan artifact validation so missing, stale, duplicated, or edited visible-route rows fail before manual animation handoff
+- Updated docs and regression coverage so the manual animation pass cannot lose the route between command queue generation and signoff planning
+
 ## 0.173.0 - 2026-06-20
 
 - Tightened `validate-animation-playtest-report` so signed manual animation reports must include real evidence notes instead of generic `ok`, `clear`, `readable`, or `stable` placeholders

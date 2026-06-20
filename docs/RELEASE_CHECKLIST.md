@@ -52,9 +52,11 @@ Run `validate-animation-playtest-commands` after any queue export or edit so no
 required visible-window run is skipped before handoff.
 Run `animation-playtest-plan` after queue validation to see whether the handoff
 is queue-blocked, still manual-required, or complete. Use `--output` to save the
-grouped plan beside the report and command queue.
+grouped plan and its 18-step visible test route beside the report and command
+queue.
 Run `validate-animation-playtest-plan` after writing the grouped plan so stale
-status and open-item counts are blocked before handoff.
+status, open-item counts, or visible-route evidence prompts are blocked before
+handoff.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact, and
 current plan validation without completing manual signoff.

@@ -555,6 +555,11 @@ uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-pla
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
+The exported animation playtest plan includes a validated `Visible Test Route`
+with all 18 required menu/play window and motion runs plus the evidence each
+step must record, so manual QA cannot lose the route between command generation
+and final signoff.
+
 The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, and uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep` after the CI animation gates.
 
 Use `--motion-mode reduced` or `--motion-mode off` on `play-2d`, `menu-2d`, `audit-2d-motion`, and `audit-2d-visual` when you want quieter highlight, entity, action-feedback, late-game choreography, pending-preview, summary-lane, and scene-transition animation while keeping the same gameplay state and controls. Use `--window-size 820x620`, `--window-size 960x640`, or `--window-size 1440x900` on visible `play-2d` and `menu-2d` runs to match the manual animation window matrix exactly.

@@ -4134,6 +4134,8 @@ def test_write_2d_animation_playtest_readiness_plan_exports_handoff_artifact(
     assert "- Release decision: `-`" in plan_text
     assert "- Manual result: `not completed by automation`" in plan_text
     assert "| Manual Window Matrix | `manual-required` | `9` |" in plan_text
+    assert "## Visible Test Route" in plan_text
+    assert "| 18 | `play` | `1440x900` | `off` |" in plan_text
     assert "## Report Findings" in plan_text
 
 
@@ -4169,6 +4171,44 @@ def test_validate_2d_animation_playtest_readiness_plan_accepts_current_artifact(
     assert validation.status == "pass"
     assert validation.expected_status == "manual-required"
     assert validation.findings == ()
+
+
+def test_validate_2d_animation_playtest_readiness_plan_rejects_missing_route(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.174.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=31),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=31)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").split("## Visible Test Route", maxsplit=1)[0],
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=31,
+    )
+
+    assert validation.status == "fail"
+    assert "missing visible test route section" in validation.findings
+    assert "expected 18 visible test route rows, found 0" in validation.findings
 
 
 def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_artifact(
@@ -5322,6 +5362,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "- Command queue status: `pass`" in plan_text
     assert "- Report status: `fail`" in plan_text
     assert "- Manual result: `not completed by automation`" in plan_text
+    assert "## Visible Test Route" in plan_text
+    assert "| 18 | `play` | `1440x900` | `off` |" in plan_text
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

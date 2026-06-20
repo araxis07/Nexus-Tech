@@ -22,6 +22,8 @@ before anyone starts the visible-window pass.
 Run the playtest plan command after queue validation to see the remaining manual
 areas and signoff fields without digging through raw validator findings. Use
 `--output` when the current grouped plan should be attached to the handoff.
+The exported plan includes a validated `Visible Test Route` so testers know
+which menu/play window and motion runs map to which evidence notes.
 Validate the exported plan after writing it so the attached plan cannot drift
 from the current report or command queue.
 The session setup command creates the report, command queue, and grouped plan
