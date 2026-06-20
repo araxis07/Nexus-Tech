@@ -34,6 +34,10 @@ After filling the generated manual report draft, validate it before calling anim
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
 
+The completed report must include `Visible Route Evidence` for all 18 menu/play
+launches from the command queue. Each route row must be `pass` with observed
+notes naming what was checked in that window and motion mode.
+
 Use `animation-playtest-status` during the manual pass to group remaining work
 without failing by default. Use `validate-animation-playtest-report` as the final
 blocking gate after the visible-window rows and signoff fields are filled.

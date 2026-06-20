@@ -559,6 +559,9 @@ The exported animation playtest plan includes a validated `Visible Test Route`
 with all 18 required menu/play window and motion runs plus the evidence each
 step must record, so manual QA cannot lose the route between command generation
 and final signoff.
+The strict manual report also includes matching `Visible Route Evidence` rows;
+`validate-animation-playtest-report` fails until all 18 rows are `pass` with
+observed notes from the actual visible-window runs.
 
 The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, and uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep` after the CI animation gates.
 

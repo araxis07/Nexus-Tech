@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.175.0 - 2026-06-20
+
+- Added required `Visible Route Evidence` rows to the strict manual animation playtest report so all 18 visible menu/play launches must be signed off with observed notes
+- Tightened `validate-animation-playtest-report` so missing, duplicated, stale, non-pass, or thin visible-route evidence blocks final animation signoff
+- Updated docs and regression coverage so the final report, command queue, and playtest plan all preserve the same visible-window route before presentation clearance
+
 ## 0.174.0 - 2026-06-20
 
 - Added a validated `Visible Test Route` section to animation playtest plans so the 18 required menu/play window and motion runs include explicit evidence prompts

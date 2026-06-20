@@ -29,6 +29,9 @@ from the current report or command queue.
 The session setup command creates the report, command queue, and grouped plan
 together but still leaves manual rows incomplete until real observations are
 entered.
+The final report must keep the generated `Visible Route Evidence` table and fill
+all 18 menu/play rows with `pass` plus observed notes from the matching window
+and motion mode.
 The final validator rejects generic evidence notes such as `ok`, `clear`,
 `readable`, `stable`, or `none` in gate, window, control, scene, and game-feel
 evidence cells. Record concise observed facts instead, such as which window,
@@ -66,6 +69,12 @@ control path, scene element, or motion cue was checked.
 | `820x620` |  |  |  |  |
 | `960x640` |  |  |  |  |
 | `1440x900` |  |  |  |  |
+
+## Visible Route Evidence
+
+| Step | Target | Window | Motion | Result | Evidence Notes |
+| ---: | --- | --- | --- | --- | --- |
+| 1-18 |  |  |  |  | Keep the generated rows from `draft-animation-playtest-report` and replace each result/note with real observations |
 
 ## Control Clarity Results
 

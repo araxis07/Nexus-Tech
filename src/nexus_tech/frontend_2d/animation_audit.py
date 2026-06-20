@@ -634,6 +634,11 @@ _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] =
         "Test 820x620, 960x640, and 1440x900 in full, reduced, and off modes.",
     ),
     (
+        "Manual Route Evidence",
+        ("visible route",),
+        "Run every visible test route step and record observed notes for each menu/play launch.",
+    ),
+    (
         "Manual Control Checks",
         ("control check",),
         "Verify pause/resume, back/escape, menu return, help/hover, layout, typography, and modes.",
@@ -690,6 +695,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         evidence_columns=((2, "notes"),),
     )
     _validate_required_window_matrix(findings, rows)
+    _validate_required_visible_route_evidence(findings, rows)
     _validate_required_result_rows(
         findings,
         rows,
@@ -747,7 +753,7 @@ def summarize_2d_animation_playtest_report(
         findings = tuple(
             finding
             for finding in validation.findings
-            if any(marker in finding.lower() for marker in markers)
+            if finding not in matched and any(marker in finding.lower() for marker in markers)
         )
         if not findings:
             continue
@@ -1124,6 +1130,60 @@ def _validate_required_window_matrix(
                 findings.append(f"window matrix {label} {mode} is {result}, not pass")
         if len(row) <= 4 or _is_thin_evidence(row[4]):
             findings.append(f"missing window matrix evidence: {label} notes")
+
+
+def _validate_required_visible_route_evidence(
+    findings: list[str],
+    rows: tuple[tuple[str, ...], ...],
+) -> None:
+    expected_route = build_2d_animation_playtest_command_queue()
+    route_rows = tuple(
+        row
+        for row in rows
+        if len(row) >= 5 and row[0].isdigit() and _strip_markdown_code(row[1]) in {"menu", "play"}
+    )
+    if len(route_rows) != len(expected_route):
+        findings.append(
+            f"expected {len(expected_route)} visible route evidence rows, found {len(route_rows)}"
+        )
+
+    route_by_step: dict[int, tuple[str, ...]] = {}
+    for row in route_rows:
+        step = int(row[0])
+        if step in route_by_step:
+            findings.append(f"duplicate visible route evidence step: {step}")
+            continue
+        route_by_step[step] = row
+
+    for index, item in enumerate(expected_route, start=1):
+        row = route_by_step.get(index)
+        if row is None:
+            findings.append(f"missing visible route evidence row: {index}")
+            continue
+        target = _strip_markdown_code(row[1])
+        window = _strip_markdown_code(row[2])
+        motion = _strip_markdown_code(row[3])
+        if target != item.target:
+            findings.append(
+                f"visible route evidence row {index} target is {target}, expected {item.target}"
+            )
+        if window != item.window_size:
+            findings.append(
+                f"visible route evidence row {index} window is {window}, "
+                f"expected {item.window_size}"
+            )
+        if motion != item.motion_mode:
+            findings.append(
+                f"visible route evidence row {index} motion is {motion}, "
+                f"expected {item.motion_mode}"
+            )
+        if len(row) <= 4 or _is_placeholder_result(row[4]):
+            findings.append(f"incomplete visible route evidence result: {index}")
+        elif not _is_passing_result(row[4]):
+            result = _normalize_report_result(row[4]) or "blank"
+            findings.append(f"visible route evidence row {index} is {result}, not pass")
+        if len(row) <= 5 or _is_thin_evidence(row[5]):
+            findings.append(f"missing visible route evidence note: {index}")
 
 
 def _validate_required_result_rows(
@@ -1805,6 +1865,26 @@ def write_2d_animation_playtest_report_template(
         lines.append(
             f"| `{window_size}` | `todo` | `todo` | `todo` | "
             f"Launch with `--window-size {window_size}` and record real window notes |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Visible Route Evidence",
+            "",
+            "| Step | Target | Window | Motion | Result | Evidence Notes |",
+            "| ---: | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for index, item in enumerate(build_2d_animation_playtest_command_queue(), start=1):
+        lines.append(
+            "| "
+            f"{index} | "
+            f"`{item.target}` | "
+            f"`{item.window_size}` | "
+            f"`{item.motion_mode}` | "
+            "`todo` | "
+            f"{_animation_playtest_route_evidence(item)} |"
         )
 
     lines.extend(

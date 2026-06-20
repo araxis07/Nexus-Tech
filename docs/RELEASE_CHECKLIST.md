@@ -60,6 +60,8 @@ handoff.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact, and
 current plan validation without completing manual signoff.
+The completed report must retain all 18 `Visible Route Evidence` rows generated
+from the queue and mark each row `pass` with observed notes before signoff.
 Final report notes must contain observed evidence. Generic notes such as `ok`,
 `clear`, `readable`, or `stable` fail validation because they do not prove which
 window, control path, scene, or motion cue was checked.

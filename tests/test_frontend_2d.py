@@ -4044,6 +4044,7 @@ def test_summarize_2d_animation_playtest_report_groups_manual_gaps(tmp_path: Pat
 
     assert "Automated Gates" not in areas
     assert areas["Manual Window Matrix"].incomplete_count == 9
+    assert areas["Manual Route Evidence"].incomplete_count == 18
     assert areas["Manual Control Checks"].incomplete_count == 9
     assert areas["Manual Scene Checks"].incomplete_count == 9
     assert areas["Manual Game Feel"].incomplete_count == 4
@@ -4405,6 +4406,25 @@ def _completed_animation_playtest_report_text() -> str:
         "- Nice-to-have polish: none",
         "- Validator result: pass",
     ]
+    route_rows = [
+        "",
+        "## Visible Route Evidence",
+        "",
+        "| Step | Target | Window | Motion | Result | Evidence Notes |",
+        "| ---: | --- | --- | --- | --- | --- |",
+    ]
+    for index, item in enumerate(build_2d_animation_playtest_command_queue(), start=1):
+        route_rows.append(
+            "| "
+            f"{index} | "
+            f"`{item.target}` | "
+            f"`{item.window_size}` | "
+            f"`{item.motion_mode}` | "
+            "`pass` | "
+            f"{item.target} route observed at {item.window_size} with {item.motion_mode} motion |"
+        )
+    insert_index = lines.index("## Control Clarity Results") - 1
+    lines[insert_index:insert_index] = route_rows
     return "\n".join(lines) + "\n"
 
 
@@ -4481,6 +4501,47 @@ def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(
     assert "missing automated gate evidence: ruff check src tests notes" in validation.findings
     assert "missing window matrix evidence: 820x620 notes" in validation.findings
     assert "missing control check evidence: Pause / Resume notes" in validation.findings
+
+
+def test_validate_2d_animation_playtest_report_rejects_missing_visible_route(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "missing-route-animation-report.md"
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        "\n".join(
+            [
+                "",
+                "## Visible Route Evidence",
+                "",
+                "| Step | Target | Window | Motion | Result | Evidence Notes |",
+                "| ---: | --- | --- | --- | --- | --- |",
+            ]
+        )
+        + "\n"
+        + "\n".join(
+            (
+                "| "
+                f"{index} | "
+                f"`{item.target}` | "
+                f"`{item.window_size}` | "
+                f"`{item.motion_mode}` | "
+                "`pass` | "
+                f"{item.target} route observed at {item.window_size} "
+                f"with {item.motion_mode} motion |"
+            )
+            for index, item in enumerate(build_2d_animation_playtest_command_queue(), start=1)
+        )
+        + "\n",
+        "\n",
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "expected 18 visible route evidence rows, found 0" in validation.findings
+    assert "missing visible route evidence row: 1" in validation.findings
 
 
 def test_validate_2d_animation_playtest_report_rejects_missing_required_rows(
@@ -5229,12 +5290,13 @@ def test_validate_animation_playtest_plan_command_rejects_stale_artifact(
         build_2d_animation_playtest_command_queue(),
         commands_path,
     )
-    write_2d_animation_playtest_readiness_plan(
-        build_2d_animation_playtest_readiness_plan(report_path, commands_path),
-        plan_path,
-    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
     plan_path.write_text(
-        plan_path.read_text(encoding="utf-8").replace("- Open items: `46`", "- Open items: `0`"),
+        plan_path.read_text(encoding="utf-8").replace(
+            f"- Open items: `{plan.open_item_count}`",
+            "- Open items: `0`",
+        ),
         encoding="utf-8",
     )
 
