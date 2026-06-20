@@ -648,6 +648,11 @@ _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] =
         "Confirm success, blocked, impact, and actor/feedback cues are readable and aligned.",
     ),
     (
+        "Manual Evidence Notes",
+        ("evidence",),
+        "Replace generic notes like ok/clear/readable with concise observed tester evidence.",
+    ),
+    (
         "Signoff Fields",
         ("missing field", "release decision"),
         "Fill release blocker notes, decision fields, validator result, and final pass decision.",
@@ -681,6 +686,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         rows,
         REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES,
         "automated gate",
+        evidence_columns=((2, "notes"),),
     )
     _validate_required_window_matrix(findings, rows)
     _validate_required_result_rows(
@@ -688,18 +694,21 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         rows,
         tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
         "control check",
+        evidence_columns=((2, "notes"),),
     )
     _validate_required_result_rows(
         findings,
         rows,
         tuple(scene for scene, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
         "scene check",
+        evidence_columns=((2, "readability notes"), (3, "motion notes")),
     )
     _validate_required_result_rows(
         findings,
         rows,
         tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
         "game-feel check",
+        evidence_columns=((2, "notes"),),
     )
 
     release_decision = _extract_report_field(text, "Release decision")
@@ -1025,6 +1034,8 @@ def _validate_required_window_matrix(
             if not _is_passing_result(row[index]):
                 result = _normalize_report_result(row[index]) or "blank"
                 findings.append(f"window matrix {label} {mode} is {result}, not pass")
+        if len(row) <= 4 or _is_thin_evidence(row[4]):
+            findings.append(f"missing window matrix evidence: {label} notes")
 
 
 def _validate_required_result_rows(
@@ -1032,6 +1043,8 @@ def _validate_required_result_rows(
     rows: tuple[tuple[str, ...], ...],
     labels: tuple[str, ...],
     category: str,
+    *,
+    evidence_columns: tuple[tuple[int, str], ...] = (),
 ) -> None:
     for label in labels:
         row = _find_report_table_row(rows, label)
@@ -1044,6 +1057,9 @@ def _validate_required_result_rows(
         if not _is_passing_result(row[1]):
             result = _normalize_report_result(row[1]) or "blank"
             findings.append(f"{category} {label} is {result}, not pass")
+        for column_index, evidence_name in evidence_columns:
+            if len(row) <= column_index or _is_thin_evidence(row[column_index]):
+                findings.append(f"missing {category} evidence: {label} {evidence_name}")
 
 
 def _find_report_table_row(
@@ -1095,6 +1111,22 @@ def _is_placeholder_field(value: str) -> bool:
         or "pass / watch / fail" in normalized
         or "pass/watch/fail" in normalized
     )
+
+
+def _is_thin_evidence(value: str) -> bool:
+    normalized = _normalize_report_result(value)
+    return _is_placeholder_field(value) or normalized in {
+        "ok",
+        "clear",
+        "readable",
+        "stable",
+        "verified",
+        "works",
+        "pass",
+        "passed",
+        "success",
+        "none",
+    }
 
 
 def _extract_report_field(text: str, label: str) -> str:

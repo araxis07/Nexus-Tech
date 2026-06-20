@@ -4,8 +4,8 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.172.0`
-- Focus: 2D actor/sprite timeline, archive/meta comparison motion, path-specific late-game repair cues, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, balance preflight evidence, strict manual signoff validation, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
+- Version: `0.173.0`
+- Focus: 2D actor/sprite timeline, archive/meta comparison motion, path-specific late-game repair cues, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, balance preflight evidence, strict manual evidence-note validation, strict manual signoff validation, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 - Status guard: `animation-playtest-status` groups remaining manual rows while the report is incomplete; use `--fail-on-incomplete` only for release gate checks.
 - Window guard: visible `menu-2d` and `play-2d` runs support `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` so the manual matrix starts at the exact target dimensions.
 - Command queue guard: `animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md` exports every required visible-window command while keeping manual signoff incomplete.
@@ -53,6 +53,7 @@ nexus-tech play-2d --scenario founder_journey --seed 7 --window-size 1440x900 --
 - Session setup guard: `prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md` refreshes the report draft, command queue, and grouped plan artifact for handoff.
 - Report draft guard: `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` writes the validator-required manual report rows and prefilled automated gate evidence before the human pass starts.
 - Signoff guard: `validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md` passes before calling the manual animation pass complete; every automated gate row, window/motion cell, control row, scene row, game-feel row, release-blocker field, and decision field must be filled.
+- Evidence guard: report evidence cells must name what was observed; generic notes such as `ok`, `clear`, `readable`, `stable`, or `none` fail validation.
 - Balance preflight: run the balance/long-session commands listed in the playtest prep artifact and either fix any `balance-audit` warning or name it as intentional pressure before adding more animation layers.
 - CI guard: GitHub Actions runs headless 2D smoke checks plus motion, visual, animation-completeness, broad animation-matrix, and playtest-prep gates before the manual pass, then uploads `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` for review.
 - Blocked commands: disabled or rejected actions show a distinct blocked card, warning pulse, and matching actor state instead of looking like a successful command.

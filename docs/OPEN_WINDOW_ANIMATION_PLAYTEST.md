@@ -51,6 +51,10 @@ handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, grouped plan artifact, and plan validation created together
 before handing the manual pass to a tester.
+Report notes must be observed evidence, not generic placeholders. The validator
+rejects broad notes like `ok`, `clear`, `readable`, or `stable` in evidence
+cells because those do not prove which window, control path, scene, or motion cue
+was actually checked.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 
@@ -67,6 +71,8 @@ cell, every control row, every scene row, every game-feel row, and every
 release-blocker field still needs real tester input. A `pass` release decision
 requires those rows to be `pass`; use `watch` or `fail` when any item still needs
 owner follow-up.
+Generic evidence notes such as `ok`, `clear`, `readable`, `stable`, or `none`
+are blockers for presentation signoff.
 
 ## Window Matrix
 

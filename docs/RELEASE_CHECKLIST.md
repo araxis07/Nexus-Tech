@@ -58,6 +58,9 @@ status and open-item counts are blocked before handoff.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact, and
 current plan validation without completing manual signoff.
+Final report notes must contain observed evidence. Generic notes such as `ok`,
+`clear`, `readable`, or `stable` fail validation because they do not prove which
+window, control path, scene, or motion cue was checked.
 
 ## Demo Verification
 
@@ -100,6 +103,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.
 - Treat any missing automated gate row, window/motion cell, control row, scene row, game-feel row, release-blocker field, or validator PASS in the manual report as a release blocker.
+- Treat generic evidence notes such as `ok`, `clear`, `readable`, `stable`, or `none` in required report evidence cells as release blockers.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat missing `actor-pose-depth` layers as release blockers before presenting new actor/sprite reactions.
 - Treat `Actor State Coverage` failures as release blockers before presenting new actor/sprite reactions.

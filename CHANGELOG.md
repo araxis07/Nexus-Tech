@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.173.0 - 2026-06-20
+
+- Tightened `validate-animation-playtest-report` so signed manual animation reports must include real evidence notes instead of generic `ok`, `clear`, `readable`, or `stable` placeholders
+- Added grouped `Manual Evidence Notes` status output so thin manual proof is visible in playtest handoff plans
+- Updated docs and regression coverage so final animation signoff requires observed tester evidence for gates, windows, controls, scenes, and game-feel rows
+
 ## 0.172.0 - 2026-06-20
 
 - Extended `prepare-animation-playtest-session` to export the grouped animation playtest plan alongside the strict report draft and visible-window command queue

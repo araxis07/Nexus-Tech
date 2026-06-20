@@ -27,6 +27,10 @@ from the current report or command queue.
 The session setup command creates the report, command queue, and grouped plan
 together but still leaves manual rows incomplete until real observations are
 entered.
+The final validator rejects generic evidence notes such as `ok`, `clear`,
+`readable`, `stable`, or `none` in gate, window, control, scene, and game-feel
+evidence cells. Record concise observed facts instead, such as which window,
+control path, scene element, or motion cue was checked.
 
 ## Build
 
@@ -118,4 +122,4 @@ entered.
 - Nice-to-have polish:
 - Validator result:
 
-Run `validate-animation-playtest-report` only after every automated gate, window/motion cell, control row, scene row, and game-feel row is filled with real evidence. For a `pass` release decision, validator expects these rows to be `pass`; use `watch` or `fail` only when the build is not being cleared for presentation.
+Run `validate-animation-playtest-report` only after every automated gate, window/motion cell, control row, scene row, and game-feel row is filled with real evidence. For a `pass` release decision, validator expects these rows to be `pass` with non-generic evidence notes; use `watch` or `fail` only when the build is not being cleared for presentation.

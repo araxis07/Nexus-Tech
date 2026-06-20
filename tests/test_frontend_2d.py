@@ -4245,63 +4245,105 @@ def _completed_animation_playtest_report_text() -> str:
         "",
         "| Gate | Result | Notes |",
         "| --- | --- | --- |",
-        "| ruff check src tests | `pass` | ok |",
-        "| pytest tests/test_frontend_2d.py -q | `pass` | ok |",
-        "| pytest -q | `pass` | ok |",
-        "| audit-2d-motion full/reduced/off | `pass` | ok |",
-        "| audit-2d-visual full/off | `pass` | ok |",
-        "| audit-2d-animation | `pass` | ok |",
-        "| audit-2d-animation-matrix --output | `pass` | ok |",
-        "| prepare-2d-animation-playtest --output | `pass` | ok |",
-        "| Balance / long-session preflight | `pass` | ok |",
-        "| validate-animation-playtest-report | `pass` | ok |",
-        "| Headless menu-2d / play-2d | `pass` | ok |",
-        "| Open-window menu-2d / play-2d smoke | `pass` | ok |",
+        "| ruff check src tests | `pass` | local lint output clean |",
+        "| pytest tests/test_frontend_2d.py -q | `pass` | frontend regression subset passed |",
+        "| pytest -q | `pass` | full suite completed green |",
+        "| audit-2d-motion full/reduced/off | `pass` | all motion modes met budgets |",
+        "| audit-2d-visual full/off | `pass` | full and off captures passed |",
+        "| audit-2d-animation | `pass` | animation coverage gate passed |",
+        "| audit-2d-animation-matrix --output | `pass` | matrix artifact passed default cells |",
+        (
+            "| prepare-2d-animation-playtest --output | `pass` | "
+            "prep artifact generated from matrix evidence |"
+        ),
+        (
+            "| Balance / long-session preflight | `pass` | "
+            "balance sweep stayed within release thresholds |"
+        ),
+        (
+            "| validate-animation-playtest-report | `pass` | "
+            "completed report validated after manual notes |"
+        ),
+        "| Headless menu-2d / play-2d | `pass` | headless launchers closed by max frame cap |",
+        (
+            "| Open-window menu-2d / play-2d smoke | `pass` | "
+            "visible windows launched and closed cleanly |"
+        ),
         "",
         "## Window Matrix",
         "",
         "| Window | Full | Reduced | Off | Notes |",
         "| --- | --- | --- | --- | --- |",
-        "| `820x620` | `pass` | `pass` | `pass` | readable |",
-        "| `960x640` | `pass` | `pass` | `pass` | readable |",
-        "| `1440x900` | `pass` | `pass` | `pass` | readable |",
+        "| `820x620` | `pass` | `pass` | `pass` | menu and play checked at compact size |",
+        "| `960x640` | `pass` | `pass` | `pass` | menu and play checked at small laptop size |",
+        "| `1440x900` | `pass` | `pass` | `pass` | menu and play checked at presentation size |",
         "",
         "## Control Clarity Results",
         "",
         "| Control Area | Result | Notes | Follow-up |",
         "| --- | --- | --- | --- |",
-        "| Pause / Resume | `pass` | clear | none |",
-        "| Back / Escape | `pass` | clear | none |",
-        "| Menu Return | `pass` | clear | none |",
-        "| Help / Hover | `pass` | clear | none |",
-        "| Control Replay Safety | `pass` | clear | none |",
-        "| Control Affordance Coverage | `pass` | clear | none |",
-        "| UI Layout Safety | `pass` | clear | none |",
-        "| Typography Safety | `pass` | clear | none |",
-        "| Motion Modes | `pass` | clear | none |",
+        "| Pause / Resume | `pass` | P opens pause and resume returns to run | none |",
+        "| Back / Escape | `pass` | Escape closes overlays before pause | none |",
+        "| Menu Return | `pass` | pause menu return lands on title shell | none |",
+        "| Help / Hover | `pass` | F1 and hover hints identify controls | none |",
+        "| Control Replay Safety | `pass` | replay path covered pause help save menu | none |",
+        (
+            "| Control Affordance Coverage | `pass` | "
+            "click targets present for navigation rails | none |"
+        ),
+        "| UI Layout Safety | `pass` | compact controls stayed in bounds | none |",
+        "| Typography Safety | `pass` | compact labels stayed clipped or fitted | none |",
+        "| Motion Modes | `pass` | full reduced off kept same controls | none |",
         "",
         "## Scene Results",
         "",
         "| Scene | Result | Readability Notes | Motion Notes | Follow-up |",
         "| --- | --- | --- | --- | --- |",
-        "| Title/Menu | `pass` | readable | stable | none |",
-        "| Live Dashboard | `pass` | readable | stable | none |",
-        "| Action Picker | `pass` | readable | stable | none |",
-        "| Pending Event | `pass` | readable | stable | none |",
-        "| Inspector | `pass` | readable | stable | none |",
-        "| Endgame Board | `pass` | readable | stable | none |",
-        "| Turn Summary | `pass` | readable | stable | none |",
-        "| Outcome/Review | `pass` | readable | stable | none |",
-        "| Scene Handoffs | `pass` | readable | stable | none |",
+        (
+            "| Title/Menu | `pass` | wizard and save copy stayed visible | "
+            "title actors stayed outside action labels | none |"
+        ),
+        (
+            "| Live Dashboard | `pass` | stat chips and product cards stayed legible | "
+            "actor clips did not cover primary controls | none |"
+        ),
+        (
+            "| Action Picker | `pass` | picker cards kept readable option text | "
+            "choreography cues pointed at target lane | none |"
+        ),
+        (
+            "| Pending Event | `pass` | option text remained readable | "
+            "preview motion stayed secondary to choices | none |"
+        ),
+        (
+            "| Inspector | `pass` | selected row and pager stayed visible | "
+            "actor routing did not hide status chips | none |"
+        ),
+        (
+            "| Endgame Board | `pass` | path-fix buttons stayed primary | "
+            "cockpit motion stayed behind decision controls | none |"
+        ),
+        (
+            "| Turn Summary | `pass` | timeline cards stayed readable | "
+            "reveal pacing supported metrics | none |"
+        ),
+        (
+            "| Outcome/Review | `pass` | after-action notes stayed visible | "
+            "outcome cinematic remained the focal state | none |"
+        ),
+        (
+            "| Scene Handoffs | `pass` | navigation context stayed visible | "
+            "transitions oriented without hiding controls | none |"
+        ),
         "",
         "## Game Feel Results",
         "",
         "| Feedback Area | Result | Notes | Follow-up |",
         "| --- | --- | --- | --- |",
-        "| Success Feedback | `pass` | clear | none |",
-        "| Blocked Feedback | `pass` | clear | none |",
-        "| Impact Values | `pass` | clear | none |",
-        "| Actor + Feedback Match | `pass` | clear | none |",
+        "| Success Feedback | `pass` | success card named the changed target | none |",
+        "| Blocked Feedback | `pass` | blocked card named missing prerequisite | none |",
+        "| Impact Values | `pass` | deltas displayed target and value | none |",
+        "| Actor + Feedback Match | `pass` | actor pose matched feedback family | none |",
         "",
         "## Release Blockers",
         "",
@@ -4374,16 +4416,47 @@ def test_validate_2d_animation_playtest_report_accepts_signed_pass(
     assert validation.findings == ()
 
 
+def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "thin-evidence-animation-report.md"
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        "| ruff check src tests | `pass` | local lint output clean |",
+        "| ruff check src tests | `pass` | ok |",
+    )
+    report_text = report_text.replace(
+        "| `820x620` | `pass` | `pass` | `pass` | menu and play checked at compact size |",
+        "| `820x620` | `pass` | `pass` | `pass` | readable |",
+    )
+    report_text = report_text.replace(
+        "| Pause / Resume | `pass` | P opens pause and resume returns to run | none |",
+        "| Pause / Resume | `pass` | clear | none |",
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "missing automated gate evidence: ruff check src tests notes" in validation.findings
+    assert "missing window matrix evidence: 820x620 notes" in validation.findings
+    assert "missing control check evidence: Pause / Resume notes" in validation.findings
+
+
 def test_validate_2d_animation_playtest_report_rejects_missing_required_rows(
     tmp_path: Path,
 ) -> None:
     report_path = tmp_path / "partial-animation-report.md"
     report_text = _completed_animation_playtest_report_text()
     report_text = report_text.replace(
-        "| `960x640` | `pass` | `pass` | `pass` | readable |\n",
+        "| `960x640` | `pass` | `pass` | `pass` | menu and play checked at small laptop size |\n",
         "",
     )
-    report_text = report_text.replace("| Inspector | `pass` | readable | stable | none |\n", "")
+    report_text = report_text.replace(
+        "| Inspector | `pass` | selected row and pager stayed visible | "
+        "actor routing did not hide status chips | none |\n",
+        "",
+    )
     report_path.write_text(report_text, encoding="utf-8")
 
     validation = validate_2d_animation_playtest_report(report_path)
