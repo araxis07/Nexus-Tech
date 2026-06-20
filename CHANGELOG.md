@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.176.0 - 2026-06-21
+
+- Tightened `Visible Route Evidence` validation so menu route notes must mention title, wizard, save, archive, meta, hover, and text observations
+- Tightened play route notes so dashboard, action, pending-event, inspector, endgame, summary, pause, and motion observations are required before signoff
+- Updated regression coverage and docs so broad visible-route notes cannot pass final manual animation report validation
+
 ## 0.175.0 - 2026-06-20
 
 - Added required `Visible Route Evidence` rows to the strict manual animation playtest report so all 18 visible menu/play launches must be signed off with observed notes

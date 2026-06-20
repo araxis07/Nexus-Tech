@@ -32,6 +32,10 @@ entered.
 The final report must keep the generated `Visible Route Evidence` table and fill
 all 18 menu/play rows with `pass` plus observed notes from the matching window
 and motion mode.
+Do not replace route notes with generic summaries. Menu rows must mention title,
+wizard, save, archive, meta, hover, and text observations; play rows must
+mention dashboard, action, pending, inspector, endgame, summary, pause, and
+motion observations.
 The final validator rejects generic evidence notes such as `ok`, `clear`,
 `readable`, `stable`, or `none` in gate, window, control, scene, and game-feel
 evidence cells. Record concise observed facts instead, such as which window,

@@ -51,6 +51,25 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS: tuple[tuple[int, int], ...] = (
     (1440, 900),
 )
 DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES: tuple[str, ...] = ("full", "reduced", "off")
+MENU_ROUTE_EVIDENCE_TERMS: tuple[str, ...] = (
+    "title",
+    "wizard",
+    "save",
+    "archive",
+    "meta",
+    "hover",
+    "text",
+)
+PLAY_ROUTE_EVIDENCE_TERMS: tuple[str, ...] = (
+    "dashboard",
+    "action",
+    "pending",
+    "inspector",
+    "endgame",
+    "summary",
+    "pause",
+    "motion",
+)
 DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
     (
         "Pause / Resume",
@@ -1184,6 +1203,13 @@ def _validate_required_visible_route_evidence(
             findings.append(f"visible route evidence row {index} is {result}, not pass")
         if len(row) <= 5 or _is_thin_evidence(row[5]):
             findings.append(f"missing visible route evidence note: {index}")
+        else:
+            missing_terms = _missing_route_evidence_terms(item, row[5])
+            if missing_terms:
+                findings.append(
+                    f"visible route evidence row {index} missing observed terms: "
+                    f"{', '.join(missing_terms)}"
+                )
 
 
 def _validate_required_result_rows(
@@ -1208,6 +1234,17 @@ def _validate_required_result_rows(
         for column_index, evidence_name in evidence_columns:
             if len(row) <= column_index or _is_thin_evidence(row[column_index]):
                 findings.append(f"missing {category} evidence: {label} {evidence_name}")
+
+
+def _missing_route_evidence_terms(
+    item: AnimationPlaytestCommand,
+    evidence: str,
+) -> tuple[str, ...]:
+    tokens = set(re.findall(r"[a-z0-9]+", _normalize_report_result(evidence)))
+    required_terms = (
+        MENU_ROUTE_EVIDENCE_TERMS if item.target == "menu" else PLAY_ROUTE_EVIDENCE_TERMS
+    )
+    return tuple(term for term in required_terms if term not in tokens)
 
 
 def _find_report_table_row(

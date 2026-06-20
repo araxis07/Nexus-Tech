@@ -62,6 +62,9 @@ tester; it creates the report draft, command queue, grouped plan artifact, and
 current plan validation without completing manual signoff.
 The completed report must retain all 18 `Visible Route Evidence` rows generated
 from the queue and mark each row `pass` with observed notes before signoff.
+Route evidence notes must cover the required target-specific terms: menu rows
+cover title/wizard/save/archive/meta/hover/text, and play rows cover
+dashboard/action/pending/inspector/endgame/summary/pause/motion.
 Final report notes must contain observed evidence. Generic notes such as `ok`,
 `clear`, `readable`, or `stable` fail validation because they do not prove which
 window, control path, scene, or motion cue was checked.

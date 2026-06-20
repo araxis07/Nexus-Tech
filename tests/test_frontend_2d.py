@@ -4414,6 +4414,16 @@ def _completed_animation_playtest_report_text() -> str:
         "| ---: | --- | --- | --- | --- | --- |",
     ]
     for index, item in enumerate(build_2d_animation_playtest_command_queue(), start=1):
+        if item.target == "menu":
+            note = (
+                "title wizard save archive meta hover text-fit checked "
+                f"at {item.window_size} with {item.motion_mode} motion"
+            )
+        else:
+            note = (
+                "dashboard action pending inspector endgame summary pause motion checked "
+                f"at {item.window_size} with {item.motion_mode} motion"
+            )
         route_rows.append(
             "| "
             f"{index} | "
@@ -4421,7 +4431,7 @@ def _completed_animation_playtest_report_text() -> str:
             f"`{item.window_size}` | "
             f"`{item.motion_mode}` | "
             "`pass` | "
-            f"{item.target} route observed at {item.window_size} with {item.motion_mode} motion |"
+            f"{note} |"
         )
     insert_index = lines.index("## Control Clarity Results") - 1
     lines[insert_index:insert_index] = route_rows
@@ -4508,33 +4518,9 @@ def test_validate_2d_animation_playtest_report_rejects_missing_visible_route(
 ) -> None:
     report_path = tmp_path / "missing-route-animation-report.md"
     report_text = _completed_animation_playtest_report_text()
-    report_text = report_text.replace(
-        "\n".join(
-            [
-                "",
-                "## Visible Route Evidence",
-                "",
-                "| Step | Target | Window | Motion | Result | Evidence Notes |",
-                "| ---: | --- | --- | --- | --- | --- |",
-            ]
-        )
-        + "\n"
-        + "\n".join(
-            (
-                "| "
-                f"{index} | "
-                f"`{item.target}` | "
-                f"`{item.window_size}` | "
-                f"`{item.motion_mode}` | "
-                "`pass` | "
-                f"{item.target} route observed at {item.window_size} "
-                f"with {item.motion_mode} motion |"
-            )
-            for index, item in enumerate(build_2d_animation_playtest_command_queue(), start=1)
-        )
-        + "\n",
-        "\n",
-    )
+    route_start = report_text.index("\n## Visible Route Evidence\n")
+    route_end = report_text.index("\n## Control Clarity Results\n")
+    report_text = report_text[:route_start] + report_text[route_end:]
     report_path.write_text(report_text, encoding="utf-8")
 
     validation = validate_2d_animation_playtest_report(report_path)
@@ -4542,6 +4528,67 @@ def test_validate_2d_animation_playtest_report_rejects_missing_visible_route(
     assert validation.status == "fail"
     assert "expected 18 visible route evidence rows, found 0" in validation.findings
     assert "missing visible route evidence row: 1" in validation.findings
+
+
+def test_validate_2d_animation_playtest_report_rejects_incomplete_route_terms(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "incomplete-route-terms-animation-report.md"
+    first_route = build_2d_animation_playtest_command_queue()[0]
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        (
+            "| "
+            f"1 | `{first_route.target}` | `{first_route.window_size}` | "
+            f"`{first_route.motion_mode}` | `pass` | title wizard save archive meta hover "
+            f"text-fit checked at {first_route.window_size} "
+            f"with {first_route.motion_mode} motion |"
+        ),
+        (
+            "| "
+            f"1 | `{first_route.target}` | `{first_route.window_size}` | "
+            f"`{first_route.motion_mode}` | `pass` | title text checked for menu launch |"
+        ),
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert (
+        "visible route evidence row 1 missing observed terms: wizard, save, archive, meta, hover"
+        in validation.findings
+    )
+
+
+def test_validate_2d_animation_playtest_report_rejects_embedded_route_terms(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "embedded-route-terms-animation-report.md"
+    play_route = build_2d_animation_playtest_command_queue()[1]
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        (
+            "| "
+            f"2 | `{play_route.target}` | `{play_route.window_size}` | "
+            f"`{play_route.motion_mode}` | `pass` | dashboard action pending "
+            "inspector endgame summary pause motion checked "
+            f"at {play_route.window_size} with {play_route.motion_mode} motion |"
+        ),
+        (
+            "| "
+            f"2 | `{play_route.target}` | `{play_route.window_size}` | "
+            f"`{play_route.motion_mode}` | `pass` | dashboard interaction pending "
+            "inspector endgame summary pause motion checked "
+            f"at {play_route.window_size} with {play_route.motion_mode} motion |"
+        ),
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "visible route evidence row 2 missing observed terms: action" in validation.findings
 
 
 def test_validate_2d_animation_playtest_report_rejects_missing_required_rows(

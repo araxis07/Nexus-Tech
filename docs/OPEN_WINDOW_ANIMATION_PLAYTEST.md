@@ -37,6 +37,10 @@ uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-p
 The completed report must include `Visible Route Evidence` for all 18 menu/play
 launches from the command queue. Each route row must be `pass` with observed
 notes naming what was checked in that window and motion mode.
+Menu route notes must explicitly cover title/menu, wizard, save-slot, archive,
+meta-board, hover, and text-fit observations. Play route notes must explicitly
+cover dashboard, action picker, pending event, inspector, endgame, summary,
+pause/back, and motion-feel observations.
 
 Use `animation-playtest-status` during the manual pass to group remaining work
 without failing by default. Use `validate-animation-playtest-report` as the final
