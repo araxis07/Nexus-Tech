@@ -5195,11 +5195,12 @@ def test_animation_playtest_plan_command_accepts_completed_report(
     assert "Release Signoff" in result.output
 
 
-def test_prepare_animation_playtest_session_command_writes_draft_and_queue(
+def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     tmp_path: Path,
 ) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
 
     result = runner.invoke(
         app,
@@ -5213,6 +5214,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_and_queue(
             str(report_path),
             "--commands-output",
             str(commands_path),
+            "--plan-output",
+            str(plan_path),
             "--commit",
             "abc1234",
             "--tester",
@@ -5231,8 +5234,10 @@ def test_prepare_animation_playtest_session_command_writes_draft_and_queue(
     assert "Status FAIL" in result.output
     assert report_path.exists()
     assert commands_path.exists()
+    assert plan_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
+    plan_text = plan_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
     assert "| ruff check src tests | `pass`" in report_text
@@ -5240,6 +5245,10 @@ def test_prepare_animation_playtest_session_command_writes_draft_and_queue(
     assert "- Manual result: `not completed by automation`" in commands_text
     assert "play-2d --scenario founder_journey --seed 17" in commands_text
     assert "menu-2d --window-size 1440x900 --motion-mode off" in commands_text
+    assert "- Status: `manual-required`" in plan_text
+    assert "- Command queue status: `pass`" in plan_text
+    assert "- Report status: `fail`" in plan_text
+    assert "- Manual result: `not completed by automation`" in plan_text
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

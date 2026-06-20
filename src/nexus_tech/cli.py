@@ -318,6 +318,11 @@ ANIMATION_PLAYTEST_SESSION_COMMANDS_OUTPUT_OPTION = typer.Option(
     "--commands-output",
     help="Markdown path for the manual animation playtest command queue.",
 )
+ANIMATION_PLAYTEST_SESSION_PLAN_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-plan.md"),
+    "--plan-output",
+    help="Markdown path for the grouped manual animation playtest plan.",
+)
 ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-report.md"),
     "--output",
@@ -1613,6 +1618,7 @@ def validate_animation_playtest_plan_command(
 def prepare_animation_playtest_session_command(
     report_output: Path = ANIMATION_PLAYTEST_SESSION_REPORT_OUTPUT_OPTION,
     commands_output: Path = ANIMATION_PLAYTEST_SESSION_COMMANDS_OUTPUT_OPTION,
+    plan_output: Path = ANIMATION_PLAYTEST_SESSION_PLAN_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
         DEMO_SEED_EXAMPLE,
@@ -1632,7 +1638,7 @@ def prepare_animation_playtest_session_command(
         ),
     ),
 ) -> None:
-    """Prepare report and command queue files for the manual animation playtest session."""
+    """Prepare report, command queue, and plan files for the manual animation playtest."""
 
     validate_scenario_id(scenario)
     write_2d_animation_playtest_report_template(
@@ -1649,25 +1655,50 @@ def prepare_animation_playtest_session_command(
         seed=seed,
     )
     write_2d_animation_playtest_command_queue(queue, commands_output)
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_output,
+        commands_output,
+        scenario_id=scenario,
+        seed=seed,
+    )
+    write_2d_animation_playtest_readiness_plan(plan, plan_output)
+    plan_validation = validate_2d_animation_playtest_readiness_plan(
+        plan_output,
+        report_output,
+        commands_output,
+        scenario_id=scenario,
+        seed=seed,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
     session_table.add_column("Value")
     session_table.add_row("Report", str(report_output))
     session_table.add_row("Commands", str(commands_output))
+    session_table.add_row("Plan", str(plan_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
     session_table.add_row("Command Queue", f"{len(queue)} visible-window command(s)")
+    session_table.add_row("Plan Status", plan.status.upper())
+    session_table.add_row("Plan Artifact", plan_validation.status.upper())
+    session_table.add_row("Open Items", str(plan.open_item_count))
     console.print(session_table)
 
     validation = validate_2d_animation_playtest_report(report_output)
     print_animation_playtest_status(validation)
+    if plan_validation.findings:
+        findings_table = Table(title="Animation Playtest Plan Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in plan_validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
     console.print(
         Panel.fit(
             (
                 "Manual animation signoff is still incomplete. "
                 "Run the visible-window queue, fill the report with real notes, "
-                "then validate it."
+                "then validate the report and plan artifacts."
             ),
             title="Animation Playtest Session",
             border_style="yellow",

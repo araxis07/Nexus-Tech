@@ -9,7 +9,7 @@ uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
 Keep completed reports as dated copies only when they contain real tester observations.
@@ -24,8 +24,9 @@ areas and signoff fields without digging through raw validator findings. Use
 `--output` when the current grouped plan should be attached to the handoff.
 Validate the exported plan after writing it so the attached plan cannot drift
 from the current report or command queue.
-The session setup command creates both files together but still leaves manual
-rows incomplete until real observations are entered.
+The session setup command creates the report, command queue, and grouped plan
+together but still leaves manual rows incomplete until real observations are
+entered.
 
 ## Build
 

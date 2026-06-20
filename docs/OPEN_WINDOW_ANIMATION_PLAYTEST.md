@@ -21,7 +21,7 @@ uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
@@ -49,8 +49,8 @@ Use `validate-animation-playtest-plan` after writing the plan artifact so stale
 status, open-item counts, or missing manual-result guards are caught before
 handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
-command queue, and grouped status summary created together before handing the
-manual pass to a tester.
+command queue, grouped plan artifact, and plan validation created together
+before handing the manual pass to a tester.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 

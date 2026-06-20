@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.172.0 - 2026-06-20
+
+- Extended `prepare-animation-playtest-session` to export the grouped animation playtest plan alongside the strict report draft and visible-window command queue
+- Added built-in plan artifact validation during session setup so stale open-item counts or manual-result guards fail before handoff
+- Updated docs and regression coverage so one-command animation QA setup produces the full report, command queue, and plan package without marking manual signoff complete
+
 ## 0.171.0 - 2026-06-20
 
 - Added `validate-animation-playtest-plan` so exported animation QA plan artifacts fail when they drift from the current report and command queue
