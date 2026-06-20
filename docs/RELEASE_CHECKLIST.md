@@ -34,6 +34,7 @@ uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-r
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
@@ -52,6 +53,8 @@ required visible-window run is skipped before handoff.
 Run `animation-playtest-plan` after queue validation to see whether the handoff
 is queue-blocked, still manual-required, or complete. Use `--output` to save the
 grouped plan beside the report and command queue.
+Run `validate-animation-playtest-plan` after writing the grouped plan so stale
+status and open-item counts are blocked before handoff.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, and current grouped status
 without completing manual signoff.
@@ -91,6 +94,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md` when handing the remaining manual QA to a tester so no required window or motion mode is skipped.
 - Run `validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md` before handoff so the exported queue has every required menu/play command.
 - Run `animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md` before and during handoff so open manual areas are grouped without treating queue completeness as signoff.
+- Run `validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md` before attaching the plan artifact to handoff notes.
 - Run `prepare-animation-playtest-session --prefill-automated-gates` for the one-command setup when the report draft and command queue should be regenerated together.
 - Run `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` after automated gates pass so the completed report starts from the same validator-required rows while manual window/control/scene/game-feel rows still require real tester input.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.

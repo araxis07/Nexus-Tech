@@ -47,6 +47,7 @@ from nexus_tech.frontend_2d import (
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
+    validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -4136,6 +4137,80 @@ def test_write_2d_animation_playtest_readiness_plan_exports_handoff_artifact(
     assert "## Report Findings" in plan_text
 
 
+def test_validate_2d_animation_playtest_readiness_plan_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.171.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=29),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=29)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=29,
+    )
+
+    assert validation.status == "pass"
+    assert validation.expected_status == "manual-required"
+    assert validation.findings == ()
+
+
+def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.171.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=31),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=31)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            "- Status: `manual-required`",
+            "- Status: `pass`",
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=31,
+    )
+
+    assert validation.status == "fail"
+    assert any("missing or stale plan line" in finding for finding in validation.findings)
+
+
 def test_build_2d_animation_playtest_readiness_plan_accepts_signed_pass(
     tmp_path: Path,
 ) -> None:
@@ -4978,6 +5053,91 @@ def test_animation_playtest_plan_command_writes_markdown_output(
     assert "- Status: `manual-required`" in plan_text
     assert "- Manual result: `not completed by automation`" in plan_text
     assert "## Next Animation QA Steps" in plan_text
+
+
+def test_validate_animation_playtest_plan_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.171.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=37),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=37),
+        plan_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-plan",
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            "--seed",
+            "37",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Plan Validation" in result.output
+    assert "MANUAL-REQUIRED" in result.output
+    assert "PASS" in result.output
+
+
+def test_validate_animation_playtest_plan_command_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.171.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path),
+        plan_path,
+    )
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace("- Open items: `46`", "- Open items: `0`"),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-plan",
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Plan Artifact Findings" in result.output
+    assert "missing or stale plan line" in result.output
 
 
 def test_animation_playtest_plan_command_can_fail_on_incomplete(

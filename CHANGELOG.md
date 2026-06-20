@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.171.0 - 2026-06-20
+
+- Added `validate-animation-playtest-plan` so exported animation QA plan artifacts fail when they drift from the current report and command queue
+- Added reusable playtest plan artifact validation for release tooling while preserving the manual signoff guard
+- Updated docs and regression coverage so handoff packages validate the report, command queue, and grouped plan artifact together
+
 ## 0.170.0 - 2026-06-20
 
 - Added Markdown export for `animation-playtest-plan` so grouped manual animation QA next steps can be saved as a handoff artifact

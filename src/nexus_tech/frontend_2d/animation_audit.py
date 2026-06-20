@@ -606,6 +606,21 @@ class AnimationPlaytestReadinessPlan:
         return len(self.report.findings) + len(self.commands.findings)
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestPlanArtifactValidation:
+    """Validation result for an exported animation playtest plan artifact."""
+
+    path: str
+    expected_status: str
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the exported plan matches current artifacts."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -820,17 +835,8 @@ def write_2d_animation_playtest_readiness_plan(
     """Write the grouped manual animation QA plan as a Markdown handoff artifact."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    manual_result = (
-        "report validator passed before this plan was written"
-        if plan.status == "pass"
-        else "not completed by automation"
-    )
-    raw_release_decision = plan.report.release_decision
-    release_decision = (
-        "-"
-        if "/" in raw_release_decision or _is_placeholder_field(raw_release_decision)
-        else raw_release_decision or "-"
-    )
+    manual_result = _plan_manual_result(plan)
+    release_decision = _plan_release_decision(plan)
     lines = [
         "# NEXUS TECH 2D Animation Playtest Plan",
         "",
@@ -885,6 +891,96 @@ def write_2d_animation_playtest_readiness_plan(
             lines.append(f"| {_markdown_table_cell(finding)} |")
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_readiness_plan(
+    plan_path: Path,
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestPlanArtifactValidation:
+    """Validate that an exported animation plan still matches the source artifacts."""
+
+    text = plan_path.read_text(encoding="utf-8")
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    findings: list[str] = []
+    expected_lines = (
+        "# NEXUS TECH 2D Animation Playtest Plan",
+        f"- Status: `{plan.status}`",
+        f"- Report: `{plan.report.path}`",
+        f"- Commands: `{plan.commands.path}`",
+        f"- Command queue status: `{plan.commands.status}`",
+        f"- Report status: `{plan.report.status}`",
+        f"- Release decision: `{_plan_release_decision(plan)}`",
+        f"- Open items: `{plan.open_item_count}`",
+        f"- Manual result: `{_plan_manual_result(plan)}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+    )
+    for line in expected_lines:
+        if line not in text:
+            findings.append(f"missing or stale plan line: {line}")
+
+    rows = _extract_markdown_table_rows(text)
+    for step in plan.steps:
+        row = _find_report_table_row(rows, step.area)
+        if row is None:
+            findings.append(f"missing plan step row: {step.area}")
+            continue
+        if len(row) <= 3:
+            findings.append(f"incomplete plan step row: {step.area}")
+            continue
+        status = _strip_markdown_code(row[1])
+        open_items = _strip_markdown_code(row[2])
+        next_step = row[3].replace(r"\|", "|").strip()
+        if status != step.status:
+            findings.append(f"plan step {step.area} status is {status}, expected {step.status}")
+        if open_items != str(step.open_items):
+            findings.append(
+                f"plan step {step.area} open items is {open_items}, expected {step.open_items}"
+            )
+        if _normalize_report_key(next_step) != _normalize_report_key(step.next_step):
+            findings.append(f"plan step {step.area} next step is stale")
+
+    for finding in plan.commands.findings:
+        if finding not in text:
+            findings.append(f"missing command queue finding: {finding}")
+    for finding in plan.report.findings:
+        if finding not in text:
+            findings.append(f"missing report finding: {finding}")
+
+    return AnimationPlaytestPlanArtifactValidation(
+        path=str(plan_path),
+        expected_status=plan.status,
+        findings=tuple(findings),
+    )
+
+
+def _plan_manual_result(plan: AnimationPlaytestReadinessPlan) -> str:
+    return (
+        "report validator passed before this plan was written"
+        if plan.status == "pass"
+        else "not completed by automation"
+    )
+
+
+def _plan_release_decision(plan: AnimationPlaytestReadinessPlan) -> str:
+    raw_release_decision = plan.report.release_decision
+    if "/" in raw_release_decision or _is_placeholder_field(raw_release_decision):
+        return "-"
+    return raw_release_decision or "-"
 
 
 def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:

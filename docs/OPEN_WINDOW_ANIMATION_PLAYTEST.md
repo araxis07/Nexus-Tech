@@ -20,6 +20,7 @@ uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-r
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates
 ```
 
@@ -44,6 +45,9 @@ Use `animation-playtest-plan` after validating the queue to combine the current
 report gaps and command queue status into one grouped next-step plan. Add
 `--output /tmp/nexus-tech-animation-playtest-plan.md` when you need a handoff
 artifact.
+Use `validate-animation-playtest-plan` after writing the plan artifact so stale
+status, open-item counts, or missing manual-result guards are caught before
+handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, and grouped status summary created together before handing the
 manual pass to a tester.
