@@ -4163,6 +4163,9 @@ def test_write_2d_animation_playtest_readiness_plan_exports_handoff_artifact(
     assert "- Release decision: `-`" in plan_text
     assert "- Manual result: `not completed by automation`" in plan_text
     assert "| Manual Window Matrix | `manual-required` | `9` |" in plan_text
+    assert "## Manual Evidence Checklist" in plan_text
+    assert "| Window Matrix Evidence | Record 820x620, 960x640, and 1440x900" in plan_text
+    assert "| Game Feel Evidence | Confirm success, blocked, impact-value" in plan_text
     assert "## Visible Test Route" in plan_text
     assert "| 18 | `play` | `1440x900` | `off` |" in plan_text
     assert "## Report Findings" in plan_text
@@ -4238,6 +4241,91 @@ def test_validate_2d_animation_playtest_readiness_plan_rejects_missing_route(
     assert validation.status == "fail"
     assert "missing visible test route section" in validation.findings
     assert "expected 18 visible test route rows, found 0" in validation.findings
+
+
+def test_validate_2d_animation_playtest_readiness_plan_rejects_missing_checklist(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.178.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-21",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=41),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=41)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+    plan_text = plan_path.read_text(encoding="utf-8")
+    checklist_start = plan_text.index("\n## Manual Evidence Checklist\n")
+    route_start = plan_text.index("\n## Visible Test Route\n")
+    plan_path.write_text(
+        plan_text[:checklist_start] + plan_text[route_start:],
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=41,
+    )
+
+    assert validation.status == "fail"
+    assert "missing manual evidence checklist section" in validation.findings
+    assert "missing manual evidence checklist row: Window Matrix Evidence" in validation.findings
+
+
+def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_checklist(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.178.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-21",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=43),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=43)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            (
+                "Record 820x620, 960x640, and 1440x900 in full, reduced, and off "
+                "with notes for primary actions, disabled reasons, layout collisions, "
+                "and motion-mode behavior."
+            ),
+            "Record every window quickly.",
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=43,
+    )
+
+    assert validation.status == "fail"
+    assert "manual evidence checklist row Window Matrix Evidence is stale" in validation.findings
 
 
 def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_artifact(

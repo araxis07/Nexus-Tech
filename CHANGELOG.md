@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.178.0 - 2026-06-21
+
+- Added a validated `Manual Evidence Checklist` to animation playtest plan artifacts so window, route, control, scene, game-feel, and signoff evidence requirements stay visible before handoff
+- Tightened `validate-animation-playtest-plan` so missing or stale manual evidence checklist rows fail before manual animation QA starts
+- Updated regression coverage and docs so manual animation handoff plans cannot omit non-route evidence requirements
+
 ## 0.177.0 - 2026-06-21
 
 - Added required route evidence prompts to exported manual animation command queues so testers see what to record beside each visible-window command

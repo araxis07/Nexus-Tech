@@ -689,6 +689,54 @@ _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] =
     ),
 )
 
+_MANUAL_ANIMATION_EVIDENCE_CHECKLIST: tuple[tuple[str, str], ...] = (
+    (
+        "Window Matrix Evidence",
+        (
+            "Record 820x620, 960x640, and 1440x900 in full, reduced, and off "
+            "with notes for primary actions, disabled reasons, layout collisions, "
+            "and motion-mode behavior."
+        ),
+    ),
+    (
+        "Route Evidence Notes",
+        (
+            "Complete all 18 visible menu/play route rows with target-specific notes: "
+            "menu covers title, wizard, save, archive, meta, hover, and text; play "
+            "covers dashboard, action, pending, inspector, endgame, summary, pause, "
+            "and motion."
+        ),
+    ),
+    (
+        "Control Evidence",
+        (
+            "Verify pause/resume, back/escape, menu return, help/hover, replay safety, "
+            "affordance coverage, layout safety, typography safety, and motion modes."
+        ),
+    ),
+    (
+        "Scene Evidence",
+        (
+            "Review title/menu, dashboard, action picker, pending event, inspector, "
+            "endgame board, turn summary, outcome/review, and scene handoffs."
+        ),
+    ),
+    (
+        "Game Feel Evidence",
+        (
+            "Confirm success, blocked, impact-value, and actor-feedback cues are readable, "
+            "aligned with the event, and not hidden by animation."
+        ),
+    ),
+    (
+        "Signoff Evidence",
+        (
+            "Fill blocker fields, required fixes, nice-to-have polish, validator result, "
+            "and final release decision after the report validator passes."
+        ),
+    ),
+)
+
 
 def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytestReportValidation:
     """Validate that a manual animation playtest report is completed, not still a template."""
@@ -910,6 +958,20 @@ def write_2d_animation_playtest_readiness_plan(
     lines.extend(
         [
             "",
+            "## Manual Evidence Checklist",
+            "",
+            "| Area | Required Evidence |",
+            "| --- | --- |",
+        ]
+    )
+    for area, required_evidence in _MANUAL_ANIMATION_EVIDENCE_CHECKLIST:
+        lines.append(
+            f"| {_markdown_table_cell(area)} | {_markdown_table_cell(required_evidence)} |"
+        )
+
+    lines.extend(
+        [
+            "",
             "## Visible Test Route",
             "",
             "| Step | Target | Window | Motion | Evidence To Record | Command |",
@@ -1016,6 +1078,21 @@ def validate_2d_animation_playtest_readiness_plan(
             )
         if _normalize_report_key(next_step) != _normalize_report_key(step.next_step):
             findings.append(f"plan step {step.area} next step is stale")
+
+    if "## Manual Evidence Checklist" not in text:
+        findings.append("missing manual evidence checklist section")
+
+    for area, required_evidence in _MANUAL_ANIMATION_EVIDENCE_CHECKLIST:
+        row = _find_report_table_row(rows, area)
+        if row is None:
+            findings.append(f"missing manual evidence checklist row: {area}")
+            continue
+        if len(row) <= 1:
+            findings.append(f"incomplete manual evidence checklist row: {area}")
+            continue
+        evidence = row[1].replace(r"\|", "|").strip()
+        if _normalize_report_key(evidence) != _normalize_report_key(required_evidence):
+            findings.append(f"manual evidence checklist row {area} is stale")
 
     if "## Visible Test Route" not in text:
         findings.append("missing visible test route section")

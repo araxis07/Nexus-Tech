@@ -559,6 +559,9 @@ The exported command queue and animation playtest plan include validated route
 evidence prompts for all 18 required menu/play window and motion runs, so manual
 QA cannot lose what each visible run must record between command generation and
 final signoff.
+The plan also includes a validated `Manual Evidence Checklist` for the window
+matrix, route notes, controls, scenes, game feel, and signoff fields so the
+non-route manual evidence cannot be dropped from handoff notes.
 The strict manual report also includes matching `Visible Route Evidence` rows;
 `validate-animation-playtest-report` fails until all 18 rows are `pass` with
 observed notes from the actual visible-window runs.

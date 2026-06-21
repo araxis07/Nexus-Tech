@@ -54,11 +54,13 @@ evidence prompt.
 Use `animation-playtest-plan` after validating the queue to combine the current
 report gaps and command queue status into one grouped next-step plan. The plan
 also includes a validated `Visible Test Route` with all 18 menu/play window and
-motion runs plus the evidence each step should record. Add `--output
-/tmp/nexus-tech-animation-playtest-plan.md` when you need a handoff artifact.
+motion runs plus the evidence each step should record, and a validated
+`Manual Evidence Checklist` for window, route, control, scene, game-feel, and
+signoff evidence. Add `--output /tmp/nexus-tech-animation-playtest-plan.md`
+when you need a handoff artifact.
 Use `validate-animation-playtest-plan` after writing the plan artifact so stale
-status, open-item counts, missing visible-route rows, or missing manual-result
-guards are caught before handoff.
+status, open-item counts, missing visible-route rows, missing checklist rows, or
+missing manual-result guards are caught before handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, grouped plan artifact, and plan validation created together
 before handing the manual pass to a tester.
