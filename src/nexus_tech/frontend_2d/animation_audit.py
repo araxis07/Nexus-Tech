@@ -1562,14 +1562,16 @@ def write_2d_animation_playtest_command_queue(
         "",
         "- Manual result: `not completed by automation`",
         "- Fill the strict playtest report with real tester observations after running these.",
+        "- Evidence prompts: `required in every command row`",
         "",
-        "| Step | Target | Window | Motion | Command |",
-        "| ---: | --- | --- | --- | --- |",
+        "| Step | Target | Window | Motion | Command | Evidence To Record |",
+        "| ---: | --- | --- | --- | --- | --- |",
     ]
     for index, item in enumerate(queue, start=1):
         lines.append(
             f"| {index} | `{item.target}` | `{item.window_size}` | "
-            f"`{item.motion_mode}` | `{item.command}` |"
+            f"`{item.motion_mode}` | `{item.command}` | "
+            f"{_markdown_table_cell(_animation_playtest_route_evidence(item))} |"
         )
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1589,6 +1591,8 @@ def validate_2d_animation_playtest_command_queue(
     findings: list[str] = []
     if "- Manual result: `not completed by automation`" not in text:
         findings.append("manual result guard is missing")
+    if "- Evidence prompts: `required in every command row`" not in text:
+        findings.append("evidence prompt guard is missing")
 
     rows = _extract_markdown_table_rows(text)
     command_rows = tuple(row for row in rows if len(row) >= 5 and row[0].isdigit())
@@ -1602,6 +1606,7 @@ def validate_2d_animation_playtest_command_queue(
     expected_commands = {item.command for item in expected_queue}
     actual_commands = tuple(_strip_markdown_code(row[4]) for row in command_rows)
     actual_command_set = set(actual_commands)
+    expected_by_step = dict(enumerate(expected_queue, start=1))
 
     if len(command_rows) != len(expected_queue):
         findings.append(f"expected {len(expected_queue)} command rows, found {len(command_rows)}")
@@ -1615,6 +1620,47 @@ def validate_2d_animation_playtest_command_queue(
     for command in actual_commands:
         if command not in expected_commands:
             findings.append(f"unexpected command: {command}")
+
+    seen_steps: set[int] = set()
+    for row in command_rows:
+        step = int(row[0])
+        if step in seen_steps:
+            findings.append(f"duplicate command queue step: {step}")
+            continue
+        seen_steps.add(step)
+
+        expected_item = expected_by_step.get(step)
+        if expected_item is None:
+            findings.append(f"unexpected command queue step: {step}")
+            continue
+
+        target = _strip_markdown_code(row[1])
+        window = _strip_markdown_code(row[2])
+        motion = _strip_markdown_code(row[3])
+        command = _strip_markdown_code(row[4])
+        if target != expected_item.target:
+            findings.append(
+                f"command queue step {step} target is {target}, expected {expected_item.target}"
+            )
+        if window != expected_item.window_size:
+            findings.append(
+                f"command queue step {step} window is {window}, "
+                f"expected {expected_item.window_size}"
+            )
+        if motion != expected_item.motion_mode:
+            findings.append(
+                f"command queue step {step} motion is {motion}, "
+                f"expected {expected_item.motion_mode}"
+            )
+        if command != expected_item.command:
+            findings.append(f"command queue step {step} command is stale")
+        if len(row) <= 5 or _is_thin_evidence(row[5]):
+            findings.append(f"missing command evidence prompt: step {step}")
+            continue
+        evidence = row[5].replace(r"\|", "|").strip()
+        expected_evidence = _animation_playtest_route_evidence(expected_item)
+        if _normalize_report_key(evidence) != _normalize_report_key(expected_evidence):
+            findings.append(f"command evidence prompt is stale: step {step}")
 
     return AnimationPlaytestCommandQueueValidation(
         path=str(queue_path),

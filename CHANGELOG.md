@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.177.0 - 2026-06-21
+
+- Added required route evidence prompts to exported manual animation command queues so testers see what to record beside each visible-window command
+- Tightened `validate-animation-playtest-commands` so stale targets, windows, motion modes, commands, or evidence prompts fail before manual handoff
+- Updated regression coverage and docs so command queue artifacts cannot drift from the final visible-route signoff requirements
+
 ## 0.176.0 - 2026-06-21
 
 - Tightened `Visible Route Evidence` validation so menu route notes must mention title, wizard, save, archive, meta, hover, and text observations

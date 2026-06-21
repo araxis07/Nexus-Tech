@@ -555,10 +555,10 @@ uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-pla
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
-The exported animation playtest plan includes a validated `Visible Test Route`
-with all 18 required menu/play window and motion runs plus the evidence each
-step must record, so manual QA cannot lose the route between command generation
-and final signoff.
+The exported command queue and animation playtest plan include validated route
+evidence prompts for all 18 required menu/play window and motion runs, so manual
+QA cannot lose what each visible run must record between command generation and
+final signoff.
 The strict manual report also includes matching `Visible Route Evidence` rows;
 `validate-animation-playtest-report` fails until all 18 rows are `pass` with
 observed notes from the actual visible-window runs.

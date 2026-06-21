@@ -46,10 +46,10 @@ Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command
 is being used as a release gate.
 Run `animation-playtest-commands` to export the exact visible-window queue before
-the manual pass; keep the generated queue in `/tmp` unless it contains real
-release notes.
+the manual pass, including the evidence prompt each row must record; keep the
+generated queue in `/tmp` unless it contains real release notes.
 Run `validate-animation-playtest-commands` after any queue export or edit so no
-required visible-window run is skipped before handoff.
+required visible-window run or evidence prompt is skipped before handoff.
 Run `animation-playtest-plan` after queue validation to see whether the handoff
 is queue-blocked, still manual-required, or complete. Use `--output` to save the
 grouped plan and its 18-step visible test route beside the report and command

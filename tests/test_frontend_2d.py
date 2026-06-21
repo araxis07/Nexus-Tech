@@ -3926,9 +3926,12 @@ def test_write_2d_animation_playtest_command_queue_keeps_manual_scope(tmp_path: 
     report_text = output_path.read_text(encoding="utf-8")
     assert "NEXUS TECH 2D Manual Animation Playtest Commands" in report_text
     assert "- Manual result: `not completed by automation`" in report_text
+    assert "- Evidence prompts: `required in every command row`" in report_text
+    assert "| Step | Target | Window | Motion | Command | Evidence To Record |" in report_text
     assert "menu-2d --window-size 820x620 --motion-mode full" in report_text
     assert "play-2d --scenario founder_journey --seed 7" in report_text
     assert "play-2d --scenario founder_journey --seed 7 --window-size 1440x900" in (report_text)
+    assert "Record title/menu, wizard, save-slot, archive, meta-board" in report_text
 
 
 def test_validate_2d_animation_playtest_command_queue_accepts_complete_queue(
@@ -3961,6 +3964,31 @@ def test_validate_2d_animation_playtest_command_queue_rejects_missing_command(
     assert validation.status == "fail"
     assert "expected 18 command rows, found 17" in validation.findings
     assert any("missing command:" in finding for finding in validation.findings)
+
+
+def test_validate_2d_animation_playtest_command_queue_rejects_missing_prompt(
+    tmp_path: Path,
+) -> None:
+    queue = build_2d_animation_playtest_command_queue()
+    output_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_command_queue(queue, output_path)
+    output_path.write_text(
+        output_path.read_text(encoding="utf-8")
+        .replace("- Evidence prompts: `required in every command row`\n", "")
+        .replace(
+            " | Record title/menu, wizard, save-slot, archive, meta-board, hover, "
+            "and text-fit observations for 820x620 full. |",
+            " |",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_command_queue(output_path)
+
+    assert validation.status == "fail"
+    assert "evidence prompt guard is missing" in validation.findings
+    assert "missing command evidence prompt: step 1" in validation.findings
 
 
 def test_write_2d_animation_playtest_report_template_matches_validator_contract(
@@ -5154,8 +5182,10 @@ def test_animation_playtest_commands_command_writes_queue(tmp_path: Path) -> Non
     assert output_path.exists()
     report_text = output_path.read_text(encoding="utf-8")
     assert "- Manual result: `not completed by automation`" in report_text
+    assert "- Evidence prompts: `required in every command row`" in report_text
     assert "play-2d --scenario founder_journey --seed 11" in report_text
     assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
+    assert "Record dashboard, action picker, pending event, inspector" in report_text
 
 
 def test_validate_animation_playtest_commands_command_accepts_complete_queue(
@@ -5196,6 +5226,31 @@ def test_validate_animation_playtest_commands_command_rejects_missing_queue_row(
     assert result.exit_code == 1
     assert "Command Queue Findings" in result.output
     assert "expected 18 command rows, found 17" in result.output
+
+
+def test_validate_animation_playtest_commands_command_rejects_stale_evidence_prompt(
+    tmp_path: Path,
+) -> None:
+    queue = build_2d_animation_playtest_command_queue()
+    output_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_command_queue(queue, output_path)
+    output_path.write_text(
+        output_path.read_text(encoding="utf-8").replace(
+            "Record title/menu, wizard, save-slot, archive, meta-board, hover, "
+            "and text-fit observations for 820x620 full.",
+            "Record menu opens cleanly.",
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["validate-animation-playtest-commands", str(output_path)],
+    )
+
+    assert result.exit_code == 1
+    assert "Command Queue Findings" in result.output
+    assert "command evidence prompt is stale: step 1" in result.output
 
 
 def test_animation_playtest_plan_command_reports_manual_required(
@@ -5465,8 +5520,10 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "| ruff check src tests | `pass`" in report_text
     assert "| `820x620` | `todo` | `todo` | `todo`" in report_text
     assert "- Manual result: `not completed by automation`" in commands_text
+    assert "- Evidence prompts: `required in every command row`" in commands_text
     assert "play-2d --scenario founder_journey --seed 17" in commands_text
     assert "menu-2d --window-size 1440x900 --motion-mode off" in commands_text
+    assert "Record title/menu, wizard, save-slot, archive" in commands_text
     assert "- Status: `manual-required`" in plan_text
     assert "- Command queue status: `pass`" in plan_text
     assert "- Report status: `fail`" in plan_text

@@ -46,9 +46,11 @@ Use `animation-playtest-status` during the manual pass to group remaining work
 without failing by default. Use `validate-animation-playtest-report` as the final
 blocking gate after the visible-window rows and signoff fields are filled.
 Use `animation-playtest-commands` to print or export the exact visible-window
-command queue; it does not mark any manual row complete.
+command queue with the evidence prompt each row must record; it does not mark
+any manual row complete.
 Use `validate-animation-playtest-commands` before handoff so an edited queue
-cannot silently skip a window size, motion mode, menu run, or play run.
+cannot silently skip a window size, motion mode, menu run, play run, or route
+evidence prompt.
 Use `animation-playtest-plan` after validating the queue to combine the current
 report gaps and command queue status into one grouped next-step plan. The plan
 also includes a validated `Visible Test Route` with all 18 menu/play window and
