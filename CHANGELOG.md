@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.181.0 - 2026-06-25
+
+- Added a validated `Manual Runbook` section to animation playtest plan artifacts so tester handoffs preserve execution order and exit criteria
+- Tightened `validate-animation-playtest-plan` so missing or stale runbook rows fail before manual open-window QA starts
+- Updated docs and regression coverage so animation signoff handoffs include the queue, evidence checklist, visible route, and runbook together
+
 ## 0.180.0 - 2026-06-25
 
 - Added required evidence-term prompts directly into the manual animation report draft for window, control, scene, and game-feel rows

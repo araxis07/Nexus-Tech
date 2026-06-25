@@ -562,6 +562,9 @@ final signoff.
 The plan also includes a validated `Manual Evidence Checklist` for the window
 matrix, route notes, controls, scenes, game feel, and signoff fields so the
 non-route manual evidence cannot be dropped from handoff notes.
+It now also exports a validated `Manual Runbook` with artifact refresh, visible
+window execution, evidence-fill, and final validator exit criteria, so handoff
+notes cannot lose the order of work before manual QA starts.
 The strict manual report also includes matching `Visible Route Evidence` rows;
 `validate-animation-playtest-report` fails until all 18 rows are `pass` with
 observed notes from the actual visible-window runs.

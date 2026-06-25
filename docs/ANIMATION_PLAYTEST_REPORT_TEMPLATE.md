@@ -24,6 +24,8 @@ areas and signoff fields without digging through raw validator findings. Use
 `--output` when the current grouped plan should be attached to the handoff.
 The exported plan includes a validated `Visible Test Route` so testers know
 which menu/play window and motion runs map to which evidence notes.
+It also includes a validated `Manual Runbook` so testers keep the artifact
+refresh, visible-window execution, evidence-fill, and final validation order.
 Validate the exported plan after writing it so the attached plan cannot drift
 from the current report or command queue.
 The session setup command creates the report, command queue, and grouped plan

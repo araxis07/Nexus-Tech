@@ -4171,6 +4171,9 @@ def test_write_2d_animation_playtest_readiness_plan_exports_handoff_artifact(
     assert "## Manual Evidence Checklist" in plan_text
     assert "| Window Matrix Evidence | Record 820x620, 960x640, and 1440x900" in plan_text
     assert "| Game Feel Evidence | Confirm success, blocked, impact-value" in plan_text
+    assert "## Manual Runbook" in plan_text
+    assert "| Refresh Artifacts | Run prepare-animation-playtest-session" in plan_text
+    assert "| Validate Signoff | Run validate-animation-playtest-report" in plan_text
     assert "## Visible Test Route" in plan_text
     assert "| 18 | `play` | `1440x900` | `off` |" in plan_text
     assert "## Report Findings" in plan_text
@@ -4331,6 +4334,90 @@ def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_checklist(
 
     assert validation.status == "fail"
     assert "manual evidence checklist row Window Matrix Evidence is stale" in validation.findings
+
+
+def test_validate_2d_animation_playtest_readiness_plan_rejects_missing_runbook(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.181.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-25",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=47),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=47)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+    plan_text = plan_path.read_text(encoding="utf-8")
+    runbook_start = plan_text.index("\n## Manual Runbook\n")
+    route_start = plan_text.index("\n## Visible Test Route\n")
+    plan_path.write_text(
+        plan_text[:runbook_start] + plan_text[route_start:],
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=47,
+    )
+
+    assert validation.status == "fail"
+    assert "missing manual runbook section" in validation.findings
+    assert "missing manual runbook row: Refresh Artifacts" in validation.findings
+
+
+def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_runbook(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.181.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-25",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=53),
+        commands_path,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=53)
+    write_2d_animation_playtest_readiness_plan(plan, plan_path)
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            (
+                "Run all 18 visible menu/play commands in order across 820x620, 960x640, "
+                "and 1440x900 in full, reduced, and off motion modes."
+            ),
+            "Run a few visible windows quickly.",
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_readiness_plan(
+        plan_path,
+        report_path,
+        commands_path,
+        seed=53,
+    )
+
+    assert validation.status == "fail"
+    assert "manual runbook row Execute Visible Windows action is stale" in validation.findings
 
 
 def test_validate_2d_animation_playtest_readiness_plan_rejects_stale_artifact(

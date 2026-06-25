@@ -784,6 +784,41 @@ _MANUAL_ANIMATION_EVIDENCE_CHECKLIST: tuple[tuple[str, str], ...] = (
     ),
 )
 
+_MANUAL_ANIMATION_RUNBOOK_STEPS: tuple[tuple[str, str, str], ...] = (
+    (
+        "Refresh Artifacts",
+        (
+            "Run prepare-animation-playtest-session with prefilled automated gates, "
+            "then validate the command queue and playtest plan."
+        ),
+        "Report, command queue, and plan artifacts are current and plan validation passes.",
+    ),
+    (
+        "Execute Visible Windows",
+        (
+            "Run all 18 visible menu/play commands in order across 820x620, 960x640, "
+            "and 1440x900 in full, reduced, and off motion modes."
+        ),
+        "Every visible route row has observed notes from a real open-window run.",
+    ),
+    (
+        "Fill Evidence Notes",
+        (
+            "Replace todo cells and prompt text with window, control, scene, game-feel, "
+            "route, blocker, and decision observations."
+        ),
+        "Generic notes are gone and each required evidence term remains represented.",
+    ),
+    (
+        "Validate Signoff",
+        (
+            "Run validate-animation-playtest-report and attach the passing report before "
+            "calling animation complete."
+        ),
+        "Release decision is pass and the final report validator returns PASS.",
+    ),
+)
+
 
 def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytestReportValidation:
     """Validate that a manual animation playtest report is completed, not still a template."""
@@ -1026,6 +1061,23 @@ def write_2d_animation_playtest_readiness_plan(
     lines.extend(
         [
             "",
+            "## Manual Runbook",
+            "",
+            "| Step | Action | Exit Criteria |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for step, action, exit_criteria in _MANUAL_ANIMATION_RUNBOOK_STEPS:
+        lines.append(
+            "| "
+            f"{_markdown_table_cell(step)} | "
+            f"{_markdown_table_cell(action)} | "
+            f"{_markdown_table_cell(exit_criteria)} |"
+        )
+
+    lines.extend(
+        [
+            "",
             "## Visible Test Route",
             "",
             "| Step | Target | Window | Motion | Evidence To Record | Command |",
@@ -1147,6 +1199,24 @@ def validate_2d_animation_playtest_readiness_plan(
         evidence = row[1].replace(r"\|", "|").strip()
         if _normalize_report_key(evidence) != _normalize_report_key(required_evidence):
             findings.append(f"manual evidence checklist row {area} is stale")
+
+    if "## Manual Runbook" not in text:
+        findings.append("missing manual runbook section")
+
+    for step, action, exit_criteria in _MANUAL_ANIMATION_RUNBOOK_STEPS:
+        row = _find_report_table_row(rows, step)
+        if row is None:
+            findings.append(f"missing manual runbook row: {step}")
+            continue
+        if len(row) <= 2:
+            findings.append(f"incomplete manual runbook row: {step}")
+            continue
+        action_text = row[1].replace(r"\|", "|").strip()
+        exit_text = row[2].replace(r"\|", "|").strip()
+        if _normalize_report_key(action_text) != _normalize_report_key(action):
+            findings.append(f"manual runbook row {step} action is stale")
+        if _normalize_report_key(exit_text) != _normalize_report_key(exit_criteria):
+            findings.append(f"manual runbook row {step} exit criteria is stale")
 
     if "## Visible Test Route" not in text:
         findings.append("missing visible test route section")

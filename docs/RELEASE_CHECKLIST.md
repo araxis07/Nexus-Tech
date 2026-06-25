@@ -53,10 +53,12 @@ required visible-window run or evidence prompt is skipped before handoff.
 Run `animation-playtest-plan` after queue validation to see whether the handoff
 is queue-blocked, still manual-required, or complete. Use `--output` to save the
 grouped plan, manual evidence checklist, and 18-step visible test route beside
-the report and command queue.
+the report and command queue. The plan also includes a validated manual runbook
+for artifact refresh, visible-window execution, evidence-fill, and final
+validator exit criteria.
 Run `validate-animation-playtest-plan` after writing the grouped plan so stale
 status, open-item counts, visible-route evidence prompts, or manual evidence
-checklist rows are blocked before handoff.
+checklist/runbook rows are blocked before handoff.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact, and
 current plan validation without completing manual signoff.
