@@ -43,6 +43,9 @@ control path, scene element, or motion cue was checked.
 It also checks target-specific observed terms for window matrix, control, scene,
 and game-feel evidence rows, so completed reports must name the actual UI,
 motion, control, or feedback behavior verified in that row.
+Generated report drafts include `Pass notes must mention: ...` prompts in those
+manual rows; replace the prompt text with real observations that still include
+the required terms before final validation.
 
 ## Build
 

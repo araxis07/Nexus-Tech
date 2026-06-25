@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.180.0 - 2026-06-25
+
+- Added required evidence-term prompts directly into the manual animation report draft for window, control, scene, and game-feel rows
+- Updated draft report regression coverage so CLI-generated reports expose the same terms enforced by the final validator
+- Updated docs so manual testers see the concrete evidence terms before filling final animation signoff rows
+
 ## 0.179.0 - 2026-06-25
 
 - Tightened final manual animation report validation so window matrix, control, scene, and game-feel evidence must include target-specific observed terms

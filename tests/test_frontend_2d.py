@@ -4010,9 +4010,13 @@ def test_write_2d_animation_playtest_report_template_matches_validator_contract(
     assert "- Commit: abc1234" in report_text
     assert "| audit-2d-animation-matrix --output | `todo`" in report_text
     assert "| `820x620` | `todo` | `todo` | `todo`" in report_text
+    assert "Pass notes must mention: menu, play, primary, disabled, layout, motion." in report_text
     assert "| UI Layout Safety | `todo`" in report_text
+    assert "Pass notes must mention: target, bounds, actor, collision." in report_text
     assert "| Scene Handoffs | `todo`" in report_text
+    assert "Pass notes must mention: transition, oriented, control." in report_text
     assert "| Actor + Feedback Match | `todo`" in report_text
+    assert "Pass notes must mention: actor, pose, family." in report_text
     assert "- visual-audit-summary.md anomalies: todo" in report_text
 
     validation = validate_2d_animation_playtest_report(output_path)
@@ -4044,6 +4048,7 @@ def test_write_2d_animation_playtest_report_template_can_prefill_automated_gates
     assert "| audit-2d-animation-matrix --output | `pass`" in report_text
     assert "| prepare-2d-animation-playtest --output | `pass`" in report_text
     assert "| `820x620` | `todo` | `todo` | `todo`" in report_text
+    assert "Pass notes must mention: menu, play, primary, disabled, layout, motion." in report_text
 
     validation = validate_2d_animation_playtest_report(output_path)
 
@@ -5174,8 +5179,11 @@ def test_draft_animation_playtest_report_command_writes_strict_template(
     report_text = output_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "| Pause / Resume | `todo`" in report_text
+    assert "Pass notes must mention: pause, resume, run." in report_text
     assert "| Outcome/Review | `todo`" in report_text
+    assert "Pass notes must mention: outcome, cinematic, focal." in report_text
     assert "| Actor + Feedback Match | `todo`" in report_text
+    assert "Pass notes must mention: actor, pose, family." in report_text
 
 
 def test_draft_animation_playtest_report_command_prefills_automated_gates(
@@ -5206,6 +5214,7 @@ def test_draft_animation_playtest_report_command_prefills_automated_gates(
     assert "| ruff check src tests | `pass`" in report_text
     assert "| Open-window menu-2d / play-2d smoke | `pass`" in report_text
     assert "| Pause / Resume | `todo`" in report_text
+    assert "Pass notes must mention: pause, resume, run." in report_text
 
 
 def test_validate_animation_playtest_report_command_accepts_completed_report(

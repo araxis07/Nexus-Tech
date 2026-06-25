@@ -1236,6 +1236,12 @@ def _animation_playtest_route_evidence(item: AnimationPlaytestCommand) -> str:
     )
 
 
+def _required_terms_prompt(terms: tuple[str, ...]) -> str:
+    """Return a compact prompt for evidence terms the final validator expects."""
+
+    return f"Pass notes must mention: {', '.join(terms)}."
+
+
 def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
     rows: list[tuple[str, ...]] = []
     for line in text.splitlines():
@@ -2107,7 +2113,8 @@ def write_2d_animation_playtest_report_template(
         window_size = f"{width}x{height}"
         lines.append(
             f"| `{window_size}` | `todo` | `todo` | `todo` | "
-            f"Launch with `--window-size {window_size}` and record real window notes |"
+            f"Launch with `--window-size {window_size}`. "
+            f"{_required_terms_prompt(WINDOW_MATRIX_EVIDENCE_TERMS)} |"
         )
 
     lines.extend(
@@ -2140,7 +2147,11 @@ def write_2d_animation_playtest_report_template(
         ]
     )
     for area, required_check in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS:
-        lines.append(f"| {area} | `todo` | {required_check} | owner/date if not pass |")
+        lines.append(
+            f"| {area} | `todo` | {required_check} "
+            f"{_required_terms_prompt(CONTROL_EVIDENCE_TERMS[area])} | "
+            "owner/date if not pass |"
+        )
 
     lines.extend(
         [
@@ -2153,7 +2164,10 @@ def write_2d_animation_playtest_report_template(
     )
     for scene, required_check in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS:
         lines.append(
-            f"| {scene} | `todo` | {required_check} | Motion notes | owner/date if not pass |"
+            f"| {scene} | `todo` | {required_check} "
+            f"{_required_terms_prompt(SCENE_READABILITY_EVIDENCE_TERMS[scene])} | "
+            f"Motion notes. {_required_terms_prompt(SCENE_MOTION_EVIDENCE_TERMS[scene])} | "
+            "owner/date if not pass |"
         )
 
     lines.extend(
@@ -2166,7 +2180,11 @@ def write_2d_animation_playtest_report_template(
         ]
     )
     for area, required_check in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS:
-        lines.append(f"| {area} | `todo` | {required_check} | owner/date if not pass |")
+        lines.append(
+            f"| {area} | `todo` | {required_check} "
+            f"{_required_terms_prompt(FEEDBACK_EVIDENCE_TERMS[area])} | "
+            "owner/date if not pass |"
+        )
 
     lines.extend(["", "## Release Blockers", ""])
     for label in REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS:

@@ -71,6 +71,8 @@ window, control path, scene, or motion cue was checked.
 The final report validator also requires target-specific observed terms for
 window matrix, control, scene, and game-feel rows before animation signoff can
 pass.
+Generated report drafts include the same required-term prompts in each affected
+manual row, so stale or vague evidence can be caught before final validation.
 
 ## Demo Verification
 
