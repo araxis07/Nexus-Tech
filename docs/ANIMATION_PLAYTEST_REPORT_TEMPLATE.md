@@ -52,6 +52,9 @@ text as missing evidence, including route-recording prompts and automated-gate
 `Record command output...` placeholders.
 For a `pass` release decision, release blocker fields and required fixes must
 be clear, and `Validator result` must be a passing value.
+Keep all generated section headings in the completed report. The validator
+requires Build, automated gate, window matrix, visible route, control, scene,
+game-feel, release blocker, and decision sections to remain present.
 
 ## Build
 

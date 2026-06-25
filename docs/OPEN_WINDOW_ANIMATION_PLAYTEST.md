@@ -79,6 +79,9 @@ validation treats leftover prompt text or `Record ...` placeholders as missing
 evidence.
 For a final `pass`, all release-blocker fields must be clear, `Required fixes
 before presenting` must be clear, and `Validator result` must be pass.
+Do not delete generated report sections while filling observations; final
+validation requires the build, gate, window, route, control, scene, game-feel,
+blocker, and decision sections to remain present.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 

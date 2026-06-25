@@ -4703,6 +4703,19 @@ def test_validate_2d_animation_playtest_report_accepts_signed_pass(
     assert validation.findings == ()
 
 
+def test_validate_2d_animation_playtest_report_rejects_missing_required_section(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "missing-section-animation-report.md"
+    report_text = _completed_animation_playtest_report_text().replace("## Release Blockers\n\n", "")
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "missing report section: Release Blockers" in validation.findings
+
+
 def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(
     tmp_path: Path,
 ) -> None:

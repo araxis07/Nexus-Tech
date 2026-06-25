@@ -78,6 +78,8 @@ manual row, but those prompts must be replaced with observed notes before final
 validation; leftover prompt text is treated as missing evidence.
 For a `pass` release decision, all release-blocker fields and `Required fixes
 before presenting` must be clear, and `Validator result` must be pass.
+The completed manual report must preserve all generated section headings so the
+signoff artifact can be audited after release.
 
 ## Demo Verification
 
@@ -120,6 +122,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.
 - Treat any missing automated gate row, window/motion cell, control row, scene row, game-feel row, release-blocker field, or validator PASS in the manual report as a release blocker.
+- Treat missing manual report sections as release blockers even when the rows and fields are still present elsewhere in the file.
 - Treat generic evidence notes such as `ok`, `clear`, `readable`, `stable`, or `none` in required report evidence cells as release blockers.
 - Treat missing `actor-readability` layers as release blockers before the remaining open-window readability pass.
 - Treat missing `actor-pose-depth` layers as release blockers before presenting new actor/sprite reactions.

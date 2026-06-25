@@ -581,6 +581,9 @@ completed reports must replace it with real observations from visible runs.
 For a `pass` release decision, the same validator also requires release blocker
 fields and required fixes to be clear, and the recorded validator result must be
 passing.
+Completed reports must keep the generated section structure, including build,
+automated gates, window matrix, visible route evidence, controls, scenes, game
+feel, release blockers, and decision sections.
 
 The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, and uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep` after the CI animation gates.
 

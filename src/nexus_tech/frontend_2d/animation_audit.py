@@ -246,6 +246,17 @@ REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS: tuple[str, ...] = (
     "Date",
     "Platform",
 )
+REQUIRED_ANIMATION_PLAYTEST_SECTIONS: tuple[str, ...] = (
+    "Build",
+    "Automated Gate Summary",
+    "Window Matrix",
+    "Visible Route Evidence",
+    "Control Clarity Results",
+    "Scene Results",
+    "Game Feel Results",
+    "Release Blockers",
+    "Decision",
+)
 REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS: tuple[str, ...] = (
     "Hidden primary actions",
     "Unreadable disabled reasons",
@@ -841,6 +852,10 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         findings.append("report still contains todo cells")
     if re.search(r"\|[ \t]*\|", text):
         findings.append("report still contains blank table cells")
+
+    for section in REQUIRED_ANIMATION_PLAYTEST_SECTIONS:
+        if re.search(rf"^##\s+{re.escape(section)}\s*$", text, re.MULTILINE) is None:
+            findings.append(f"missing report section: {section}")
 
     for label in REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS:
         if _is_placeholder_field(_extract_report_field(text, label)):

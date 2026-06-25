@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.184.0 - 2026-06-26
+
+- Tightened final animation report validation so required signoff sections must remain present in completed reports
+- Added regression coverage for reports that keep passing rows but drop the `Release Blockers` section heading
+- Updated docs so manual animation signoff requires the full report structure, not only table rows and fields
+
 ## 0.183.0 - 2026-06-26
 
 - Tightened final animation signoff validation so blocker fields must be clear before a pass release decision is accepted
