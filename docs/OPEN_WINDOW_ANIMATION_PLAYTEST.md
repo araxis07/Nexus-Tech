@@ -74,7 +74,9 @@ The final report validator also requires target-specific observed terms in
 window matrix, control, scene, and game-feel evidence rows, not only the visible
 route table.
 The generated report draft prints `Pass notes must mention: ...` in those rows;
-use it as a checklist, then replace it with actual observed evidence.
+use it as a checklist, then replace it with actual observed evidence. Final
+validation treats leftover prompt text or `Record ...` placeholders as missing
+evidence.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 

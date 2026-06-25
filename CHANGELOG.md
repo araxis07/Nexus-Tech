@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.182.0 - 2026-06-26
+
+- Tightened final animation report validation so generated evidence prompts cannot be reused as passing tester evidence
+- Added regression coverage for stale `Pass notes must mention`, route-recording, and automated-gate prompt text in completed reports
+- Updated docs so manual testers must replace prompt text with real observed notes before final animation signoff
+
 ## 0.181.0 - 2026-06-25
 
 - Added a validated `Manual Runbook` section to animation playtest plan artifacts so tester handoffs preserve execution order and exit criteria

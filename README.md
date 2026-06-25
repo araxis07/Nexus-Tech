@@ -576,7 +576,8 @@ control, scene, and game-feel evidence notes, so broad notes cannot pass
 non-route manual signoff rows either.
 The generated manual report draft now prints those required terms in each
 affected row so testers can fill evidence notes without guessing the validator
-contract.
+contract. Final validation rejects that prompt text if it is left in place, so
+completed reports must replace it with real observations from visible runs.
 
 The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, and uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep` after the CI animation gates.
 

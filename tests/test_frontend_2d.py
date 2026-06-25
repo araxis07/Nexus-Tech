@@ -4733,6 +4733,61 @@ def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(
     assert "missing control check evidence: Pause / Resume notes" in validation.findings
 
 
+def test_validate_2d_animation_playtest_report_rejects_template_prompt_evidence_notes(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "prompt-evidence-animation-report.md"
+    first_route = build_2d_animation_playtest_command_queue()[0]
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        "| ruff check src tests | `pass` | local lint output clean |",
+        "| ruff check src tests | `pass` | Record command output or CI artifact evidence |",
+    )
+    report_text = report_text.replace(
+        (
+            "| `820x620` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at compact size |"
+        ),
+        (
+            "| `820x620` | `pass` | `pass` | `pass` | "
+            "Launch with `--window-size 820x620`. Pass notes must mention: menu, "
+            "play, primary, disabled, layout, motion. |"
+        ),
+    )
+    report_text = report_text.replace(
+        "| Pause / Resume | `pass` | pause resume returns to run state | none |",
+        (
+            "| Pause / Resume | `pass` | P and the Pause rail open the pause modal; "
+            "Resume returns to the same run state. Pass notes must mention: "
+            "pause, resume, run. | none |"
+        ),
+    )
+    report_text = report_text.replace(
+        (
+            "| "
+            f"1 | `{first_route.target}` | `{first_route.window_size}` | "
+            f"`{first_route.motion_mode}` | `pass` | title wizard save archive meta hover "
+            f"text-fit checked at {first_route.window_size} "
+            f"with {first_route.motion_mode} motion |"
+        ),
+        (
+            "| "
+            f"1 | `{first_route.target}` | `{first_route.window_size}` | "
+            f"`{first_route.motion_mode}` | `pass` | "
+            f"{animation_audit_module._animation_playtest_route_evidence(first_route)} |"
+        ),
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "missing automated gate evidence: ruff check src tests notes" in validation.findings
+    assert "missing window matrix evidence: 820x620 notes" in validation.findings
+    assert "missing control check evidence: Pause / Resume notes" in validation.findings
+    assert "missing visible route evidence note: 1" in validation.findings
+
+
 def test_validate_2d_animation_playtest_report_rejects_incomplete_manual_evidence_terms(
     tmp_path: Path,
 ) -> None:

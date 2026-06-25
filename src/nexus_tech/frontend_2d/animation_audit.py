@@ -819,6 +819,16 @@ _MANUAL_ANIMATION_RUNBOOK_STEPS: tuple[tuple[str, str, str], ...] = (
     ),
 )
 
+_TEMPLATE_EVIDENCE_PROMPT_KEYS: tuple[str, ...] = (
+    "pass notes must mention",
+    "record command output or ci artifact evidence",
+    "record title menu wizard save slot archive meta board hover and text fit observations for",
+    (
+        "record dashboard action picker pending event inspector endgame summary "
+        "pause back and motion feel observations for"
+    ),
+)
+
 
 def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytestReportValidation:
     """Validate that a manual animation playtest report is completed, not still a template."""
@@ -1357,7 +1367,7 @@ def _validate_required_window_matrix(
                 result = _normalize_report_result(row[index]) or "blank"
                 findings.append(f"window matrix {label} {mode} is {result}, not pass")
                 row_results_pass = False
-        if len(row) <= 4 or _is_thin_evidence(row[4]):
+        if len(row) <= 4 or (row_results_pass and _is_missing_report_evidence(row[4])):
             findings.append(f"missing window matrix evidence: {label} notes")
         elif row_results_pass:
             missing_terms = _missing_evidence_terms(row[4], WINDOW_MATRIX_EVIDENCE_TERMS)
@@ -1413,14 +1423,17 @@ def _validate_required_visible_route_evidence(
                 f"visible route evidence row {index} motion is {motion}, "
                 f"expected {item.motion_mode}"
             )
+        route_result_pass = False
         if len(row) <= 4 or _is_placeholder_result(row[4]):
             findings.append(f"incomplete visible route evidence result: {index}")
         elif not _is_passing_result(row[4]):
             result = _normalize_report_result(row[4]) or "blank"
             findings.append(f"visible route evidence row {index} is {result}, not pass")
-        if len(row) <= 5 or _is_thin_evidence(row[5]):
-            findings.append(f"missing visible route evidence note: {index}")
         else:
+            route_result_pass = True
+        if route_result_pass and (len(row) <= 5 or _is_missing_report_evidence(row[5])):
+            findings.append(f"missing visible route evidence note: {index}")
+        elif route_result_pass:
             missing_terms = _missing_route_evidence_terms(item, row[5])
             if missing_terms:
                 findings.append(
@@ -1451,7 +1464,7 @@ def _validate_required_result_rows(
             result = _normalize_report_result(row[1]) or "blank"
             findings.append(f"{category} {label} is {result}, not pass")
         for column_index, evidence_name in evidence_columns:
-            if len(row) <= column_index or _is_thin_evidence(row[column_index]):
+            if len(row) <= column_index or _is_missing_report_evidence(row[column_index]):
                 findings.append(f"missing {category} evidence: {label} {evidence_name}")
                 continue
             required_terms = evidence_terms.get((label, evidence_name)) or evidence_terms.get(label)
@@ -1548,6 +1561,15 @@ def _is_thin_evidence(value: str) -> bool:
         "success",
         "none",
     }
+
+
+def _is_missing_report_evidence(value: str) -> bool:
+    return _is_thin_evidence(value) or _is_template_evidence_prompt(value)
+
+
+def _is_template_evidence_prompt(value: str) -> bool:
+    normalized = _normalize_report_key(value)
+    return any(prompt in normalized for prompt in _TEMPLATE_EVIDENCE_PROMPT_KEYS)
 
 
 def _extract_report_field(text: str, label: str) -> str:

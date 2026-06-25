@@ -47,7 +47,9 @@ and game-feel evidence rows, so completed reports must name the actual UI,
 motion, control, or feedback behavior verified in that row.
 Generated report drafts include `Pass notes must mention: ...` prompts in those
 manual rows; replace the prompt text with real observations that still include
-the required terms before final validation.
+the required terms before final validation. The validator treats leftover prompt
+text as missing evidence, including route-recording prompts and automated-gate
+`Record command output...` placeholders.
 
 ## Build
 
