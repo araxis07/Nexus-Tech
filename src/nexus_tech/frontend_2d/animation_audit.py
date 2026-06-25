@@ -742,7 +742,7 @@ _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] =
     ),
     (
         "Template Cleanup",
-        ("todo cells", "blank table cells"),
+        ("todo cells", "blank table cells", "draft warning", "follow-up placeholder"),
         "Replace template placeholders with pass/watch/fail and real tester notes.",
     ),
 )
@@ -852,6 +852,10 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         findings.append("report still contains todo cells")
     if re.search(r"\|[ \t]*\|", text):
         findings.append("report still contains blank table cells")
+    if "this draft is intentionally incomplete" in normalized:
+        findings.append("report still contains draft warning text")
+    if "owner/date if not pass" in normalized:
+        findings.append("report still contains follow-up placeholder text")
 
     for section in REQUIRED_ANIMATION_PLAYTEST_SECTIONS:
         if re.search(rf"^##\s+{re.escape(section)}\s*$", text, re.MULTILINE) is None:

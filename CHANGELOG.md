@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.185.0 - 2026-06-26
+
+- Tightened final animation report validation so leftover draft warning text and `owner/date if not pass` placeholders fail template cleanup
+- Added regression coverage for otherwise passing reports that still contain draft or follow-up placeholder copy
+- Updated docs so completed manual animation reports must replace all template copy before final signoff
+
 ## 0.184.0 - 2026-06-26
 
 - Tightened final animation report validation so required signoff sections must remain present in completed reports

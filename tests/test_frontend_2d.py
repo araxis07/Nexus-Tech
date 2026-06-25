@@ -4082,7 +4082,7 @@ def test_summarize_2d_animation_playtest_report_groups_manual_gaps(tmp_path: Pat
     assert areas["Manual Scene Checks"].incomplete_count == 9
     assert areas["Manual Game Feel"].incomplete_count == 4
     assert areas["Signoff Fields"].incomplete_count >= 1
-    assert areas["Template Cleanup"].incomplete_count == 1
+    assert areas["Template Cleanup"].incomplete_count == 3
 
 
 def test_build_2d_animation_playtest_readiness_plan_blocks_missing_queue(
@@ -4714,6 +4714,35 @@ def test_validate_2d_animation_playtest_report_rejects_missing_required_section(
 
     assert validation.status == "fail"
     assert "missing report section: Release Blockers" in validation.findings
+
+
+def test_validate_2d_animation_playtest_report_rejects_leftover_template_copy(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "leftover-template-copy-animation-report.md"
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        "# Animation Playtest Report\n\n",
+        (
+            "# Animation Playtest Report\n\n"
+            "This draft is intentionally incomplete. Replace every `todo` and `fill-me` "
+            "after the real open-window playtest.\n\n"
+        ),
+    )
+    report_text = report_text.replace(
+        "| Pause / Resume | `pass` | pause resume returns to run state | none |",
+        (
+            "| Pause / Resume | `pass` | pause resume returns to run state | "
+            "owner/date if not pass |"
+        ),
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert "report still contains draft warning text" in validation.findings
+    assert "report still contains follow-up placeholder text" in validation.findings
 
 
 def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(

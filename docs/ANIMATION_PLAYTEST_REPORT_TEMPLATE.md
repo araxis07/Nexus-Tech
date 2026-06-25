@@ -55,6 +55,8 @@ be clear, and `Validator result` must be a passing value.
 Keep all generated section headings in the completed report. The validator
 requires Build, automated gate, window matrix, visible route, control, scene,
 game-feel, release blocker, and decision sections to remain present.
+Remove the draft warning paragraph and replace any `owner/date if not pass`
+follow-up placeholders before final validation.
 
 ## Build
 

@@ -82,6 +82,8 @@ before presenting` must be clear, and `Validator result` must be pass.
 Do not delete generated report sections while filling observations; final
 validation requires the build, gate, window, route, control, scene, game-feel,
 blocker, and decision sections to remain present.
+Remove draft warning text and `owner/date if not pass` placeholders before final
+validation.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 

@@ -4,7 +4,7 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 
 ## Build Under Review
 
-- Version: `0.184.0`
+- Version: `0.185.0`
 - Focus: 2D actor/sprite timeline, archive/meta comparison motion, path-specific late-game repair cues, actor-state coverage, actor-pose-depth, action feedback clarity, scene transition handoffs, control-affordance coverage, control replay safety, UI layout safety, typography safety, blocked-action feedback, CI-backed animation gates, automated actor-readability, readability guard, visual-fatigue, animation-pacing, long-session stress, balance preflight evidence, strict manual evidence-note validation, strict manual signoff validation, scenario/seed matrix readiness, and scene motion-profile guards, scene pacing, overlay readability, and motion-mode behavior.
 - Status guard: `animation-playtest-status` groups remaining manual rows while the report is incomplete; use `--fail-on-incomplete` only for release gate checks.
 - Window guard: visible `menu-2d` and `play-2d` runs support `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` so the manual matrix starts at the exact target dimensions.
@@ -18,6 +18,7 @@ Use this checklist for the manual open-window pass that headless audits cannot j
 - Manual evidence guard: final window matrix, control, scene, and game-feel notes must include their required observed terms, not just generic pass/readable/clear wording.
 - Report structure guard: completed reports must keep the generated Build, automated gate, window matrix, visible route, control, scene, game-feel, release blocker, and decision sections.
 - Draft prompt guard: generated report drafts print the required evidence terms in each affected manual row before the tester fills final notes, and final validation fails if that prompt text is left as evidence.
+- Template cleanup guard: completed reports must remove draft warning copy and `owner/date if not pass` follow-up placeholders.
 - Signoff coherence guard: a `pass` release decision requires clear blocker fields, no required fixes before presenting, and a passing validator result.
 - Runbook guard: generated playtest plans include validated artifact refresh, visible-window execution, evidence-fill, and final validation exit criteria before handoff.
 
