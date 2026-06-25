@@ -70,6 +70,53 @@ PLAY_ROUTE_EVIDENCE_TERMS: tuple[str, ...] = (
     "pause",
     "motion",
 )
+WINDOW_MATRIX_EVIDENCE_TERMS: tuple[str, ...] = (
+    "menu",
+    "play",
+    "primary",
+    "disabled",
+    "layout",
+    "motion",
+)
+CONTROL_EVIDENCE_TERMS: dict[str, tuple[str, ...]] = {
+    "Pause / Resume": ("pause", "resume", "run"),
+    "Back / Escape": ("escape", "overlay", "pause"),
+    "Menu Return": ("menu", "save", "title"),
+    "Help / Hover": ("help", "hover", "controls"),
+    "Control Replay Safety": ("replay", "pause", "help", "save", "menu"),
+    "Control Affordance Coverage": ("click", "title", "run", "pause", "save", "flow"),
+    "UI Layout Safety": ("target", "bounds", "actor", "collision"),
+    "Typography Safety": ("label", "text", "fit"),
+    "Motion Modes": ("full", "reduced", "off", "controls"),
+}
+SCENE_READABILITY_EVIDENCE_TERMS: dict[str, tuple[str, ...]] = {
+    "Title/Menu": ("wizard", "save", "visible"),
+    "Live Dashboard": ("stat", "product", "legible"),
+    "Action Picker": ("picker", "option", "text"),
+    "Pending Event": ("option", "text", "readable"),
+    "Inspector": ("selected", "row", "pager"),
+    "Endgame Board": ("path", "fix", "button"),
+    "Turn Summary": ("timeline", "card", "readable"),
+    "Outcome/Review": ("action", "note", "visible"),
+    "Scene Handoffs": ("navigation", "context", "visible"),
+}
+SCENE_MOTION_EVIDENCE_TERMS: dict[str, tuple[str, ...]] = {
+    "Title/Menu": ("title", "actor", "label"),
+    "Live Dashboard": ("actor", "control", "cover"),
+    "Action Picker": ("choreography", "target", "lane"),
+    "Pending Event": ("preview", "motion", "choice"),
+    "Inspector": ("actor", "routing", "chip"),
+    "Endgame Board": ("cockpit", "motion", "control"),
+    "Turn Summary": ("reveal", "pacing", "metric"),
+    "Outcome/Review": ("outcome", "cinematic", "focal"),
+    "Scene Handoffs": ("transition", "oriented", "control"),
+}
+FEEDBACK_EVIDENCE_TERMS: dict[str, tuple[str, ...]] = {
+    "Success Feedback": ("success", "target", "changed"),
+    "Blocked Feedback": ("blocked", "prerequisite", "reason"),
+    "Impact Values": ("delta", "target", "value"),
+    "Actor + Feedback Match": ("actor", "pose", "family"),
+}
 DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS: tuple[tuple[str, str], ...] = (
     (
         "Pause / Resume",
@@ -769,6 +816,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
         "control check",
         evidence_columns=((2, "notes"),),
+        evidence_terms=CONTROL_EVIDENCE_TERMS,
     )
     _validate_required_result_rows(
         findings,
@@ -776,6 +824,11 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         tuple(scene for scene, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
         "scene check",
         evidence_columns=((2, "readability notes"), (3, "motion notes")),
+        evidence_terms={
+            (scene, "readability notes"): terms
+            for scene, terms in SCENE_READABILITY_EVIDENCE_TERMS.items()
+        }
+        | {(scene, "motion notes"): terms for scene, terms in SCENE_MOTION_EVIDENCE_TERMS.items()},
     )
     _validate_required_result_rows(
         findings,
@@ -783,6 +836,7 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         tuple(area for area, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
         "game-feel check",
         evidence_columns=((2, "notes"),),
+        evidence_terms=FEEDBACK_EVIDENCE_TERMS,
     )
 
     release_decision = _extract_report_field(text, "Release decision")
@@ -1217,15 +1271,25 @@ def _validate_required_window_matrix(
         if row is None:
             findings.append(f"missing window matrix row: {label}")
             continue
+        row_results_pass = True
         for index, mode in enumerate(("Full", "Reduced", "Off"), start=1):
             if len(row) <= index or _is_placeholder_result(row[index]):
                 findings.append(f"incomplete window matrix result: {label} {mode}")
+                row_results_pass = False
                 continue
             if not _is_passing_result(row[index]):
                 result = _normalize_report_result(row[index]) or "blank"
                 findings.append(f"window matrix {label} {mode} is {result}, not pass")
+                row_results_pass = False
         if len(row) <= 4 or _is_thin_evidence(row[4]):
             findings.append(f"missing window matrix evidence: {label} notes")
+        elif row_results_pass:
+            missing_terms = _missing_evidence_terms(row[4], WINDOW_MATRIX_EVIDENCE_TERMS)
+            if missing_terms:
+                findings.append(
+                    f"window matrix {label} evidence missing observed terms: "
+                    f"{', '.join(missing_terms)}"
+                )
 
 
 def _validate_required_visible_route_evidence(
@@ -1296,7 +1360,9 @@ def _validate_required_result_rows(
     category: str,
     *,
     evidence_columns: tuple[tuple[int, str], ...] = (),
+    evidence_terms: dict[str | tuple[str, str], tuple[str, ...]] | None = None,
 ) -> None:
+    evidence_terms = evidence_terms or {}
     for label in labels:
         row = _find_report_table_row(rows, label)
         if row is None:
@@ -1311,16 +1377,33 @@ def _validate_required_result_rows(
         for column_index, evidence_name in evidence_columns:
             if len(row) <= column_index or _is_thin_evidence(row[column_index]):
                 findings.append(f"missing {category} evidence: {label} {evidence_name}")
+                continue
+            required_terms = evidence_terms.get((label, evidence_name)) or evidence_terms.get(label)
+            if not required_terms:
+                continue
+            missing_terms = _missing_evidence_terms(row[column_index], required_terms)
+            if missing_terms:
+                findings.append(
+                    f"{category} evidence {label} {evidence_name} "
+                    f"missing observed terms: {', '.join(missing_terms)}"
+                )
 
 
 def _missing_route_evidence_terms(
     item: AnimationPlaytestCommand,
     evidence: str,
 ) -> tuple[str, ...]:
-    tokens = set(re.findall(r"[a-z0-9]+", _normalize_report_result(evidence)))
     required_terms = (
         MENU_ROUTE_EVIDENCE_TERMS if item.target == "menu" else PLAY_ROUTE_EVIDENCE_TERMS
     )
+    return _missing_evidence_terms(evidence, required_terms)
+
+
+def _missing_evidence_terms(
+    evidence: str,
+    required_terms: tuple[str, ...],
+) -> tuple[str, ...]:
+    tokens = set(re.findall(r"[a-z0-9]+", _normalize_report_result(evidence)))
     return tuple(term for term in required_terms if term not in tokens)
 
 

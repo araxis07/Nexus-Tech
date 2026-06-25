@@ -40,6 +40,9 @@ The final validator rejects generic evidence notes such as `ok`, `clear`,
 `readable`, `stable`, or `none` in gate, window, control, scene, and game-feel
 evidence cells. Record concise observed facts instead, such as which window,
 control path, scene element, or motion cue was checked.
+It also checks target-specific observed terms for window matrix, control, scene,
+and game-feel evidence rows, so completed reports must name the actual UI,
+motion, control, or feedback behavior verified in that row.
 
 ## Build
 

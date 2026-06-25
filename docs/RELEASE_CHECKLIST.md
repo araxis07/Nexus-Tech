@@ -68,6 +68,9 @@ dashboard/action/pending/inspector/endgame/summary/pause/motion.
 Final report notes must contain observed evidence. Generic notes such as `ok`,
 `clear`, `readable`, or `stable` fail validation because they do not prove which
 window, control path, scene, or motion cue was checked.
+The final report validator also requires target-specific observed terms for
+window matrix, control, scene, and game-feel rows before animation signoff can
+pass.
 
 ## Demo Verification
 

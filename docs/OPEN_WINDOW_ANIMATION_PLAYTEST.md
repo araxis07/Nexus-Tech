@@ -68,6 +68,9 @@ Report notes must be observed evidence, not generic placeholders. The validator
 rejects broad notes like `ok`, `clear`, `readable`, or `stable` in evidence
 cells because those do not prove which window, control path, scene, or motion cue
 was actually checked.
+The final report validator also requires target-specific observed terms in
+window matrix, control, scene, and game-feel evidence rows, not only the visible
+route table.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.179.0 - 2026-06-25
+
+- Tightened final manual animation report validation so window matrix, control, scene, and game-feel evidence must include target-specific observed terms
+- Added regression coverage for incomplete non-route manual evidence notes so broad notes cannot pass signoff outside the visible-route table
+- Updated docs so manual animation signoff requires concrete evidence for windows, controls, scenes, game feel, and route rows
+
 ## 0.178.0 - 2026-06-21
 
 - Added a validated `Manual Evidence Checklist` to animation playtest plan artifacts so window, route, control, scene, game-feel, and signoff evidence requirements stay visible before handoff

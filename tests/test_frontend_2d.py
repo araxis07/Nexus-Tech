@@ -4431,25 +4431,34 @@ def _completed_animation_playtest_report_text() -> str:
         "",
         "| Window | Full | Reduced | Off | Notes |",
         "| --- | --- | --- | --- | --- |",
-        "| `820x620` | `pass` | `pass` | `pass` | menu and play checked at compact size |",
-        "| `960x640` | `pass` | `pass` | `pass` | menu and play checked at small laptop size |",
-        "| `1440x900` | `pass` | `pass` | `pass` | menu and play checked at presentation size |",
+        (
+            "| `820x620` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at compact size |"
+        ),
+        (
+            "| `960x640` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at small laptop size |"
+        ),
+        (
+            "| `1440x900` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at presentation size |"
+        ),
         "",
         "## Control Clarity Results",
         "",
         "| Control Area | Result | Notes | Follow-up |",
         "| --- | --- | --- | --- |",
-        "| Pause / Resume | `pass` | P opens pause and resume returns to run | none |",
-        "| Back / Escape | `pass` | Escape closes overlays before pause | none |",
-        "| Menu Return | `pass` | pause menu return lands on title shell | none |",
-        "| Help / Hover | `pass` | F1 and hover hints identify controls | none |",
-        "| Control Replay Safety | `pass` | replay path covered pause help save menu | none |",
+        "| Pause / Resume | `pass` | pause resume returns to run state | none |",
+        "| Back / Escape | `pass` | escape closes overlay before pause | none |",
+        "| Menu Return | `pass` | menu save returns to title shell | none |",
+        "| Help / Hover | `pass` | help hover controls stay visible | none |",
+        "| Control Replay Safety | `pass` | replay covered pause help save menu | none |",
         (
             "| Control Affordance Coverage | `pass` | "
-            "click targets present for navigation rails | none |"
+            "click targets cover title run pause save flow controls | none |"
         ),
-        "| UI Layout Safety | `pass` | compact controls stayed in bounds | none |",
-        "| Typography Safety | `pass` | compact labels stayed clipped or fitted | none |",
+        "| UI Layout Safety | `pass` | target bounds actor collision clear | none |",
+        "| Typography Safety | `pass` | label text fit verified | none |",
         "| Motion Modes | `pass` | full reduced off kept same controls | none |",
         "",
         "## Scene Results",
@@ -4457,49 +4466,49 @@ def _completed_animation_playtest_report_text() -> str:
         "| Scene | Result | Readability Notes | Motion Notes | Follow-up |",
         "| --- | --- | --- | --- | --- |",
         (
-            "| Title/Menu | `pass` | wizard and save copy stayed visible | "
-            "title actors stayed outside action labels | none |"
+            "| Title/Menu | `pass` | wizard save visible copy stayed aligned | "
+            "title actor label stayed outside action labels | none |"
         ),
         (
-            "| Live Dashboard | `pass` | stat chips and product cards stayed legible | "
-            "actor clips did not cover primary controls | none |"
+            "| Live Dashboard | `pass` | stat product chips stayed legible | "
+            "actor control cover avoided primary controls | none |"
         ),
         (
-            "| Action Picker | `pass` | picker cards kept readable option text | "
+            "| Action Picker | `pass` | picker option text stayed readable | "
             "choreography cues pointed at target lane | none |"
         ),
         (
             "| Pending Event | `pass` | option text remained readable | "
-            "preview motion stayed secondary to choices | none |"
+            "preview motion stayed secondary to choice text | none |"
         ),
         (
-            "| Inspector | `pass` | selected row and pager stayed visible | "
-            "actor routing did not hide status chips | none |"
+            "| Inspector | `pass` | selected row pager stayed visible | "
+            "actor routing did not hide status chip | none |"
         ),
         (
-            "| Endgame Board | `pass` | path-fix buttons stayed primary | "
-            "cockpit motion stayed behind decision controls | none |"
+            "| Endgame Board | `pass` | path fix button stayed primary | "
+            "cockpit motion stayed behind decision control | none |"
         ),
         (
-            "| Turn Summary | `pass` | timeline cards stayed readable | "
-            "reveal pacing supported metrics | none |"
+            "| Turn Summary | `pass` | timeline card stayed readable | "
+            "reveal pacing supported metric cards | none |"
         ),
         (
-            "| Outcome/Review | `pass` | after-action notes stayed visible | "
+            "| Outcome/Review | `pass` | after-action note stayed visible | "
             "outcome cinematic remained the focal state | none |"
         ),
         (
             "| Scene Handoffs | `pass` | navigation context stayed visible | "
-            "transitions oriented without hiding controls | none |"
+            "transition oriented without hiding control rail | none |"
         ),
         "",
         "## Game Feel Results",
         "",
         "| Feedback Area | Result | Notes | Follow-up |",
         "| --- | --- | --- | --- |",
-        "| Success Feedback | `pass` | success card named the changed target | none |",
-        "| Blocked Feedback | `pass` | blocked card named missing prerequisite | none |",
-        "| Impact Values | `pass` | deltas displayed target and value | none |",
+        "| Success Feedback | `pass` | success card named changed target | none |",
+        "| Blocked Feedback | `pass` | blocked card named prerequisite reason | none |",
+        "| Impact Values | `pass` | delta displayed target and value | none |",
         "| Actor + Feedback Match | `pass` | actor pose matched feedback family | none |",
         "",
         "## Release Blockers",
@@ -4612,11 +4621,14 @@ def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(
         "| ruff check src tests | `pass` | ok |",
     )
     report_text = report_text.replace(
-        "| `820x620` | `pass` | `pass` | `pass` | menu and play checked at compact size |",
+        (
+            "| `820x620` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at compact size |"
+        ),
         "| `820x620` | `pass` | `pass` | `pass` | readable |",
     )
     report_text = report_text.replace(
-        "| Pause / Resume | `pass` | P opens pause and resume returns to run | none |",
+        "| Pause / Resume | `pass` | pause resume returns to run state | none |",
         "| Pause / Resume | `pass` | clear | none |",
     )
     report_path.write_text(report_text, encoding="utf-8")
@@ -4627,6 +4639,60 @@ def test_validate_2d_animation_playtest_report_rejects_generic_evidence_notes(
     assert "missing automated gate evidence: ruff check src tests notes" in validation.findings
     assert "missing window matrix evidence: 820x620 notes" in validation.findings
     assert "missing control check evidence: Pause / Resume notes" in validation.findings
+
+
+def test_validate_2d_animation_playtest_report_rejects_incomplete_manual_evidence_terms(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "incomplete-manual-evidence-animation-report.md"
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        (
+            "| `820x620` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at compact size |"
+        ),
+        "| `820x620` | `pass` | `pass` | `pass` | menu play layout checked |",
+    )
+    report_text = report_text.replace(
+        "| Pause / Resume | `pass` | pause resume returns to run state | none |",
+        "| Pause / Resume | `pass` | pause overlay checked | none |",
+    )
+    report_text = report_text.replace(
+        (
+            "| Action Picker | `pass` | picker option text stayed readable | "
+            "choreography cues pointed at target lane | none |"
+        ),
+        ("| Action Picker | `pass` | picker visible | choreography cue visible | none |"),
+    )
+    report_text = report_text.replace(
+        "| Impact Values | `pass` | delta displayed target and value | none |",
+        "| Impact Values | `pass` | impact visible | none |",
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert (
+        "window matrix 820x620 evidence missing observed terms: primary, disabled, motion"
+        in validation.findings
+    )
+    assert (
+        "control check evidence Pause / Resume notes missing observed terms: resume, run"
+        in validation.findings
+    )
+    assert (
+        "scene check evidence Action Picker readability notes missing observed terms: option, text"
+        in validation.findings
+    )
+    assert (
+        "scene check evidence Action Picker motion notes missing observed terms: target, lane"
+        in validation.findings
+    )
+    assert (
+        "game-feel check evidence Impact Values notes missing observed terms: delta, target, value"
+        in validation.findings
+    )
 
 
 def test_validate_2d_animation_playtest_report_rejects_missing_visible_route(
@@ -4713,12 +4779,15 @@ def test_validate_2d_animation_playtest_report_rejects_missing_required_rows(
     report_path = tmp_path / "partial-animation-report.md"
     report_text = _completed_animation_playtest_report_text()
     report_text = report_text.replace(
-        "| `960x640` | `pass` | `pass` | `pass` | menu and play checked at small laptop size |\n",
+        (
+            "| `960x640` | `pass` | `pass` | `pass` | "
+            "menu play primary disabled layout motion checked at small laptop size |\n"
+        ),
         "",
     )
     report_text = report_text.replace(
-        "| Inspector | `pass` | selected row and pager stayed visible | "
-        "actor routing did not hide status chips | none |\n",
+        "| Inspector | `pass` | selected row pager stayed visible | "
+        "actor routing did not hide status chip | none |\n",
         "",
     )
     report_path.write_text(report_text, encoding="utf-8")
