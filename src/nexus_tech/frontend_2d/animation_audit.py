@@ -900,6 +900,15 @@ def validate_2d_animation_playtest_report(report_path: Path) -> AnimationPlaytes
         value = _extract_report_field(text, label)
         if _is_placeholder_field(value):
             findings.append(f"missing field: {label}")
+            continue
+        if label in REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS and not _is_clear_signoff_value(
+            value
+        ):
+            findings.append(f"blocker field is not clear: {label}")
+        if label == "Required fixes before presenting" and not _is_clear_signoff_value(value):
+            findings.append("required fixes before presenting are not clear")
+        if label == "Validator result" and not _is_passing_result(value):
+            findings.append("validator result is not pass")
 
     return AnimationPlaytestReportValidation(
         path=str(report_path),
@@ -1533,6 +1542,17 @@ def _is_passing_result(value: str) -> bool:
         or normalized.startswith("pass ")
         or normalized.startswith("passed ")
         or normalized.startswith("success ")
+    )
+
+
+def _is_clear_signoff_value(value: str) -> bool:
+    normalized = _normalize_report_result(value)
+    return (
+        normalized in {"none", "no", "no issues", "no blockers", "no required fixes", "clear"}
+        or normalized.startswith("none ")
+        or normalized.startswith("no ")
+        or normalized.endswith(" none")
+        or normalized.endswith(" clear")
     )
 
 

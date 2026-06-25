@@ -76,6 +76,8 @@ pass.
 Generated report drafts include the same required-term prompts in each affected
 manual row, but those prompts must be replaced with observed notes before final
 validation; leftover prompt text is treated as missing evidence.
+For a `pass` release decision, all release-blocker fields and `Required fixes
+before presenting` must be clear, and `Validator result` must be pass.
 
 ## Demo Verification
 
@@ -141,6 +143,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat missing visible Back/Pause/Menu controls, missing hover/cursor affordance on primary controls, or `Esc` quitting the run without pause confirmation as release blockers before presenting the 2D build.
 - Treat 820x620 title/run/summary/review captures with overlapping navigation, cut-off cards, or action buttons spilling outside their panels as release blockers before presenting the 2D build.
 - Treat `audit-2d-animation-matrix` failures as release blockers for the default seven-scenario, three-seed presentation matrix.
+- Treat any non-clear release-blocker field, required fix before presenting, or non-pass validator result as a release blocker even when the release decision says `pass`.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.
 - Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures, and review the uploaded `nexus-tech-2d-animation-matrix` and `nexus-tech-2d-animation-playtest-prep` artifacts before manual presentation playtests.
 - Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md`, and `docs/ANIMATION_PLAYTEST_CHECKLIST_2026-06-06.md` for the remaining open-window readability pass before presenting the 2D build.

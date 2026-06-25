@@ -50,6 +50,8 @@ manual rows; replace the prompt text with real observations that still include
 the required terms before final validation. The validator treats leftover prompt
 text as missing evidence, including route-recording prompts and automated-gate
 `Record command output...` placeholders.
+For a `pass` release decision, release blocker fields and required fixes must
+be clear, and `Validator result` must be a passing value.
 
 ## Build
 

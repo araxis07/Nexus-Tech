@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.183.0 - 2026-06-26
+
+- Tightened final animation signoff validation so blocker fields must be clear before a pass release decision is accepted
+- Required `Validator result` to be a passing value and `Required fixes before presenting` to be clear in completed manual reports
+- Updated regression coverage and docs so final animation signoff cannot pass with unresolved UI/layout blockers hidden in decision fields
+
 ## 0.182.0 - 2026-06-26
 
 - Tightened final animation report validation so generated evidence prompts cannot be reused as passing tester evidence

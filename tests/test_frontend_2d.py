@@ -4788,6 +4788,33 @@ def test_validate_2d_animation_playtest_report_rejects_template_prompt_evidence_
     assert "missing visible route evidence note: 1" in validation.findings
 
 
+def test_validate_2d_animation_playtest_report_rejects_uncleared_signoff_fields(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "uncleared-signoff-animation-report.md"
+    report_text = _completed_animation_playtest_report_text()
+    report_text = report_text.replace(
+        "- Actor, tooltip, footer, modal, or button collisions: none",
+        "- Actor, tooltip, footer, modal, or button collisions: tooltip overlaps footer at 820x620",
+    )
+    report_text = report_text.replace(
+        "- Required fixes before presenting: none",
+        "- Required fixes before presenting: fix compact pause overlay",
+    )
+    report_text = report_text.replace("- Validator result: pass", "- Validator result: fail")
+    report_path.write_text(report_text, encoding="utf-8")
+
+    validation = validate_2d_animation_playtest_report(report_path)
+
+    assert validation.status == "fail"
+    assert (
+        "blocker field is not clear: Actor, tooltip, footer, modal, or button collisions"
+        in validation.findings
+    )
+    assert "required fixes before presenting are not clear" in validation.findings
+    assert "validator result is not pass" in validation.findings
+
+
 def test_validate_2d_animation_playtest_report_rejects_incomplete_manual_evidence_terms(
     tmp_path: Path,
 ) -> None:

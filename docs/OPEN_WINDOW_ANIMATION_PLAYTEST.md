@@ -77,6 +77,8 @@ The generated report draft prints `Pass notes must mention: ...` in those rows;
 use it as a checklist, then replace it with actual observed evidence. Final
 validation treats leftover prompt text or `Record ...` placeholders as missing
 evidence.
+For a final `pass`, all release-blocker fields must be clear, `Required fixes
+before presenting` must be clear, and `Validator result` must be pass.
 
 Use `--window-size` instead of hand-resizing windows during the manual pass:
 
