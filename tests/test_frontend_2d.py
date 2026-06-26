@@ -5134,6 +5134,50 @@ def test_audit_2d_visual_command_reports_scene_matrix(monkeypatch, tmp_path: Pat
     assert calls["output_dir"] == tmp_path
 
 
+def test_audit_2d_visual_command_accepts_focused_viewports(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_visual_audit(**kwargs):
+        calls.update(kwargs)
+        return VisualAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            motion_mode=kwargs["motion_mode"].value,
+            cells=(),
+        )
+
+    monkeypatch.setattr(cli_module, "run_2d_visual_audit", fake_run_2d_visual_audit)
+
+    result = runner.invoke(
+        app,
+        [
+            "audit-2d-visual",
+            "--viewport",
+            "820x620",
+            "--viewport",
+            "1440x900",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["sizes"] == ((820, 620), (1440, 900))
+
+
+def test_audit_2d_visual_command_rejects_invalid_focused_viewport(monkeypatch) -> None:
+    monkeypatch.setattr(
+        cli_module,
+        "run_2d_visual_audit",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("audit should not run")),
+    )
+
+    result = runner.invoke(app, ["audit-2d-visual", "--viewport", "small"])
+
+    assert result.exit_code == 1
+    assert "Invalid Visual Audit Viewport" in result.output
+    assert "Use WIDTHxHEIGHT" in result.output
+
+
 def test_audit_2d_animation_command_reports_completeness_matrix(monkeypatch) -> None:
     calls: dict[str, object] = {}
 

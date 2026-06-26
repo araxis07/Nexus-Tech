@@ -24,8 +24,8 @@ uv run nexus-tech menu-2d --headless --max-frames 2 --motion-mode reduced
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode off
-uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7
-uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off
+uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --viewport 820x620 --viewport 960x640 --viewport 1440x900
+uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off --viewport 820x620 --viewport 960x640 --viewport 1440x900
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md

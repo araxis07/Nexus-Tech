@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.186.0 - 2026-06-26
+
+- Added repeatable `audit-2d-visual --viewport WIDTHxHEIGHT` filtering for fast responsive-layout QA captures
+- Kept the full visual audit matrix as the default while documenting the 820x620, 960x640, and 1440x900 manual-review subset
+- Added CLI regression coverage for focused viewport parsing and invalid viewport rejection
+
 ## 0.185.0 - 2026-06-26
 
 - Tightened final animation report validation so leftover draft warning text and `owner/date if not pass` placeholders fail template cleanup

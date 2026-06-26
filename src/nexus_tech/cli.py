@@ -279,6 +279,14 @@ VISUAL_AUDIT_OUTPUT_DIR_OPTION = typer.Option(
     "--output-dir",
     help="Optional directory for PNG captures. Omit to keep the audit in-memory only.",
 )
+VISUAL_AUDIT_VIEWPORT_OPTION = typer.Option(
+    None,
+    "--viewport",
+    help=(
+        "Optional visual-audit viewport as WIDTHxHEIGHT. Repeat to audit a focused "
+        "subset; omit to run the full matrix."
+    ),
+)
 ANIMATION_MATRIX_SEED_OPTION = typer.Option(
     None,
     "--seed",
@@ -384,6 +392,26 @@ def resolve_2d_window_size(value: str) -> tuple[int, int]:
             Panel.fit(
                 str(error),
                 title="Invalid 2D Window Size",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+
+def resolve_2d_visual_audit_viewports(
+    values: list[str] | None,
+) -> tuple[tuple[int, int], ...] | None:
+    """Parse optional visual-audit viewport overrides without changing the default matrix."""
+
+    if not values:
+        return None
+    try:
+        return tuple(parse_2d_window_size(value) for value in values)
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Invalid Visual Audit Viewport",
                 border_style="red",
             )
         )
@@ -914,17 +942,22 @@ def audit_2d_visual_command(
     ),
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
     output_dir: Path | None = VISUAL_AUDIT_OUTPUT_DIR_OPTION,
+    viewport: list[str] | None = VISUAL_AUDIT_VIEWPORT_OPTION,
 ) -> None:
     """Capture deterministic 2D scene frames and verify visual/motion layers."""
 
+    sizes = resolve_2d_visual_audit_viewports(viewport)
     try:
-        report = run_2d_visual_audit(
+        audit_kwargs = dict(
             scenario_id=scenario,
             difficulty_mode=difficulty,
             seed=seed,
             motion_mode=motion_mode,
             output_dir=output_dir,
         )
+        if sizes is not None:
+            audit_kwargs["sizes"] = sizes
+        report = run_2d_visual_audit(**audit_kwargs)
     except Frontend2DUnavailableError as error:
         console.print(
             Panel.fit(

@@ -525,6 +525,15 @@ Run the deterministic 2D visual QA capture audit:
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7
 ```
 
+For a fast focused visual pass while iterating on a responsive layout, repeat
+`--viewport` instead of rendering the full matrix:
+
+```bash
+uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 \
+  --viewport 820x620 --viewport 960x640 --viewport 1440x900 \
+  --output-dir /tmp/nexus-tech-visual-audit/focused
+```
+
 Run the combined 2D animation-completeness gate:
 
 ```bash
@@ -589,7 +598,7 @@ follow-up placeholders before final validation.
 
 The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, and uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep` after the CI animation gates.
 
-Use `--motion-mode reduced` or `--motion-mode off` on `play-2d`, `menu-2d`, `audit-2d-motion`, and `audit-2d-visual` when you want quieter highlight, entity, action-feedback, late-game choreography, pending-preview, summary-lane, and scene-transition animation while keeping the same gameplay state and controls. Use `--window-size 820x620`, `--window-size 960x640`, or `--window-size 1440x900` on visible `play-2d` and `menu-2d` runs to match the manual animation window matrix exactly.
+Use `--motion-mode reduced` or `--motion-mode off` on `play-2d`, `menu-2d`, `audit-2d-motion`, and `audit-2d-visual` when you want quieter highlight, entity, action-feedback, late-game choreography, pending-preview, summary-lane, and scene-transition animation while keeping the same gameplay state and controls. Use `--window-size 820x620`, `--window-size 960x640`, or `--window-size 1440x900` on visible `play-2d` and `menu-2d` runs to match the manual animation window matrix exactly. Use repeated `audit-2d-visual --viewport WIDTHxHEIGHT` values to capture only the responsive sizes under review; omit the option for the full CI matrix.
 
 Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md` and `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md` for the manual open-window pass that checks compact, small, and presentation windows across full, reduced, and off motion modes after the automated gates pass.
 Completed manual reports must include specific observed evidence in the required notes cells; generic notes such as `ok`, `clear`, `readable`, `stable`, or `none` fail `validate-animation-playtest-report`.

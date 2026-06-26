@@ -67,6 +67,7 @@ from nexus_tech.frontend_2d.widgets import (
     draw_progress_bar,
     draw_text_line,
     draw_wrapped_text,
+    fit_text_line,
     tone_color,
 )
 from nexus_tech.persistence.errors import PersistenceError
@@ -5117,7 +5118,8 @@ class RunScene(BaseScene):
         clip_width = 124 if width >= 1040 else 108
         total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
         left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 10)
-        top = max(anchor_rect.top - 36, 18)
+        # Leave a clear vertical lane between overlay actors and header summaries.
+        top = max(anchor_rect.top - 44, 18)
         for index, clip in enumerate(visible_clips):
             clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
             self._record_actor_sprite_bounds(clip, clip_rect)
@@ -8596,7 +8598,18 @@ class RunScene(BaseScene):
             emphasis=max(panel_motion, overlay_motion, inspector_motion),
             lift=int(max(panel_motion, overlay_motion, inspector_motion) * 5),
         )
-        title_surface = self.fonts.title.render(f"{panel.title} Inspector", True, TEXT)
+        viewport_width, _viewport_height = surface.get_size()
+        actor_reserve = 0
+        if self.inspector_actor_active():
+            actor_width = 124 if viewport_width >= 1040 else 108
+            # Keep header copy out of the actor chip's visual lane on compact overlays.
+            actor_reserve = actor_width + 20
+        header_text_width = max(220, inner.width - actor_reserve)
+        title_surface = self.fonts.title.render(
+            fit_text_line(self.fonts.title, f"{panel.title} Inspector", header_text_width),
+            True,
+            TEXT,
+        )
         surface.blit(title_surface, (inner.left, inner.top - 28))
         self._draw_overlay_actor_sprite_layer(
             surface,
@@ -8609,7 +8622,7 @@ class RunScene(BaseScene):
             self.fonts.body,
             panel.summary,
             MUTED,
-            pygame.Rect(inner.left, inner.top, inner.width, 42),
+            pygame.Rect(inner.left, inner.top, header_text_width, 42),
             line_height=18,
             max_lines=2,
         )
