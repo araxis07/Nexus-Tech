@@ -20,6 +20,7 @@ uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-r
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
@@ -60,6 +61,10 @@ signoff evidence. It also includes a validated `Manual Runbook` for artifact
 refresh, visible-window execution, evidence-fill, and final validator exit
 criteria. Add `--output /tmp/nexus-tech-animation-playtest-plan.md` when you
 need a handoff artifact.
+Use `animation-playtest-next` when you need the shortest possible next action:
+it reads the current report and command queue, then prints the next evidence
+area and first visible-window command still called out by validation. It does not
+mark manual signoff complete.
 Use `validate-animation-playtest-plan` after writing the plan artifact so stale
 status, open-item counts, missing visible-route rows, missing checklist rows, or
 missing runbook/manual-result guards are caught before handoff.

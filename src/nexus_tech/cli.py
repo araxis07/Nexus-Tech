@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
@@ -57,6 +58,8 @@ from nexus_tech.domain.models import (
 from nexus_tech.frontend_2d import (
     DEFAULT_ANIMATION_MATRIX_SCENARIOS,
     DEFAULT_ANIMATION_MATRIX_SEEDS,
+    AnimationPlaytestCommand,
+    AnimationPlaytestReadinessPlan,
     AnimationPlaytestReportValidation,
     Frontend2DUnavailableError,
     MotionMode,
@@ -1590,6 +1593,162 @@ def animation_playtest_plan_command(
         )
     if fail_on_incomplete and plan.status != "pass":
         raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-next")
+def animation_playtest_next_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the single next manual animation QA action to run or fill."""
+
+    validate_scenario_id(scenario)
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+    )
+    next_step = plan.steps[0]
+    route_item = _next_animation_playtest_route_item(plan)
+
+    table = Table(title="Animation Playtest Next Action")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", plan.status.upper())
+    table.add_row("Open Items", str(plan.open_item_count))
+    table.add_row("Next Area", next_step.area)
+    table.add_row("Next Step", next_step.next_step)
+    console.print(table)
+
+    if route_item is not None:
+        route_index = plan.visible_route.index(route_item) + 1
+        evidence_prompt = _animation_playtest_route_prompt(
+            route_item.target,
+            route_item.window_size,
+            route_item.motion_mode,
+        )
+        route_table = Table(title="Next Visible-Window Command")
+        route_table.add_column("Step", justify="right")
+        route_table.add_column("Target", style="cyan")
+        route_table.add_column("Window")
+        route_table.add_column("Motion")
+        route_table.add_column("Evidence To Record")
+        route_table.add_column("Command")
+        route_table.add_row(
+            str(route_index),
+            route_item.target,
+            route_item.window_size,
+            route_item.motion_mode,
+            evidence_prompt,
+            route_item.command,
+        )
+        console.print(route_table)
+        console.print(
+            Panel.fit(
+                evidence_prompt,
+                title="Evidence To Record",
+                border_style="yellow",
+            )
+        )
+        console.print(
+            Panel.fit(
+                route_item.command,
+                title="Run Next Visible Command",
+                border_style="cyan",
+            )
+        )
+    elif plan.commands.status != "pass":
+        console.print(
+            Panel.fit(
+                "Regenerate and validate the command queue before opening visible windows.",
+                title="Animation Playtest Next Action",
+                border_style="red",
+            )
+        )
+    elif plan.status == "pass":
+        console.print(
+            Panel.fit(
+                "Manual animation signoff is complete. Attach the passing report before release.",
+                title="Animation Playtest Next Action",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel.fit(
+                "No visible-window command is next; fill the next report evidence area above.",
+                title="Animation Playtest Next Action",
+                border_style="yellow",
+            )
+        )
+
+    if fail_on_incomplete and plan.status != "pass":
+        raise typer.Exit(code=1)
+
+
+def _next_animation_playtest_route_item(
+    plan: AnimationPlaytestReadinessPlan,
+) -> AnimationPlaytestCommand | None:
+    """Return the first visible route command still called out by report validation."""
+
+    if plan.commands.status != "pass":
+        return None
+    if not any("visible route" in finding.lower() for finding in plan.report.findings):
+        return None
+
+    route_index = _first_animation_playtest_route_finding_index(plan.report.findings)
+    if route_index is None:
+        route_index = 1
+    if not 1 <= route_index <= len(plan.visible_route):
+        return None
+    return plan.visible_route[route_index - 1]
+
+
+def _first_animation_playtest_route_finding_index(findings: tuple[str, ...]) -> int | None:
+    """Extract the first visible-route row index from validator findings."""
+
+    route_patterns = (
+        r"visible route evidence row (\d+)",
+        r"visible route evidence result: (\d+)",
+        r"visible route evidence note: (\d+)",
+        r"missing visible route evidence row: (\d+)",
+        r"incomplete visible route evidence result: (\d+)",
+        r"visible test route row (\d+)",
+        r"missing visible test route row: (\d+)",
+    )
+    route_indexes: list[int] = []
+    for finding in findings:
+        normalized = finding.lower()
+        for pattern in route_patterns:
+            match = re.search(pattern, normalized)
+            if match is None:
+                continue
+            route_indexes.append(int(match.group(1)))
+            break
+    return min(route_indexes) if route_indexes else None
+
+
+def _animation_playtest_route_prompt(target: str, window_size: str, motion_mode: str) -> str:
+    """Return compact evidence copy for one visible-window route command."""
+
+    window_context = f"{window_size} {motion_mode}"
+    if target == "menu":
+        return (
+            "Record title/menu, wizard, save-slot, archive, meta-board, hover, "
+            f"and text-fit observations for {window_context}."
+        )
+    return (
+        "Record dashboard, action picker, pending event, inspector, endgame, "
+        f"summary, pause/back, and motion-feel observations for {window_context}."
+    )
 
 
 @app.command("validate-animation-playtest-plan")

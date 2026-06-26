@@ -5903,6 +5903,66 @@ def test_animation_playtest_plan_command_accepts_completed_report(
     assert "Release Signoff" in result.output
 
 
+def test_animation_playtest_next_command_shows_first_visible_route(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.189.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-20",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-next",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Next Action" in result.output
+    assert "MANUAL-REQUIRED" in result.output
+    assert "Next Visible-Window Command" in result.output
+    assert "menu-2d --window-size 820x620 --motion-mode full" in result.output
+    assert "Record title/menu, wizard, save-slot, archive" in result.output
+
+
+def test_animation_playtest_next_command_accepts_completed_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "signed-animation-report.md"
+    commands_path = tmp_path / "manual-animation-commands.md"
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        ["animation-playtest-next", str(report_path), str(commands_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "PASS" in result.output
+    assert "Manual animation signoff is complete" in result.output
+    assert "Next Visible-Window Command" not in result.output
+
+
 def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     tmp_path: Path,
 ) -> None:

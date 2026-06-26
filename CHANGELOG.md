@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.189.0 - 2026-06-27
+
+- Added `animation-playtest-next` to surface the next manual animation QA action and first visible-window command still required by validation
+- Kept manual signoff strict by reporting next evidence work without marking any route or report row complete automatically
+- Updated docs and regression coverage for the single-next-action animation playtest workflow
+
 ## 0.188.0 - 2026-06-26
 
 - Added per-viewport visual audit contact sheets that combine every captured 2D scene for faster manual layout review
