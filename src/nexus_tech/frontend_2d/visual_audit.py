@@ -44,6 +44,7 @@ MIN_NON_DARK_RATIO = 0.05
 MAX_EDGE_DENSITY = 0.72
 MAX_BRIGHT_RATIO = 0.42
 VISUAL_AUDIT_SUMMARY_NAME = "visual-audit-summary.md"
+VISUAL_AUDIT_CONTACT_SHEET_PREFIX = "visual-audit-contact-sheet"
 MIN_CLICK_TARGET_WIDTH = 28
 MIN_CLICK_TARGET_HEIGHT = 24
 
@@ -742,6 +743,7 @@ def run_2d_visual_audit(
             output_dir=output_dir_text,
         )
         if output_dir is not None:
+            _write_visual_audit_contact_sheets(pygame, report, output_dir)
             _write_visual_audit_summary(report, output_dir)
         return report
     finally:
@@ -991,6 +993,66 @@ def _write_visual_audit_summary(report: VisualAuditReport, output_dir: Path) -> 
         "\n".join(lines) + "\n",
         encoding="utf-8",
     )
+
+
+def _write_visual_audit_contact_sheets(pygame, report: VisualAuditReport, output_dir: Path) -> None:
+    """Create one compact visual-review sheet for each audited viewport."""
+
+    grouped_cells: dict[tuple[int, int], list[VisualAuditCell]] = {}
+    for cell in report.cells:
+        if cell.output_path is not None:
+            grouped_cells.setdefault((cell.width, cell.height), []).append(cell)
+
+    for (width, height), cells in sorted(grouped_cells.items()):
+        columns = min(3, len(cells))
+        thumbnail_width = min(320, max(180, int(width * 0.3)))
+        thumbnail_height = max(120, int(thumbnail_width * height / width))
+        label_height = 28
+        header_height = 40
+        padding = 16
+        gap = 12
+        rows = (len(cells) + columns - 1) // columns
+        sheet_width = padding * 2 + columns * thumbnail_width + (columns - 1) * gap
+        sheet_height = (
+            padding * 2
+            + header_height
+            + rows * (label_height + thumbnail_height)
+            + (rows - 1) * gap
+        )
+        sheet = pygame.Surface((sheet_width, sheet_height))
+        sheet.fill((8, 13, 22))
+        title_font = pygame.font.Font(None, 26)
+        label_font = pygame.font.Font(None, 18)
+        title = title_font.render(
+            f"NEXUS TECH visual QA | {width}x{height} | {report.motion_mode}",
+            True,
+            (222, 231, 241),
+        )
+        sheet.blit(title, (padding, padding + 8))
+
+        for index, cell in enumerate(cells):
+            source = pygame.image.load(cell.output_path).convert()
+            thumbnail = pygame.transform.smoothscale(
+                source,
+                (thumbnail_width, thumbnail_height),
+            )
+            column = index % columns
+            row = index // columns
+            left = padding + column * (thumbnail_width + gap)
+            top = padding + header_height + row * (label_height + thumbnail_height + gap)
+            tile_rect = pygame.Rect(
+                left - 1,
+                top - 1,
+                thumbnail_width + 2,
+                label_height + thumbnail_height + 2,
+            )
+            pygame.draw.rect(sheet, (30, 56, 82), tile_rect, width=1, border_radius=4)
+            label = label_font.render(cell.scene_key.replace("_", " "), True, (169, 190, 214))
+            sheet.blit(label, (left + 6, top + 6))
+            sheet.blit(thumbnail, (left, top + label_height))
+
+        contact_sheet = output_dir / f"{VISUAL_AUDIT_CONTACT_SHEET_PREFIX}-{width}x{height}.png"
+        pygame.image.save(sheet, contact_sheet)
 
 
 def _active_layers(scene) -> tuple[str, ...]:

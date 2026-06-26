@@ -534,6 +534,11 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 \
   --output-dir /tmp/nexus-tech-visual-audit/focused
 ```
 
+When `--output-dir` is set, each viewport also writes a
+`visual-audit-contact-sheet-WIDTHxHEIGHT.png` that combines every audited scene
+for quick manual layout review. Individual captures and the Markdown summary
+remain available for detail checks.
+
 Run the combined 2D animation-completeness gate:
 
 ```bash

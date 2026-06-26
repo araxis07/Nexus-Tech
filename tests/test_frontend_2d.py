@@ -3352,6 +3352,8 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     summary_path = tmp_path / VISUAL_AUDIT_SUMMARY_NAME
     assert summary_path.exists()
+    contact_sheet_path = tmp_path / "visual-audit-contact-sheet-820x620.png"
+    assert contact_sheet_path.exists()
     summary = summary_path.read_text(encoding="utf-8")
     assert "NEXUS TECH 2D Visual Audit" in summary
     assert report.baseline_signature in summary

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.188.0 - 2026-06-26
+
+- Added per-viewport visual audit contact sheets that combine every captured 2D scene for faster manual layout review
+- Kept individual captures and the Markdown summary, while documenting contact sheets as the first manual-review artifact
+- Added regression coverage for contact-sheet generation
+
 ## 0.187.0 - 2026-06-26
 
 - Aligned generated animation playtest preflight commands with the 820x620, 960x640, and 1440x900 responsive review matrix

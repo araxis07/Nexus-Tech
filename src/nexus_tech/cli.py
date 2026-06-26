@@ -1002,7 +1002,7 @@ def audit_2d_visual_command(
     if report.output_dir is not None:
         console.print(
             Panel.fit(
-                f"PNG captures written to {report.output_dir}",
+                f"PNG captures and viewport contact sheets written to {report.output_dir}",
                 title="2D Visual Captures",
                 border_style="cyan",
             )

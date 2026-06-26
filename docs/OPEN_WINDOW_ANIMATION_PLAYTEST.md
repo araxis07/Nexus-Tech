@@ -24,7 +24,7 @@ uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-pla
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
-Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
+Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with each `visual-audit-contact-sheet-WIDTHxHEIGHT.png`, then use `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
 
 The generated playtest prep report also lists balance and long-session preflight commands. Run those before the visible-window pass; any balance `watch` or `fail` should be fixed or explicitly named as intentional scenario pressure before adding more animation layers.
 
