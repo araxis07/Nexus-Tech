@@ -2010,11 +2010,13 @@ def write_2d_animation_playtest_prep_report(
         ),
         (
             "uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 "
+            "--viewport 820x620 --viewport 960x640 --viewport 1440x900 "
             "--output-dir /tmp/nexus-tech-visual-audit/full"
         ),
         (
             "uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 "
-            "--motion-mode off --output-dir /tmp/nexus-tech-visual-audit/off"
+            "--motion-mode off --viewport 820x620 --viewport 960x640 "
+            "--viewport 1440x900 --output-dir /tmp/nexus-tech-visual-audit/off"
         ),
         "uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1",
         (

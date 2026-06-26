@@ -3871,6 +3871,14 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
         "play-2d --scenario founder_journey --seed 7 --window-size 960x640 --motion-mode reduced"
     ) in report_text
     assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
+    assert (
+        "audit-2d-visual --scenario founder_journey --seed 7 --viewport 820x620 "
+        "--viewport 960x640 --viewport 1440x900"
+    ) in report_text
+    assert (
+        "audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off "
+        "--viewport 820x620 --viewport 960x640 --viewport 1440x900"
+    ) in report_text
     assert "## Control Clarity Checklist" in report_text
     assert "Pause / Resume" in report_text
     assert "Back / Escape" in report_text

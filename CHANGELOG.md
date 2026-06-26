@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.187.0 - 2026-06-26
+
+- Aligned generated animation playtest preflight commands with the 820x620, 960x640, and 1440x900 responsive review matrix
+- Added regression coverage so exported full and motion-off visual audit commands retain every required viewport
+
 ## 0.186.0 - 2026-06-26
 
 - Added repeatable `audit-2d-visual --viewport WIDTHxHEIGHT` filtering for fast responsive-layout QA captures
