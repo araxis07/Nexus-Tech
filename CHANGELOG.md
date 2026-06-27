@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.193.0 - 2026-06-28
+
+- Added `animation-playtest-recorder-next` to pair the next visible-window manual run with the matching safe recorder command
+- Kept manual signoff protected by emitting editable placeholders instead of writing observed evidence automatically
+- Updated docs and regression coverage for guided recorder handoff during the remaining animation QA pass
+
 ## 0.192.0 - 2026-06-28
 
 - Added manual animation report recorders for control, scene, game-feel, and build/blocker/decision fields

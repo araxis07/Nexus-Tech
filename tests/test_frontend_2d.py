@@ -39,6 +39,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
+    build_2d_animation_playtest_recorder_hint,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -6249,6 +6250,98 @@ def test_animation_playtest_next_command_accepts_completed_report(
     assert "PASS" in result.output
     assert "Manual animation signoff is complete" in result.output
     assert "Next Visible-Window Command" not in result.output
+
+
+def test_build_animation_playtest_recorder_hint_shows_first_route_recorder(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.193.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+
+    hint = build_2d_animation_playtest_recorder_hint(
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert hint.status == "manual-required"
+    assert hint.area == "Visible Route Evidence"
+    assert hint.target == "1"
+    assert "menu-2d --window-size 820x620 --motion-mode full" in hint.visible_command
+    assert "record-animation-playtest-route" in hint.recorder_command
+    assert "--notes '<replace with observed visible-window notes>'" in hint.recorder_command
+    assert hint.required_terms == ("title", "wizard", "save", "archive", "meta", "hover", "text")
+
+
+def test_animation_playtest_recorder_next_command_shows_safe_placeholder(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.193.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-recorder-next",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Recorder Next" in result.output
+    assert "MANUAL-REQUIRED" in result.output
+    assert "Run Visible Command First" in result.output
+    assert "menu-2d --window-size 820x620 --motion-mode full" in result.output
+    assert "record-animation-playtest-route" in result.output
+    assert "Evidence To Record" in result.output
+    assert "Required Evidence Terms" in result.output
+
+
+def test_animation_playtest_recorder_next_command_accepts_completed_report(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "signed-animation-report.md"
+    commands_path = tmp_path / "manual-animation-commands.md"
+    report_path.write_text(_completed_animation_playtest_report_text(), encoding="utf-8")
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        ["animation-playtest-recorder-next", str(report_path), str(commands_path)],
+    )
+
+    assert result.exit_code == 0
+    assert "PASS" in result.output
+    assert "validate-animation-playtest-report" in result.output
+    assert "Manual animation signoff is complete" in result.output
 
 
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:

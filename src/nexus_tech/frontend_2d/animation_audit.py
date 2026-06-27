@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -710,6 +711,19 @@ class AnimationPlaytestReportRecord:
     result: str
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestRecorderHint:
+    """Next safe recorder command for a manual animation report."""
+
+    status: str
+    area: str
+    target: str
+    recorder_command: str
+    evidence_prompt: str
+    required_terms: tuple[str, ...] = ()
+    visible_command: str = ""
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1055,6 +1069,350 @@ def build_2d_animation_playtest_readiness_plan(
         steps=tuple(steps),
         visible_route=visible_route,
     )
+
+
+def build_2d_animation_playtest_recorder_hint(
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestRecorderHint:
+    """Return the next manual recorder command without filling tester evidence."""
+
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    if plan.commands.status != "pass":
+        return AnimationPlaytestRecorderHint(
+            status="blocked",
+            area="Command Queue",
+            target=str(command_path),
+            recorder_command=(
+                f"{command_prefix} animation-playtest-commands "
+                f"--scenario {_shell_arg(scenario_id)} --seed {seed} "
+                f"--command-prefix {_shell_arg(command_prefix)} "
+                f"--output {_shell_arg(command_path)}"
+            ),
+            evidence_prompt="Regenerate and validate the visible-window command queue first.",
+        )
+
+    if plan.status == "pass":
+        return AnimationPlaytestRecorderHint(
+            status="pass",
+            area="Release Signoff",
+            target=str(report_path),
+            recorder_command=(
+                f"{command_prefix} validate-animation-playtest-report {_shell_arg(report_path)}"
+            ),
+            evidence_prompt="Manual animation signoff is complete; attach the passing report.",
+        )
+
+    route_hint = _build_next_route_recorder_hint(
+        plan,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if route_hint is not None:
+        return route_hint
+
+    window_hint = _build_next_window_recorder_hint(
+        plan.report.findings,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if window_hint is not None:
+        return window_hint
+
+    control_hint = _build_next_labeled_recorder_hint(
+        plan.report.findings,
+        report_path=report_path,
+        command_prefix=command_prefix,
+        marker="control check",
+        section="Control Clarity Results",
+        command_name="record-animation-playtest-control",
+        option_name="--notes",
+        labels=tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
+        evidence_terms=CONTROL_EVIDENCE_TERMS,
+        evidence_prompt_prefix="Replace placeholder with observed control notes.",
+    )
+    if control_hint is not None:
+        return control_hint
+
+    scene_hint = _build_next_scene_recorder_hint(
+        plan.report.findings,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if scene_hint is not None:
+        return scene_hint
+
+    feedback_hint = _build_next_labeled_recorder_hint(
+        plan.report.findings,
+        report_path=report_path,
+        command_prefix=command_prefix,
+        marker="game-feel check",
+        section="Game Feel Results",
+        command_name="record-animation-playtest-feedback",
+        option_name="--notes",
+        labels=tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
+        evidence_terms=FEEDBACK_EVIDENCE_TERMS,
+        evidence_prompt_prefix="Replace placeholder with observed feedback notes.",
+    )
+    if feedback_hint is not None:
+        return feedback_hint
+
+    field_hint = _build_next_field_recorder_hint(
+        plan.report.findings,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if field_hint is not None:
+        return field_hint
+
+    return AnimationPlaytestRecorderHint(
+        status="manual-required",
+        area="Template Cleanup",
+        target=str(report_path),
+        recorder_command=f"{command_prefix} animation-playtest-status {_shell_arg(report_path)}",
+        evidence_prompt="Review remaining template cleanup findings, then rerun recorder-next.",
+    )
+
+
+def _build_next_route_recorder_hint(
+    plan: AnimationPlaytestReadinessPlan,
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint | None:
+    route_index = _first_route_finding_index(plan.report.findings)
+    if route_index is None or not 1 <= route_index <= len(plan.visible_route):
+        return None
+
+    route_item = plan.visible_route[route_index - 1]
+    required_terms = (
+        MENU_ROUTE_EVIDENCE_TERMS if route_item.target == "menu" else PLAY_ROUTE_EVIDENCE_TERMS
+    )
+    evidence_prompt = (
+        f"Run the visible command first, then replace the notes placeholder with observed "
+        f"{route_item.target} evidence mentioning: {', '.join(required_terms)}."
+    )
+    return AnimationPlaytestRecorderHint(
+        status="manual-required",
+        area="Visible Route Evidence",
+        target=str(route_index),
+        recorder_command=(
+            f"{command_prefix} record-animation-playtest-route "
+            f"{_shell_arg(report_path)} {route_index} --result pass "
+            "--notes '<replace with observed visible-window notes>'"
+        ),
+        evidence_prompt=evidence_prompt,
+        required_terms=required_terms,
+        visible_command=route_item.command,
+    )
+
+
+def _build_next_window_recorder_hint(
+    findings: tuple[str, ...],
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint | None:
+    window_size = _first_window_finding_label(findings)
+    if window_size is None:
+        return None
+    return AnimationPlaytestRecorderHint(
+        status="manual-required",
+        area="Window Matrix",
+        target=window_size,
+        recorder_command=(
+            f"{command_prefix} record-animation-playtest-window "
+            f"{_shell_arg(report_path)} {_shell_arg(window_size)} "
+            "--full pass --reduced pass --off pass "
+            "--notes '<replace with observed window-matrix notes>'"
+        ),
+        evidence_prompt=(
+            "Replace the notes placeholder after testing this window across full, reduced, "
+            f"and off modes. Required terms: {', '.join(WINDOW_MATRIX_EVIDENCE_TERMS)}."
+        ),
+        required_terms=WINDOW_MATRIX_EVIDENCE_TERMS,
+    )
+
+
+def _build_next_labeled_recorder_hint(
+    findings: tuple[str, ...],
+    *,
+    report_path: Path,
+    command_prefix: str,
+    marker: str,
+    section: str,
+    command_name: str,
+    option_name: str,
+    labels: tuple[str, ...],
+    evidence_terms: dict[str, tuple[str, ...]],
+    evidence_prompt_prefix: str,
+) -> AnimationPlaytestRecorderHint | None:
+    label = _first_labeled_finding(findings, labels=labels, marker=marker)
+    if label is None:
+        return None
+    required_terms = evidence_terms[label]
+    return AnimationPlaytestRecorderHint(
+        status="manual-required",
+        area=section,
+        target=label,
+        recorder_command=(
+            f"{command_prefix} {command_name} {_shell_arg(report_path)} {_shell_arg(label)} "
+            "--result pass "
+            f"{option_name} '<replace with observed evidence notes>' --follow-up none"
+        ),
+        evidence_prompt=(f"{evidence_prompt_prefix} Required terms: {', '.join(required_terms)}."),
+        required_terms=required_terms,
+    )
+
+
+def _build_next_scene_recorder_hint(
+    findings: tuple[str, ...],
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint | None:
+    label = _first_labeled_finding(
+        findings,
+        labels=tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
+        marker="scene check",
+    )
+    if label is None:
+        return None
+    readability_terms = SCENE_READABILITY_EVIDENCE_TERMS[label]
+    motion_terms = SCENE_MOTION_EVIDENCE_TERMS[label]
+    return AnimationPlaytestRecorderHint(
+        status="manual-required",
+        area="Scene Results",
+        target=label,
+        recorder_command=(
+            f"{command_prefix} record-animation-playtest-scene "
+            f"{_shell_arg(report_path)} {_shell_arg(label)} --result pass "
+            "--readability-notes '<replace with observed readability notes>' "
+            "--motion-notes '<replace with observed motion notes>' --follow-up none"
+        ),
+        evidence_prompt=(
+            "Replace both placeholders after viewing the scene. "
+            f"Readability terms: {', '.join(readability_terms)}. "
+            f"Motion terms: {', '.join(motion_terms)}."
+        ),
+        required_terms=(*readability_terms, *motion_terms),
+    )
+
+
+def _build_next_field_recorder_hint(
+    findings: tuple[str, ...],
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint | None:
+    field_name = _first_field_finding_label(findings)
+    if field_name is None:
+        return None
+    return AnimationPlaytestRecorderHint(
+        status="manual-required",
+        area="Report Field",
+        target=field_name,
+        recorder_command=(
+            f"{command_prefix} record-animation-playtest-field "
+            f"{_shell_arg(report_path)} {_shell_arg(field_name)} "
+            "--value '<replace with final signoff value>'"
+        ),
+        evidence_prompt=(
+            "Replace the value placeholder with a real build, blocker, validator, or "
+            "decision value from the completed manual pass."
+        ),
+    )
+
+
+def _first_route_finding_index(findings: tuple[str, ...]) -> int | None:
+    route_patterns = (
+        r"visible route evidence row (\d+)",
+        r"visible route evidence result: (\d+)",
+        r"visible route evidence note: (\d+)",
+        r"missing visible route evidence row: (\d+)",
+        r"incomplete visible route evidence result: (\d+)",
+        r"visible test route row (\d+)",
+        r"missing visible test route row: (\d+)",
+    )
+    indexes: list[int] = []
+    for finding in findings:
+        normalized = finding.lower()
+        for pattern in route_patterns:
+            match = re.search(pattern, normalized)
+            if match is None:
+                continue
+            indexes.append(int(match.group(1)))
+            break
+    return min(indexes) if indexes else None
+
+
+def _first_window_finding_label(findings: tuple[str, ...]) -> str | None:
+    for finding in findings:
+        if "window matrix" not in finding.lower():
+            continue
+        match = re.search(r"\b(\d+x\d+)\b", finding.lower())
+        if match is not None:
+            return match.group(1)
+    return None
+
+
+def _first_labeled_finding(
+    findings: tuple[str, ...],
+    *,
+    labels: tuple[str, ...],
+    marker: str,
+) -> str | None:
+    normalized_marker = marker.lower()
+    for finding in findings:
+        if normalized_marker not in finding.lower():
+            continue
+        normalized_finding = _normalize_report_key(finding)
+        for label in labels:
+            if _normalize_report_key(label) in normalized_finding:
+                return label
+    return None
+
+
+def _first_field_finding_label(findings: tuple[str, ...]) -> str | None:
+    allowed_fields = (
+        *REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS,
+        "Release decision",
+        *REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS,
+        *REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS,
+    )
+    for finding in findings:
+        normalized = finding.lower()
+        if normalized.startswith("missing field: "):
+            field_name = finding.split(":", maxsplit=1)[1].strip()
+            return _normalize_allowed_manual_label(field_name, allowed_fields, "Report field")
+        if "release decision" in normalized:
+            return "Release decision"
+        if normalized.startswith("blocker field is not clear: "):
+            field_name = finding.split(":", maxsplit=1)[1].strip()
+            return _normalize_allowed_manual_label(field_name, allowed_fields, "Report field")
+        if "required fixes before presenting" in normalized:
+            return "Required fixes before presenting"
+        if "validator result" in normalized:
+            return "Validator result"
+    return None
+
+
+def _shell_arg(value: str | Path) -> str:
+    return shlex.quote(str(value))
 
 
 def write_2d_animation_playtest_readiness_plan(

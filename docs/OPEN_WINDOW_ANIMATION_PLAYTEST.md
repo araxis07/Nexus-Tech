@@ -21,6 +21,7 @@ uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
+uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
@@ -28,6 +29,7 @@ uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates -
 If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
 to `animation-playtest-commands`, `validate-animation-playtest-commands`,
 `animation-playtest-plan`, `animation-playtest-next`,
+`animation-playtest-recorder-next`,
 `validate-animation-playtest-plan`, and `prepare-animation-playtest-session`.
 The command queue and validators must use the same prefix.
 
@@ -71,6 +73,10 @@ Use `animation-playtest-next` when you need the shortest possible next action:
 it reads the current report and command queue, then prints the next evidence
 area and first visible-window command still called out by validation. It does not
 mark manual signoff complete.
+Use `animation-playtest-recorder-next` after a visible-window run to print the
+safe recorder command for the next incomplete report row. The generated recorder
+command intentionally contains a notes placeholder that must be replaced with
+real observed evidence before it can be used as signoff.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

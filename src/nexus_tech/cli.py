@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import textwrap
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
@@ -60,12 +61,14 @@ from nexus_tech.frontend_2d import (
     DEFAULT_ANIMATION_MATRIX_SEEDS,
     AnimationPlaytestCommand,
     AnimationPlaytestReadinessPlan,
+    AnimationPlaytestRecorderHint,
     AnimationPlaytestReportValidation,
     Frontend2DUnavailableError,
     MotionMode,
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
+    build_2d_animation_playtest_recorder_hint,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -1776,6 +1779,82 @@ def animation_playtest_next_command(
 
     if fail_on_incomplete and plan.status != "pass":
         raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-recorder-next")
+def animation_playtest_recorder_next_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the next safe recorder command for manual animation QA."""
+
+    validate_scenario_id(scenario)
+    hint = build_2d_animation_playtest_recorder_hint(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    _print_animation_playtest_recorder_hint(hint)
+
+    if fail_on_incomplete and hint.status != "pass":
+        raise typer.Exit(code=1)
+
+
+def _print_animation_playtest_recorder_hint(hint: AnimationPlaytestRecorderHint) -> None:
+    table = Table(title="Animation Playtest Recorder Next")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", hint.status.upper())
+    table.add_row("Area", hint.area)
+    table.add_row("Target", hint.target)
+    console.print(table)
+
+    if hint.visible_command:
+        console.print(
+            Panel.fit(
+                _wrap_animation_playtest_hint_text(hint.visible_command),
+                title="Run Visible Command First",
+                border_style="cyan",
+            )
+        )
+
+    console.print(
+        Panel.fit(
+            _wrap_animation_playtest_hint_text(hint.evidence_prompt),
+            title="Evidence To Record",
+            border_style="yellow" if hint.status != "pass" else "green",
+        )
+    )
+
+    if hint.required_terms:
+        terms_table = Table(title="Required Evidence Terms")
+        terms_table.add_column("Term", style="yellow")
+        for term in hint.required_terms:
+            terms_table.add_row(term)
+        console.print(terms_table)
+
+    console.print(
+        Panel.fit(
+            _wrap_animation_playtest_hint_text(hint.recorder_command),
+            title="Recorder Command",
+            border_style="cyan" if hint.status != "pass" else "green",
+        )
+    )
+
+
+def _wrap_animation_playtest_hint_text(value: str) -> str:
+    return textwrap.fill(value, width=68, break_long_words=True)
 
 
 @app.command("record-animation-playtest-window")
