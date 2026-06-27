@@ -68,6 +68,8 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     launch_2d_frontend,
     launch_2d_menu,
+    record_2d_animation_playtest_route_evidence,
+    record_2d_animation_playtest_window_evidence,
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
     run_2d_motion_audit,
@@ -377,6 +379,40 @@ ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT = typer.Argument(
     exists=True,
     dir_okay=False,
     help="Exported animation playtest plan Markdown file.",
+)
+ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
+    ...,
+    min=1,
+    help="Visible route step number from the manual animation playtest report.",
+)
+ANIMATION_PLAYTEST_WINDOW_ARGUMENT = typer.Argument(
+    ...,
+    help="Window matrix row to update, for example 820x620.",
+)
+ANIMATION_PLAYTEST_RESULT_OPTION = typer.Option(
+    "pass",
+    "--result",
+    help="Manual result to record for one route row: pass, watch, or fail.",
+)
+ANIMATION_PLAYTEST_FULL_RESULT_OPTION = typer.Option(
+    "pass",
+    "--full",
+    help="Manual result for the full-motion window cell: pass, watch, or fail.",
+)
+ANIMATION_PLAYTEST_REDUCED_RESULT_OPTION = typer.Option(
+    "pass",
+    "--reduced",
+    help="Manual result for the reduced-motion window cell: pass, watch, or fail.",
+)
+ANIMATION_PLAYTEST_OFF_RESULT_OPTION = typer.Option(
+    "pass",
+    "--off",
+    help="Manual result for the motion-off window cell: pass, watch, or fail.",
+)
+ANIMATION_PLAYTEST_EVIDENCE_NOTES_OPTION = typer.Option(
+    ...,
+    "--notes",
+    help="Observed manual evidence notes. Generic/template notes are rejected.",
 )
 
 
@@ -1708,6 +1744,80 @@ def animation_playtest_next_command(
 
     if fail_on_incomplete and plan.status != "pass":
         raise typer.Exit(code=1)
+
+
+@app.command("record-animation-playtest-window")
+def record_animation_playtest_window_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    window_size: str = ANIMATION_PLAYTEST_WINDOW_ARGUMENT,
+    full_result: str = ANIMATION_PLAYTEST_FULL_RESULT_OPTION,
+    reduced_result: str = ANIMATION_PLAYTEST_REDUCED_RESULT_OPTION,
+    off_result: str = ANIMATION_PLAYTEST_OFF_RESULT_OPTION,
+    notes: str = ANIMATION_PLAYTEST_EVIDENCE_NOTES_OPTION,
+) -> None:
+    """Record one manual window-matrix observation in the animation report."""
+
+    try:
+        record = record_2d_animation_playtest_window_evidence(
+            report_path,
+            window_size=window_size,
+            full_result=full_result,
+            reduced_result=reduced_result,
+            off_result=off_result,
+            notes=notes,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Evidence",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    _print_animation_playtest_record_result(record.section, record.target, record.result)
+    print_animation_playtest_status(validate_2d_animation_playtest_report(report_path))
+
+
+@app.command("record-animation-playtest-route")
+def record_animation_playtest_route_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    step: int = ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT,
+    result: str = ANIMATION_PLAYTEST_RESULT_OPTION,
+    notes: str = ANIMATION_PLAYTEST_EVIDENCE_NOTES_OPTION,
+) -> None:
+    """Record one visible-route manual observation in the animation report."""
+
+    try:
+        record = record_2d_animation_playtest_route_evidence(
+            report_path,
+            step=step,
+            result=result,
+            notes=notes,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Evidence",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    _print_animation_playtest_record_result(record.section, record.target, record.result)
+    print_animation_playtest_status(validate_2d_animation_playtest_report(report_path))
+
+
+def _print_animation_playtest_record_result(section: str, target: str, result: str) -> None:
+    table = Table(title="Animation Playtest Evidence Recorded")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Section", section)
+    table.add_row("Target", target)
+    table.add_row("Result", result)
+    console.print(table)
 
 
 def _next_animation_playtest_route_item(

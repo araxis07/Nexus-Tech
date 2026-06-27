@@ -74,6 +74,11 @@ from the queue and mark each row `pass` with observed notes before signoff.
 Route evidence notes must cover the required target-specific terms: menu rows
 cover title/wizard/save/archive/meta/hover/text, and play rows cover
 dashboard/action/pending/inspector/endgame/summary/pause/motion.
+Use `record-animation-playtest-route` and `record-animation-playtest-window`
+during the visible pass when you want safer row updates than hand-editing
+Markdown tables. These commands update only route/window rows and print the
+remaining grouped manual gaps; they do not complete control, scene, game-feel,
+blocker, or final decision signoff.
 Final report notes must contain observed evidence. Generic notes such as `ok`,
 `clear`, `readable`, or `stable` fail validation because they do not prove which
 window, control path, scene, or motion cue was checked.

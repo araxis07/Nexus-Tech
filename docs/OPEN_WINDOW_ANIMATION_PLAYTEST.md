@@ -71,6 +71,19 @@ Use `animation-playtest-next` when you need the shortest possible next action:
 it reads the current report and command queue, then prints the next evidence
 area and first visible-window command still called out by validation. It does not
 mark manual signoff complete.
+After running a visible command, use the recorder commands to update the report
+without hand-editing table pipes:
+
+```bash
+uv run nexus-tech record-animation-playtest-route /tmp/nexus-tech-animation-playtest-report.md 1 --result pass --notes "Observed title wizard save archive meta hover and text behavior at 820x620 full without clipped labels."
+uv run nexus-tech record-animation-playtest-window /tmp/nexus-tech-animation-playtest-report.md 820x620 --full pass --reduced pass --off pass --notes "Observed menu and play primary controls with disabled-state labels; layout remained clean and motion stayed readable."
+```
+
+These recorder commands only update the selected row and then print grouped
+remaining work. They reject generic notes such as `ok`; they do not fill control,
+scene, game-feel, blocker, or final decision rows for the tester.
+Run recorder commands sequentially for a single report file; do not update the
+same report from multiple terminals at once.
 Use the same `--command-prefix` value across queue generation, validation,
 planning, and next-action commands when the visible-window commands should use a
 local launcher such as `.venv313/bin/nexus-tech` instead of `uv run nexus-tech`.

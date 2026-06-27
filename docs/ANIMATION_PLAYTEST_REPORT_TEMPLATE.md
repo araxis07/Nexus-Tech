@@ -39,6 +39,13 @@ entered.
 The final report must keep the generated `Visible Route Evidence` table and fill
 all 18 menu/play rows with `pass` plus observed notes from the matching window
 and motion mode.
+Prefer `record-animation-playtest-route` after each visible route and
+`record-animation-playtest-window` after each three-mode window pass so the
+report table format stays valid. The commands update only the selected row and
+reject generic notes; control, scene, game-feel, blocker, and decision rows still
+need real tester observations before final validation.
+Run those recorder commands sequentially for one report file; do not update the
+same report from multiple terminals at once.
 Do not replace route notes with generic summaries. Menu rows must mention title,
 wizard, save, archive, meta, hover, and text observations; play rows must
 mention dashboard, action, pending, inspector, endgame, summary, pause, and

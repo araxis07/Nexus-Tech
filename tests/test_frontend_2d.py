@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
@@ -40,6 +41,8 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     launch_2d_frontend,
     launch_2d_menu,
+    record_2d_animation_playtest_route_evidence,
+    record_2d_animation_playtest_window_evidence,
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
     run_2d_flow_audit,
@@ -4069,6 +4072,85 @@ def test_write_2d_animation_playtest_report_template_can_prefill_automated_gates
     assert "incomplete window matrix result: 820x620 Full" in validation.findings
 
 
+def test_record_2d_animation_playtest_window_evidence_updates_one_matrix_row(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.164.0",
+        prefill_automated_gates=True,
+    )
+
+    record = record_2d_animation_playtest_window_evidence(
+        output_path,
+        window_size="820x620",
+        full_result="pass",
+        reduced_result="pass",
+        off_result="pass",
+        notes=(
+            "Observed menu and play primary buttons; disabled labels stayed inside "
+            "layout bounds while motion mode differences stayed readable."
+        ),
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert record.section == "Window Matrix"
+    assert record.target == "820x620"
+    assert "| `820x620` | `pass` | `pass` | `pass` |" in report_text
+    assert "incomplete window matrix result: 820x620 Full" not in validation.findings
+    assert "incomplete window matrix result: 820x620 Reduced" not in validation.findings
+    assert "incomplete window matrix result: 820x620 Off" not in validation.findings
+    assert "missing window matrix evidence: 820x620 notes" not in validation.findings
+
+
+def test_record_2d_animation_playtest_route_evidence_updates_one_route_row(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.164.0",
+        prefill_automated_gates=True,
+    )
+
+    record = record_2d_animation_playtest_route_evidence(
+        output_path,
+        step=1,
+        result="pass",
+        notes=(
+            "Observed title, wizard, save slot, archive, meta board, hover hints, "
+            "and text fit at 820x620 full."
+        ),
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert record.section == "Visible Route Evidence"
+    assert record.target == "1"
+    assert "| 1 | `menu` | `820x620` | `full` | `pass` |" in report_text
+    assert "incomplete visible route evidence result: 1" not in validation.findings
+    assert "missing visible route evidence note: 1" not in validation.findings
+
+
+def test_record_2d_animation_playtest_route_evidence_rejects_generic_notes(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(output_path, version="0.164.0")
+
+    with pytest.raises(ValueError, match="Evidence notes"):
+        record_2d_animation_playtest_route_evidence(
+            output_path,
+            step=1,
+            result="pass",
+            notes="ok",
+        )
+
+
 def test_summarize_2d_animation_playtest_report_groups_manual_gaps(tmp_path: Path) -> None:
     output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -6040,6 +6122,91 @@ def test_animation_playtest_next_command_accepts_completed_report(
     assert "PASS" in result.output
     assert "Manual animation signoff is complete" in result.output
     assert "Next Visible-Window Command" not in result.output
+
+
+def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.191.0",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-window",
+            str(report_path),
+            "820x620",
+            "--full",
+            "pass",
+            "--reduced",
+            "pass",
+            "--off",
+            "pass",
+            "--notes",
+            (
+                "Observed menu and play primary controls with disabled-state labels; "
+                "layout remained clean and motion stayed readable."
+            ),
+        ],
+    )
+
+    report_text = report_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Recorded" in result.output
+    assert "| `820x620` | `pass` | `pass` | `pass` |" in report_text
+
+
+def test_record_animation_playtest_route_command_updates_report(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.191.0",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-route",
+            str(report_path),
+            "1",
+            "--result",
+            "pass",
+            "--notes",
+            (
+                "Observed title wizard save archive meta hover and text behavior "
+                "at 820x620 full without clipped labels."
+            ),
+        ],
+    )
+
+    report_text = report_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Recorded" in result.output
+    assert "| 1 | `menu` | `820x620` | `full` | `pass` |" in report_text
+
+
+def test_record_animation_playtest_route_command_rejects_generic_notes(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(report_path, version="0.191.0")
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-route",
+            str(report_path),
+            "1",
+            "--notes",
+            "ok",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Evidence notes must describe real observed details" in result.output
 
 
 def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(

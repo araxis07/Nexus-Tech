@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Callable
 
 from nexus_tech.domain.models import DifficultyMode
 from nexus_tech.frontend_2d.motion_audit import (
@@ -699,6 +700,16 @@ class AnimationPlaytestPlanArtifactValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestReportRecord:
+    """Result for one safe manual evidence update in the playtest report."""
+
+    path: str
+    section: str
+    target: str
+    result: str
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1312,6 +1323,146 @@ def validate_2d_animation_playtest_readiness_plan(
         expected_status=plan.status,
         findings=tuple(findings),
     )
+
+
+def record_2d_animation_playtest_window_evidence(
+    report_path: Path,
+    *,
+    window_size: str,
+    full_result: str,
+    reduced_result: str,
+    off_result: str,
+    notes: str,
+) -> AnimationPlaytestReportRecord:
+    """Record manual window-matrix evidence without touching unrelated signoff rows."""
+
+    normalized_window = _normalize_manual_window_size(window_size)
+    full = _normalize_manual_playtest_result(full_result)
+    reduced = _normalize_manual_playtest_result(reduced_result)
+    off = _normalize_manual_playtest_result(off_result)
+    evidence = _normalize_manual_evidence_notes(notes)
+    text = report_path.read_text(encoding="utf-8")
+
+    def replacement(row: tuple[str, ...]) -> str:
+        if len(row) < 5:
+            raise ValueError(f"Window matrix row {normalized_window} is incomplete.")
+        return (
+            f"| `{normalized_window}` | `{full}` | `{reduced}` | `{off}` | "
+            f"{_markdown_table_cell(evidence)} |"
+        )
+
+    updated = _replace_report_table_row(
+        text,
+        section="Window Matrix",
+        row_key=normalized_window,
+        replacement=replacement,
+    )
+    report_path.write_text(updated, encoding="utf-8")
+    return AnimationPlaytestReportRecord(
+        path=str(report_path),
+        section="Window Matrix",
+        target=normalized_window,
+        result=f"full={full}, reduced={reduced}, off={off}",
+    )
+
+
+def record_2d_animation_playtest_route_evidence(
+    report_path: Path,
+    *,
+    step: int,
+    result: str,
+    notes: str,
+) -> AnimationPlaytestReportRecord:
+    """Record one visible-route manual observation row in the playtest report."""
+
+    if step < 1:
+        raise ValueError("Visible route step must be 1 or greater.")
+    normalized_result = _normalize_manual_playtest_result(result)
+    evidence = _normalize_manual_evidence_notes(notes)
+    text = report_path.read_text(encoding="utf-8")
+
+    def replacement(row: tuple[str, ...]) -> str:
+        if len(row) < 6:
+            raise ValueError(f"Visible route evidence row {step} is incomplete.")
+        target = _strip_markdown_code(row[1])
+        window = _strip_markdown_code(row[2])
+        motion = _strip_markdown_code(row[3])
+        return (
+            f"| {step} | `{target}` | `{window}` | `{motion}` | "
+            f"`{normalized_result}` | {_markdown_table_cell(evidence)} |"
+        )
+
+    updated = _replace_report_table_row(
+        text,
+        section="Visible Route Evidence",
+        row_key=str(step),
+        replacement=replacement,
+    )
+    report_path.write_text(updated, encoding="utf-8")
+    return AnimationPlaytestReportRecord(
+        path=str(report_path),
+        section="Visible Route Evidence",
+        target=str(step),
+        result=normalized_result,
+    )
+
+
+def _replace_report_table_row(
+    text: str,
+    *,
+    section: str,
+    row_key: str,
+    replacement: Callable[[tuple[str, ...]], str],
+) -> str:
+    """Replace a Markdown table row inside one report section."""
+
+    lines = text.splitlines()
+    in_section = False
+    target_key = _normalize_report_key(row_key)
+    for index, line in enumerate(lines):
+        heading = re.match(r"^##\s+(.+?)\s*$", line)
+        if heading is not None:
+            in_section = _normalize_report_key(heading.group(1)) == _normalize_report_key(section)
+            continue
+        if not in_section:
+            continue
+        stripped = line.strip()
+        if not stripped.startswith("|") or not stripped.endswith("|"):
+            continue
+        cells = tuple(cell.strip() for cell in stripped.strip("|").split("|"))
+        if not cells or _is_markdown_separator_row(cells):
+            continue
+        if _normalize_report_key(cells[0]) != target_key:
+            continue
+        lines[index] = replacement(cells)
+        return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+    raise ValueError(f"Could not find {section} row: {row_key}.")
+
+
+def _normalize_manual_window_size(window_size: str) -> str:
+    normalized = window_size.strip().lower()
+    expected = {f"{width}x{height}" for width, height in DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS}
+    if normalized not in expected:
+        allowed = ", ".join(sorted(expected))
+        raise ValueError(f"Window size must be one of: {allowed}.")
+    return normalized
+
+
+def _normalize_manual_playtest_result(result: str) -> str:
+    normalized = _normalize_report_result(result)
+    if normalized not in {"pass", "watch", "fail"}:
+        raise ValueError("Result must be one of: pass, watch, fail.")
+    return normalized
+
+
+def _normalize_manual_evidence_notes(notes: str) -> str:
+    evidence = _markdown_table_cell(notes)
+    if _is_missing_report_evidence(evidence) or len(evidence) < 24:
+        raise ValueError(
+            "Evidence notes must describe real observed details, not generic/template text."
+        )
+    return evidence
 
 
 def _plan_manual_result(plan: AnimationPlaytestReadinessPlan) -> str:

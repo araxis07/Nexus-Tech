@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.191.0 - 2026-06-28
+
+- Added `record-animation-playtest-route` and `record-animation-playtest-window` to safely fill manual animation report evidence rows after visible-window testing
+- Kept manual signoff strict by rejecting generic evidence notes and updating only the selected route/window rows
+- Updated docs and regression coverage for row-level manual animation evidence recording before final report validation
+
 ## 0.190.0 - 2026-06-27
 
 - Added `--command-prefix` to manual animation playtest queue, validation, plan, next-action, and session commands so local launchers can replace `uv run nexus-tech`
