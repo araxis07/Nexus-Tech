@@ -5619,6 +5619,85 @@ def test_animation_playtest_commands_command_writes_queue(tmp_path: Path) -> Non
     assert "Record dashboard, action picker, pending event, inspector" in report_text
 
 
+def test_animation_playtest_commands_accept_custom_command_prefix(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    command_prefix = ".venv313/bin/nexus-tech"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.190.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-27",
+        prefill_automated_gates=True,
+    )
+
+    queue_result = runner.invoke(
+        app,
+        [
+            "animation-playtest-commands",
+            "--seed",
+            "23",
+            "--command-prefix",
+            command_prefix,
+            "--output",
+            str(commands_path),
+        ],
+    )
+    validate_result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-commands",
+            str(commands_path),
+            "--seed",
+            "23",
+            "--command-prefix",
+            command_prefix,
+        ],
+    )
+    plan_result = runner.invoke(
+        app,
+        [
+            "animation-playtest-plan",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "23",
+            "--command-prefix",
+            command_prefix,
+            "--output",
+            str(plan_path),
+        ],
+    )
+    next_result = runner.invoke(
+        app,
+        [
+            "animation-playtest-next",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "23",
+            "--command-prefix",
+            command_prefix,
+        ],
+    )
+
+    assert queue_result.exit_code == 0
+    assert validate_result.exit_code == 0
+    assert plan_result.exit_code == 0
+    assert next_result.exit_code == 0
+    commands_text = commands_path.read_text(encoding="utf-8")
+    plan_text = plan_path.read_text(encoding="utf-8")
+    assert f"{command_prefix} menu-2d --window-size 820x620 --motion-mode full" in commands_text
+    assert "uv run nexus-tech menu-2d" not in commands_text
+    assert f"`{command_prefix} play-2d --scenario founder_journey --seed 23" in plan_text
+    assert (
+        f"{command_prefix} menu-2d --window-size 820x620 --motion-mode full" in next_result.output
+    )
+
+
 def test_validate_animation_playtest_commands_command_accepts_complete_queue(
     tmp_path: Path,
 ) -> None:

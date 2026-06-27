@@ -364,6 +364,14 @@ ANIMATION_PLAYTEST_PLAN_OUTPUT_OPTION = typer.Option(
     "--output",
     help="Optional Markdown path for the grouped animation playtest plan.",
 )
+ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION = typer.Option(
+    "uv run nexus-tech",
+    "--command-prefix",
+    help=(
+        "Command prefix used in generated manual animation commands. "
+        "Use .venv313/bin/nexus-tech when uv is not installed."
+    ),
+)
 ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT = typer.Argument(
     ...,
     exists=True,
@@ -1423,6 +1431,7 @@ def animation_playtest_commands_command(
         "--seed",
         help="Seed used for the visible play-2d manual animation pass.",
     ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
     output: Path | None = ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION,
 ) -> None:
     """Print the visible-window command queue for manual 2D animation QA."""
@@ -1431,6 +1440,7 @@ def animation_playtest_commands_command(
     queue = build_2d_animation_playtest_command_queue(
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
 
     table = Table(title="Animation Playtest Command Queue")
@@ -1481,6 +1491,7 @@ def validate_animation_playtest_commands_command(
         "--seed",
         help="Seed expected in the visible play-2d command queue.",
     ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
 ) -> None:
     """Validate that the manual animation command queue covers every required run."""
 
@@ -1489,6 +1500,7 @@ def validate_animation_playtest_commands_command(
         command_path,
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
 
     table = Table(title="Animation Playtest Command Validation")
@@ -1533,6 +1545,7 @@ def animation_playtest_plan_command(
         "--seed",
         help="Seed expected in the visible play-2d command queue.",
     ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
     output: Path | None = ANIMATION_PLAYTEST_PLAN_OUTPUT_OPTION,
     fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
 ) -> None:
@@ -1544,6 +1557,7 @@ def animation_playtest_plan_command(
         command_path,
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
 
     table = Table(title="Animation Playtest Plan")
@@ -1605,6 +1619,7 @@ def animation_playtest_next_command(
         "--seed",
         help="Seed expected in the visible play-2d command queue.",
     ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
     fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
 ) -> None:
     """Show the single next manual animation QA action to run or fill."""
@@ -1615,6 +1630,7 @@ def animation_playtest_next_command(
         command_path,
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
     next_step = plan.steps[0]
     route_item = _next_animation_playtest_route_item(plan)
@@ -1762,6 +1778,7 @@ def validate_animation_playtest_plan_command(
         "--seed",
         help="Seed expected in the visible play-2d command queue.",
     ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
 ) -> None:
     """Validate that an exported animation playtest plan matches current artifacts."""
 
@@ -1772,6 +1789,7 @@ def validate_animation_playtest_plan_command(
         command_path,
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
 
     table = Table(title="Animation Playtest Plan Validation")
@@ -1817,6 +1835,7 @@ def prepare_animation_playtest_session_command(
         "--seed",
         help="Seed used for the visible play-2d manual animation pass.",
     ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
     commit: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     tester: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     platform: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
@@ -1845,6 +1864,7 @@ def prepare_animation_playtest_session_command(
     queue = build_2d_animation_playtest_command_queue(
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
     write_2d_animation_playtest_command_queue(queue, commands_output)
     plan = build_2d_animation_playtest_readiness_plan(
@@ -1852,6 +1872,7 @@ def prepare_animation_playtest_session_command(
         commands_output,
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
     write_2d_animation_playtest_readiness_plan(plan, plan_output)
     plan_validation = validate_2d_animation_playtest_readiness_plan(
@@ -1860,6 +1881,7 @@ def prepare_animation_playtest_session_command(
         commands_output,
         scenario_id=scenario,
         seed=seed,
+        command_prefix=command_prefix,
     )
 
     session_table = Table(title="Animation Playtest Session")

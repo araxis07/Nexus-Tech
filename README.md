@@ -570,6 +570,13 @@ uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-pla
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
+If `uv` is not installed in the local shell, keep the same workflow but add
+`--command-prefix .venv313/bin/nexus-tech` to `animation-playtest-commands`,
+`validate-animation-playtest-commands`, `animation-playtest-plan`,
+`animation-playtest-next`, `validate-animation-playtest-plan`, and
+`prepare-animation-playtest-session` so generated visible-window commands match
+the local virtualenv launcher.
+
 The exported command queue and animation playtest plan include validated route
 evidence prompts for all 18 required menu/play window and motion runs, and
 `animation-playtest-next` surfaces the single next visible command or evidence
@@ -693,6 +700,10 @@ uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-rep
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
+
+When `uv` is unavailable, rerun the manual playtest artifact commands with
+`--command-prefix .venv313/bin/nexus-tech` so validators expect the same command
+prefix printed in the queue.
 
 ## 🧹 Linting and Formatting
 

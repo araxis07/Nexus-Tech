@@ -25,6 +25,12 @@ uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-pla
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
+If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
+to `animation-playtest-commands`, `validate-animation-playtest-commands`,
+`animation-playtest-plan`, `animation-playtest-next`,
+`validate-animation-playtest-plan`, and `prepare-animation-playtest-session`.
+The command queue and validators must use the same prefix.
+
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with each `visual-audit-contact-sheet-WIDTHxHEIGHT.png`, then use `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
 
 The generated playtest prep report also lists balance and long-session preflight commands. Run those before the visible-window pass; any balance `watch` or `fail` should be fixed or explicitly named as intentional scenario pressure before adding more animation layers.
@@ -65,6 +71,9 @@ Use `animation-playtest-next` when you need the shortest possible next action:
 it reads the current report and command queue, then prints the next evidence
 area and first visible-window command still called out by validation. It does not
 mark manual signoff complete.
+Use the same `--command-prefix` value across queue generation, validation,
+planning, and next-action commands when the visible-window commands should use a
+local launcher such as `.venv313/bin/nexus-tech` instead of `uv run nexus-tech`.
 Use `validate-animation-playtest-plan` after writing the plan artifact so stale
 status, open-item counts, missing visible-route rows, missing checklist rows, or
 missing runbook/manual-result guards are caught before handoff.

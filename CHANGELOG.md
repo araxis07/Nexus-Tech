@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.190.0 - 2026-06-27
+
+- Added `--command-prefix` to manual animation playtest queue, validation, plan, next-action, and session commands so local launchers can replace `uv run nexus-tech`
+- Kept queue validators strict by requiring the same command prefix across generated artifacts and validation
+- Updated docs and regression coverage for `.venv313/bin/nexus-tech` manual QA workflows when `uv` is unavailable
+
 ## 0.189.0 - 2026-06-27
 
 - Added `animation-playtest-next` to surface the next manual animation QA action and first visible-window command still required by validation
