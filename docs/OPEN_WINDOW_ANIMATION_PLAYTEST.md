@@ -77,11 +77,15 @@ without hand-editing table pipes:
 ```bash
 uv run nexus-tech record-animation-playtest-route /tmp/nexus-tech-animation-playtest-report.md 1 --result pass --notes "Observed title wizard save archive meta hover and text behavior at 820x620 full without clipped labels."
 uv run nexus-tech record-animation-playtest-window /tmp/nexus-tech-animation-playtest-report.md 820x620 --full pass --reduced pass --off pass --notes "Observed menu and play primary controls with disabled-state labels; layout remained clean and motion stayed readable."
+uv run nexus-tech record-animation-playtest-control /tmp/nexus-tech-animation-playtest-report.md "Pause / Resume" --result pass --notes "Observed pause modal opens from the run and resume returns to the same run state."
+uv run nexus-tech record-animation-playtest-scene /tmp/nexus-tech-animation-playtest-report.md "Title/Menu" --result pass --readability-notes "Observed wizard and save controls stayed visible on the title menu." --motion-notes "Observed title actor motion and label emphasis stayed readable."
+uv run nexus-tech record-animation-playtest-feedback /tmp/nexus-tech-animation-playtest-report.md "Success Feedback" --result pass --notes "Observed success feedback names the target and changed metric before fading."
+uv run nexus-tech record-animation-playtest-field /tmp/nexus-tech-animation-playtest-report.md "Commit" --value "$(git rev-parse --short HEAD)"
 ```
 
 These recorder commands only update the selected row and then print grouped
-remaining work. They reject generic notes such as `ok`; they do not fill control,
-scene, game-feel, blocker, or final decision rows for the tester.
+remaining work. They reject generic notes such as `ok` and also enforce the
+required evidence terms that the final validator checks.
 Run recorder commands sequentially for a single report file; do not update the
 same report from multiple terminals at once.
 Use the same `--command-prefix` value across queue generation, validation,

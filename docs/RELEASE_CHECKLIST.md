@@ -76,9 +76,11 @@ cover title/wizard/save/archive/meta/hover/text, and play rows cover
 dashboard/action/pending/inspector/endgame/summary/pause/motion.
 Use `record-animation-playtest-route` and `record-animation-playtest-window`
 during the visible pass when you want safer row updates than hand-editing
-Markdown tables. These commands update only route/window rows and print the
-remaining grouped manual gaps; they do not complete control, scene, game-feel,
-blocker, or final decision signoff.
+Markdown tables. Use `record-animation-playtest-control`,
+`record-animation-playtest-scene`, `record-animation-playtest-feedback`, and
+`record-animation-playtest-field` for the remaining manual rows and signoff
+fields. These commands print the remaining grouped manual gaps, enforce required
+evidence terms, and still require real tester observations.
 Final report notes must contain observed evidence. Generic notes such as `ok`,
 `clear`, `readable`, or `stable` fail validation because they do not prove which
 window, control path, scene, or motion cue was checked.

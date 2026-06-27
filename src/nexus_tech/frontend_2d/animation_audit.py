@@ -1340,7 +1340,10 @@ def record_2d_animation_playtest_window_evidence(
     full = _normalize_manual_playtest_result(full_result)
     reduced = _normalize_manual_playtest_result(reduced_result)
     off = _normalize_manual_playtest_result(off_result)
-    evidence = _normalize_manual_evidence_notes(notes)
+    evidence = _normalize_manual_evidence_notes(
+        notes,
+        required_terms=WINDOW_MATRIX_EVIDENCE_TERMS,
+    )
     text = report_path.read_text(encoding="utf-8")
 
     def replacement(row: tuple[str, ...]) -> str:
@@ -1378,7 +1381,6 @@ def record_2d_animation_playtest_route_evidence(
     if step < 1:
         raise ValueError("Visible route step must be 1 or greater.")
     normalized_result = _normalize_manual_playtest_result(result)
-    evidence = _normalize_manual_evidence_notes(notes)
     text = report_path.read_text(encoding="utf-8")
 
     def replacement(row: tuple[str, ...]) -> str:
@@ -1387,6 +1389,12 @@ def record_2d_animation_playtest_route_evidence(
         target = _strip_markdown_code(row[1])
         window = _strip_markdown_code(row[2])
         motion = _strip_markdown_code(row[3])
+        evidence = _normalize_manual_evidence_notes(
+            notes,
+            required_terms=(
+                MENU_ROUTE_EVIDENCE_TERMS if target == "menu" else PLAY_ROUTE_EVIDENCE_TERMS
+            ),
+        )
         return (
             f"| {step} | `{target}` | `{window}` | `{motion}` | "
             f"`{normalized_result}` | {_markdown_table_cell(evidence)} |"
@@ -1404,6 +1412,184 @@ def record_2d_animation_playtest_route_evidence(
         section="Visible Route Evidence",
         target=str(step),
         result=normalized_result,
+    )
+
+
+def record_2d_animation_playtest_control_evidence(
+    report_path: Path,
+    *,
+    area: str,
+    result: str,
+    notes: str,
+    follow_up: str = "none",
+) -> AnimationPlaytestReportRecord:
+    """Record one manual control-clarity row in the playtest report."""
+
+    normalized_area = _normalize_allowed_manual_label(
+        area,
+        tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
+        "Control area",
+    )
+    normalized_result = _normalize_manual_playtest_result(result)
+    evidence = _normalize_manual_evidence_notes(
+        notes,
+        required_terms=CONTROL_EVIDENCE_TERMS[normalized_area],
+    )
+    normalized_follow_up = _normalize_manual_follow_up(follow_up)
+    text = report_path.read_text(encoding="utf-8")
+
+    def replacement(row: tuple[str, ...]) -> str:
+        if len(row) < 4:
+            raise ValueError(f"Control row {normalized_area} is incomplete.")
+        return (
+            f"| {normalized_area} | `{normalized_result}` | "
+            f"{_markdown_table_cell(evidence)} | {_markdown_table_cell(normalized_follow_up)} |"
+        )
+
+    updated = _replace_report_table_row(
+        text,
+        section="Control Clarity Results",
+        row_key=normalized_area,
+        replacement=replacement,
+    )
+    report_path.write_text(updated, encoding="utf-8")
+    return AnimationPlaytestReportRecord(
+        path=str(report_path),
+        section="Control Clarity Results",
+        target=normalized_area,
+        result=normalized_result,
+    )
+
+
+def record_2d_animation_playtest_scene_evidence(
+    report_path: Path,
+    *,
+    scene: str,
+    result: str,
+    readability_notes: str,
+    motion_notes: str,
+    follow_up: str = "none",
+) -> AnimationPlaytestReportRecord:
+    """Record one manual scene-readability and motion row in the playtest report."""
+
+    normalized_scene = _normalize_allowed_manual_label(
+        scene,
+        tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
+        "Scene",
+    )
+    normalized_result = _normalize_manual_playtest_result(result)
+    readability = _normalize_manual_evidence_notes(
+        readability_notes,
+        required_terms=SCENE_READABILITY_EVIDENCE_TERMS[normalized_scene],
+    )
+    motion = _normalize_manual_evidence_notes(
+        motion_notes,
+        required_terms=SCENE_MOTION_EVIDENCE_TERMS[normalized_scene],
+    )
+    normalized_follow_up = _normalize_manual_follow_up(follow_up)
+    text = report_path.read_text(encoding="utf-8")
+
+    def replacement(row: tuple[str, ...]) -> str:
+        if len(row) < 5:
+            raise ValueError(f"Scene row {normalized_scene} is incomplete.")
+        return (
+            f"| {normalized_scene} | `{normalized_result}` | "
+            f"{_markdown_table_cell(readability)} | {_markdown_table_cell(motion)} | "
+            f"{_markdown_table_cell(normalized_follow_up)} |"
+        )
+
+    updated = _replace_report_table_row(
+        text,
+        section="Scene Results",
+        row_key=normalized_scene,
+        replacement=replacement,
+    )
+    report_path.write_text(updated, encoding="utf-8")
+    return AnimationPlaytestReportRecord(
+        path=str(report_path),
+        section="Scene Results",
+        target=normalized_scene,
+        result=normalized_result,
+    )
+
+
+def record_2d_animation_playtest_feedback_evidence(
+    report_path: Path,
+    *,
+    area: str,
+    result: str,
+    notes: str,
+    follow_up: str = "none",
+) -> AnimationPlaytestReportRecord:
+    """Record one manual game-feel feedback row in the playtest report."""
+
+    normalized_area = _normalize_allowed_manual_label(
+        area,
+        tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
+        "Feedback area",
+    )
+    normalized_result = _normalize_manual_playtest_result(result)
+    evidence = _normalize_manual_evidence_notes(
+        notes,
+        required_terms=FEEDBACK_EVIDENCE_TERMS[normalized_area],
+    )
+    normalized_follow_up = _normalize_manual_follow_up(follow_up)
+    text = report_path.read_text(encoding="utf-8")
+
+    def replacement(row: tuple[str, ...]) -> str:
+        if len(row) < 4:
+            raise ValueError(f"Game-feel row {normalized_area} is incomplete.")
+        return (
+            f"| {normalized_area} | `{normalized_result}` | "
+            f"{_markdown_table_cell(evidence)} | {_markdown_table_cell(normalized_follow_up)} |"
+        )
+
+    updated = _replace_report_table_row(
+        text,
+        section="Game Feel Results",
+        row_key=normalized_area,
+        replacement=replacement,
+    )
+    report_path.write_text(updated, encoding="utf-8")
+    return AnimationPlaytestReportRecord(
+        path=str(report_path),
+        section="Game Feel Results",
+        target=normalized_area,
+        result=normalized_result,
+    )
+
+
+def record_2d_animation_playtest_field(
+    report_path: Path,
+    *,
+    field_name: str,
+    value: str,
+) -> AnimationPlaytestReportRecord:
+    """Record one build, blocker, or decision field in the manual report."""
+
+    normalized_field = _normalize_allowed_manual_label(
+        field_name,
+        (
+            *REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS,
+            "Release decision",
+            *REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS,
+            *REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS,
+        ),
+        "Report field",
+    )
+    normalized_value = _normalize_manual_field_value(normalized_field, value)
+    text = report_path.read_text(encoding="utf-8")
+    updated = _replace_report_field(
+        text,
+        field_name=normalized_field,
+        value=normalized_value,
+    )
+    report_path.write_text(updated, encoding="utf-8")
+    return AnimationPlaytestReportRecord(
+        path=str(report_path),
+        section="Report Field",
+        target=normalized_field,
+        result=normalized_value,
     )
 
 
@@ -1440,6 +1626,37 @@ def _replace_report_table_row(
     raise ValueError(f"Could not find {section} row: {row_key}.")
 
 
+def _replace_report_field(
+    text: str,
+    *,
+    field_name: str,
+    value: str,
+) -> str:
+    """Replace one report bullet field while preserving the report structure."""
+
+    pattern = re.compile(rf"^\s*-\s*{re.escape(field_name)}:\s*.*$", re.IGNORECASE)
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if pattern.match(line) is None:
+            continue
+        lines[index] = f"- {field_name}: {value}"
+        return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    raise ValueError(f"Could not find report field: {field_name}.")
+
+
+def _normalize_allowed_manual_label(
+    value: str,
+    allowed_values: tuple[str, ...],
+    label: str,
+) -> str:
+    key = _normalize_report_key(value)
+    for allowed_value in allowed_values:
+        if _normalize_report_key(allowed_value) == key:
+            return allowed_value
+    allowed = ", ".join(allowed_values)
+    raise ValueError(f"{label} must be one of: {allowed}.")
+
+
 def _normalize_manual_window_size(window_size: str) -> str:
     normalized = window_size.strip().lower()
     expected = {f"{width}x{height}" for width, height in DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS}
@@ -1456,13 +1673,40 @@ def _normalize_manual_playtest_result(result: str) -> str:
     return normalized
 
 
-def _normalize_manual_evidence_notes(notes: str) -> str:
+def _normalize_manual_evidence_notes(
+    notes: str,
+    *,
+    required_terms: tuple[str, ...] = (),
+) -> str:
     evidence = _markdown_table_cell(notes)
     if _is_missing_report_evidence(evidence) or len(evidence) < 24:
         raise ValueError(
             "Evidence notes must describe real observed details, not generic/template text."
         )
+    missing_terms = _missing_evidence_terms(evidence, required_terms)
+    if missing_terms:
+        raise ValueError(f"Evidence notes missing required terms: {', '.join(missing_terms)}.")
     return evidence
+
+
+def _normalize_manual_follow_up(follow_up: str) -> str:
+    normalized = _markdown_table_cell(follow_up or "none")
+    if _is_placeholder_field(normalized) and _normalize_report_result(normalized) != "none":
+        raise ValueError("Follow-up must be a real note or `none`.")
+    if "owner/date if not pass" in _normalize_report_key(normalized):
+        raise ValueError("Follow-up must replace the template owner/date placeholder.")
+    return normalized
+
+
+def _normalize_manual_field_value(field_name: str, value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value.strip())
+    if field_name == "Release decision":
+        return f"`{_normalize_manual_playtest_result(normalized)}`"
+    if _is_placeholder_field(normalized):
+        raise ValueError("Field value must not be blank, todo, or a template placeholder.")
+    if "\n" in value:
+        raise ValueError("Field value must fit on one line.")
+    return normalized
 
 
 def _plan_manual_result(plan: AnimationPlaytestReadinessPlan) -> str:

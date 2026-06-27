@@ -41,9 +41,11 @@ all 18 menu/play rows with `pass` plus observed notes from the matching window
 and motion mode.
 Prefer `record-animation-playtest-route` after each visible route and
 `record-animation-playtest-window` after each three-mode window pass so the
-report table format stays valid. The commands update only the selected row and
-reject generic notes; control, scene, game-feel, blocker, and decision rows still
-need real tester observations before final validation.
+report table format stays valid. Use `record-animation-playtest-control`,
+`record-animation-playtest-scene`, `record-animation-playtest-feedback`, and
+`record-animation-playtest-field` for the remaining manual rows and signoff
+fields. The commands update only the selected row or field, reject generic
+notes, and enforce the required evidence terms checked by final validation.
 Run those recorder commands sequentially for one report file; do not update the
 same report from multiple terminals at once.
 Do not replace route notes with generic summaries. Menu rows must mention title,

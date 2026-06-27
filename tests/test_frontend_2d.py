@@ -41,7 +41,11 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     launch_2d_frontend,
     launch_2d_menu,
+    record_2d_animation_playtest_control_evidence,
+    record_2d_animation_playtest_feedback_evidence,
+    record_2d_animation_playtest_field,
     record_2d_animation_playtest_route_evidence,
+    record_2d_animation_playtest_scene_evidence,
     record_2d_animation_playtest_window_evidence,
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
@@ -4151,6 +4155,129 @@ def test_record_2d_animation_playtest_route_evidence_rejects_generic_notes(
         )
 
 
+def test_record_2d_animation_playtest_control_evidence_updates_one_row(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.192.0",
+        prefill_automated_gates=True,
+    )
+
+    record = record_2d_animation_playtest_control_evidence(
+        output_path,
+        area="Pause / Resume",
+        result="pass",
+        notes="Observed pause modal opens from the run and resume returns to the same run state.",
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert record.section == "Control Clarity Results"
+    assert "| Pause / Resume | `pass` |" in report_text
+    assert "incomplete control check result: Pause / Resume" not in validation.findings
+    assert "missing control check evidence: Pause / Resume notes" not in validation.findings
+
+
+def test_record_2d_animation_playtest_scene_evidence_updates_one_row(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.192.0",
+        prefill_automated_gates=True,
+    )
+
+    record = record_2d_animation_playtest_scene_evidence(
+        output_path,
+        scene="Title/Menu",
+        result="pass",
+        readability_notes="Observed wizard and save controls stayed visible on the title menu.",
+        motion_notes="Observed title actor motion and label emphasis stayed readable.",
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert record.section == "Scene Results"
+    assert "| Title/Menu | `pass` |" in report_text
+    assert "incomplete scene check result: Title/Menu" not in validation.findings
+    assert "missing scene check evidence: Title/Menu readability notes" not in validation.findings
+    assert "missing scene check evidence: Title/Menu motion notes" not in validation.findings
+
+
+def test_record_2d_animation_playtest_feedback_evidence_updates_one_row(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        output_path,
+        version="0.192.0",
+        prefill_automated_gates=True,
+    )
+
+    record = record_2d_animation_playtest_feedback_evidence(
+        output_path,
+        area="Success Feedback",
+        result="pass",
+        notes="Observed success feedback names the target and changed metric before fading.",
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert record.section == "Game Feel Results"
+    assert "| Success Feedback | `pass` |" in report_text
+    assert "incomplete game-feel check result: Success Feedback" not in validation.findings
+    assert "missing game-feel check evidence: Success Feedback notes" not in validation.findings
+
+
+def test_record_2d_animation_playtest_field_updates_build_and_decision_fields(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(output_path, version="0.192.0")
+
+    commit_record = record_2d_animation_playtest_field(
+        output_path,
+        field_name="Commit",
+        value="abc1234",
+    )
+    decision_record = record_2d_animation_playtest_field(
+        output_path,
+        field_name="Release decision",
+        value="pass",
+    )
+
+    report_text = output_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(output_path)
+
+    assert commit_record.target == "Commit"
+    assert decision_record.target == "Release decision"
+    assert "- Commit: abc1234" in report_text
+    assert "- Release decision: `pass`" in report_text
+    assert "missing field: Commit" not in validation.findings
+    assert "release decision is still the template placeholder" not in validation.findings
+
+
+def test_record_2d_animation_playtest_control_evidence_rejects_missing_terms(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(output_path, version="0.192.0")
+
+    with pytest.raises(ValueError, match="missing required terms"):
+        record_2d_animation_playtest_control_evidence(
+            output_path,
+            area="Pause / Resume",
+            result="pass",
+            notes="Observed controls were understandable after opening the overlay.",
+        )
+
+
 def test_summarize_2d_animation_playtest_report_groups_manual_gaps(tmp_path: Path) -> None:
     output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -6207,6 +6334,131 @@ def test_record_animation_playtest_route_command_rejects_generic_notes(
 
     assert result.exit_code == 1
     assert "Evidence notes must describe real observed details" in result.output
+
+
+def test_record_animation_playtest_control_command_updates_report(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.192.0",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-control",
+            str(report_path),
+            "Pause / Resume",
+            "--result",
+            "pass",
+            "--notes",
+            "Observed pause modal opens from the run and resume returns to the same run state.",
+        ],
+    )
+
+    report_text = report_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Recorded" in result.output
+    assert "| Pause / Resume | `pass` |" in report_text
+
+
+def test_record_animation_playtest_scene_command_updates_report(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.192.0",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-scene",
+            str(report_path),
+            "Title/Menu",
+            "--result",
+            "pass",
+            "--readability-notes",
+            "Observed wizard and save controls stayed visible on the title menu.",
+            "--motion-notes",
+            "Observed title actor motion and label emphasis stayed readable.",
+        ],
+    )
+
+    report_text = report_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Recorded" in result.output
+    assert "| Title/Menu | `pass` |" in report_text
+
+
+def test_record_animation_playtest_feedback_command_updates_report(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.192.0",
+        prefill_automated_gates=True,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-feedback",
+            str(report_path),
+            "Success Feedback",
+            "--result",
+            "pass",
+            "--notes",
+            "Observed success feedback names the target and changed metric before fading.",
+        ],
+    )
+
+    report_text = report_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Recorded" in result.output
+    assert "| Success Feedback | `pass` |" in report_text
+
+
+def test_record_animation_playtest_field_command_updates_report(tmp_path: Path) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(report_path, version="0.192.0")
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-field",
+            str(report_path),
+            "Commit",
+            "--value",
+            "abc1234",
+        ],
+    )
+
+    report_text = report_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Recorded" in result.output
+    assert "- Commit: abc1234" in report_text
+
+
+def test_record_animation_playtest_control_command_rejects_missing_terms(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(report_path, version="0.192.0")
+
+    result = runner.invoke(
+        app,
+        [
+            "record-animation-playtest-control",
+            str(report_path),
+            "Pause / Resume",
+            "--notes",
+            "Observed the overlay controls after opening the modal.",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Evidence notes missing required terms" in result.output
 
 
 def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(

@@ -68,7 +68,11 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     launch_2d_frontend,
     launch_2d_menu,
+    record_2d_animation_playtest_control_evidence,
+    record_2d_animation_playtest_feedback_evidence,
+    record_2d_animation_playtest_field,
     record_2d_animation_playtest_route_evidence,
+    record_2d_animation_playtest_scene_evidence,
     record_2d_animation_playtest_window_evidence,
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
@@ -389,6 +393,14 @@ ANIMATION_PLAYTEST_WINDOW_ARGUMENT = typer.Argument(
     ...,
     help="Window matrix row to update, for example 820x620.",
 )
+ANIMATION_PLAYTEST_ROW_LABEL_ARGUMENT = typer.Argument(
+    ...,
+    help="Manual report row label to update, for example 'Pause / Resume'.",
+)
+ANIMATION_PLAYTEST_FIELD_NAME_ARGUMENT = typer.Argument(
+    ...,
+    help="Build, release-blocker, or decision field to update.",
+)
 ANIMATION_PLAYTEST_RESULT_OPTION = typer.Option(
     "pass",
     "--result",
@@ -413,6 +425,26 @@ ANIMATION_PLAYTEST_EVIDENCE_NOTES_OPTION = typer.Option(
     ...,
     "--notes",
     help="Observed manual evidence notes. Generic/template notes are rejected.",
+)
+ANIMATION_PLAYTEST_READABILITY_NOTES_OPTION = typer.Option(
+    ...,
+    "--readability-notes",
+    help="Observed scene readability notes. Required scene terms are enforced.",
+)
+ANIMATION_PLAYTEST_MOTION_NOTES_OPTION = typer.Option(
+    ...,
+    "--motion-notes",
+    help="Observed scene motion notes. Required scene motion terms are enforced.",
+)
+ANIMATION_PLAYTEST_FOLLOW_UP_OPTION = typer.Option(
+    "none",
+    "--follow-up",
+    help="Follow-up owner/date note for non-pass items, or none.",
+)
+ANIMATION_PLAYTEST_FIELD_VALUE_OPTION = typer.Option(
+    ...,
+    "--value",
+    help="Manual field value to record. Blank/todo/template values are rejected.",
 )
 
 
@@ -1795,6 +1827,132 @@ def record_animation_playtest_route_command(
             step=step,
             result=result,
             notes=notes,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Evidence",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    _print_animation_playtest_record_result(record.section, record.target, record.result)
+    print_animation_playtest_status(validate_2d_animation_playtest_report(report_path))
+
+
+@app.command("record-animation-playtest-control")
+def record_animation_playtest_control_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    area: str = ANIMATION_PLAYTEST_ROW_LABEL_ARGUMENT,
+    result: str = ANIMATION_PLAYTEST_RESULT_OPTION,
+    notes: str = ANIMATION_PLAYTEST_EVIDENCE_NOTES_OPTION,
+    follow_up: str = ANIMATION_PLAYTEST_FOLLOW_UP_OPTION,
+) -> None:
+    """Record one manual control-clarity observation in the animation report."""
+
+    try:
+        record = record_2d_animation_playtest_control_evidence(
+            report_path,
+            area=area,
+            result=result,
+            notes=notes,
+            follow_up=follow_up,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Evidence",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    _print_animation_playtest_record_result(record.section, record.target, record.result)
+    print_animation_playtest_status(validate_2d_animation_playtest_report(report_path))
+
+
+@app.command("record-animation-playtest-scene")
+def record_animation_playtest_scene_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    scene: str = ANIMATION_PLAYTEST_ROW_LABEL_ARGUMENT,
+    result: str = ANIMATION_PLAYTEST_RESULT_OPTION,
+    readability_notes: str = ANIMATION_PLAYTEST_READABILITY_NOTES_OPTION,
+    motion_notes: str = ANIMATION_PLAYTEST_MOTION_NOTES_OPTION,
+    follow_up: str = ANIMATION_PLAYTEST_FOLLOW_UP_OPTION,
+) -> None:
+    """Record one manual scene readability/motion observation in the report."""
+
+    try:
+        record = record_2d_animation_playtest_scene_evidence(
+            report_path,
+            scene=scene,
+            result=result,
+            readability_notes=readability_notes,
+            motion_notes=motion_notes,
+            follow_up=follow_up,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Evidence",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    _print_animation_playtest_record_result(record.section, record.target, record.result)
+    print_animation_playtest_status(validate_2d_animation_playtest_report(report_path))
+
+
+@app.command("record-animation-playtest-feedback")
+def record_animation_playtest_feedback_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    area: str = ANIMATION_PLAYTEST_ROW_LABEL_ARGUMENT,
+    result: str = ANIMATION_PLAYTEST_RESULT_OPTION,
+    notes: str = ANIMATION_PLAYTEST_EVIDENCE_NOTES_OPTION,
+    follow_up: str = ANIMATION_PLAYTEST_FOLLOW_UP_OPTION,
+) -> None:
+    """Record one manual game-feel feedback observation in the report."""
+
+    try:
+        record = record_2d_animation_playtest_feedback_evidence(
+            report_path,
+            area=area,
+            result=result,
+            notes=notes,
+            follow_up=follow_up,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Evidence",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    _print_animation_playtest_record_result(record.section, record.target, record.result)
+    print_animation_playtest_status(validate_2d_animation_playtest_report(report_path))
+
+
+@app.command("record-animation-playtest-field")
+def record_animation_playtest_field_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    field_name: str = ANIMATION_PLAYTEST_FIELD_NAME_ARGUMENT,
+    value: str = ANIMATION_PLAYTEST_FIELD_VALUE_OPTION,
+) -> None:
+    """Record one build, blocker, or decision field in the animation report."""
+
+    try:
+        record = record_2d_animation_playtest_field(
+            report_path,
+            field_name=field_name,
+            value=value,
         )
     except ValueError as error:
         console.print(

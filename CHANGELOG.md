@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.192.0 - 2026-06-28
+
+- Added manual animation report recorders for control, scene, game-feel, and build/blocker/decision fields
+- Enforced required evidence terms at record time so manual notes line up with final report validation before signoff
+- Updated docs and regression coverage for completing the full animation signoff report without hand-editing Markdown tables
+
 ## 0.191.0 - 2026-06-28
 
 - Added `record-animation-playtest-route` and `record-animation-playtest-window` to safely fill manual animation report evidence rows after visible-window testing
