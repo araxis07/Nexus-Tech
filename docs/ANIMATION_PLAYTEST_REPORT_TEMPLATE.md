@@ -12,6 +12,11 @@ uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-pla
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
 ```
 
+If the tester shell does not have `uv`, add
+`--command-prefix .venv313/bin/nexus-tech` to the command queue, command
+validation, plan, plan validation, and session setup commands so the exported
+visible-window route uses the same launcher the tester can actually run.
+
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in
 each row before filling the window matrix.

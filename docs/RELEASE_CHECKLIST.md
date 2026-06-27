@@ -42,6 +42,13 @@ uv run nexus-tech simulate-balance --scenario founder_journey --difficulty found
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
 
+If `uv` is not available in the release shell, keep the same manual animation
+workflow but add `--command-prefix .venv313/bin/nexus-tech` to
+`animation-playtest-commands`, `validate-animation-playtest-commands`,
+`animation-playtest-plan`, `validate-animation-playtest-plan`, and
+`prepare-animation-playtest-session`. The command queue, grouped plan, and
+validators must all use the same launcher prefix.
+
 Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command
 is being used as a release gate.
@@ -120,6 +127,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md` before and during handoff so open manual areas are grouped without treating queue completeness as signoff.
 - Run `validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md` before attaching the plan artifact to handoff notes.
 - Run `prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md` for the one-command setup when the report draft, command queue, and grouped plan should be regenerated together.
+- Add `--command-prefix .venv313/bin/nexus-tech` to the manual animation queue, validation, plan, and session commands when the visible-window tester is using the local virtualenv launcher instead of `uv run nexus-tech`.
 - Run `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` after automated gates pass so the completed report starts from the same validator-required rows while manual window/control/scene/game-feel rows still require real tester input.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.
 - Run `validate-animation-playtest-report` on the completed manual report before calling animation complete.
