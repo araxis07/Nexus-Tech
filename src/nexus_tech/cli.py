@@ -71,6 +71,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
+    build_2d_animation_playtest_route_batch_plan,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -96,6 +97,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
+    write_2d_animation_playtest_route_batch_plan,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -337,6 +339,11 @@ ANIMATION_PLAYTEST_HANDOFF_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the manual animation handoff sheet.",
+)
+ANIMATION_PLAYTEST_ROUTE_BATCH_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the manual visible-route batch plan.",
 )
 ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT = typer.Argument(
     ...,
@@ -2081,6 +2088,85 @@ def animation_playtest_handoff_command(
         )
 
     if fail_on_incomplete and handoff.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-route-batches")
+def animation_playtest_route_batches_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Group manual visible-window route work into window-sized batches."""
+
+    validate_scenario_id(scenario)
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    summary_table = Table(title="Animation Playtest Route Batches")
+    summary_table.add_column("Batch", justify="right")
+    summary_table.add_column("Window", style="cyan")
+    summary_table.add_column("Status")
+    summary_table.add_column("Open Items", justify="right")
+    summary_table.add_column("Visible Commands", justify="right")
+    summary_table.add_column("Next Visible Command")
+    for batch in batch_plan.batches:
+        next_item = next((item for item in batch.items if item.status != "pass"), None)
+        next_command = next_item.visible_command if next_item is not None else "-"
+        summary_table.add_row(
+            str(batch.batch_number),
+            batch.window_size,
+            batch.status.upper(),
+            str(batch.open_items),
+            str(len(batch.items)),
+            next_command,
+        )
+    console.print(summary_table)
+
+    if batch_plan.commands.findings:
+        findings_table = Table(title="Route Batch Command Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in batch_plan.commands.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+
+    border_style = "green" if batch_plan.status == "pass" else "yellow"
+    console.print(
+        Panel.fit(
+            (
+                f"Route batch status: {batch_plan.status.upper()} | "
+                f"{batch_plan.route_open_items} route/window item(s), "
+                f"{batch_plan.open_item_count} total report/queue item(s)."
+            ),
+            title="Animation Playtest Route Batches",
+            border_style=border_style,
+        )
+    )
+
+    if output is not None:
+        write_2d_animation_playtest_route_batch_plan(batch_plan, output)
+        console.print(
+            Panel.fit(
+                f"Animation route batch plan written to {output}",
+                title="Animation Playtest Route Batches",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and batch_plan.status != "pass":
         raise typer.Exit(code=1)
 
 

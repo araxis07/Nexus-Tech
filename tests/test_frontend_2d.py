@@ -42,6 +42,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
+    build_2d_animation_playtest_route_batch_plan,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -68,6 +69,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
+    write_2d_animation_playtest_route_batch_plan,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -6873,6 +6875,99 @@ def test_animation_playtest_handoff_command_writes_artifact(
     assert "Animation playtest handoff written" in result.output
     assert handoff_path.exists()
     assert "record-animation-playtest-route" in handoff_path.read_text(encoding="utf-8")
+
+
+def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-route-batches.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.200.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-29",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_2d_animation_playtest_route_batch_plan(batch_plan, output_path)
+
+    text = output_path.read_text(encoding="utf-8")
+    assert batch_plan.status == "manual-required"
+    assert len(batch_plan.batches) == 3
+    assert [batch.window_size for batch in batch_plan.batches] == [
+        "820x620",
+        "960x640",
+        "1440x900",
+    ]
+    assert all(len(batch.items) == 6 for batch in batch_plan.batches)
+    assert batch_plan.route_open_items == 21
+    assert "# NEXUS TECH 2D Animation Visible Route Batches" in text
+    assert "## Batch 1: 820x620" in text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in text
+    assert "record-animation-playtest-route" in text
+    assert "### Window Summary Recorder" in text
+    assert "record-animation-playtest-window" in text
+    assert "<replace with observed visible-window notes>" in text
+
+
+def test_animation_playtest_route_batches_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-route-batches.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.200.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-29",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-route-batches",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Route Batches" in result.output
+    assert "820x620" in result.output
+    assert "Route batch status: MANUAL-REQUIRED" in result.output
+    assert output_path.exists()
+    output_text = output_path.read_text(encoding="utf-8")
+    assert "record-animation-playtest-route" in output_text
+    assert "validate-animation-playtest-report must pass before signoff" in output_text
 
 
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.200.0 - 2026-06-29
+
+- Added `animation-playtest-route-batches` to group the 18 visible menu/play manual QA commands into window-sized batches with matching recorder commands
+- Added route-batch Markdown export so testers can work through each target window without losing required evidence terms or recorder placeholders
+- Updated README, release docs, and regression coverage for batch-based manual animation QA without completing signoff automatically
+
 ## 0.199.0 - 2026-06-29
 
 - Added the June 29 internal playtest and balance audit snapshot so current automated gate results and remaining manual animation blockers are tracked in the repository

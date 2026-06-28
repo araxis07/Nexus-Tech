@@ -790,6 +790,80 @@ class AnimationPlaytestHandoff:
         return self.session.handoff_status
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestRouteBatchItem:
+    """One visible route command paired with its manual recorder hint."""
+
+    step: int
+    target: str
+    window_size: str
+    motion_mode: str
+    status: str
+    visible_command: str
+    recorder_command: str
+    evidence_prompt: str
+    required_terms: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestRouteBatch:
+    """One window-sized batch for the manual visible-route pass."""
+
+    batch_number: int
+    window_size: str
+    items: tuple[AnimationPlaytestRouteBatchItem, ...]
+    window_recorder_hint: AnimationPlaytestRecorderHint | None = None
+
+    @property
+    def open_items(self) -> int:
+        """Return incomplete route/window evidence rows in this batch."""
+
+        route_open_items = sum(1 for item in self.items if item.status != "pass")
+        window_open_items = (
+            1
+            if self.window_recorder_hint is not None and self.window_recorder_hint.status != "pass"
+            else 0
+        )
+        return route_open_items + window_open_items
+
+    @property
+    def status(self) -> str:
+        """Return pass only when this visible-window batch has no open rows."""
+
+        return "pass" if self.open_items == 0 else "manual-required"
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestRouteBatchPlan:
+    """Manual visible-route batches derived from the current QA artifacts."""
+
+    report: AnimationPlaytestReportValidation
+    commands: AnimationPlaytestCommandQueueValidation
+    batches: tuple[AnimationPlaytestRouteBatch, ...]
+
+    @property
+    def status(self) -> str:
+        """Return the route-batch handoff status without completing signoff."""
+
+        if self.commands.status != "pass":
+            return "blocked"
+        if self.report.status != "pass":
+            return "manual-required"
+        return "pass"
+
+    @property
+    def route_open_items(self) -> int:
+        """Return open visible-route and window-matrix rows covered by batches."""
+
+        return sum(batch.open_items for batch in self.batches)
+
+    @property
+    def open_item_count(self) -> int:
+        """Return all unresolved command/report findings."""
+
+        return len(self.report.findings) + len(self.commands.findings)
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1581,6 +1655,101 @@ def build_2d_animation_playtest_handoff(
     )
 
 
+def build_2d_animation_playtest_route_batch_plan(
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestRouteBatchPlan:
+    """Build window-sized manual route batches without writing tester evidence."""
+
+    report = validate_2d_animation_playtest_report(report_path)
+    commands = validate_2d_animation_playtest_command_queue(
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    visible_route = build_2d_animation_playtest_command_queue(
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    plan = AnimationPlaytestReadinessPlan(
+        report=report,
+        commands=commands,
+        steps=(),
+        visible_route=visible_route,
+    )
+    open_route_indexes = set(_route_finding_indexes(report.findings))
+    open_window_sizes = set(_window_finding_labels(report.findings))
+    route_items_by_window: dict[str, list[AnimationPlaytestRouteBatchItem]] = {}
+    window_order: list[str] = []
+
+    for route_index, item in enumerate(visible_route, start=1):
+        if item.window_size not in route_items_by_window:
+            route_items_by_window[item.window_size] = []
+            window_order.append(item.window_size)
+        status = "manual-required" if route_index in open_route_indexes else "pass"
+        hint = (
+            _build_route_recorder_hint(
+                plan,
+                route_index=route_index,
+                report_path=report_path,
+                command_prefix=command_prefix,
+            )
+            if status != "pass"
+            else None
+        )
+        route_items_by_window[item.window_size].append(
+            AnimationPlaytestRouteBatchItem(
+                step=route_index,
+                target=item.target,
+                window_size=item.window_size,
+                motion_mode=item.motion_mode,
+                status=status,
+                visible_command=item.command,
+                recorder_command=hint.recorder_command if hint is not None else "",
+                evidence_prompt=hint.evidence_prompt if hint is not None else "Already recorded.",
+                required_terms=hint.required_terms if hint is not None else (),
+            )
+        )
+
+    batches: list[AnimationPlaytestRouteBatch] = []
+    for batch_number, window_size in enumerate(window_order, start=1):
+        window_hint = (
+            _build_window_recorder_hint(
+                window_size,
+                report_path=report_path,
+                command_prefix=command_prefix,
+            )
+            if window_size in open_window_sizes
+            else None
+        )
+        batches.append(
+            AnimationPlaytestRouteBatch(
+                batch_number=batch_number,
+                window_size=window_size,
+                items=tuple(route_items_by_window[window_size]),
+                window_recorder_hint=window_hint,
+            )
+        )
+
+    return AnimationPlaytestRouteBatchPlan(
+        report=report,
+        commands=commands,
+        batches=tuple(batches),
+    )
+
+
 def _validate_recorder_queue_row(
     findings: list[str],
     index: int,
@@ -2164,6 +2333,98 @@ def write_2d_animation_playtest_handoff(
             ]
         )
         for finding in handoff.session.findings:
+            lines.append(f"| {_markdown_table_cell(finding)} |")
+
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_2d_animation_playtest_route_batch_plan(
+    batch_plan: AnimationPlaytestRouteBatchPlan,
+    output_path: Path,
+) -> None:
+    """Write visible-window manual QA batches as a Markdown artifact."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    manual_result = "complete" if batch_plan.status == "pass" else "not completed by automation"
+    lines = [
+        "# NEXUS TECH 2D Animation Visible Route Batches",
+        "",
+        f"- Status: `{batch_plan.status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Command queue: `{batch_plan.commands.status}`",
+        f"- Final report: `{batch_plan.report.status}`",
+        f"- Report open items: `{len(batch_plan.report.findings)}`",
+        f"- Route/window open items: `{batch_plan.route_open_items}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        "",
+        "## Batch Summary",
+        "",
+        "| Batch | Window | Status | Open Items | Visible Commands |",
+        "| ---: | --- | --- | ---: | ---: |",
+    ]
+    for batch in batch_plan.batches:
+        lines.append(
+            "| "
+            f"{batch.batch_number} | "
+            f"`{batch.window_size}` | "
+            f"`{batch.status}` | "
+            f"{batch.open_items} | "
+            f"{len(batch.items)} |"
+        )
+
+    for batch in batch_plan.batches:
+        lines.extend(
+            [
+                "",
+                f"## Batch {batch.batch_number}: {batch.window_size}",
+                "",
+                (
+                    "| Step | Target | Motion | Status | Visible Command | "
+                    "Required Terms | Recorder Command |"
+                ),
+                "| ---: | --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for item in batch.items:
+            required_terms = ", ".join(item.required_terms) if item.required_terms else "-"
+            recorder_command = item.recorder_command or "-"
+            lines.append(
+                "| "
+                f"{item.step} | "
+                f"`{item.target}` | "
+                f"`{item.motion_mode}` | "
+                f"`{item.status}` | "
+                f"`{_markdown_table_cell(item.visible_command)}` | "
+                f"{_markdown_table_cell(required_terms)} | "
+                f"`{_markdown_table_cell(recorder_command)}` |"
+            )
+        if batch.window_recorder_hint is not None:
+            hint = batch.window_recorder_hint
+            required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+            lines.extend(
+                [
+                    "",
+                    "### Window Summary Recorder",
+                    "",
+                    f"- Status: `{hint.status}`",
+                    f"- Required terms: `{_markdown_table_cell(required_terms)}`",
+                    f"- Evidence prompt: {_markdown_table_cell(hint.evidence_prompt)}",
+                    "",
+                    f"`{_markdown_table_cell(hint.recorder_command)}`",
+                ]
+            )
+
+    if batch_plan.commands.findings:
+        lines.extend(
+            [
+                "",
+                "## Command Queue Findings",
+                "",
+                "| Finding |",
+                "| --- |",
+            ]
+        )
+        for finding in batch_plan.commands.findings:
             lines.append(f"| {_markdown_table_cell(finding)} |")
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

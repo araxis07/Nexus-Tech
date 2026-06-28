@@ -24,6 +24,7 @@ uv run nexus-tech animation-playtest-recorder-queue /tmp/nexus-tech-animation-pl
 uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
+uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
 uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md
@@ -35,8 +36,9 @@ to `animation-playtest-commands`, `validate-animation-playtest-commands`,
 `animation-playtest-plan`, `animation-playtest-next`,
 `animation-playtest-recorder-queue`, `validate-animation-playtest-recorder-queue`,
 `animation-playtest-recorder-next`,
-`validate-animation-playtest-plan`, `prepare-animation-playtest-session`, and
-`validate-animation-playtest-session`, and `animation-playtest-handoff`.
+`animation-playtest-route-batches`, `validate-animation-playtest-plan`,
+`prepare-animation-playtest-session`, and `validate-animation-playtest-session`,
+and `animation-playtest-handoff`.
 The command queue and validators must use the same prefix.
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with each `visual-audit-contact-sheet-WIDTHxHEIGHT.png`, then use `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
@@ -91,6 +93,10 @@ Use `animation-playtest-recorder-next` after a visible-window run to print the
 safe recorder command for the next incomplete report row. The generated recorder
 command intentionally contains a notes placeholder that must be replaced with
 real observed evidence before it can be used as signoff.
+Use `animation-playtest-route-batches` before or during the visible pass when a
+tester needs the 18 menu/play route commands grouped by target window with each
+matching recorder command beside it. The exported batch plan is a runner aid, not
+signoff evidence.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 
