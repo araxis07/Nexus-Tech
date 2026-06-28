@@ -1188,6 +1188,171 @@ def build_2d_animation_playtest_recorder_hint(
     )
 
 
+def build_2d_animation_playtest_recorder_queue(
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> tuple[AnimationPlaytestRecorderHint, ...]:
+    """Return safe recorder commands for every currently incomplete manual row."""
+
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    if plan.commands.status != "pass" or plan.status == "pass":
+        return (
+            build_2d_animation_playtest_recorder_hint(
+                report_path,
+                command_path,
+                scenario_id=scenario_id,
+                seed=seed,
+                windows=windows,
+                motion_modes=motion_modes,
+                command_prefix=command_prefix,
+            ),
+        )
+
+    hints: list[AnimationPlaytestRecorderHint] = []
+    for route_index in _route_finding_indexes(plan.report.findings):
+        if 1 <= route_index <= len(plan.visible_route):
+            hints.append(
+                _build_route_recorder_hint(
+                    plan,
+                    route_index=route_index,
+                    report_path=report_path,
+                    command_prefix=command_prefix,
+                )
+            )
+
+    for window_size in _window_finding_labels(plan.report.findings):
+        hints.append(
+            _build_window_recorder_hint(
+                window_size,
+                report_path=report_path,
+                command_prefix=command_prefix,
+            )
+        )
+
+    for area in _labeled_finding_labels(
+        plan.report.findings,
+        labels=tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
+        marker="control check",
+    ):
+        hints.append(
+            _build_labeled_recorder_hint(
+                area,
+                report_path=report_path,
+                command_prefix=command_prefix,
+                section="Control Clarity Results",
+                command_name="record-animation-playtest-control",
+                option_name="--notes",
+                evidence_terms=CONTROL_EVIDENCE_TERMS,
+                evidence_prompt_prefix="Replace placeholder with observed control notes.",
+            )
+        )
+
+    for scene in _labeled_finding_labels(
+        plan.report.findings,
+        labels=tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
+        marker="scene check",
+    ):
+        hints.append(
+            _build_scene_recorder_hint(
+                scene,
+                report_path=report_path,
+                command_prefix=command_prefix,
+            )
+        )
+
+    for area in _labeled_finding_labels(
+        plan.report.findings,
+        labels=tuple(label for label, _ in DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
+        marker="game-feel check",
+    ):
+        hints.append(
+            _build_labeled_recorder_hint(
+                area,
+                report_path=report_path,
+                command_prefix=command_prefix,
+                section="Game Feel Results",
+                command_name="record-animation-playtest-feedback",
+                option_name="--notes",
+                evidence_terms=FEEDBACK_EVIDENCE_TERMS,
+                evidence_prompt_prefix="Replace placeholder with observed feedback notes.",
+            )
+        )
+
+    for field_name in _field_finding_labels(plan.report.findings):
+        hints.append(
+            _build_field_recorder_hint(
+                field_name,
+                report_path=report_path,
+                command_prefix=command_prefix,
+            )
+        )
+
+    if hints:
+        return tuple(hints)
+    return (
+        AnimationPlaytestRecorderHint(
+            status="manual-required",
+            area="Template Cleanup",
+            target=str(report_path),
+            recorder_command=(
+                f"{command_prefix} animation-playtest-status {_shell_arg(report_path)}"
+            ),
+            evidence_prompt="Review remaining template cleanup findings, then rerun recorder-next.",
+        ),
+    )
+
+
+def write_2d_animation_playtest_recorder_queue(
+    hints: tuple[AnimationPlaytestRecorderHint, ...],
+    output_path: Path,
+) -> None:
+    """Write recorder hints as a Markdown handoff artifact."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH 2D Animation Recorder Queue",
+        "",
+        "- Manual result: `not completed by automation`",
+        "- Recorder commands: `placeholders require real tester observations before use`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        "",
+        (
+            "| Step | Status | Area | Target | Visible Command | Required Terms | "
+            "Evidence Prompt | Recorder Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for index, hint in enumerate(hints, start=1):
+        required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+        visible_command = hint.visible_command or "-"
+        lines.append(
+            "| "
+            f"{index} | "
+            f"`{hint.status}` | "
+            f"{_markdown_table_cell(hint.area)} | "
+            f"{_markdown_table_cell(hint.target)} | "
+            f"`{_markdown_table_cell(visible_command)}` | "
+            f"{_markdown_table_cell(required_terms)} | "
+            f"{_markdown_table_cell(hint.evidence_prompt)} | "
+            f"`{_markdown_table_cell(hint.recorder_command)}` |"
+        )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _build_next_route_recorder_hint(
     plan: AnimationPlaytestReadinessPlan,
     *,
@@ -1197,7 +1362,21 @@ def _build_next_route_recorder_hint(
     route_index = _first_route_finding_index(plan.report.findings)
     if route_index is None or not 1 <= route_index <= len(plan.visible_route):
         return None
+    return _build_route_recorder_hint(
+        plan,
+        route_index=route_index,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
 
+
+def _build_route_recorder_hint(
+    plan: AnimationPlaytestReadinessPlan,
+    *,
+    route_index: int,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint:
     route_item = plan.visible_route[route_index - 1]
     required_terms = (
         MENU_ROUTE_EVIDENCE_TERMS if route_item.target == "menu" else PLAY_ROUTE_EVIDENCE_TERMS
@@ -1230,6 +1409,19 @@ def _build_next_window_recorder_hint(
     window_size = _first_window_finding_label(findings)
     if window_size is None:
         return None
+    return _build_window_recorder_hint(
+        window_size,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+
+def _build_window_recorder_hint(
+    window_size: str,
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint:
     return AnimationPlaytestRecorderHint(
         status="manual-required",
         area="Window Matrix",
@@ -1264,6 +1456,29 @@ def _build_next_labeled_recorder_hint(
     label = _first_labeled_finding(findings, labels=labels, marker=marker)
     if label is None:
         return None
+    return _build_labeled_recorder_hint(
+        label,
+        report_path=report_path,
+        command_prefix=command_prefix,
+        section=section,
+        command_name=command_name,
+        option_name=option_name,
+        evidence_terms=evidence_terms,
+        evidence_prompt_prefix=evidence_prompt_prefix,
+    )
+
+
+def _build_labeled_recorder_hint(
+    label: str,
+    *,
+    report_path: Path,
+    command_prefix: str,
+    section: str,
+    command_name: str,
+    option_name: str,
+    evidence_terms: dict[str, tuple[str, ...]],
+    evidence_prompt_prefix: str,
+) -> AnimationPlaytestRecorderHint:
     required_terms = evidence_terms[label]
     return AnimationPlaytestRecorderHint(
         status="manual-required",
@@ -1292,6 +1507,19 @@ def _build_next_scene_recorder_hint(
     )
     if label is None:
         return None
+    return _build_scene_recorder_hint(
+        label,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+
+def _build_scene_recorder_hint(
+    label: str,
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint:
     readability_terms = SCENE_READABILITY_EVIDENCE_TERMS[label]
     motion_terms = SCENE_MOTION_EVIDENCE_TERMS[label]
     return AnimationPlaytestRecorderHint(
@@ -1322,6 +1550,19 @@ def _build_next_field_recorder_hint(
     field_name = _first_field_finding_label(findings)
     if field_name is None:
         return None
+    return _build_field_recorder_hint(
+        field_name,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+
+def _build_field_recorder_hint(
+    field_name: str,
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> AnimationPlaytestRecorderHint:
     return AnimationPlaytestRecorderHint(
         status="manual-required",
         area="Report Field",
@@ -1339,6 +1580,11 @@ def _build_next_field_recorder_hint(
 
 
 def _first_route_finding_index(findings: tuple[str, ...]) -> int | None:
+    indexes = _route_finding_indexes(findings)
+    return indexes[0] if indexes else None
+
+
+def _route_finding_indexes(findings: tuple[str, ...]) -> tuple[int, ...]:
     route_patterns = (
         r"visible route evidence row (\d+)",
         r"visible route evidence result: (\d+)",
@@ -1349,25 +1595,41 @@ def _first_route_finding_index(findings: tuple[str, ...]) -> int | None:
         r"missing visible test route row: (\d+)",
     )
     indexes: list[int] = []
+    seen: set[int] = set()
     for finding in findings:
         normalized = finding.lower()
         for pattern in route_patterns:
             match = re.search(pattern, normalized)
             if match is None:
                 continue
-            indexes.append(int(match.group(1)))
+            index = int(match.group(1))
+            if index not in seen:
+                indexes.append(index)
+                seen.add(index)
             break
-    return min(indexes) if indexes else None
+    return tuple(sorted(indexes))
 
 
 def _first_window_finding_label(findings: tuple[str, ...]) -> str | None:
+    labels = _window_finding_labels(findings)
+    return labels[0] if labels else None
+
+
+def _window_finding_labels(findings: tuple[str, ...]) -> tuple[str, ...]:
+    labels: list[str] = []
+    seen: set[str] = set()
     for finding in findings:
         if "window matrix" not in finding.lower():
             continue
         match = re.search(r"\b(\d+x\d+)\b", finding.lower())
-        if match is not None:
-            return match.group(1)
-    return None
+        if match is None:
+            continue
+        label = match.group(1)
+        if label in seen:
+            continue
+        labels.append(label)
+        seen.add(label)
+    return tuple(labels)
 
 
 def _first_labeled_finding(
@@ -1376,39 +1638,68 @@ def _first_labeled_finding(
     labels: tuple[str, ...],
     marker: str,
 ) -> str | None:
+    labels_found = _labeled_finding_labels(findings, labels=labels, marker=marker)
+    return labels_found[0] if labels_found else None
+
+
+def _labeled_finding_labels(
+    findings: tuple[str, ...],
+    *,
+    labels: tuple[str, ...],
+    marker: str,
+) -> tuple[str, ...]:
     normalized_marker = marker.lower()
+    labels_found: list[str] = []
+    seen: set[str] = set()
     for finding in findings:
         if normalized_marker not in finding.lower():
             continue
         normalized_finding = _normalize_report_key(finding)
         for label in labels:
             if _normalize_report_key(label) in normalized_finding:
-                return label
-    return None
+                if label not in seen:
+                    labels_found.append(label)
+                    seen.add(label)
+                break
+    return tuple(labels_found)
 
 
 def _first_field_finding_label(findings: tuple[str, ...]) -> str | None:
+    labels = _field_finding_labels(findings)
+    return labels[0] if labels else None
+
+
+def _field_finding_labels(findings: tuple[str, ...]) -> tuple[str, ...]:
     allowed_fields = (
         *REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS,
         "Release decision",
         *REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS,
         *REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS,
     )
+    labels: list[str] = []
+    seen: set[str] = set()
     for finding in findings:
         normalized = finding.lower()
+        field_name = ""
         if normalized.startswith("missing field: "):
             field_name = finding.split(":", maxsplit=1)[1].strip()
-            return _normalize_allowed_manual_label(field_name, allowed_fields, "Report field")
-        if "release decision" in normalized:
-            return "Release decision"
-        if normalized.startswith("blocker field is not clear: "):
+        elif "release decision" in normalized:
+            field_name = "Release decision"
+        elif normalized.startswith("blocker field is not clear: "):
             field_name = finding.split(":", maxsplit=1)[1].strip()
-            return _normalize_allowed_manual_label(field_name, allowed_fields, "Report field")
-        if "required fixes before presenting" in normalized:
-            return "Required fixes before presenting"
-        if "validator result" in normalized:
-            return "Validator result"
-    return None
+        elif "required fixes before presenting" in normalized:
+            field_name = "Required fixes before presenting"
+        elif "validator result" in normalized:
+            field_name = "Validator result"
+
+        if not field_name:
+            continue
+        label = _normalize_allowed_manual_label(field_name, allowed_fields, "Report field")
+        if label in seen:
+            continue
+        labels.append(label)
+        seen.add(label)
+    return tuple(labels)
 
 
 def _shell_arg(value: str | Path) -> str:

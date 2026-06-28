@@ -40,6 +40,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
+    build_2d_animation_playtest_recorder_queue,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -61,6 +62,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
+    write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
 )
 from nexus_tech.frontend_2d.catalog import (
@@ -6342,6 +6344,110 @@ def test_animation_playtest_recorder_next_command_accepts_completed_report(
     assert "PASS" in result.output
     assert "validate-animation-playtest-report" in result.output
     assert "Manual animation signoff is complete" in result.output
+
+
+def test_build_animation_playtest_recorder_queue_lists_open_manual_rows(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.194.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+
+    hints = build_2d_animation_playtest_recorder_queue(
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert len([hint for hint in hints if hint.area == "Visible Route Evidence"]) == 18
+    assert len([hint for hint in hints if hint.area == "Window Matrix"]) == 3
+    assert len([hint for hint in hints if hint.area == "Control Clarity Results"]) == 9
+    assert len([hint for hint in hints if hint.area == "Scene Results"]) == 9
+    assert len([hint for hint in hints if hint.area == "Game Feel Results"]) == 4
+    assert any(hint.target == "Commit" for hint in hints)
+    assert all("replace with" in hint.recorder_command for hint in hints)
+
+
+def test_write_animation_playtest_recorder_queue_keeps_manual_guard(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.194.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(),
+        commands_path,
+    )
+    hints = (
+        build_2d_animation_playtest_recorder_queue(
+            report_path,
+            commands_path,
+        )[0],
+    )
+
+    write_2d_animation_playtest_recorder_queue(hints, output_path)
+
+    text = output_path.read_text(encoding="utf-8")
+    assert "Manual result: `not completed by automation`" in text
+    assert "placeholders require real tester observations before use" in text
+    assert "record-animation-playtest-route" in text
+    assert "<replace with observed visible-window notes>" in text
+
+
+def test_animation_playtest_recorder_queue_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.194.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-recorder-queue",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Recorder Queue" in result.output
+    assert "recorder step(s) queued" in result.output
+    assert output_path.exists()
+    output_text = output_path.read_text(encoding="utf-8")
+    assert "Run Visible Command" not in output_text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in output_text
+    assert "record-animation-playtest-route" in output_text
 
 
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:

@@ -29,6 +29,7 @@ from nexus_tech.frontend_2d.animation_audit import (
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
+    build_2d_animation_playtest_recorder_queue,
     record_2d_animation_playtest_control_evidence,
     record_2d_animation_playtest_feedback_evidence,
     record_2d_animation_playtest_field,
@@ -45,6 +46,7 @@ from nexus_tech.frontend_2d.animation_audit import (
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
+    write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
 )
 from nexus_tech.frontend_2d.app import (
@@ -111,6 +113,7 @@ __all__ = [
     "build_2d_animation_playtest_command_queue",
     "build_2d_animation_playtest_prep_report",
     "build_2d_animation_playtest_recorder_hint",
+    "build_2d_animation_playtest_recorder_queue",
     "record_2d_animation_playtest_control_evidence",
     "record_2d_animation_playtest_feedback_evidence",
     "record_2d_animation_playtest_field",
@@ -126,6 +129,7 @@ __all__ = [
     "write_2d_animation_matrix_report",
     "write_2d_animation_playtest_command_queue",
     "write_2d_animation_playtest_prep_report",
+    "write_2d_animation_playtest_recorder_queue",
     "write_2d_animation_playtest_readiness_plan",
     "write_2d_animation_playtest_report_template",
     "run_2d_flow_audit",

@@ -69,6 +69,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
+    build_2d_animation_playtest_recorder_queue,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -89,6 +90,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
+    write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
 )
 from nexus_tech.persistence.errors import PersistenceError
@@ -321,6 +323,11 @@ ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the manual animation playtest command queue.",
+)
+ANIMATION_PLAYTEST_RECORDER_QUEUE_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the manual animation recorder queue.",
 )
 ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT = typer.Argument(
     ...,
@@ -1809,6 +1816,78 @@ def animation_playtest_recorder_next_command(
 
     if fail_on_incomplete and hint.status != "pass":
         raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-recorder-queue")
+def animation_playtest_recorder_queue_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_RECORDER_QUEUE_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show all safe recorder commands for currently incomplete manual QA rows."""
+
+    validate_scenario_id(scenario)
+    hints = build_2d_animation_playtest_recorder_queue(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    _print_animation_playtest_recorder_queue(hints)
+    if output is not None:
+        write_2d_animation_playtest_recorder_queue(hints, output)
+        console.print(
+            Panel.fit(
+                f"Animation playtest recorder queue written to {output}",
+                title="Animation Playtest Recorder Queue",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and any(hint.status != "pass" for hint in hints):
+        raise typer.Exit(code=1)
+
+
+def _print_animation_playtest_recorder_queue(
+    hints: tuple[AnimationPlaytestRecorderHint, ...],
+) -> None:
+    table = Table(title="Animation Playtest Recorder Queue")
+    table.add_column("Step", justify="right")
+    table.add_column("Status")
+    table.add_column("Area", style="cyan")
+    table.add_column("Target")
+    table.add_column("Visible")
+    table.add_column("Terms", justify="right")
+    for index, hint in enumerate(hints, start=1):
+        table.add_row(
+            str(index),
+            hint.status.upper(),
+            hint.area,
+            hint.target,
+            "yes" if hint.visible_command else "-",
+            str(len(hint.required_terms)),
+        )
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"{len(hints)} recorder step(s) queued. "
+                "Every placeholder must be replaced with real observed evidence before signoff."
+            ),
+            title="Animation Playtest Recorder Queue",
+            border_style="yellow" if any(hint.status != "pass" for hint in hints) else "green",
+        )
+    )
 
 
 def _print_animation_playtest_recorder_hint(hint: AnimationPlaytestRecorderHint) -> None:

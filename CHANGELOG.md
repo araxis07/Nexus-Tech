@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.194.0 - 2026-06-28
+
+- Added `animation-playtest-recorder-queue` to export every currently open manual animation recorder command as a tester handoff artifact
+- Kept manual signoff protected by writing placeholder recorder commands that still require real observed evidence
+- Updated docs and regression coverage for queue-based manual animation evidence collection
+
 ## 0.193.0 - 2026-06-28
 
 - Added `animation-playtest-recorder-next` to pair the next visible-window manual run with the matching safe recorder command
