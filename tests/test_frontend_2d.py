@@ -37,6 +37,7 @@ from nexus_tech.frontend_2d import (
     VisualAuditCell,
     VisualAuditReport,
     build_2d_animation_playtest_command_queue,
+    build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
@@ -62,6 +63,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_session,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
+    write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
@@ -6771,6 +6773,108 @@ def test_validate_animation_playtest_session_command_accepts_current_artifacts(
     assert "MANUAL-REQUIRED" in result.output
 
 
+def test_write_animation_playtest_handoff_exports_next_manual_step(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    handoff_path = tmp_path / "manual-animation-handoff.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.198.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-28",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+
+    handoff = build_2d_animation_playtest_handoff(
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        seed=17,
+    )
+    write_2d_animation_playtest_handoff(handoff, handoff_path)
+
+    text = handoff_path.read_text(encoding="utf-8")
+    assert handoff.status == "manual-required"
+    assert "- Artifact status: `pass`" in text
+    assert "- Handoff status: `manual-required`" in text
+    assert "## Next Visible Command" in text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in text
+    assert "record-animation-playtest-route" in text
+    assert "title, wizard, save, archive, meta, hover, text" in text
+
+
+def test_animation_playtest_handoff_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    handoff_path = tmp_path / "manual-animation-handoff.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.198.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-28",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-handoff",
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            str(recorder_queue_path),
+            "--seed",
+            "17",
+            "--output",
+            str(handoff_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Manual Handoff" in result.output
+    assert "Next Area" in result.output
+    assert "Animation playtest handoff written" in result.output
+    assert handoff_path.exists()
+    assert "record-animation-playtest-route" in handoff_path.read_text(encoding="utf-8")
+
+
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -6988,6 +7092,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
         app,
@@ -7005,6 +7110,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(plan_path),
             "--recorder-output",
             str(recorder_queue_path),
+            "--handoff-output",
+            str(handoff_path),
             "--commit",
             "abc1234",
             "--tester",
@@ -7023,14 +7130,17 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Status FAIL" in result.output
     assert "Session Artifacts" in result.output
     assert "Handoff Status" in result.output
+    assert "Handoff Sheet" in result.output
     assert report_path.exists()
     assert commands_path.exists()
     assert plan_path.exists()
     assert recorder_queue_path.exists()
+    assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
     plan_text = plan_path.read_text(encoding="utf-8")
     recorder_text = recorder_queue_path.read_text(encoding="utf-8")
+    handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
     assert "| ruff check src tests | `pass`" in report_text
@@ -7053,6 +7163,9 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
         in recorder_text
     )
     assert "record-animation-playtest-route" in recorder_text
+    assert "- Handoff status: `manual-required`" in handoff_text
+    assert "## Next Visible Command" in handoff_text
+    assert "record-animation-playtest-route" in handoff_text
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

@@ -775,6 +775,21 @@ class AnimationPlaytestSessionValidation:
         return "pass"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestHandoff:
+    """One generated manual-animation handoff sheet."""
+
+    session: AnimationPlaytestSessionValidation
+    plan: AnimationPlaytestReadinessPlan
+    recorder_hint: AnimationPlaytestRecorderHint
+
+    @property
+    def status(self) -> str:
+        """Return the handoff status from the validated package."""
+
+        return self.session.handoff_status
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1516,6 +1531,56 @@ def validate_2d_animation_playtest_session(
     )
 
 
+def build_2d_animation_playtest_handoff(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestHandoff:
+    """Build the current manual animation handoff without completing signoff."""
+
+    session = validate_2d_animation_playtest_session(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    recorder_hint = build_2d_animation_playtest_recorder_hint(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    return AnimationPlaytestHandoff(
+        session=session,
+        plan=plan,
+        recorder_hint=recorder_hint,
+    )
+
+
 def _validate_recorder_queue_row(
     findings: list[str],
     index: int,
@@ -2009,6 +2074,96 @@ def write_2d_animation_playtest_readiness_plan(
             ]
         )
         for finding in plan.report.findings:
+            lines.append(f"| {_markdown_table_cell(finding)} |")
+
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_2d_animation_playtest_handoff(
+    handoff: AnimationPlaytestHandoff,
+    output_path: Path,
+) -> None:
+    """Write a concise manual animation handoff sheet."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    next_step = handoff.plan.steps[0]
+    hint = handoff.recorder_hint
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    manual_result = "not completed by automation" if handoff.status != "pass" else "complete"
+    lines = [
+        "# NEXUS TECH 2D Animation Manual Handoff",
+        "",
+        f"- Artifact status: `{handoff.session.artifact_status}`",
+        f"- Handoff status: `{handoff.status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Report: `{handoff.session.report.path}`",
+        f"- Commands: `{handoff.session.commands.path}`",
+        f"- Plan: `{handoff.session.plan.path}`",
+        f"- Recorder queue: `{handoff.session.recorder_queue.path}`",
+        f"- Report open items: `{len(handoff.session.report.findings)}`",
+        f"- Recorder queue rows: `{handoff.session.recorder_queue.expected_count}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        "",
+        "## Current Status",
+        "",
+        "| Artifact | Status |",
+        "| --- | --- |",
+        f"| Command queue | `{handoff.session.commands.status}` |",
+        f"| Plan artifact | `{handoff.session.plan.status}` |",
+        f"| Recorder queue | `{handoff.session.recorder_queue.status}` |",
+        f"| Final report | `{handoff.session.report.status}` |",
+        "",
+        "## Next Manual Step",
+        "",
+        "| Area | Status | Open Items | Next Step |",
+        "| --- | --- | ---: | --- |",
+        (
+            "| "
+            f"{_markdown_table_cell(next_step.area)} | "
+            f"`{next_step.status}` | "
+            f"`{next_step.open_items}` | "
+            f"{_markdown_table_cell(next_step.next_step)} |"
+        ),
+        "",
+        "## Next Visible Command",
+        "",
+        f"`{_markdown_table_cell(visible_command)}`",
+        "",
+        "## Next Recorder Command",
+        "",
+        f"- Area: `{hint.area}`",
+        f"- Target: `{hint.target}`",
+        f"- Required terms: `{_markdown_table_cell(required_terms)}`",
+        f"- Evidence prompt: {_markdown_table_cell(hint.evidence_prompt)}",
+        "",
+        f"`{_markdown_table_cell(hint.recorder_command)}`",
+        "",
+        "## Open Areas",
+        "",
+        "| Area | Status | Open Items | Next Step |",
+        "| --- | --- | ---: | --- |",
+    ]
+    for step in handoff.plan.steps:
+        lines.append(
+            "| "
+            f"{_markdown_table_cell(step.area)} | "
+            f"`{step.status}` | "
+            f"`{step.open_items}` | "
+            f"{_markdown_table_cell(step.next_step)} |"
+        )
+
+    if handoff.session.findings:
+        lines.extend(
+            [
+                "",
+                "## Artifact Findings",
+                "",
+                "| Finding |",
+                "| --- |",
+            ]
+        )
+        for finding in handoff.session.findings:
             lines.append(f"| {_markdown_table_cell(finding)} |")
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

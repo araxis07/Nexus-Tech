@@ -25,8 +25,9 @@ uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-ani
 uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md
+uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --output /tmp/nexus-tech-animation-handoff.md
 ```
 
 If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
@@ -35,7 +36,7 @@ to `animation-playtest-commands`, `validate-animation-playtest-commands`,
 `animation-playtest-recorder-queue`, `validate-animation-playtest-recorder-queue`,
 `animation-playtest-recorder-next`,
 `validate-animation-playtest-plan`, `prepare-animation-playtest-session`, and
-`validate-animation-playtest-session`.
+`validate-animation-playtest-session`, and `animation-playtest-handoff`.
 The command queue and validators must use the same prefix.
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with each `visual-audit-contact-sheet-WIDTHxHEIGHT.png`, then use `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
@@ -115,12 +116,16 @@ status, open-item counts, missing visible-route rows, missing checklist rows, or
 missing runbook/manual-result guards are caught before handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, grouped plan artifact, recorder queue, and artifact validation
-created together before handing the manual pass to a tester.
+created together before handing the manual pass to a tester. It also writes a
+handoff sheet when `--handoff-output` is supplied or left at its default.
 Use `validate-animation-playtest-session` immediately before handoff or after
 editing artifacts so the report, command queue, grouped plan, and recorder queue
 are checked as one package. A fresh incomplete manual report can still return a
 manual-required handoff status; only stale or missing artifacts block the session
 validator.
+Use `animation-playtest-handoff` to print or write the current handoff sheet with
+artifact status, the next manual area, the next visible command, and the matching
+recorder command. It still uses placeholders and does not complete signoff.
 Report notes must be observed evidence, not generic placeholders. The validator
 rejects broad notes like `ok`, `clear`, `readable`, or `stable` in evidence
 cells because those do not prove which window, control path, scene, or motion cue

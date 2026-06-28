@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.198.0 - 2026-06-28
+
+- Added `animation-playtest-handoff` to print or write the current manual animation handoff sheet with artifact status, the next visible command, and the matching recorder command
+- Extended `prepare-animation-playtest-session` to generate the handoff sheet alongside the report, command queue, grouped plan, and recorder queue
+- Updated README, release docs, and regression coverage for one-sheet manual animation QA handoff without completing signoff automatically
+
 ## 0.197.0 - 2026-06-28
 
 - Added `validate-animation-playtest-session` to validate the manual animation report, visible command queue, grouped plan, and recorder queue as one handoff package

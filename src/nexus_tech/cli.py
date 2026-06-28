@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
     MotionMode,
     build_2d_animation_playtest_command_queue,
+    build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
@@ -90,6 +91,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_session,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
+    write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
@@ -331,6 +333,11 @@ ANIMATION_PLAYTEST_RECORDER_QUEUE_OUTPUT_OPTION = typer.Option(
     "--output",
     help="Optional Markdown path for the manual animation recorder queue.",
 )
+ANIMATION_PLAYTEST_HANDOFF_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the manual animation handoff sheet.",
+)
 ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT = typer.Argument(
     ...,
     exists=True,
@@ -362,6 +369,11 @@ ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-recorder-queue.md"),
     "--recorder-output",
     help="Markdown path for the manual animation recorder queue.",
+)
+ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-handoff.md"),
+    "--handoff-output",
+    help="Markdown path for the manual animation handoff sheet.",
 )
 ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-report.md"),
@@ -1999,6 +2011,79 @@ def validate_animation_playtest_session_command(
     )
 
 
+@app.command("animation-playtest-handoff")
+def animation_playtest_handoff_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_HANDOFF_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the next visible command and recorder command for manual animation QA."""
+
+    validate_scenario_id(scenario)
+    handoff = build_2d_animation_playtest_handoff(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    next_step = handoff.plan.steps[0]
+
+    table = Table(title="Animation Playtest Manual Handoff")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Artifact Status", handoff.session.artifact_status.upper())
+    table.add_row("Handoff Status", handoff.status.upper())
+    table.add_row("Report Open Items", str(len(handoff.session.report.findings)))
+    table.add_row("Recorder Queue Rows", str(handoff.session.recorder_queue.expected_count))
+    table.add_row("Next Area", next_step.area)
+    table.add_row("Next Open Items", str(next_step.open_items))
+    table.add_row("Next Step", next_step.next_step)
+    console.print(table)
+
+    if handoff.session.findings:
+        findings_table = Table(title="Animation Handoff Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in handoff.session.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Fix stale session artifacts before starting the visible-window pass.",
+                title="Animation Playtest Handoff",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    _print_animation_playtest_recorder_hint(handoff.recorder_hint)
+
+    if output is not None:
+        write_2d_animation_playtest_handoff(handoff, output)
+        console.print(
+            Panel.fit(
+                f"Animation playtest handoff written to {output}",
+                title="Animation Playtest Handoff",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and handoff.status != "pass":
+        raise typer.Exit(code=1)
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -2397,6 +2482,7 @@ def prepare_animation_playtest_session_command(
     commands_output: Path = ANIMATION_PLAYTEST_SESSION_COMMANDS_OUTPUT_OPTION,
     plan_output: Path = ANIMATION_PLAYTEST_SESSION_PLAN_OUTPUT_OPTION,
     recorder_output: Path = ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION,
+    handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
         DEMO_SEED_EXAMPLE,
@@ -2476,6 +2562,16 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    handoff = build_2d_animation_playtest_handoff(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_handoff(handoff, handoff_output)
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -2484,6 +2580,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Commands", str(commands_output))
     session_table.add_row("Plan", str(plan_output))
     session_table.add_row("Recorder Queue", str(recorder_output))
+    session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
     session_table.add_row("Command Queue", f"{len(queue)} visible-window command(s)")
@@ -2493,6 +2590,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Recorder Artifact", recorder_validation.status.upper())
     session_table.add_row("Session Artifacts", session_validation.artifact_status.upper())
     session_table.add_row("Handoff Status", session_validation.handoff_status.upper())
+    session_table.add_row("Handoff Sheet", handoff.status.upper())
     session_table.add_row("Open Items", str(plan.open_item_count))
     console.print(session_table)
 
