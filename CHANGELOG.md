@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.199.0 - 2026-06-29
+
+- Added the June 29 internal playtest and balance audit snapshot so current automated gate results and remaining manual animation blockers are tracked in the repository
+- Captured the latest animation, visual, motion, balance, content, doctor, session, and handoff status before the next manual open-window pass
+- Kept manual animation signoff explicitly blocked until real visible-window evidence replaces generated placeholders
+
 ## 0.198.0 - 2026-06-28
 
 - Added `animation-playtest-handoff` to print or write the current manual animation handoff sheet with artifact status, the next visible command, and the matching recorder command
