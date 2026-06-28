@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.197.0 - 2026-06-28
+
+- Added `validate-animation-playtest-session` to validate the manual animation report, visible command queue, grouped plan, and recorder queue as one handoff package
+- Updated session preparation to surface package-level artifact and handoff status without marking manual signoff complete
+- Updated animation playtest docs and regression coverage for full-package handoff validation before visible-window QA
+
 ## 0.196.0 - 2026-06-28
 
 - Extended `prepare-animation-playtest-session` to generate and validate the recorder queue alongside the report, visible command queue, and grouped plan

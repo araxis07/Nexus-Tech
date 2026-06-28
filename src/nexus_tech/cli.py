@@ -87,6 +87,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_report,
+    validate_2d_animation_playtest_session,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
@@ -1927,6 +1928,77 @@ def validate_animation_playtest_recorder_queue_command(
     )
 
 
+@app.command("validate-animation-playtest-session")
+def validate_animation_playtest_session_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the complete manual animation handoff package."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_session(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Session Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Report", validation.report.path)
+    table.add_row("Commands", validation.commands.path)
+    table.add_row("Plan", validation.plan.path)
+    table.add_row("Recorder Queue", validation.recorder_queue.path)
+    table.add_row("Command Queue", validation.commands.status.upper())
+    table.add_row("Plan Artifact", validation.plan.status.upper())
+    table.add_row("Recorder Artifact", validation.recorder_queue.status.upper())
+    table.add_row("Artifact Status", validation.artifact_status.upper())
+    table.add_row("Handoff Status", validation.handoff_status.upper())
+    table.add_row("Report Open Items", str(len(validation.report.findings)))
+    table.add_row("Recorder Queue Rows", str(validation.recorder_queue.expected_count))
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Animation Session Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation playtest session artifacts are stale or incomplete.",
+                title="Animation Playtest Session",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    border_style = "green" if validation.handoff_status == "pass" else "yellow"
+    console.print(
+        Panel.fit(
+            (
+                "Animation playtest session artifacts are current. "
+                f"Handoff status: {validation.handoff_status.upper()}."
+            ),
+            title="Animation Playtest Session",
+            border_style=border_style,
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -2395,6 +2467,15 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    session_validation = validate_2d_animation_playtest_session(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -2410,6 +2491,8 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
     session_table.add_row("Recorder Artifact", recorder_validation.status.upper())
+    session_table.add_row("Session Artifacts", session_validation.artifact_status.upper())
+    session_table.add_row("Handoff Status", session_validation.handoff_status.upper())
     session_table.add_row("Open Items", str(plan.open_item_count))
     console.print(session_table)
 
@@ -2426,6 +2509,13 @@ def prepare_animation_playtest_session_command(
         findings_table = Table(title="Animation Recorder Queue Artifact Findings")
         findings_table.add_column("Finding", style="yellow")
         for finding in recorder_validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
+    if session_validation.findings:
+        findings_table = Table(title="Animation Session Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in session_validation.findings:
             findings_table.add_row(finding)
         console.print(findings_table)
         raise typer.Exit(code=1)

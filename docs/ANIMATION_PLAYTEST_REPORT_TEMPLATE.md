@@ -8,14 +8,18 @@ uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-r
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech animation-playtest-recorder-queue /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-recorder-queue.md
+uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md
+uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md
 ```
 
 If the tester shell does not have `uv`, add
 `--command-prefix .venv313/bin/nexus-tech` to the command queue, command
-validation, plan, plan validation, and session setup commands so the exported
-visible-window route uses the same launcher the tester can actually run.
+validation, plan, recorder queue, plan validation, session setup, and session
+validation commands so the exported visible-window route uses the same launcher
+the tester can actually run.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in
@@ -33,9 +37,13 @@ It also includes a validated `Manual Runbook` so testers keep the artifact
 refresh, visible-window execution, evidence-fill, and final validation order.
 Validate the exported plan after writing it so the attached plan cannot drift
 from the current report or command queue.
-The session setup command creates the report, command queue, and grouped plan
-together but still leaves manual rows incomplete until real observations are
-entered.
+Export and validate the recorder queue before handoff so every open manual row
+has a safe recorder command with observation placeholders.
+The session setup command creates the report, command queue, grouped plan, and
+recorder queue together but still leaves manual rows incomplete until real
+observations are entered.
+Run session validation after setup or edits so stale package artifacts fail
+before a tester starts the visible-window pass.
 The final report must keep the generated `Visible Route Evidence` table and fill
 all 18 menu/play rows with `pass` plus observed notes from the matching window
 and motion mode.

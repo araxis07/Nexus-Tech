@@ -59,6 +59,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_report,
+    validate_2d_animation_playtest_session,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_prep_report,
@@ -6625,6 +6626,151 @@ def test_validate_animation_playtest_recorder_queue_command_rejects_stale_artifa
     assert "recorder command is stale" in result.output
 
 
+def test_validate_animation_playtest_session_accepts_current_artifacts(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.197.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-28",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+
+    validation = validate_2d_animation_playtest_session(
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        seed=17,
+    )
+
+    assert validation.artifact_status == "pass"
+    assert validation.handoff_status == "manual-required"
+    assert validation.report.status == "fail"
+    assert validation.commands.status == "pass"
+    assert validation.plan.status == "pass"
+    assert validation.recorder_queue.status == "pass"
+    assert validation.findings == ()
+
+
+def test_validate_animation_playtest_session_reports_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.197.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-28",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    plan_path.write_text(
+        plan_path.read_text(encoding="utf-8").replace(
+            "- Status: `manual-required`",
+            "- Status: `pass`",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_session(
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        seed=17,
+    )
+
+    assert validation.artifact_status == "fail"
+    assert validation.handoff_status == "blocked"
+    assert any(finding.startswith("plan artifact:") for finding in validation.findings)
+
+
+def test_validate_animation_playtest_session_command_accepts_current_artifacts(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.197.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-06-28",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-session",
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            str(recorder_queue_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Session Validation" in result.output
+    assert "Artifact Status" in result.output
+    assert "Handoff Status" in result.output
+    assert "MANUAL-REQUIRED" in result.output
+
+
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -6875,6 +7021,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Animation Playtest Session" in result.output
     assert "Animation Playtest Status" in result.output
     assert "Status FAIL" in result.output
+    assert "Session Artifacts" in result.output
+    assert "Handoff Status" in result.output
     assert report_path.exists()
     assert commands_path.exists()
     assert plan_path.exists()
