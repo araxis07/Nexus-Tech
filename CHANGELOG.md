@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.196.0 - 2026-06-28
+
+- Extended `prepare-animation-playtest-session` to generate and validate the recorder queue alongside the report, visible command queue, and grouped plan
+- Added recorder queue path and row counts to the session summary so manual QA handoffs have one complete artifact package
+- Updated docs and regression coverage for one-command manual animation handoff preparation without completing signoff automatically
+
 ## 0.195.0 - 2026-06-28
 
 - Added `validate-animation-playtest-recorder-queue` to block stale manual recorder queue handoff artifacts before visible-window QA

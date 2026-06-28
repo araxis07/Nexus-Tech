@@ -38,7 +38,7 @@ uv run nexus-tech animation-playtest-recorder-queue /tmp/nexus-tech-animation-pl
 uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
 # After the manual report is filled:
@@ -73,8 +73,9 @@ status, open-item counts, visible-route evidence prompts, or manual evidence
 checklist/runbook rows are blocked before handoff.
 Run `animation-playtest-recorder-queue` before handing the report to a tester
 when you need a full Markdown queue of every currently incomplete recorder
-command. The exported queue still uses placeholders and does not complete manual
-signoff.
+command. `prepare-animation-playtest-session` also writes this queue with the
+default recorder output path, and the exported queue still uses placeholders and
+does not complete manual signoff.
 Run `validate-animation-playtest-recorder-queue` after exporting the recorder
 queue so stale row counts, evidence prompts, visible commands, required terms, or
 recorder commands fail before manual evidence collection starts.
@@ -83,8 +84,9 @@ needs the next safe recorder command. It prints the matching visible-window
 command, required evidence terms, and a recorder command with placeholders that
 must be replaced by real observations before signoff.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
-tester; it creates the report draft, command queue, grouped plan artifact, and
-current plan validation without completing manual signoff.
+tester; it creates the report draft, command queue, grouped plan artifact,
+recorder queue artifact, and current artifact validation without completing
+manual signoff.
 The completed report must retain all 18 `Visible Route Evidence` rows generated
 from the queue and mark each row `pass` with observed notes before signoff.
 Route evidence notes must cover the required target-specific terms: menu rows
@@ -152,7 +154,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `validate-animation-playtest-recorder-queue /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md` after exporting the recorder queue so stale handoff rows fail before manual recording starts.
 - Run `animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md` while filling evidence so each visible run is paired with the correct recorder command and required evidence terms.
 - Run `validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md` before attaching the plan artifact to handoff notes.
-- Run `prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md` for the one-command setup when the report draft, command queue, and grouped plan should be regenerated together.
+- Run `prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md` for the one-command setup when the report draft, command queue, grouped plan, and recorder queue should be regenerated together.
 - Add `--command-prefix .venv313/bin/nexus-tech` to the manual animation queue, validation, plan, recorder-queue, recorder-queue validation, recorder-next, and session commands when the visible-window tester is using the local virtualenv launcher instead of `uv run nexus-tech`.
 - Run `draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md` after automated gates pass so the completed report starts from the same validator-required rows while manual window/control/scene/game-feel rows still require real tester input.
 - Run the balance and long-session preflight commands listed in the playtest prep artifact before opening the manual animation pass.

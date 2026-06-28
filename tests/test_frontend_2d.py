@@ -6841,6 +6841,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
 
     result = runner.invoke(
         app,
@@ -6856,6 +6857,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(commands_path),
             "--plan-output",
             str(plan_path),
+            "--recorder-output",
+            str(recorder_queue_path),
             "--commit",
             "abc1234",
             "--tester",
@@ -6875,9 +6878,11 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert report_path.exists()
     assert commands_path.exists()
     assert plan_path.exists()
+    assert recorder_queue_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
     plan_text = plan_path.read_text(encoding="utf-8")
+    recorder_text = recorder_queue_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
     assert "| ruff check src tests | `pass`" in report_text
@@ -6893,6 +6898,13 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "- Manual result: `not completed by automation`" in plan_text
     assert "## Visible Test Route" in plan_text
     assert "| 18 | `play` | `1440x900` | `off` |" in plan_text
+    assert "Recorder Artifact" in result.output
+    assert "Recorder Queue Rows" in result.output
+    assert (
+        "- Recorder commands: `placeholders require real tester observations before use`"
+        in recorder_text
+    )
+    assert "record-animation-playtest-route" in recorder_text
 
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:

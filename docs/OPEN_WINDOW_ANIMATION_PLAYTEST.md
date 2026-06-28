@@ -25,7 +25,7 @@ uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-ani
 uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md
 ```
 
 If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
@@ -77,9 +77,10 @@ it reads the current report and command queue, then prints the next evidence
 area and first visible-window command still called out by validation. It does not
 mark manual signoff complete.
 Use `animation-playtest-recorder-queue` before handoff or during long manual
-passes to export every currently incomplete recorder command with visible
+passes to refresh every currently incomplete recorder command with visible
 commands, required evidence terms, and placeholders that must be replaced by real
-tester observations.
+tester observations. `prepare-animation-playtest-session` also generates this
+recorder queue when `--recorder-output` is supplied or left at its default.
 Use `validate-animation-playtest-recorder-queue` after exporting the recorder
 queue so stale row counts, visible commands, required terms, prompts, or recorder
 commands fail before the tester starts recording evidence.
@@ -111,8 +112,8 @@ Use `validate-animation-playtest-plan` after writing the plan artifact so stale
 status, open-item counts, missing visible-route rows, missing checklist rows, or
 missing runbook/manual-result guards are caught before handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
-command queue, grouped plan artifact, and plan validation created together
-before handing the manual pass to a tester.
+command queue, grouped plan artifact, recorder queue, and artifact validation
+created together before handing the manual pass to a tester.
 Report notes must be observed evidence, not generic placeholders. The validator
 rejects broad notes like `ok`, `clear`, `readable`, or `stable` in evidence
 cells because those do not prove which window, control path, scene, or motion cue
