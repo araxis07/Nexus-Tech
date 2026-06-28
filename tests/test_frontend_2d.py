@@ -57,6 +57,7 @@ from nexus_tech.frontend_2d import (
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_readiness_plan,
+    validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -6448,6 +6449,180 @@ def test_animation_playtest_recorder_queue_command_writes_artifact(
     assert "Run Visible Command" not in output_text
     assert "menu-2d --window-size 820x620 --motion-mode full" in output_text
     assert "record-animation-playtest-route" in output_text
+
+
+def test_validate_animation_playtest_recorder_queue_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.195.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(
+            report_path,
+            commands_path,
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        recorder_queue_path,
+    )
+
+    validation = validate_2d_animation_playtest_recorder_queue(
+        recorder_queue_path,
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.status == "pass"
+    assert validation.expected_count == 61
+    assert validation.findings == ()
+
+
+def test_validate_animation_playtest_recorder_queue_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.195.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(
+            report_path,
+            commands_path,
+            seed=17,
+        ),
+        recorder_queue_path,
+    )
+    recorder_queue_path.write_text(
+        recorder_queue_path.read_text(encoding="utf-8").replace(
+            "Visible Route Evidence",
+            "Visible Route Drift",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_recorder_queue(
+        recorder_queue_path,
+        report_path,
+        commands_path,
+        seed=17,
+    )
+
+    assert validation.status == "fail"
+    assert "recorder queue row 1 area is stale" in validation.findings
+
+
+def test_validate_animation_playtest_recorder_queue_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.195.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(
+            report_path,
+            commands_path,
+            seed=17,
+        ),
+        recorder_queue_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-recorder-queue",
+            str(recorder_queue_path),
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Recorder Queue Validation" in result.output
+    assert "PASS" in result.output
+
+
+def test_validate_animation_playtest_recorder_queue_command_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.195.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(
+            report_path,
+            commands_path,
+            seed=17,
+        ),
+        recorder_queue_path,
+    )
+    recorder_queue_path.write_text(
+        recorder_queue_path.read_text(encoding="utf-8").replace(
+            "record-animation-playtest-route",
+            "record-animation-playtest-drift",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-recorder-queue",
+            str(recorder_queue_path),
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Recorder Queue Findings" in result.output
+    assert "recorder command is stale" in result.output
 
 
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.195.0 - 2026-06-28
+
+- Added `validate-animation-playtest-recorder-queue` to block stale manual recorder queue handoff artifacts before visible-window QA
+- Validated exported recorder rows against the current report gaps, command queue, evidence prompts, required terms, and recorder commands
+- Updated release docs and regression coverage for queue validation without marking manual signoff complete
+
 ## 0.194.0 - 2026-06-28
 
 - Added `animation-playtest-recorder-queue` to export every currently open manual animation recorder command as a tester handoff artifact

@@ -724,6 +724,21 @@ class AnimationPlaytestRecorderHint:
     visible_command: str = ""
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestRecorderQueueValidation:
+    """Validation result for an exported recorder queue artifact."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the recorder queue matches current artifacts."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1351,6 +1366,96 @@ def write_2d_animation_playtest_recorder_queue(
             f"`{_markdown_table_cell(hint.recorder_command)}` |"
         )
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_recorder_queue(
+    queue_path: Path,
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestRecorderQueueValidation:
+    """Validate that a recorder queue artifact matches the current report gaps."""
+
+    text = queue_path.read_text(encoding="utf-8")
+    expected_hints = build_2d_animation_playtest_recorder_queue(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Recorder Queue",
+        "- Manual result: `not completed by automation`",
+        "- Recorder commands: `placeholders require real tester observations before use`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing recorder queue guard: {line}")
+
+    rows = _extract_markdown_table_rows(text)
+    recorder_rows = tuple(row for row in rows if len(row) >= 8 and row[0].isdigit())
+    if len(recorder_rows) != len(expected_hints):
+        findings.append(f"expected {len(expected_hints)} recorder rows, found {len(recorder_rows)}")
+
+    rows_by_step: dict[int, tuple[str, ...]] = {}
+    for row in recorder_rows:
+        step = int(row[0])
+        if step in rows_by_step:
+            findings.append(f"duplicate recorder queue step: {step}")
+            continue
+        rows_by_step[step] = row
+
+    for index, hint in enumerate(expected_hints, start=1):
+        row = rows_by_step.get(index)
+        if row is None:
+            findings.append(f"missing recorder queue row: {index}")
+            continue
+        _validate_recorder_queue_row(findings, index, row, hint)
+
+    return AnimationPlaytestRecorderQueueValidation(
+        path=str(queue_path),
+        expected_count=len(expected_hints),
+        findings=tuple(findings),
+    )
+
+
+def _validate_recorder_queue_row(
+    findings: list[str],
+    index: int,
+    row: tuple[str, ...],
+    hint: AnimationPlaytestRecorderHint,
+) -> None:
+    status = _strip_markdown_code(row[1])
+    area = row[2].replace(r"\|", "|").strip()
+    target = row[3].replace(r"\|", "|").strip()
+    visible_command = _strip_markdown_code(row[4]).replace(r"\|", "|")
+    required_terms = row[5].replace(r"\|", "|").strip()
+    evidence_prompt = row[6].replace(r"\|", "|").strip()
+    recorder_command = _strip_markdown_code(row[7]).replace(r"\|", "|")
+    expected_visible_command = hint.visible_command or "-"
+    expected_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    expected_values = (
+        ("status", status, hint.status),
+        ("area", area, hint.area),
+        ("target", target, hint.target),
+        ("visible command", visible_command, expected_visible_command),
+        ("required terms", required_terms, expected_terms),
+        ("evidence prompt", evidence_prompt, hint.evidence_prompt),
+        ("recorder command", recorder_command, hint.recorder_command),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"recorder queue row {index} {field} is stale")
 
 
 def _build_next_route_recorder_hint(

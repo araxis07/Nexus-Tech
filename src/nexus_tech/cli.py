@@ -85,6 +85,7 @@ from nexus_tech.frontend_2d import (
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_readiness_plan,
+    validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_report,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -328,6 +329,12 @@ ANIMATION_PLAYTEST_RECORDER_QUEUE_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the manual animation recorder queue.",
+)
+ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Manual animation recorder queue Markdown file.",
 )
 ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT = typer.Argument(
     ...,
@@ -1856,6 +1863,63 @@ def animation_playtest_recorder_queue_command(
 
     if fail_on_incomplete and any(hint.status != "pass" for hint in hints):
         raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-recorder-queue")
+def validate_animation_playtest_recorder_queue_command(
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that a recorder queue artifact matches current manual QA gaps."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_recorder_queue(
+        recorder_queue_path,
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Recorder Queue Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Recorder Queue", validation.path)
+    table.add_row("Expected Rows", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Recorder Queue Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation recorder queue is stale or incomplete.",
+                title="Animation Playtest Recorder Queue",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation recorder queue matches the current report and command queue.",
+            title="Animation Playtest Recorder Queue",
+            border_style="green",
+        )
+    )
 
 
 def _print_animation_playtest_recorder_queue(
