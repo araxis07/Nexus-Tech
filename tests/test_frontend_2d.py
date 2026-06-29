@@ -7433,9 +7433,15 @@ def test_write_animation_playtest_release_gate_blocks_until_manual_signoff(
     assert gate.artifact_status == "pass"
     assert gate.manual_result == "not completed by automation"
     assert gate.blocking_check_count == 3
+    assert gate.recorder_hint.area == "Visible Route Evidence"
+    assert gate.recorder_hint.target == "1"
     assert validation.status == "pass"
     assert validation.expected_count == 5
     assert "# NEXUS TECH 2D Animation Release Gate" in text
+    assert "## Next Manual Action" in text
+    assert "- Next manual area: `Visible Route Evidence`" in text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in text
+    assert "record-animation-playtest-route" in text
     assert "Manual Report Signoff" in text
     assert "P0/P1 UI Lanes" in text
     assert "no animation release while the gate is blocked or manual-required" in text
@@ -7583,6 +7589,8 @@ def test_animation_playtest_release_gate_command_writes_artifact(
     assert result.exit_code == 0
     assert "Animation Playtest Release Gate" in result.output
     assert "Release gate status: MANUAL-REQUIRED" in result.output
+    assert "Next Manual Action" in result.output
+    assert "record-animation-playtest-route" in result.output
     assert gate_path.exists()
     assert "P0/P1 UI Lanes" in gate_path.read_text(encoding="utf-8")
 

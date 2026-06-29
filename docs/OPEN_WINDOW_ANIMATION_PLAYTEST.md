@@ -114,7 +114,9 @@ controls, scenes, motion feedback, and release signoff. Validate it with
 polish pass.
 Use `animation-playtest-release-gate` after UI triage validation to produce the
 final go/no-go artifact. It remains `blocked` for stale artifacts and
-`manual-required` until the report validates and all P0/P1 lanes are clear.
+`manual-required` until the report validates and all P0/P1 lanes are clear. Its
+`Next Manual Action` section also shows the next visible command, required
+evidence terms, and matching recorder command.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

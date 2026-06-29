@@ -607,7 +607,9 @@ layout, typography, control, scene, motion, and signoff lanes so UI polish work
 does not get mixed into generic notes before the final validator pass.
 `animation-playtest-release-gate` then combines the session artifacts, UI triage
 artifact, P0/P1 lanes, and final report into one go/no-go gate; it stays
-`manual-required` until real visible-window evidence clears the report.
+`manual-required` until real visible-window evidence clears the report. The gate
+also carries the next visible-window command and matching recorder command so a
+tester can continue from the same artifact.
 The plan also includes a validated `Manual Evidence Checklist` for the window
 matrix, route notes, controls, scenes, game feel, and signoff fields so the
 non-route manual evidence cannot be dropped from handoff notes.

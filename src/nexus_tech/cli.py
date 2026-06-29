@@ -2494,6 +2494,21 @@ def animation_playtest_release_gate_command(
         )
     console.print(checks_table)
 
+    hint = gate.recorder_hint
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    next_table = Table(title="Next Manual Action")
+    next_table.add_column("Field", style="cyan")
+    next_table.add_column("Value")
+    next_table.add_row("Area", hint.area)
+    next_table.add_row("Target", hint.target)
+    next_table.add_row("Status", hint.status.upper())
+    next_table.add_row("Required Terms", required_terms)
+    next_table.add_row("Evidence Prompt", hint.evidence_prompt)
+    next_table.add_row("Visible Command", visible_command)
+    next_table.add_row("Recorder Command", hint.recorder_command)
+    console.print(next_table)
+
     console.print(
         Panel.fit(
             (

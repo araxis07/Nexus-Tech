@@ -33,6 +33,8 @@ Use the UI triage artifact to keep layout, typography, control, scene, motion,
 and signoff issues separated into P0/P1/P2 lanes before the next polish pass.
 Use the release gate artifact to keep the build blocked or manual-required until
 session artifacts, UI triage, P0/P1 lanes, and the final report all validate.
+Its `Next Manual Action` section is the safest place to pick up the next
+visible-window command plus matching recorder command.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

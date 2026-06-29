@@ -109,6 +109,8 @@ Run `animation-playtest-release-gate` after UI triage validation so release
 review has one go/no-go artifact across session artifacts, UI triage, P0/P1
 lanes, and final manual signoff. Run
 `validate-animation-playtest-release-gate` before treating the gate as current.
+Use the gate's `Next Manual Action` section to continue the visible-window pass
+with the next command and matching recorder command.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

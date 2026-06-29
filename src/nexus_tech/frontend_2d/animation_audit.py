@@ -965,6 +965,7 @@ class AnimationPlaytestReleaseGate:
     session: AnimationPlaytestSessionValidation
     triage: AnimationPlaytestUITriagePlan
     triage_validation: AnimationPlaytestUITriageValidation
+    recorder_hint: AnimationPlaytestRecorderHint
     checks: tuple[AnimationPlaytestReleaseGateCheck, ...]
 
     @property
@@ -2268,6 +2269,15 @@ def build_2d_animation_playtest_release_gate(
         motion_modes=motion_modes,
         command_prefix=command_prefix,
     )
+    recorder_hint = build_2d_animation_playtest_recorder_hint(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
     checks = (
         AnimationPlaytestReleaseGateCheck(
             name="Session Artifacts",
@@ -2338,6 +2348,7 @@ def build_2d_animation_playtest_release_gate(
         session=session,
         triage=triage,
         triage_validation=triage_validation,
+        recorder_hint=recorder_hint,
         checks=checks,
     )
 
@@ -2349,6 +2360,9 @@ def write_2d_animation_playtest_release_gate(
     """Write the final manual animation release gate as Markdown."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    hint = gate.recorder_hint
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
     lines = [
         "# NEXUS TECH 2D Animation Release Gate",
         "",
@@ -2372,6 +2386,9 @@ def write_2d_animation_playtest_release_gate(
         f"- Open UI triage items: `{gate.triage.open_item_count}`",
         f"- P0/P1 lanes: `{gate.triage.blocker_count}`",
         f"- Blocking checks: `{gate.blocking_check_count}`",
+        f"- Next manual area: `{hint.area}`",
+        f"- Next manual target: `{hint.target}`",
+        f"- Next manual status: `{hint.status}`",
         (
             "- Completion gate: "
             "`validate-animation-playtest-report and validate-animation-playtest-ui-triage "
@@ -2394,6 +2411,24 @@ def write_2d_animation_playtest_release_gate(
         )
     lines.extend(
         [
+            "",
+            "## Next Manual Action",
+            "",
+            (
+                "| Area | Target | Status | Required Terms | Evidence Prompt | "
+                "Visible Command | Recorder Command |"
+            ),
+            "| --- | --- | --- | --- | --- | --- | --- |",
+            (
+                "| "
+                f"{_markdown_table_cell(hint.area)} | "
+                f"{_markdown_table_cell(hint.target)} | "
+                f"`{hint.status}` | "
+                f"{_markdown_table_cell(required_terms)} | "
+                f"{_markdown_table_cell(hint.evidence_prompt)} | "
+                f"`{_markdown_table_cell(visible_command)}` | "
+                f"`{_markdown_table_cell(hint.recorder_command)}` |"
+            ),
             "",
             "## Release Rules",
             "",
@@ -2458,6 +2493,9 @@ def validate_2d_animation_playtest_release_gate(
         f"- Open UI triage items: `{gate.triage.open_item_count}`",
         f"- P0/P1 lanes: `{gate.triage.blocker_count}`",
         f"- Blocking checks: `{gate.blocking_check_count}`",
+        f"- Next manual area: `{gate.recorder_hint.area}`",
+        f"- Next manual target: `{gate.recorder_hint.target}`",
+        f"- Next manual status: `{gate.recorder_hint.status}`",
         (
             "- Completion gate: "
             "`validate-animation-playtest-report and validate-animation-playtest-ui-triage "
@@ -2485,6 +2523,14 @@ def validate_2d_animation_playtest_release_gate(
             findings.append(f"missing release gate row: {check.name}")
             continue
         _validate_release_gate_row(findings, check, row)
+
+    next_action_rows = tuple(
+        row for row in rows if len(row) >= 7 and row[0] == gate.recorder_hint.area
+    )
+    if len(next_action_rows) != 1:
+        findings.append("expected 1 release gate next-action row")
+    else:
+        _validate_release_gate_next_action(findings, gate.recorder_hint, next_action_rows[0])
 
     return AnimationPlaytestReleaseGateValidation(
         path=str(gate_path),
@@ -2548,6 +2594,34 @@ def _validate_release_gate_row(
     for field, actual, expected in expected_values:
         if _normalize_report_key(actual) != _normalize_report_key(expected):
             findings.append(f"release gate row {check.name} {field} is stale")
+
+
+def _validate_release_gate_next_action(
+    findings: list[str],
+    hint: AnimationPlaytestRecorderHint,
+    row: tuple[str, ...],
+) -> None:
+    area = row[0].replace(r"\|", "|").strip()
+    target = row[1].replace(r"\|", "|").strip()
+    status = _strip_markdown_code(row[2])
+    required_terms = row[3].replace(r"\|", "|").strip()
+    evidence_prompt = row[4].replace(r"\|", "|").strip()
+    visible_command = _strip_markdown_code(row[5]).replace(r"\|", "|")
+    recorder_command = _strip_markdown_code(row[6]).replace(r"\|", "|")
+    expected_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    expected_visible_command = hint.visible_command or "-"
+    expected_values = (
+        ("area", area, hint.area),
+        ("target", target, hint.target),
+        ("status", status, hint.status),
+        ("required terms", required_terms, expected_terms),
+        ("evidence prompt", evidence_prompt, hint.evidence_prompt),
+        ("visible command", visible_command, expected_visible_command),
+        ("recorder command", recorder_command, hint.recorder_command),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"release gate next action {field} is stale")
 
 
 def _validate_recorder_queue_row(

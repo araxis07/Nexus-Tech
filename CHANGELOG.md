@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.204.0 - 2026-06-30
+
+- Extended the animation release gate with a validated `Next Manual Action` section that pairs the next visible-window command with the matching recorder command
+- Updated the release-gate CLI output so testers can see the next evidence area, required terms, visible command, and recorder command without switching artifacts
+- Added regression coverage to keep the release gate stale-safe while preserving manual-required status until real open-window evidence is recorded
+
 ## 0.203.0 - 2026-06-30
 
 - Added `animation-playtest-release-gate` and `validate-animation-playtest-release-gate` to combine session artifacts, UI triage, and manual report signoff into one explicit go/no-go animation release gate
