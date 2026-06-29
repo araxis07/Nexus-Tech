@@ -25,10 +25,11 @@ uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-ani
 uv run nexus-tech animation-playtest-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
+uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --handoff-output /tmp/nexus-tech-animation-handoff.md
-uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md
-uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
+uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
 ```
 
 If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
@@ -36,9 +37,9 @@ to `animation-playtest-commands`, `validate-animation-playtest-commands`,
 `animation-playtest-plan`, `animation-playtest-next`,
 `animation-playtest-recorder-queue`, `validate-animation-playtest-recorder-queue`,
 `animation-playtest-recorder-next`,
-`animation-playtest-route-batches`, `validate-animation-playtest-plan`,
-`prepare-animation-playtest-session`, and `validate-animation-playtest-session`,
-and `animation-playtest-handoff`.
+`animation-playtest-route-batches`, `validate-animation-playtest-route-batches`,
+`validate-animation-playtest-plan`, `prepare-animation-playtest-session`,
+`validate-animation-playtest-session`, and `animation-playtest-handoff`.
 The command queue and validators must use the same prefix.
 
 Do not commit generated PNG captures or local readiness reports. Use `/tmp/nexus-tech-visual-audit`, `/tmp/nexus-tech-animation-matrix.md`, and `/tmp/nexus-tech-animation-playtest-prep.md` locally or the `nexus-tech-2d-visual-audit`, `nexus-tech-2d-animation-matrix`, and `nexus-tech-2d-animation-playtest-prep` GitHub Actions artifacts for review. Start with each `visual-audit-contact-sheet-WIDTHxHEIGHT.png`, then use `visual-audit-summary.md`, the animation matrix Markdown, and the playtest prep report before opening individual PNG captures.
@@ -97,6 +98,9 @@ Use `animation-playtest-route-batches` before or during the visible pass when a
 tester needs the 18 menu/play route commands grouped by target window with each
 matching recorder command beside it. The exported batch plan is a runner aid, not
 signoff evidence.
+Use `validate-animation-playtest-route-batches` after exporting or editing the
+batch plan so stale windows, visible commands, required terms, or recorder
+commands fail before the tester follows the batch artifact.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 
@@ -122,13 +126,14 @@ status, open-item counts, missing visible-route rows, missing checklist rows, or
 missing runbook/manual-result guards are caught before handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, grouped plan artifact, recorder queue, and artifact validation
-created together before handing the manual pass to a tester. It also writes a
-handoff sheet when `--handoff-output` is supplied or left at its default.
+created together before handing the manual pass to a tester. It also writes the
+route-batch artifact and a handoff sheet when their output options are supplied
+or left at their defaults.
 Use `validate-animation-playtest-session` immediately before handoff or after
-editing artifacts so the report, command queue, grouped plan, and recorder queue
-are checked as one package. A fresh incomplete manual report can still return a
-manual-required handoff status; only stale or missing artifacts block the session
-validator.
+editing artifacts so the report, command queue, grouped plan, recorder queue,
+and optional route-batch artifact are checked as one package. A fresh incomplete
+manual report can still return a manual-required handoff status; only stale or
+missing artifacts block the session validator.
 Use `animation-playtest-handoff` to print or write the current handoff sheet with
 artifact status, the next manual area, the next visible command, and the matching
 recorder command. It still uses placeholders and does not complete signoff.

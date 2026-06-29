@@ -89,6 +89,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_report,
+    validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -377,6 +378,11 @@ ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION = typer.Option(
     "--recorder-output",
     help="Markdown path for the manual animation recorder queue.",
 )
+ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-route-batches.md"),
+    "--route-batches-output",
+    help="Markdown path for the manual visible-route batch plan.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -425,6 +431,19 @@ ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT = typer.Argument(
     exists=True,
     dir_okay=False,
     help="Exported animation playtest plan Markdown file.",
+)
+ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation visible-route batch Markdown file.",
+)
+ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION = typer.Option(
+    None,
+    "--route-batches",
+    exists=True,
+    dir_okay=False,
+    help="Optional exported animation visible-route batch Markdown file.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -1953,6 +1972,7 @@ def validate_animation_playtest_session_command(
     command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
     plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
     recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
         DEMO_SEED_EXAMPLE,
@@ -1969,6 +1989,7 @@ def validate_animation_playtest_session_command(
         command_path,
         plan_path,
         recorder_queue_path,
+        route_batch_path,
         scenario_id=scenario,
         seed=seed,
         command_prefix=command_prefix,
@@ -1981,9 +2002,13 @@ def validate_animation_playtest_session_command(
     table.add_row("Commands", validation.commands.path)
     table.add_row("Plan", validation.plan.path)
     table.add_row("Recorder Queue", validation.recorder_queue.path)
+    if validation.route_batches is not None:
+        table.add_row("Route Batches", validation.route_batches.path)
     table.add_row("Command Queue", validation.commands.status.upper())
     table.add_row("Plan Artifact", validation.plan.status.upper())
     table.add_row("Recorder Artifact", validation.recorder_queue.status.upper())
+    if validation.route_batches is not None:
+        table.add_row("Route Batch Artifact", validation.route_batches.status.upper())
     table.add_row("Artifact Status", validation.artifact_status.upper())
     table.add_row("Handoff Status", validation.handoff_status.upper())
     table.add_row("Report Open Items", str(len(validation.report.findings)))
@@ -2024,6 +2049,7 @@ def animation_playtest_handoff_command(
     command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
     plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
     recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
         DEMO_SEED_EXAMPLE,
@@ -2042,6 +2068,7 @@ def animation_playtest_handoff_command(
         command_path,
         plan_path,
         recorder_queue_path,
+        route_batch_path,
         scenario_id=scenario,
         seed=seed,
         command_prefix=command_prefix,
@@ -2055,6 +2082,8 @@ def animation_playtest_handoff_command(
     table.add_row("Handoff Status", handoff.status.upper())
     table.add_row("Report Open Items", str(len(handoff.session.report.findings)))
     table.add_row("Recorder Queue Rows", str(handoff.session.recorder_queue.expected_count))
+    if handoff.session.route_batches is not None:
+        table.add_row("Route Batch Artifact", handoff.session.route_batches.status.upper())
     table.add_row("Next Area", next_step.area)
     table.add_row("Next Open Items", str(next_step.open_items))
     table.add_row("Next Step", next_step.next_step)
@@ -2168,6 +2197,64 @@ def animation_playtest_route_batches_command(
 
     if fail_on_incomplete and batch_plan.status != "pass":
         raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-route-batches")
+def validate_animation_playtest_route_batches_command(
+    batch_path: Path = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that a visible-route batch artifact matches current QA gaps."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_route_batch_plan(
+        batch_path,
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Route Batch Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Route Batches", validation.path)
+    table.add_row("Expected Batches", str(validation.expected_batches))
+    table.add_row("Expected Route Rows", str(validation.expected_route_rows))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Route Batch Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation route batch artifact is stale or incomplete.",
+                title="Animation Playtest Route Batches",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation route batch artifact matches the current report and command queue.",
+            title="Animation Playtest Route Batches",
+            border_style="green",
+        )
+    )
 
 
 def _print_animation_playtest_recorder_queue(
@@ -2568,6 +2655,7 @@ def prepare_animation_playtest_session_command(
     commands_output: Path = ANIMATION_PLAYTEST_SESSION_COMMANDS_OUTPUT_OPTION,
     plan_output: Path = ANIMATION_PLAYTEST_SESSION_PLAN_OUTPUT_OPTION,
     recorder_output: Path = ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION,
+    route_batch_output: Path = ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -2639,11 +2727,28 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    route_batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_output,
+        commands_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_route_batch_plan(route_batch_plan, route_batch_output)
+    route_batch_validation = validate_2d_animation_playtest_route_batch_plan(
+        route_batch_output,
+        report_output,
+        commands_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
     session_validation = validate_2d_animation_playtest_session(
         report_output,
         commands_output,
         plan_output,
         recorder_output,
+        route_batch_output,
         scenario_id=scenario,
         seed=seed,
         command_prefix=command_prefix,
@@ -2653,6 +2758,7 @@ def prepare_animation_playtest_session_command(
         commands_output,
         plan_output,
         recorder_output,
+        route_batch_output,
         scenario_id=scenario,
         seed=seed,
         command_prefix=command_prefix,
@@ -2666,14 +2772,17 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Commands", str(commands_output))
     session_table.add_row("Plan", str(plan_output))
     session_table.add_row("Recorder Queue", str(recorder_output))
+    session_table.add_row("Route Batches", str(route_batch_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
     session_table.add_row("Command Queue", f"{len(queue)} visible-window command(s)")
     session_table.add_row("Recorder Queue Rows", str(len(recorder_queue)))
+    session_table.add_row("Route Batch Open Items", str(route_batch_plan.route_open_items))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
     session_table.add_row("Recorder Artifact", recorder_validation.status.upper())
+    session_table.add_row("Route Batch Artifact", route_batch_validation.status.upper())
     session_table.add_row("Session Artifacts", session_validation.artifact_status.upper())
     session_table.add_row("Handoff Status", session_validation.handoff_status.upper())
     session_table.add_row("Handoff Sheet", handoff.status.upper())
@@ -2696,6 +2805,13 @@ def prepare_animation_playtest_session_command(
             findings_table.add_row(finding)
         console.print(findings_table)
         raise typer.Exit(code=1)
+    if route_batch_validation.findings:
+        findings_table = Table(title="Animation Route Batch Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in route_batch_validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
     if session_validation.findings:
         findings_table = Table(title="Animation Session Artifact Findings")
         findings_table.add_column("Finding", style="yellow")
@@ -2707,7 +2823,7 @@ def prepare_animation_playtest_session_command(
         Panel.fit(
             (
                 "Manual animation signoff is still incomplete. "
-                "Run the visible-window queue, follow the recorder queue, fill the report "
+                "Run the visible-window batches, follow the recorder queue, fill the report "
                 "with real notes, then validate the report and handoff artifacts."
             ),
             title="Animation Playtest Session",

@@ -61,6 +61,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_report,
+    validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -6637,6 +6638,7 @@ def test_validate_animation_playtest_session_accepts_current_artifacts(
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
     write_2d_animation_playtest_report_template(
         report_path,
         version="0.197.0",
@@ -6658,12 +6660,17 @@ def test_validate_animation_playtest_session_accepts_current_artifacts(
         build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
         recorder_queue_path,
     )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
 
     validation = validate_2d_animation_playtest_session(
         report_path,
         commands_path,
         plan_path,
         recorder_queue_path,
+        route_batch_path,
         seed=17,
     )
 
@@ -6673,6 +6680,8 @@ def test_validate_animation_playtest_session_accepts_current_artifacts(
     assert validation.commands.status == "pass"
     assert validation.plan.status == "pass"
     assert validation.recorder_queue.status == "pass"
+    assert validation.route_batches is not None
+    assert validation.route_batches.status == "pass"
     assert validation.findings == ()
 
 
@@ -6733,6 +6742,7 @@ def test_validate_animation_playtest_session_command_accepts_current_artifacts(
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
     write_2d_animation_playtest_report_template(
         report_path,
         version="0.197.0",
@@ -6754,6 +6764,10 @@ def test_validate_animation_playtest_session_command_accepts_current_artifacts(
         build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
         recorder_queue_path,
     )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
 
     result = runner.invoke(
         app,
@@ -6763,6 +6777,8 @@ def test_validate_animation_playtest_session_command_accepts_current_artifacts(
             str(commands_path),
             str(plan_path),
             str(recorder_queue_path),
+            "--route-batches",
+            str(route_batch_path),
             "--seed",
             "17",
         ],
@@ -6771,6 +6787,7 @@ def test_validate_animation_playtest_session_command_accepts_current_artifacts(
     assert result.exit_code == 0
     assert "Animation Playtest Session Validation" in result.output
     assert "Artifact Status" in result.output
+    assert "Route Batch Artifact" in result.output
     assert "Handoff Status" in result.output
     assert "MANUAL-REQUIRED" in result.output
 
@@ -6782,6 +6799,7 @@ def test_write_animation_playtest_handoff_exports_next_manual_step(
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
     write_2d_animation_playtest_report_template(
         report_path,
@@ -6804,12 +6822,17 @@ def test_write_animation_playtest_handoff_exports_next_manual_step(
         build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
         recorder_queue_path,
     )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
 
     handoff = build_2d_animation_playtest_handoff(
         report_path,
         commands_path,
         plan_path,
         recorder_queue_path,
+        route_batch_path,
         seed=17,
     )
     write_2d_animation_playtest_handoff(handoff, handoff_path)
@@ -6819,6 +6842,8 @@ def test_write_animation_playtest_handoff_exports_next_manual_step(
     assert "- Artifact status: `pass`" in text
     assert "- Handoff status: `manual-required`" in text
     assert "## Next Visible Command" in text
+    assert "- Route batches: `" in text
+    assert "| Route batches | `pass` |" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
     assert "record-animation-playtest-route" in text
     assert "title, wizard, save, archive, meta, hover, text" in text
@@ -6968,6 +6993,124 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     output_text = output_path.read_text(encoding="utf-8")
     assert "record-animation-playtest-route" in output_text
     assert "validate-animation-playtest-report must pass before signoff" in output_text
+
+
+def test_validate_animation_playtest_route_batch_plan_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-route-batches.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.201.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(
+            report_path,
+            commands_path,
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        output_path,
+    )
+
+    validation = validate_2d_animation_playtest_route_batch_plan(
+        output_path,
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.status == "pass"
+    assert validation.expected_batches == 3
+    assert validation.expected_route_rows == 18
+    assert validation.findings == ()
+
+
+def test_validate_animation_playtest_route_batch_plan_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-route-batches.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.201.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        output_path,
+    )
+    output_path.write_text(
+        output_path.read_text(encoding="utf-8").replace(
+            "record-animation-playtest-route",
+            "record-animation-playtest-drift",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_route_batch_plan(
+        output_path,
+        report_path,
+        commands_path,
+        seed=17,
+    )
+
+    assert validation.status == "fail"
+    assert "route batch row 1 recorder command is stale" in validation.findings
+
+
+def test_validate_animation_playtest_route_batches_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    output_path = tmp_path / "manual-animation-route-batches.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.201.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        output_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-route-batches",
+            str(output_path),
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Route Batch Validation" in result.output
+    assert "PASS" in result.output
 
 
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
@@ -7187,6 +7330,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
@@ -7205,6 +7349,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(plan_path),
             "--recorder-output",
             str(recorder_queue_path),
+            "--route-batches-output",
+            str(route_batch_path),
             "--handoff-output",
             str(handoff_path),
             "--commit",
@@ -7230,11 +7376,13 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert commands_path.exists()
     assert plan_path.exists()
     assert recorder_queue_path.exists()
+    assert route_batch_path.exists()
     assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
     plan_text = plan_path.read_text(encoding="utf-8")
     recorder_text = recorder_queue_path.read_text(encoding="utf-8")
+    route_batch_text = route_batch_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
@@ -7253,12 +7401,19 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "| 18 | `play` | `1440x900` | `off` |" in plan_text
     assert "Recorder Artifact" in result.output
     assert "Recorder Queue Rows" in result.output
+    assert "Route Batch Artifact" in result.output
+    assert "Route Batch Open Items" in result.output
     assert (
         "- Recorder commands: `placeholders require real tester observations before use`"
         in recorder_text
     )
     assert "record-animation-playtest-route" in recorder_text
+    assert "# NEXUS TECH 2D Animation Visible Route Batches" in route_batch_text
+    assert "## Batch 1: 820x620" in route_batch_text
+    assert "record-animation-playtest-window" in route_batch_text
     assert "- Handoff status: `manual-required`" in handoff_text
+    assert "- Route batches: `" in handoff_text
+    assert "| Route batches | `pass` |" in handoff_text
     assert "## Next Visible Command" in handoff_text
     assert "record-animation-playtest-route" in handoff_text
 

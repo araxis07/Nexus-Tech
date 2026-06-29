@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.201.0 - 2026-06-29
+
+- Added `validate-animation-playtest-route-batches` to block stale visible-route batch artifacts before manual animation QA handoff
+- Extended session validation and handoff generation to include optional route-batch artifacts alongside the report, command queue, plan, and recorder queue
+- Updated one-command playtest session setup, docs, and regression coverage while keeping final animation signoff manual-required until real tester evidence is recorded
+
 ## 0.200.0 - 2026-06-29
 
 - Added `animation-playtest-route-batches` to group the 18 visible menu/play manual QA commands into window-sized batches with matching recorder commands

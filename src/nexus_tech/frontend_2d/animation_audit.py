@@ -740,6 +740,22 @@ class AnimationPlaytestRecorderQueueValidation:
 
 
 @dataclass(frozen=True)
+class AnimationPlaytestRouteBatchPlanValidation:
+    """Validation result for an exported visible-route batch artifact."""
+
+    path: str
+    expected_batches: int
+    expected_route_rows: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the route-batch artifact matches current gaps."""
+
+        return "pass" if not self.findings else "fail"
+
+
+@dataclass(frozen=True)
 class AnimationPlaytestSessionValidation:
     """Validation result for a complete manual animation handoff package."""
 
@@ -747,15 +763,22 @@ class AnimationPlaytestSessionValidation:
     commands: AnimationPlaytestCommandQueueValidation
     plan: AnimationPlaytestPlanArtifactValidation
     recorder_queue: AnimationPlaytestRecorderQueueValidation
+    route_batches: AnimationPlaytestRouteBatchPlanValidation | None = None
 
     @property
     def findings(self) -> tuple[str, ...]:
         """Return artifact findings that block handoff before manual testing."""
 
+        route_batch_findings = (
+            ()
+            if self.route_batches is None
+            else tuple(f"route batches: {finding}" for finding in self.route_batches.findings)
+        )
         return (
             tuple(f"command queue: {finding}" for finding in self.commands.findings)
             + tuple(f"plan artifact: {finding}" for finding in self.plan.findings)
             + tuple(f"recorder queue: {finding}" for finding in self.recorder_queue.findings)
+            + route_batch_findings
         )
 
     @property
@@ -1559,6 +1582,7 @@ def validate_2d_animation_playtest_session(
     command_path: Path,
     plan_path: Path,
     recorder_queue_path: Path,
+    route_batch_path: Path | None = None,
     *,
     scenario_id: str = "founder_journey",
     seed: int = 7,
@@ -1597,11 +1621,26 @@ def validate_2d_animation_playtest_session(
         motion_modes=motion_modes,
         command_prefix=command_prefix,
     )
+    route_batches = (
+        None
+        if route_batch_path is None
+        else validate_2d_animation_playtest_route_batch_plan(
+            route_batch_path,
+            report_path,
+            command_path,
+            scenario_id=scenario_id,
+            seed=seed,
+            windows=windows,
+            motion_modes=motion_modes,
+            command_prefix=command_prefix,
+        )
+    )
     return AnimationPlaytestSessionValidation(
         report=report,
         commands=commands,
         plan=plan,
         recorder_queue=recorder_queue,
+        route_batches=route_batches,
     )
 
 
@@ -1610,6 +1649,7 @@ def build_2d_animation_playtest_handoff(
     command_path: Path,
     plan_path: Path,
     recorder_queue_path: Path,
+    route_batch_path: Path | None = None,
     *,
     scenario_id: str = "founder_journey",
     seed: int = 7,
@@ -1624,6 +1664,7 @@ def build_2d_animation_playtest_handoff(
         command_path,
         plan_path,
         recorder_queue_path,
+        route_batch_path,
         scenario_id=scenario_id,
         seed=seed,
         windows=windows,
@@ -1777,6 +1818,70 @@ def _validate_recorder_queue_row(
     for field, actual, expected in expected_values:
         if _normalize_report_key(actual) != _normalize_report_key(expected):
             findings.append(f"recorder queue row {index} {field} is stale")
+
+
+def _validate_route_batch_summary_row(
+    findings: list[str],
+    batch: AnimationPlaytestRouteBatch,
+    row: tuple[str, ...],
+) -> None:
+    window_size = _strip_markdown_code(row[1])
+    status = _strip_markdown_code(row[2])
+    open_items = row[3].strip()
+    visible_commands = row[4].strip()
+    expected_values = (
+        ("window", window_size, batch.window_size),
+        ("status", status, batch.status),
+        ("open items", open_items, str(batch.open_items)),
+        ("visible commands", visible_commands, str(len(batch.items))),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"route batch {batch.batch_number} summary {field} is stale")
+
+
+def _validate_route_batch_item_row(
+    findings: list[str],
+    item: AnimationPlaytestRouteBatchItem,
+    row: tuple[str, ...],
+) -> None:
+    target = _strip_markdown_code(row[1])
+    motion = _strip_markdown_code(row[2])
+    status = _strip_markdown_code(row[3])
+    visible_command = _strip_markdown_code(row[4]).replace(r"\|", "|")
+    required_terms = row[5].replace(r"\|", "|").strip()
+    recorder_command = _strip_markdown_code(row[6]).replace(r"\|", "|")
+    expected_terms = ", ".join(item.required_terms) if item.required_terms else "-"
+    expected_recorder = item.recorder_command or "-"
+    expected_values = (
+        ("target", target, item.target),
+        ("motion", motion, item.motion_mode),
+        ("status", status, item.status),
+        ("visible command", visible_command, item.visible_command),
+        ("required terms", required_terms, expected_terms),
+        ("recorder command", recorder_command, expected_recorder),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"route batch row {item.step} {field} is stale")
+
+
+def _validate_route_batch_window_hint(
+    findings: list[str],
+    hint: AnimationPlaytestRecorderHint,
+    text: str,
+) -> None:
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    expected_snippets = (
+        f"- Status: `{hint.status}`",
+        f"- Required terms: `{_markdown_table_cell(required_terms)}`",
+        f"- Evidence prompt: {_markdown_table_cell(hint.evidence_prompt)}",
+        f"`{_markdown_table_cell(hint.recorder_command)}`",
+    )
+    for snippet in expected_snippets:
+        if snippet not in text:
+            findings.append(f"route batch window recorder {hint.target} is stale")
+            return
 
 
 def _build_next_route_recorder_hint(
@@ -2270,6 +2375,11 @@ def write_2d_animation_playtest_handoff(
         f"- Commands: `{handoff.session.commands.path}`",
         f"- Plan: `{handoff.session.plan.path}`",
         f"- Recorder queue: `{handoff.session.recorder_queue.path}`",
+        *(
+            ()
+            if handoff.session.route_batches is None
+            else (f"- Route batches: `{handoff.session.route_batches.path}`",)
+        ),
         f"- Report open items: `{len(handoff.session.report.findings)}`",
         f"- Recorder queue rows: `{handoff.session.recorder_queue.expected_count}`",
         "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
@@ -2281,6 +2391,11 @@ def write_2d_animation_playtest_handoff(
         f"| Command queue | `{handoff.session.commands.status}` |",
         f"| Plan artifact | `{handoff.session.plan.status}` |",
         f"| Recorder queue | `{handoff.session.recorder_queue.status}` |",
+        *(
+            ()
+            if handoff.session.route_batches is None
+            else (f"| Route batches | `{handoff.session.route_batches.status}` |",)
+        ),
         f"| Final report | `{handoff.session.report.status}` |",
         "",
         "## Next Manual Step",
@@ -2428,6 +2543,101 @@ def write_2d_animation_playtest_route_batch_plan(
             lines.append(f"| {_markdown_table_cell(finding)} |")
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_route_batch_plan(
+    batch_path: Path,
+    report_path: Path,
+    command_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestRouteBatchPlanValidation:
+    """Validate that a route-batch artifact matches the current manual QA gaps."""
+
+    text = batch_path.read_text(encoding="utf-8")
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    findings: list[str] = []
+    manual_result = "complete" if batch_plan.status == "pass" else "not completed by automation"
+    required_lines = (
+        "# NEXUS TECH 2D Animation Visible Route Batches",
+        f"- Status: `{batch_plan.status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Command queue: `{batch_plan.commands.status}`",
+        f"- Final report: `{batch_plan.report.status}`",
+        f"- Report open items: `{len(batch_plan.report.findings)}`",
+        f"- Route/window open items: `{batch_plan.route_open_items}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing route batch guard: {line}")
+
+    rows = _extract_markdown_table_rows(text)
+    summary_rows = tuple(row for row in rows if len(row) == 5 and row[0].isdigit())
+    if len(summary_rows) != len(batch_plan.batches):
+        findings.append(f"expected {len(batch_plan.batches)} batch summary rows")
+
+    summary_by_batch: dict[int, tuple[str, ...]] = {}
+    for row in summary_rows:
+        batch_number = int(row[0])
+        if batch_number in summary_by_batch:
+            findings.append(f"duplicate route batch summary row: {batch_number}")
+            continue
+        summary_by_batch[batch_number] = row
+
+    for batch in batch_plan.batches:
+        row = summary_by_batch.get(batch.batch_number)
+        if row is None:
+            findings.append(f"missing route batch summary row: {batch.batch_number}")
+            continue
+        _validate_route_batch_summary_row(findings, batch, row)
+
+    route_rows = tuple(
+        row
+        for row in rows
+        if len(row) >= 7 and row[0].isdigit() and _strip_markdown_code(row[1]) in {"menu", "play"}
+    )
+    expected_items = tuple(item for batch in batch_plan.batches for item in batch.items)
+    if len(route_rows) != len(expected_items):
+        findings.append(f"expected {len(expected_items)} route batch rows, found {len(route_rows)}")
+
+    route_rows_by_step: dict[int, tuple[str, ...]] = {}
+    for row in route_rows:
+        step = int(row[0])
+        if step in route_rows_by_step:
+            findings.append(f"duplicate route batch step: {step}")
+            continue
+        route_rows_by_step[step] = row
+
+    for item in expected_items:
+        row = route_rows_by_step.get(item.step)
+        if row is None:
+            findings.append(f"missing route batch row: {item.step}")
+            continue
+        _validate_route_batch_item_row(findings, item, row)
+
+    for batch in batch_plan.batches:
+        if batch.window_recorder_hint is not None:
+            _validate_route_batch_window_hint(findings, batch.window_recorder_hint, text)
+
+    return AnimationPlaytestRouteBatchPlanValidation(
+        path=str(batch_path),
+        expected_batches=len(batch_plan.batches),
+        expected_route_rows=len(expected_items),
+        findings=tuple(findings),
+    )
 
 
 def validate_2d_animation_playtest_readiness_plan(
