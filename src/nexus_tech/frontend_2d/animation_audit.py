@@ -887,6 +887,67 @@ class AnimationPlaytestRouteBatchPlan:
         return len(self.report.findings) + len(self.commands.findings)
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestUITriageItem:
+    """One manual UI/animation issue lane that still needs human review or repair."""
+
+    step: int
+    priority: str
+    area: str
+    lane: str
+    status: str
+    open_items: int
+    required_evidence: str
+    next_action: str
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestUITriagePlan:
+    """Structured triage backlog for manual animation and UI polish."""
+
+    session: AnimationPlaytestSessionValidation
+    items: tuple[AnimationPlaytestUITriageItem, ...]
+
+    @property
+    def status(self) -> str:
+        """Return the triage state without completing manual signoff."""
+
+        if self.session.artifact_status != "pass":
+            return "blocked"
+        if self.session.report.status != "pass":
+            return "manual-required"
+        return "pass"
+
+    @property
+    def open_item_count(self) -> int:
+        """Return unresolved triage work item count."""
+
+        return sum(item.open_items for item in self.items if item.status != "pass")
+
+    @property
+    def blocker_count(self) -> int:
+        """Return unresolved P0/P1 triage lanes."""
+
+        return sum(
+            1 for item in self.items if item.status != "pass" and item.priority in {"P0", "P1"}
+        )
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestUITriageValidation:
+    """Validation result for an exported manual UI triage artifact."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the triage artifact matches current handoff state."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1016,6 +1077,76 @@ _MANUAL_ANIMATION_RUNBOOK_STEPS: tuple[tuple[str, str, str], ...] = (
         ),
         "Release decision is pass and the final report validator returns PASS.",
     ),
+)
+
+_ANIMATION_UI_TRIAGE_PROFILES: dict[str, tuple[str, str, str]] = {
+    "Command Queue": (
+        "P0",
+        "Artifact Hygiene",
+        "Queue rows, route commands, and evidence prompts match the current build.",
+    ),
+    "Manual Window Matrix": (
+        "P0",
+        "Responsive Layout",
+        (
+            "820x620, 960x640, and 1440x900 notes cover layout, motion, "
+            "primary actions, and disabled states."
+        ),
+    ),
+    "Manual Route Evidence": (
+        "P0",
+        "Route Flow Coverage",
+        "All 18 menu/play route notes cover target-specific visible evidence after real runs.",
+    ),
+    "Manual Control Checks": (
+        "P0",
+        "Controls / Navigation",
+        (
+            "Pause, resume, back, menu return, help, hover, and shortcut behavior "
+            "are observed and readable."
+        ),
+    ),
+    "Manual Scene Checks": (
+        "P1",
+        "Scene Readability",
+        (
+            "Title, dashboard, picker, pending event, inspector, endgame, summary, "
+            "and review scenes stay readable."
+        ),
+    ),
+    "Manual Game Feel": (
+        "P1",
+        "Motion / Feedback",
+        (
+            "Success, blocked, impact, and actor feedback cues match the same outcome "
+            "without hiding controls."
+        ),
+    ),
+    "Manual Evidence Notes": (
+        "P2",
+        "Evidence Quality",
+        "Notes are specific observed facts, not generic ok/clear/readable placeholders.",
+    ),
+    "Signoff Fields": (
+        "P0",
+        "Release Decision",
+        "Blockers, required fixes, validator result, and release decision are explicit and final.",
+    ),
+    "Template Cleanup": (
+        "P2",
+        "Report Hygiene",
+        "Todo cells, blank cells, draft warnings, and follow-up placeholders are removed.",
+    ),
+    "Release Signoff": (
+        "PASS",
+        "Release Decision",
+        "Manual animation report validates and is ready to attach to presentation notes.",
+    ),
+}
+
+_ANIMATION_UI_TRIAGE_POLICY_LINE = (
+    "- UI policy: `layout, typography, controls, and motion issues stay open until "
+    "observed evidence clears them`"
 )
 
 _TEMPLATE_EVIDENCE_PROMPT_KEYS: tuple[str, ...] = (
@@ -1789,6 +1920,258 @@ def build_2d_animation_playtest_route_batch_plan(
         commands=commands,
         batches=tuple(batches),
     )
+
+
+def build_2d_animation_playtest_ui_triage_plan(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestUITriagePlan:
+    """Build a manual UI/animation triage backlog from current handoff artifacts."""
+
+    session = validate_2d_animation_playtest_session(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    items: list[AnimationPlaytestUITriageItem] = []
+    if session.findings:
+        for finding in session.findings:
+            items.append(
+                AnimationPlaytestUITriageItem(
+                    step=len(items) + 1,
+                    priority="P0",
+                    area="Session Artifact",
+                    lane="Artifact Hygiene",
+                    status="blocked",
+                    open_items=1,
+                    required_evidence=(
+                        "Regenerate and validate stale handoff artifacts before manual UI review."
+                    ),
+                    next_action=finding,
+                )
+            )
+        return AnimationPlaytestUITriagePlan(session=session, items=tuple(items))
+
+    plan = build_2d_animation_playtest_readiness_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    for step in plan.steps:
+        priority, lane, required_evidence = _animation_ui_triage_profile(step.area)
+        items.append(
+            AnimationPlaytestUITriageItem(
+                step=len(items) + 1,
+                priority="PASS" if step.status == "pass" else priority,
+                area=step.area,
+                lane=lane,
+                status=step.status,
+                open_items=step.open_items,
+                required_evidence=required_evidence,
+                next_action=step.next_step,
+            )
+        )
+
+    return AnimationPlaytestUITriagePlan(session=session, items=tuple(items))
+
+
+def write_2d_animation_playtest_ui_triage_plan(
+    triage: AnimationPlaytestUITriagePlan,
+    output_path: Path,
+) -> None:
+    """Write a structured manual UI/animation triage backlog."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    manual_result = "complete" if triage.status == "pass" else "not completed by automation"
+    lines = [
+        "# NEXUS TECH 2D Animation UI Triage",
+        "",
+        f"- Status: `{triage.status}`",
+        f"- Artifact status: `{triage.session.artifact_status}`",
+        f"- Handoff status: `{triage.session.handoff_status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Report: `{triage.session.report.path}`",
+        f"- Command queue: `{triage.session.commands.path}`",
+        f"- Recorder queue: `{triage.session.recorder_queue.path}`",
+        *(
+            ()
+            if triage.session.route_batches is None
+            else (f"- Route batches: `{triage.session.route_batches.path}`",)
+        ),
+        f"- Open triage items: `{triage.open_item_count}`",
+        f"- P0/P1 lanes: `{triage.blocker_count}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        _ANIMATION_UI_TRIAGE_POLICY_LINE,
+        "",
+        "## Triage Backlog",
+        "",
+        "| Step | Priority | Area | Lane | Status | Open Items | Required Evidence | Next Action |",
+        "| ---: | --- | --- | --- | --- | ---: | --- | --- |",
+    ]
+    for item in triage.items:
+        lines.append(
+            "| "
+            f"{item.step} | "
+            f"`{item.priority}` | "
+            f"{_markdown_table_cell(item.area)} | "
+            f"{_markdown_table_cell(item.lane)} | "
+            f"`{item.status}` | "
+            f"{item.open_items} | "
+            f"{_markdown_table_cell(item.required_evidence)} | "
+            f"{_markdown_table_cell(item.next_action)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Triage Rules",
+            "",
+            "- `P0` lanes block beta until they pass or have a named accepted blocker.",
+            "- `P1` lanes block presentation polish until real open-window evidence clears them.",
+            (
+                "- `P2` lanes can wait only when the release decision explicitly "
+                "accepts the follow-up."
+            ),
+            "- This artifact is a backlog aid only; it never completes manual signoff by itself.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_ui_triage_plan(
+    triage_path: Path,
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestUITriageValidation:
+    """Validate that a UI triage artifact matches the current handoff package."""
+
+    text = triage_path.read_text(encoding="utf-8")
+    triage = build_2d_animation_playtest_ui_triage_plan(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    findings: list[str] = []
+    manual_result = "complete" if triage.status == "pass" else "not completed by automation"
+    required_lines = (
+        "# NEXUS TECH 2D Animation UI Triage",
+        f"- Status: `{triage.status}`",
+        f"- Artifact status: `{triage.session.artifact_status}`",
+        f"- Handoff status: `{triage.session.handoff_status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Report: `{triage.session.report.path}`",
+        f"- Command queue: `{triage.session.commands.path}`",
+        f"- Recorder queue: `{triage.session.recorder_queue.path}`",
+        f"- Open triage items: `{triage.open_item_count}`",
+        f"- P0/P1 lanes: `{triage.blocker_count}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        _ANIMATION_UI_TRIAGE_POLICY_LINE,
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing ui triage guard: {line}")
+    if triage.session.route_batches is not None:
+        route_line = f"- Route batches: `{triage.session.route_batches.path}`"
+        if route_line not in text:
+            findings.append(f"missing ui triage guard: {route_line}")
+
+    rows = _extract_markdown_table_rows(text)
+    triage_rows = tuple(row for row in rows if len(row) >= 8 and row[0].isdigit())
+    if len(triage_rows) != len(triage.items):
+        findings.append(f"expected {len(triage.items)} ui triage rows, found {len(triage_rows)}")
+
+    rows_by_step: dict[int, tuple[str, ...]] = {}
+    for row in triage_rows:
+        step = int(row[0])
+        if step in rows_by_step:
+            findings.append(f"duplicate ui triage step: {step}")
+            continue
+        rows_by_step[step] = row
+
+    for item in triage.items:
+        row = rows_by_step.get(item.step)
+        if row is None:
+            findings.append(f"missing ui triage row: {item.step}")
+            continue
+        _validate_ui_triage_row(findings, item, row)
+
+    return AnimationPlaytestUITriageValidation(
+        path=str(triage_path),
+        expected_count=len(triage.items),
+        findings=tuple(findings),
+    )
+
+
+def _animation_ui_triage_profile(area: str) -> tuple[str, str, str]:
+    return _ANIMATION_UI_TRIAGE_PROFILES.get(
+        area,
+        (
+            "P2",
+            "Manual QA",
+            "Observed issue is named, reproducible, and attached to the current playtest report.",
+        ),
+    )
+
+
+def _validate_ui_triage_row(
+    findings: list[str],
+    item: AnimationPlaytestUITriageItem,
+    row: tuple[str, ...],
+) -> None:
+    priority = _strip_markdown_code(row[1])
+    area = row[2].replace(r"\|", "|").strip()
+    lane = row[3].replace(r"\|", "|").strip()
+    status = _strip_markdown_code(row[4])
+    open_items = row[5].strip()
+    required_evidence = row[6].replace(r"\|", "|").strip()
+    next_action = row[7].replace(r"\|", "|").strip()
+    expected_values = (
+        ("priority", priority, item.priority),
+        ("area", area, item.area),
+        ("lane", lane, item.lane),
+        ("status", status, item.status),
+        ("open items", open_items, str(item.open_items)),
+        ("required evidence", required_evidence, item.required_evidence),
+        ("next action", next_action, item.next_action),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"ui triage row {item.step} {field} is stale")
 
 
 def _validate_recorder_queue_row(

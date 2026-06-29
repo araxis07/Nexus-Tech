@@ -43,6 +43,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
     build_2d_animation_playtest_route_batch_plan,
+    build_2d_animation_playtest_ui_triage_plan,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -63,6 +64,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_report,
     validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
+    validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_handoff,
@@ -71,6 +73,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
     write_2d_animation_playtest_route_batch_plan,
+    write_2d_animation_playtest_ui_triage_plan,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -7113,6 +7116,251 @@ def test_validate_animation_playtest_route_batches_command_accepts_current_artif
     assert "PASS" in result.output
 
 
+def test_write_animation_playtest_ui_triage_plan_groups_manual_ui_backlog(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.202.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+
+    triage = build_2d_animation_playtest_ui_triage_plan(
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        seed=17,
+    )
+    write_2d_animation_playtest_ui_triage_plan(triage, triage_path)
+    validation = validate_2d_animation_playtest_ui_triage_plan(
+        triage_path,
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        seed=17,
+    )
+
+    text = triage_path.read_text(encoding="utf-8")
+    assert triage.status == "manual-required"
+    assert triage.open_item_count == 70
+    assert triage.blocker_count == 6
+    assert validation.status == "pass"
+    assert validation.expected_count == 7
+    assert "# NEXUS TECH 2D Animation UI Triage" in text
+    assert "Responsive Layout" in text
+    assert "Controls / Navigation" in text
+    assert "Motion / Feedback" in text
+    assert "This artifact is a backlog aid only" in text
+
+
+def test_validate_animation_playtest_ui_triage_plan_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.202.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=17,
+        ),
+        triage_path,
+    )
+    triage_path.write_text(
+        triage_path.read_text(encoding="utf-8").replace(
+            "Controls / Navigation",
+            "Controls / Drift",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_ui_triage_plan(
+        triage_path,
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        seed=17,
+    )
+
+    assert validation.status == "fail"
+    assert "ui triage row 3 lane is stale" in validation.findings
+
+
+def test_animation_playtest_ui_triage_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.202.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-ui-triage",
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            str(recorder_queue_path),
+            "--route-batches",
+            str(route_batch_path),
+            "--seed",
+            "17",
+            "--output",
+            str(triage_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest UI Triage" in result.output
+    assert "UI triage status: MANUAL-REQUIRED" in result.output
+    assert triage_path.exists()
+    assert "Controls / Navigation" in triage_path.read_text(encoding="utf-8")
+
+
+def test_validate_animation_playtest_ui_triage_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.202.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=17,
+        ),
+        triage_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-ui-triage",
+            str(triage_path),
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            str(recorder_queue_path),
+            "--route-batches",
+            str(route_batch_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest UI Triage Validation" in result.output
+    assert "PASS" in result.output
+
+
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -7331,6 +7579,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
     route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
@@ -7351,6 +7600,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(recorder_queue_path),
             "--route-batches-output",
             str(route_batch_path),
+            "--triage-output",
+            str(triage_path),
             "--handoff-output",
             str(handoff_path),
             "--commit",
@@ -7377,12 +7628,14 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert plan_path.exists()
     assert recorder_queue_path.exists()
     assert route_batch_path.exists()
+    assert triage_path.exists()
     assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
     plan_text = plan_path.read_text(encoding="utf-8")
     recorder_text = recorder_queue_path.read_text(encoding="utf-8")
     route_batch_text = route_batch_path.read_text(encoding="utf-8")
+    triage_text = triage_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
@@ -7403,6 +7656,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Recorder Queue Rows" in result.output
     assert "Route Batch Artifact" in result.output
     assert "Route Batch Open Items" in result.output
+    assert "UI Triage Artifact" in result.output
+    assert "UI Triage Items" in result.output
     assert (
         "- Recorder commands: `placeholders require real tester observations before use`"
         in recorder_text
@@ -7411,6 +7666,9 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "# NEXUS TECH 2D Animation Visible Route Batches" in route_batch_text
     assert "## Batch 1: 820x620" in route_batch_text
     assert "record-animation-playtest-window" in route_batch_text
+    assert "# NEXUS TECH 2D Animation UI Triage" in triage_text
+    assert "Controls / Navigation" in triage_text
+    assert "Motion / Feedback" in triage_text
     assert "- Handoff status: `manual-required`" in handoff_text
     assert "- Route batches: `" in handoff_text
     assert "| Route batches | `pass` |" in handoff_text

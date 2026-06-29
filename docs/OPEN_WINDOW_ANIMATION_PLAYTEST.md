@@ -27,9 +27,11 @@ uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-pla
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech animation-playtest-ui-triage /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-ui-triage.md
+uv run nexus-tech validate-animation-playtest-ui-triage /tmp/nexus-tech-animation-ui-triage.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 ```
 
 If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
@@ -38,6 +40,7 @@ to `animation-playtest-commands`, `validate-animation-playtest-commands`,
 `animation-playtest-recorder-queue`, `validate-animation-playtest-recorder-queue`,
 `animation-playtest-recorder-next`,
 `animation-playtest-route-batches`, `validate-animation-playtest-route-batches`,
+`animation-playtest-ui-triage`, `validate-animation-playtest-ui-triage`,
 `validate-animation-playtest-plan`, `prepare-animation-playtest-session`,
 `validate-animation-playtest-session`, and `animation-playtest-handoff`.
 The command queue and validators must use the same prefix.
@@ -101,6 +104,11 @@ signoff evidence.
 Use `validate-animation-playtest-route-batches` after exporting or editing the
 batch plan so stale windows, visible commands, required terms, or recorder
 commands fail before the tester follows the batch artifact.
+Use `animation-playtest-ui-triage` after session validation to convert the
+remaining manual gaps into P0/P1/P2 UI lanes for responsive layout, typography,
+controls, scenes, motion feedback, and release signoff. Validate it with
+`validate-animation-playtest-ui-triage` before handing the backlog to the next
+polish pass.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 
@@ -127,8 +135,8 @@ missing runbook/manual-result guards are caught before handoff.
 Use `prepare-animation-playtest-session` when you want the strict report draft,
 command queue, grouped plan artifact, recorder queue, and artifact validation
 created together before handing the manual pass to a tester. It also writes the
-route-batch artifact and a handoff sheet when their output options are supplied
-or left at their defaults.
+route-batch artifact, UI triage backlog, and a handoff sheet when their output
+options are supplied or left at their defaults.
 Use `validate-animation-playtest-session` immediately before handoff or after
 editing artifacts so the report, command queue, grouped plan, recorder queue,
 and optional route-batch artifact are checked as one package. A fresh incomplete

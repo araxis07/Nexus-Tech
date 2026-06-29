@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.202.0 - 2026-06-29
+
+- Added `animation-playtest-ui-triage` and `validate-animation-playtest-ui-triage` to turn manual animation playtest gaps into a structured UI/UX backlog
+- Extended `prepare-animation-playtest-session` to generate and validate the UI triage artifact alongside the report, queue, plan, recorder queue, route batches, and handoff
+- Updated docs and regression coverage so layout, typography, control, and motion issues remain explicit until real open-window evidence clears them
+
 ## 0.201.0 - 2026-06-29
 
 - Added `validate-animation-playtest-route-batches` to block stale visible-route batch artifacts before manual animation QA handoff

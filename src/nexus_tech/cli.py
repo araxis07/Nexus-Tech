@@ -72,6 +72,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
     build_2d_animation_playtest_route_batch_plan,
+    build_2d_animation_playtest_ui_triage_plan,
     launch_2d_frontend,
     launch_2d_menu,
     record_2d_animation_playtest_control_evidence,
@@ -91,6 +92,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_report,
     validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
+    validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_handoff,
@@ -99,6 +101,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_report_template,
     write_2d_animation_playtest_route_batch_plan,
+    write_2d_animation_playtest_ui_triage_plan,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -383,6 +386,11 @@ ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION = typer.Option(
     "--route-batches-output",
     help="Markdown path for the manual visible-route batch plan.",
 )
+ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-ui-triage.md"),
+    "--triage-output",
+    help="Markdown path for the manual UI/animation triage backlog.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -444,6 +452,17 @@ ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION = typer.Option(
     exists=True,
     dir_okay=False,
     help="Optional exported animation visible-route batch Markdown file.",
+)
+ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation UI triage Markdown file.",
+)
+ANIMATION_PLAYTEST_TRIAGE_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation UI triage backlog.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -2257,6 +2276,143 @@ def validate_animation_playtest_route_batches_command(
     )
 
 
+@app.command("animation-playtest-ui-triage")
+def animation_playtest_ui_triage_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_TRIAGE_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the manual UI/animation issue triage backlog."""
+
+    validate_scenario_id(scenario)
+    triage = build_2d_animation_playtest_ui_triage_plan(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest UI Triage")
+    table.add_column("Step", justify="right")
+    table.add_column("Priority")
+    table.add_column("Area", style="cyan")
+    table.add_column("Lane")
+    table.add_column("Status")
+    table.add_column("Open", justify="right")
+    for item in triage.items:
+        table.add_row(
+            str(item.step),
+            item.priority,
+            item.area,
+            item.lane,
+            item.status.upper(),
+            str(item.open_items),
+        )
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"UI triage status: {triage.status.upper()} | "
+                f"{triage.open_item_count} open item(s), "
+                f"{triage.blocker_count} P0/P1 lane(s)."
+            ),
+            title="Animation Playtest UI Triage",
+            border_style="green" if triage.status == "pass" else "yellow",
+        )
+    )
+
+    if output is not None:
+        write_2d_animation_playtest_ui_triage_plan(triage, output)
+        console.print(
+            Panel.fit(
+                f"Animation UI triage written to {output}",
+                title="Animation Playtest UI Triage",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and triage.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-ui-triage")
+def validate_animation_playtest_ui_triage_command(
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the UI triage artifact matches current handoff artifacts."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_ui_triage_plan(
+        triage_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest UI Triage Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("UI Triage", validation.path)
+    table.add_row("Expected Rows", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="UI Triage Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation UI triage artifact is stale or incomplete.",
+                title="Animation Playtest UI Triage",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation UI triage artifact matches the current handoff package.",
+            title="Animation Playtest UI Triage",
+            border_style="green",
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -2656,6 +2812,7 @@ def prepare_animation_playtest_session_command(
     plan_output: Path = ANIMATION_PLAYTEST_SESSION_PLAN_OUTPUT_OPTION,
     recorder_output: Path = ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION,
     route_batch_output: Path = ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION,
+    triage_output: Path = ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -2764,6 +2921,28 @@ def prepare_animation_playtest_session_command(
         command_prefix=command_prefix,
     )
     write_2d_animation_playtest_handoff(handoff, handoff_output)
+    triage = build_2d_animation_playtest_ui_triage_plan(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_ui_triage_plan(triage, triage_output)
+    triage_validation = validate_2d_animation_playtest_ui_triage_plan(
+        triage_output,
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -2773,16 +2952,19 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Plan", str(plan_output))
     session_table.add_row("Recorder Queue", str(recorder_output))
     session_table.add_row("Route Batches", str(route_batch_output))
+    session_table.add_row("UI Triage", str(triage_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
     session_table.add_row("Command Queue", f"{len(queue)} visible-window command(s)")
     session_table.add_row("Recorder Queue Rows", str(len(recorder_queue)))
     session_table.add_row("Route Batch Open Items", str(route_batch_plan.route_open_items))
+    session_table.add_row("UI Triage Items", str(triage.open_item_count))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
     session_table.add_row("Recorder Artifact", recorder_validation.status.upper())
     session_table.add_row("Route Batch Artifact", route_batch_validation.status.upper())
+    session_table.add_row("UI Triage Artifact", triage_validation.status.upper())
     session_table.add_row("Session Artifacts", session_validation.artifact_status.upper())
     session_table.add_row("Handoff Status", session_validation.handoff_status.upper())
     session_table.add_row("Handoff Sheet", handoff.status.upper())
@@ -2812,6 +2994,13 @@ def prepare_animation_playtest_session_command(
             findings_table.add_row(finding)
         console.print(findings_table)
         raise typer.Exit(code=1)
+    if triage_validation.findings:
+        findings_table = Table(title="Animation UI Triage Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in triage_validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
     if session_validation.findings:
         findings_table = Table(title="Animation Session Artifact Findings")
         findings_table.add_column("Finding", style="yellow")
@@ -2823,8 +3012,8 @@ def prepare_animation_playtest_session_command(
         Panel.fit(
             (
                 "Manual animation signoff is still incomplete. "
-                "Run the visible-window batches, follow the recorder queue, fill the report "
-                "with real notes, then validate the report and handoff artifacts."
+                "Run the visible-window batches, follow the recorder queue, use the UI triage "
+                "backlog for layout/control fixes, then validate the report and handoff artifacts."
             ),
             title="Animation Playtest Session",
             border_style="yellow",
