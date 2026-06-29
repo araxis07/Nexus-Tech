@@ -71,6 +71,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
+    build_2d_animation_playtest_release_gate,
     build_2d_animation_playtest_route_batch_plan,
     build_2d_animation_playtest_ui_triage_plan,
     launch_2d_frontend,
@@ -89,6 +90,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
+    validate_2d_animation_playtest_release_gate,
     validate_2d_animation_playtest_report,
     validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
@@ -99,6 +101,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
+    write_2d_animation_playtest_release_gate,
     write_2d_animation_playtest_report_template,
     write_2d_animation_playtest_route_batch_plan,
     write_2d_animation_playtest_ui_triage_plan,
@@ -391,6 +394,11 @@ ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION = typer.Option(
     "--triage-output",
     help="Markdown path for the manual UI/animation triage backlog.",
 )
+ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-release-gate.md"),
+    "--release-gate-output",
+    help="Markdown path for the manual animation release gate.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -463,6 +471,17 @@ ANIMATION_PLAYTEST_TRIAGE_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the animation UI triage backlog.",
+)
+ANIMATION_PLAYTEST_RELEASE_GATE_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation release-gate Markdown file.",
+)
+ANIMATION_PLAYTEST_RELEASE_GATE_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation release gate.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -2413,6 +2432,158 @@ def validate_animation_playtest_ui_triage_command(
     )
 
 
+@app.command("animation-playtest-release-gate")
+def animation_playtest_release_gate_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_RELEASE_GATE_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the final animation go/no-go gate without completing manual signoff."""
+
+    validate_scenario_id(scenario)
+    gate = build_2d_animation_playtest_release_gate(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Release Gate")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", gate.status.upper())
+    table.add_row("Artifact Status", gate.artifact_status.upper())
+    table.add_row("Manual Result", gate.manual_result)
+    table.add_row("Handoff Status", gate.session.handoff_status.upper())
+    table.add_row("Report Status", gate.session.report.status.upper())
+    table.add_row("UI Triage Artifact", gate.triage_validation.status.upper())
+    table.add_row("Open Report Items", str(len(gate.session.report.findings)))
+    table.add_row("Open UI Triage Items", str(gate.triage.open_item_count))
+    table.add_row("P0/P1 Lanes", str(gate.triage.blocker_count))
+    table.add_row("Blocking Checks", str(gate.blocking_check_count))
+    console.print(table)
+
+    checks_table = Table(title="Release Gate Checks")
+    checks_table.add_column("Check", style="cyan")
+    checks_table.add_column("Status")
+    checks_table.add_column("Blockers", justify="right")
+    checks_table.add_column("Next Action")
+    for check in gate.checks:
+        checks_table.add_row(
+            check.name,
+            check.status.upper(),
+            str(check.blocker_count),
+            check.next_action,
+        )
+    console.print(checks_table)
+
+    console.print(
+        Panel.fit(
+            (
+                f"Release gate status: {gate.status.upper()} | "
+                f"{gate.blocking_check_count} blocking check(s)."
+            ),
+            title="Animation Playtest Release Gate",
+            border_style="green" if gate.status == "pass" else "yellow",
+        )
+    )
+
+    if output is not None:
+        write_2d_animation_playtest_release_gate(gate, output)
+        console.print(
+            Panel.fit(
+                f"Animation release gate written to {output}",
+                title="Animation Playtest Release Gate",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and gate.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-release-gate")
+def validate_animation_playtest_release_gate_command(
+    gate_path: Path = ANIMATION_PLAYTEST_RELEASE_GATE_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the animation release gate matches current QA artifacts."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_release_gate(
+        gate_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Release Gate Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Release Gate", validation.path)
+    table.add_row("Expected Checks", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Release Gate Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation release gate artifact is stale or incomplete.",
+                title="Animation Playtest Release Gate",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation release gate artifact matches the current QA package.",
+            title="Animation Playtest Release Gate",
+            border_style="green",
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -2813,6 +2984,7 @@ def prepare_animation_playtest_session_command(
     recorder_output: Path = ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION,
     route_batch_output: Path = ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION,
     triage_output: Path = ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION,
+    release_gate_output: Path = ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -2943,6 +3115,30 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    release_gate = build_2d_animation_playtest_release_gate(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_release_gate(release_gate, release_gate_output)
+    release_gate_validation = validate_2d_animation_playtest_release_gate(
+        release_gate_output,
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -2953,6 +3149,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Recorder Queue", str(recorder_output))
     session_table.add_row("Route Batches", str(route_batch_output))
     session_table.add_row("UI Triage", str(triage_output))
+    session_table.add_row("Release Gate", str(release_gate_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
@@ -2960,6 +3157,9 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Recorder Queue Rows", str(len(recorder_queue)))
     session_table.add_row("Route Batch Open Items", str(route_batch_plan.route_open_items))
     session_table.add_row("UI Triage Items", str(triage.open_item_count))
+    session_table.add_row("Release Gate Status", release_gate.status.upper())
+    session_table.add_row("Release Gate Artifact", release_gate_validation.status.upper())
+    session_table.add_row("Blocking Checks", str(release_gate.blocking_check_count))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
     session_table.add_row("Recorder Artifact", recorder_validation.status.upper())

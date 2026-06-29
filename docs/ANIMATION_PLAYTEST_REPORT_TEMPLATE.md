@@ -13,22 +13,26 @@ uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-ani
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech animation-playtest-ui-triage /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-ui-triage.md
 uv run nexus-tech validate-animation-playtest-ui-triage /tmp/nexus-tech-animation-ui-triage.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
+uv run nexus-tech animation-playtest-release-gate /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-release-gate.md
+uv run nexus-tech validate-animation-playtest-release-gate /tmp/nexus-tech-animation-release-gate.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 ```
 
 If the tester shell does not have `uv`, add
 `--command-prefix .venv313/bin/nexus-tech` to the command queue, command
 validation, plan, recorder queue, route-batches, route-batch validation, UI
-triage, UI triage validation, plan validation, session setup, session
-validation, and handoff commands so the exported visible-window route uses the
-same launcher the tester can actually run.
+triage, UI triage validation, release gate, release gate validation, plan
+validation, session setup, session validation, and handoff commands so the
+exported visible-window route uses the same launcher the tester can actually run.
 
 Use the UI triage artifact to keep layout, typography, control, scene, motion,
 and signoff issues separated into P0/P1/P2 lanes before the next polish pass.
+Use the release gate artifact to keep the build blocked or manual-required until
+session artifacts, UI triage, P0/P1 lanes, and the final report all validate.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

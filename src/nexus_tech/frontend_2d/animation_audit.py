@@ -948,6 +948,71 @@ class AnimationPlaytestUITriageValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestReleaseGateCheck:
+    """One release-readiness check for the manual animation gate."""
+
+    name: str
+    status: str
+    blocker_count: int
+    next_action: str
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestReleaseGate:
+    """Final release gate for the current manual animation QA package."""
+
+    session: AnimationPlaytestSessionValidation
+    triage: AnimationPlaytestUITriagePlan
+    triage_validation: AnimationPlaytestUITriageValidation
+    checks: tuple[AnimationPlaytestReleaseGateCheck, ...]
+
+    @property
+    def artifact_status(self) -> str:
+        """Return pass only when all generated handoff artifacts are current."""
+
+        if self.session.artifact_status != "pass" or self.triage_validation.status != "pass":
+            return "fail"
+        return "pass"
+
+    @property
+    def manual_result(self) -> str:
+        """Return whether the human visible-window pass has completed."""
+
+        return "complete" if self.session.report.status == "pass" else "not completed by automation"
+
+    @property
+    def status(self) -> str:
+        """Return release readiness without faking manual playtest evidence."""
+
+        if self.artifact_status != "pass":
+            return "blocked"
+        if self.session.report.status != "pass" or self.triage.blocker_count:
+            return "manual-required"
+        return "pass"
+
+    @property
+    def blocking_check_count(self) -> int:
+        """Return how many release checks still block or require manual evidence."""
+
+        return sum(1 for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestReleaseGateValidation:
+    """Validation result for an exported animation release-gate artifact."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the release-gate artifact is current."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1147,6 +1212,19 @@ _ANIMATION_UI_TRIAGE_PROFILES: dict[str, tuple[str, str, str]] = {
 _ANIMATION_UI_TRIAGE_POLICY_LINE = (
     "- UI policy: `layout, typography, controls, and motion issues stay open until "
     "observed evidence clears them`"
+)
+
+_ANIMATION_RELEASE_GATE_POLICY_LINE = (
+    "- Release policy: `no animation release while the gate is blocked or manual-required`"
+)
+_RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
+    {
+        "Session Artifacts",
+        "UI Triage Artifact",
+        "Manual Report Signoff",
+        "P0/P1 UI Lanes",
+        "Release Decision",
+    }
 )
 
 _TEMPLATE_EVIDENCE_PROMPT_KEYS: tuple[str, ...] = (
@@ -2137,6 +2215,284 @@ def validate_2d_animation_playtest_ui_triage_plan(
     )
 
 
+def build_2d_animation_playtest_release_gate(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestReleaseGate:
+    """Build a go/no-go release gate for the current manual animation QA package."""
+
+    session = validate_2d_animation_playtest_session(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    triage = build_2d_animation_playtest_ui_triage_plan(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    triage_validation = validate_2d_animation_playtest_ui_triage_plan(
+        triage_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    checks = (
+        AnimationPlaytestReleaseGateCheck(
+            name="Session Artifacts",
+            status=session.artifact_status,
+            blocker_count=len(session.findings),
+            next_action=(
+                "Regenerate stale command, plan, recorder, or route artifacts."
+                if session.findings
+                else "Session artifacts are current."
+            ),
+        ),
+        AnimationPlaytestReleaseGateCheck(
+            name="UI Triage Artifact",
+            status=triage_validation.status,
+            blocker_count=len(triage_validation.findings),
+            next_action=(
+                "Regenerate animation-playtest-ui-triage, then rerun its validator."
+                if triage_validation.findings
+                else "UI triage artifact matches the current handoff package."
+            ),
+        ),
+        AnimationPlaytestReleaseGateCheck(
+            name="Manual Report Signoff",
+            status=session.report.status if session.report.status == "pass" else "manual-required",
+            blocker_count=len(session.report.findings),
+            next_action=(
+                "Run visible-window QA and record real evidence until the report validates."
+                if session.report.status != "pass"
+                else "Manual animation report validates."
+            ),
+        ),
+        AnimationPlaytestReleaseGateCheck(
+            name="P0/P1 UI Lanes",
+            status="pass" if triage.blocker_count == 0 else triage.status,
+            blocker_count=triage.blocker_count,
+            next_action=(
+                "Clear P0/P1 layout, typography, control, motion, and signoff lanes."
+                if triage.blocker_count
+                else "No open P0/P1 UI triage lanes."
+            ),
+        ),
+        AnimationPlaytestReleaseGateCheck(
+            name="Release Decision",
+            status=(
+                "blocked"
+                if session.artifact_status != "pass" or triage_validation.status != "pass"
+                else "pass"
+                if session.report.status == "pass" and triage.blocker_count == 0
+                else "manual-required"
+            ),
+            blocker_count=0
+            if session.artifact_status == "pass"
+            and triage_validation.status == "pass"
+            and session.report.status == "pass"
+            and triage.blocker_count == 0
+            else 1,
+            next_action=(
+                "Release can proceed with the passing manual animation evidence attached."
+                if session.artifact_status == "pass"
+                and triage_validation.status == "pass"
+                and session.report.status == "pass"
+                and triage.blocker_count == 0
+                else "Keep release blocked until artifacts, manual report, and UI triage all pass."
+            ),
+        ),
+    )
+    return AnimationPlaytestReleaseGate(
+        session=session,
+        triage=triage,
+        triage_validation=triage_validation,
+        checks=checks,
+    )
+
+
+def write_2d_animation_playtest_release_gate(
+    gate: AnimationPlaytestReleaseGate,
+    output_path: Path,
+) -> None:
+    """Write the final manual animation release gate as Markdown."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH 2D Animation Release Gate",
+        "",
+        f"- Status: `{gate.status}`",
+        f"- Artifact status: `{gate.artifact_status}`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Handoff status: `{gate.session.handoff_status}`",
+        f"- Report status: `{gate.session.report.status}`",
+        f"- UI triage status: `{gate.triage.status}`",
+        f"- UI triage artifact: `{gate.triage_validation.status}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Plan: `{gate.session.plan.path}`",
+        f"- Recorder queue: `{gate.session.recorder_queue.path}`",
+        *(
+            ()
+            if gate.session.route_batches is None
+            else (f"- Route batches: `{gate.session.route_batches.path}`",)
+        ),
+        f"- Open report items: `{len(gate.session.report.findings)}`",
+        f"- Open UI triage items: `{gate.triage.open_item_count}`",
+        f"- P0/P1 lanes: `{gate.triage.blocker_count}`",
+        f"- Blocking checks: `{gate.blocking_check_count}`",
+        (
+            "- Completion gate: "
+            "`validate-animation-playtest-report and validate-animation-playtest-ui-triage "
+            "must pass before release`"
+        ),
+        _ANIMATION_RELEASE_GATE_POLICY_LINE,
+        "",
+        "## Release Gate Checks",
+        "",
+        "| Check | Status | Blockers | Next Action |",
+        "| --- | --- | ---: | --- |",
+    ]
+    for check in gate.checks:
+        lines.append(
+            "| "
+            f"{_markdown_table_cell(check.name)} | "
+            f"`{check.status}` | "
+            f"{check.blocker_count} | "
+            f"{_markdown_table_cell(check.next_action)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Release Rules",
+            "",
+            "- `blocked` means at least one generated handoff artifact is stale.",
+            (
+                "- `manual-required` means visible-window evidence or P0/P1 UI "
+                "closure is still missing."
+            ),
+            "- `pass` means the session, triage, and manual report are all current and signed off.",
+            "- This artifact is a release gate only; it never records tester evidence by itself.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_release_gate(
+    gate_path: Path,
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestReleaseGateValidation:
+    """Validate that a release-gate artifact matches the current QA package."""
+
+    text = gate_path.read_text(encoding="utf-8")
+    gate = build_2d_animation_playtest_release_gate(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Release Gate",
+        f"- Status: `{gate.status}`",
+        f"- Artifact status: `{gate.artifact_status}`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Handoff status: `{gate.session.handoff_status}`",
+        f"- Report status: `{gate.session.report.status}`",
+        f"- UI triage status: `{gate.triage.status}`",
+        f"- UI triage artifact: `{gate.triage_validation.status}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Plan: `{gate.session.plan.path}`",
+        f"- Recorder queue: `{gate.session.recorder_queue.path}`",
+        f"- Open report items: `{len(gate.session.report.findings)}`",
+        f"- Open UI triage items: `{gate.triage.open_item_count}`",
+        f"- P0/P1 lanes: `{gate.triage.blocker_count}`",
+        f"- Blocking checks: `{gate.blocking_check_count}`",
+        (
+            "- Completion gate: "
+            "`validate-animation-playtest-report and validate-animation-playtest-ui-triage "
+            "must pass before release`"
+        ),
+        _ANIMATION_RELEASE_GATE_POLICY_LINE,
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing release gate guard: {line}")
+    if gate.session.route_batches is not None:
+        route_line = f"- Route batches: `{gate.session.route_batches.path}`"
+        if route_line not in text:
+            findings.append(f"missing release gate guard: {route_line}")
+
+    rows = _extract_markdown_table_rows(text)
+    gate_rows = tuple(row for row in rows if len(row) >= 4 and row[0] in _RELEASE_GATE_CHECKS)
+    if len(gate_rows) != len(gate.checks):
+        findings.append(f"expected {len(gate.checks)} release gate rows, found {len(gate_rows)}")
+
+    rows_by_check = {row[0].replace(r"\|", "|").strip(): row for row in gate_rows}
+    for check in gate.checks:
+        row = rows_by_check.get(check.name)
+        if row is None:
+            findings.append(f"missing release gate row: {check.name}")
+            continue
+        _validate_release_gate_row(findings, check, row)
+
+    return AnimationPlaytestReleaseGateValidation(
+        path=str(gate_path),
+        expected_count=len(gate.checks),
+        findings=tuple(findings),
+    )
+
+
 def _animation_ui_triage_profile(area: str) -> tuple[str, str, str]:
     return _ANIMATION_UI_TRIAGE_PROFILES.get(
         area,
@@ -2172,6 +2528,26 @@ def _validate_ui_triage_row(
     for field, actual, expected in expected_values:
         if _normalize_report_key(actual) != _normalize_report_key(expected):
             findings.append(f"ui triage row {item.step} {field} is stale")
+
+
+def _validate_release_gate_row(
+    findings: list[str],
+    check: AnimationPlaytestReleaseGateCheck,
+    row: tuple[str, ...],
+) -> None:
+    name = row[0].replace(r"\|", "|").strip()
+    status = _strip_markdown_code(row[1])
+    blockers = row[2].strip()
+    next_action = row[3].replace(r"\|", "|").strip()
+    expected_values = (
+        ("check", name, check.name),
+        ("status", status, check.status),
+        ("blockers", blockers, str(check.blocker_count)),
+        ("next action", next_action, check.next_action),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"release gate row {check.name} {field} is stale")
 
 
 def _validate_recorder_queue_row(

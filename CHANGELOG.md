@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.203.0 - 2026-06-30
+
+- Added `animation-playtest-release-gate` and `validate-animation-playtest-release-gate` to combine session artifacts, UI triage, and manual report signoff into one explicit go/no-go animation release gate
+- Extended `prepare-animation-playtest-session` to generate and validate the release-gate artifact alongside report, queue, plan, recorder queue, route batches, UI triage, and handoff outputs
+- Updated docs and regression coverage so builds remain blocked or manual-required until real visible-window evidence clears P0/P1 UI lanes and the final manual report validates
+
 ## 0.202.0 - 2026-06-29
 
 - Added `animation-playtest-ui-triage` and `validate-animation-playtest-ui-triage` to turn manual animation playtest gaps into a structured UI/UX backlog

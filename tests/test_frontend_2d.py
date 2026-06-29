@@ -42,6 +42,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
+    build_2d_animation_playtest_release_gate,
     build_2d_animation_playtest_route_batch_plan,
     build_2d_animation_playtest_ui_triage_plan,
     launch_2d_frontend,
@@ -61,6 +62,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
+    validate_2d_animation_playtest_release_gate,
     validate_2d_animation_playtest_report,
     validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
@@ -71,6 +73,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
+    write_2d_animation_playtest_release_gate,
     write_2d_animation_playtest_report_template,
     write_2d_animation_playtest_route_batch_plan,
     write_2d_animation_playtest_ui_triage_plan,
@@ -7361,6 +7364,306 @@ def test_validate_animation_playtest_ui_triage_command_accepts_current_artifact(
     assert "PASS" in result.output
 
 
+def test_write_animation_playtest_release_gate_blocks_until_manual_signoff(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    gate_path = tmp_path / "manual-animation-release-gate.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.203.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=17,
+        ),
+        triage_path,
+    )
+
+    gate = build_2d_animation_playtest_release_gate(
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        seed=17,
+    )
+    write_2d_animation_playtest_release_gate(gate, gate_path)
+    validation = validate_2d_animation_playtest_release_gate(
+        gate_path,
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        seed=17,
+    )
+
+    text = gate_path.read_text(encoding="utf-8")
+    assert gate.status == "manual-required"
+    assert gate.artifact_status == "pass"
+    assert gate.manual_result == "not completed by automation"
+    assert gate.blocking_check_count == 3
+    assert validation.status == "pass"
+    assert validation.expected_count == 5
+    assert "# NEXUS TECH 2D Animation Release Gate" in text
+    assert "Manual Report Signoff" in text
+    assert "P0/P1 UI Lanes" in text
+    assert "no animation release while the gate is blocked or manual-required" in text
+
+
+def test_validate_animation_playtest_release_gate_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    gate_path = tmp_path / "manual-animation-release-gate.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.203.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=17,
+        ),
+        triage_path,
+    )
+    write_2d_animation_playtest_release_gate(
+        build_2d_animation_playtest_release_gate(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            triage_path,
+            route_batch_path,
+            seed=17,
+        ),
+        gate_path,
+    )
+    gate_path.write_text(
+        gate_path.read_text(encoding="utf-8").replace(
+            "Manual Report Signoff",
+            "Manual Report Drift",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_release_gate(
+        gate_path,
+        report_path,
+        commands_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        seed=17,
+    )
+
+    assert validation.status == "fail"
+    assert "missing release gate row: Manual Report Signoff" in validation.findings
+
+
+def test_animation_playtest_release_gate_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    gate_path = tmp_path / "manual-animation-release-gate.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.203.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=17,
+        ),
+        triage_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-release-gate",
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            str(recorder_queue_path),
+            str(triage_path),
+            "--route-batches",
+            str(route_batch_path),
+            "--seed",
+            "17",
+            "--output",
+            str(gate_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Release Gate" in result.output
+    assert "Release gate status: MANUAL-REQUIRED" in result.output
+    assert gate_path.exists()
+    assert "P0/P1 UI Lanes" in gate_path.read_text(encoding="utf-8")
+
+
+def test_validate_animation_playtest_release_gate_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    gate_path = tmp_path / "manual-animation-release-gate.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.203.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=17),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=17),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=17),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=17),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=17,
+        ),
+        triage_path,
+    )
+    write_2d_animation_playtest_release_gate(
+        build_2d_animation_playtest_release_gate(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            triage_path,
+            route_batch_path,
+            seed=17,
+        ),
+        gate_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-release-gate",
+            str(gate_path),
+            str(report_path),
+            str(commands_path),
+            str(plan_path),
+            str(recorder_queue_path),
+            str(triage_path),
+            "--route-batches",
+            str(route_batch_path),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Release Gate Validation" in result.output
+    assert "PASS" in result.output
+
+
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -7580,6 +7883,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
     route_batch_path = tmp_path / "manual-animation-route-batches.md"
     triage_path = tmp_path / "manual-animation-ui-triage.md"
+    release_gate_path = tmp_path / "manual-animation-release-gate.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
@@ -7602,6 +7906,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(route_batch_path),
             "--triage-output",
             str(triage_path),
+            "--release-gate-output",
+            str(release_gate_path),
             "--handoff-output",
             str(handoff_path),
             "--commit",
@@ -7623,12 +7929,16 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Session Artifacts" in result.output
     assert "Handoff Status" in result.output
     assert "Handoff Sheet" in result.output
+    assert "Release Gate Status" in result.output
+    assert "Release Gate Artifact" in result.output
+    assert "Blocking Checks" in result.output
     assert report_path.exists()
     assert commands_path.exists()
     assert plan_path.exists()
     assert recorder_queue_path.exists()
     assert route_batch_path.exists()
     assert triage_path.exists()
+    assert release_gate_path.exists()
     assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
@@ -7636,6 +7946,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     recorder_text = recorder_queue_path.read_text(encoding="utf-8")
     route_batch_text = route_batch_path.read_text(encoding="utf-8")
     triage_text = triage_path.read_text(encoding="utf-8")
+    release_gate_text = release_gate_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
@@ -7669,6 +7980,10 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "# NEXUS TECH 2D Animation UI Triage" in triage_text
     assert "Controls / Navigation" in triage_text
     assert "Motion / Feedback" in triage_text
+    assert "# NEXUS TECH 2D Animation Release Gate" in release_gate_text
+    assert "- Status: `manual-required`" in release_gate_text
+    assert "Manual Report Signoff" in release_gate_text
+    assert "P0/P1 UI Lanes" in release_gate_text
     assert "- Handoff status: `manual-required`" in handoff_text
     assert "- Route batches: `" in handoff_text
     assert "| Route batches | `pass` |" in handoff_text
