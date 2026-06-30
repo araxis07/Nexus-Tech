@@ -39,6 +39,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
+    build_2d_animation_playtest_issue_backlog,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_progress_board,
     build_2d_animation_playtest_readiness_plan,
@@ -63,6 +64,7 @@ from nexus_tech.frontend_2d import (
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_execution_guide,
+    validate_2d_animation_playtest_issue_backlog,
     validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
@@ -75,6 +77,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
+    write_2d_animation_playtest_issue_backlog,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_progress_board,
     write_2d_animation_playtest_readiness_plan,
@@ -7981,6 +7984,142 @@ def test_validate_animation_playtest_progress_command_accepts_current_artifact(
     assert "PASS" in result.output
 
 
+def _write_animation_issue_backlog_report(tmp_path: Path) -> Path:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    report_text = (
+        _completed_animation_playtest_report_text()
+        .replace(
+            "| Pause / Resume | `pass` | pause resume returns to run state | none |",
+            (
+                "| Pause / Resume | `fail` | pause resume button overlaps the run panel | "
+                "owner/ui 2026-07-01 |"
+            ),
+        )
+        .replace(
+            (
+                "| Title/Menu | `pass` | wizard save visible copy stayed aligned | "
+                "title actor label stayed outside action labels | none |"
+            ),
+            (
+                "| Title/Menu | `watch` | wizard save visible copy has tight spacing | "
+                "title actor label nudges action labels | owner/motion 2026-07-01 |"
+            ),
+        )
+    )
+    report_path.write_text(report_text, encoding="utf-8")
+    return report_path
+
+
+def test_write_animation_playtest_issue_backlog_tracks_fail_and_watch(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_animation_issue_backlog_report(tmp_path)
+    backlog_path = tmp_path / "manual-animation-issues.md"
+
+    backlog = build_2d_animation_playtest_issue_backlog(report_path)
+    write_2d_animation_playtest_issue_backlog(backlog, backlog_path)
+    validation = validate_2d_animation_playtest_issue_backlog(backlog_path, report_path)
+
+    text = backlog_path.read_text(encoding="utf-8")
+    assert backlog.status == "blocked"
+    assert backlog.issue_count == 2
+    assert backlog.p0_count == 1
+    assert backlog.p1_count == 1
+    assert validation.status == "pass"
+    assert "# NEXUS TECH 2D Animation Issue Backlog" in text
+    assert "| P0 | fix-needed | Control Clarity Results | Pause / Resume | fail |" in text
+    assert "| P1 | fix-needed | Scene Results | Title/Menu | watch |" in text
+    assert "validate-animation-playtest-issue-backlog" in text
+
+
+def test_validate_animation_playtest_issue_backlog_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_animation_issue_backlog_report(tmp_path)
+    backlog_path = tmp_path / "manual-animation-issues.md"
+    write_2d_animation_playtest_issue_backlog(
+        build_2d_animation_playtest_issue_backlog(report_path),
+        backlog_path,
+    )
+    backlog_path.write_text(
+        backlog_path.read_text(encoding="utf-8").replace("Pause / Resume", "Pause Drift", 1),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_issue_backlog(backlog_path, report_path)
+
+    assert validation.status == "fail"
+    assert any("missing issue backlog row" in finding for finding in validation.findings)
+
+
+def test_animation_playtest_issue_backlog_tracks_release_decision_placeholder(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.207.0",
+        prefill_automated_gates=True,
+    )
+
+    backlog = build_2d_animation_playtest_issue_backlog(report_path)
+
+    assert any(
+        issue.area == "Decision"
+        and issue.target == "Release decision"
+        and issue.priority == "P2"
+        and issue.result == "pass / watch / fail"
+        for issue in backlog.issues
+    )
+
+
+def test_animation_playtest_issue_backlog_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_animation_issue_backlog_report(tmp_path)
+    backlog_path = tmp_path / "manual-animation-issues.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-issue-backlog",
+            str(report_path),
+            "--output",
+            str(backlog_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Issue Backlog" in result.output
+    assert "Issue Queue" in result.output
+    assert backlog_path.exists()
+    assert "Pause / Resume" in backlog_path.read_text(encoding="utf-8")
+
+
+def test_validate_animation_playtest_issue_backlog_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = _write_animation_issue_backlog_report(tmp_path)
+    backlog_path = tmp_path / "manual-animation-issues.md"
+    write_2d_animation_playtest_issue_backlog(
+        build_2d_animation_playtest_issue_backlog(report_path),
+        backlog_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-issue-backlog",
+            str(backlog_path),
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Issue Backlog Validation" in result.output
+    assert "PASS" in result.output
+
+
 def _write_animation_playtest_execution_artifacts(
     tmp_path: Path,
     *,
@@ -7996,7 +8135,7 @@ def _write_animation_playtest_execution_artifacts(
     guide_path = tmp_path / "manual-animation-execution-guide.md"
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.206.0",
+        version="0.207.0",
         prefill_automated_gates=True,
     )
     write_2d_animation_playtest_command_queue(
@@ -8434,6 +8573,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     release_gate_path = tmp_path / "manual-animation-release-gate.md"
     progress_path = tmp_path / "manual-animation-progress.md"
     execution_guide_path = tmp_path / "manual-animation-execution-guide.md"
+    issue_backlog_path = tmp_path / "manual-animation-issues.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
@@ -8462,6 +8602,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(progress_path),
             "--execution-guide-output",
             str(execution_guide_path),
+            "--issue-backlog-output",
+            str(issue_backlog_path),
             "--handoff-output",
             str(handoff_path),
             "--commit",
@@ -8489,6 +8631,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Progress Open Items" in result.output
     assert "Execution Guide Artifact" in result.output
     assert "Execution Guide Steps" in result.output
+    assert "Issue Backlog Artifact" in result.output
+    assert "Issue Backlog Items" in result.output
     assert "Blocking Checks" in result.output
     assert report_path.exists()
     assert commands_path.exists()
@@ -8499,6 +8643,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert release_gate_path.exists()
     assert progress_path.exists()
     assert execution_guide_path.exists()
+    assert issue_backlog_path.exists()
     assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
@@ -8509,6 +8654,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     release_gate_text = release_gate_path.read_text(encoding="utf-8")
     progress_text = progress_path.read_text(encoding="utf-8")
     execution_guide_text = execution_guide_path.read_text(encoding="utf-8")
+    issue_backlog_text = issue_backlog_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
@@ -8554,6 +8700,9 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "## Operator Loop" in execution_guide_text
     assert "## Execution Queue" in execution_guide_text
     assert "run visible commands first" in execution_guide_text
+    assert "# NEXUS TECH 2D Animation Issue Backlog" in issue_backlog_text
+    assert "- Backlog policy:" in issue_backlog_text
+    assert "validate-animation-playtest-issue-backlog" in issue_backlog_text
     assert "- Handoff status: `manual-required`" in handoff_text
     assert "- Route batches: `" in handoff_text
     assert "| Route batches | `pass` |" in handoff_text

@@ -68,6 +68,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
+    build_2d_animation_playtest_issue_backlog,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_progress_board,
     build_2d_animation_playtest_readiness_plan,
@@ -91,6 +92,7 @@ from nexus_tech.frontend_2d import (
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
     validate_2d_animation_playtest_execution_guide,
+    validate_2d_animation_playtest_issue_backlog,
     validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
@@ -103,6 +105,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
+    write_2d_animation_playtest_issue_backlog,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_progress_board,
     write_2d_animation_playtest_readiness_plan,
@@ -415,6 +418,11 @@ ANIMATION_PLAYTEST_SESSION_EXECUTION_GUIDE_OUTPUT_OPTION = typer.Option(
     "--execution-guide-output",
     help="Markdown path for the manual animation QA execution guide.",
 )
+ANIMATION_PLAYTEST_SESSION_ISSUE_BACKLOG_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-issues.md"),
+    "--issue-backlog-output",
+    help="Markdown path for the manual animation issue backlog.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -525,6 +533,17 @@ ANIMATION_PLAYTEST_EXECUTION_GUIDE_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the animation execution guide.",
+)
+ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation issue backlog Markdown file.",
+)
+ANIMATION_PLAYTEST_ISSUE_BACKLOG_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation issue backlog.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -2955,6 +2974,102 @@ def validate_animation_playtest_execution_guide_command(
     )
 
 
+@app.command("animation-playtest-issue-backlog")
+def animation_playtest_issue_backlog_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    output: Path | None = ANIMATION_PLAYTEST_ISSUE_BACKLOG_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show the fix/evidence backlog from a manual animation report."""
+
+    backlog = build_2d_animation_playtest_issue_backlog(report_path)
+
+    summary_table = Table(title="Animation Playtest Issue Backlog")
+    summary_table.add_column("Field", style="cyan")
+    summary_table.add_column("Value")
+    summary_table.add_row("Status", backlog.status.upper())
+    summary_table.add_row("Report", backlog.report.path)
+    summary_table.add_row("Report Validation", backlog.report.status.upper())
+    summary_table.add_row("Release Decision", backlog.report.release_decision or "-")
+    summary_table.add_row("Total Issues", str(backlog.issue_count))
+    summary_table.add_row("P0", str(backlog.p0_count))
+    summary_table.add_row("P1", str(backlog.p1_count))
+    summary_table.add_row("P2", str(backlog.p2_count))
+    console.print(summary_table)
+
+    issue_table = Table(title="Issue Queue")
+    issue_table.add_column("Priority")
+    issue_table.add_column("Status")
+    issue_table.add_column("Area", style="cyan")
+    issue_table.add_column("Target")
+    issue_table.add_column("Result")
+    issue_table.add_column("Next Action")
+    for issue in backlog.issues:
+        issue_table.add_row(
+            issue.priority,
+            issue.status.upper(),
+            issue.area,
+            issue.target,
+            issue.result,
+            issue.next_action,
+        )
+    console.print(issue_table)
+
+    if output is not None:
+        write_2d_animation_playtest_issue_backlog(backlog, output)
+        console.print(
+            Panel.fit(
+                f"Animation issue backlog written to {output}",
+                title="Animation Playtest Issue Backlog",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and backlog.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-issue-backlog")
+def validate_animation_playtest_issue_backlog_command(
+    backlog_path: Path = ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+) -> None:
+    """Validate that the animation issue backlog matches the current report."""
+
+    validation = validate_2d_animation_playtest_issue_backlog(backlog_path, report_path)
+
+    table = Table(title="Animation Playtest Issue Backlog Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Issue Backlog", validation.path)
+    table.add_row("Expected Issues", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Issue Backlog Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation issue backlog artifact is stale or incomplete.",
+                title="Animation Playtest Issue Backlog",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation issue backlog matches the current manual report.",
+            title="Animation Playtest Issue Backlog",
+            border_style="green",
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -3358,6 +3473,7 @@ def prepare_animation_playtest_session_command(
     release_gate_output: Path = ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION,
     progress_output: Path = ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION,
     execution_guide_output: Path = ANIMATION_PLAYTEST_SESSION_EXECUTION_GUIDE_OUTPUT_OPTION,
+    issue_backlog_output: Path = ANIMATION_PLAYTEST_SESSION_ISSUE_BACKLOG_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -3562,6 +3678,12 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    issue_backlog = build_2d_animation_playtest_issue_backlog(report_output)
+    write_2d_animation_playtest_issue_backlog(issue_backlog, issue_backlog_output)
+    issue_backlog_validation = validate_2d_animation_playtest_issue_backlog(
+        issue_backlog_output,
+        report_output,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -3575,6 +3697,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Release Gate", str(release_gate_output))
     session_table.add_row("Progress Board", str(progress_output))
     session_table.add_row("Execution Guide", str(execution_guide_output))
+    session_table.add_row("Issue Backlog", str(issue_backlog_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
@@ -3589,6 +3712,8 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Progress Open Items", str(progress_board.open_item_count))
     session_table.add_row("Execution Guide Artifact", execution_guide_validation.status.upper())
     session_table.add_row("Execution Guide Steps", str(len(execution_guide.recorder_steps)))
+    session_table.add_row("Issue Backlog Artifact", issue_backlog_validation.status.upper())
+    session_table.add_row("Issue Backlog Items", str(issue_backlog.issue_count))
     session_table.add_row("Blocking Checks", str(release_gate.blocking_check_count))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())

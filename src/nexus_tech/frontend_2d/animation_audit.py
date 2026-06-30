@@ -1133,6 +1133,77 @@ class AnimationPlaytestExecutionGuideValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestIssue:
+    """One manual animation QA item that still needs evidence or a fix."""
+
+    priority: str
+    status: str
+    area: str
+    target: str
+    result: str
+    evidence: str
+    follow_up: str
+    next_action: str
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestIssueBacklog:
+    """Backlog derived from the current manual animation playtest report."""
+
+    report: AnimationPlaytestReportValidation
+    issues: tuple[AnimationPlaytestIssue, ...]
+
+    @property
+    def status(self) -> str:
+        """Return blocked when fixes are known, otherwise mirror evidence state."""
+
+        if any(issue.priority == "P0" for issue in self.issues):
+            return "blocked"
+        if self.issues:
+            return "manual-required"
+        return "pass"
+
+    @property
+    def issue_count(self) -> int:
+        """Return total open backlog items."""
+
+        return len(self.issues)
+
+    @property
+    def p0_count(self) -> int:
+        """Return release-blocking fix count."""
+
+        return sum(1 for issue in self.issues if issue.priority == "P0")
+
+    @property
+    def p1_count(self) -> int:
+        """Return watch item count."""
+
+        return sum(1 for issue in self.issues if issue.priority == "P1")
+
+    @property
+    def p2_count(self) -> int:
+        """Return missing-evidence item count."""
+
+        return sum(1 for issue in self.issues if issue.priority == "P2")
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestIssueBacklogValidation:
+    """Validation result for an exported manual animation issue backlog."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the backlog matches the current report."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1343,6 +1414,10 @@ _ANIMATION_PROGRESS_POLICY_LINE = (
 _ANIMATION_EXECUTION_GUIDE_POLICY_LINE = (
     "- Execution policy: `run visible commands first; recorder placeholders require "
     "real tester observations`"
+)
+_ANIMATION_ISSUE_BACKLOG_POLICY_LINE = (
+    "- Backlog policy: `derived from the manual report; it never replaces visible-window "
+    "tester evidence`"
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
     {
@@ -3285,6 +3360,335 @@ def validate_2d_animation_playtest_execution_guide(
     )
 
 
+def build_2d_animation_playtest_issue_backlog(
+    report_path: Path,
+) -> AnimationPlaytestIssueBacklog:
+    """Build a fix/evidence backlog from the current manual animation report."""
+
+    text = report_path.read_text(encoding="utf-8")
+    validation = validate_2d_animation_playtest_report(report_path)
+    issues: list[AnimationPlaytestIssue] = []
+
+    for row in _extract_report_section_table_rows(text, "Automated Gate Summary"):
+        if len(row) < 3 or _normalize_report_key(row[0]) == "gate":
+            continue
+        _append_animation_issue(
+            issues,
+            area="Automated Gate",
+            target=row[0],
+            result=row[1],
+            evidence=row[2],
+            follow_up="-",
+        )
+
+    for row in _extract_report_section_table_rows(text, "Window Matrix"):
+        if len(row) < 5 or _normalize_report_key(row[0]) == "window":
+            continue
+        window = _strip_markdown_code(row[0])
+        for result_index, mode in enumerate(("full", "reduced", "off"), start=1):
+            _append_animation_issue(
+                issues,
+                area="Window Matrix",
+                target=f"{window} {mode}",
+                result=row[result_index],
+                evidence=row[4],
+                follow_up="-",
+            )
+
+    for row in _extract_report_section_table_rows(text, "Visible Route Evidence"):
+        if len(row) < 6 or not row[0].isdigit():
+            continue
+        target = (
+            f"step {row[0]} {_strip_markdown_code(row[1])} "
+            f"{_strip_markdown_code(row[2])} {_strip_markdown_code(row[3])}"
+        )
+        _append_animation_issue(
+            issues,
+            area="Visible Route Evidence",
+            target=target,
+            result=row[4],
+            evidence=row[5],
+            follow_up="-",
+        )
+
+    for row in _extract_report_section_table_rows(text, "Control Clarity Results"):
+        if len(row) < 4 or _normalize_report_key(row[0]) == "control area":
+            continue
+        _append_animation_issue(
+            issues,
+            area="Control Clarity Results",
+            target=row[0],
+            result=row[1],
+            evidence=row[2],
+            follow_up=row[3],
+        )
+
+    for row in _extract_report_section_table_rows(text, "Scene Results"):
+        if len(row) < 5 or _normalize_report_key(row[0]) == "scene":
+            continue
+        evidence = f"readability: {row[2]}; motion: {row[3]}"
+        _append_animation_issue(
+            issues,
+            area="Scene Results",
+            target=row[0],
+            result=row[1],
+            evidence=evidence,
+            follow_up=row[4],
+        )
+
+    for row in _extract_report_section_table_rows(text, "Game Feel Results"):
+        if len(row) < 4 or _normalize_report_key(row[0]) == "feedback area":
+            continue
+        _append_animation_issue(
+            issues,
+            area="Game Feel Results",
+            target=row[0],
+            result=row[1],
+            evidence=row[2],
+            follow_up=row[3],
+        )
+
+    release_decision = _extract_report_field(text, "Release decision")
+    _append_animation_issue(
+        issues,
+        area="Decision",
+        target="Release decision",
+        result=release_decision,
+        evidence=release_decision or "missing release decision",
+        follow_up=_extract_report_field(text, "Required fixes before presenting") or "-",
+    )
+
+    for field_name in REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS:
+        value = _extract_report_field(text, field_name)
+        if _is_clear_signoff_value(value):
+            continue
+        _append_manual_report_field_issue(
+            issues,
+            field_name=field_name,
+            value=value,
+            priority="P0",
+        )
+
+    for field_name in REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS:
+        value = _extract_report_field(text, field_name)
+        if field_name == "Validator result":
+            if _is_passing_result(value):
+                continue
+            priority = "P0"
+        elif field_name == "Required fixes before presenting":
+            if _is_clear_signoff_value(value):
+                continue
+            priority = "P1"
+        else:
+            if not _is_placeholder_field(value):
+                continue
+            priority = "P2"
+        _append_manual_report_field_issue(
+            issues,
+            field_name=field_name,
+            value=value,
+            priority=priority,
+        )
+
+    return AnimationPlaytestIssueBacklog(
+        report=validation,
+        issues=tuple(issues),
+    )
+
+
+def write_2d_animation_playtest_issue_backlog(
+    backlog: AnimationPlaytestIssueBacklog,
+    output_path: Path,
+) -> None:
+    """Write the manual animation issue backlog as Markdown."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH 2D Animation Issue Backlog",
+        "",
+        f"- Status: `{backlog.status}`",
+        f"- Report: `{backlog.report.path}`",
+        f"- Report validation: `{backlog.report.status}`",
+        f"- Release decision: `{backlog.report.release_decision or '-'}`",
+        f"- Total issues: `{backlog.issue_count}`",
+        f"- P0 issues: `{backlog.p0_count}`",
+        f"- P1 issues: `{backlog.p1_count}`",
+        f"- P2 issues: `{backlog.p2_count}`",
+        _ANIMATION_ISSUE_BACKLOG_POLICY_LINE,
+        "",
+        "## Issue Queue",
+        "",
+        "| Priority | Status | Area | Target | Result | Evidence | Follow-up | Next Action |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for issue in backlog.issues:
+        lines.append(_format_animation_issue_row(issue))
+    lines.extend(
+        [
+            "",
+            "## Validation Commands",
+            "",
+            "```bash",
+            (
+                "uv run nexus-tech validate-animation-playtest-report "
+                f"{_shell_arg(backlog.report.path)}"
+            ),
+            (
+                f"uv run nexus-tech validate-animation-playtest-issue-backlog "
+                f"{_shell_arg(output_path)} {_shell_arg(backlog.report.path)}"
+            ),
+            "```",
+            "",
+            "## Backlog Rules",
+            "",
+            "- P0 items block release and need a code or content fix before signoff.",
+            "- P1 items need an explicit watch/fix decision before release candidate.",
+            "- P2 items mean tester evidence is still missing or placeholder text remains.",
+            "- Regenerate this backlog after every manual report edit.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_issue_backlog(
+    backlog_path: Path,
+    report_path: Path,
+) -> AnimationPlaytestIssueBacklogValidation:
+    """Validate that an issue backlog matches the current manual report."""
+
+    text = backlog_path.read_text(encoding="utf-8")
+    backlog = build_2d_animation_playtest_issue_backlog(report_path)
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Issue Backlog",
+        f"- Status: `{backlog.status}`",
+        f"- Report: `{backlog.report.path}`",
+        f"- Report validation: `{backlog.report.status}`",
+        f"- Release decision: `{backlog.report.release_decision or '-'}`",
+        f"- Total issues: `{backlog.issue_count}`",
+        f"- P0 issues: `{backlog.p0_count}`",
+        f"- P1 issues: `{backlog.p1_count}`",
+        f"- P2 issues: `{backlog.p2_count}`",
+        _ANIMATION_ISSUE_BACKLOG_POLICY_LINE,
+        f"uv run nexus-tech validate-animation-playtest-report {_shell_arg(backlog.report.path)}",
+        (
+            f"uv run nexus-tech validate-animation-playtest-issue-backlog "
+            f"{_shell_arg(backlog_path)} {_shell_arg(backlog.report.path)}"
+        ),
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing issue backlog guard: {line}")
+
+    rows = _extract_markdown_table_rows(text)
+    issue_rows = tuple(row for row in rows if len(row) >= 8 and row[0] in {"P0", "P1", "P2"})
+    if len(issue_rows) != len(backlog.issues):
+        findings.append(f"expected {len(backlog.issues)} issue rows, found {len(issue_rows)}")
+
+    expected_rows = tuple(_format_animation_issue_row(issue) for issue in backlog.issues)
+    actual_rows = tuple(
+        "| " + " | ".join(_markdown_table_cell(cell) for cell in row) + " |" for row in issue_rows
+    )
+    for expected in expected_rows:
+        if expected not in actual_rows:
+            findings.append(f"missing issue backlog row: {expected}")
+
+    return AnimationPlaytestIssueBacklogValidation(
+        path=str(backlog_path),
+        expected_count=len(backlog.issues),
+        findings=tuple(findings),
+    )
+
+
+def _append_animation_issue(
+    issues: list[AnimationPlaytestIssue],
+    *,
+    area: str,
+    target: str,
+    result: str,
+    evidence: str,
+    follow_up: str,
+) -> None:
+    normalized_result = _normalize_issue_result(result)
+    if _is_passing_result(result) and not _is_placeholder_result(result):
+        return
+    priority = _animation_issue_priority(normalized_result)
+    issues.append(
+        AnimationPlaytestIssue(
+            priority=priority,
+            status=_animation_issue_status(normalized_result),
+            area=area,
+            target=_strip_markdown_code(target),
+            result=normalized_result or "missing",
+            evidence=_markdown_table_cell(evidence or "missing evidence"),
+            follow_up=_markdown_table_cell(follow_up or "-"),
+            next_action=_animation_issue_next_action(priority),
+        )
+    )
+
+
+def _append_manual_report_field_issue(
+    issues: list[AnimationPlaytestIssue],
+    *,
+    field_name: str,
+    value: str,
+    priority: str,
+) -> None:
+    normalized = _normalize_issue_result(value)
+    issues.append(
+        AnimationPlaytestIssue(
+            priority=priority,
+            status="manual-required" if priority == "P2" else "fix-needed",
+            area="Report Field",
+            target=field_name,
+            result=normalized or "missing",
+            evidence=_markdown_table_cell(value or "missing field value"),
+            follow_up="-",
+            next_action=_animation_issue_next_action(priority),
+        )
+    )
+
+
+def _animation_issue_priority(normalized_result: str) -> str:
+    if normalized_result == "fail":
+        return "P0"
+    if normalized_result == "watch":
+        return "P1"
+    return "P2"
+
+
+def _normalize_issue_result(value: str) -> str:
+    return _normalize_report_result(value).replace("`", "")
+
+
+def _animation_issue_status(normalized_result: str) -> str:
+    if normalized_result in {"fail", "watch"}:
+        return "fix-needed"
+    return "manual-required"
+
+
+def _animation_issue_next_action(priority: str) -> str:
+    if priority == "P0":
+        return "Fix before release, rerun the visible command, and record new evidence."
+    if priority == "P1":
+        return "Triage before release candidate and decide fix or accepted watch risk."
+    return "Run the manual check and replace placeholders with real observed evidence."
+
+
+def _format_animation_issue_row(issue: AnimationPlaytestIssue) -> str:
+    return (
+        "| "
+        f"{_markdown_table_cell(issue.priority)} | "
+        f"{_markdown_table_cell(issue.status)} | "
+        f"{_markdown_table_cell(issue.area)} | "
+        f"{_markdown_table_cell(issue.target)} | "
+        f"{_markdown_table_cell(issue.result)} | "
+        f"{_markdown_table_cell(issue.evidence)} | "
+        f"{_markdown_table_cell(issue.follow_up)} | "
+        f"{_markdown_table_cell(issue.next_action)} |"
+    )
+
+
 def _animation_ui_triage_profile(area: str) -> tuple[str, str, str]:
     return _ANIMATION_UI_TRIAGE_PROFILES.get(
         area,
@@ -4917,6 +5321,27 @@ def _extract_markdown_table_rows(text: str) -> tuple[tuple[str, ...], ...]:
     return tuple(rows)
 
 
+def _extract_report_section_table_rows(text: str, section: str) -> tuple[tuple[str, ...], ...]:
+    rows: list[tuple[str, ...]] = []
+    in_section = False
+    section_key = _normalize_report_key(section)
+    for line in text.splitlines():
+        heading = re.match(r"^##\s+(.+?)\s*$", line)
+        if heading is not None:
+            in_section = _normalize_report_key(heading.group(1)) == section_key
+            continue
+        if not in_section:
+            continue
+        stripped = line.strip()
+        if not stripped.startswith("|") or not stripped.endswith("|"):
+            continue
+        cells = tuple(cell.strip() for cell in stripped.strip("|").split("|"))
+        if not cells or _is_markdown_separator_row(cells):
+            continue
+        rows.append(cells)
+    return tuple(rows)
+
+
 def _strip_markdown_code(value: str) -> str:
     return value.strip().strip("` ")
 
@@ -5095,7 +5520,7 @@ def _normalize_report_key(value: str) -> str:
 
 
 def _normalize_report_result(value: str) -> str:
-    return re.sub(r"\s+", " ", value.strip().strip("` ")).lower()
+    return re.sub(r"\s+", " ", value.strip().strip("` ").replace("`", "")).lower()
 
 
 def _is_placeholder_result(value: str) -> bool:

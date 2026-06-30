@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.207.0 - 2026-06-30
+
+- Added `animation-playtest-issue-backlog` and `validate-animation-playtest-issue-backlog` to turn manual report `fail`, `watch`, and missing-evidence rows into a prioritized P0/P1/P2 fix queue
+- Extended `prepare-animation-playtest-session` to generate and validate the issue backlog alongside the execution guide, progress board, release gate, UI triage, route batches, recorder queue, plan, command queue, report, and handoff
+- Updated docs and regression coverage so stale issue backlogs fail validation while real visible-window tester observations remain required before signoff
+
 ## 0.206.0 - 2026-06-30
 
 - Added `animation-playtest-execution-guide` and `validate-animation-playtest-execution-guide` to turn the current progress board and recorder queue into a step-by-step manual QA operator guide
