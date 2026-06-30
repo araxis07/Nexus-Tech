@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
     MotionMode,
     build_2d_animation_playtest_command_queue,
+    build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_progress_board,
@@ -89,6 +90,7 @@ from nexus_tech.frontend_2d import (
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
+    validate_2d_animation_playtest_execution_guide,
     validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
@@ -99,6 +101,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
+    write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_progress_board,
@@ -407,6 +410,11 @@ ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION = typer.Option(
     "--progress-output",
     help="Markdown path for the manual animation QA progress board.",
 )
+ANIMATION_PLAYTEST_SESSION_EXECUTION_GUIDE_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    "--execution-guide-output",
+    help="Markdown path for the manual animation QA execution guide.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -501,6 +509,22 @@ ANIMATION_PLAYTEST_PROGRESS_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the animation progress board.",
+)
+ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-progress.md"),
+    "--progress-path",
+    help="Animation progress board path referenced by the execution guide.",
+)
+ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation execution guide Markdown file.",
+)
+ANIMATION_PLAYTEST_EXECUTION_GUIDE_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation execution guide.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -2786,6 +2810,151 @@ def validate_animation_playtest_progress_command(
     )
 
 
+@app.command("animation-playtest-execution-guide")
+def animation_playtest_execution_guide_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_EXECUTION_GUIDE_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show a step-by-step manual animation QA execution guide."""
+
+    validate_scenario_id(scenario)
+    guide = build_2d_animation_playtest_execution_guide(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    summary_table = Table(title="Animation Playtest Execution Guide")
+    summary_table.add_column("Field", style="cyan")
+    summary_table.add_column("Value")
+    summary_table.add_row("Status", guide.status.upper())
+    summary_table.add_row("Completion", f"{guide.progress.completion_percent}%")
+    summary_table.add_row("Open Progress Items", str(guide.progress.open_item_count))
+    summary_table.add_row("Open Recorder Steps", str(guide.open_step_count))
+    summary_table.add_row("Manual Result", guide.progress.release_gate.manual_result)
+    summary_table.add_row("Progress Board", guide.progress_path)
+    console.print(summary_table)
+
+    queue_table = Table(title="Execution Queue")
+    queue_table.add_column("Step", justify="right")
+    queue_table.add_column("Status")
+    queue_table.add_column("Area", style="cyan")
+    queue_table.add_column("Target")
+    queue_table.add_column("Visible")
+    queue_table.add_column("Terms", justify="right")
+    for index, hint in enumerate(guide.recorder_steps, start=1):
+        queue_table.add_row(
+            str(index),
+            hint.status.upper(),
+            hint.area,
+            hint.target,
+            "yes" if hint.visible_command else "-",
+            str(len(hint.required_terms)),
+        )
+    console.print(queue_table)
+
+    if output is not None:
+        write_2d_animation_playtest_execution_guide(guide, output)
+        console.print(
+            Panel.fit(
+                f"Animation execution guide written to {output}",
+                title="Animation Playtest Execution Guide",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and guide.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-execution-guide")
+def validate_animation_playtest_execution_guide_command(
+    guide_path: Path = ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the execution guide matches current QA artifacts."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_execution_guide(
+        guide_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Execution Guide Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Execution Guide", validation.path)
+    table.add_row("Expected Steps", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Execution Guide Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation execution guide artifact is stale or incomplete.",
+                title="Animation Playtest Execution Guide",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation execution guide matches the current QA package.",
+            title="Animation Playtest Execution Guide",
+            border_style="green",
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -3188,6 +3357,7 @@ def prepare_animation_playtest_session_command(
     triage_output: Path = ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION,
     release_gate_output: Path = ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION,
     progress_output: Path = ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION,
+    execution_guide_output: Path = ANIMATION_PLAYTEST_SESSION_EXECUTION_GUIDE_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -3366,6 +3536,32 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    execution_guide = build_2d_animation_playtest_execution_guide(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        progress_path=progress_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_execution_guide(execution_guide, execution_guide_output)
+    execution_guide_validation = validate_2d_animation_playtest_execution_guide(
+        execution_guide_output,
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        progress_path=progress_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -3378,6 +3574,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("UI Triage", str(triage_output))
     session_table.add_row("Release Gate", str(release_gate_output))
     session_table.add_row("Progress Board", str(progress_output))
+    session_table.add_row("Execution Guide", str(execution_guide_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
@@ -3390,6 +3587,8 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Progress", f"{progress_board.completion_percent}%")
     session_table.add_row("Progress Artifact", progress_validation.status.upper())
     session_table.add_row("Progress Open Items", str(progress_board.open_item_count))
+    session_table.add_row("Execution Guide Artifact", execution_guide_validation.status.upper())
+    session_table.add_row("Execution Guide Steps", str(len(execution_guide.recorder_steps)))
     session_table.add_row("Blocking Checks", str(release_gate.blocking_check_count))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())

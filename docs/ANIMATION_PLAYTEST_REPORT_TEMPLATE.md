@@ -13,7 +13,7 @@ uv run nexus-tech validate-animation-playtest-recorder-queue /tmp/nexus-tech-ani
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --execution-guide-output /tmp/nexus-tech-animation-execution-guide.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech animation-playtest-ui-triage /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-ui-triage.md
@@ -22,15 +22,17 @@ uv run nexus-tech animation-playtest-release-gate /tmp/nexus-tech-animation-play
 uv run nexus-tech validate-animation-playtest-release-gate /tmp/nexus-tech-animation-release-gate.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-progress /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-progress.md
 uv run nexus-tech validate-animation-playtest-progress /tmp/nexus-tech-animation-progress.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md
+uv run nexus-tech animation-playtest-execution-guide /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --progress-path /tmp/nexus-tech-animation-progress.md --output /tmp/nexus-tech-animation-execution-guide.md
+uv run nexus-tech validate-animation-playtest-execution-guide /tmp/nexus-tech-animation-execution-guide.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --progress-path /tmp/nexus-tech-animation-progress.md
 ```
 
 If the tester shell does not have `uv`, add
 `--command-prefix .venv313/bin/nexus-tech` to the command queue, command
 validation, plan, recorder queue, route-batches, route-batch validation, UI
 triage, UI triage validation, release gate, release gate validation, progress,
-progress validation, plan validation, session setup, session validation, and
-handoff commands so the exported visible-window route uses the same launcher the
-tester can actually run.
+progress validation, execution guide, execution guide validation, plan
+validation, session setup, session validation, and handoff commands so the
+exported visible-window route uses the same launcher the tester can actually run.
 
 Use the UI triage artifact to keep layout, typography, control, scene, motion,
 and signoff issues separated into P0/P1/P2 lanes before the next polish pass.
@@ -40,6 +42,9 @@ Its `Next Manual Action` section is the safest place to pick up the next
 visible-window command plus matching recorder command.
 Use the progress board when the tester needs completion percentage and open
 manual lanes beside the gate. It is advisory only and does not record evidence.
+Use the execution guide when the tester needs each open visible command paired
+with required terms, evidence prompts, and recorder commands. It still requires
+real visible-window observations before recording evidence.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

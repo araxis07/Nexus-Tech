@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.206.0 - 2026-06-30
+
+- Added `animation-playtest-execution-guide` and `validate-animation-playtest-execution-guide` to turn the current progress board and recorder queue into a step-by-step manual QA operator guide
+- Extended `prepare-animation-playtest-session` to generate and validate the execution guide alongside the progress board, release gate, UI triage, route batches, recorder queue, plan, command queue, report, and handoff
+- Updated docs and regression coverage so stale execution guides fail validation while recorder placeholders still require real visible-window tester observations
+
 ## 0.205.0 - 2026-06-30
 
 - Added `animation-playtest-progress` and `validate-animation-playtest-progress` to summarize manual animation QA completion, open lanes, P0/P1 status, and the next manual action without recording tester evidence

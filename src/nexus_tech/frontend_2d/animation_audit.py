@@ -1094,6 +1094,45 @@ class AnimationPlaytestProgressBoardValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestExecutionGuide:
+    """Operator guide for completing manual animation QA from current artifacts."""
+
+    progress: AnimationPlaytestProgressBoard
+    recorder_steps: tuple[AnimationPlaytestRecorderHint, ...]
+    progress_path: str
+    scenario_id: str
+    seed: int
+    command_prefix: str
+
+    @property
+    def status(self) -> str:
+        """Return the current manual QA status."""
+
+        return self.progress.status
+
+    @property
+    def open_step_count(self) -> int:
+        """Return recorder steps that still require manual action."""
+
+        return sum(1 for step in self.recorder_steps if step.status != "pass")
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestExecutionGuideValidation:
+    """Validation result for an exported manual animation execution guide."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the execution guide matches current artifacts."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1300,6 +1339,10 @@ _ANIMATION_RELEASE_GATE_POLICY_LINE = (
 )
 _ANIMATION_PROGRESS_POLICY_LINE = (
     "- Progress policy: `progress board is advisory and does not record tester evidence`"
+)
+_ANIMATION_EXECUTION_GUIDE_POLICY_LINE = (
+    "- Execution policy: `run visible commands first; recorder placeholders require "
+    "real tester observations`"
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
     {
@@ -2938,6 +2981,310 @@ def validate_2d_animation_playtest_progress_board(
     )
 
 
+def build_2d_animation_playtest_execution_guide(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    progress_path: Path = Path("/tmp/nexus-tech-animation-progress.md"),
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestExecutionGuide:
+    """Build the manual animation execution guide without recording evidence."""
+
+    progress = build_2d_animation_playtest_progress_board(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    recorder_steps = build_2d_animation_playtest_recorder_queue(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    return AnimationPlaytestExecutionGuide(
+        progress=progress,
+        recorder_steps=recorder_steps,
+        progress_path=str(progress_path),
+        scenario_id=scenario_id,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+
+def write_2d_animation_playtest_execution_guide(
+    guide: AnimationPlaytestExecutionGuide,
+    output_path: Path,
+) -> None:
+    """Write a manual animation QA operator guide as Markdown."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    progress = guide.progress
+    gate = progress.release_gate
+    route_batch_args = (
+        ""
+        if gate.session.route_batches is None
+        else f" --route-batches {_shell_arg(gate.session.route_batches.path)}"
+    )
+    validation_context_args = (
+        f" --scenario {_shell_arg(guide.scenario_id)}"
+        f" --seed {guide.seed}"
+        f" --command-prefix {_shell_arg(guide.command_prefix)}"
+    )
+    progress_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-progress "
+        f"{_shell_arg(guide.progress_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f"{validation_context_args}"
+    )
+    guide_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-execution-guide "
+        f"{_shell_arg(output_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f"{validation_context_args}"
+    )
+    report_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-report "
+        f"{_shell_arg(gate.session.report.path)}"
+    )
+    lines = [
+        "# NEXUS TECH 2D Animation Execution Guide",
+        "",
+        f"- Status: `{guide.status}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Open progress items: `{progress.open_item_count}`",
+        f"- Open recorder steps: `{guide.open_step_count}`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Plan: `{gate.session.plan.path}`",
+        f"- Recorder queue: `{gate.session.recorder_queue.path}`",
+        f"- Progress board: `{guide.progress_path}`",
+        f"- Next manual area: `{gate.recorder_hint.area}`",
+        f"- Next manual target: `{gate.recorder_hint.target}`",
+        (
+            "- Completion gate: "
+            "`record real visible-window evidence, then rerun progress, release-gate, "
+            "and report validators`"
+        ),
+        _ANIMATION_EXECUTION_GUIDE_POLICY_LINE,
+        "",
+        "## Operator Loop",
+        "",
+        "| Step | Action | Required Result |",
+        "| ---: | --- | --- |",
+        (
+            "| 1 | Run the visible command for the current row when one is listed. | "
+            "Game window opens at the expected size and motion mode. |"
+        ),
+        (
+            "| 2 | Observe layout, text, controls, scene motion, and feedback without "
+            "editing placeholders first. | Notes describe what was actually visible. |"
+        ),
+        (
+            "| 3 | Run the recorder command with real notes replacing the placeholder text. | "
+            "The report row changes from todo to the observed result. |"
+        ),
+        (
+            "| 4 | Rerun progress and release-gate validators. | "
+            "The next open lane or next manual action advances. |"
+        ),
+        "",
+        "## Execution Queue",
+        "",
+        (
+            "| Step | Phase | Status | Area | Target | Visible Command | Required Terms | "
+            "Evidence Prompt | Recorder Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for index, hint in enumerate(guide.recorder_steps, start=1):
+        required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+        visible_command = hint.visible_command or "-"
+        lines.append(
+            "| "
+            f"{index} | "
+            f"{_markdown_table_cell(_execution_phase_for_area(hint.area))} | "
+            f"`{hint.status}` | "
+            f"{_markdown_table_cell(hint.area)} | "
+            f"{_markdown_table_cell(hint.target)} | "
+            f"`{_markdown_table_cell(visible_command)}` | "
+            f"{_markdown_table_cell(required_terms)} | "
+            f"{_markdown_table_cell(hint.evidence_prompt)} | "
+            f"`{_markdown_table_cell(hint.recorder_command)}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Validation Commands",
+            "",
+            "```bash",
+            progress_validation_command,
+            guide_validation_command,
+            report_validation_command,
+            "```",
+            "",
+            "## Guide Rules",
+            "",
+            "- This guide does not complete the manual pass by itself.",
+            "- Do not run recorder commands with placeholder text.",
+            "- If a row fails visually, record the actual failure and keep release blocked.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_execution_guide(
+    guide_path: Path,
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    progress_path: Path = Path("/tmp/nexus-tech-animation-progress.md"),
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestExecutionGuideValidation:
+    """Validate that an execution guide matches the current QA package."""
+
+    text = guide_path.read_text(encoding="utf-8")
+    guide = build_2d_animation_playtest_execution_guide(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    progress = guide.progress
+    gate = progress.release_gate
+    route_batch_args = (
+        ""
+        if gate.session.route_batches is None
+        else f" --route-batches {_shell_arg(gate.session.route_batches.path)}"
+    )
+    validation_context_args = (
+        f" --scenario {_shell_arg(guide.scenario_id)}"
+        f" --seed {guide.seed}"
+        f" --command-prefix {_shell_arg(guide.command_prefix)}"
+    )
+    progress_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-progress "
+        f"{_shell_arg(guide.progress_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f"{validation_context_args}"
+    )
+    guide_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-execution-guide "
+        f"{_shell_arg(guide_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f"{validation_context_args}"
+    )
+    report_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-report "
+        f"{_shell_arg(gate.session.report.path)}"
+    )
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Execution Guide",
+        f"- Status: `{guide.status}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Open progress items: `{progress.open_item_count}`",
+        f"- Open recorder steps: `{guide.open_step_count}`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Plan: `{gate.session.plan.path}`",
+        f"- Recorder queue: `{gate.session.recorder_queue.path}`",
+        f"- Progress board: `{guide.progress_path}`",
+        f"- Next manual area: `{gate.recorder_hint.area}`",
+        f"- Next manual target: `{gate.recorder_hint.target}`",
+        (
+            "- Completion gate: "
+            "`record real visible-window evidence, then rerun progress, release-gate, "
+            "and report validators`"
+        ),
+        _ANIMATION_EXECUTION_GUIDE_POLICY_LINE,
+        progress_validation_command,
+        guide_validation_command,
+        report_validation_command,
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing execution guide guard: {line}")
+
+    rows = _extract_markdown_table_rows(text)
+    execution_rows = tuple(row for row in rows if len(row) >= 9 and row[0].isdigit())
+    if len(execution_rows) != len(guide.recorder_steps):
+        findings.append(
+            f"expected {len(guide.recorder_steps)} execution rows, found {len(execution_rows)}"
+        )
+
+    rows_by_step: dict[int, tuple[str, ...]] = {}
+    for row in execution_rows:
+        step = int(row[0])
+        if step in rows_by_step:
+            findings.append(f"duplicate execution guide step: {step}")
+            continue
+        rows_by_step[step] = row
+
+    for index, hint in enumerate(guide.recorder_steps, start=1):
+        row = rows_by_step.get(index)
+        if row is None:
+            findings.append(f"missing execution guide row: {index}")
+            continue
+        _validate_execution_guide_row(findings, index, row, hint)
+
+    return AnimationPlaytestExecutionGuideValidation(
+        path=str(guide_path),
+        expected_count=len(guide.recorder_steps),
+        findings=tuple(findings),
+    )
+
+
 def _animation_ui_triage_profile(area: str) -> tuple[str, str, str]:
     return _ANIMATION_UI_TRIAGE_PROFILES.get(
         area,
@@ -3035,6 +3382,57 @@ def _validate_progress_lane_row(
     for field, actual, expected in expected_values:
         if _normalize_report_key(actual) != _normalize_report_key(expected):
             findings.append(f"progress lane {lane.area} {field} is stale")
+
+
+def _execution_phase_for_area(area: str) -> str:
+    """Return the operator phase for one recorder area."""
+
+    if area == "Visible Route Evidence":
+        return "visible-route"
+    if area in {"Manual Window Matrix", "Window Matrix"}:
+        return "window-matrix"
+    if area == "Control Clarity Results":
+        return "control"
+    if area == "Scene Results":
+        return "scene"
+    if area == "Game Feel Results":
+        return "game-feel"
+    if area in {"Build", "Release Blockers", "Decision", "Signoff Fields", "Report Field"}:
+        return "signoff"
+    if area == "Command Queue":
+        return "artifact"
+    return "cleanup"
+
+
+def _validate_execution_guide_row(
+    findings: list[str],
+    index: int,
+    row: tuple[str, ...],
+    hint: AnimationPlaytestRecorderHint,
+) -> None:
+    phase = row[1].replace(r"\|", "|").strip()
+    status = _strip_markdown_code(row[2])
+    area = row[3].replace(r"\|", "|").strip()
+    target = row[4].replace(r"\|", "|").strip()
+    visible_command = _strip_markdown_code(row[5]).replace(r"\|", "|")
+    required_terms = row[6].replace(r"\|", "|").strip()
+    evidence_prompt = row[7].replace(r"\|", "|").strip()
+    recorder_command = _strip_markdown_code(row[8]).replace(r"\|", "|")
+    expected_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    expected_visible_command = hint.visible_command or "-"
+    expected_values = (
+        ("phase", phase, _execution_phase_for_area(hint.area)),
+        ("status", status, hint.status),
+        ("area", area, hint.area),
+        ("target", target, hint.target),
+        ("visible command", visible_command, expected_visible_command),
+        ("required terms", required_terms, expected_terms),
+        ("evidence prompt", evidence_prompt, hint.evidence_prompt),
+        ("recorder command", recorder_command, hint.recorder_command),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"execution guide row {index} {field} is stale")
 
 
 def _validate_release_gate_row(

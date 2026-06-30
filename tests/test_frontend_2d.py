@@ -37,6 +37,7 @@ from nexus_tech.frontend_2d import (
     VisualAuditCell,
     VisualAuditReport,
     build_2d_animation_playtest_command_queue,
+    build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_prep_report,
     build_2d_animation_playtest_progress_board,
@@ -61,6 +62,7 @@ from nexus_tech.frontend_2d import (
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
+    validate_2d_animation_playtest_execution_guide,
     validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
@@ -71,6 +73,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
+    write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_progress_board,
@@ -7978,6 +7981,237 @@ def test_validate_animation_playtest_progress_command_accepts_current_artifact(
     assert "PASS" in result.output
 
 
+def _write_animation_playtest_execution_artifacts(
+    tmp_path: Path,
+    *,
+    seed: int = 17,
+) -> dict[str, Path]:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    plan_path = tmp_path / "manual-animation-plan.md"
+    recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    triage_path = tmp_path / "manual-animation-ui-triage.md"
+    progress_path = tmp_path / "manual-animation-progress.md"
+    guide_path = tmp_path / "manual-animation-execution-guide.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.206.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(seed=seed),
+        commands_path,
+    )
+    write_2d_animation_playtest_readiness_plan(
+        build_2d_animation_playtest_readiness_plan(report_path, commands_path, seed=seed),
+        plan_path,
+    )
+    write_2d_animation_playtest_recorder_queue(
+        build_2d_animation_playtest_recorder_queue(report_path, commands_path, seed=seed),
+        recorder_queue_path,
+    )
+    write_2d_animation_playtest_route_batch_plan(
+        build_2d_animation_playtest_route_batch_plan(report_path, commands_path, seed=seed),
+        route_batch_path,
+    )
+    write_2d_animation_playtest_ui_triage_plan(
+        build_2d_animation_playtest_ui_triage_plan(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            route_batch_path,
+            seed=seed,
+        ),
+        triage_path,
+    )
+    write_2d_animation_playtest_progress_board(
+        build_2d_animation_playtest_progress_board(
+            report_path,
+            commands_path,
+            plan_path,
+            recorder_queue_path,
+            triage_path,
+            route_batch_path,
+            seed=seed,
+        ),
+        progress_path,
+    )
+    return {
+        "report": report_path,
+        "commands": commands_path,
+        "plan": plan_path,
+        "recorder": recorder_queue_path,
+        "route_batches": route_batch_path,
+        "triage": triage_path,
+        "progress": progress_path,
+        "guide": guide_path,
+    }
+
+
+def test_write_animation_playtest_execution_guide_tracks_operator_steps(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+
+    guide = build_2d_animation_playtest_execution_guide(
+        paths["report"],
+        paths["commands"],
+        paths["plan"],
+        paths["recorder"],
+        paths["triage"],
+        paths["route_batches"],
+        progress_path=paths["progress"],
+        seed=17,
+    )
+    write_2d_animation_playtest_execution_guide(guide, paths["guide"])
+    validation = validate_2d_animation_playtest_execution_guide(
+        paths["guide"],
+        paths["report"],
+        paths["commands"],
+        paths["plan"],
+        paths["recorder"],
+        paths["triage"],
+        paths["route_batches"],
+        progress_path=paths["progress"],
+        seed=17,
+    )
+
+    text = paths["guide"].read_text(encoding="utf-8")
+    assert guide.status == "manual-required"
+    assert guide.open_step_count > 0
+    assert validation.status == "pass"
+    assert validation.expected_count == len(guide.recorder_steps)
+    assert "# NEXUS TECH 2D Animation Execution Guide" in text
+    assert "## Operator Loop" in text
+    assert "## Execution Queue" in text
+    assert "visible-route" in text
+    assert "window-matrix" in text
+    assert "menu-2d --window-size 820x620 --motion-mode full" in text
+    assert "record-animation-playtest-route" in text
+    assert "validate-animation-playtest-progress" in text
+    assert "run visible commands first" in text
+
+
+def test_validate_animation_playtest_execution_guide_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+    write_2d_animation_playtest_execution_guide(
+        build_2d_animation_playtest_execution_guide(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            seed=17,
+        ),
+        paths["guide"],
+    )
+    paths["guide"].write_text(
+        paths["guide"]
+        .read_text(encoding="utf-8")
+        .replace(
+            "visible-route",
+            "visible-drift",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_execution_guide(
+        paths["guide"],
+        paths["report"],
+        paths["commands"],
+        paths["plan"],
+        paths["recorder"],
+        paths["triage"],
+        paths["route_batches"],
+        progress_path=paths["progress"],
+        seed=17,
+    )
+
+    assert validation.status == "fail"
+    assert "execution guide row 1 phase is stale" in validation.findings
+
+
+def test_animation_playtest_execution_guide_command_writes_artifact(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-execution-guide",
+            str(paths["report"]),
+            str(paths["commands"]),
+            str(paths["plan"]),
+            str(paths["recorder"]),
+            str(paths["triage"]),
+            "--route-batches",
+            str(paths["route_batches"]),
+            "--progress-path",
+            str(paths["progress"]),
+            "--seed",
+            "17",
+            "--output",
+            str(paths["guide"]),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Execution Guide" in result.output
+    assert "Execution Queue" in result.output
+    assert paths["guide"].exists()
+    assert "## Operator Loop" in paths["guide"].read_text(encoding="utf-8")
+
+
+def test_validate_animation_playtest_execution_guide_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+    write_2d_animation_playtest_execution_guide(
+        build_2d_animation_playtest_execution_guide(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            seed=17,
+        ),
+        paths["guide"],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-execution-guide",
+            str(paths["guide"]),
+            str(paths["report"]),
+            str(paths["commands"]),
+            str(paths["plan"]),
+            str(paths["recorder"]),
+            str(paths["triage"]),
+            "--route-batches",
+            str(paths["route_batches"]),
+            "--progress-path",
+            str(paths["progress"]),
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Execution Guide Validation" in result.output
+    assert "PASS" in result.output
+
+
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -8199,6 +8433,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     triage_path = tmp_path / "manual-animation-ui-triage.md"
     release_gate_path = tmp_path / "manual-animation-release-gate.md"
     progress_path = tmp_path / "manual-animation-progress.md"
+    execution_guide_path = tmp_path / "manual-animation-execution-guide.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
@@ -8225,6 +8460,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(release_gate_path),
             "--progress-output",
             str(progress_path),
+            "--execution-guide-output",
+            str(execution_guide_path),
             "--handoff-output",
             str(handoff_path),
             "--commit",
@@ -8250,6 +8487,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Release Gate Artifact" in result.output
     assert "Progress Artifact" in result.output
     assert "Progress Open Items" in result.output
+    assert "Execution Guide Artifact" in result.output
+    assert "Execution Guide Steps" in result.output
     assert "Blocking Checks" in result.output
     assert report_path.exists()
     assert commands_path.exists()
@@ -8259,6 +8498,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert triage_path.exists()
     assert release_gate_path.exists()
     assert progress_path.exists()
+    assert execution_guide_path.exists()
     assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
@@ -8268,6 +8508,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     triage_text = triage_path.read_text(encoding="utf-8")
     release_gate_text = release_gate_path.read_text(encoding="utf-8")
     progress_text = progress_path.read_text(encoding="utf-8")
+    execution_guide_text = execution_guide_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: abc1234" in report_text
     assert "- Tester: araxis07" in report_text
@@ -8309,6 +8550,10 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "- Release gate status: `manual-required`" in progress_text
     assert "Manual Route Evidence" in progress_text
     assert "does not record tester evidence" in progress_text
+    assert "# NEXUS TECH 2D Animation Execution Guide" in execution_guide_text
+    assert "## Operator Loop" in execution_guide_text
+    assert "## Execution Queue" in execution_guide_text
+    assert "run visible commands first" in execution_guide_text
     assert "- Handoff status: `manual-required`" in handoff_text
     assert "- Route batches: `" in handoff_text
     assert "| Route batches | `pass` |" in handoff_text
