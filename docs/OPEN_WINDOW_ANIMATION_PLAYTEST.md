@@ -27,13 +27,15 @@ uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-pla
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech animation-playtest-ui-triage /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-ui-triage.md
 uv run nexus-tech validate-animation-playtest-ui-triage /tmp/nexus-tech-animation-ui-triage.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-release-gate /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-release-gate.md
 uv run nexus-tech validate-animation-playtest-release-gate /tmp/nexus-tech-animation-release-gate.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md
+uv run nexus-tech animation-playtest-progress /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-progress.md
+uv run nexus-tech validate-animation-playtest-progress /tmp/nexus-tech-animation-progress.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 ```
 
 If the shell does not have `uv`, add `--command-prefix .venv313/bin/nexus-tech`
@@ -44,6 +46,7 @@ to `animation-playtest-commands`, `validate-animation-playtest-commands`,
 `animation-playtest-route-batches`, `validate-animation-playtest-route-batches`,
 `animation-playtest-ui-triage`, `validate-animation-playtest-ui-triage`,
 `animation-playtest-release-gate`, `validate-animation-playtest-release-gate`,
+`animation-playtest-progress`, `validate-animation-playtest-progress`,
 `validate-animation-playtest-plan`, `prepare-animation-playtest-session`,
 `validate-animation-playtest-session`, and `animation-playtest-handoff`.
 The command queue and validators must use the same prefix.
@@ -117,6 +120,9 @@ final go/no-go artifact. It remains `blocked` for stale artifacts and
 `manual-required` until the report validates and all P0/P1 lanes are clear. Its
 `Next Manual Action` section also shows the next visible command, required
 evidence terms, and matching recorder command.
+Use `animation-playtest-progress` when the tester needs a completion percentage,
+open manual lanes, and the same next manual action in one board. The progress
+board is advisory only; it does not record or replace real tester evidence.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

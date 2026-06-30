@@ -1014,6 +1014,86 @@ class AnimationPlaytestReleaseGateValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestProgressLane:
+    """One progress lane for the manual animation QA board."""
+
+    area: str
+    status: str
+    total_items: int
+    open_items: int
+    next_action: str
+
+    @property
+    def completed_items(self) -> int:
+        """Return completed work items without allowing negative counts."""
+
+        return max(0, self.total_items - self.open_items)
+
+    @property
+    def completion_percent(self) -> int:
+        """Return a whole-number completion percentage for this lane."""
+
+        if self.total_items <= 0:
+            return 100
+        return round(self.completed_items * 100 / self.total_items)
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestProgressBoard:
+    """Manual animation QA progress board derived from current artifacts."""
+
+    release_gate: AnimationPlaytestReleaseGate
+    lanes: tuple[AnimationPlaytestProgressLane, ...]
+
+    @property
+    def status(self) -> str:
+        """Return release status without completing manual evidence."""
+
+        return self.release_gate.status
+
+    @property
+    def total_item_count(self) -> int:
+        """Return all tracked progress items across lanes."""
+
+        return sum(lane.total_items for lane in self.lanes)
+
+    @property
+    def open_item_count(self) -> int:
+        """Return unresolved work items across progress lanes."""
+
+        return sum(lane.open_items for lane in self.lanes)
+
+    @property
+    def completed_item_count(self) -> int:
+        """Return completed work items across progress lanes."""
+
+        return sum(lane.completed_items for lane in self.lanes)
+
+    @property
+    def completion_percent(self) -> int:
+        """Return weighted progress completion across all lanes."""
+
+        if self.total_item_count <= 0:
+            return 100
+        return round(self.completed_item_count * 100 / self.total_item_count)
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestProgressBoardValidation:
+    """Validation result for an exported animation progress board artifact."""
+
+    path: str
+    expected_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the progress board matches current artifacts."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1218,6 +1298,9 @@ _ANIMATION_UI_TRIAGE_POLICY_LINE = (
 _ANIMATION_RELEASE_GATE_POLICY_LINE = (
     "- Release policy: `no animation release while the gate is blocked or manual-required`"
 )
+_ANIMATION_PROGRESS_POLICY_LINE = (
+    "- Progress policy: `progress board is advisory and does not record tester evidence`"
+)
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
     {
         "Session Artifacts",
@@ -1227,6 +1310,22 @@ _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
         "Release Decision",
     }
 )
+_PROGRESS_BOARD_LANES: tuple[str, ...] = (
+    "Automated Gates",
+    "Manual Window Matrix",
+    "Manual Route Evidence",
+    "Manual Control Checks",
+    "Manual Scene Checks",
+    "Manual Game Feel",
+    "Manual Evidence Notes",
+    "Signoff Fields",
+    "Template Cleanup",
+    "Session Artifacts",
+    "UI Triage Artifact",
+    "P0/P1 UI Lanes",
+    "Release Gate",
+)
+_PROGRESS_BOARD_LANE_NAMES: frozenset[str] = frozenset(_PROGRESS_BOARD_LANES)
 
 _TEMPLATE_EVIDENCE_PROMPT_KEYS: tuple[str, ...] = (
     "pass notes must mention",
@@ -2539,6 +2638,306 @@ def validate_2d_animation_playtest_release_gate(
     )
 
 
+def build_2d_animation_playtest_progress_board(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestProgressBoard:
+    """Build a manual animation progress board without recording tester evidence."""
+
+    gate = build_2d_animation_playtest_release_gate(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    route = build_2d_animation_playtest_command_queue(
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    report_areas = {
+        area.area: area for area in summarize_2d_animation_playtest_report(gate.session.report)
+    }
+    report_lane_totals = _animation_progress_report_lane_totals(
+        route_count=len(route),
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+    lanes: list[AnimationPlaytestProgressLane] = []
+    for lane_name in _PROGRESS_BOARD_LANES:
+        if lane_name in report_lane_totals:
+            area = report_areas.get(lane_name)
+            open_items = 0 if area is None else area.incomplete_count
+            total_items = max(report_lane_totals[lane_name], open_items)
+            lanes.append(
+                AnimationPlaytestProgressLane(
+                    area=lane_name,
+                    status="pass" if open_items == 0 else "manual-required",
+                    total_items=total_items,
+                    open_items=open_items,
+                    next_action=(
+                        "Current report lane is complete." if area is None else area.next_step
+                    ),
+                )
+            )
+            continue
+        if lane_name == "Session Artifacts":
+            lanes.append(
+                AnimationPlaytestProgressLane(
+                    area=lane_name,
+                    status="pass" if gate.session.artifact_status == "pass" else "blocked",
+                    total_items=max(1, len(gate.session.findings)),
+                    open_items=len(gate.session.findings),
+                    next_action=_release_gate_check_next_action(gate, lane_name),
+                )
+            )
+            continue
+        if lane_name == "UI Triage Artifact":
+            lanes.append(
+                AnimationPlaytestProgressLane(
+                    area=lane_name,
+                    status="pass" if gate.triage_validation.status == "pass" else "blocked",
+                    total_items=max(1, len(gate.triage_validation.findings)),
+                    open_items=len(gate.triage_validation.findings),
+                    next_action=_release_gate_check_next_action(gate, lane_name),
+                )
+            )
+            continue
+        if lane_name == "P0/P1 UI Lanes":
+            total_items = max(
+                1,
+                sum(1 for item in gate.triage.items if item.priority in {"P0", "P1"}),
+                gate.triage.blocker_count,
+            )
+            lanes.append(
+                AnimationPlaytestProgressLane(
+                    area=lane_name,
+                    status="pass" if gate.triage.blocker_count == 0 else "manual-required",
+                    total_items=total_items,
+                    open_items=gate.triage.blocker_count,
+                    next_action=_release_gate_check_next_action(gate, lane_name),
+                )
+            )
+            continue
+        lanes.append(
+            AnimationPlaytestProgressLane(
+                area=lane_name,
+                status=gate.status,
+                total_items=max(1, len(gate.checks)),
+                open_items=gate.blocking_check_count,
+                next_action=_release_gate_check_next_action(gate, "Release Decision"),
+            )
+        )
+
+    return AnimationPlaytestProgressBoard(
+        release_gate=gate,
+        lanes=tuple(lanes),
+    )
+
+
+def write_2d_animation_playtest_progress_board(
+    board: AnimationPlaytestProgressBoard,
+    output_path: Path,
+) -> None:
+    """Write the current manual animation QA progress board as Markdown."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    gate = board.release_gate
+    hint = gate.recorder_hint
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    lines = [
+        "# NEXUS TECH 2D Animation Progress Board",
+        "",
+        f"- Status: `{board.status}`",
+        f"- Completion: `{board.completion_percent}%`",
+        f"- Completed items: `{board.completed_item_count}`",
+        f"- Open work items: `{board.open_item_count}`",
+        f"- Total tracked items: `{board.total_item_count}`",
+        f"- Release gate status: `{gate.status}`",
+        f"- Artifact status: `{gate.artifact_status}`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Plan: `{gate.session.plan.path}`",
+        f"- Recorder queue: `{gate.session.recorder_queue.path}`",
+        *(
+            ()
+            if gate.session.route_batches is None
+            else (f"- Route batches: `{gate.session.route_batches.path}`",)
+        ),
+        f"- UI triage status: `{gate.triage.status}`",
+        f"- P0/P1 lanes: `{gate.triage.blocker_count}`",
+        f"- Blocking checks: `{gate.blocking_check_count}`",
+        f"- Next manual area: `{hint.area}`",
+        f"- Next manual target: `{hint.target}`",
+        (
+            "- Completion gate: "
+            "`validate-animation-playtest-report, validate-animation-playtest-ui-triage, "
+            "and validate-animation-playtest-release-gate must pass before release`"
+        ),
+        _ANIMATION_PROGRESS_POLICY_LINE,
+        "",
+        "## Progress Lanes",
+        "",
+        "| Lane | Status | Done | Open | Completion | Next Action |",
+        "| --- | --- | ---: | ---: | ---: | --- |",
+    ]
+    for lane in board.lanes:
+        lines.append(
+            "| "
+            f"{_markdown_table_cell(lane.area)} | "
+            f"`{lane.status}` | "
+            f"{lane.completed_items}/{lane.total_items} | "
+            f"{lane.open_items} | "
+            f"{lane.completion_percent}% | "
+            f"{_markdown_table_cell(lane.next_action)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Next Manual Action",
+            "",
+            (
+                "| Area | Target | Status | Required Terms | Evidence Prompt | "
+                "Visible Command | Recorder Command |"
+            ),
+            "| --- | --- | --- | --- | --- | --- | --- |",
+            (
+                "| "
+                f"{_markdown_table_cell(hint.area)} | "
+                f"{_markdown_table_cell(hint.target)} | "
+                f"`{hint.status}` | "
+                f"{_markdown_table_cell(required_terms)} | "
+                f"{_markdown_table_cell(hint.evidence_prompt)} | "
+                f"`{_markdown_table_cell(visible_command)}` | "
+                f"`{_markdown_table_cell(hint.recorder_command)}` |"
+            ),
+            "",
+            "## Board Rules",
+            "",
+            "- Use this board to decide the next manual QA target; do not attach it as evidence.",
+            "- Use the recorder command only after observing the visible-window command yourself.",
+            "- The release gate remains authoritative for go/no-go status.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_progress_board(
+    progress_path: Path,
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestProgressBoardValidation:
+    """Validate that a progress board artifact matches the current QA package."""
+
+    text = progress_path.read_text(encoding="utf-8")
+    board = build_2d_animation_playtest_progress_board(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    gate = board.release_gate
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Progress Board",
+        f"- Status: `{board.status}`",
+        f"- Completion: `{board.completion_percent}%`",
+        f"- Completed items: `{board.completed_item_count}`",
+        f"- Open work items: `{board.open_item_count}`",
+        f"- Total tracked items: `{board.total_item_count}`",
+        f"- Release gate status: `{gate.status}`",
+        f"- Artifact status: `{gate.artifact_status}`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Plan: `{gate.session.plan.path}`",
+        f"- Recorder queue: `{gate.session.recorder_queue.path}`",
+        f"- UI triage status: `{gate.triage.status}`",
+        f"- P0/P1 lanes: `{gate.triage.blocker_count}`",
+        f"- Blocking checks: `{gate.blocking_check_count}`",
+        f"- Next manual area: `{gate.recorder_hint.area}`",
+        f"- Next manual target: `{gate.recorder_hint.target}`",
+        (
+            "- Completion gate: "
+            "`validate-animation-playtest-report, validate-animation-playtest-ui-triage, "
+            "and validate-animation-playtest-release-gate must pass before release`"
+        ),
+        _ANIMATION_PROGRESS_POLICY_LINE,
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing progress board guard: {line}")
+    if gate.session.route_batches is not None:
+        route_line = f"- Route batches: `{gate.session.route_batches.path}`"
+        if route_line not in text:
+            findings.append(f"missing progress board guard: {route_line}")
+
+    rows = _extract_markdown_table_rows(text)
+    lane_rows = tuple(row for row in rows if len(row) >= 6 and row[0] in _PROGRESS_BOARD_LANE_NAMES)
+    if len(lane_rows) != len(board.lanes):
+        findings.append(f"expected {len(board.lanes)} progress lanes, found {len(lane_rows)}")
+
+    rows_by_lane = {row[0].replace(r"\|", "|").strip(): row for row in lane_rows}
+    for lane in board.lanes:
+        row = rows_by_lane.get(lane.area)
+        if row is None:
+            findings.append(f"missing progress lane: {lane.area}")
+            continue
+        _validate_progress_lane_row(findings, lane, row)
+
+    next_action_rows = tuple(
+        row for row in rows if len(row) >= 7 and row[0] == gate.recorder_hint.area
+    )
+    if len(next_action_rows) != 1:
+        findings.append("expected 1 progress board next-action row")
+    else:
+        _validate_release_gate_next_action(findings, gate.recorder_hint, next_action_rows[0])
+
+    return AnimationPlaytestProgressBoardValidation(
+        path=str(progress_path),
+        expected_count=len(board.lanes),
+        findings=tuple(findings),
+    )
+
+
 def _animation_ui_triage_profile(area: str) -> tuple[str, str, str]:
     return _ANIMATION_UI_TRIAGE_PROFILES.get(
         area,
@@ -2574,6 +2973,68 @@ def _validate_ui_triage_row(
     for field, actual, expected in expected_values:
         if _normalize_report_key(actual) != _normalize_report_key(expected):
             findings.append(f"ui triage row {item.step} {field} is stale")
+
+
+def _animation_progress_report_lane_totals(
+    *,
+    route_count: int,
+    windows: tuple[tuple[int, int], ...],
+    motion_modes: tuple[str, ...],
+) -> dict[str, int]:
+    """Return expected manual report item totals by progress lane."""
+
+    return {
+        "Automated Gates": len(REQUIRED_ANIMATION_PLAYTEST_AUTOMATED_GATES),
+        "Manual Window Matrix": len(windows) * len(motion_modes),
+        "Manual Route Evidence": route_count,
+        "Manual Control Checks": len(DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS),
+        "Manual Scene Checks": len(DEFAULT_OPEN_WINDOW_PLAYTEST_SCENE_CHECKS),
+        "Manual Game Feel": len(DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS),
+        "Manual Evidence Notes": 1,
+        "Signoff Fields": (
+            len(REQUIRED_ANIMATION_PLAYTEST_BUILD_FIELDS)
+            + len(REQUIRED_ANIMATION_PLAYTEST_BLOCKER_FIELDS)
+            + len(REQUIRED_ANIMATION_PLAYTEST_DECISION_FIELDS)
+            + 1
+        ),
+        "Template Cleanup": 4,
+    }
+
+
+def _release_gate_check_next_action(
+    gate: AnimationPlaytestReleaseGate,
+    check_name: str,
+) -> str:
+    """Return the current release-gate next action for one check."""
+
+    for check in gate.checks:
+        if check.name == check_name:
+            return check.next_action
+    return "Review the current release gate before continuing."
+
+
+def _validate_progress_lane_row(
+    findings: list[str],
+    lane: AnimationPlaytestProgressLane,
+    row: tuple[str, ...],
+) -> None:
+    area = row[0].replace(r"\|", "|").strip()
+    status = _strip_markdown_code(row[1])
+    done = row[2].strip()
+    open_items = row[3].strip()
+    completion = row[4].strip()
+    next_action = row[5].replace(r"\|", "|").strip()
+    expected_values = (
+        ("lane", area, lane.area),
+        ("status", status, lane.status),
+        ("done", done, f"{lane.completed_items}/{lane.total_items}"),
+        ("open", open_items, str(lane.open_items)),
+        ("completion", completion, f"{lane.completion_percent}%"),
+        ("next action", next_action, lane.next_action),
+    )
+    for field, actual, expected in expected_values:
+        if _normalize_report_key(actual) != _normalize_report_key(expected):
+            findings.append(f"progress lane {lane.area} {field} is stale")
 
 
 def _validate_release_gate_row(

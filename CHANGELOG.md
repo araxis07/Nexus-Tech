@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.205.0 - 2026-06-30
+
+- Added `animation-playtest-progress` and `validate-animation-playtest-progress` to summarize manual animation QA completion, open lanes, P0/P1 status, and the next manual action without recording tester evidence
+- Extended `prepare-animation-playtest-session` to generate and validate the progress board alongside the report, command queue, plan, recorder queue, route batches, UI triage, release gate, and handoff
+- Updated docs and regression coverage so stale progress boards fail validation while the release remains manual-required until real open-window evidence is recorded
+
 ## 0.204.0 - 2026-06-30
 
 - Extended the animation release gate with a validated `Next Manual Action` section that pairs the next visible-window command with the matching recorder command

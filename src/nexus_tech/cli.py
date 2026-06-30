@@ -68,6 +68,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_prep_report,
+    build_2d_animation_playtest_progress_board,
     build_2d_animation_playtest_readiness_plan,
     build_2d_animation_playtest_recorder_hint,
     build_2d_animation_playtest_recorder_queue,
@@ -88,6 +89,7 @@ from nexus_tech.frontend_2d import (
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
+    validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
     validate_2d_animation_playtest_release_gate,
@@ -99,6 +101,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_command_queue,
     write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_prep_report,
+    write_2d_animation_playtest_progress_board,
     write_2d_animation_playtest_readiness_plan,
     write_2d_animation_playtest_recorder_queue,
     write_2d_animation_playtest_release_gate,
@@ -399,6 +402,11 @@ ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION = typer.Option(
     "--release-gate-output",
     help="Markdown path for the manual animation release gate.",
 )
+ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-progress.md"),
+    "--progress-output",
+    help="Markdown path for the manual animation QA progress board.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -482,6 +490,17 @@ ANIMATION_PLAYTEST_RELEASE_GATE_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the animation release gate.",
+)
+ANIMATION_PLAYTEST_PROGRESS_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation progress board Markdown file.",
+)
+ANIMATION_PLAYTEST_PROGRESS_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation progress board.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -2599,6 +2618,174 @@ def validate_animation_playtest_release_gate_command(
     )
 
 
+@app.command("animation-playtest-progress")
+def animation_playtest_progress_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_PROGRESS_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show manual animation QA progress without recording tester evidence."""
+
+    validate_scenario_id(scenario)
+    board = build_2d_animation_playtest_progress_board(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    summary_table = Table(title="Animation Playtest Progress")
+    summary_table.add_column("Field", style="cyan")
+    summary_table.add_column("Value")
+    summary_table.add_row("Status", board.status.upper())
+    summary_table.add_row("Completion", f"{board.completion_percent}%")
+    summary_table.add_row("Completed Items", str(board.completed_item_count))
+    summary_table.add_row("Open Work Items", str(board.open_item_count))
+    summary_table.add_row("Total Tracked Items", str(board.total_item_count))
+    summary_table.add_row("Release Gate", board.release_gate.status.upper())
+    summary_table.add_row("Manual Result", board.release_gate.manual_result)
+    console.print(summary_table)
+
+    lanes_table = Table(title="Progress Lanes")
+    lanes_table.add_column("Lane", style="cyan")
+    lanes_table.add_column("Status")
+    lanes_table.add_column("Done", justify="right")
+    lanes_table.add_column("Open", justify="right")
+    lanes_table.add_column("Completion", justify="right")
+    lanes_table.add_column("Next Action")
+    for lane in board.lanes:
+        lanes_table.add_row(
+            lane.area,
+            lane.status.upper(),
+            f"{lane.completed_items}/{lane.total_items}",
+            str(lane.open_items),
+            f"{lane.completion_percent}%",
+            lane.next_action,
+        )
+    console.print(lanes_table)
+
+    hint = board.release_gate.recorder_hint
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    next_table = Table(title="Next Manual Action")
+    next_table.add_column("Field", style="cyan")
+    next_table.add_column("Value")
+    next_table.add_row("Area", hint.area)
+    next_table.add_row("Target", hint.target)
+    next_table.add_row("Status", hint.status.upper())
+    next_table.add_row("Required Terms", required_terms)
+    next_table.add_row("Evidence Prompt", hint.evidence_prompt)
+    next_table.add_row("Visible Command", visible_command)
+    next_table.add_row("Recorder Command", hint.recorder_command)
+    console.print(next_table)
+
+    console.print(
+        Panel.fit(
+            (
+                f"Manual animation progress: {board.completion_percent}% complete | "
+                f"{board.open_item_count} open work item(s)."
+            ),
+            title="Animation Playtest Progress",
+            border_style="green" if board.status == "pass" else "yellow",
+        )
+    )
+
+    if output is not None:
+        write_2d_animation_playtest_progress_board(board, output)
+        console.print(
+            Panel.fit(
+                f"Animation progress board written to {output}",
+                title="Animation Playtest Progress",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and board.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-progress")
+def validate_animation_playtest_progress_command(
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the animation progress board matches current QA artifacts."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_progress_board(
+        progress_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Progress Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Progress Board", validation.path)
+    table.add_row("Expected Lanes", str(validation.expected_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Progress Board Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation progress board artifact is stale or incomplete.",
+                title="Animation Playtest Progress",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation progress board matches the current QA package.",
+            title="Animation Playtest Progress",
+            border_style="green",
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -3000,6 +3187,7 @@ def prepare_animation_playtest_session_command(
     route_batch_output: Path = ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION,
     triage_output: Path = ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION,
     release_gate_output: Path = ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION,
+    progress_output: Path = ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -3154,6 +3342,30 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    progress_board = build_2d_animation_playtest_progress_board(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_progress_board(progress_board, progress_output)
+    progress_validation = validate_2d_animation_playtest_progress_board(
+        progress_output,
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -3165,6 +3377,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Route Batches", str(route_batch_output))
     session_table.add_row("UI Triage", str(triage_output))
     session_table.add_row("Release Gate", str(release_gate_output))
+    session_table.add_row("Progress Board", str(progress_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
@@ -3174,6 +3387,9 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("UI Triage Items", str(triage.open_item_count))
     session_table.add_row("Release Gate Status", release_gate.status.upper())
     session_table.add_row("Release Gate Artifact", release_gate_validation.status.upper())
+    session_table.add_row("Progress", f"{progress_board.completion_percent}%")
+    session_table.add_row("Progress Artifact", progress_validation.status.upper())
+    session_table.add_row("Progress Open Items", str(progress_board.open_item_count))
     session_table.add_row("Blocking Checks", str(release_gate.blocking_check_count))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
