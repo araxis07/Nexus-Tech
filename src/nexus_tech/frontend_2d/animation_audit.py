@@ -1204,6 +1204,53 @@ class AnimationPlaytestIssueBacklogValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestSprintPacket:
+    """One focused manual QA sprint derived from the current animation package."""
+
+    execution_guide: AnimationPlaytestExecutionGuide
+    issue_backlog: AnimationPlaytestIssueBacklog
+    execution_guide_path: str
+    issue_backlog_path: str
+    observation_steps: tuple[AnimationPlaytestRecorderHint, ...]
+    blocker_issues: tuple[AnimationPlaytestIssue, ...]
+    max_observation_steps: int
+
+    @property
+    def status(self) -> str:
+        """Return the current sprint status without completing manual evidence."""
+
+        return self.execution_guide.status
+
+    @property
+    def open_observation_count(self) -> int:
+        """Return visible/manual observation steps included in this sprint."""
+
+        return len(self.observation_steps)
+
+    @property
+    def blocker_count(self) -> int:
+        """Return P0/P1 issue count carried into this sprint."""
+
+        return len(self.blocker_issues)
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestSprintPacketValidation:
+    """Validation result for an exported manual animation sprint packet."""
+
+    path: str
+    expected_observation_count: int
+    expected_blocker_count: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the sprint packet matches current artifacts."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1418,6 +1465,10 @@ _ANIMATION_EXECUTION_GUIDE_POLICY_LINE = (
 _ANIMATION_ISSUE_BACKLOG_POLICY_LINE = (
     "- Backlog policy: `derived from the manual report; it never replaces visible-window "
     "tester evidence`"
+)
+_ANIMATION_SPRINT_POLICY_LINE = (
+    "- Sprint policy: `observe visible commands before recorder commands; P0/P1 blockers "
+    "stay open until real evidence and validators clear them`"
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
     {
@@ -3600,6 +3651,373 @@ def validate_2d_animation_playtest_issue_backlog(
     )
 
 
+def build_2d_animation_playtest_sprint_packet(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    progress_path: Path = Path("/tmp/nexus-tech-animation-progress.md"),
+    execution_guide_path: Path = Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    issue_backlog_path: Path = Path("/tmp/nexus-tech-animation-issues.md"),
+    max_observation_steps: int = 12,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestSprintPacket:
+    """Build a focused manual animation QA sprint without recording evidence."""
+
+    guide = build_2d_animation_playtest_execution_guide(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    backlog = build_2d_animation_playtest_issue_backlog(report_path)
+    open_steps = tuple(step for step in guide.recorder_steps if step.status != "pass")
+    capped_count = max(1, max_observation_steps)
+    blocker_issues = tuple(issue for issue in backlog.issues if issue.priority in {"P0", "P1"})
+    return AnimationPlaytestSprintPacket(
+        execution_guide=guide,
+        issue_backlog=backlog,
+        execution_guide_path=str(execution_guide_path),
+        issue_backlog_path=str(issue_backlog_path),
+        observation_steps=open_steps[:capped_count],
+        blocker_issues=blocker_issues,
+        max_observation_steps=capped_count,
+    )
+
+
+def write_2d_animation_playtest_sprint_packet(
+    sprint: AnimationPlaytestSprintPacket,
+    output_path: Path,
+) -> None:
+    """Write one focused manual animation QA sprint packet as Markdown."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    guide = sprint.execution_guide
+    progress = guide.progress
+    gate = progress.release_gate
+    route_batch_args = (
+        ""
+        if gate.session.route_batches is None
+        else f" --route-batches {_shell_arg(gate.session.route_batches.path)}"
+    )
+    validation_context_args = (
+        f" --scenario {_shell_arg(guide.scenario_id)}"
+        f" --seed {guide.seed}"
+        f" --command-prefix {_shell_arg(guide.command_prefix)}"
+    )
+    sprint_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-sprint "
+        f"{_shell_arg(output_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f" --execution-guide-path {_shell_arg(sprint.execution_guide_path)}"
+        f" --issue-backlog-path {_shell_arg(sprint.issue_backlog_path)}"
+        f" --max-observation-steps {sprint.max_observation_steps}"
+        f"{validation_context_args}"
+    )
+    guide_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-execution-guide "
+        f"{_shell_arg(sprint.execution_guide_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f"{validation_context_args}"
+    )
+    backlog_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-issue-backlog "
+        f"{_shell_arg(sprint.issue_backlog_path)} {_shell_arg(sprint.issue_backlog.report.path)}"
+    )
+    report_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-report "
+        f"{_shell_arg(gate.session.report.path)}"
+    )
+    lines = [
+        "# NEXUS TECH 2D Animation Sprint Packet",
+        "",
+        f"- Status: `{sprint.status}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Progress board: `{guide.progress_path}`",
+        f"- Execution guide: `{sprint.execution_guide_path}`",
+        f"- Issue backlog: `{sprint.issue_backlog_path}`",
+        f"- Observation steps: `{sprint.open_observation_count}`",
+        f"- Max observation steps: `{sprint.max_observation_steps}`",
+        f"- P0/P1 blockers: `{sprint.blocker_count}`",
+        f"- Backlog status: `{sprint.issue_backlog.status}`",
+        f"- Next manual area: `{gate.recorder_hint.area}`",
+        f"- Next manual target: `{gate.recorder_hint.target}`",
+        _ANIMATION_SPRINT_POLICY_LINE,
+        "",
+        "## Sprint Order",
+        "",
+        "| Step | Action | Required Result |",
+        "| ---: | --- | --- |",
+        (
+            "| 1 | Work the observation queue from top to bottom. | "
+            "Visible window was inspected before editing report rows. |"
+        ),
+        (
+            "| 2 | Replace recorder placeholders only with real notes. | "
+            "Report rows move from todo/watch/fail based on observed behavior. |"
+        ),
+        (
+            "| 3 | Review the P0/P1 blocker queue after observation. | "
+            "Code fixes, risk decisions, or clear signoff fields are explicit. |"
+        ),
+        "| 4 | Run the validation commands. | Sprint, guide, backlog, and report status agree. |",
+        "",
+        "## Observation Queue",
+        "",
+        (
+            "| Step | Phase | Status | Area | Target | Visible Command | Required Terms | "
+            "Evidence Prompt | Recorder Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for index, hint in enumerate(sprint.observation_steps, start=1):
+        lines.append(_format_animation_sprint_observation_row(index, hint))
+    lines.extend(
+        [
+            "",
+            "## P0/P1 Blocker Queue",
+            "",
+            "| Priority | Status | Area | Target | Result | Evidence | Follow-up | Next Action |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for issue in sprint.blocker_issues:
+        lines.append(_format_animation_issue_row(issue))
+    lines.extend(
+        [
+            "",
+            "## Validation Commands",
+            "",
+            "```bash",
+            guide_validation_command,
+            backlog_validation_command,
+            sprint_validation_command,
+            report_validation_command,
+            "```",
+            "",
+            "## Sprint Rules",
+            "",
+            "- This packet is a work order, not release evidence.",
+            "- Visible commands must be observed before recorder commands are used.",
+            (
+                "- Leave P0/P1 blockers open when notes show a real UI, layout, "
+                "control, or motion defect."
+            ),
+            "- Regenerate this packet after every report edit or code fix.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_sprint_packet(
+    sprint_path: Path,
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    progress_path: Path = Path("/tmp/nexus-tech-animation-progress.md"),
+    execution_guide_path: Path = Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    issue_backlog_path: Path = Path("/tmp/nexus-tech-animation-issues.md"),
+    max_observation_steps: int = 12,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestSprintPacketValidation:
+    """Validate that a sprint packet matches the current animation QA package."""
+
+    text = sprint_path.read_text(encoding="utf-8")
+    sprint = build_2d_animation_playtest_sprint_packet(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    guide = sprint.execution_guide
+    progress = guide.progress
+    gate = progress.release_gate
+    route_batch_args = (
+        ""
+        if gate.session.route_batches is None
+        else f" --route-batches {_shell_arg(gate.session.route_batches.path)}"
+    )
+    validation_context_args = (
+        f" --scenario {_shell_arg(guide.scenario_id)}"
+        f" --seed {guide.seed}"
+        f" --command-prefix {_shell_arg(guide.command_prefix)}"
+    )
+    sprint_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-sprint "
+        f"{_shell_arg(sprint_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f" --execution-guide-path {_shell_arg(sprint.execution_guide_path)}"
+        f" --issue-backlog-path {_shell_arg(sprint.issue_backlog_path)}"
+        f" --max-observation-steps {sprint.max_observation_steps}"
+        f"{validation_context_args}"
+    )
+    guide_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-execution-guide "
+        f"{_shell_arg(sprint.execution_guide_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f"{validation_context_args}"
+    )
+    backlog_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-issue-backlog "
+        f"{_shell_arg(sprint.issue_backlog_path)} {_shell_arg(sprint.issue_backlog.report.path)}"
+    )
+    report_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-report "
+        f"{_shell_arg(gate.session.report.path)}"
+    )
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Sprint Packet",
+        f"- Status: `{sprint.status}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Command queue: `{gate.session.commands.path}`",
+        f"- Progress board: `{guide.progress_path}`",
+        f"- Execution guide: `{sprint.execution_guide_path}`",
+        f"- Issue backlog: `{sprint.issue_backlog_path}`",
+        f"- Observation steps: `{sprint.open_observation_count}`",
+        f"- Max observation steps: `{sprint.max_observation_steps}`",
+        f"- P0/P1 blockers: `{sprint.blocker_count}`",
+        f"- Backlog status: `{sprint.issue_backlog.status}`",
+        f"- Next manual area: `{gate.recorder_hint.area}`",
+        f"- Next manual target: `{gate.recorder_hint.target}`",
+        _ANIMATION_SPRINT_POLICY_LINE,
+        guide_validation_command,
+        backlog_validation_command,
+        sprint_validation_command,
+        report_validation_command,
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing sprint packet guard: {line}")
+
+    try:
+        guide_validation = validate_2d_animation_playtest_execution_guide(
+            execution_guide_path,
+            report_path,
+            command_path,
+            plan_path,
+            recorder_queue_path,
+            triage_path,
+            route_batch_path,
+            progress_path=progress_path,
+            scenario_id=scenario_id,
+            seed=seed,
+            windows=windows,
+            motion_modes=motion_modes,
+            command_prefix=command_prefix,
+        )
+    except FileNotFoundError:
+        findings.append(f"missing sprint execution guide artifact: {execution_guide_path}")
+    else:
+        findings.extend(f"execution guide: {finding}" for finding in guide_validation.findings)
+
+    try:
+        backlog_validation = validate_2d_animation_playtest_issue_backlog(
+            issue_backlog_path,
+            report_path,
+        )
+    except FileNotFoundError:
+        findings.append(f"missing sprint issue backlog artifact: {issue_backlog_path}")
+    else:
+        findings.extend(f"issue backlog: {finding}" for finding in backlog_validation.findings)
+
+    rows = _extract_markdown_table_rows(text)
+    observation_rows = tuple(row for row in rows if len(row) >= 9 and row[0].isdigit())
+    if len(observation_rows) != len(sprint.observation_steps):
+        findings.append(
+            f"expected {len(sprint.observation_steps)} sprint observation rows, "
+            f"found {len(observation_rows)}"
+        )
+    rows_by_step: dict[int, tuple[str, ...]] = {}
+    for row in observation_rows:
+        step = int(row[0])
+        if step in rows_by_step:
+            findings.append(f"duplicate sprint observation row: {step}")
+            continue
+        rows_by_step[step] = row
+    for index, hint in enumerate(sprint.observation_steps, start=1):
+        row = rows_by_step.get(index)
+        if row is None:
+            findings.append(f"missing sprint observation row: {index}")
+            continue
+        _validate_execution_guide_row(findings, index, row, hint)
+
+    blocker_rows = tuple(row for row in rows if len(row) >= 8 and row[0] in {"P0", "P1"})
+    if len(blocker_rows) != len(sprint.blocker_issues):
+        findings.append(
+            f"expected {len(sprint.blocker_issues)} sprint blocker rows, found {len(blocker_rows)}"
+        )
+    expected_blocker_rows = tuple(
+        _format_animation_issue_row(issue) for issue in sprint.blocker_issues
+    )
+    actual_blocker_rows = tuple(
+        "| " + " | ".join(_markdown_table_cell(cell) for cell in row) + " |" for row in blocker_rows
+    )
+    for expected in expected_blocker_rows:
+        if expected not in actual_blocker_rows:
+            findings.append(f"missing sprint blocker row: {expected}")
+
+    return AnimationPlaytestSprintPacketValidation(
+        path=str(sprint_path),
+        expected_observation_count=len(sprint.observation_steps),
+        expected_blocker_count=len(sprint.blocker_issues),
+        findings=tuple(findings),
+    )
+
+
 def _append_animation_issue(
     issues: list[AnimationPlaytestIssue],
     *,
@@ -3686,6 +4104,26 @@ def _format_animation_issue_row(issue: AnimationPlaytestIssue) -> str:
         f"{_markdown_table_cell(issue.evidence)} | "
         f"{_markdown_table_cell(issue.follow_up)} | "
         f"{_markdown_table_cell(issue.next_action)} |"
+    )
+
+
+def _format_animation_sprint_observation_row(
+    index: int,
+    hint: AnimationPlaytestRecorderHint,
+) -> str:
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    return (
+        "| "
+        f"{index} | "
+        f"{_markdown_table_cell(_execution_phase_for_area(hint.area))} | "
+        f"`{_markdown_table_cell(hint.status)}` | "
+        f"{_markdown_table_cell(hint.area)} | "
+        f"{_markdown_table_cell(hint.target)} | "
+        f"`{_markdown_table_cell(visible_command)}` | "
+        f"{_markdown_table_cell(required_terms)} | "
+        f"{_markdown_table_cell(hint.evidence_prompt)} | "
+        f"`{_markdown_table_cell(hint.recorder_command)}` |"
     )
 
 

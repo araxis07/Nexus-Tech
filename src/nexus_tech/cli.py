@@ -76,6 +76,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_recorder_queue,
     build_2d_animation_playtest_release_gate,
     build_2d_animation_playtest_route_batch_plan,
+    build_2d_animation_playtest_sprint_packet,
     build_2d_animation_playtest_ui_triage_plan,
     launch_2d_frontend,
     launch_2d_menu,
@@ -100,6 +101,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_report,
     validate_2d_animation_playtest_route_batch_plan,
     validate_2d_animation_playtest_session,
+    validate_2d_animation_playtest_sprint_packet,
     validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
@@ -113,6 +115,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_release_gate,
     write_2d_animation_playtest_report_template,
     write_2d_animation_playtest_route_batch_plan,
+    write_2d_animation_playtest_sprint_packet,
     write_2d_animation_playtest_ui_triage_plan,
 )
 from nexus_tech.persistence.errors import PersistenceError
@@ -423,6 +426,11 @@ ANIMATION_PLAYTEST_SESSION_ISSUE_BACKLOG_OUTPUT_OPTION = typer.Option(
     "--issue-backlog-output",
     help="Markdown path for the manual animation issue backlog.",
 )
+ANIMATION_PLAYTEST_SESSION_SPRINT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-sprint.md"),
+    "--sprint-output",
+    help="Markdown path for the focused manual animation sprint packet.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -534,6 +542,11 @@ ANIMATION_PLAYTEST_EXECUTION_GUIDE_OUTPUT_OPTION = typer.Option(
     "--output",
     help="Optional Markdown path for the animation execution guide.",
 )
+ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    "--execution-guide-path",
+    help="Animation execution guide path referenced by the sprint packet.",
+)
 ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_ARGUMENT = typer.Argument(
     ...,
     exists=True,
@@ -544,6 +557,28 @@ ANIMATION_PLAYTEST_ISSUE_BACKLOG_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the animation issue backlog.",
+)
+ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-issues.md"),
+    "--issue-backlog-path",
+    help="Animation issue backlog path referenced by the sprint packet.",
+)
+ANIMATION_PLAYTEST_SPRINT_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation sprint packet Markdown file.",
+)
+ANIMATION_PLAYTEST_SPRINT_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation sprint packet.",
+)
+ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION = typer.Option(
+    12,
+    "--max-observation-steps",
+    min=1,
+    help="Maximum open observation rows to include in one sprint packet.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -3070,6 +3105,182 @@ def validate_animation_playtest_issue_backlog_command(
     )
 
 
+@app.command("animation-playtest-sprint")
+def animation_playtest_sprint_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION,
+    execution_guide_path: Path = ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_OPTION,
+    issue_backlog_path: Path = ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_SPRINT_OUTPUT_OPTION,
+    max_observation_steps: int = ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show a focused manual animation QA sprint packet."""
+
+    validate_scenario_id(scenario)
+    sprint = build_2d_animation_playtest_sprint_packet(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    summary_table = Table(title="Animation Playtest Sprint")
+    summary_table.add_column("Field", style="cyan")
+    summary_table.add_column("Value")
+    summary_table.add_row("Status", sprint.status.upper())
+    summary_table.add_row("Completion", f"{sprint.execution_guide.progress.completion_percent}%")
+    summary_table.add_row("Report", sprint.issue_backlog.report.path)
+    summary_table.add_row("Execution Guide", sprint.execution_guide_path)
+    summary_table.add_row("Issue Backlog", sprint.issue_backlog_path)
+    summary_table.add_row("Observation Steps", str(sprint.open_observation_count))
+    summary_table.add_row("P0/P1 Blockers", str(sprint.blocker_count))
+    summary_table.add_row("Backlog Status", sprint.issue_backlog.status.upper())
+    console.print(summary_table)
+
+    observation_table = Table(title="Sprint Observation Queue")
+    observation_table.add_column("Step", justify="right")
+    observation_table.add_column("Status")
+    observation_table.add_column("Area", style="cyan")
+    observation_table.add_column("Target")
+    observation_table.add_column("Visible")
+    observation_table.add_column("Terms", justify="right")
+    for index, hint in enumerate(sprint.observation_steps, start=1):
+        observation_table.add_row(
+            str(index),
+            hint.status.upper(),
+            hint.area,
+            hint.target,
+            "yes" if hint.visible_command else "-",
+            str(len(hint.required_terms)),
+        )
+    console.print(observation_table)
+
+    blocker_table = Table(title="Sprint P0/P1 Blockers")
+    blocker_table.add_column("Priority")
+    blocker_table.add_column("Status")
+    blocker_table.add_column("Area", style="cyan")
+    blocker_table.add_column("Target")
+    blocker_table.add_column("Next Action")
+    for issue in sprint.blocker_issues:
+        blocker_table.add_row(
+            issue.priority,
+            issue.status.upper(),
+            issue.area,
+            issue.target,
+            issue.next_action,
+        )
+    console.print(blocker_table)
+
+    if output is not None:
+        write_2d_animation_playtest_sprint_packet(sprint, output)
+        console.print(
+            Panel.fit(
+                f"Animation sprint packet written to {output}",
+                title="Animation Playtest Sprint",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and sprint.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-sprint")
+def validate_animation_playtest_sprint_command(
+    sprint_path: Path = ANIMATION_PLAYTEST_SPRINT_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION,
+    execution_guide_path: Path = ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_OPTION,
+    issue_backlog_path: Path = ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_OPTION,
+    max_observation_steps: int = ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the animation sprint packet matches current artifacts."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_sprint_packet(
+        sprint_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Sprint Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Sprint", validation.path)
+    table.add_row("Expected Observation Rows", str(validation.expected_observation_count))
+    table.add_row("Expected P0/P1 Blockers", str(validation.expected_blocker_count))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Sprint Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation sprint packet is stale or incomplete.",
+                title="Animation Playtest Sprint",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation sprint packet matches the current QA package.",
+            title="Animation Playtest Sprint",
+            border_style="green",
+        )
+    )
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -3474,6 +3685,7 @@ def prepare_animation_playtest_session_command(
     progress_output: Path = ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION,
     execution_guide_output: Path = ANIMATION_PLAYTEST_SESSION_EXECUTION_GUIDE_OUTPUT_OPTION,
     issue_backlog_output: Path = ANIMATION_PLAYTEST_SESSION_ISSUE_BACKLOG_OUTPUT_OPTION,
+    sprint_output: Path = ANIMATION_PLAYTEST_SESSION_SPRINT_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -3684,6 +3896,36 @@ def prepare_animation_playtest_session_command(
         issue_backlog_output,
         report_output,
     )
+    sprint_packet = build_2d_animation_playtest_sprint_packet(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        progress_path=progress_output,
+        execution_guide_path=execution_guide_output,
+        issue_backlog_path=issue_backlog_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_sprint_packet(sprint_packet, sprint_output)
+    sprint_validation = validate_2d_animation_playtest_sprint_packet(
+        sprint_output,
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        progress_path=progress_output,
+        execution_guide_path=execution_guide_output,
+        issue_backlog_path=issue_backlog_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -3698,6 +3940,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Progress Board", str(progress_output))
     session_table.add_row("Execution Guide", str(execution_guide_output))
     session_table.add_row("Issue Backlog", str(issue_backlog_output))
+    session_table.add_row("Sprint Packet", str(sprint_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
@@ -3714,6 +3957,9 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Execution Guide Steps", str(len(execution_guide.recorder_steps)))
     session_table.add_row("Issue Backlog Artifact", issue_backlog_validation.status.upper())
     session_table.add_row("Issue Backlog Items", str(issue_backlog.issue_count))
+    session_table.add_row("Sprint Artifact", sprint_validation.status.upper())
+    session_table.add_row("Sprint Observation Steps", str(sprint_packet.open_observation_count))
+    session_table.add_row("Sprint P0/P1 Blockers", str(sprint_packet.blocker_count))
     session_table.add_row("Blocking Checks", str(release_gate.blocking_check_count))
     session_table.add_row("Plan Status", plan.status.upper())
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
