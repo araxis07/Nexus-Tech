@@ -8061,7 +8061,7 @@ def test_animation_playtest_issue_backlog_tracks_release_decision_placeholder(
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.211.0",
+        version="0.212.0",
         prefill_automated_gates=True,
     )
 
@@ -8140,7 +8140,7 @@ def _write_animation_playtest_execution_artifacts(
     sprint_path = tmp_path / "manual-animation-sprint.md"
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.211.0",
+        version="0.212.0",
         prefill_automated_gates=True,
     )
     write_2d_animation_playtest_command_queue(
@@ -8414,6 +8414,7 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert sprint.open_observation_count == 5
     assert sprint.checklist_count == 5
     assert sprint.defect_intake_count == 5
+    assert sprint.exit_criteria_count == 4
     assert sprint.blocker_count == 12
     assert validation.status == "pass"
     assert validation.expected_observation_count == 5
@@ -8426,6 +8427,9 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert "## Manual Defect Intake" in text
     assert "Text overlap, clipped labels, or controls outside panels" in text
     assert "Record fail evidence, fix layout before release" in text
+    assert "## Sprint Exit Criteria" in text
+    assert "Observation rows recorded" in text
+    assert "Sprint, execution guide, issue backlog, and report validators are rerun" in text
     assert "## Observation Queue" in text
     assert "## P0/P1 Blocker Queue" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
@@ -8528,6 +8532,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert "Animation Playtest Sprint" in result.output
     assert "Checklist Items" in result.output
     assert "Defect Intake Rows" in result.output
+    assert "Exit Criteria" in result.output
     assert "Sprint Observation Queue" in result.output
     assert "Post-observation Signoff" in result.output
     assert paths["sprint"].exists()
@@ -8968,6 +8973,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "## Sprint Order" in sprint_text
     assert "## Manual Observation Checklist" in sprint_text
     assert "## Manual Defect Intake" in sprint_text
+    assert "## Sprint Exit Criteria" in sprint_text
     assert "## Observation Queue" in sprint_text
     assert "## P0/P1 Blocker Queue" in sprint_text
     assert "post-observation signoff" in sprint_text

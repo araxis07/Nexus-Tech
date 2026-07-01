@@ -1246,6 +1246,12 @@ class AnimationPlaytestSprintPacket:
 
         return len(_ANIMATION_SPRINT_DEFECT_INTAKE_ROWS)
 
+    @property
+    def exit_criteria_count(self) -> int:
+        """Return sprint closure checks included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_EXIT_CRITERIA)
+
 
 @dataclass(frozen=True)
 class AnimationPlaytestSprintPacketValidation:
@@ -1539,6 +1545,28 @@ _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS: tuple[tuple[str, str, str, str], ...] = (
         "P2",
         "Route, element, observed annoyance, and why gameplay remains usable.",
         "Record follow-up evidence; do not clear P0/P1 signoff until blockers are resolved.",
+    ),
+)
+_ANIMATION_SPRINT_EXIT_CRITERIA: tuple[tuple[str, str, str], ...] = (
+    (
+        "Observation rows recorded",
+        "Every visible command in this sprint has real observed notes or an explicit fail/watch.",
+        "No recorder command still contains placeholder notes for completed rows.",
+    ),
+    (
+        "Defects classified",
+        "Every observed UI or animation issue is mapped to the defect intake priority.",
+        "P0/P1 items stay open in the blocker queue until fixed or accepted by signoff.",
+    ),
+    (
+        "Signoff fields updated",
+        "Release blocker notes, validator result, and final pass decision are not placeholders.",
+        "Report fields name either clear evidence, remaining blockers, or accepted watch risk.",
+    ),
+    (
+        "Validation rerun",
+        "Sprint, execution guide, issue backlog, and report validators are rerun after edits.",
+        "The packet is regenerated when any report row, blocker, or code fix changes.",
     ),
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
@@ -3836,6 +3864,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
+        f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3878,6 +3907,17 @@ def write_2d_animation_playtest_sprint_packet(
     )
     for intake_row in _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS:
         lines.append(_format_animation_sprint_defect_intake_row(intake_row))
+    lines.extend(
+        [
+            "",
+            "## Sprint Exit Criteria",
+            "",
+            "| Criteria | Done Means | Validation Guard |",
+            "| --- | --- | --- |",
+        ]
+    )
+    for exit_criteria in _ANIMATION_SPRINT_EXIT_CRITERIA:
+        lines.append(_format_animation_sprint_exit_criteria_row(exit_criteria))
     lines.extend(
         [
             "",
@@ -4029,6 +4069,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
+        f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -4049,6 +4090,12 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_defect_intake_row(intake_row)
             for intake_row in _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS
+        ),
+        "## Sprint Exit Criteria",
+        "| Criteria | Done Means | Validation Guard |",
+        *(
+            _format_animation_sprint_exit_criteria_row(exit_criteria)
+            for exit_criteria in _ANIMATION_SPRINT_EXIT_CRITERIA
         ),
     )
     for line in required_lines:
@@ -4283,6 +4330,16 @@ def _format_animation_sprint_defect_intake_row(intake_row: tuple[str, str, str, 
         f"{_markdown_table_cell(priority)} | "
         f"{_markdown_table_cell(evidence_terms)} | "
         f"{_markdown_table_cell(required_action)} |"
+    )
+
+
+def _format_animation_sprint_exit_criteria_row(exit_criteria: tuple[str, str, str]) -> str:
+    criteria, done_means, validation_guard = exit_criteria
+    return (
+        "| "
+        f"{_markdown_table_cell(criteria)} | "
+        f"{_markdown_table_cell(done_means)} | "
+        f"{_markdown_table_cell(validation_guard)} |"
     )
 
 

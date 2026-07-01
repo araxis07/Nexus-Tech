@@ -3160,6 +3160,7 @@ def animation_playtest_sprint_command(
     summary_table.add_row("Observation Steps", str(sprint.open_observation_count))
     summary_table.add_row("Checklist Items", str(sprint.checklist_count))
     summary_table.add_row("Defect Intake Rows", str(sprint.defect_intake_count))
+    summary_table.add_row("Exit Criteria", str(sprint.exit_criteria_count))
     summary_table.add_row("P0/P1 Blockers", str(sprint.blocker_count))
     summary_table.add_row(
         "Post-observation Signoff",

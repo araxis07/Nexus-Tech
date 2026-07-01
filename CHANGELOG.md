@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.212.0 - 2026-07-02
+
+- Added validated sprint exit criteria to `animation-playtest-sprint` so manual QA passes define when observation rows, defect classification, signoff fields, and validators are complete
+- Extended sprint metadata and CLI output with exit-criteria counts, making focused playtest packets explicit about how to close a pass after real evidence is recorded
+- Updated docs and regression coverage while keeping release signoff blocked until visible-window evidence clears the gate
+
 ## 0.211.0 - 2026-07-02
 
 - Added a validated manual defect intake table to `animation-playtest-sprint` so playtesters can classify UI and animation findings as P0/P1/P2 with required evidence before editing report rows
