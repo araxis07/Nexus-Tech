@@ -8413,6 +8413,7 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert sprint.status == "manual-required"
     assert sprint.open_observation_count == 5
     assert sprint.checklist_count == 5
+    assert sprint.layout_repair_count == 5
     assert sprint.defect_intake_count == 5
     assert sprint.exit_criteria_count == 4
     assert sprint.evidence_capture_count == 5
@@ -8426,6 +8427,11 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert "## Manual Observation Checklist" in text
     assert "Layout bounds" in text
     assert "No overlapping text, clipped labels, or controls outside panels." in text
+    assert "## Layout Repair Pass" in text
+    assert "Responsive frame" in text
+    assert "Button grid" in text
+    assert "Pause/back/menu/help/hover paths" in text
+    assert "Compare full, reduced, and off modes before deciding watch versus fail." in text
     assert "## Manual Defect Intake" in text
     assert "Text overlap, clipped labels, or controls outside panels" in text
     assert "Record fail evidence, fix layout before release" in text
@@ -8539,6 +8545,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert result.exit_code == 0
     assert "Animation Playtest Sprint" in result.output
     assert "Checklist Items" in result.output
+    assert "Layout Repair Checks" in result.output
     assert "Defect Intake Rows" in result.output
     assert "Exit Criteria" in result.output
     assert "Evidence Capture Rows" in result.output
@@ -8547,6 +8554,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert "Post-observation Signoff" in result.output
     assert paths["sprint"].exists()
     sprint_text = paths["sprint"].read_text(encoding="utf-8")
+    assert "## Layout Repair Pass" in sprint_text
     assert "## Observation Queue" in sprint_text
     assert "post-observation signoff" in sprint_text
 
@@ -8906,6 +8914,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Issue Backlog Items" in result.output
     assert "Sprint Artifact" in result.output
     assert "Sprint Observation Steps" in result.output
+    assert "Sprint Layout Repair Checks" in result.output
     assert "Sprint P0/P1 Blockers" in result.output
     assert "Blocking Checks" in result.output
     assert report_path.exists()
@@ -8982,6 +8991,9 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "# NEXUS TECH 2D Animation Sprint Packet" in sprint_text
     assert "## Sprint Order" in sprint_text
     assert "## Manual Observation Checklist" in sprint_text
+    assert "## Layout Repair Pass" in sprint_text
+    assert "Text containment" in sprint_text
+    assert "Navigation affordance" in sprint_text
     assert "## Manual Defect Intake" in sprint_text
     assert "## Sprint Exit Criteria" in sprint_text
     assert "## Evidence Capture Prompts" in sprint_text

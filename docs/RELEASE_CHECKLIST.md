@@ -136,9 +136,10 @@ Run `animation-playtest-sprint` when the next QA loop needs a focused work
 packet. It pulls the next visible observation rows from the execution guide and
 the current P0/P1 blockers from the issue backlog, labels report-field
 placeholders as post-observation signoff work, includes the manual observation
-checklist plus defect intake, exit criteria, evidence capture prompts, and note
-templates, then `validate-animation-playtest-sprint` verifies both sources still
-match.
+checklist plus defect intake, a layout repair pass for responsive frames, button
+grids, text containment, navigation affordance, and motion separation, exit
+criteria, evidence capture prompts, and note templates, then
+`validate-animation-playtest-sprint` verifies both sources still match.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

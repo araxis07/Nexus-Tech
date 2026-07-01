@@ -1241,6 +1241,12 @@ class AnimationPlaytestSprintPacket:
         return len(_ANIMATION_SPRINT_OBSERVATION_CHECKS)
 
     @property
+    def layout_repair_count(self) -> int:
+        """Return layout repair checks included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS)
+
+    @property
     def defect_intake_count(self) -> int:
         """Return manual defect intake rows included in the sprint."""
 
@@ -1525,6 +1531,38 @@ _ANIMATION_SPRINT_OBSERVATION_CHECKS: tuple[tuple[str, str, str], ...] = (
         "Evidence wording",
         "Recorder notes describe observed facts instead of generic ok/pass wording.",
         "Specific UI elements, animation cues, and blocker names.",
+    ),
+)
+_ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "Responsive frame",
+        "820x620, 960x640, and 1440x900",
+        "Panel bounds, footer rails, modal edges, and title/menu sidebars do not collide.",
+        "Record fail/watch evidence before accepting any overlap or overflow.",
+    ),
+    (
+        "Button grid",
+        "Title, run, pause, inspector, endgame, summary, and review controls",
+        "Primary, secondary, disabled, back, pause, help, save, and menu buttons align.",
+        "Fix button placement or copy before marking the route pass.",
+    ),
+    (
+        "Text containment",
+        "Headers, cards, tooltips, disabled reasons, and footer status lines",
+        "Labels stay inside their cards or intentionally truncate without hiding meaning.",
+        "Capture the exact clipped or overlapping text in the defect intake row.",
+    ),
+    (
+        "Navigation affordance",
+        "Pause/back/menu/help/hover paths",
+        "The player can see how to pause, back out, return to menu, and request help.",
+        "Treat unclear navigation as P0 until the visible command proves recovery.",
+    ),
+    (
+        "Motion separation",
+        "Actors, pulses, overlays, transition sweeps, and feedback cards",
+        "Motion cues do not cover text, controls, or the next required decision.",
+        "Compare full, reduced, and off modes before deciding watch versus fail.",
     ),
 )
 _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS: tuple[tuple[str, str, str, str], ...] = (
@@ -3908,6 +3946,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
+        f"- Layout repair checks: `{sprint.layout_repair_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
@@ -3943,6 +3982,17 @@ def write_2d_animation_playtest_sprint_packet(
     ]
     for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS:
         lines.append(_format_animation_sprint_checklist_row(checklist_item))
+    lines.extend(
+        [
+            "",
+            "## Layout Repair Pass",
+            "",
+            "| Focus | Applies To | Pass Criteria | Repair Rule |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for repair_row in _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS:
+        lines.append(_format_animation_sprint_layout_repair_row(repair_row))
     lines.extend(
         [
             "",
@@ -4137,6 +4187,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
+        f"- Layout repair checks: `{sprint.layout_repair_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
@@ -4155,6 +4206,12 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_checklist_row(checklist_item)
             for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS
+        ),
+        "## Layout Repair Pass",
+        "| Focus | Applies To | Pass Criteria | Repair Rule |",
+        *(
+            _format_animation_sprint_layout_repair_row(repair_row)
+            for repair_row in _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS
         ),
         "## Manual Defect Intake",
         "| Trigger | Priority | Evidence Must Name | Required Action |",
@@ -4402,6 +4459,17 @@ def _format_animation_sprint_checklist_row(checklist_item: tuple[str, str, str])
         f"{_markdown_table_cell(check)} | "
         f"{_markdown_table_cell(pass_criteria)} | "
         f"{_markdown_table_cell(evidence_terms)} |"
+    )
+
+
+def _format_animation_sprint_layout_repair_row(repair_row: tuple[str, str, str, str]) -> str:
+    focus, applies_to, pass_criteria, repair_rule = repair_row
+    return (
+        "| "
+        f"{_markdown_table_cell(focus)} | "
+        f"{_markdown_table_cell(applies_to)} | "
+        f"{_markdown_table_cell(pass_criteria)} | "
+        f"{_markdown_table_cell(repair_rule)} |"
     )
 
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.215.0 - 2026-07-02
+
+- Added a validated layout repair pass to `animation-playtest-sprint` so responsive frame, button grid, text containment, navigation affordance, and motion separation checks stay explicit before release signoff
+- Extended sprint metadata and CLI output with layout-repair check counts, making the next QA packet focus directly on overlapping text, uneven buttons, unclear pause/back/menu affordances, and motion covering UI
+- Updated docs and regression coverage while keeping manual animation signoff blocked until real visible-window evidence clears every row
+
 ## 0.214.0 - 2026-07-02
 
 - Added validated evidence note templates to `animation-playtest-sprint` so pass/watch/fail notes have specific observed-field skeletons instead of generic wording
