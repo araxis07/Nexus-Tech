@@ -1252,6 +1252,12 @@ class AnimationPlaytestSprintPacket:
 
         return len(_ANIMATION_SPRINT_EXIT_CRITERIA)
 
+    @property
+    def evidence_capture_count(self) -> int:
+        """Return evidence capture prompt rows included in the sprint."""
+
+        return len(self.observation_steps)
+
 
 @dataclass(frozen=True)
 class AnimationPlaytestSprintPacketValidation:
@@ -3865,6 +3871,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
+        f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3918,6 +3925,17 @@ def write_2d_animation_playtest_sprint_packet(
     )
     for exit_criteria in _ANIMATION_SPRINT_EXIT_CRITERIA:
         lines.append(_format_animation_sprint_exit_criteria_row(exit_criteria))
+    lines.extend(
+        [
+            "",
+            "## Evidence Capture Prompts",
+            "",
+            "| Step | Capture Focus | Result Choices | Defect Decision | Evidence Must Name |",
+            "| ---: | --- | --- | --- | --- |",
+        ]
+    )
+    for index, hint in enumerate(sprint.observation_steps, start=1):
+        lines.append(_format_animation_sprint_evidence_capture_row(index, hint))
     lines.extend(
         [
             "",
@@ -4070,6 +4088,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
+        f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -4096,6 +4115,12 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_exit_criteria_row(exit_criteria)
             for exit_criteria in _ANIMATION_SPRINT_EXIT_CRITERIA
+        ),
+        "## Evidence Capture Prompts",
+        "| Step | Capture Focus | Result Choices | Defect Decision | Evidence Must Name |",
+        *(
+            _format_animation_sprint_evidence_capture_row(index, hint)
+            for index, hint in enumerate(sprint.observation_steps, start=1)
         ),
     )
     for line in required_lines:
@@ -4340,6 +4365,21 @@ def _format_animation_sprint_exit_criteria_row(exit_criteria: tuple[str, str, st
         f"{_markdown_table_cell(criteria)} | "
         f"{_markdown_table_cell(done_means)} | "
         f"{_markdown_table_cell(validation_guard)} |"
+    )
+
+
+def _format_animation_sprint_evidence_capture_row(
+    index: int,
+    hint: AnimationPlaytestRecorderHint,
+) -> str:
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    return (
+        "| "
+        f"{index} | "
+        f"{_markdown_table_cell(hint.area)}: {_markdown_table_cell(hint.target)} | "
+        "pass / watch / fail | "
+        "Use Manual Defect Intake before recorder command. | "
+        f"{_markdown_table_cell(required_terms)} |"
     )
 
 

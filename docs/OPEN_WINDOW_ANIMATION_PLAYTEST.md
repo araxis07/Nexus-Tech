@@ -143,8 +143,8 @@ Use `animation-playtest-sprint` when the tester needs one focused work packet
 for the next pass: it combines the next visible observation rows with the
 current P0/P1 blockers, labels report-field placeholders as post-observation
 signoff work, includes the manual observation checklist plus defect intake, adds
-exit criteria, and validates against the execution guide plus issue backlog
-before the packet is used.
+exit criteria and evidence capture prompts, and validates against the execution
+guide plus issue backlog before the packet is used.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.213.0 - 2026-07-02
+
+- Added validated evidence capture prompts to `animation-playtest-sprint` so each visible step names result choices, defect-intake handoff, and required evidence terms before recorder commands are used
+- Extended sprint metadata and CLI output with evidence-capture row counts, keeping focused QA packets explicit about what testers must record from each visible command
+- Updated docs and regression coverage while preserving the rule that recorder placeholders require real visible-window observations
+
 ## 0.212.0 - 2026-07-02
 
 - Added validated sprint exit criteria to `animation-playtest-sprint` so manual QA passes define when observation rows, defect classification, signoff fields, and validators are complete
