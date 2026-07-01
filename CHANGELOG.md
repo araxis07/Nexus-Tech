@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.209.0 - 2026-07-01
+
+- Clarified `animation-playtest-sprint` P0/P1 blockers with phase labels that separate post-observation signoff work from fix-before-release defects
+- Added blocker evidence-dependency guidance to the sprint Markdown and CLI output so testers know when to observe visible windows before clearing report fields
+- Updated docs and regression coverage so sprint packets remain stale-safe without fabricating manual animation evidence
+
 ## 0.208.0 - 2026-07-01
 
 - Added `animation-playtest-sprint` and `validate-animation-playtest-sprint` to combine the next visible observation steps with current P0/P1 backlog blockers into a focused manual QA work packet

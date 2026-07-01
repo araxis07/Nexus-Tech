@@ -8061,7 +8061,7 @@ def test_animation_playtest_issue_backlog_tracks_release_decision_placeholder(
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.208.0",
+        version="0.209.0",
         prefill_automated_gates=True,
     )
 
@@ -8140,7 +8140,7 @@ def _write_animation_playtest_execution_artifacts(
     sprint_path = tmp_path / "manual-animation-sprint.md"
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.208.0",
+        version="0.209.0",
         prefill_automated_gates=True,
     )
     write_2d_animation_playtest_command_queue(
@@ -8421,6 +8421,9 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert "## Observation Queue" in text
     assert "## P0/P1 Blocker Queue" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
+    assert "post-observation signoff" in text
+    assert "Complete visible observation rows, then clear or name this signoff blocker." in text
+    assert "Observe visible checks, then replace the signoff placeholder." in text
     assert "validate-animation-playtest-sprint" in text
     assert "observe visible commands before recorder commands" in text
 
@@ -8516,8 +8519,11 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert result.exit_code == 0
     assert "Animation Playtest Sprint" in result.output
     assert "Sprint Observation Queue" in result.output
+    assert "Post-observation Signoff" in result.output
     assert paths["sprint"].exists()
-    assert "## Observation Queue" in paths["sprint"].read_text(encoding="utf-8")
+    sprint_text = paths["sprint"].read_text(encoding="utf-8")
+    assert "## Observation Queue" in sprint_text
+    assert "post-observation signoff" in sprint_text
 
 
 def test_validate_animation_playtest_sprint_command_accepts_current_artifact(
@@ -8952,6 +8958,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "## Sprint Order" in sprint_text
     assert "## Observation Queue" in sprint_text
     assert "## P0/P1 Blocker Queue" in sprint_text
+    assert "post-observation signoff" in sprint_text
     assert "validate-animation-playtest-sprint" in sprint_text
     assert "observe visible commands before recorder commands" in sprint_text
     assert "- Handoff status: `manual-required`" in handoff_text

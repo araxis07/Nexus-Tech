@@ -52,7 +52,8 @@ with required terms, evidence prompts, and recorder commands. It still requires
 real visible-window observations before recording evidence.
 Use the sprint packet when the next pass should stay focused: it selects the
 next open observation rows and carries current P0/P1 blockers from the issue
-backlog without treating either artifact as release evidence.
+backlog with post-observation signoff labels for report-field placeholders,
+without treating either artifact as release evidence.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

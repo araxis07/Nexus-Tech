@@ -634,9 +634,10 @@ validated P0/P1/P2 fix queue, so fail/watch rows and missing evidence become
 explicit follow-up work before the next release-candidate pass.
 `animation-playtest-sprint` combines the next open observation rows with the
 current P0/P1 blockers into a focused work packet for one manual QA pass. It
-keeps recorder placeholders invalid until the visible command has been observed
-and `validate-animation-playtest-sprint` confirms the packet still matches the
-current guide and backlog.
+labels report-field blockers as post-observation signoff work until visible
+evidence exists, keeps recorder placeholders invalid until the visible command
+has been observed, and `validate-animation-playtest-sprint` confirms the packet
+still matches the current guide and backlog.
 The plan also includes a validated `Manual Evidence Checklist` for the window
 matrix, route notes, controls, scenes, game feel, and signoff fields so the
 non-route manual evidence cannot be dropped from handoff notes.

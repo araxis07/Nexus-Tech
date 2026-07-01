@@ -65,6 +65,9 @@ from nexus_tech.frontend_2d import (
     AnimationPlaytestReportValidation,
     Frontend2DUnavailableError,
     MotionMode,
+    animation_playtest_sprint_blocker_dependency,
+    animation_playtest_sprint_blocker_next_action,
+    animation_playtest_sprint_blocker_phase,
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
@@ -3156,6 +3159,26 @@ def animation_playtest_sprint_command(
     summary_table.add_row("Issue Backlog", sprint.issue_backlog_path)
     summary_table.add_row("Observation Steps", str(sprint.open_observation_count))
     summary_table.add_row("P0/P1 Blockers", str(sprint.blocker_count))
+    summary_table.add_row(
+        "Post-observation Signoff",
+        str(
+            sum(
+                1
+                for issue in sprint.blocker_issues
+                if animation_playtest_sprint_blocker_phase(issue) == "post-observation signoff"
+            )
+        ),
+    )
+    summary_table.add_row(
+        "Fix-before-release",
+        str(
+            sum(
+                1
+                for issue in sprint.blocker_issues
+                if animation_playtest_sprint_blocker_phase(issue) == "fix-before-release"
+            )
+        ),
+    )
     summary_table.add_row("Backlog Status", sprint.issue_backlog.status.upper())
     console.print(summary_table)
 
@@ -3180,16 +3203,20 @@ def animation_playtest_sprint_command(
     blocker_table = Table(title="Sprint P0/P1 Blockers")
     blocker_table.add_column("Priority")
     blocker_table.add_column("Status")
+    blocker_table.add_column("Phase")
     blocker_table.add_column("Area", style="cyan")
     blocker_table.add_column("Target")
+    blocker_table.add_column("Dependency")
     blocker_table.add_column("Next Action")
     for issue in sprint.blocker_issues:
         blocker_table.add_row(
             issue.priority,
             issue.status.upper(),
+            animation_playtest_sprint_blocker_phase(issue),
             issue.area,
             issue.target,
-            issue.next_action,
+            animation_playtest_sprint_blocker_dependency(issue),
+            animation_playtest_sprint_blocker_next_action(issue),
         )
     console.print(blocker_table)
 

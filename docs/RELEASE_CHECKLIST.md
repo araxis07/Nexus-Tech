@@ -134,7 +134,8 @@ fail/watch results and missing-evidence rows into a validated P0/P1/P2 queue for
 the next fix pass.
 Run `animation-playtest-sprint` when the next QA loop needs a focused work
 packet. It pulls the next visible observation rows from the execution guide and
-the current P0/P1 blockers from the issue backlog, then
+the current P0/P1 blockers from the issue backlog, labels report-field
+placeholders as post-observation signoff work, then
 `validate-animation-playtest-sprint` verifies both sources still match.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,

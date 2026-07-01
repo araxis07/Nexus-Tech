@@ -3802,12 +3802,15 @@ def write_2d_animation_playtest_sprint_packet(
             "",
             "## P0/P1 Blocker Queue",
             "",
-            "| Priority | Status | Area | Target | Result | Evidence | Follow-up | Next Action |",
+            (
+                "| Priority | Status | Phase | Area | Target | Result | "
+                "Evidence Dependency | Next Action |"
+            ),
             "| --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
     )
     for issue in sprint.blocker_issues:
-        lines.append(_format_animation_issue_row(issue))
+        lines.append(_format_animation_sprint_blocker_row(issue))
     lines.extend(
         [
             "",
@@ -4001,7 +4004,7 @@ def validate_2d_animation_playtest_sprint_packet(
             f"expected {len(sprint.blocker_issues)} sprint blocker rows, found {len(blocker_rows)}"
         )
     expected_blocker_rows = tuple(
-        _format_animation_issue_row(issue) for issue in sprint.blocker_issues
+        _format_animation_sprint_blocker_row(issue) for issue in sprint.blocker_issues
     )
     actual_blocker_rows = tuple(
         "| " + " | ".join(_markdown_table_cell(cell) for cell in row) + " |" for row in blocker_rows
@@ -4093,6 +4096,38 @@ def _animation_issue_next_action(priority: str) -> str:
     return "Run the manual check and replace placeholders with real observed evidence."
 
 
+def animation_playtest_sprint_blocker_phase(issue: AnimationPlaytestIssue) -> str:
+    """Classify how a sprint blocker should be handled during manual QA."""
+
+    if issue.area == "Report Field" and _is_placeholder_result(issue.evidence):
+        return "post-observation signoff"
+    if issue.priority == "P1":
+        return "watch-triage"
+    return "fix-before-release"
+
+
+def animation_playtest_sprint_blocker_dependency(issue: AnimationPlaytestIssue) -> str:
+    """Return the evidence dependency that must be cleared for a sprint blocker."""
+
+    phase = animation_playtest_sprint_blocker_phase(issue)
+    if phase == "post-observation signoff":
+        return "Complete visible observation rows, then clear or name this signoff blocker."
+    if phase == "watch-triage":
+        return "Record watch evidence, then decide accepted risk or follow-up fix."
+    return "Fix the observed defect, rerun the visible command, then record evidence."
+
+
+def animation_playtest_sprint_blocker_next_action(issue: AnimationPlaytestIssue) -> str:
+    """Return the next action that is specific to the sprint blocker phase."""
+
+    phase = animation_playtest_sprint_blocker_phase(issue)
+    if phase == "post-observation signoff":
+        return "Observe visible checks, then replace the signoff placeholder."
+    if phase == "watch-triage":
+        return "Triage watch evidence before the release candidate."
+    return issue.next_action
+
+
 def _format_animation_issue_row(issue: AnimationPlaytestIssue) -> str:
     return (
         "| "
@@ -4104,6 +4139,20 @@ def _format_animation_issue_row(issue: AnimationPlaytestIssue) -> str:
         f"{_markdown_table_cell(issue.evidence)} | "
         f"{_markdown_table_cell(issue.follow_up)} | "
         f"{_markdown_table_cell(issue.next_action)} |"
+    )
+
+
+def _format_animation_sprint_blocker_row(issue: AnimationPlaytestIssue) -> str:
+    return (
+        "| "
+        f"{_markdown_table_cell(issue.priority)} | "
+        f"{_markdown_table_cell(issue.status)} | "
+        f"{_markdown_table_cell(animation_playtest_sprint_blocker_phase(issue))} | "
+        f"{_markdown_table_cell(issue.area)} | "
+        f"{_markdown_table_cell(issue.target)} | "
+        f"{_markdown_table_cell(issue.result)} | "
+        f"{_markdown_table_cell(animation_playtest_sprint_blocker_dependency(issue))} | "
+        f"{_markdown_table_cell(animation_playtest_sprint_blocker_next_action(issue))} |"
     )
 
 
