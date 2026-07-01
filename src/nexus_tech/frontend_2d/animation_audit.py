@@ -1258,6 +1258,12 @@ class AnimationPlaytestSprintPacket:
 
         return len(self.observation_steps)
 
+    @property
+    def evidence_template_count(self) -> int:
+        """Return evidence note templates included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_EVIDENCE_NOTE_TEMPLATES)
+
 
 @dataclass(frozen=True)
 class AnimationPlaytestSprintPacketValidation:
@@ -1573,6 +1579,39 @@ _ANIMATION_SPRINT_EXIT_CRITERIA: tuple[tuple[str, str, str], ...] = (
         "Validation rerun",
         "Sprint, execution guide, issue backlog, and report validators are rerun after edits.",
         "The packet is regenerated when any report row, blocker, or code fix changes.",
+    ),
+)
+_ANIMATION_SPRINT_EVIDENCE_NOTE_TEMPLATES: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "pass",
+        "Checklist passed and no defect intake trigger applies.",
+        "Window size, route, motion mode, checked controls or labels, and visible cue.",
+        "Observed {window} {route} in {mode}; {controls_or_labels} stayed readable; "
+        "{motion_cue} made the state change clear.",
+    ),
+    (
+        "watch",
+        "Issue is visible but does not block completing the task.",
+        (
+            "Specific UI element, route, motion mode, why gameplay remains usable, "
+            "and follow-up owner."
+        ),
+        (
+            "Observed {window} {route} in {mode}; {element} was questionable because "
+            "{reason}; gameplay remained usable because {mitigation}."
+        ),
+    ),
+    (
+        "fail",
+        "P0/P1 defect blocks task completion, readability, navigation, or release signoff.",
+        (
+            "Exact blocker, reproduction route, expected behavior, actual behavior, "
+            "and rerun condition."
+        ),
+        (
+            "Observed {window} {route} in {mode}; expected {expected}; actual {actual}; "
+            "block classified as {P0_or_P1}."
+        ),
     ),
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
@@ -3872,6 +3911,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
+        f"- Evidence note templates: `{sprint.evidence_template_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3936,6 +3976,17 @@ def write_2d_animation_playtest_sprint_packet(
     )
     for index, hint in enumerate(sprint.observation_steps, start=1):
         lines.append(_format_animation_sprint_evidence_capture_row(index, hint))
+    lines.extend(
+        [
+            "",
+            "## Evidence Note Templates",
+            "",
+            "| Result | Use When | Note Must Include | Template Skeleton |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for note_template in _ANIMATION_SPRINT_EVIDENCE_NOTE_TEMPLATES:
+        lines.append(_format_animation_sprint_evidence_note_template_row(note_template))
     lines.extend(
         [
             "",
@@ -4089,6 +4140,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
+        f"- Evidence note templates: `{sprint.evidence_template_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -4121,6 +4173,12 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_evidence_capture_row(index, hint)
             for index, hint in enumerate(sprint.observation_steps, start=1)
+        ),
+        "## Evidence Note Templates",
+        "| Result | Use When | Note Must Include | Template Skeleton |",
+        *(
+            _format_animation_sprint_evidence_note_template_row(note_template)
+            for note_template in _ANIMATION_SPRINT_EVIDENCE_NOTE_TEMPLATES
         ),
     )
     for line in required_lines:
@@ -4380,6 +4438,19 @@ def _format_animation_sprint_evidence_capture_row(
         "pass / watch / fail | "
         "Use Manual Defect Intake before recorder command. | "
         f"{_markdown_table_cell(required_terms)} |"
+    )
+
+
+def _format_animation_sprint_evidence_note_template_row(
+    note_template: tuple[str, str, str, str],
+) -> str:
+    result, use_when, note_must_include, template_skeleton = note_template
+    return (
+        "| "
+        f"{_markdown_table_cell(result)} | "
+        f"{_markdown_table_cell(use_when)} | "
+        f"{_markdown_table_cell(note_must_include)} | "
+        f"{_markdown_table_cell(template_skeleton)} |"
     )
 
 

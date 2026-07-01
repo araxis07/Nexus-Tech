@@ -638,8 +638,9 @@ labels report-field blockers as post-observation signoff work until visible
 evidence exists, includes a manual observation checklist for layout, navigation,
 typography, motion, and evidence wording, adds a defect intake table for
 P0/P1/P2 UI or animation findings, includes exit criteria for closing the pass,
-adds evidence capture prompts for every visible step, keeps recorder
-placeholders invalid until the visible command has been observed, and
+adds evidence capture prompts for every visible step, provides note templates
+for pass/watch/fail evidence, keeps recorder placeholders invalid until the
+visible command has been observed, and
 `validate-animation-playtest-sprint` confirms the packet still matches the
 current guide and backlog.
 The plan also includes a validated `Manual Evidence Checklist` for the window

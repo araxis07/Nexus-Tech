@@ -54,7 +54,8 @@ Use the sprint packet when the next pass should stay focused: it selects the
 next open observation rows and carries current P0/P1 blockers from the issue
 backlog with post-observation signoff labels for report-field placeholders,
 plus a manual observation checklist, defect intake table, exit criteria, and
-evidence capture prompts, without treating either artifact as release evidence.
+evidence capture prompts with note templates, without treating either artifact
+as release evidence.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

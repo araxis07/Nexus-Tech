@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.214.0 - 2026-07-02
+
+- Added validated evidence note templates to `animation-playtest-sprint` so pass/watch/fail notes have specific observed-field skeletons instead of generic wording
+- Extended sprint metadata and CLI output with evidence-note template counts, keeping manual QA packets explicit about what must be filled from visible-window observations
+- Updated docs and regression coverage while keeping recorder placeholders invalid until testers replace every template field with real evidence
+
 ## 0.213.0 - 2026-07-02
 
 - Added validated evidence capture prompts to `animation-playtest-sprint` so each visible step names result choices, defect-intake handoff, and required evidence terms before recorder commands are used
