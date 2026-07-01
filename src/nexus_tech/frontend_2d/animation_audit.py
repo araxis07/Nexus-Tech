@@ -1234,6 +1234,12 @@ class AnimationPlaytestSprintPacket:
 
         return len(self.blocker_issues)
 
+    @property
+    def checklist_count(self) -> int:
+        """Return manual acceptance checks included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_OBSERVATION_CHECKS)
+
 
 @dataclass(frozen=True)
 class AnimationPlaytestSprintPacketValidation:
@@ -1469,6 +1475,33 @@ _ANIMATION_ISSUE_BACKLOG_POLICY_LINE = (
 _ANIMATION_SPRINT_POLICY_LINE = (
     "- Sprint policy: `observe visible commands before recorder commands; P0/P1 blockers "
     "stay open until real evidence and validators clear them`"
+)
+_ANIMATION_SPRINT_OBSERVATION_CHECKS: tuple[tuple[str, str, str], ...] = (
+    (
+        "Layout bounds",
+        "No overlapping text, clipped labels, or controls outside panels.",
+        "Window size, route, panel or control names, and visible result.",
+    ),
+    (
+        "Navigation controls",
+        "Pause, back, menu, help, save, and disabled actions are discoverable.",
+        "Which controls were tried and whether the response was clear.",
+    ),
+    (
+        "Typography contrast",
+        "Primary labels, disabled reasons, tooltips, and footer text stay readable.",
+        "Any hard-to-read label, color pairing, or clipped copy.",
+    ),
+    (
+        "Motion readability",
+        "Full, reduced, and off modes keep state changes understandable.",
+        "Mode, actor or panel motion, and whether the cue helped or distracted.",
+    ),
+    (
+        "Evidence wording",
+        "Recorder notes describe observed facts instead of generic ok/pass wording.",
+        "Specific UI elements, animation cues, and blocker names.",
+    ),
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
     {
@@ -3763,6 +3796,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Issue backlog: `{sprint.issue_backlog_path}`",
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
+        f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3787,14 +3821,25 @@ def write_2d_animation_playtest_sprint_packet(
         ),
         "| 4 | Run the validation commands. | Sprint, guide, backlog, and report status agree. |",
         "",
-        "## Observation Queue",
+        "## Manual Observation Checklist",
         "",
-        (
-            "| Step | Phase | Status | Area | Target | Visible Command | Required Terms | "
-            "Evidence Prompt | Recorder Command |"
-        ),
-        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Check | Pass Criteria | Evidence Must Name |",
+        "| --- | --- | --- |",
     ]
+    for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS:
+        lines.append(_format_animation_sprint_checklist_row(checklist_item))
+    lines.extend(
+        [
+            "",
+            "## Observation Queue",
+            "",
+            (
+                "| Step | Phase | Status | Area | Target | Visible Command | Required Terms | "
+                "Evidence Prompt | Recorder Command |"
+            ),
+            "| ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
     for index, hint in enumerate(sprint.observation_steps, start=1):
         lines.append(_format_animation_sprint_observation_row(index, hint))
     lines.extend(
@@ -3932,6 +3977,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Issue backlog: `{sprint.issue_backlog_path}`",
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
+        f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3941,6 +3987,12 @@ def validate_2d_animation_playtest_sprint_packet(
         backlog_validation_command,
         sprint_validation_command,
         report_validation_command,
+        "## Manual Observation Checklist",
+        "| Check | Pass Criteria | Evidence Must Name |",
+        *(
+            _format_animation_sprint_checklist_row(checklist_item)
+            for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS
+        ),
     )
     for line in required_lines:
         if line not in text:
@@ -4153,6 +4205,16 @@ def _format_animation_sprint_blocker_row(issue: AnimationPlaytestIssue) -> str:
         f"{_markdown_table_cell(issue.result)} | "
         f"{_markdown_table_cell(animation_playtest_sprint_blocker_dependency(issue))} | "
         f"{_markdown_table_cell(animation_playtest_sprint_blocker_next_action(issue))} |"
+    )
+
+
+def _format_animation_sprint_checklist_row(checklist_item: tuple[str, str, str]) -> str:
+    check, pass_criteria, evidence_terms = checklist_item
+    return (
+        "| "
+        f"{_markdown_table_cell(check)} | "
+        f"{_markdown_table_cell(pass_criteria)} | "
+        f"{_markdown_table_cell(evidence_terms)} |"
     )
 
 

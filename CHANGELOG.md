@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.210.0 - 2026-07-01
+
+- Added a validated manual observation checklist to `animation-playtest-sprint` so each focused QA pass names layout, navigation, typography, motion, and evidence wording checks before recorder commands are used
+- Extended sprint metadata and CLI output with checklist counts so handoff packets show both the visible observation rows and acceptance criteria for the pass
+- Updated docs and regression coverage while keeping manual animation signoff blocked until real visible-window evidence is recorded
+
 ## 0.209.0 - 2026-07-01
 
 - Clarified `animation-playtest-sprint` P0/P1 blockers with phase labels that separate post-observation signoff work from fix-before-release defects

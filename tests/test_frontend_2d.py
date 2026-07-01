@@ -8061,7 +8061,7 @@ def test_animation_playtest_issue_backlog_tracks_release_decision_placeholder(
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.209.0",
+        version="0.210.0",
         prefill_automated_gates=True,
     )
 
@@ -8140,7 +8140,7 @@ def _write_animation_playtest_execution_artifacts(
     sprint_path = tmp_path / "manual-animation-sprint.md"
     write_2d_animation_playtest_report_template(
         report_path,
-        version="0.209.0",
+        version="0.210.0",
         prefill_automated_gates=True,
     )
     write_2d_animation_playtest_command_queue(
@@ -8412,12 +8412,16 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     text = paths["sprint"].read_text(encoding="utf-8")
     assert sprint.status == "manual-required"
     assert sprint.open_observation_count == 5
+    assert sprint.checklist_count == 5
     assert sprint.blocker_count == 12
     assert validation.status == "pass"
     assert validation.expected_observation_count == 5
     assert validation.expected_blocker_count == 12
     assert "# NEXUS TECH 2D Animation Sprint Packet" in text
     assert "## Sprint Order" in text
+    assert "## Manual Observation Checklist" in text
+    assert "Layout bounds" in text
+    assert "No overlapping text, clipped labels, or controls outside panels." in text
     assert "## Observation Queue" in text
     assert "## P0/P1 Blocker Queue" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
@@ -8518,6 +8522,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
 
     assert result.exit_code == 0
     assert "Animation Playtest Sprint" in result.output
+    assert "Checklist Items" in result.output
     assert "Sprint Observation Queue" in result.output
     assert "Post-observation Signoff" in result.output
     assert paths["sprint"].exists()
@@ -8956,6 +8961,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "validate-animation-playtest-issue-backlog" in issue_backlog_text
     assert "# NEXUS TECH 2D Animation Sprint Packet" in sprint_text
     assert "## Sprint Order" in sprint_text
+    assert "## Manual Observation Checklist" in sprint_text
     assert "## Observation Queue" in sprint_text
     assert "## P0/P1 Blocker Queue" in sprint_text
     assert "post-observation signoff" in sprint_text
