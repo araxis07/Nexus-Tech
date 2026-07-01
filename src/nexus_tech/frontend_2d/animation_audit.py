@@ -1240,6 +1240,12 @@ class AnimationPlaytestSprintPacket:
 
         return len(_ANIMATION_SPRINT_OBSERVATION_CHECKS)
 
+    @property
+    def defect_intake_count(self) -> int:
+        """Return manual defect intake rows included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_DEFECT_INTAKE_ROWS)
+
 
 @dataclass(frozen=True)
 class AnimationPlaytestSprintPacketValidation:
@@ -1501,6 +1507,38 @@ _ANIMATION_SPRINT_OBSERVATION_CHECKS: tuple[tuple[str, str, str], ...] = (
         "Evidence wording",
         "Recorder notes describe observed facts instead of generic ok/pass wording.",
         "Specific UI elements, animation cues, and blocker names.",
+    ),
+)
+_ANIMATION_SPRINT_DEFECT_INTAKE_ROWS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "Text overlap, clipped labels, or controls outside panels",
+        "P0",
+        "Window size, route, motion mode, exact label/control, and screenshot note.",
+        "Record fail evidence, fix layout before release, then rerun the visible command.",
+    ),
+    (
+        "Pause, back, menu, help, save, or disabled action is unclear",
+        "P0",
+        "Control tried, expected navigation, actual response, and visible feedback.",
+        "Record control evidence, fix interaction copy/state, then rerun the command.",
+    ),
+    (
+        "Motion hides state changes or makes text hard to follow",
+        "P0/P1",
+        "Motion mode, actor or panel, state change, and whether reduced/off clears it.",
+        "Record fail/watch evidence and tune motion before release candidate review.",
+    ),
+    (
+        "Contrast, typography, or tooltip readability is questionable",
+        "P1",
+        "Text, color pairing, panel, route, and reading condition.",
+        "Record watch evidence and decide fix or accepted watch risk before RC.",
+    ),
+    (
+        "Small polish issue that does not block task completion",
+        "P2",
+        "Route, element, observed annoyance, and why gameplay remains usable.",
+        "Record follow-up evidence; do not clear P0/P1 signoff until blockers are resolved.",
     ),
 )
 _RELEASE_GATE_CHECKS: frozenset[str] = frozenset(
@@ -3797,6 +3835,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
+        f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3828,6 +3867,17 @@ def write_2d_animation_playtest_sprint_packet(
     ]
     for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS:
         lines.append(_format_animation_sprint_checklist_row(checklist_item))
+    lines.extend(
+        [
+            "",
+            "## Manual Defect Intake",
+            "",
+            "| Trigger | Priority | Evidence Must Name | Required Action |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for intake_row in _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS:
+        lines.append(_format_animation_sprint_defect_intake_row(intake_row))
     lines.extend(
         [
             "",
@@ -3978,6 +4028,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
+        f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- P0/P1 blockers: `{sprint.blocker_count}`",
         f"- Backlog status: `{sprint.issue_backlog.status}`",
         f"- Next manual area: `{gate.recorder_hint.area}`",
@@ -3992,6 +4043,12 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_checklist_row(checklist_item)
             for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS
+        ),
+        "## Manual Defect Intake",
+        "| Trigger | Priority | Evidence Must Name | Required Action |",
+        *(
+            _format_animation_sprint_defect_intake_row(intake_row)
+            for intake_row in _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS
         ),
     )
     for line in required_lines:
@@ -4215,6 +4272,17 @@ def _format_animation_sprint_checklist_row(checklist_item: tuple[str, str, str])
         f"{_markdown_table_cell(check)} | "
         f"{_markdown_table_cell(pass_criteria)} | "
         f"{_markdown_table_cell(evidence_terms)} |"
+    )
+
+
+def _format_animation_sprint_defect_intake_row(intake_row: tuple[str, str, str, str]) -> str:
+    trigger, priority, evidence_terms, required_action = intake_row
+    return (
+        "| "
+        f"{_markdown_table_cell(trigger)} | "
+        f"{_markdown_table_cell(priority)} | "
+        f"{_markdown_table_cell(evidence_terms)} | "
+        f"{_markdown_table_cell(required_action)} |"
     )
 
 

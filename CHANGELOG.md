@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.211.0 - 2026-07-02
+
+- Added a validated manual defect intake table to `animation-playtest-sprint` so playtesters can classify UI and animation findings as P0/P1/P2 with required evidence before editing report rows
+- Extended sprint metadata and CLI output with defect-intake row counts, keeping focused QA packets explicit about both acceptance checks and defect escalation
+- Updated docs and regression coverage while preserving the rule that release signoff still requires real visible-window evidence
+
 ## 0.210.0 - 2026-07-01
 
 - Added a validated manual observation checklist to `animation-playtest-sprint` so each focused QA pass names layout, navigation, typography, motion, and evidence wording checks before recorder commands are used
