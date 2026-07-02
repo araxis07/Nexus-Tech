@@ -70,10 +70,12 @@ before recorder commands, then use the batch evidence checklist and result
 decision guide to choose pass/watch/fail. Keep `--result pass` only when no
 defect trigger applies, switch to `watch` for playable/readable risks, and
 switch to `fail` for blocking UI, navigation, readability, or motion defects.
-The batch copy blocks still require replacing placeholder notes with real
-observations from the visible window. After recording a batch, run the
-post-recording refresh commands so the route-batch artifact and report status
-reflect the new evidence.
+Use the defect-trigger checklist to classify layout containment, navigation
+recovery, motion readability, feedback clarity, and evidence-quality issues
+before editing recorder result flags. The batch copy blocks still require
+replacing placeholder notes with real observations from the visible window.
+After recording a batch, run the post-recording refresh commands so the
+route-batch artifact and report status reflect the new evidence.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

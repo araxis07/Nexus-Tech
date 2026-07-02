@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.227.0 - 2026-07-03
+
+- Added a validated defect-trigger checklist to every visible route batch
+- Added terminal defect-trigger guidance for layout, navigation, motion, feedback, and evidence-quality checks before recorder commands
+- Updated docs and regression coverage so manual route batches classify watch/fail triggers before final signoff
+
 ## 0.226.0 - 2026-07-03
 
 - Added a validated pass/watch/fail result decision guide to every visible route batch

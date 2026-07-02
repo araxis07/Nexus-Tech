@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
     MotionMode,
     animation_playtest_route_batch_copy_commands,
+    animation_playtest_route_batch_defect_trigger_rows,
     animation_playtest_route_batch_evidence_checklist_rows,
     animation_playtest_route_batch_post_recording_commands,
     animation_playtest_route_batch_result_decision_rows,
@@ -2352,6 +2353,24 @@ def animation_playtest_route_batches_command(
                     f"{result} | use when: {use_when} | "
                     f"recorder: {recorder_edit} | release: {release_rule}"
                 )
+            )
+        defect_table = Table(title="Route Batch Defect Trigger Checklist")
+        defect_table.add_column("Trigger", style="cyan")
+        defect_table.add_column("Record Watch When")
+        defect_table.add_column("Record Fail When")
+        defect_table.add_column("Required Action")
+        for row in animation_playtest_route_batch_defect_trigger_rows():
+            defect_table.add_row(*row)
+        console.print(defect_table)
+        console.print("[bold cyan]Route Batch Defect Trigger Lines[/bold cyan]")
+        for (
+            trigger,
+            watch_when,
+            fail_when,
+            required_action,
+        ) in animation_playtest_route_batch_defect_trigger_rows():
+            console.print(
+                (f"{trigger} | watch: {watch_when} | fail: {fail_when} | action: {required_action}")
             )
         console.print("[bold cyan]Route Batch Copy Commands[/bold cyan]")
         console.print(f"Batch {next_batch.batch_number}: {next_batch.window_size}")

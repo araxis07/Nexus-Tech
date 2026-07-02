@@ -167,6 +167,9 @@ pass/watch/fail before replacing recorder placeholders with notes from the
 visible game window. Keep `--result pass` only when no defect trigger applies;
 change it to `--result watch` for playable/readable follow-up risks or
 `--result fail` for blocking UI, navigation, readability, or motion defects.
+Use the defect-trigger checklist to name whether the issue is layout
+containment, navigation recovery, motion readability, feedback clarity, or
+evidence quality before running the recorder command.
 After recording the batch, run the post-recording refresh commands in the same
 artifact to regenerate route batches, validate them, and check the current
 report status.

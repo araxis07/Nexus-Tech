@@ -233,6 +233,38 @@ _ROUTE_BATCH_RESULT_DECISION_ROWS: tuple[tuple[str, str, str, str], ...] = (
         "Fix before release, rerun visible command, then record new evidence.",
     ),
 )
+_ROUTE_BATCH_DEFECT_TRIGGER_ROWS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "Layout containment",
+        "Text, cards, or actor motion touches another region but the route remains usable.",
+        "Text/control is clipped, unreadable, or covers a required action.",
+        "Record watch/fail and name the scene plus control.",
+    ),
+    (
+        "Navigation recovery",
+        "Pause/back/menu/help affordance is visible but unclear or slow to discover.",
+        "Player cannot pause, back out, return to menu, save, or understand a disabled action.",
+        "Record control evidence before closing the batch.",
+    ),
+    (
+        "Motion readability",
+        "Motion distracts or competes but labels remain readable.",
+        "Animation covers text, controls, feedback, or the decision target.",
+        "Rerun in full/reduced/off and record the affected mode.",
+    ),
+    (
+        "Feedback clarity",
+        "Outcome is visible but target, metric, or reason needs clearer copy.",
+        "Success, blocked, or impact feedback does not identify the target, value, or reason.",
+        "Attach route notes to the matching feedback row.",
+    ),
+    (
+        "Evidence quality",
+        "Observation lacks one required term or needs a stronger note.",
+        "Notes are generic or recorder placeholders remain.",
+        "Do not run final validation until notes name observed behavior.",
+    ),
+)
 DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS: tuple[str, ...] = (
     (
         "uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch "
@@ -5852,6 +5884,17 @@ def write_2d_animation_playtest_route_batch_plan(
         lines.extend(
             [
                 "",
+                f"### Batch {batch.batch_number} Defect Trigger Checklist",
+                "",
+                "| Trigger | Record Watch When | Record Fail When | Required Action |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for row in animation_playtest_route_batch_defect_trigger_rows():
+            lines.append(_format_route_batch_defect_trigger_row(row))
+        lines.extend(
+            [
+                "",
                 f"### Batch {batch.batch_number} Copy Commands",
                 "",
                 "```bash",
@@ -6010,6 +6053,17 @@ def validate_2d_animation_playtest_route_batch_plan(
         for line in result_decision_lines:
             if line not in text:
                 findings.append(f"missing route batch result decision guard: {line}")
+        defect_trigger_lines = (
+            f"### Batch {batch.batch_number} Defect Trigger Checklist",
+            "| Trigger | Record Watch When | Record Fail When | Required Action |",
+            *(
+                _format_route_batch_defect_trigger_row(row)
+                for row in animation_playtest_route_batch_defect_trigger_rows()
+            ),
+        )
+        for line in defect_trigger_lines:
+            if line not in text:
+                findings.append(f"missing route batch defect trigger guard: {line}")
         copy_block_lines = (
             f"### Batch {batch.batch_number} Copy Commands",
             *animation_playtest_route_batch_copy_commands(batch),
@@ -6108,6 +6162,12 @@ def animation_playtest_route_batch_result_decision_rows() -> tuple[tuple[str, st
     return _ROUTE_BATCH_RESULT_DECISION_ROWS
 
 
+def animation_playtest_route_batch_defect_trigger_rows() -> tuple[tuple[str, str, str, str], ...]:
+    """Return defect trigger guidance for manual route-batch observations."""
+
+    return _ROUTE_BATCH_DEFECT_TRIGGER_ROWS
+
+
 def animation_playtest_route_batch_post_recording_commands(
     batch_plan: AnimationPlaytestRouteBatchPlan,
     output_path: Path,
@@ -6162,6 +6222,17 @@ def _format_route_batch_result_decision_row(row: tuple[str, str, str, str]) -> s
         f"{_markdown_table_cell(use_when)} | "
         f"{_markdown_table_cell(recorder_edit)} | "
         f"{_markdown_table_cell(release_rule)} |"
+    )
+
+
+def _format_route_batch_defect_trigger_row(row: tuple[str, str, str, str]) -> str:
+    trigger, record_watch_when, record_fail_when, required_action = row
+    return (
+        "| "
+        f"{_markdown_table_cell(trigger)} | "
+        f"{_markdown_table_cell(record_watch_when)} | "
+        f"{_markdown_table_cell(record_fail_when)} | "
+        f"{_markdown_table_cell(required_action)} |"
     )
 
 
