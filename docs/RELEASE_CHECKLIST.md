@@ -139,7 +139,8 @@ placeholders as post-observation signoff work, includes the manual observation
 checklist plus defect intake, a layout repair pass for responsive frames, button
 grids, text containment, navigation affordance, and motion separation,
 navigation recovery drills for pause, resume, back/escape, menu return, and
-help/hover paths, exit criteria, evidence capture prompts, and note templates, then
+help/hover paths, a navigation recording map with the exact control recorder
+commands, exit criteria, evidence capture prompts, and note templates, then
 `validate-animation-playtest-sprint` verifies both sources still match.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,

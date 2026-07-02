@@ -640,10 +640,11 @@ typography, motion, and evidence wording, adds a defect intake table for
 P0/P1/P2 UI or animation findings, adds a dedicated layout repair pass for
 responsive frames, button grids, text containment, navigation affordance, and
 motion separation, adds navigation recovery drills for pause, resume,
-back/escape, menu return, and help/hover paths, includes exit criteria for
-closing the pass, adds evidence capture prompts for every visible step, provides
-note templates for pass/watch/fail evidence, keeps recorder placeholders invalid
-until the visible command has been observed, and
+back/escape, menu return, and help/hover paths, maps those drills to the exact
+control recorder commands that must update the report, includes exit criteria
+for closing the pass, adds evidence capture prompts for every visible step,
+provides note templates for pass/watch/fail evidence, keeps recorder
+placeholders invalid until the visible command has been observed, and
 `validate-animation-playtest-sprint` confirms the packet still matches the
 current guide and backlog.
 The plan also includes a validated `Manual Evidence Checklist` for the window

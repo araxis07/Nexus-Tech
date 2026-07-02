@@ -1253,6 +1253,12 @@ class AnimationPlaytestSprintPacket:
         return len(_ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS)
 
     @property
+    def navigation_recording_count(self) -> int:
+        """Return navigation recorder rows included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_NAVIGATION_RECORDING_ROWS)
+
+    @property
     def defect_intake_count(self) -> int:
         """Return manual defect intake rows included in the sprint."""
 
@@ -1605,6 +1611,13 @@ _ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS: tuple[tuple[str, str, str, str], .
         ),
         "Mark P1 when the control exists but the affordance copy is unclear.",
     ),
+)
+_ANIMATION_SPRINT_NAVIGATION_RECORDING_ROWS: tuple[tuple[str, str], ...] = (
+    ("Pause open + Resume", "Pause / Resume"),
+    ("Back / Escape", "Back / Escape"),
+    ("Menu return", "Menu Return"),
+    ("Help / hover", "Help / Hover"),
+    ("Control replay safety", "Control Replay Safety"),
 )
 _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS: tuple[tuple[str, str, str, str], ...] = (
     (
@@ -3989,6 +4002,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
         f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
+        f"- Navigation recording rows: `{sprint.navigation_recording_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
@@ -4046,6 +4060,23 @@ def write_2d_animation_playtest_sprint_packet(
     )
     for drill in _ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS:
         lines.append(_format_animation_sprint_navigation_drill_row(drill))
+    lines.extend(
+        [
+            "",
+            "## Navigation Recording Map",
+            "",
+            "| Drill Group | Report Row | Required Terms | Recorder Command |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for recording_row in _ANIMATION_SPRINT_NAVIGATION_RECORDING_ROWS:
+        lines.append(
+            _format_animation_sprint_navigation_recording_row(
+                recording_row,
+                report_path=Path(gate.session.report.path),
+                command_prefix=guide.command_prefix,
+            )
+        )
     lines.extend(
         [
             "",
@@ -4242,6 +4273,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
         f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
+        f"- Navigation recording rows: `{sprint.navigation_recording_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
@@ -4272,6 +4304,16 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_navigation_drill_row(drill)
             for drill in _ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS
+        ),
+        "## Navigation Recording Map",
+        "| Drill Group | Report Row | Required Terms | Recorder Command |",
+        *(
+            _format_animation_sprint_navigation_recording_row(
+                recording_row,
+                report_path=Path(gate.session.report.path),
+                command_prefix=guide.command_prefix,
+            )
+            for recording_row in _ANIMATION_SPRINT_NAVIGATION_RECORDING_ROWS
         ),
         "## Manual Defect Intake",
         "| Trigger | Priority | Evidence Must Name | Required Action |",
@@ -4543,6 +4585,28 @@ def _format_animation_sprint_navigation_drill_row(
         f"{_markdown_table_cell(manual_action)} | "
         f"{_markdown_table_cell(pass_criteria)} | "
         f"{_markdown_table_cell(escalation_rule)} |"
+    )
+
+
+def _format_animation_sprint_navigation_recording_row(
+    recording_row: tuple[str, str],
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> str:
+    drill_group, report_row = recording_row
+    required_terms = CONTROL_EVIDENCE_TERMS[report_row]
+    recorder_command = (
+        f"{command_prefix} record-animation-playtest-control "
+        f"{_shell_arg(report_path)} {_shell_arg(report_row)} --result pass "
+        "--notes '<replace with observed evidence notes>' --follow-up none"
+    )
+    return (
+        "| "
+        f"{_markdown_table_cell(drill_group)} | "
+        f"{_markdown_table_cell(report_row)} | "
+        f"{_markdown_table_cell(', '.join(required_terms))} | "
+        f"`{_markdown_table_cell(recorder_command)}` |"
     )
 
 

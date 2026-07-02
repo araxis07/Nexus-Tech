@@ -3161,6 +3161,7 @@ def animation_playtest_sprint_command(
     summary_table.add_row("Checklist Items", str(sprint.checklist_count))
     summary_table.add_row("Layout Repair Checks", str(sprint.layout_repair_count))
     summary_table.add_row("Navigation Recovery Drills", str(sprint.navigation_drill_count))
+    summary_table.add_row("Navigation Recording Rows", str(sprint.navigation_recording_count))
     summary_table.add_row("Defect Intake Rows", str(sprint.defect_intake_count))
     summary_table.add_row("Exit Criteria", str(sprint.exit_criteria_count))
     summary_table.add_row("Evidence Capture Rows", str(sprint.evidence_capture_count))
@@ -3996,6 +3997,9 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Sprint Layout Repair Checks", str(sprint_packet.layout_repair_count))
     session_table.add_row(
         "Sprint Navigation Recovery Drills", str(sprint_packet.navigation_drill_count)
+    )
+    session_table.add_row(
+        "Sprint Navigation Recording Rows", str(sprint_packet.navigation_recording_count)
     )
     session_table.add_row("Sprint P0/P1 Blockers", str(sprint_packet.blocker_count))
     session_table.add_row("Blocking Checks", str(release_gate.blocking_check_count))

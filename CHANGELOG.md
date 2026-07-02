@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.217.0 - 2026-07-02
+
+- Added a validated navigation recording map to `animation-playtest-sprint` so pause/resume, back/escape, menu return, help/hover, and replay-safety drills point to the correct recorder commands
+- Extended sprint metadata and CLI output with navigation-recording row counts, keeping recovery drills connected to concrete report rows instead of free-form notes
+- Updated docs and regression coverage while keeping recorder placeholders invalid until testers replace them with real visible-window evidence
+
 ## 0.216.0 - 2026-07-02
 
 - Added validated navigation recovery drills to `animation-playtest-sprint` so pause open, resume, back/escape, menu return, and help/hover recovery checks are explicit before signoff
