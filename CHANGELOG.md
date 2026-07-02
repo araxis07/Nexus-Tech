@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.221.0 - 2026-07-02
+
+- Added a `Next Sprint Action` section to `animation-playtest-sprint` artifacts so the next visible command and matching recorder command are visible before the full observation queue
+- Added a terminal `Sprint Next Action` table to the sprint command, keeping the first manual playtest step actionable without opening the Markdown packet
+- Updated docs and regression coverage while keeping the release gate `manual-required` until real visible-window evidence is recorded
+
 ## 0.220.0 - 2026-07-02
 
 - Added a visible `Sprint Execution Batches` table to `animation-playtest-sprint` so testers can see the ordered batch plan directly in terminal output

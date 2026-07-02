@@ -60,7 +60,9 @@ templates, without
 treating either artifact as release evidence.
 The sprint command also prints the execution batch table directly in terminal
 output; use that order before replacing report placeholders with recorder
-commands.
+commands. Use the `Next Sprint Action` row to run the next visible command
+first, then replace the recorder placeholder with real observed notes only
+after the window has been checked.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

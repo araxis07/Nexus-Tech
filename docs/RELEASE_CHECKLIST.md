@@ -146,7 +146,9 @@ commands, exit criteria, evidence capture prompts, and note templates, then
 `validate-animation-playtest-sprint` verifies both sources still match.
 The CLI output prints the execution batch table too, so release review can see
 the next artifact refresh, layout, recovery, motion, and closure steps without
-opening the sprint Markdown file.
+opening the sprint Markdown file. It also prints the next visible command and
+matching recorder command as `Sprint Next Action`, keeping the handoff anchored
+to the first real observation step.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

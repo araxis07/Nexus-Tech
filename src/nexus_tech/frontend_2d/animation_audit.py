@@ -1229,6 +1229,12 @@ class AnimationPlaytestSprintPacket:
         return len(self.observation_steps)
 
     @property
+    def next_observation(self) -> AnimationPlaytestRecorderHint | None:
+        """Return the next manual observation row for this sprint."""
+
+        return self.observation_steps[0] if self.observation_steps else None
+
+    @property
     def blocker_count(self) -> int:
         """Return P0/P1 issue count carried into this sprint."""
 
@@ -4092,6 +4098,12 @@ def write_2d_animation_playtest_sprint_packet(
         ),
         "| 4 | Run the validation commands. | Sprint, guide, backlog, and report status agree. |",
         "",
+        "## Next Sprint Action",
+        "",
+        "| Area | Target | Visible Command | Required Terms | Recorder Command |",
+        "| --- | --- | --- | --- | --- |",
+        _format_animation_sprint_next_action_row(sprint.next_observation),
+        "",
         "## Manual Execution Batches",
         "",
         "| Batch | Visible Scope | Record After | Stop / Escalate If |",
@@ -4378,6 +4390,9 @@ def validate_2d_animation_playtest_sprint_packet(
         backlog_validation_command,
         sprint_validation_command,
         report_validation_command,
+        "## Next Sprint Action",
+        "| Area | Target | Visible Command | Required Terms | Recorder Command |",
+        _format_animation_sprint_next_action_row(sprint.next_observation),
         "## Manual Execution Batches",
         "| Batch | Visible Scope | Record After | Stop / Escalate If |",
         *(
@@ -4805,6 +4820,23 @@ def _format_animation_sprint_evidence_note_template_row(
         f"{_markdown_table_cell(use_when)} | "
         f"{_markdown_table_cell(note_must_include)} | "
         f"{_markdown_table_cell(template_skeleton)} |"
+    )
+
+
+def _format_animation_sprint_next_action_row(
+    hint: AnimationPlaytestRecorderHint | None,
+) -> str:
+    if hint is None:
+        return "| none | none | `-` | - | `-` |"
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    return (
+        "| "
+        f"{_markdown_table_cell(hint.area)} | "
+        f"{_markdown_table_cell(hint.target)} | "
+        f"`{_markdown_table_cell(visible_command)}` | "
+        f"{_markdown_table_cell(required_terms)} | "
+        f"`{_markdown_table_cell(hint.recorder_command)}` |"
     )
 
 

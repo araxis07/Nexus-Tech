@@ -3192,6 +3192,23 @@ def animation_playtest_sprint_command(
     summary_table.add_row("Backlog Status", sprint.issue_backlog.status.upper())
     console.print(summary_table)
 
+    if sprint.next_observation is not None:
+        hint = sprint.next_observation
+        next_table = Table(title="Sprint Next Action")
+        next_table.add_column("Area", style="cyan")
+        next_table.add_column("Target")
+        next_table.add_column("Visible Command")
+        next_table.add_column("Required Terms", justify="right")
+        next_table.add_column("Recorder Command")
+        next_table.add_row(
+            hint.area,
+            hint.target,
+            hint.visible_command or "-",
+            str(len(hint.required_terms)),
+            hint.recorder_command,
+        )
+        console.print(next_table)
+
     batch_table = Table(title="Sprint Execution Batches")
     batch_table.add_column("Batch", style="cyan", no_wrap=True)
     batch_table.add_column("Visible Scope")

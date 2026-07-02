@@ -154,7 +154,9 @@ prompts, and note templates, and validates against the execution guide plus
 issue backlog before the packet is used.
 The sprint command prints the same execution batches in terminal output, so the
 tester can start with artifact refresh and the 820x620 layout pass before
-opening or editing the Markdown packet.
+opening or editing the Markdown packet. It also prints `Sprint Next Action`
+with the first visible command and matching recorder command, so the tester can
+start the next real observation without scanning the full queue.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 
