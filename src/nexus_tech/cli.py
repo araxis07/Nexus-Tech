@@ -65,6 +65,7 @@ from nexus_tech.frontend_2d import (
     AnimationPlaytestReportValidation,
     Frontend2DUnavailableError,
     MotionMode,
+    animation_playtest_route_batch_copy_commands,
     animation_playtest_sprint_blocker_dependency,
     animation_playtest_sprint_blocker_next_action,
     animation_playtest_sprint_blocker_phase,
@@ -2302,6 +2303,13 @@ def animation_playtest_route_batches_command(
             next_command,
         )
     console.print(summary_table)
+
+    next_batch = next((batch for batch in batch_plan.batches if batch.open_items), None)
+    if next_batch is not None:
+        console.print("[bold cyan]Route Batch Copy Commands[/bold cyan]")
+        console.print(f"Batch {next_batch.batch_number}: {next_batch.window_size}")
+        for line in animation_playtest_route_batch_copy_commands(next_batch):
+            console.print(line)
 
     if batch_plan.commands.findings:
         findings_table = Table(title="Route Batch Command Findings")

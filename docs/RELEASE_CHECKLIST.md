@@ -151,6 +151,9 @@ matching recorder command as `Sprint Next Action`, keeping the handoff anchored
 to the first real observation step. The `Next Sprint Copy Commands` panel keeps
 the full command text visible for copy-paste while preserving placeholder notes
 until a tester records real evidence.
+The route-batch artifact and CLI now surface per-window copy commands for the
+next incomplete batch, keeping all visible route commands ahead of recorder
+placeholders during release review.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

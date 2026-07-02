@@ -5801,6 +5801,16 @@ def write_2d_animation_playtest_route_batch_plan(
                 f"{_markdown_table_cell(required_terms)} | "
                 f"`{_markdown_table_cell(recorder_command)}` |"
             )
+        lines.extend(
+            [
+                "",
+                f"### Batch {batch.batch_number} Copy Commands",
+                "",
+                "```bash",
+                *animation_playtest_route_batch_copy_commands(batch),
+                "```",
+            ]
+        )
         if batch.window_recorder_hint is not None:
             hint = batch.window_recorder_hint
             required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
@@ -5917,6 +5927,13 @@ def validate_2d_animation_playtest_route_batch_plan(
         _validate_route_batch_item_row(findings, item, row)
 
     for batch in batch_plan.batches:
+        copy_block_lines = (
+            f"### Batch {batch.batch_number} Copy Commands",
+            *animation_playtest_route_batch_copy_commands(batch),
+        )
+        for line in copy_block_lines:
+            if line not in text:
+                findings.append(f"missing route batch copy command guard: {line}")
         if batch.window_recorder_hint is not None:
             _validate_route_batch_window_hint(findings, batch.window_recorder_hint, text)
 
@@ -5926,6 +5943,38 @@ def validate_2d_animation_playtest_route_batch_plan(
         expected_route_rows=len(expected_items),
         findings=tuple(findings),
     )
+
+
+def animation_playtest_route_batch_copy_commands(
+    batch: AnimationPlaytestRouteBatch,
+) -> tuple[str, ...]:
+    """Return copy-paste commands for one visible-window route batch."""
+
+    open_items = tuple(item for item in batch.items if item.status != "pass")
+    has_open_window_summary = (
+        batch.window_recorder_hint is not None and batch.window_recorder_hint.status != "pass"
+    )
+    if not open_items and not has_open_window_summary:
+        return (f"# Batch {batch.batch_number}: {batch.window_size} already recorded.",)
+
+    lines: list[str] = [f"# Batch {batch.batch_number}: {batch.window_size} visible commands"]
+    for item in open_items:
+        lines.append(item.visible_command)
+
+    recorder_commands = tuple(item.recorder_command for item in open_items if item.recorder_command)
+    if recorder_commands:
+        lines.append(
+            "# Replace recorder placeholders with observed notes after each visible command:"
+        )
+        lines.extend(recorder_commands)
+
+    if has_open_window_summary and batch.window_recorder_hint is not None:
+        lines.append(
+            f"# Record the {batch.window_size} window summary after all motion modes are observed:"
+        )
+        lines.append(batch.window_recorder_hint.recorder_command)
+
+    return tuple(lines)
 
 
 def validate_2d_animation_playtest_readiness_plan(

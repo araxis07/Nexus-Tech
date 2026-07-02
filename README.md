@@ -613,7 +613,10 @@ visible command plus matching recorder command, while
 `animation-playtest-route-batches` groups the visible pass into one batch per
 target window and `validate-animation-playtest-route-batches` blocks stale route
 batch artifacts so manual QA can work through the matrix without losing recorder
-commands between command generation and final signoff.
+commands between command generation and final signoff. Each route batch also
+exports copy-paste command blocks that run visible windows before listing
+recorder placeholders, so testers do not mark evidence before observing the
+game window.
 `animation-playtest-ui-triage` turns the current manual gaps into P0/P1/P2
 layout, typography, control, scene, motion, and signoff lanes so UI polish work
 does not get mixed into generic notes before the final validator pass.

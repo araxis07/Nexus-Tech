@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.223.0 - 2026-07-03
+
+- Added per-window route batch copy commands so manual animation QA can run all visible commands before using recorder placeholders
+- Added terminal route-batch copy output for the next incomplete window batch
+- Updated validators, docs, and regression coverage to keep route batch artifacts current without treating copy commands as evidence
+
 ## 0.222.0 - 2026-07-02
 
 - Added `Next Sprint Copy Commands` to `animation-playtest-sprint` artifacts so the next visible command and recorder command are available as full copy-paste commands

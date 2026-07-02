@@ -160,6 +160,9 @@ start the next real observation without scanning the full queue. Use `Next
 Sprint Copy Commands` when copying commands from the terminal, but do not run
 the recorder line until the placeholder notes have been replaced with observed
 evidence.
+The route-batch artifact also includes per-window copy blocks for 820x620,
+960x640, and 1440x900. Run the visible commands in those blocks first, then
+replace the recorder placeholders with notes from the visible game window.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 
