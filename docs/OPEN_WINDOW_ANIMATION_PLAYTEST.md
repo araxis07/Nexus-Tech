@@ -163,7 +163,9 @@ evidence.
 The route-batch artifact also includes per-window copy blocks for 820x620,
 960x640, and 1440x900. Run the visible commands in those blocks first, then
 use the batch evidence checklist to decide pass/watch/fail and replace the
-recorder placeholders with notes from the visible game window.
+recorder placeholders with notes from the visible game window. After recording
+the batch, run the post-recording refresh commands in the same artifact to
+regenerate route batches, validate them, and check the current report status.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

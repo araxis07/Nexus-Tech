@@ -67,6 +67,7 @@ from nexus_tech.frontend_2d import (
     MotionMode,
     animation_playtest_route_batch_copy_commands,
     animation_playtest_route_batch_evidence_checklist_rows,
+    animation_playtest_route_batch_post_recording_commands,
     animation_playtest_sprint_blocker_dependency,
     animation_playtest_sprint_blocker_next_action,
     animation_playtest_sprint_blocker_phase,
@@ -2334,6 +2335,13 @@ def animation_playtest_route_batches_command(
         console.print(f"Batch {next_batch.batch_number}: {next_batch.window_size}")
         for line in animation_playtest_route_batch_copy_commands(next_batch):
             console.print(line)
+        if output is not None:
+            console.print("[bold cyan]Route Batch Post-Recording Commands[/bold cyan]")
+            for line in animation_playtest_route_batch_post_recording_commands(
+                batch_plan,
+                output,
+            ):
+                console.print(line)
 
     if batch_plan.commands.findings:
         findings_table = Table(title="Route Batch Command Findings")

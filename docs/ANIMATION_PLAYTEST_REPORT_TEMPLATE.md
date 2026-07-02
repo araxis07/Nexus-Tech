@@ -68,7 +68,9 @@ evidence.
 For route batches, use the per-window copy blocks to run all visible commands
 before recorder commands, then use the batch evidence checklist to choose
 pass/watch/fail. The batch copy blocks still require replacing placeholder notes
-with real observations from the visible window.
+with real observations from the visible window. After recording a batch, run the
+post-recording refresh commands so the route-batch artifact and report status
+reflect the new evidence.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

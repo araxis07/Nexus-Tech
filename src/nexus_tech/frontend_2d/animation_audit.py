@@ -863,6 +863,9 @@ class AnimationPlaytestRouteBatchPlan:
     report: AnimationPlaytestReportValidation
     commands: AnimationPlaytestCommandQueueValidation
     batches: tuple[AnimationPlaytestRouteBatch, ...]
+    scenario_id: str = "founder_journey"
+    seed: int = 7
+    command_prefix: str = "uv run nexus-tech"
 
     @property
     def status(self) -> str:
@@ -2567,6 +2570,9 @@ def build_2d_animation_playtest_route_batch_plan(
         report=report,
         commands=commands,
         batches=tuple(batches),
+        scenario_id=scenario_id,
+        seed=seed,
+        command_prefix=command_prefix,
     )
 
 
@@ -5837,6 +5843,19 @@ def write_2d_animation_playtest_route_batch_plan(
                     f"`{_markdown_table_cell(hint.recorder_command)}`",
                 ]
             )
+        lines.extend(
+            [
+                "",
+                f"### Batch {batch.batch_number} Post-Recording Commands",
+                "",
+                "```bash",
+                *animation_playtest_route_batch_post_recording_commands(
+                    batch_plan,
+                    output_path,
+                ),
+                "```",
+            ]
+        )
 
     if batch_plan.commands.findings:
         lines.extend(
@@ -5956,6 +5975,16 @@ def validate_2d_animation_playtest_route_batch_plan(
         for line in copy_block_lines:
             if line not in text:
                 findings.append(f"missing route batch copy command guard: {line}")
+        post_recording_lines = (
+            f"### Batch {batch.batch_number} Post-Recording Commands",
+            *animation_playtest_route_batch_post_recording_commands(
+                batch_plan,
+                batch_path,
+            ),
+        )
+        for line in post_recording_lines:
+            if line not in text:
+                findings.append(f"missing route batch post-recording guard: {line}")
         if batch.window_recorder_hint is not None:
             _validate_route_batch_window_hint(findings, batch.window_recorder_hint, text)
 
@@ -6029,6 +6058,38 @@ def animation_playtest_route_batch_evidence_checklist_rows(
             )
         )
     return tuple(rows)
+
+
+def animation_playtest_route_batch_post_recording_commands(
+    batch_plan: AnimationPlaytestRouteBatchPlan,
+    output_path: Path,
+) -> tuple[str, ...]:
+    """Return commands to refresh and validate route batches after manual recording."""
+
+    context_args = (
+        f" --scenario {_shell_arg(batch_plan.scenario_id)}"
+        f" --seed {batch_plan.seed}"
+        f" --command-prefix {_shell_arg(batch_plan.command_prefix)}"
+    )
+    return (
+        "# After recording observed notes for this batch, refresh the route-batch artifact:",
+        (
+            f"{batch_plan.command_prefix} animation-playtest-route-batches "
+            f"{_shell_arg(batch_plan.report.path)} {_shell_arg(batch_plan.commands.path)}"
+            f"{context_args} --output {_shell_arg(output_path)}"
+        ),
+        "# Validate that the refreshed route-batch artifact still matches the report:",
+        (
+            f"{batch_plan.command_prefix} validate-animation-playtest-route-batches "
+            f"{_shell_arg(output_path)} {_shell_arg(batch_plan.report.path)} "
+            f"{_shell_arg(batch_plan.commands.path)}{context_args}"
+        ),
+        "# Check the report status; MANUAL-REQUIRED is expected until all batches/signoff pass:",
+        (
+            f"{batch_plan.command_prefix} animation-playtest-status "
+            f"{_shell_arg(batch_plan.report.path)}"
+        ),
+    )
 
 
 def _format_route_batch_evidence_checklist_row(

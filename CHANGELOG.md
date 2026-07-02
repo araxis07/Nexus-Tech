@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.225.0 - 2026-07-03
+
+- Added post-recording refresh and validation commands to every visible route batch
+- Added terminal post-recording commands for the next incomplete route batch when an output artifact path is provided
+- Updated docs and regression coverage so testers can refresh route batches and status after recording observed evidence
+
 ## 0.224.0 - 2026-07-03
 
 - Added per-batch evidence checklists to visible route-batch artifacts so testers decide pass/watch/fail before recorder commands

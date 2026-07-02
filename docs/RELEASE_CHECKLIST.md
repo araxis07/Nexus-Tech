@@ -154,6 +154,9 @@ until a tester records real evidence.
 The route-batch artifact and CLI now surface per-window evidence checklists and
 copy commands for the next incomplete batch, keeping pass/watch/fail decisions
 and visible route commands ahead of recorder placeholders during release review.
+When an output artifact path is provided, the CLI also prints post-recording
+refresh commands for validating route batches and checking report status after
+observed evidence is recorded.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

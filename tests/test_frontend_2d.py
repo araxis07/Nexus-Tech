@@ -6974,6 +6974,10 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert "# Record the 820x620 window summary after all motion modes are observed:" in text
     assert "### Window Summary Recorder" in text
     assert "record-animation-playtest-window" in text
+    assert "### Batch 1 Post-Recording Commands" in text
+    assert "animation-playtest-route-batches" in text
+    assert "validate-animation-playtest-route-batches" in text
+    assert "animation-playtest-status" in text
     assert "<replace with observed visible-window notes>" in text
 
 
@@ -7018,10 +7022,13 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "Route Batch Copy Commands" in result.output
     assert "Batch 1: 820x620" in result.output
     assert "Record the 820x620 window summary after all motion modes are observed" in result.output
+    assert "Route Batch Post-Recording Commands" in result.output
+    assert "validate-animation-playtest-route-batches" in result.output
     assert "Route batch status: MANUAL-REQUIRED" in result.output
     assert output_path.exists()
     output_text = output_path.read_text(encoding="utf-8")
     assert "### Batch 1 Copy Commands" in output_text
+    assert "### Batch 1 Post-Recording Commands" in output_text
     assert "record-animation-playtest-route" in output_text
     assert "validate-animation-playtest-report must pass before signoff" in output_text
 
@@ -9035,6 +9042,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Route 1: menu/full" in route_batch_text
     assert "### Batch 1 Copy Commands" in route_batch_text
     assert "# Batch 1: 820x620 visible commands" in route_batch_text
+    assert "### Batch 1 Post-Recording Commands" in route_batch_text
+    assert "animation-playtest-status" in route_batch_text
     assert "record-animation-playtest-window" in route_batch_text
     assert "# NEXUS TECH 2D Animation UI Triage" in triage_text
     assert "Controls / Navigation" in triage_text
