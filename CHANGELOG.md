@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.216.0 - 2026-07-02
+
+- Added validated navigation recovery drills to `animation-playtest-sprint` so pause open, resume, back/escape, menu return, and help/hover recovery checks are explicit before signoff
+- Extended sprint metadata and CLI output with navigation-recovery drill counts, keeping pause/back/menu/help UX issues visible in the manual QA packet
+- Updated docs and regression coverage while keeping release status `manual-required` until real visible-window evidence proves the recovery paths work
+
 ## 0.215.0 - 2026-07-02
 
 - Added a validated layout repair pass to `animation-playtest-sprint` so responsive frame, button grid, text containment, navigation affordance, and motion separation checks stay explicit before release signoff

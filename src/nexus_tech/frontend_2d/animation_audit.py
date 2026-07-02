@@ -1247,6 +1247,12 @@ class AnimationPlaytestSprintPacket:
         return len(_ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS)
 
     @property
+    def navigation_drill_count(self) -> int:
+        """Return recovery navigation drills included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS)
+
+    @property
     def defect_intake_count(self) -> int:
         """Return manual defect intake rows included in the sprint."""
 
@@ -1563,6 +1569,41 @@ _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS: tuple[tuple[str, str, str, str], ...] = (
         "Actors, pulses, overlays, transition sweeps, and feedback cards",
         "Motion cues do not cover text, controls, or the next required decision.",
         "Compare full, reduced, and off modes before deciding watch versus fail.",
+    ),
+)
+_ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "Pause open",
+        "Press P and click the Pause rail from live play.",
+        "Pause overlay opens without hiding the current run context or primary recovery actions.",
+        "Mark P0 if the player cannot discover pause without guessing.",
+    ),
+    (
+        "Resume",
+        "Click Resume from the pause overlay.",
+        "The same run state returns and the player can identify what changed or did not change.",
+        "Mark P0 if resume exits, advances, or loses visible context.",
+    ),
+    (
+        "Back / Escape",
+        "Open an overlay, press Esc, then press Esc again from the cleared run view.",
+        "Esc closes overlays first, then opens pause instead of quitting or advancing the turn.",
+        "Mark P0 if back behavior is destructive or ambiguous.",
+    ),
+    (
+        "Menu return",
+        "Open Pause, choose Menu, and confirm the title shell is reachable.",
+        "The path back to title/menu is visible, labeled, and does not strand the player.",
+        "Mark P0 until menu return is obvious and recoverable.",
+    ),
+    (
+        "Help / hover",
+        "Open help with F1 or ? and hover over primary controls.",
+        (
+            "Help and hover copy explain available controls without covering the button "
+            "being explained."
+        ),
+        "Mark P1 when the control exists but the affordance copy is unclear.",
     ),
 )
 _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS: tuple[tuple[str, str, str, str], ...] = (
@@ -3947,6 +3988,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
+        f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
@@ -3993,6 +4035,17 @@ def write_2d_animation_playtest_sprint_packet(
     )
     for repair_row in _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS:
         lines.append(_format_animation_sprint_layout_repair_row(repair_row))
+    lines.extend(
+        [
+            "",
+            "## Navigation Recovery Drills",
+            "",
+            "| Drill | Manual Action | Pass Criteria | Escalation Rule |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for drill in _ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS:
+        lines.append(_format_animation_sprint_navigation_drill_row(drill))
     lines.extend(
         [
             "",
@@ -4188,6 +4241,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
+        f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
         f"- Exit criteria: `{sprint.exit_criteria_count}`",
         f"- Evidence capture rows: `{sprint.evidence_capture_count}`",
@@ -4212,6 +4266,12 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_layout_repair_row(repair_row)
             for repair_row in _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS
+        ),
+        "## Navigation Recovery Drills",
+        "| Drill | Manual Action | Pass Criteria | Escalation Rule |",
+        *(
+            _format_animation_sprint_navigation_drill_row(drill)
+            for drill in _ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS
         ),
         "## Manual Defect Intake",
         "| Trigger | Priority | Evidence Must Name | Required Action |",
@@ -4470,6 +4530,19 @@ def _format_animation_sprint_layout_repair_row(repair_row: tuple[str, str, str, 
         f"{_markdown_table_cell(applies_to)} | "
         f"{_markdown_table_cell(pass_criteria)} | "
         f"{_markdown_table_cell(repair_rule)} |"
+    )
+
+
+def _format_animation_sprint_navigation_drill_row(
+    drill: tuple[str, str, str, str],
+) -> str:
+    name, manual_action, pass_criteria, escalation_rule = drill
+    return (
+        "| "
+        f"{_markdown_table_cell(name)} | "
+        f"{_markdown_table_cell(manual_action)} | "
+        f"{_markdown_table_cell(pass_criteria)} | "
+        f"{_markdown_table_cell(escalation_rule)} |"
     )
 
 
