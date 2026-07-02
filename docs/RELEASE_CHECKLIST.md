@@ -136,8 +136,9 @@ Run `animation-playtest-sprint` when the next QA loop needs a focused work
 packet. It pulls the next visible observation rows from the execution guide and
 the current P0/P1 blockers from the issue backlog, labels report-field
 placeholders as post-observation signoff work, includes the manual observation
-checklist plus defect intake, a layout repair pass for responsive frames, button
-grids, text containment, navigation affordance, and motion separation,
+checklist plus execution batches and defect intake, a layout repair pass for
+responsive frames, button grids, text containment, navigation affordance, and
+motion separation,
 layout recording map rows with the exact window/control recorder commands,
 navigation recovery drills for pause, resume, back/escape, menu return, and
 help/hover paths, a navigation recording map with the exact control recorder

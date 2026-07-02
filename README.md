@@ -636,7 +636,9 @@ explicit follow-up work before the next release-candidate pass.
 current P0/P1 blockers into a focused work packet for one manual QA pass. It
 labels report-field blockers as post-observation signoff work until visible
 evidence exists, includes a manual observation checklist for layout, navigation,
-typography, motion, and evidence wording, adds a defect intake table for
+typography, motion, and evidence wording, adds manual execution batches for
+artifact refresh, 820x620 layout, 960x640 recovery controls, 1440x900 motion
+readability, and report closure, adds a defect intake table for
 P0/P1/P2 UI or animation findings, adds a dedicated layout repair pass for
 responsive frames, button grids, text containment, navigation affordance, and
 motion separation, maps those layout checks to the exact window/control recorder

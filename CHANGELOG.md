@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.219.0 - 2026-07-02
+
+- Added validated manual execution batches to `animation-playtest-sprint` so artifact refresh, 820x620 layout, 960x640 recovery controls, 1440x900 motion readability, and report closure run in a fixed order
+- Extended sprint metadata and CLI output with execution-batch counts, making the next visible-window QA pass easier to run without mixing recorder updates into observation work
+- Updated docs and regression coverage while keeping release status `manual-required` until real visible-window evidence clears placeholders and P0/P1 blockers
+
 ## 0.218.0 - 2026-07-02
 
 - Added a validated layout recording map to `animation-playtest-sprint` so responsive frame, button grid, text containment, navigation affordance, and motion separation checks point to the correct report rows

@@ -8413,6 +8413,7 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert sprint.status == "manual-required"
     assert sprint.open_observation_count == 5
     assert sprint.checklist_count == 5
+    assert sprint.execution_batch_count == 5
     assert sprint.layout_repair_count == 5
     assert sprint.layout_recording_count == 7
     assert sprint.navigation_drill_count == 5
@@ -8427,6 +8428,11 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert validation.expected_blocker_count == 12
     assert "# NEXUS TECH 2D Animation Sprint Packet" in text
     assert "## Sprint Order" in text
+    assert "## Manual Execution Batches" in text
+    assert "820x620 layout first" in text
+    assert "960x640 recovery controls" in text
+    assert "1440x900 motion readability" in text
+    assert "Report closure" in text
     assert "## Manual Observation Checklist" in text
     assert "Layout bounds" in text
     assert "No overlapping text, clipped labels, or controls outside panels." in text
@@ -8560,6 +8566,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert result.exit_code == 0
     assert "Animation Playtest Sprint" in result.output
     assert "Checklist Items" in result.output
+    assert "Execution Batches" in result.output
     assert "Layout Repair Checks" in result.output
     assert "Layout Recording Rows" in result.output
     assert "Navigation Recovery Drills" in result.output
@@ -8572,6 +8579,8 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert "Post-observation Signoff" in result.output
     assert paths["sprint"].exists()
     sprint_text = paths["sprint"].read_text(encoding="utf-8")
+    assert "## Manual Execution Batches" in sprint_text
+    assert "Artifact refresh" in sprint_text
     assert "## Layout Repair Pass" in sprint_text
     assert "## Layout Recording Map" in sprint_text
     assert "## Navigation Recovery Drills" in sprint_text
@@ -8935,6 +8944,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Issue Backlog Items" in result.output
     assert "Sprint Artifact" in result.output
     assert "Sprint Observation Steps" in result.output
+    assert "Sprint Execution Batches" in result.output
     assert "Sprint Layout Repair Checks" in result.output
     assert "Sprint Layout Recording Rows" in result.output
     assert "Sprint Navigation Recovery Drills" in result.output
@@ -9014,6 +9024,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "validate-animation-playtest-issue-backlog" in issue_backlog_text
     assert "# NEXUS TECH 2D Animation Sprint Packet" in sprint_text
     assert "## Sprint Order" in sprint_text
+    assert "## Manual Execution Batches" in sprint_text
+    assert "Stop on stale artifact" in sprint_text
     assert "## Manual Observation Checklist" in sprint_text
     assert "## Layout Repair Pass" in sprint_text
     assert "Text containment" in sprint_text

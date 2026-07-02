@@ -1241,6 +1241,12 @@ class AnimationPlaytestSprintPacket:
         return len(_ANIMATION_SPRINT_OBSERVATION_CHECKS)
 
     @property
+    def execution_batch_count(self) -> int:
+        """Return manual execution batches included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_EXECUTION_BATCHES)
+
+    @property
     def layout_repair_count(self) -> int:
         """Return layout repair checks included in the sprint."""
 
@@ -1549,6 +1555,38 @@ _ANIMATION_SPRINT_OBSERVATION_CHECKS: tuple[tuple[str, str, str], ...] = (
         "Evidence wording",
         "Recorder notes describe observed facts instead of generic ok/pass wording.",
         "Specific UI elements, animation cues, and blocker names.",
+    ),
+)
+_ANIMATION_SPRINT_EXECUTION_BATCHES: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "Artifact refresh",
+        "Regenerate the session package and run artifact validators before opening windows.",
+        "Sprint, guide, backlog, route batches, and release gate are current.",
+        "Stop on stale artifact, command-prefix mismatch, or failing validator.",
+    ),
+    (
+        "820x620 layout first",
+        "Run 820x620 full, reduced, and off menu/play commands before larger windows.",
+        "Window matrix plus responsive frame, button grid, and text containment rows.",
+        "Escalate P0 on overlap, clipped controls, or controls outside panels.",
+    ),
+    (
+        "960x640 recovery controls",
+        "Run 960x640 route rows plus pause, back, menu, help, and hover drills.",
+        "Pause/resume, back/escape, menu return, help/hover, and replay safety rows.",
+        "Escalate P0 when recovery is hidden, destructive, or unclear.",
+    ),
+    (
+        "1440x900 motion readability",
+        "Run 1440x900 full, reduced, and off routes while comparing motion behavior.",
+        "Motion modes, scene checks, game-feel rows, and motion separation evidence.",
+        "Escalate P0/P1 when animation hides state, text, controls, or next decisions.",
+    ),
+    (
+        "Report closure",
+        "Rerun validators after recorder rows and update signoff only from evidence.",
+        "Release blocker notes, validator result, final decision, and accepted watch risk.",
+        "Keep manual-required while placeholders, P0/P1 blockers, or missing evidence remain.",
     ),
 )
 _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS: tuple[tuple[str, str, str, str], ...] = (
@@ -4015,6 +4053,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
+        f"- Execution batches: `{sprint.execution_batch_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
         f"- Layout recording rows: `{sprint.layout_recording_count}`",
         f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
@@ -4047,11 +4086,22 @@ def write_2d_animation_playtest_sprint_packet(
         ),
         "| 4 | Run the validation commands. | Sprint, guide, backlog, and report status agree. |",
         "",
-        "## Manual Observation Checklist",
+        "## Manual Execution Batches",
         "",
-        "| Check | Pass Criteria | Evidence Must Name |",
-        "| --- | --- | --- |",
+        "| Batch | Visible Scope | Record After | Stop / Escalate If |",
+        "| --- | --- | --- | --- |",
     ]
+    for batch in _ANIMATION_SPRINT_EXECUTION_BATCHES:
+        lines.append(_format_animation_sprint_execution_batch_row(batch))
+    lines.extend(
+        [
+            "",
+            "## Manual Observation Checklist",
+            "",
+            "| Check | Pass Criteria | Evidence Must Name |",
+            "| --- | --- | --- |",
+        ]
+    )
     for checklist_item in _ANIMATION_SPRINT_OBSERVATION_CHECKS:
         lines.append(_format_animation_sprint_checklist_row(checklist_item))
     lines.extend(
@@ -4304,6 +4354,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Observation steps: `{sprint.open_observation_count}`",
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
+        f"- Execution batches: `{sprint.execution_batch_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
         f"- Layout recording rows: `{sprint.layout_recording_count}`",
         f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
@@ -4321,6 +4372,12 @@ def validate_2d_animation_playtest_sprint_packet(
         backlog_validation_command,
         sprint_validation_command,
         report_validation_command,
+        "## Manual Execution Batches",
+        "| Batch | Visible Scope | Record After | Stop / Escalate If |",
+        *(
+            _format_animation_sprint_execution_batch_row(batch)
+            for batch in _ANIMATION_SPRINT_EXECUTION_BATCHES
+        ),
         "## Manual Observation Checklist",
         "| Check | Pass Criteria | Evidence Must Name |",
         *(
@@ -4605,6 +4662,17 @@ def _format_animation_sprint_checklist_row(checklist_item: tuple[str, str, str])
         f"{_markdown_table_cell(check)} | "
         f"{_markdown_table_cell(pass_criteria)} | "
         f"{_markdown_table_cell(evidence_terms)} |"
+    )
+
+
+def _format_animation_sprint_execution_batch_row(batch: tuple[str, str, str, str]) -> str:
+    name, visible_scope, record_after, stop_condition = batch
+    return (
+        "| "
+        f"{_markdown_table_cell(name)} | "
+        f"{_markdown_table_cell(visible_scope)} | "
+        f"{_markdown_table_cell(record_after)} | "
+        f"{_markdown_table_cell(stop_condition)} |"
     )
 
 

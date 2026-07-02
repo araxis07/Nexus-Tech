@@ -3159,6 +3159,7 @@ def animation_playtest_sprint_command(
     summary_table.add_row("Issue Backlog", sprint.issue_backlog_path)
     summary_table.add_row("Observation Steps", str(sprint.open_observation_count))
     summary_table.add_row("Checklist Items", str(sprint.checklist_count))
+    summary_table.add_row("Execution Batches", str(sprint.execution_batch_count))
     summary_table.add_row("Layout Repair Checks", str(sprint.layout_repair_count))
     summary_table.add_row("Layout Recording Rows", str(sprint.layout_recording_count))
     summary_table.add_row("Navigation Recovery Drills", str(sprint.navigation_drill_count))
@@ -3995,6 +3996,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Issue Backlog Items", str(issue_backlog.issue_count))
     session_table.add_row("Sprint Artifact", sprint_validation.status.upper())
     session_table.add_row("Sprint Observation Steps", str(sprint_packet.open_observation_count))
+    session_table.add_row("Sprint Execution Batches", str(sprint_packet.execution_batch_count))
     session_table.add_row("Sprint Layout Repair Checks", str(sprint_packet.layout_repair_count))
     session_table.add_row("Sprint Layout Recording Rows", str(sprint_packet.layout_recording_count))
     session_table.add_row(

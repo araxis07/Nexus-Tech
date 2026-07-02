@@ -143,6 +143,8 @@ Use `animation-playtest-sprint` when the tester needs one focused work packet
 for the next pass: it combines the next visible observation rows with the
 current P0/P1 blockers, labels report-field placeholders as post-observation
 signoff work, includes the manual observation checklist plus defect intake, adds
+manual execution batches for artifact refresh, 820x620 layout, 960x640 recovery
+controls, 1440x900 motion readability, and report closure, adds
 the layout repair pass for responsive frames, button grids, text containment,
 navigation affordance, and motion separation, maps those layout checks to the
 exact window/control recorder commands, adds navigation recovery drills for
