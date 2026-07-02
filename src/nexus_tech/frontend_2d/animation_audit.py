@@ -4104,6 +4104,12 @@ def write_2d_animation_playtest_sprint_packet(
         "| --- | --- | --- | --- | --- |",
         _format_animation_sprint_next_action_row(sprint.next_observation),
         "",
+        "## Next Sprint Copy Commands",
+        "",
+        "```bash",
+        *_animation_sprint_next_action_copy_commands(sprint.next_observation),
+        "```",
+        "",
         "## Manual Execution Batches",
         "",
         "| Batch | Visible Scope | Record After | Stop / Escalate If |",
@@ -4393,6 +4399,8 @@ def validate_2d_animation_playtest_sprint_packet(
         "## Next Sprint Action",
         "| Area | Target | Visible Command | Required Terms | Recorder Command |",
         _format_animation_sprint_next_action_row(sprint.next_observation),
+        "## Next Sprint Copy Commands",
+        *_animation_sprint_next_action_copy_commands(sprint.next_observation),
         "## Manual Execution Batches",
         "| Batch | Visible Scope | Record After | Stop / Escalate If |",
         *(
@@ -4837,6 +4845,19 @@ def _format_animation_sprint_next_action_row(
         f"`{_markdown_table_cell(visible_command)}` | "
         f"{_markdown_table_cell(required_terms)} | "
         f"`{_markdown_table_cell(hint.recorder_command)}` |"
+    )
+
+
+def _animation_sprint_next_action_copy_commands(
+    hint: AnimationPlaytestRecorderHint | None,
+) -> tuple[str, ...]:
+    if hint is None:
+        return ("# No open sprint action.",)
+    visible_command = hint.visible_command or "# No visible command for this row."
+    return (
+        visible_command,
+        "# After observing the visible window, replace placeholder notes before running:",
+        hint.recorder_command,
     )
 
 

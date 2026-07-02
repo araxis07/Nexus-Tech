@@ -655,6 +655,9 @@ batch table directly, so the tester can see artifact refresh, 820x620 layout,
 Markdown packet first. The sprint packet and CLI also surface the next visible
 command plus matching recorder command as `Next Sprint Action`, so the tester
 can start the first real observation without hunting through the full queue.
+`Next Sprint Copy Commands` repeats those commands as full copy-paste lines and
+keeps the recorder placeholder explicit until real visible-window notes replace
+it.
 The plan also includes a validated `Manual Evidence Checklist` for the window
 matrix, route notes, controls, scenes, game feel, and signoff fields so the
 non-route manual evidence cannot be dropped from handoff notes.

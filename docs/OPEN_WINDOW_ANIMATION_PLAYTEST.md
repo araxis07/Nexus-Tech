@@ -156,7 +156,10 @@ The sprint command prints the same execution batches in terminal output, so the
 tester can start with artifact refresh and the 820x620 layout pass before
 opening or editing the Markdown packet. It also prints `Sprint Next Action`
 with the first visible command and matching recorder command, so the tester can
-start the next real observation without scanning the full queue.
+start the next real observation without scanning the full queue. Use `Next
+Sprint Copy Commands` when copying commands from the terminal, but do not run
+the recorder line until the placeholder notes have been replaced with observed
+evidence.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

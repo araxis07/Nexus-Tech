@@ -8429,7 +8429,9 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert "# NEXUS TECH 2D Animation Sprint Packet" in text
     assert "## Sprint Order" in text
     assert "## Next Sprint Action" in text
+    assert "## Next Sprint Copy Commands" in text
     assert "| Visible Route Evidence | 1 |" in text
+    assert "# After observing the visible window, replace placeholder notes before running:" in text
     assert "## Manual Execution Batches" in text
     assert "820x620 layout first" in text
     assert "960x640 recovery controls" in text
@@ -8570,6 +8572,8 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert "Checklist Items" in result.output
     assert "Execution Batches" in result.output
     assert "Sprint Next Action" in result.output
+    assert "Sprint Next Copy Commands" in result.output
+    assert "Recorder command after observation" in result.output
     assert "Visible Route Evidence" in result.output
     assert "Sprint Execution Batches" in result.output
     assert "820x620 layout first" in result.output
@@ -8587,7 +8591,9 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert paths["sprint"].exists()
     sprint_text = paths["sprint"].read_text(encoding="utf-8")
     assert "## Next Sprint Action" in sprint_text
+    assert "## Next Sprint Copy Commands" in sprint_text
     assert "record-animation-playtest-route" in sprint_text
+    assert "replace placeholder notes before running" in sprint_text
     assert "## Manual Execution Batches" in sprint_text
     assert "Artifact refresh" in sprint_text
     assert "## Layout Repair Pass" in sprint_text
@@ -9034,6 +9040,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "# NEXUS TECH 2D Animation Sprint Packet" in sprint_text
     assert "## Sprint Order" in sprint_text
     assert "## Next Sprint Action" in sprint_text
+    assert "## Next Sprint Copy Commands" in sprint_text
     assert "## Manual Execution Batches" in sprint_text
     assert "Stop on stale artifact" in sprint_text
     assert "## Manual Observation Checklist" in sprint_text

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.222.0 - 2026-07-02
+
+- Added `Next Sprint Copy Commands` to `animation-playtest-sprint` artifacts so the next visible command and recorder command are available as full copy-paste commands
+- Added a terminal `Sprint Next Copy Commands` panel so long next-action commands are not lost inside truncated table cells
+- Updated docs and regression coverage while preserving the rule that recorder placeholders require real visible-window observations
+
 ## 0.221.0 - 2026-07-02
 
 - Added a `Next Sprint Action` section to `animation-playtest-sprint` artifacts so the next visible command and matching recorder command are visible before the full observation queue

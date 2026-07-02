@@ -148,7 +148,9 @@ The CLI output prints the execution batch table too, so release review can see
 the next artifact refresh, layout, recovery, motion, and closure steps without
 opening the sprint Markdown file. It also prints the next visible command and
 matching recorder command as `Sprint Next Action`, keeping the handoff anchored
-to the first real observation step.
+to the first real observation step. The `Next Sprint Copy Commands` panel keeps
+the full command text visible for copy-paste while preserving placeholder notes
+until a tester records real evidence.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

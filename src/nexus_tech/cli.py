@@ -3208,6 +3208,11 @@ def animation_playtest_sprint_command(
             hint.recorder_command,
         )
         console.print(next_table)
+        console.print("[bold cyan]Sprint Next Copy Commands[/bold cyan]")
+        console.print("Visible command:")
+        console.print(hint.visible_command or "-")
+        console.print("Recorder command after observation:")
+        console.print(hint.recorder_command)
 
     batch_table = Table(title="Sprint Execution Batches")
     batch_table.add_column("Batch", style="cyan", no_wrap=True)
