@@ -8567,6 +8567,9 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert "Animation Playtest Sprint" in result.output
     assert "Checklist Items" in result.output
     assert "Execution Batches" in result.output
+    assert "Sprint Execution Batches" in result.output
+    assert "820x620 layout first" in result.output
+    assert "Report closure" in result.output
     assert "Layout Repair Checks" in result.output
     assert "Layout Recording Rows" in result.output
     assert "Navigation Recovery Drills" in result.output

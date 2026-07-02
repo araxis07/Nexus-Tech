@@ -152,6 +152,9 @@ pause, resume, back/escape, menu return, and help/hover paths, maps those drills
 to the exact control recorder commands, adds exit criteria, evidence capture
 prompts, and note templates, and validates against the execution guide plus
 issue backlog before the packet is used.
+The sprint command prints the same execution batches in terminal output, so the
+tester can start with artifact refresh and the 820x620 layout pass before
+opening or editing the Markdown packet.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

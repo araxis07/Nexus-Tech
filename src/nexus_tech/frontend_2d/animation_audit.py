@@ -1241,10 +1241,16 @@ class AnimationPlaytestSprintPacket:
         return len(_ANIMATION_SPRINT_OBSERVATION_CHECKS)
 
     @property
+    def execution_batches(self) -> tuple[tuple[str, str, str, str], ...]:
+        """Return ordered manual execution batches for the sprint."""
+
+        return _ANIMATION_SPRINT_EXECUTION_BATCHES
+
+    @property
     def execution_batch_count(self) -> int:
         """Return manual execution batches included in the sprint."""
 
-        return len(_ANIMATION_SPRINT_EXECUTION_BATCHES)
+        return len(self.execution_batches)
 
     @property
     def layout_repair_count(self) -> int:

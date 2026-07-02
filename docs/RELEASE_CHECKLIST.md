@@ -144,6 +144,9 @@ navigation recovery drills for pause, resume, back/escape, menu return, and
 help/hover paths, a navigation recording map with the exact control recorder
 commands, exit criteria, evidence capture prompts, and note templates, then
 `validate-animation-playtest-sprint` verifies both sources still match.
+The CLI output prints the execution batch table too, so release review can see
+the next artifact refresh, layout, recovery, motion, and closure steps without
+opening the sprint Markdown file.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,

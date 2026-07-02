@@ -3192,6 +3192,15 @@ def animation_playtest_sprint_command(
     summary_table.add_row("Backlog Status", sprint.issue_backlog.status.upper())
     console.print(summary_table)
 
+    batch_table = Table(title="Sprint Execution Batches")
+    batch_table.add_column("Batch", style="cyan", no_wrap=True)
+    batch_table.add_column("Visible Scope")
+    batch_table.add_column("Record After")
+    batch_table.add_column("Stop / Escalate If")
+    for name, visible_scope, record_after, stop_condition in sprint.execution_batches:
+        batch_table.add_row(name, visible_scope, record_after, stop_condition)
+    console.print(batch_table)
+
     observation_table = Table(title="Sprint Observation Queue")
     observation_table.add_column("Step", justify="right")
     observation_table.add_column("Status")

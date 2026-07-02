@@ -649,7 +649,10 @@ criteria for closing the pass, adds evidence capture prompts for every visible
 step, provides note templates for pass/watch/fail evidence, keeps recorder
 placeholders invalid until the visible command has been observed, and
 `validate-animation-playtest-sprint` confirms the packet still matches the
-current guide and backlog.
+current guide and backlog. The CLI output also prints the ordered execution
+batch table directly, so the tester can see artifact refresh, 820x620 layout,
+960x640 recovery, 1440x900 motion, and closure steps without opening the
+Markdown packet first.
 The plan also includes a validated `Manual Evidence Checklist` for the window
 matrix, route notes, controls, scenes, game feel, and signoff fields so the
 non-route manual evidence cannot be dropped from handoff notes.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.220.0 - 2026-07-02
+
+- Added a visible `Sprint Execution Batches` table to `animation-playtest-sprint` so testers can see the ordered batch plan directly in terminal output
+- Exposed sprint execution batch rows from the sprint packet model instead of forcing CLI code to duplicate manual QA batch definitions
+- Updated regression coverage and docs while keeping release status `manual-required` until real visible-window evidence clears the report
+
 ## 0.219.0 - 2026-07-02
 
 - Added validated manual execution batches to `animation-playtest-sprint` so artifact refresh, 820x620 layout, 960x640 recovery controls, 1440x900 motion readability, and report closure run in a fixed order

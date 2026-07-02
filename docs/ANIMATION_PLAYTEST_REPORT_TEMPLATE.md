@@ -58,6 +58,9 @@ layout repair pass, layout recording map, navigation recovery drills, a
 navigation recording map, exit criteria, and evidence capture prompts with note
 templates, without
 treating either artifact as release evidence.
+The sprint command also prints the execution batch table directly in terminal
+output; use that order before replacing report placeholders with recorder
+commands.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in
