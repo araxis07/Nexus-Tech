@@ -144,11 +144,12 @@ for the next pass: it combines the next visible observation rows with the
 current P0/P1 blockers, labels report-field placeholders as post-observation
 signoff work, includes the manual observation checklist plus defect intake, adds
 the layout repair pass for responsive frames, button grids, text containment,
-navigation affordance, and motion separation, adds navigation recovery drills
-for pause, resume, back/escape, menu return, and help/hover paths, maps those
-drills to the exact control recorder commands, adds exit criteria, evidence
-capture prompts, and note templates, and validates against the execution guide
-plus issue backlog before the packet is used.
+navigation affordance, and motion separation, maps those layout checks to the
+exact window/control recorder commands, adds navigation recovery drills for
+pause, resume, back/escape, menu return, and help/hover paths, maps those drills
+to the exact control recorder commands, adds exit criteria, evidence capture
+prompts, and note templates, and validates against the execution guide plus
+issue backlog before the packet is used.
 After running a visible command, use the recorder commands to update the report
 without hand-editing table pipes:
 

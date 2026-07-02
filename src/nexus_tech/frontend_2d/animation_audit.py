@@ -1247,6 +1247,12 @@ class AnimationPlaytestSprintPacket:
         return len(_ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS)
 
     @property
+    def layout_recording_count(self) -> int:
+        """Return layout recorder rows included in the sprint."""
+
+        return len(_ANIMATION_SPRINT_LAYOUT_RECORDING_ROWS)
+
+    @property
     def navigation_drill_count(self) -> int:
         """Return recovery navigation drills included in the sprint."""
 
@@ -1576,6 +1582,15 @@ _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS: tuple[tuple[str, str, str, str], ...] = (
         "Motion cues do not cover text, controls, or the next required decision.",
         "Compare full, reduced, and off modes before deciding watch versus fail.",
     ),
+)
+_ANIMATION_SPRINT_LAYOUT_RECORDING_ROWS: tuple[tuple[str, str, str], ...] = (
+    ("Responsive frame 820x620", "window", "820x620"),
+    ("Responsive frame 960x640", "window", "960x640"),
+    ("Responsive frame 1440x900", "window", "1440x900"),
+    ("Button grid", "control", "Control Affordance Coverage"),
+    ("Text containment", "control", "Typography Safety"),
+    ("Navigation affordance", "control", "UI Layout Safety"),
+    ("Motion separation", "control", "Motion Modes"),
 )
 _ANIMATION_SPRINT_NAVIGATION_RECOVERY_DRILLS: tuple[tuple[str, str, str, str], ...] = (
     (
@@ -4001,6 +4016,7 @@ def write_2d_animation_playtest_sprint_packet(
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
+        f"- Layout recording rows: `{sprint.layout_recording_count}`",
         f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
         f"- Navigation recording rows: `{sprint.navigation_recording_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
@@ -4049,6 +4065,23 @@ def write_2d_animation_playtest_sprint_packet(
     )
     for repair_row in _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS:
         lines.append(_format_animation_sprint_layout_repair_row(repair_row))
+    lines.extend(
+        [
+            "",
+            "## Layout Recording Map",
+            "",
+            "| Focus | Report Row | Required Terms | Recorder Command |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for recording_row in _ANIMATION_SPRINT_LAYOUT_RECORDING_ROWS:
+        lines.append(
+            _format_animation_sprint_layout_recording_row(
+                recording_row,
+                report_path=Path(gate.session.report.path),
+                command_prefix=guide.command_prefix,
+            )
+        )
     lines.extend(
         [
             "",
@@ -4272,6 +4305,7 @@ def validate_2d_animation_playtest_sprint_packet(
         f"- Max observation steps: `{sprint.max_observation_steps}`",
         f"- Observation checklist items: `{sprint.checklist_count}`",
         f"- Layout repair checks: `{sprint.layout_repair_count}`",
+        f"- Layout recording rows: `{sprint.layout_recording_count}`",
         f"- Navigation recovery drills: `{sprint.navigation_drill_count}`",
         f"- Navigation recording rows: `{sprint.navigation_recording_count}`",
         f"- Defect intake rows: `{sprint.defect_intake_count}`",
@@ -4298,6 +4332,16 @@ def validate_2d_animation_playtest_sprint_packet(
         *(
             _format_animation_sprint_layout_repair_row(repair_row)
             for repair_row in _ANIMATION_SPRINT_LAYOUT_REPAIR_ROWS
+        ),
+        "## Layout Recording Map",
+        "| Focus | Report Row | Required Terms | Recorder Command |",
+        *(
+            _format_animation_sprint_layout_recording_row(
+                recording_row,
+                report_path=Path(gate.session.report.path),
+                command_prefix=guide.command_prefix,
+            )
+            for recording_row in _ANIMATION_SPRINT_LAYOUT_RECORDING_ROWS
         ),
         "## Navigation Recovery Drills",
         "| Drill | Manual Action | Pass Criteria | Escalation Rule |",
@@ -4572,6 +4616,37 @@ def _format_animation_sprint_layout_repair_row(repair_row: tuple[str, str, str, 
         f"{_markdown_table_cell(applies_to)} | "
         f"{_markdown_table_cell(pass_criteria)} | "
         f"{_markdown_table_cell(repair_rule)} |"
+    )
+
+
+def _format_animation_sprint_layout_recording_row(
+    recording_row: tuple[str, str, str],
+    *,
+    report_path: Path,
+    command_prefix: str,
+) -> str:
+    focus, row_type, target = recording_row
+    if row_type == "window":
+        required_terms = WINDOW_MATRIX_EVIDENCE_TERMS
+        recorder_command = (
+            f"{command_prefix} record-animation-playtest-window "
+            f"{_shell_arg(report_path)} {_shell_arg(target)} "
+            "--full pass --reduced pass --off pass "
+            "--notes '<replace with observed window-matrix notes>'"
+        )
+    else:
+        required_terms = CONTROL_EVIDENCE_TERMS[target]
+        recorder_command = (
+            f"{command_prefix} record-animation-playtest-control "
+            f"{_shell_arg(report_path)} {_shell_arg(target)} --result pass "
+            "--notes '<replace with observed evidence notes>' --follow-up none"
+        )
+    return (
+        "| "
+        f"{_markdown_table_cell(focus)} | "
+        f"{_markdown_table_cell(target)} | "
+        f"{_markdown_table_cell(', '.join(required_terms))} | "
+        f"`{_markdown_table_cell(recorder_command)}` |"
     )
 
 

@@ -8414,6 +8414,7 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert sprint.open_observation_count == 5
     assert sprint.checklist_count == 5
     assert sprint.layout_repair_count == 5
+    assert sprint.layout_recording_count == 7
     assert sprint.navigation_drill_count == 5
     assert sprint.navigation_recording_count == 5
     assert sprint.defect_intake_count == 5
@@ -8434,6 +8435,10 @@ def test_write_animation_playtest_sprint_packet_tracks_next_work(
     assert "Button grid" in text
     assert "Pause/back/menu/help/hover paths" in text
     assert "Compare full, reduced, and off modes before deciding watch versus fail." in text
+    assert "## Layout Recording Map" in text
+    assert "Responsive frame 820x620" in text
+    assert "record-animation-playtest-window" in text
+    assert "Control Affordance Coverage" in text
     assert "## Navigation Recovery Drills" in text
     assert "Pause open" in text
     assert "Back / Escape" in text
@@ -8556,6 +8561,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert "Animation Playtest Sprint" in result.output
     assert "Checklist Items" in result.output
     assert "Layout Repair Checks" in result.output
+    assert "Layout Recording Rows" in result.output
     assert "Navigation Recovery Drills" in result.output
     assert "Navigation Recording Rows" in result.output
     assert "Defect Intake Rows" in result.output
@@ -8567,6 +8573,7 @@ def test_animation_playtest_sprint_command_writes_artifact(tmp_path: Path) -> No
     assert paths["sprint"].exists()
     sprint_text = paths["sprint"].read_text(encoding="utf-8")
     assert "## Layout Repair Pass" in sprint_text
+    assert "## Layout Recording Map" in sprint_text
     assert "## Navigation Recovery Drills" in sprint_text
     assert "## Navigation Recording Map" in sprint_text
     assert "## Observation Queue" in sprint_text
@@ -8929,6 +8936,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Sprint Artifact" in result.output
     assert "Sprint Observation Steps" in result.output
     assert "Sprint Layout Repair Checks" in result.output
+    assert "Sprint Layout Recording Rows" in result.output
     assert "Sprint Navigation Recovery Drills" in result.output
     assert "Sprint Navigation Recording Rows" in result.output
     assert "Sprint P0/P1 Blockers" in result.output
@@ -9010,6 +9018,9 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "## Layout Repair Pass" in sprint_text
     assert "Text containment" in sprint_text
     assert "Navigation affordance" in sprint_text
+    assert "## Layout Recording Map" in sprint_text
+    assert "Typography Safety" in sprint_text
+    assert "Motion Modes" in sprint_text
     assert "## Navigation Recovery Drills" in sprint_text
     assert "Menu return" in sprint_text
     assert "Help / hover" in sprint_text

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.218.0 - 2026-07-02
+
+- Added a validated layout recording map to `animation-playtest-sprint` so responsive frame, button grid, text containment, navigation affordance, and motion separation checks point to the correct report rows
+- Extended sprint metadata and CLI output with layout-recording row counts, keeping layout repair work connected to concrete recorder commands instead of loose checklist notes
+- Updated docs and regression coverage while keeping recorder placeholders invalid until testers replace them with real visible-window evidence
+
 ## 0.217.0 - 2026-07-02
 
 - Added a validated navigation recording map to `animation-playtest-sprint` so pause/resume, back/escape, menu return, help/hover, and replay-safety drills point to the correct recorder commands
