@@ -6963,6 +6963,9 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert batch_plan.route_open_items == 21
     assert "# NEXUS TECH 2D Animation Visible Route Batches" in text
     assert "## Batch 1: 820x620" in text
+    assert "### Batch 1 Evidence Checklist" in text
+    assert "Route 1: menu/full" in text
+    assert "Choose pass, watch, or fail after observing the visible command." in text
     assert "### Batch 1 Copy Commands" in text
     assert "# Batch 1: 820x620 visible commands" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
@@ -7010,6 +7013,8 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert result.exit_code == 0
     assert "Animation Playtest Route Batches" in result.output
     assert "820x620" in result.output
+    assert "Route Batch Evidence Checklist" in result.output
+    assert "Route 1: menu/full" in result.output
     assert "Route Batch Copy Commands" in result.output
     assert "Batch 1: 820x620" in result.output
     assert "Record the 820x620 window summary after all motion modes are observed" in result.output
@@ -9026,6 +9031,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "record-animation-playtest-route" in recorder_text
     assert "# NEXUS TECH 2D Animation Visible Route Batches" in route_batch_text
     assert "## Batch 1: 820x620" in route_batch_text
+    assert "### Batch 1 Evidence Checklist" in route_batch_text
+    assert "Route 1: menu/full" in route_batch_text
     assert "### Batch 1 Copy Commands" in route_batch_text
     assert "# Batch 1: 820x620 visible commands" in route_batch_text
     assert "record-animation-playtest-window" in route_batch_text

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.224.0 - 2026-07-03
+
+- Added per-batch evidence checklists to visible route-batch artifacts so testers decide pass/watch/fail before recorder commands
+- Added terminal evidence checklist output for the next incomplete route batch
+- Updated validators, docs, and regression coverage to keep batch evidence requirements current without recording manual evidence automatically
+
 ## 0.223.0 - 2026-07-03
 
 - Added per-window route batch copy commands so manual animation QA can run all visible commands before using recorder placeholders

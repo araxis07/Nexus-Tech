@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
     MotionMode,
     animation_playtest_route_batch_copy_commands,
+    animation_playtest_route_batch_evidence_checklist_rows,
     animation_playtest_sprint_blocker_dependency,
     animation_playtest_sprint_blocker_next_action,
     animation_playtest_sprint_blocker_phase,
@@ -2306,6 +2307,29 @@ def animation_playtest_route_batches_command(
 
     next_batch = next((batch for batch in batch_plan.batches if batch.open_items), None)
     if next_batch is not None:
+        checklist_table = Table(title="Route Batch Evidence Checklist")
+        checklist_table.add_column("Item", style="cyan")
+        checklist_table.add_column("Status")
+        checklist_table.add_column("Required Evidence")
+        checklist_table.add_column("Decision")
+        checklist_table.add_column("Recorder Timing")
+        for row in animation_playtest_route_batch_evidence_checklist_rows(next_batch):
+            checklist_table.add_row(*row)
+        console.print(checklist_table)
+        console.print("[bold cyan]Route Batch Evidence Checklist Lines[/bold cyan]")
+        for (
+            item,
+            status,
+            required_evidence,
+            result_decision,
+            recorder_timing,
+        ) in animation_playtest_route_batch_evidence_checklist_rows(next_batch):
+            console.print(
+                (
+                    f"{item} | {status} | evidence: {required_evidence} | "
+                    f"decision: {result_decision} | recorder: {recorder_timing}"
+                )
+            )
         console.print("[bold cyan]Route Batch Copy Commands[/bold cyan]")
         console.print(f"Batch {next_batch.batch_number}: {next_batch.window_size}")
         for line in animation_playtest_route_batch_copy_commands(next_batch):

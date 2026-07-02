@@ -5804,6 +5804,17 @@ def write_2d_animation_playtest_route_batch_plan(
         lines.extend(
             [
                 "",
+                f"### Batch {batch.batch_number} Evidence Checklist",
+                "",
+                "| Item | Status | Required Evidence | Result Decision | Recorder Timing |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in animation_playtest_route_batch_evidence_checklist_rows(batch):
+            lines.append(_format_route_batch_evidence_checklist_row(row))
+        lines.extend(
+            [
+                "",
                 f"### Batch {batch.batch_number} Copy Commands",
                 "",
                 "```bash",
@@ -5927,6 +5938,17 @@ def validate_2d_animation_playtest_route_batch_plan(
         _validate_route_batch_item_row(findings, item, row)
 
     for batch in batch_plan.batches:
+        evidence_checklist_lines = (
+            f"### Batch {batch.batch_number} Evidence Checklist",
+            "| Item | Status | Required Evidence | Result Decision | Recorder Timing |",
+            *(
+                _format_route_batch_evidence_checklist_row(row)
+                for row in animation_playtest_route_batch_evidence_checklist_rows(batch)
+            ),
+        )
+        for line in evidence_checklist_lines:
+            if line not in text:
+                findings.append(f"missing route batch evidence checklist guard: {line}")
         copy_block_lines = (
             f"### Batch {batch.batch_number} Copy Commands",
             *animation_playtest_route_batch_copy_commands(batch),
@@ -5975,6 +5997,52 @@ def animation_playtest_route_batch_copy_commands(
         lines.append(batch.window_recorder_hint.recorder_command)
 
     return tuple(lines)
+
+
+def animation_playtest_route_batch_evidence_checklist_rows(
+    batch: AnimationPlaytestRouteBatch,
+) -> tuple[tuple[str, str, str, str, str], ...]:
+    """Return observed-evidence checklist rows for one route batch."""
+
+    rows: list[tuple[str, str, str, str, str]] = []
+    for item in batch.items:
+        required_terms = ", ".join(item.required_terms) if item.required_terms else "-"
+        rows.append(
+            (
+                f"Route {item.step}: {item.target}/{item.motion_mode}",
+                item.status,
+                required_terms,
+                "Choose pass, watch, or fail after observing the visible command.",
+                "Run the route recorder only after replacing placeholder notes.",
+            )
+        )
+    if batch.window_recorder_hint is not None:
+        hint = batch.window_recorder_hint
+        required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+        rows.append(
+            (
+                f"Window summary: {batch.window_size}",
+                hint.status,
+                required_terms,
+                "Summarize the full/reduced/off window result from observed behavior.",
+                "Run the window recorder after all batch motion modes are checked.",
+            )
+        )
+    return tuple(rows)
+
+
+def _format_route_batch_evidence_checklist_row(
+    row: tuple[str, str, str, str, str],
+) -> str:
+    item, status, required_evidence, result_decision, recorder_timing = row
+    return (
+        "| "
+        f"{_markdown_table_cell(item)} | "
+        f"`{_markdown_table_cell(status)}` | "
+        f"{_markdown_table_cell(required_evidence)} | "
+        f"{_markdown_table_cell(result_decision)} | "
+        f"{_markdown_table_cell(recorder_timing)} |"
+    )
 
 
 def validate_2d_animation_playtest_readiness_plan(

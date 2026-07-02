@@ -66,8 +66,9 @@ after the window has been checked. The `Next Sprint Copy Commands` block repeats
 the full commands for copy-paste, but it is still a work order rather than
 evidence.
 For route batches, use the per-window copy blocks to run all visible commands
-before recorder commands. The batch copy blocks still require replacing
-placeholder notes with real observations from the visible window.
+before recorder commands, then use the batch evidence checklist to choose
+pass/watch/fail. The batch copy blocks still require replacing placeholder notes
+with real observations from the visible window.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in
