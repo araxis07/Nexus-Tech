@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.228.0 - 2026-07-03
+
+- Reduced compact 2D run footer height by using a tighter 820-class action grid
+- Added regression coverage so compact action bars keep more content space on small windows
+- Verified the 820x620 visual audit still passes after the action-bar layout change
+
 ## 0.227.0 - 2026-07-03
 
 - Added a validated defect-trigger checklist to every visible route batch

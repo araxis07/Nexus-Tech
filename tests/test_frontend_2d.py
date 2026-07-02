@@ -1359,12 +1359,14 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         )
         button_cols, button_height, footer_band_height = scene._footer_layout_metrics(820, 320)
         rows = max(1, (len(scenes_module._ACTION_BUTTONS) + button_cols - 1) // button_cols)
+        compact_outer_height = scene._footer_outer_height(820, 620)
 
         assert len(compact_detail) <= 24
         assert len(narrow_detail) <= 28
-        assert button_cols == 5
+        assert button_cols == 7
         assert footer_band_height == 48
         assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
+        assert compact_outer_height <= 270
     finally:
         pygame.quit()
 

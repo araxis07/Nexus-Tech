@@ -7621,10 +7621,8 @@ class RunScene(BaseScene):
         usable_width = width - 40 - 32
         if usable_width < 620:
             button_cols = 4
-        elif usable_width < 980:
+        elif usable_width < 720:
             button_cols = 5
-        elif usable_width < 1220:
-            button_cols = 6
         else:
             button_cols = 7
         rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
@@ -7639,10 +7637,8 @@ class RunScene(BaseScene):
     def _footer_layout_metrics(self, inner_width: int, inner_height: int) -> tuple[int, int, int]:
         if inner_width < 620:
             button_cols = 4
-        elif inner_width < 980:
+        elif inner_width < 720:
             button_cols = 5
-        elif inner_width < 1220:
-            button_cols = 6
         else:
             button_cols = 7
         rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
