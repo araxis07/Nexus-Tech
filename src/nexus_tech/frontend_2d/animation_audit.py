@@ -213,6 +213,26 @@ DEFAULT_OPEN_WINDOW_PLAYTEST_FEEDBACK_CHECKS: tuple[tuple[str, str], ...] = (
         "Actor pose, action cue, and metric pulse describe the same outcome instead of competing.",
     ),
 )
+_ROUTE_BATCH_RESULT_DECISION_ROWS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "pass",
+        "No defect trigger applies after the visible command.",
+        "Keep --result pass and replace notes with observed evidence.",
+        "Do not use generic ok/pass wording.",
+    ),
+    (
+        "watch",
+        "Issue is visible but task remains playable/readable.",
+        "Change recorder to --result watch and name the follow-up risk.",
+        "Keep release gate manual-required until accepted or fixed.",
+    ),
+    (
+        "fail",
+        "UI, navigation, readability, or motion blocks the task/signoff.",
+        "Change recorder to --result fail and keep the blocker open.",
+        "Fix before release, rerun visible command, then record new evidence.",
+    ),
+)
 DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS: tuple[str, ...] = (
     (
         "uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch "
@@ -5821,6 +5841,17 @@ def write_2d_animation_playtest_route_batch_plan(
         lines.extend(
             [
                 "",
+                f"### Batch {batch.batch_number} Result Decision Guide",
+                "",
+                "| Result | Use When | Recorder Edit | Release Rule |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for row in animation_playtest_route_batch_result_decision_rows():
+            lines.append(_format_route_batch_result_decision_row(row))
+        lines.extend(
+            [
+                "",
                 f"### Batch {batch.batch_number} Copy Commands",
                 "",
                 "```bash",
@@ -5968,6 +5999,17 @@ def validate_2d_animation_playtest_route_batch_plan(
         for line in evidence_checklist_lines:
             if line not in text:
                 findings.append(f"missing route batch evidence checklist guard: {line}")
+        result_decision_lines = (
+            f"### Batch {batch.batch_number} Result Decision Guide",
+            "| Result | Use When | Recorder Edit | Release Rule |",
+            *(
+                _format_route_batch_result_decision_row(row)
+                for row in animation_playtest_route_batch_result_decision_rows()
+            ),
+        )
+        for line in result_decision_lines:
+            if line not in text:
+                findings.append(f"missing route batch result decision guard: {line}")
         copy_block_lines = (
             f"### Batch {batch.batch_number} Copy Commands",
             *animation_playtest_route_batch_copy_commands(batch),
@@ -6060,6 +6102,12 @@ def animation_playtest_route_batch_evidence_checklist_rows(
     return tuple(rows)
 
 
+def animation_playtest_route_batch_result_decision_rows() -> tuple[tuple[str, str, str, str], ...]:
+    """Return pass/watch/fail decision guidance for route-batch recorder commands."""
+
+    return _ROUTE_BATCH_RESULT_DECISION_ROWS
+
+
 def animation_playtest_route_batch_post_recording_commands(
     batch_plan: AnimationPlaytestRouteBatchPlan,
     output_path: Path,
@@ -6103,6 +6151,17 @@ def _format_route_batch_evidence_checklist_row(
         f"{_markdown_table_cell(required_evidence)} | "
         f"{_markdown_table_cell(result_decision)} | "
         f"{_markdown_table_cell(recorder_timing)} |"
+    )
+
+
+def _format_route_batch_result_decision_row(row: tuple[str, str, str, str]) -> str:
+    result, use_when, recorder_edit, release_rule = row
+    return (
+        "| "
+        f"`{_markdown_table_cell(result)}` | "
+        f"{_markdown_table_cell(use_when)} | "
+        f"{_markdown_table_cell(recorder_edit)} | "
+        f"{_markdown_table_cell(release_rule)} |"
     )
 
 

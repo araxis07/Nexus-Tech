@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.226.0 - 2026-07-03
+
+- Added a validated pass/watch/fail result decision guide to every visible route batch
+- Added terminal result-decision guidance for the next incomplete route batch before recorder copy commands
+- Updated docs and regression coverage so route-batch recorder edits stay tied to observed visible-window defects
+
 ## 0.225.0 - 2026-07-03
 
 - Added post-recording refresh and validation commands to every visible route batch

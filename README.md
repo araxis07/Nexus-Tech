@@ -617,8 +617,11 @@ commands between command generation and final signoff. Each route batch also
 exports an evidence checklist plus copy-paste command blocks that run visible
 windows before listing recorder placeholders, so testers choose pass, watch, or
 fail from observed game-window behavior before marking evidence. The same batch
-artifact also includes post-recording refresh and validation commands so testers
-can confirm the batch and report status moved after evidence is recorded.
+artifact also includes a result decision guide before the recorder placeholders,
+making it explicit when to keep `--result pass` or change the command to
+`--result watch` or `--result fail`. Post-recording refresh and validation
+commands let testers confirm the batch and report status moved after evidence is
+recorded.
 `animation-playtest-ui-triage` turns the current manual gaps into P0/P1/P2
 layout, typography, control, scene, motion, and signoff lanes so UI polish work
 does not get mixed into generic notes before the final validator pass.

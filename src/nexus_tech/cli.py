@@ -68,6 +68,7 @@ from nexus_tech.frontend_2d import (
     animation_playtest_route_batch_copy_commands,
     animation_playtest_route_batch_evidence_checklist_rows,
     animation_playtest_route_batch_post_recording_commands,
+    animation_playtest_route_batch_result_decision_rows,
     animation_playtest_sprint_blocker_dependency,
     animation_playtest_sprint_blocker_next_action,
     animation_playtest_sprint_blocker_phase,
@@ -2329,6 +2330,27 @@ def animation_playtest_route_batches_command(
                 (
                     f"{item} | {status} | evidence: {required_evidence} | "
                     f"decision: {result_decision} | recorder: {recorder_timing}"
+                )
+            )
+        decision_table = Table(title="Route Batch Result Decision Guide")
+        decision_table.add_column("Result", style="cyan")
+        decision_table.add_column("Use When")
+        decision_table.add_column("Recorder Edit")
+        decision_table.add_column("Release Rule")
+        for row in animation_playtest_route_batch_result_decision_rows():
+            decision_table.add_row(*row)
+        console.print(decision_table)
+        console.print("[bold cyan]Route Batch Result Decision Lines[/bold cyan]")
+        for (
+            result,
+            use_when,
+            recorder_edit,
+            release_rule,
+        ) in animation_playtest_route_batch_result_decision_rows():
+            console.print(
+                (
+                    f"{result} | use when: {use_when} | "
+                    f"recorder: {recorder_edit} | release: {release_rule}"
                 )
             )
         console.print("[bold cyan]Route Batch Copy Commands[/bold cyan]")

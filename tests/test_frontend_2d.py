@@ -6966,6 +6966,8 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert "### Batch 1 Evidence Checklist" in text
     assert "Route 1: menu/full" in text
     assert "Choose pass, watch, or fail after observing the visible command." in text
+    assert "### Batch 1 Result Decision Guide" in text
+    assert "Change recorder to --result watch and name the follow-up risk." in text
     assert "### Batch 1 Copy Commands" in text
     assert "# Batch 1: 820x620 visible commands" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
@@ -7019,6 +7021,8 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "820x620" in result.output
     assert "Route Batch Evidence Checklist" in result.output
     assert "Route 1: menu/full" in result.output
+    assert "Route Batch Result Decision Guide" in result.output
+    assert "Change recorder to --result fail and keep the blocker open." in result.output
     assert "Route Batch Copy Commands" in result.output
     assert "Batch 1: 820x620" in result.output
     assert "Record the 820x620 window summary after all motion modes are observed" in result.output
@@ -7027,6 +7031,7 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "Route batch status: MANUAL-REQUIRED" in result.output
     assert output_path.exists()
     output_text = output_path.read_text(encoding="utf-8")
+    assert "### Batch 1 Result Decision Guide" in output_text
     assert "### Batch 1 Copy Commands" in output_text
     assert "### Batch 1 Post-Recording Commands" in output_text
     assert "record-animation-playtest-route" in output_text

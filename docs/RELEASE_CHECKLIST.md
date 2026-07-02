@@ -151,12 +151,14 @@ matching recorder command as `Sprint Next Action`, keeping the handoff anchored
 to the first real observation step. The `Next Sprint Copy Commands` panel keeps
 the full command text visible for copy-paste while preserving placeholder notes
 until a tester records real evidence.
-The route-batch artifact and CLI now surface per-window evidence checklists and
-copy commands for the next incomplete batch, keeping pass/watch/fail decisions
-and visible route commands ahead of recorder placeholders during release review.
-When an output artifact path is provided, the CLI also prints post-recording
-refresh commands for validating route batches and checking report status after
-observed evidence is recorded.
+The route-batch artifact and CLI now surface per-window evidence checklists,
+result decision guidance, and copy commands for the next incomplete batch,
+keeping pass/watch/fail decisions and visible route commands ahead of recorder
+placeholders during release review. Keep `--result pass` only when no defect
+trigger applies; switch to `watch` or `fail` before recording when the visible
+window shows a follow-up risk or blocker. When an output artifact path is
+provided, the CLI also prints post-recording refresh commands for validating
+route batches and checking report status after observed evidence is recorded.
 Run `prepare-animation-playtest-session` when preparing a handoff package for a
 tester; it creates the report draft, command queue, grouped plan artifact,
 recorder queue artifact, route-batch artifact, UI triage backlog, release gate,
