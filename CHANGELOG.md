@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.229.0 - 2026-07-03
+
+- Shortened compact 2D action-bar labels on 820-class layouts
+- Added regression coverage for compact footer titles so long labels such as End Turn do not crowd narrow buttons
+- Verified the 820x620 visual audit still passes after compact action-label cleanup
+
 ## 0.228.0 - 2026-07-03
 
 - Reduced compact 2D run footer height by using a tighter 820-class action grid

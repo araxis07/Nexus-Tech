@@ -7580,7 +7580,7 @@ class RunScene(BaseScene):
                 surface,
                 pygame,
                 rect=button_rect,
-                title=f"{button.key_hint} {button.title}",
+                title=self._footer_button_title(button, button_cols=button_cols),
                 detail=self._footer_button_detail(
                     button,
                     enabled=enabled,
@@ -7655,6 +7655,24 @@ class RunScene(BaseScene):
         else:
             button_height = min(58, max(min_button_height, available_per_row))
         return button_cols, button_height, footer_band_height
+
+    def _footer_button_title(self, button: ActionButtonSpec, *, button_cols: int) -> str:
+        if button_cols < 7:
+            return f"{button.key_hint} {button.title}"
+        compact_titles = {
+            "New Product": "Product",
+            "Customers": "Cust",
+            "Partners": "Partner",
+            "Pipeline": "Pipe",
+            "Endgame": "Exit",
+            "Debt Down": "Debt",
+            "Strategy": "Strat",
+            "Roadmap": "Map",
+            "End Turn": "End",
+        }
+        key_hint = "Sp" if button.key_hint == "Space" else button.key_hint
+        title = compact_titles.get(button.title, button.title)
+        return f"{key_hint} {title}"
 
     def _footer_button_detail(
         self,
