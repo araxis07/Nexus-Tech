@@ -617,9 +617,9 @@ visible command plus matching recorder command, while
 target window and `validate-animation-playtest-route-batches` blocks stale route
 batch artifacts so manual QA can work through the matrix without losing recorder
 commands between command generation and final signoff. Each route batch also
-exports an evidence checklist plus copy-paste command blocks that run visible
-windows before listing recorder placeholders, so testers choose pass, watch, or
-fail from observed game-window behavior before marking evidence. The same batch
+exports an evidence checklist, copy-paste command blocks, and ordered operator
+steps that alternate visible-window launches with the matching recorder command,
+so testers choose pass, watch, or fail from observed game-window behavior before marking evidence. The same batch
 artifact also includes a result decision guide before the recorder placeholders,
 making it explicit when to keep `--result pass` or change the command to
 `--result watch` or `--result fail`. It now also includes defect-trigger rows

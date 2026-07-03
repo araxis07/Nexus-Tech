@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.232.0 - 2026-07-03
+
+- Added ordered operator steps to visible-route manual QA batches so testers run each visible window before the matching recorder command
+- Validated the new operator-step block in route-batch artifacts to prevent stale manual QA instructions
+- Updated docs and regression coverage for safer open-window animation QA execution
+
 ## 0.231.0 - 2026-07-03
 
 - Added `--auto-commit` to manual animation report and session draft commands so QA packets can prefill the current short Git SHA

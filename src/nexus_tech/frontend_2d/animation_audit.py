@@ -5902,6 +5902,16 @@ def write_2d_animation_playtest_route_batch_plan(
                 "```",
             ]
         )
+        lines.extend(
+            [
+                "",
+                f"### Batch {batch.batch_number} Operator Steps",
+                "",
+                "```bash",
+                *animation_playtest_route_batch_operator_steps(batch),
+                "```",
+            ]
+        )
         if batch.window_recorder_hint is not None:
             hint = batch.window_recorder_hint
             required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
@@ -6071,6 +6081,13 @@ def validate_2d_animation_playtest_route_batch_plan(
         for line in copy_block_lines:
             if line not in text:
                 findings.append(f"missing route batch copy command guard: {line}")
+        operator_step_lines = (
+            f"### Batch {batch.batch_number} Operator Steps",
+            *animation_playtest_route_batch_operator_steps(batch),
+        )
+        for line in operator_step_lines:
+            if line not in text:
+                findings.append(f"missing route batch operator step guard: {line}")
         post_recording_lines = (
             f"### Batch {batch.batch_number} Post-Recording Commands",
             *animation_playtest_route_batch_post_recording_commands(
@@ -6121,6 +6138,49 @@ def animation_playtest_route_batch_copy_commands(
         )
         lines.append(batch.window_recorder_hint.recorder_command)
 
+    return tuple(lines)
+
+
+def animation_playtest_route_batch_operator_steps(
+    batch: AnimationPlaytestRouteBatch,
+) -> tuple[str, ...]:
+    """Return an ordered run-observe-record sequence for one route batch."""
+
+    open_items = tuple(item for item in batch.items if item.status != "pass")
+    has_open_window_summary = (
+        batch.window_recorder_hint is not None and batch.window_recorder_hint.status != "pass"
+    )
+    if not open_items and not has_open_window_summary:
+        return (f"# Batch {batch.batch_number}: {batch.window_size} already recorded.",)
+
+    lines: list[str] = [
+        f"# Batch {batch.batch_number}: {batch.window_size} operator sequence",
+        "# Do not run recorder commands until the matching visible window has been observed.",
+    ]
+    for step_number, item in enumerate(open_items, start=1):
+        required_terms = ", ".join(item.required_terms) if item.required_terms else "-"
+        route_label = f"route {item.step} ({item.target}/{item.motion_mode})"
+        lines.extend(
+            [
+                f"# Step {step_number}: observe {route_label}",
+                item.visible_command,
+                f"# Required evidence terms: {required_terms}",
+                "# Replace recorder placeholders with real visible-window notes:",
+            ]
+        )
+        if item.recorder_command:
+            lines.append(item.recorder_command)
+    if has_open_window_summary and batch.window_recorder_hint is not None:
+        hint = batch.window_recorder_hint
+        required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+        lines.extend(
+            [
+                f"# Final step: record the {batch.window_size} window summary",
+                f"# Required evidence terms: {required_terms}",
+                "# Replace recorder placeholders with the observed full/reduced/off summary:",
+                hint.recorder_command,
+            ]
+        )
     return tuple(lines)
 
 

@@ -69,6 +69,7 @@ from nexus_tech.frontend_2d import (
     animation_playtest_route_batch_copy_commands,
     animation_playtest_route_batch_defect_trigger_rows,
     animation_playtest_route_batch_evidence_checklist_rows,
+    animation_playtest_route_batch_operator_steps,
     animation_playtest_route_batch_post_recording_commands,
     animation_playtest_route_batch_result_decision_rows,
     animation_playtest_sprint_blocker_dependency,
@@ -2404,6 +2405,9 @@ def animation_playtest_route_batches_command(
         console.print("[bold cyan]Route Batch Copy Commands[/bold cyan]")
         console.print(f"Batch {next_batch.batch_number}: {next_batch.window_size}")
         for line in animation_playtest_route_batch_copy_commands(next_batch):
+            console.print(line)
+        console.print("[bold cyan]Route Batch Operator Steps[/bold cyan]")
+        for line in animation_playtest_route_batch_operator_steps(next_batch):
             console.print(line)
         if output is not None:
             console.print("[bold cyan]Route Batch Post-Recording Commands[/bold cyan]")

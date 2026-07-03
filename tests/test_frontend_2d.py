@@ -7014,6 +7014,14 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
     assert "record-animation-playtest-route" in text
     assert "# Replace recorder placeholders with observed notes after each visible command:" in text
+    assert "### Batch 1 Operator Steps" in text
+    assert "# Batch 1: 820x620 operator sequence" in text
+    assert "# Step 1: observe route 1 (menu/full)" in text
+    assert (
+        "# Do not run recorder commands until the matching visible window has been observed."
+        in text
+    )
+    assert "# Replace recorder placeholders with real visible-window notes:" in text
     assert "# Record the 820x620 window summary after all motion modes are observed:" in text
     assert "### Window Summary Recorder" in text
     assert "record-animation-playtest-window" in text
@@ -7068,6 +7076,12 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "Motion readability" in result.output
     assert "Route Batch Copy Commands" in result.output
     assert "Batch 1: 820x620" in result.output
+    assert "Route Batch Operator Steps" in result.output
+    assert "Step 1: observe route 1 (menu/full)" in result.output
+    assert (
+        "Do not run recorder commands until the matching visible window has been observed"
+        in result.output
+    )
     assert "Record the 820x620 window summary after all motion modes are observed" in result.output
     assert "Route Batch Post-Recording Commands" in result.output
     assert "validate-animation-playtest-route-batches" in result.output
@@ -7077,6 +7091,7 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "### Batch 1 Result Decision Guide" in output_text
     assert "### Batch 1 Defect Trigger Checklist" in output_text
     assert "### Batch 1 Copy Commands" in output_text
+    assert "### Batch 1 Operator Steps" in output_text
     assert "### Batch 1 Post-Recording Commands" in output_text
     assert "record-animation-playtest-route" in output_text
     assert "validate-animation-playtest-report must pass before signoff" in output_text
