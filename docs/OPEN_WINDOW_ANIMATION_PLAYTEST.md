@@ -114,8 +114,9 @@ command intentionally contains a notes placeholder that must be replaced with
 real observed evidence before it can be used as signoff.
 Use `animation-playtest-route-batches` before or during the visible pass when a
 tester needs the 18 menu/play route commands grouped by target window with each
-matching recorder command beside it. The exported batch plan is a runner aid, not
-signoff evidence.
+matching recorder command beside it. Each batch starts with preflight checks for
+the exact window, pending route count, motion modes, required evidence terms, and
+recorder timing. The exported batch plan is a runner aid, not signoff evidence.
 Use `validate-animation-playtest-route-batches` after exporting or editing the
 batch plan so stale windows, visible commands, required terms, or recorder
 commands fail before the tester follows the batch artifact.

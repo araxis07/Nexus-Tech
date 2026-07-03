@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.233.0 - 2026-07-03
+
+- Added validated preflight checks to every visible route batch so testers confirm the exact window, pending routes, motion modes, evidence terms, and recorder timing before opening commands
+- Exposed route-batch preflight checks in terminal output and Markdown artifacts
+- Updated manual animation QA docs and regression coverage for the safer route-batch handoff flow
+
 ## 0.232.0 - 2026-07-03
 
 - Added ordered operator steps to visible-route manual QA batches so testers run each visible window before the matching recorder command

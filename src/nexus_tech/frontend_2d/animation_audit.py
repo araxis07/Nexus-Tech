@@ -5862,6 +5862,17 @@ def write_2d_animation_playtest_route_batch_plan(
         lines.extend(
             [
                 "",
+                f"### Batch {batch.batch_number} Preflight Checks",
+                "",
+                "| Check | Required Action |",
+                "| --- | --- |",
+            ]
+        )
+        for row in animation_playtest_route_batch_preflight_rows(batch):
+            lines.append(_format_route_batch_preflight_row(row))
+        lines.extend(
+            [
+                "",
                 f"### Batch {batch.batch_number} Evidence Checklist",
                 "",
                 "| Item | Status | Required Evidence | Result Decision | Recorder Timing |",
@@ -6041,6 +6052,17 @@ def validate_2d_animation_playtest_route_batch_plan(
         _validate_route_batch_item_row(findings, item, row)
 
     for batch in batch_plan.batches:
+        preflight_lines = (
+            f"### Batch {batch.batch_number} Preflight Checks",
+            "| Check | Required Action |",
+            *(
+                _format_route_batch_preflight_row(row)
+                for row in animation_playtest_route_batch_preflight_rows(batch)
+            ),
+        )
+        for line in preflight_lines:
+            if line not in text:
+                findings.append(f"missing route batch preflight guard: {line}")
         evidence_checklist_lines = (
             f"### Batch {batch.batch_number} Evidence Checklist",
             "| Item | Status | Required Evidence | Result Decision | Recorder Timing |",
@@ -6184,6 +6206,55 @@ def animation_playtest_route_batch_operator_steps(
     return tuple(lines)
 
 
+def animation_playtest_route_batch_preflight_rows(
+    batch: AnimationPlaytestRouteBatch,
+) -> tuple[tuple[str, str], ...]:
+    """Return preflight checks testers must confirm before a route batch."""
+
+    open_items = tuple(item for item in batch.items if item.status != "pass")
+    has_open_window_summary = (
+        batch.window_recorder_hint is not None and batch.window_recorder_hint.status != "pass"
+    )
+    if not open_items and not has_open_window_summary:
+        return (
+            (
+                "Batch state",
+                f"{batch.window_size} already has recorded route and window evidence.",
+            ),
+        )
+
+    pending_modes = tuple(dict.fromkeys(item.motion_mode for item in open_items))
+    route_terms = tuple(dict.fromkeys(term for item in open_items for term in item.required_terms))
+    window_terms = (
+        batch.window_recorder_hint.required_terms
+        if batch.window_recorder_hint is not None and has_open_window_summary
+        else ()
+    )
+    required_route_terms = ", ".join(route_terms) if route_terms else "-"
+    required_window_terms = ", ".join(window_terms) if window_terms else "-"
+    pending_mode_text = ", ".join(pending_modes) if pending_modes else "-"
+    return (
+        (
+            "Visible window",
+            f"Open the {batch.window_size} command window exactly; do not resize mid-batch.",
+        ),
+        (
+            "Pending routes",
+            f"{len(open_items)} menu/play route row(s) still require observed evidence.",
+        ),
+        ("Motion modes", f"Observe this batch in these mode(s): {pending_mode_text}."),
+        ("Route evidence terms", required_route_terms),
+        ("Window summary terms", required_window_terms),
+        (
+            "Recorder safety",
+            (
+                "Run recorder commands only after visible observation and after replacing "
+                "placeholder notes."
+            ),
+        ),
+    )
+
+
 def animation_playtest_route_batch_evidence_checklist_rows(
     batch: AnimationPlaytestRouteBatch,
 ) -> tuple[tuple[str, str, str, str, str], ...]:
@@ -6258,6 +6329,11 @@ def animation_playtest_route_batch_post_recording_commands(
             f"{_shell_arg(batch_plan.report.path)}"
         ),
     )
+
+
+def _format_route_batch_preflight_row(row: tuple[str, str]) -> str:
+    check, required_action = row
+    return f"| {_markdown_table_cell(check)} | {_markdown_table_cell(required_action)} |"
 
 
 def _format_route_batch_evidence_checklist_row(

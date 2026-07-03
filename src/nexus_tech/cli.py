@@ -71,6 +71,7 @@ from nexus_tech.frontend_2d import (
     animation_playtest_route_batch_evidence_checklist_rows,
     animation_playtest_route_batch_operator_steps,
     animation_playtest_route_batch_post_recording_commands,
+    animation_playtest_route_batch_preflight_rows,
     animation_playtest_route_batch_result_decision_rows,
     animation_playtest_sprint_blocker_dependency,
     animation_playtest_sprint_blocker_next_action,
@@ -2340,6 +2341,15 @@ def animation_playtest_route_batches_command(
 
     next_batch = next((batch for batch in batch_plan.batches if batch.open_items), None)
     if next_batch is not None:
+        preflight_table = Table(title="Route Batch Preflight Checks")
+        preflight_table.add_column("Check", style="cyan")
+        preflight_table.add_column("Required Action")
+        for row in animation_playtest_route_batch_preflight_rows(next_batch):
+            preflight_table.add_row(*row)
+        console.print(preflight_table)
+        console.print("[bold cyan]Route Batch Preflight Lines[/bold cyan]")
+        for check, required_action in animation_playtest_route_batch_preflight_rows(next_batch):
+            console.print(f"{check} | {required_action}")
         checklist_table = Table(title="Route Batch Evidence Checklist")
         checklist_table.add_column("Item", style="cyan")
         checklist_table.add_column("Status")

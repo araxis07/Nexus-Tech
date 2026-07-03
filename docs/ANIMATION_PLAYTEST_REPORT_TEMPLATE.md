@@ -65,15 +65,18 @@ first, then replace the recorder placeholder with real observed notes only
 after the window has been checked. The `Next Sprint Copy Commands` block repeats
 the full commands for copy-paste, but it is still a work order rather than
 evidence.
-For route batches, use the per-window copy blocks to run all visible commands
-before recorder commands, then use the batch evidence checklist and result
-decision guide to choose pass/watch/fail. Keep `--result pass` only when no
-defect trigger applies, switch to `watch` for playable/readable risks, and
-switch to `fail` for blocking UI, navigation, readability, or motion defects.
-Use the defect-trigger checklist to classify layout containment, navigation
-recovery, motion readability, feedback clarity, and evidence-quality issues
-before editing recorder result flags. The batch copy blocks still require
-replacing placeholder notes with real observations from the visible window.
+For route batches, use the per-window preflight checks first so the target
+window, pending motion modes, required evidence terms, and recorder timing are
+confirmed before any visible route starts. Then use the copy blocks to run all
+visible commands before recorder commands, followed by the batch evidence
+checklist and result decision guide to choose pass/watch/fail. Keep
+`--result pass` only when no defect trigger applies, switch to `watch` for
+playable/readable risks, and switch to `fail` for blocking UI, navigation,
+readability, or motion defects. Use the defect-trigger checklist to classify
+layout containment, navigation recovery, motion readability, feedback clarity,
+and evidence-quality issues before editing recorder result flags. The batch copy
+blocks still require replacing placeholder notes with real observations from the
+visible window.
 After recording a batch, run the post-recording refresh commands so the
 route-batch artifact and report status reflect the new evidence.
 

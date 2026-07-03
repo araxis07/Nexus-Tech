@@ -616,10 +616,12 @@ visible command plus matching recorder command, while
 `animation-playtest-route-batches` groups the visible pass into one batch per
 target window and `validate-animation-playtest-route-batches` blocks stale route
 batch artifacts so manual QA can work through the matrix without losing recorder
-commands between command generation and final signoff. Each route batch also
-exports an evidence checklist, copy-paste command blocks, and ordered operator
-steps that alternate visible-window launches with the matching recorder command,
-so testers choose pass, watch, or fail from observed game-window behavior before marking evidence. The same batch
+commands between command generation and final signoff. Each route batch now
+exports preflight checks, an evidence checklist, copy-paste command blocks, and
+ordered operator steps that alternate visible-window launches with the matching
+recorder command, so testers confirm the target window, pending modes, required
+terms, and recorder timing before choosing pass, watch, or fail from observed
+game-window behavior. The same batch
 artifact also includes a result decision guide before the recorder placeholders,
 making it explicit when to keep `--result pass` or change the command to
 `--result watch` or `--result fail`. It now also includes defect-trigger rows
