@@ -74,9 +74,11 @@ checklist and result decision guide to choose pass/watch/fail. Keep
 playable/readable risks, and switch to `fail` for blocking UI, navigation,
 readability, or motion defects. Use the defect-trigger checklist to classify
 layout containment, navigation recovery, motion readability, feedback clarity,
-and evidence-quality issues before editing recorder result flags. The batch copy
-blocks still require replacing placeholder notes with real observations from the
-visible window.
+and evidence-quality issues before editing recorder result flags. Use the
+defect intake template to record severity, reproduction, evidence, recorder
+action, and follow-up ownership whenever a route becomes watch or fail. The
+batch copy blocks still require replacing placeholder notes with real
+observations from the visible window.
 After recording a batch, run the post-recording refresh commands so the
 route-batch artifact and report status reflect the new evidence.
 

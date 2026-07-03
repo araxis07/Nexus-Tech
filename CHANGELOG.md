@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.234.0 - 2026-07-03
+
+- Added a validated defect intake template to every visible route batch so watch/fail notes capture severity, reproduction, evidence, recorder action, and follow-up ownership
+- Exposed route-batch defect intake fields in terminal output and Markdown artifacts
+- Updated manual animation QA docs and regression coverage for batch-level defect recording
+
 ## 0.233.0 - 2026-07-03
 
 - Added validated preflight checks to every visible route batch so testers confirm the exact window, pending routes, motion modes, evidence terms, and recorder timing before opening commands

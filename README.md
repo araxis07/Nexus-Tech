@@ -626,10 +626,11 @@ artifact also includes a result decision guide before the recorder placeholders,
 making it explicit when to keep `--result pass` or change the command to
 `--result watch` or `--result fail`. It now also includes defect-trigger rows
 for layout containment, navigation recovery, motion readability, feedback
-clarity, and evidence quality, so watch/fail notes name the actual blocker
-instead of becoming generic polish comments. Post-recording refresh and
-validation commands let testers confirm the batch and report status moved after
-evidence is recorded.
+clarity, and evidence quality, plus a defect intake template for severity,
+reproduction, evidence, recorder action, and follow-up ownership. That keeps
+watch/fail notes tied to the actual blocker instead of becoming generic polish
+comments. Post-recording refresh and validation commands let testers confirm the
+batch and report status moved after evidence is recorded.
 `animation-playtest-ui-triage` turns the current manual gaps into P0/P1/P2
 layout, typography, control, scene, motion, and signoff lanes so UI polish work
 does not get mixed into generic notes before the final validator pass.

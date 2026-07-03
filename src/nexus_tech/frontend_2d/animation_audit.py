@@ -265,6 +265,28 @@ _ROUTE_BATCH_DEFECT_TRIGGER_ROWS: tuple[tuple[str, str, str, str], ...] = (
         "Do not run final validation until notes name observed behavior.",
     ),
 )
+_ROUTE_BATCH_DEFECT_INTAKE_ROWS: tuple[tuple[str, str], ...] = (
+    (
+        "Severity",
+        "Choose P0 for blocked navigation/readability, P1 for risky but playable, P2 for polish.",
+    ),
+    (
+        "Reproduction",
+        "Copy the visible command, expected result, actual result, window, route, and motion mode.",
+    ),
+    (
+        "Evidence",
+        "Name the affected UI element, defect trigger, and required evidence terms seen on screen.",
+    ),
+    (
+        "Recorder action",
+        "Change the route/window recorder to watch or fail; never keep pass for an open blocker.",
+    ),
+    (
+        "Follow-up",
+        "Assign fix-or-accept decision before rerunning the visible command and validator.",
+    ),
+)
 DEFAULT_OPEN_WINDOW_PLAYTEST_BALANCE_COMMANDS: tuple[str, ...] = (
     (
         "uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch "
@@ -5906,6 +5928,17 @@ def write_2d_animation_playtest_route_batch_plan(
         lines.extend(
             [
                 "",
+                f"### Batch {batch.batch_number} Defect Intake Template",
+                "",
+                "| Field | Required Detail |",
+                "| --- | --- |",
+            ]
+        )
+        for row in animation_playtest_route_batch_defect_intake_rows(batch):
+            lines.append(_format_route_batch_defect_intake_row(row))
+        lines.extend(
+            [
+                "",
                 f"### Batch {batch.batch_number} Copy Commands",
                 "",
                 "```bash",
@@ -6096,6 +6129,17 @@ def validate_2d_animation_playtest_route_batch_plan(
         for line in defect_trigger_lines:
             if line not in text:
                 findings.append(f"missing route batch defect trigger guard: {line}")
+        defect_intake_lines = (
+            f"### Batch {batch.batch_number} Defect Intake Template",
+            "| Field | Required Detail |",
+            *(
+                _format_route_batch_defect_intake_row(row)
+                for row in animation_playtest_route_batch_defect_intake_rows(batch)
+            ),
+        )
+        for line in defect_intake_lines:
+            if line not in text:
+                findings.append(f"missing route batch defect intake guard: {line}")
         copy_block_lines = (
             f"### Batch {batch.batch_number} Copy Commands",
             *animation_playtest_route_batch_copy_commands(batch),
@@ -6299,6 +6343,26 @@ def animation_playtest_route_batch_defect_trigger_rows() -> tuple[tuple[str, str
     return _ROUTE_BATCH_DEFECT_TRIGGER_ROWS
 
 
+def animation_playtest_route_batch_defect_intake_rows(
+    batch: AnimationPlaytestRouteBatch,
+) -> tuple[tuple[str, str], ...]:
+    """Return defect intake fields for one manual route batch."""
+
+    pending_items = tuple(item for item in batch.items if item.status != "pass")
+    pending_labels = ", ".join(
+        f"{item.step}:{item.target}/{item.motion_mode}" for item in pending_items
+    )
+    batch_context = (
+        f"{batch.window_size}; pending routes: {pending_labels}"
+        if pending_labels
+        else f"{batch.window_size}; no pending route rows"
+    )
+    return (
+        ("Batch context", batch_context),
+        *_ROUTE_BATCH_DEFECT_INTAKE_ROWS,
+    )
+
+
 def animation_playtest_route_batch_post_recording_commands(
     batch_plan: AnimationPlaytestRouteBatchPlan,
     output_path: Path,
@@ -6370,6 +6434,11 @@ def _format_route_batch_defect_trigger_row(row: tuple[str, str, str, str]) -> st
         f"{_markdown_table_cell(record_fail_when)} | "
         f"{_markdown_table_cell(required_action)} |"
     )
+
+
+def _format_route_batch_defect_intake_row(row: tuple[str, str]) -> str:
+    field, required_detail = row
+    return f"| {_markdown_table_cell(field)} | {_markdown_table_cell(required_detail)} |"
 
 
 def validate_2d_animation_playtest_readiness_plan(

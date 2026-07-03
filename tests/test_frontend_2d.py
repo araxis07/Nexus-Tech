@@ -7014,6 +7014,11 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert "### Batch 1 Defect Trigger Checklist" in text
     assert "Layout containment" in text
     assert "Record control evidence before closing the batch." in text
+    assert "### Batch 1 Defect Intake Template" in text
+    assert "Batch context" in text
+    assert "820x620; pending routes: 1:menu/full, 2:play/full" in text
+    assert "Choose P0 for blocked navigation/readability" in text
+    assert "Change the route/window recorder to watch or fail" in text
     assert "### Batch 1 Copy Commands" in text
     assert "# Batch 1: 820x620 visible commands" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
@@ -7086,6 +7091,10 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "Change recorder to --result fail and keep the blocker open." in result.output
     assert "Route Batch Defect Trigger Checklist" in result.output
     assert "Motion readability" in result.output
+    assert "Route Batch Defect Intake Template" in result.output
+    assert "Route Batch Defect Intake Lines" in result.output
+    assert "Batch context | 820x620; pending routes: 1:menu/full" in result.output
+    assert "Severity | Choose P0 for blocked navigation/readability" in result.output
     assert "Route Batch Copy Commands" in result.output
     assert "Batch 1: 820x620" in result.output
     assert "Route Batch Operator Steps" in result.output
@@ -7103,6 +7112,7 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "### Batch 1 Preflight Checks" in output_text
     assert "### Batch 1 Result Decision Guide" in output_text
     assert "### Batch 1 Defect Trigger Checklist" in output_text
+    assert "### Batch 1 Defect Intake Template" in output_text
     assert "### Batch 1 Copy Commands" in output_text
     assert "### Batch 1 Operator Steps" in output_text
     assert "### Batch 1 Post-Recording Commands" in output_text

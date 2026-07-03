@@ -67,6 +67,7 @@ from nexus_tech.frontend_2d import (
     Frontend2DUnavailableError,
     MotionMode,
     animation_playtest_route_batch_copy_commands,
+    animation_playtest_route_batch_defect_intake_rows,
     animation_playtest_route_batch_defect_trigger_rows,
     animation_playtest_route_batch_evidence_checklist_rows,
     animation_playtest_route_batch_operator_steps,
@@ -2412,6 +2413,15 @@ def animation_playtest_route_batches_command(
             console.print(
                 (f"{trigger} | watch: {watch_when} | fail: {fail_when} | action: {required_action}")
             )
+        intake_table = Table(title="Route Batch Defect Intake Template")
+        intake_table.add_column("Field", style="cyan")
+        intake_table.add_column("Required Detail")
+        for row in animation_playtest_route_batch_defect_intake_rows(next_batch):
+            intake_table.add_row(*row)
+        console.print(intake_table)
+        console.print("[bold cyan]Route Batch Defect Intake Lines[/bold cyan]")
+        for field, required_detail in animation_playtest_route_batch_defect_intake_rows(next_batch):
+            console.print(f"{field} | {required_detail}")
         console.print("[bold cyan]Route Batch Copy Commands[/bold cyan]")
         console.print(f"Batch {next_batch.batch_number}: {next_batch.window_size}")
         for line in animation_playtest_route_batch_copy_commands(next_batch):
