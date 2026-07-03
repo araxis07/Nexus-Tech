@@ -5974,6 +5974,17 @@ def write_2d_animation_playtest_route_batch_plan(
         lines.extend(
             [
                 "",
+                f"### Batch {batch.batch_number} Closure Checklist",
+                "",
+                "| Check | Required Action |",
+                "| --- | --- |",
+            ]
+        )
+        for row in animation_playtest_route_batch_closure_rows(batch):
+            lines.append(_format_route_batch_closure_row(row))
+        lines.extend(
+            [
+                "",
                 f"### Batch {batch.batch_number} Post-Recording Commands",
                 "",
                 "```bash",
@@ -6154,6 +6165,17 @@ def validate_2d_animation_playtest_route_batch_plan(
         for line in operator_step_lines:
             if line not in text:
                 findings.append(f"missing route batch operator step guard: {line}")
+        closure_lines = (
+            f"### Batch {batch.batch_number} Closure Checklist",
+            "| Check | Required Action |",
+            *(
+                _format_route_batch_closure_row(row)
+                for row in animation_playtest_route_batch_closure_rows(batch)
+            ),
+        )
+        for line in closure_lines:
+            if line not in text:
+                findings.append(f"missing route batch closure guard: {line}")
         post_recording_lines = (
             f"### Batch {batch.batch_number} Post-Recording Commands",
             *animation_playtest_route_batch_post_recording_commands(
@@ -6363,6 +6385,63 @@ def animation_playtest_route_batch_defect_intake_rows(
     )
 
 
+def animation_playtest_route_batch_closure_rows(
+    batch: AnimationPlaytestRouteBatch,
+) -> tuple[tuple[str, str], ...]:
+    """Return closure checks before moving to the next route batch."""
+
+    open_items = tuple(item for item in batch.items if item.status != "pass")
+    has_open_window_summary = (
+        batch.window_recorder_hint is not None and batch.window_recorder_hint.status != "pass"
+    )
+    if not open_items and not has_open_window_summary:
+        return (
+            (
+                "Batch closed",
+                f"{batch.window_size} route rows and window summary are already recorded.",
+            ),
+        )
+
+    return (
+        (
+            "Route recorders",
+            (
+                f"Record observed notes for {len(open_items)} pending route row(s); "
+                "switch result to watch/fail for any defect trigger."
+            ),
+        ),
+        (
+            "Window summary",
+            (
+                f"Record the {batch.window_size} full/reduced/off summary after every "
+                "motion mode is observed."
+            ),
+        ),
+        (
+            "Defect intake",
+            (
+                "For any watch/fail, capture severity, reproduction, evidence, recorder "
+                "action, and follow-up ownership."
+            ),
+        ),
+        (
+            "Artifact refresh",
+            "Run the post-recording commands so route batches and report status update.",
+        ),
+        (
+            "Validation gate",
+            (
+                "Run route-batch validation and animation-playtest-status; manual-required "
+                "is expected until every batch and signoff field passes."
+            ),
+        ),
+        (
+            "Next batch gate",
+            f"Move past {batch.window_size} only after this batch no longer has placeholder notes.",
+        ),
+    )
+
+
 def animation_playtest_route_batch_post_recording_commands(
     batch_plan: AnimationPlaytestRouteBatchPlan,
     output_path: Path,
@@ -6439,6 +6518,11 @@ def _format_route_batch_defect_trigger_row(row: tuple[str, str, str, str]) -> st
 def _format_route_batch_defect_intake_row(row: tuple[str, str]) -> str:
     field, required_detail = row
     return f"| {_markdown_table_cell(field)} | {_markdown_table_cell(required_detail)} |"
+
+
+def _format_route_batch_closure_row(row: tuple[str, str]) -> str:
+    check, required_action = row
+    return f"| {_markdown_table_cell(check)} | {_markdown_table_cell(required_action)} |"
 
 
 def validate_2d_animation_playtest_readiness_plan(

@@ -117,8 +117,11 @@ tester needs the 18 menu/play route commands grouped by target window with each
 matching recorder command beside it. Each batch starts with preflight checks for
 the exact window, pending route count, motion modes, required evidence terms, and
 recorder timing, then provides a defect intake template for severity,
-reproduction, evidence, recorder action, and follow-up ownership. The exported
-batch plan is a runner aid, not signoff evidence.
+reproduction, evidence, recorder action, and follow-up ownership. The closure
+checklist blocks moving to the next window until route/window recorders,
+defect classification, artifact refresh, route-batch validation, and status
+review are complete. The exported batch plan is a runner aid, not signoff
+evidence.
 Use `validate-animation-playtest-route-batches` after exporting or editing the
 batch plan so stale windows, visible commands, required terms, or recorder
 commands fail before the tester follows the batch artifact.

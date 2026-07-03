@@ -66,6 +66,7 @@ from nexus_tech.frontend_2d import (
     AnimationPlaytestReportValidation,
     Frontend2DUnavailableError,
     MotionMode,
+    animation_playtest_route_batch_closure_rows,
     animation_playtest_route_batch_copy_commands,
     animation_playtest_route_batch_defect_intake_rows,
     animation_playtest_route_batch_defect_trigger_rows,
@@ -2429,6 +2430,15 @@ def animation_playtest_route_batches_command(
         console.print("[bold cyan]Route Batch Operator Steps[/bold cyan]")
         for line in animation_playtest_route_batch_operator_steps(next_batch):
             console.print(line)
+        closure_table = Table(title="Route Batch Closure Checklist")
+        closure_table.add_column("Check", style="cyan")
+        closure_table.add_column("Required Action")
+        for row in animation_playtest_route_batch_closure_rows(next_batch):
+            closure_table.add_row(*row)
+        console.print(closure_table)
+        console.print("[bold cyan]Route Batch Closure Lines[/bold cyan]")
+        for check, required_action in animation_playtest_route_batch_closure_rows(next_batch):
+            console.print(f"{check} | {required_action}")
         if output is not None:
             console.print("[bold cyan]Route Batch Post-Recording Commands[/bold cyan]")
             for line in animation_playtest_route_batch_post_recording_commands(

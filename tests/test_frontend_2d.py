@@ -7035,6 +7035,11 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert "# Record the 820x620 window summary after all motion modes are observed:" in text
     assert "### Window Summary Recorder" in text
     assert "record-animation-playtest-window" in text
+    assert "### Batch 1 Closure Checklist" in text
+    assert "Route recorders" in text
+    assert "Record observed notes for 6 pending route row(s)" in text
+    assert "Run route-batch validation and animation-playtest-status" in text
+    assert "Move past 820x620 only after this batch no longer has placeholder notes." in text
     assert "### Batch 1 Post-Recording Commands" in text
     assert "animation-playtest-route-batches" in text
     assert "validate-animation-playtest-route-batches" in text
@@ -7104,6 +7109,10 @@ def test_animation_playtest_route_batches_command_writes_artifact(
         in result.output
     )
     assert "Record the 820x620 window summary after all motion modes are observed" in result.output
+    assert "Route Batch Closure Checklist" in result.output
+    assert "Route Batch Closure Lines" in result.output
+    assert "Route recorders | Record observed notes for 6 pending route row(s)" in result.output
+    assert "Next batch gate | Move past 820x620 only after this batch" in result.output
     assert "Route Batch Post-Recording Commands" in result.output
     assert "validate-animation-playtest-route-batches" in result.output
     assert "Route batch status: MANUAL-REQUIRED" in result.output
@@ -7115,6 +7124,7 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "### Batch 1 Defect Intake Template" in output_text
     assert "### Batch 1 Copy Commands" in output_text
     assert "### Batch 1 Operator Steps" in output_text
+    assert "### Batch 1 Closure Checklist" in output_text
     assert "### Batch 1 Post-Recording Commands" in output_text
     assert "record-animation-playtest-route" in output_text
     assert "validate-animation-playtest-report must pass before signoff" in output_text

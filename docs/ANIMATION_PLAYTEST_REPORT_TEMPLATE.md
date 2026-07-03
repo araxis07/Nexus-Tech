@@ -79,8 +79,11 @@ defect intake template to record severity, reproduction, evidence, recorder
 action, and follow-up ownership whenever a route becomes watch or fail. The
 batch copy blocks still require replacing placeholder notes with real
 observations from the visible window.
-After recording a batch, run the post-recording refresh commands so the
-route-batch artifact and report status reflect the new evidence.
+After recording a batch, use the closure checklist before changing windows: all
+route/window recorders must be updated, defects classified, artifacts refreshed,
+route-batch validation rerun, and report status checked. Then run the
+post-recording refresh commands so the route-batch artifact and report status
+reflect the new evidence.
 
 Keep completed reports as dated copies only when they contain real tester observations.
 Use visible `menu-2d` and `play-2d` runs with the exact `--window-size` listed in

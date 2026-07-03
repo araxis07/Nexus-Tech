@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.235.0 - 2026-07-03
+
+- Added a validated closure checklist to every visible route batch so testers refresh artifacts, rerun validation, and check status before moving to the next window
+- Exposed route-batch closure checks in terminal output and Markdown artifacts
+- Updated manual animation QA docs and regression coverage for batch-level closeout
+
 ## 0.234.0 - 2026-07-03
 
 - Added a validated defect intake template to every visible route batch so watch/fail notes capture severity, reproduction, evidence, recorder action, and follow-up ownership
