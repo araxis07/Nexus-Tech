@@ -5735,6 +5735,28 @@ def test_draft_animation_playtest_report_command_prefills_automated_gates(
     assert "Pass notes must mention: pause, resume, run." in report_text
 
 
+def test_draft_animation_playtest_report_command_can_prefill_current_commit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    monkeypatch.setattr(cli_module, "_resolve_git_short_commit", lambda: "def5678")
+
+    result = runner.invoke(
+        app,
+        [
+            "draft-animation-playtest-report",
+            "--output",
+            str(output_path),
+            "--auto-commit",
+        ],
+    )
+
+    assert result.exit_code == 0
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Commit: def5678" in report_text
+
+
 def test_validate_animation_playtest_report_command_accepts_completed_report(
     tmp_path: Path,
 ) -> None:
@@ -8930,8 +8952,10 @@ def test_record_animation_playtest_control_command_rejects_missing_terms(
 
 
 def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
+    monkeypatch,
     tmp_path: Path,
 ) -> None:
+    monkeypatch.setattr(cli_module, "_resolve_git_short_commit", lambda: "def5678")
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     commands_path = tmp_path / "manual-animation-commands.md"
     plan_path = tmp_path / "manual-animation-plan.md"
@@ -8977,8 +9001,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(sprint_path),
             "--handoff-output",
             str(handoff_path),
-            "--commit",
-            "abc1234",
+            "--auto-commit",
             "--tester",
             "araxis07",
             "--platform",
@@ -9037,7 +9060,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     issue_backlog_text = issue_backlog_path.read_text(encoding="utf-8")
     sprint_text = sprint_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
-    assert "- Commit: abc1234" in report_text
+    assert "- Commit: def5678" in report_text
     assert "- Tester: araxis07" in report_text
     assert "| ruff check src tests | `pass`" in report_text
     assert "| `820x620` | `todo` | `todo` | `todo`" in report_text

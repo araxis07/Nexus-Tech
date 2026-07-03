@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.231.0 - 2026-07-03
+
+- Added `--auto-commit` to manual animation report and session draft commands so QA packets can prefill the current short Git SHA
+- Updated the manual animation QA workflow docs to generate current-build report/session artifacts by default
+- Added regression coverage for auto-filled report/session commit metadata
+
 ## 0.230.0 - 2026-07-03
 
 - Compacted run-footer status and hint copy on narrow 2D layouts

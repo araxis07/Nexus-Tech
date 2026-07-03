@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import subprocess
 import textwrap
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -237,6 +238,25 @@ DEBUG_MODE = False
 DEFAULT_DB_PATH = DEFAULT_DATABASE_PATH
 
 
+def _resolve_git_short_commit() -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return completed.stdout.strip()
+
+
+def _resolve_animation_report_commit(commit: str, *, auto_commit: bool) -> str:
+    if commit.strip() or not auto_commit:
+        return commit
+    return _resolve_git_short_commit()
+
+
 def show_version_callback(value: bool) -> None:
     """Print the current package version and exit immediately."""
 
@@ -452,6 +472,13 @@ ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
 ANIMATION_PLAYTEST_REPORT_METADATA_OPTION = typer.Option(
     "",
     help="Optional metadata value to prefill in the manual animation playtest report draft.",
+)
+ANIMATION_PLAYTEST_AUTO_COMMIT_OPTION = typer.Option(
+    False,
+    "--auto-commit",
+    help=(
+        "Prefill the report commit from `git rev-parse --short HEAD` when --commit is not provided."
+    ),
 )
 ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT = typer.Argument(
     ...,
@@ -1579,6 +1606,7 @@ def prepare_2d_animation_playtest_command(
 def draft_animation_playtest_report_command(
     output: Path = ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION,
     commit: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    auto_commit: bool = ANIMATION_PLAYTEST_AUTO_COMMIT_OPTION,
     tester: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     platform: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     date: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
@@ -1593,10 +1621,11 @@ def draft_animation_playtest_report_command(
 ) -> None:
     """Write the strict manual 2D animation playtest report draft."""
 
+    resolved_commit = _resolve_animation_report_commit(commit, auto_commit=auto_commit)
     write_2d_animation_playtest_report_template(
         output,
         version=__version__,
-        commit=commit,
+        commit=resolved_commit,
         tester=tester,
         platform=platform,
         date=date,
@@ -3844,6 +3873,7 @@ def prepare_animation_playtest_session_command(
     ),
     command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
     commit: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
+    auto_commit: bool = ANIMATION_PLAYTEST_AUTO_COMMIT_OPTION,
     tester: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     platform: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
     date: str = ANIMATION_PLAYTEST_REPORT_METADATA_OPTION,
@@ -3859,10 +3889,11 @@ def prepare_animation_playtest_session_command(
     """Prepare report, command queue, and plan files for the manual animation playtest."""
 
     validate_scenario_id(scenario)
+    resolved_commit = _resolve_animation_report_commit(commit, auto_commit=auto_commit)
     write_2d_animation_playtest_report_template(
         report_output,
         version=__version__,
-        commit=commit,
+        commit=resolved_commit,
         tester=tester,
         platform=platform,
         date=date,

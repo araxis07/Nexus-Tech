@@ -560,7 +560,7 @@ uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-t
 Create the strict manual report draft that the validator expects after the real open-window pass:
 
 ```bash
-uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech draft-animation-playtest-report --auto-commit --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
@@ -572,7 +572,7 @@ uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-pla
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --execution-guide-output /tmp/nexus-tech-animation-execution-guide.md --issue-backlog-output /tmp/nexus-tech-animation-issues.md --sprint-output /tmp/nexus-tech-animation-sprint.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --auto-commit --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --execution-guide-output /tmp/nexus-tech-animation-execution-guide.md --issue-backlog-output /tmp/nexus-tech-animation-issues.md --sprint-output /tmp/nexus-tech-animation-sprint.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech animation-playtest-ui-triage /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-ui-triage.md
@@ -608,6 +608,9 @@ generated visible-window commands match the local virtualenv launcher.
 The exported command queue, animation playtest plan, recorder queue, session
 validator, route-batch plan, and handoff sheet include validated route evidence
 prompts for all 18 required menu/play window and motion runs.
+Use `--auto-commit` on the report/session draft commands so the manual QA packet
+records the current short Git SHA; pass `--commit <sha>` only when testing a
+specific build artifact that differs from the checked-out workspace.
 `animation-playtest-next` and `animation-playtest-handoff` surface the next
 visible command plus matching recorder command, while
 `animation-playtest-route-batches` groups the visible pass into one batch per
@@ -778,7 +781,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-m
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
-uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
+uv run nexus-tech draft-animation-playtest-report --auto-commit --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md
@@ -790,7 +793,7 @@ uv run nexus-tech animation-playtest-recorder-next /tmp/nexus-tech-animation-pla
 uv run nexus-tech animation-playtest-route-batches /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md --output /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech validate-animation-playtest-route-batches /tmp/nexus-tech-animation-route-batches.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md
 uv run nexus-tech validate-animation-playtest-plan /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md
-uv run nexus-tech prepare-animation-playtest-session --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --execution-guide-output /tmp/nexus-tech-animation-execution-guide.md --issue-backlog-output /tmp/nexus-tech-animation-issues.md --sprint-output /tmp/nexus-tech-animation-sprint.md --handoff-output /tmp/nexus-tech-animation-handoff.md
+uv run nexus-tech prepare-animation-playtest-session --auto-commit --prefill-automated-gates --plan-output /tmp/nexus-tech-animation-playtest-plan.md --recorder-output /tmp/nexus-tech-animation-recorder-queue.md --route-batches-output /tmp/nexus-tech-animation-route-batches.md --triage-output /tmp/nexus-tech-animation-ui-triage.md --release-gate-output /tmp/nexus-tech-animation-release-gate.md --progress-output /tmp/nexus-tech-animation-progress.md --execution-guide-output /tmp/nexus-tech-animation-execution-guide.md --issue-backlog-output /tmp/nexus-tech-animation-issues.md --sprint-output /tmp/nexus-tech-animation-sprint.md --handoff-output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech validate-animation-playtest-session /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md
 uv run nexus-tech animation-playtest-handoff /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-handoff.md
 uv run nexus-tech animation-playtest-ui-triage /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md --route-batches /tmp/nexus-tech-animation-route-batches.md --output /tmp/nexus-tech-animation-ui-triage.md
