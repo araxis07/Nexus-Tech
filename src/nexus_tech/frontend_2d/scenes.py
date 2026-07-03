@@ -7597,7 +7597,7 @@ class RunScene(BaseScene):
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
         footer_top = inner.bottom - footer_band_height + 6
-        status_line, hint_line = self._footer_status_lines()
+        status_line, hint_line = self._footer_status_lines(max_width=inner.width)
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -7689,7 +7689,7 @@ class RunScene(BaseScene):
         max_length = 24 if button_cols <= 4 else 28 if button_cols == 5 else 36
         return self._compact_button_detail(detail, max_length=max_length)
 
-    def _footer_status_lines(self) -> tuple[str, str]:
+    def _footer_status_lines(self, *, max_width: int | None = None) -> tuple[str, str]:
         workspace_key = self._active_panel_key()
         workspace_title = (
             self._panel_display_name(workspace_key) if workspace_key is not None else "Core HUD"
@@ -7723,7 +7723,39 @@ class RunScene(BaseScene):
                 f"Actions Left: {self.state.action_points_remaining}"
             )
         hint = self._hover_hint_line() or f"Watch: {self._view_model.watch_for}"
+        if max_width is not None and max_width < 760:
+            primary = self._compact_footer_status_line(primary)
+            hint = self._compact_footer_hint_line(hint)
         return primary, hint
+
+    def _compact_footer_status_line(self, line: str) -> str:
+        compact = line
+        replacements = (
+            ("Workspace: ", "WS: "),
+            ("Inspector: ", "Inspect: "),
+            ("Pending Event: ", "Event: "),
+            ("Actions Left: ", "AP: "),
+            ("Product: ", "Prod: "),
+            ("options", "opts"),
+            ("workspace ", "ws "),
+            ("resolve before more actions", "resolve first"),
+        )
+        for source, target in replacements:
+            compact = compact.replace(source, target)
+        return self._compact_button_detail(compact, max_length=92)
+
+    def _compact_footer_hint_line(self, line: str) -> str:
+        compact = line
+        replacements = (
+            ("Click ", "Tap "),
+            ("Control: ", "Ctrl: "),
+            (" because ", ": "),
+            (" currently ", " "),
+            ("hover over controls", "hover controls"),
+        )
+        for source, target in replacements:
+            compact = compact.replace(source, target)
+        return self._compact_button_detail(compact, max_length=96)
 
     def _event_queue_visible_count(self, event_height: int) -> int:
         visible = 2 if event_height < 180 else 3 if event_height < 280 else 4

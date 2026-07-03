@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.230.0 - 2026-07-03
+
+- Compacted run-footer status and hint copy on narrow 2D layouts
+- Added regression coverage so compact footer copy stays short while preserving full-size labels
+- Verified the 820x620 visual audit still passes after footer-copy cleanup
+
 ## 0.229.0 - 2026-07-03
 
 - Shortened compact 2D action-bar labels on 820-class layouts
