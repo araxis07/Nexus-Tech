@@ -79,6 +79,7 @@ from nexus_tech.frontend_2d import (
     animation_playtest_sprint_blocker_next_action,
     animation_playtest_sprint_blocker_phase,
     build_2d_animation_playtest_command_queue,
+    build_2d_animation_playtest_evidence_sheet,
     build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_issue_backlog,
@@ -105,6 +106,7 @@ from nexus_tech.frontend_2d import (
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
+    validate_2d_animation_playtest_evidence_sheet,
     validate_2d_animation_playtest_execution_guide,
     validate_2d_animation_playtest_issue_backlog,
     validate_2d_animation_playtest_progress_board,
@@ -118,6 +120,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
+    write_2d_animation_playtest_evidence_sheet,
     write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_issue_backlog,
@@ -463,6 +466,11 @@ ANIMATION_PLAYTEST_SESSION_SPRINT_OUTPUT_OPTION = typer.Option(
     "--sprint-output",
     help="Markdown path for the focused manual animation sprint packet.",
 )
+ANIMATION_PLAYTEST_SESSION_EVIDENCE_SHEET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-evidence-sheet.md"),
+    "--evidence-sheet-output",
+    help="Markdown path for the manual animation evidence capture sheet.",
+)
 ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-handoff.md"),
     "--handoff-output",
@@ -618,6 +626,22 @@ ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION = typer.Option(
     "--max-observation-steps",
     min=1,
     help="Maximum open observation rows to include in one sprint packet.",
+)
+ANIMATION_PLAYTEST_EVIDENCE_SHEET_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation evidence capture sheet Markdown file.",
+)
+ANIMATION_PLAYTEST_EVIDENCE_SHEET_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for the animation evidence capture sheet.",
+)
+ANIMATION_PLAYTEST_SPRINT_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-sprint.md"),
+    "--sprint-path",
+    help="Animation sprint packet path referenced by the evidence capture sheet.",
 )
 ANIMATION_PLAYTEST_ROUTE_STEP_ARGUMENT = typer.Argument(
     ...,
@@ -3493,6 +3517,186 @@ def validate_animation_playtest_sprint_command(
     )
 
 
+@app.command("animation-playtest-evidence-sheet")
+def animation_playtest_evidence_sheet_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION,
+    execution_guide_path: Path = ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_OPTION,
+    issue_backlog_path: Path = ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_OPTION,
+    sprint_path: Path = ANIMATION_PLAYTEST_SPRINT_PATH_OPTION,
+    output: Path | None = ANIMATION_PLAYTEST_EVIDENCE_SHEET_OUTPUT_OPTION,
+    max_observation_steps: int = ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Show a printable evidence capture sheet for the current animation QA sprint."""
+
+    validate_scenario_id(scenario)
+    sheet = build_2d_animation_playtest_evidence_sheet(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        sprint_path=sprint_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Evidence Sheet")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", sheet.status.upper())
+    table.add_row("Report", sheet.sprint.issue_backlog.report.path)
+    table.add_row("Sprint Packet", sheet.sprint_path)
+    table.add_row("Capture Rows", str(sheet.capture_row_count))
+    table.add_row("P0/P1 Blockers", str(sheet.blocker_count))
+    table.add_row("Capture Slug Prefix", sheet.capture_slug_prefix)
+    console.print(table)
+
+    rows = Table(title="Evidence Capture Rows")
+    rows.add_column("Step", justify="right")
+    rows.add_column("Phase")
+    rows.add_column("Area", style="cyan")
+    rows.add_column("Target")
+    rows.add_column("Terms", justify="right")
+    rows.add_column("Visible")
+    for index, hint in enumerate(sheet.sprint.observation_steps, start=1):
+        rows.add_row(
+            str(index),
+            _animation_playtest_cli_phase_for_area(hint.area),
+            hint.area,
+            hint.target,
+            str(len(hint.required_terms)),
+            "yes" if hint.visible_command else "-",
+        )
+    console.print(rows)
+
+    if sheet.sprint.next_observation is not None:
+        hint = sheet.sprint.next_observation
+        console.print("[bold cyan]Evidence Sheet Next Copy Commands[/bold cyan]")
+        console.print("Visible command:")
+        console.print(hint.visible_command or "-")
+        console.print("Recorder command after observed notes are ready:")
+        console.print(hint.recorder_command)
+
+    if output is not None:
+        write_2d_animation_playtest_evidence_sheet(sheet, output)
+        console.print(
+            Panel.fit(
+                f"Animation evidence capture sheet written to {output}",
+                title="Animation Playtest Evidence Sheet",
+                border_style="cyan",
+            )
+        )
+
+    if fail_on_incomplete and sheet.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("validate-animation-playtest-evidence-sheet")
+def validate_animation_playtest_evidence_sheet_command(
+    sheet_path: Path = ANIMATION_PLAYTEST_EVIDENCE_SHEET_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    plan_path: Path = ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT,
+    triage_path: Path = ANIMATION_PLAYTEST_TRIAGE_PATH_ARGUMENT,
+    route_batch_path: Path | None = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_PROGRESS_PATH_OPTION,
+    execution_guide_path: Path = ANIMATION_PLAYTEST_EXECUTION_GUIDE_PATH_OPTION,
+    issue_backlog_path: Path = ANIMATION_PLAYTEST_ISSUE_BACKLOG_PATH_OPTION,
+    sprint_path: Path = ANIMATION_PLAYTEST_SPRINT_PATH_OPTION,
+    max_observation_steps: int = ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the evidence capture sheet matches current sprint artifacts."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_evidence_sheet(
+        sheet_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        sprint_path=sprint_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Evidence Sheet Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Evidence Sheet", validation.path)
+    table.add_row("Expected Capture Rows", str(validation.expected_capture_rows))
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Evidence Sheet Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation evidence capture sheet matches the current QA sprint.",
+            title="Animation Playtest Evidence Sheet Validation",
+            border_style="green",
+        )
+    )
+
+
+def _animation_playtest_cli_phase_for_area(area: str) -> str:
+    if area == "Visible Route Evidence":
+        return "visible-route"
+    if area in {"Manual Window Matrix", "Window Matrix"}:
+        return "window-matrix"
+    if area == "Control Clarity Results":
+        return "control"
+    if area == "Scene Results":
+        return "scene"
+    if area == "Game Feel Results":
+        return "game-feel"
+    if area in {"Build", "Release Blockers", "Decision", "Signoff Fields", "Report Field"}:
+        return "signoff"
+    if area == "Command Queue":
+        return "artifact"
+    return "cleanup"
+
+
 def _print_animation_playtest_recorder_queue(
     hints: tuple[AnimationPlaytestRecorderHint, ...],
 ) -> None:
@@ -3898,6 +4102,7 @@ def prepare_animation_playtest_session_command(
     execution_guide_output: Path = ANIMATION_PLAYTEST_SESSION_EXECUTION_GUIDE_OUTPUT_OPTION,
     issue_backlog_output: Path = ANIMATION_PLAYTEST_SESSION_ISSUE_BACKLOG_OUTPUT_OPTION,
     sprint_output: Path = ANIMATION_PLAYTEST_SESSION_SPRINT_OUTPUT_OPTION,
+    evidence_sheet_output: Path = ANIMATION_PLAYTEST_SESSION_EVIDENCE_SHEET_OUTPUT_OPTION,
     handoff_output: Path = ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION,
     scenario: str = SCENARIO_OPTION,
     seed: int = typer.Option(
@@ -4140,6 +4345,38 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    evidence_sheet = build_2d_animation_playtest_evidence_sheet(
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        progress_path=progress_output,
+        execution_guide_path=execution_guide_output,
+        issue_backlog_path=issue_backlog_output,
+        sprint_path=sprint_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    write_2d_animation_playtest_evidence_sheet(evidence_sheet, evidence_sheet_output)
+    evidence_sheet_validation = validate_2d_animation_playtest_evidence_sheet(
+        evidence_sheet_output,
+        report_output,
+        commands_output,
+        plan_output,
+        recorder_output,
+        triage_output,
+        route_batch_output,
+        progress_path=progress_output,
+        execution_guide_path=execution_guide_output,
+        issue_backlog_path=issue_backlog_output,
+        sprint_path=sprint_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
 
     session_table = Table(title="Animation Playtest Session")
     session_table.add_column("Field", style="cyan")
@@ -4155,6 +4392,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Execution Guide", str(execution_guide_output))
     session_table.add_row("Issue Backlog", str(issue_backlog_output))
     session_table.add_row("Sprint Packet", str(sprint_output))
+    session_table.add_row("Evidence Sheet", str(evidence_sheet_output))
     session_table.add_row("Handoff", str(handoff_output))
     session_table.add_row("Scenario", scenario)
     session_table.add_row("Seed", str(seed))
@@ -4173,6 +4411,8 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Issue Backlog Items", str(issue_backlog.issue_count))
     session_table.add_row("Sprint Artifact", sprint_validation.status.upper())
     session_table.add_row("Sprint Observation Steps", str(sprint_packet.open_observation_count))
+    session_table.add_row("Evidence Sheet Artifact", evidence_sheet_validation.status.upper())
+    session_table.add_row("Evidence Capture Rows", str(evidence_sheet.capture_row_count))
     session_table.add_row("Sprint Execution Batches", str(sprint_packet.execution_batch_count))
     session_table.add_row("Sprint Layout Repair Checks", str(sprint_packet.layout_repair_count))
     session_table.add_row("Sprint Layout Recording Rows", str(sprint_packet.layout_recording_count))
@@ -4229,6 +4469,13 @@ def prepare_animation_playtest_session_command(
         findings_table = Table(title="Animation Session Artifact Findings")
         findings_table.add_column("Finding", style="yellow")
         for finding in session_validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
+    if evidence_sheet_validation.findings:
+        findings_table = Table(title="Animation Evidence Sheet Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in evidence_sheet_validation.findings:
             findings_table.add_row(finding)
         console.print(findings_table)
         raise typer.Exit(code=1)

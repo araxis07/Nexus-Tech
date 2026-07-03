@@ -37,6 +37,7 @@ from nexus_tech.frontend_2d import (
     VisualAuditCell,
     VisualAuditReport,
     build_2d_animation_playtest_command_queue,
+    build_2d_animation_playtest_evidence_sheet,
     build_2d_animation_playtest_execution_guide,
     build_2d_animation_playtest_handoff,
     build_2d_animation_playtest_issue_backlog,
@@ -64,6 +65,7 @@ from nexus_tech.frontend_2d import (
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
     validate_2d_animation_playtest_command_queue,
+    validate_2d_animation_playtest_evidence_sheet,
     validate_2d_animation_playtest_execution_guide,
     validate_2d_animation_playtest_issue_backlog,
     validate_2d_animation_playtest_progress_board,
@@ -77,6 +79,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_ui_triage_plan,
     write_2d_animation_matrix_report,
     write_2d_animation_playtest_command_queue,
+    write_2d_animation_playtest_evidence_sheet,
     write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_issue_backlog,
@@ -8255,6 +8258,7 @@ def _write_animation_playtest_execution_artifacts(
     guide_path = tmp_path / "manual-animation-execution-guide.md"
     issue_backlog_path = tmp_path / "manual-animation-issues.md"
     sprint_path = tmp_path / "manual-animation-sprint.md"
+    evidence_sheet_path = tmp_path / "manual-animation-evidence-sheet.md"
     write_2d_animation_playtest_report_template(
         report_path,
         version="0.214.0",
@@ -8310,6 +8314,7 @@ def _write_animation_playtest_execution_artifacts(
         "guide": guide_path,
         "issues": issue_backlog_path,
         "sprint": sprint_path,
+        "evidence": evidence_sheet_path,
     }
 
 
@@ -8789,6 +8794,336 @@ def test_validate_animation_playtest_sprint_command_accepts_current_artifact(
     assert "PASS" in result.output
 
 
+def test_write_animation_playtest_evidence_sheet_tracks_capture_rows(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+    write_2d_animation_playtest_execution_guide(
+        build_2d_animation_playtest_execution_guide(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            seed=17,
+        ),
+        paths["guide"],
+    )
+    write_2d_animation_playtest_issue_backlog(
+        build_2d_animation_playtest_issue_backlog(paths["report"]),
+        paths["issues"],
+    )
+    write_2d_animation_playtest_sprint_packet(
+        build_2d_animation_playtest_sprint_packet(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            execution_guide_path=paths["guide"],
+            issue_backlog_path=paths["issues"],
+            max_observation_steps=4,
+            seed=17,
+        ),
+        paths["sprint"],
+    )
+
+    sheet = build_2d_animation_playtest_evidence_sheet(
+        paths["report"],
+        paths["commands"],
+        paths["plan"],
+        paths["recorder"],
+        paths["triage"],
+        paths["route_batches"],
+        progress_path=paths["progress"],
+        execution_guide_path=paths["guide"],
+        issue_backlog_path=paths["issues"],
+        sprint_path=paths["sprint"],
+        max_observation_steps=4,
+        seed=17,
+    )
+    write_2d_animation_playtest_evidence_sheet(sheet, paths["evidence"])
+    validation = validate_2d_animation_playtest_evidence_sheet(
+        paths["evidence"],
+        paths["report"],
+        paths["commands"],
+        paths["plan"],
+        paths["recorder"],
+        paths["triage"],
+        paths["route_batches"],
+        progress_path=paths["progress"],
+        execution_guide_path=paths["guide"],
+        issue_backlog_path=paths["issues"],
+        sprint_path=paths["sprint"],
+        max_observation_steps=4,
+        seed=17,
+    )
+
+    text = paths["evidence"].read_text(encoding="utf-8")
+    assert sheet.status == "manual-required"
+    assert sheet.capture_row_count == 4
+    assert sheet.blocker_count == 12
+    assert validation.status == "pass"
+    assert validation.expected_capture_rows == 4
+    assert "# NEXUS TECH 2D Animation Evidence Capture Sheet" in text
+    assert "- Evidence sheet policy:" in text
+    assert "## Evidence Workflow" in text
+    assert "## Capture Rows" in text
+    assert "pass / watch / fail" in text
+    assert "nexus-tech-animation-evidence-01-visible-route-visible-route-evidence-1.png" in text
+    assert "none / owner-date / blocker-id" in text
+    assert "## Defect Intake Reference" in text
+    assert "Text overlap, clipped labels, or controls outside panels" in text
+    assert "validate-animation-playtest-evidence-sheet" in text
+
+
+def test_validate_animation_playtest_evidence_sheet_rejects_stale_artifact(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+    write_2d_animation_playtest_execution_guide(
+        build_2d_animation_playtest_execution_guide(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            seed=17,
+        ),
+        paths["guide"],
+    )
+    write_2d_animation_playtest_issue_backlog(
+        build_2d_animation_playtest_issue_backlog(paths["report"]),
+        paths["issues"],
+    )
+    write_2d_animation_playtest_sprint_packet(
+        build_2d_animation_playtest_sprint_packet(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            execution_guide_path=paths["guide"],
+            issue_backlog_path=paths["issues"],
+            max_observation_steps=3,
+            seed=17,
+        ),
+        paths["sprint"],
+    )
+    write_2d_animation_playtest_evidence_sheet(
+        build_2d_animation_playtest_evidence_sheet(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            execution_guide_path=paths["guide"],
+            issue_backlog_path=paths["issues"],
+            sprint_path=paths["sprint"],
+            max_observation_steps=3,
+            seed=17,
+        ),
+        paths["evidence"],
+    )
+    evidence_text = paths["evidence"].read_text(encoding="utf-8")
+    paths["evidence"].write_text(
+        evidence_text.replace("pass / watch / fail", "pass only", 1),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_evidence_sheet(
+        paths["evidence"],
+        paths["report"],
+        paths["commands"],
+        paths["plan"],
+        paths["recorder"],
+        paths["triage"],
+        paths["route_batches"],
+        progress_path=paths["progress"],
+        execution_guide_path=paths["guide"],
+        issue_backlog_path=paths["issues"],
+        sprint_path=paths["sprint"],
+        max_observation_steps=3,
+        seed=17,
+    )
+
+    assert validation.status == "fail"
+    assert any("missing evidence capture row" in finding for finding in validation.findings)
+
+
+def test_animation_playtest_evidence_sheet_command_writes_artifact(tmp_path: Path) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+    write_2d_animation_playtest_execution_guide(
+        build_2d_animation_playtest_execution_guide(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            seed=17,
+        ),
+        paths["guide"],
+    )
+    write_2d_animation_playtest_issue_backlog(
+        build_2d_animation_playtest_issue_backlog(paths["report"]),
+        paths["issues"],
+    )
+    write_2d_animation_playtest_sprint_packet(
+        build_2d_animation_playtest_sprint_packet(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            execution_guide_path=paths["guide"],
+            issue_backlog_path=paths["issues"],
+            max_observation_steps=3,
+            seed=17,
+        ),
+        paths["sprint"],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-evidence-sheet",
+            str(paths["report"]),
+            str(paths["commands"]),
+            str(paths["plan"]),
+            str(paths["recorder"]),
+            str(paths["triage"]),
+            "--route-batches",
+            str(paths["route_batches"]),
+            "--progress-path",
+            str(paths["progress"]),
+            "--execution-guide-path",
+            str(paths["guide"]),
+            "--issue-backlog-path",
+            str(paths["issues"]),
+            "--sprint-path",
+            str(paths["sprint"]),
+            "--max-observation-steps",
+            "3",
+            "--seed",
+            "17",
+            "--output",
+            str(paths["evidence"]),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Sheet" in result.output
+    assert "Evidence Capture Rows" in result.output
+    assert "Evidence Sheet Next Copy Commands" in result.output
+    assert "Recorder command after observed notes are ready" in result.output
+    assert paths["evidence"].exists()
+    text = paths["evidence"].read_text(encoding="utf-8")
+    assert "## Capture Rows" in text
+    assert "validate-animation-playtest-evidence-sheet" in text
+
+
+def test_validate_animation_playtest_evidence_sheet_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    paths = _write_animation_playtest_execution_artifacts(tmp_path)
+    write_2d_animation_playtest_execution_guide(
+        build_2d_animation_playtest_execution_guide(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            seed=17,
+        ),
+        paths["guide"],
+    )
+    write_2d_animation_playtest_issue_backlog(
+        build_2d_animation_playtest_issue_backlog(paths["report"]),
+        paths["issues"],
+    )
+    write_2d_animation_playtest_sprint_packet(
+        build_2d_animation_playtest_sprint_packet(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            execution_guide_path=paths["guide"],
+            issue_backlog_path=paths["issues"],
+            max_observation_steps=3,
+            seed=17,
+        ),
+        paths["sprint"],
+    )
+    write_2d_animation_playtest_evidence_sheet(
+        build_2d_animation_playtest_evidence_sheet(
+            paths["report"],
+            paths["commands"],
+            paths["plan"],
+            paths["recorder"],
+            paths["triage"],
+            paths["route_batches"],
+            progress_path=paths["progress"],
+            execution_guide_path=paths["guide"],
+            issue_backlog_path=paths["issues"],
+            sprint_path=paths["sprint"],
+            max_observation_steps=3,
+            seed=17,
+        ),
+        paths["evidence"],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-evidence-sheet",
+            str(paths["evidence"]),
+            str(paths["report"]),
+            str(paths["commands"]),
+            str(paths["plan"]),
+            str(paths["recorder"]),
+            str(paths["triage"]),
+            "--route-batches",
+            str(paths["route_batches"]),
+            "--progress-path",
+            str(paths["progress"]),
+            "--execution-guide-path",
+            str(paths["guide"]),
+            "--issue-backlog-path",
+            str(paths["issues"]),
+            "--sprint-path",
+            str(paths["sprint"]),
+            "--max-observation-steps",
+            "3",
+            "--seed",
+            "17",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Evidence Sheet Validation" in result.output
+    assert "Expected Capture Rows" in result.output
+    assert "PASS" in result.output
+
+
 def test_record_animation_playtest_window_command_updates_report(tmp_path: Path) -> None:
     report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
     write_2d_animation_playtest_report_template(
@@ -9015,6 +9350,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     execution_guide_path = tmp_path / "manual-animation-execution-guide.md"
     issue_backlog_path = tmp_path / "manual-animation-issues.md"
     sprint_path = tmp_path / "manual-animation-sprint.md"
+    evidence_sheet_path = tmp_path / "manual-animation-evidence-sheet.md"
     handoff_path = tmp_path / "manual-animation-handoff.md"
 
     result = runner.invoke(
@@ -9047,6 +9383,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(issue_backlog_path),
             "--sprint-output",
             str(sprint_path),
+            "--evidence-sheet-output",
+            str(evidence_sheet_path),
             "--handoff-output",
             str(handoff_path),
             "--auto-commit",
@@ -9077,6 +9415,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Issue Backlog Items" in result.output
     assert "Sprint Artifact" in result.output
     assert "Sprint Observation Steps" in result.output
+    assert "Evidence Sheet Artifact" in result.output
+    assert "Evidence Capture Rows" in result.output
     assert "Sprint Execution Batches" in result.output
     assert "Sprint Layout Repair Checks" in result.output
     assert "Sprint Layout Recording Rows" in result.output
@@ -9095,6 +9435,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert execution_guide_path.exists()
     assert issue_backlog_path.exists()
     assert sprint_path.exists()
+    assert evidence_sheet_path.exists()
     assert handoff_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     commands_text = commands_path.read_text(encoding="utf-8")
@@ -9107,6 +9448,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     execution_guide_text = execution_guide_path.read_text(encoding="utf-8")
     issue_backlog_text = issue_backlog_path.read_text(encoding="utf-8")
     sprint_text = sprint_path.read_text(encoding="utf-8")
+    evidence_sheet_text = evidence_sheet_path.read_text(encoding="utf-8")
     handoff_text = handoff_path.read_text(encoding="utf-8")
     assert "- Commit: def5678" in report_text
     assert "- Tester: araxis07" in report_text
@@ -9188,6 +9530,12 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "post-observation signoff" in sprint_text
     assert "validate-animation-playtest-sprint" in sprint_text
     assert "observe visible commands before recorder commands" in sprint_text
+    assert "# NEXUS TECH 2D Animation Evidence Capture Sheet" in evidence_sheet_text
+    assert "## Capture Rows" in evidence_sheet_text
+    assert "nexus-tech-animation-evidence-01-visible-route-visible-route-evidence-1.png" in (
+        evidence_sheet_text
+    )
+    assert "validate-animation-playtest-evidence-sheet" in evidence_sheet_text
     assert "- Handoff status: `manual-required`" in handoff_text
     assert "- Route batches: `" in handoff_text
     assert "| Route batches | `pass` |" in handoff_text

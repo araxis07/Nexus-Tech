@@ -1400,6 +1400,48 @@ class AnimationPlaytestSprintPacketValidation:
         return "pass" if not self.findings else "fail"
 
 
+@dataclass(frozen=True)
+class AnimationPlaytestEvidenceSheet:
+    """Printable capture sheet for one manual animation QA sprint."""
+
+    sprint: AnimationPlaytestSprintPacket
+    sprint_path: str
+    capture_slug_prefix: str = "nexus-tech-animation-evidence"
+
+    @property
+    def status(self) -> str:
+        """Return the current manual QA status without recording evidence."""
+
+        return self.sprint.status
+
+    @property
+    def capture_row_count(self) -> int:
+        """Return evidence rows included for the current sprint."""
+
+        return len(self.sprint.observation_steps)
+
+    @property
+    def blocker_count(self) -> int:
+        """Return P0/P1 blockers carried into this evidence pass."""
+
+        return self.sprint.blocker_count
+
+
+@dataclass(frozen=True)
+class AnimationPlaytestEvidenceSheetValidation:
+    """Validation result for an exported animation evidence capture sheet."""
+
+    path: str
+    expected_capture_rows: int
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the evidence sheet matches current sprint work."""
+
+        return "pass" if not self.findings else "fail"
+
+
 _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     (
         "Automated Gates",
@@ -1618,6 +1660,10 @@ _ANIMATION_ISSUE_BACKLOG_POLICY_LINE = (
 _ANIMATION_SPRINT_POLICY_LINE = (
     "- Sprint policy: `observe visible commands before recorder commands; P0/P1 blockers "
     "stay open until real evidence and validators clear them`"
+)
+_ANIMATION_EVIDENCE_SHEET_POLICY_LINE = (
+    "- Evidence sheet policy: `capture rows are worksheets only; recorder commands require "
+    "observed notes from the live game window`"
 )
 _ANIMATION_SPRINT_OBSERVATION_CHECKS: tuple[tuple[str, str, str], ...] = (
     (
@@ -4081,6 +4127,50 @@ def build_2d_animation_playtest_sprint_packet(
     )
 
 
+def build_2d_animation_playtest_evidence_sheet(
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    progress_path: Path = Path("/tmp/nexus-tech-animation-progress.md"),
+    execution_guide_path: Path = Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    issue_backlog_path: Path = Path("/tmp/nexus-tech-animation-issues.md"),
+    sprint_path: Path = Path("/tmp/nexus-tech-animation-sprint.md"),
+    max_observation_steps: int = 12,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestEvidenceSheet:
+    """Build a printable manual evidence capture sheet without recording evidence."""
+
+    sprint = build_2d_animation_playtest_sprint_packet(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    return AnimationPlaytestEvidenceSheet(
+        sprint=sprint,
+        sprint_path=str(sprint_path),
+    )
+
+
 def write_2d_animation_playtest_sprint_packet(
     sprint: AnimationPlaytestSprintPacket,
     output_path: Path,
@@ -4362,6 +4452,138 @@ def write_2d_animation_playtest_sprint_packet(
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_2d_animation_playtest_evidence_sheet(
+    sheet: AnimationPlaytestEvidenceSheet,
+    output_path: Path,
+) -> None:
+    """Write a worksheet for live manual evidence capture."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sprint = sheet.sprint
+    guide = sprint.execution_guide
+    progress = guide.progress
+    gate = progress.release_gate
+    route_batch_args = (
+        ""
+        if gate.session.route_batches is None
+        else f" --route-batches {_shell_arg(gate.session.route_batches.path)}"
+    )
+    validation_context_args = (
+        f" --scenario {_shell_arg(guide.scenario_id)}"
+        f" --seed {guide.seed}"
+        f" --command-prefix {_shell_arg(guide.command_prefix)}"
+    )
+    sprint_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-sprint "
+        f"{_shell_arg(sheet.sprint_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f" --execution-guide-path {_shell_arg(sprint.execution_guide_path)}"
+        f" --issue-backlog-path {_shell_arg(sprint.issue_backlog_path)}"
+        f" --max-observation-steps {sprint.max_observation_steps}"
+        f"{validation_context_args}"
+    )
+    sheet_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-evidence-sheet "
+        f"{_shell_arg(output_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f" --execution-guide-path {_shell_arg(sprint.execution_guide_path)}"
+        f" --issue-backlog-path {_shell_arg(sprint.issue_backlog_path)}"
+        f" --sprint-path {_shell_arg(sheet.sprint_path)}"
+        f" --max-observation-steps {sprint.max_observation_steps}"
+        f"{validation_context_args}"
+    )
+    report_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-report "
+        f"{_shell_arg(gate.session.report.path)}"
+    )
+    lines = [
+        "# NEXUS TECH 2D Animation Evidence Capture Sheet",
+        "",
+        f"- Status: `{sheet.status}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Sprint packet: `{sheet.sprint_path}`",
+        f"- Observation rows: `{sheet.capture_row_count}`",
+        f"- P0/P1 blockers: `{sheet.blocker_count}`",
+        f"- Capture slug prefix: `{sheet.capture_slug_prefix}`",
+        _ANIMATION_EVIDENCE_SHEET_POLICY_LINE,
+        "",
+        "## Evidence Workflow",
+        "",
+        "| Step | Action | Guardrail |",
+        "| ---: | --- | --- |",
+        (
+            "| 1 | Run the visible command and keep the game window open long enough "
+            "to inspect it. | "
+            "Do not run the recorder command before observing the live window. |"
+        ),
+        (
+            "| 2 | Choose pass, watch, or fail from the observed layout, controls, "
+            "motion, and text. | "
+            "Use watch/fail when a defect intake trigger applies. |"
+        ),
+        (
+            "| 3 | Capture a screenshot or clip name and write the concrete note "
+            "before recording. | "
+            "Notes must name the required terms and actual UI elements. |"
+        ),
+        (
+            "| 4 | Run the matching recorder command with placeholder text replaced. | "
+            "Regenerate sprint/evidence artifacts after report edits. |"
+        ),
+        "",
+        "## Capture Rows",
+        "",
+        (
+            "| Step | Phase | Area | Target | Visible Command | Required Terms | Result | "
+            "Notes Must Include | Screenshot / Clip Name | Recorder Command | Follow-up |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for index, hint in enumerate(sprint.observation_steps, start=1):
+        lines.append(_format_animation_evidence_capture_row(sheet, index, hint))
+    lines.extend(
+        [
+            "",
+            "## Defect Intake Reference",
+            "",
+            "| Trigger | Priority | Evidence Must Name | Required Action |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for intake_row in _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS:
+        lines.append(_format_animation_sprint_defect_intake_row(intake_row))
+    lines.extend(
+        [
+            "",
+            "## Completion Rules",
+            "",
+            "- A capture row is complete only after the visible command was observed.",
+            "- A pass row still needs a specific note naming window, route, mode, and UI element.",
+            "- A watch/fail row must keep the release gate blocked until fixed or accepted.",
+            "- This sheet is a worksheet; the report validator is still the source of truth.",
+            "",
+            "## Validation Commands",
+            "",
+            "```bash",
+            sprint_validation_command,
+            sheet_validation_command,
+            report_validation_command,
+            "```",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def validate_2d_animation_playtest_sprint_packet(
     sprint_path: Path,
     report_path: Path,
@@ -4625,6 +4847,175 @@ def validate_2d_animation_playtest_sprint_packet(
         path=str(sprint_path),
         expected_observation_count=len(sprint.observation_steps),
         expected_blocker_count=len(sprint.blocker_issues),
+        findings=tuple(findings),
+    )
+
+
+def validate_2d_animation_playtest_evidence_sheet(
+    sheet_path: Path,
+    report_path: Path,
+    command_path: Path,
+    plan_path: Path,
+    recorder_queue_path: Path,
+    triage_path: Path,
+    route_batch_path: Path | None = None,
+    *,
+    progress_path: Path = Path("/tmp/nexus-tech-animation-progress.md"),
+    execution_guide_path: Path = Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    issue_backlog_path: Path = Path("/tmp/nexus-tech-animation-issues.md"),
+    sprint_path: Path = Path("/tmp/nexus-tech-animation-sprint.md"),
+    max_observation_steps: int = 12,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestEvidenceSheetValidation:
+    """Validate that an evidence capture sheet matches the current sprint packet."""
+
+    text = sheet_path.read_text(encoding="utf-8")
+    sheet = build_2d_animation_playtest_evidence_sheet(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        sprint_path=sprint_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    sprint = sheet.sprint
+    guide = sprint.execution_guide
+    progress = guide.progress
+    gate = progress.release_gate
+    route_batch_args = (
+        ""
+        if gate.session.route_batches is None
+        else f" --route-batches {_shell_arg(gate.session.route_batches.path)}"
+    )
+    validation_context_args = (
+        f" --scenario {_shell_arg(guide.scenario_id)}"
+        f" --seed {guide.seed}"
+        f" --command-prefix {_shell_arg(guide.command_prefix)}"
+    )
+    sprint_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-sprint "
+        f"{_shell_arg(sheet.sprint_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f" --execution-guide-path {_shell_arg(sprint.execution_guide_path)}"
+        f" --issue-backlog-path {_shell_arg(sprint.issue_backlog_path)}"
+        f" --max-observation-steps {sprint.max_observation_steps}"
+        f"{validation_context_args}"
+    )
+    sheet_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-evidence-sheet "
+        f"{_shell_arg(sheet_path)} "
+        f"{_shell_arg(gate.session.report.path)} {_shell_arg(gate.session.commands.path)} "
+        f"{_shell_arg(gate.session.plan.path)} "
+        f"{_shell_arg(gate.session.recorder_queue.path)} "
+        f"{_shell_arg(gate.triage_validation.path)}{route_batch_args}"
+        f" --progress-path {_shell_arg(guide.progress_path)}"
+        f" --execution-guide-path {_shell_arg(sprint.execution_guide_path)}"
+        f" --issue-backlog-path {_shell_arg(sprint.issue_backlog_path)}"
+        f" --sprint-path {_shell_arg(sheet.sprint_path)}"
+        f" --max-observation-steps {sprint.max_observation_steps}"
+        f"{validation_context_args}"
+    )
+    report_validation_command = (
+        f"{guide.command_prefix} validate-animation-playtest-report "
+        f"{_shell_arg(gate.session.report.path)}"
+    )
+    findings: list[str] = []
+    required_lines = (
+        "# NEXUS TECH 2D Animation Evidence Capture Sheet",
+        f"- Status: `{sheet.status}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Manual result: `{gate.manual_result}`",
+        f"- Report: `{gate.session.report.path}`",
+        f"- Sprint packet: `{sheet.sprint_path}`",
+        f"- Observation rows: `{sheet.capture_row_count}`",
+        f"- P0/P1 blockers: `{sheet.blocker_count}`",
+        f"- Capture slug prefix: `{sheet.capture_slug_prefix}`",
+        _ANIMATION_EVIDENCE_SHEET_POLICY_LINE,
+        "## Evidence Workflow",
+        "| Step | Action | Guardrail |",
+        "## Capture Rows",
+        (
+            "| Step | Phase | Area | Target | Visible Command | Required Terms | Result | "
+            "Notes Must Include | Screenshot / Clip Name | Recorder Command | Follow-up |"
+        ),
+        "## Defect Intake Reference",
+        "| Trigger | Priority | Evidence Must Name | Required Action |",
+        *(
+            _format_animation_sprint_defect_intake_row(intake_row)
+            for intake_row in _ANIMATION_SPRINT_DEFECT_INTAKE_ROWS
+        ),
+        "## Completion Rules",
+        sprint_validation_command,
+        sheet_validation_command,
+        report_validation_command,
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing evidence sheet guard: {line}")
+
+    try:
+        sprint_validation = validate_2d_animation_playtest_sprint_packet(
+            sprint_path,
+            report_path,
+            command_path,
+            plan_path,
+            recorder_queue_path,
+            triage_path,
+            route_batch_path,
+            progress_path=progress_path,
+            execution_guide_path=execution_guide_path,
+            issue_backlog_path=issue_backlog_path,
+            max_observation_steps=max_observation_steps,
+            scenario_id=scenario_id,
+            seed=seed,
+            windows=windows,
+            motion_modes=motion_modes,
+            command_prefix=command_prefix,
+        )
+    except FileNotFoundError:
+        findings.append(f"missing evidence sheet sprint artifact: {sprint_path}")
+    else:
+        findings.extend(f"sprint packet: {finding}" for finding in sprint_validation.findings)
+
+    rows = _extract_markdown_table_rows(text)
+    capture_rows = tuple(row for row in rows if len(row) >= 11 and row[0].isdigit())
+    if len(capture_rows) != len(sprint.observation_steps):
+        findings.append(
+            f"expected {len(sprint.observation_steps)} evidence capture rows, "
+            f"found {len(capture_rows)}"
+        )
+    expected_rows = tuple(
+        _format_animation_evidence_capture_row(sheet, index, hint)
+        for index, hint in enumerate(sprint.observation_steps, start=1)
+    )
+    actual_rows = tuple(
+        "| " + " | ".join(_markdown_table_cell(cell) for cell in row) + " |" for row in capture_rows
+    )
+    for expected in expected_rows:
+        if expected not in actual_rows:
+            findings.append(f"missing evidence capture row: {expected}")
+
+    return AnimationPlaytestEvidenceSheetValidation(
+        path=str(sheet_path),
+        expected_capture_rows=len(sprint.observation_steps),
         findings=tuple(findings),
     )
 
@@ -4896,6 +5287,52 @@ def _format_animation_sprint_evidence_capture_row(
         "Use Manual Defect Intake before recorder command. | "
         f"{_markdown_table_cell(required_terms)} |"
     )
+
+
+def _format_animation_evidence_capture_row(
+    sheet: AnimationPlaytestEvidenceSheet,
+    index: int,
+    hint: AnimationPlaytestRecorderHint,
+) -> str:
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+    visible_command = hint.visible_command or "-"
+    return (
+        "| "
+        f"{index} | "
+        f"{_markdown_table_cell(_execution_phase_for_area(hint.area))} | "
+        f"{_markdown_table_cell(hint.area)} | "
+        f"{_markdown_table_cell(hint.target)} | "
+        f"`{_markdown_table_cell(visible_command)}` | "
+        f"{_markdown_table_cell(required_terms)} | "
+        "pass / watch / fail | "
+        f"{_markdown_table_cell(_animation_evidence_note_requirement(hint))} | "
+        f"`{_markdown_table_cell(_animation_evidence_capture_name(sheet, index, hint))}` | "
+        f"`{_markdown_table_cell(hint.recorder_command)}` | "
+        "none / owner-date / blocker-id |"
+    )
+
+
+def _animation_evidence_note_requirement(hint: AnimationPlaytestRecorderHint) -> str:
+    required_terms = ", ".join(hint.required_terms) if hint.required_terms else "observed evidence"
+    return (
+        f"Observed facts naming {required_terms}; include window, route/control, motion mode, "
+        "result choice, and any defect trigger."
+    )
+
+
+def _animation_evidence_capture_name(
+    sheet: AnimationPlaytestEvidenceSheet,
+    index: int,
+    hint: AnimationPlaytestRecorderHint,
+) -> str:
+    phase = _slug_fragment(_execution_phase_for_area(hint.area))
+    target = _slug_fragment(f"{hint.area}-{hint.target}")
+    return f"{sheet.capture_slug_prefix}-{index:02d}-{phase}-{target}.png"
+
+
+def _slug_fragment(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or "item"
 
 
 def _format_animation_sprint_evidence_note_template_row(

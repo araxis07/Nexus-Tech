@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.236.0 - 2026-07-04
+
+- Added a validated animation evidence capture sheet so manual QA rows have result, notes, screenshot/clip, recorder, and follow-up columns before signoff
+- Added `animation-playtest-evidence-sheet` and `validate-animation-playtest-evidence-sheet` commands for focused open-window evidence capture
+- Extended `prepare-animation-playtest-session` to generate and validate the evidence sheet alongside the sprint packet and release artifacts
+
 ## 0.235.0 - 2026-07-03
 
 - Added a validated closure checklist to every visible route batch so testers refresh artifacts, rerun validation, and check status before moving to the next window
