@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.242.0 - 2026-07-05
+
+- Added visual/animation-audit clearance tracking for critical click targets so compact layouts fail before pause, back, inspector, or footer controls become visually cramped
+- Increased compact inspector section spacing to keep section buttons clear on the 820x620 playtest viewport
+- Added regression coverage for click-target clearance failures alongside existing overlap, size, and typography guards
+
 ## 0.241.0 - 2026-07-04
 
 - Updated manual animation QA status, progress board, and UI triage next steps to call out first-turn guide and Coach path checks explicitly

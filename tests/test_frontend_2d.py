@@ -131,6 +131,7 @@ from nexus_tech.frontend_2d.viewmodels import (
 from nexus_tech.frontend_2d.visual_audit import (
     MAX_BRIGHT_RATIO,
     MAX_EDGE_DENSITY,
+    MIN_CLICK_TARGET_CLEARANCE,
     VISUAL_AUDIT_SUMMARY_NAME,
 )
 from nexus_tech.frontend_2d.widgets import (
@@ -3486,6 +3487,9 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert all(cell.click_target_count > 0 for cell in report.cells)
     assert all(cell.min_click_target_size[0] >= 28 for cell in report.cells)
     assert all(cell.min_click_target_size[1] >= 24 for cell in report.cells)
+    assert all(
+        cell.min_click_target_clearance >= MIN_CLICK_TARGET_CLEARANCE for cell in report.cells
+    )
     assert all(cell.typography_violations == () for cell in report.cells)
     assert all(0.0 <= cell.min_text_fit_ratio <= 1.0 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
@@ -3677,6 +3681,27 @@ def test_visual_audit_cell_fails_layout_safety_violations() -> None:
     assert "layout target-too-small:pause_toggle:20x18" in unsafe.notes
 
 
+def test_visual_audit_cell_fails_click_target_clearance_violations() -> None:
+    unsafe = VisualAuditCell(
+        scene_key="run_inspector",
+        width=820,
+        height=620,
+        checksum=12345,
+        unique_color_samples=42,
+        luminance_spread=128,
+        non_dark_ratio=0.42,
+        active_layers=("click-targets",),
+        expected_layers=("click-targets",),
+        layout_violations=("target-too-close:inspector_section:inspector_section:3px",),
+        click_target_count=2,
+        min_click_target_size=(104, 32),
+        min_click_target_clearance=3,
+    )
+
+    assert unsafe.status == "fail"
+    assert "target-too-close:inspector_section:inspector_section:3px" in unsafe.notes
+
+
 def test_visual_audit_cell_fails_typography_safety_violations() -> None:
     unsafe = VisualAuditCell(
         scene_key="title_menu",
@@ -3792,6 +3817,10 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert areas["UI Layout Safety"].status == "pass"
     assert "layout-pass" in areas["UI Layout Safety"].active_layers
     assert "target-size" in areas["UI Layout Safety"].required_layers
+    assert "target-clearance" in areas["UI Layout Safety"].required_layers
+    assert any(
+        layer.startswith("min-clearance:") for layer in areas["UI Layout Safety"].active_layers
+    )
     assert "actor-control-clearance" in areas["UI Layout Safety"].active_layers
     assert areas["Typography Safety"].status == "pass"
     assert "text-overflow-clear" in areas["Typography Safety"].active_layers

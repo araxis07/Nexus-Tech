@@ -9145,7 +9145,7 @@ class RunScene(BaseScene):
         self._click_targets.append(ClickTarget("inspector_focus_actionable", "", actionable_rect))
         self._click_targets.append(ClickTarget("inspector_focus_hotspot", "", hotspot_rect))
         top = nav_inner.top + 148
-        section_gap = 6 if nav_inner.height < 430 else 10
+        section_gap = 8 if nav_inner.height < 430 else 10
         section_count = max(1, len(panel.inspectors))
         section_area_height = max(0, nav_inner.bottom - top)
         section_height = max(

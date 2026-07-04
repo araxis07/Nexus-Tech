@@ -47,6 +47,7 @@ VISUAL_AUDIT_SUMMARY_NAME = "visual-audit-summary.md"
 VISUAL_AUDIT_CONTACT_SHEET_PREFIX = "visual-audit-contact-sheet"
 MIN_CLICK_TARGET_WIDTH = 28
 MIN_CLICK_TARGET_HEIGHT = 24
+MIN_CLICK_TARGET_CLEARANCE = 8
 
 _CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("pause-control", frozenset({"pause_toggle", "pause_resume"})),
@@ -122,6 +123,7 @@ class VisualAuditCell:
     layout_violations: tuple[str, ...] = ()
     click_target_count: int = 0
     min_click_target_size: tuple[int, int] = (0, 0)
+    min_click_target_clearance: int = MIN_CLICK_TARGET_CLEARANCE
     typography_violations: tuple[str, ...] = ()
     text_fit_count: int = 0
     wrapped_clamp_count: int = 0
@@ -219,6 +221,7 @@ class VisualAuditReport:
                 f"{cell.luminance_spread}:{cell.non_dark_ratio}:"
                 f"{cell.edge_density}:{cell.bright_ratio}:"
                 f"{cell.click_target_count}:{cell.min_click_target_size}:"
+                f"{cell.min_click_target_clearance}:"
                 f"{','.join(cell.layout_violations)}:"
                 f"{cell.text_fit_count}:{cell.wrapped_clamp_count}:"
                 f"{cell.min_text_fit_ratio}:{','.join(cell.typography_violations)}"
@@ -805,7 +808,12 @@ def _capture_visual_cell(
         finish_typography_audit()
         raise
     active_layers = _active_layers(scene)
-    layout_violations, click_target_count, min_click_target_size = _layout_safety_metrics(
+    (
+        layout_violations,
+        click_target_count,
+        min_click_target_size,
+        min_click_target_clearance,
+    ) = _layout_safety_metrics(
         scene,
         width,
         height,
@@ -844,6 +852,7 @@ def _capture_visual_cell(
         layout_violations=layout_violations,
         click_target_count=click_target_count,
         min_click_target_size=min_click_target_size,
+        min_click_target_clearance=min_click_target_clearance,
         typography_violations=typography_violations,
         text_fit_count=text_fit_count,
         wrapped_clamp_count=wrapped_clamp_count,
@@ -865,11 +874,12 @@ def _typography_safety_metrics(events) -> tuple[tuple[str, ...], int, int, float
 
 def _layout_safety_metrics(
     scene, width: int, height: int
-) -> tuple[tuple[str, ...], int, tuple[int, int]]:
+) -> tuple[tuple[str, ...], int, tuple[int, int], int]:
     targets = tuple(getattr(scene, "_click_targets", ()))
     violations: list[str] = []
     min_width = 0
     min_height = 0
+    min_clearance = MIN_CLICK_TARGET_CLEARANCE
 
     for target in targets:
         rect = getattr(target, "rect", None)
@@ -903,12 +913,18 @@ def _layout_safety_metrics(
                 continue
             if _rects_overlap(first_rect, second_rect):
                 violations.append(f"target-overlap:{first_kind}:{second_kind}")
+                min_clearance = 0
+                continue
+            clearance = _rect_clearance(first_rect, second_rect)
+            min_clearance = min(min_clearance, clearance)
+            if clearance < MIN_CLICK_TARGET_CLEARANCE:
+                violations.append(f"target-too-close:{first_kind}:{second_kind}:{clearance}px")
 
     actor_layout_violations = getattr(scene, "actor_sprite_layout_violations", None)
     if callable(actor_layout_violations):
         violations.extend(f"actor:{violation}" for violation in actor_layout_violations())
 
-    return tuple(sorted(set(violations))), len(targets), (min_width, min_height)
+    return tuple(sorted(set(violations))), len(targets), (min_width, min_height), min_clearance
 
 
 def _should_check_target_overlap(first_kind: str, second_kind: str) -> bool:
@@ -926,6 +942,24 @@ def _rects_overlap(first_rect, second_rect) -> bool:
     ) and max(int(getattr(first_rect, "top", 0)), int(getattr(second_rect, "top", 0))) < min(
         int(getattr(first_rect, "bottom", 0)), int(getattr(second_rect, "bottom", 0))
     )
+
+
+def _rect_clearance(first_rect, second_rect) -> int:
+    horizontal_gap = max(
+        0,
+        max(int(getattr(first_rect, "left", 0)), int(getattr(second_rect, "left", 0)))
+        - min(int(getattr(first_rect, "right", 0)), int(getattr(second_rect, "right", 0))),
+    )
+    vertical_gap = max(
+        0,
+        max(int(getattr(first_rect, "top", 0)), int(getattr(second_rect, "top", 0)))
+        - min(int(getattr(first_rect, "bottom", 0)), int(getattr(second_rect, "bottom", 0))),
+    )
+    if horizontal_gap == 0:
+        return vertical_gap
+    if vertical_gap == 0:
+        return horizontal_gap
+    return int((horizontal_gap**2 + vertical_gap**2) ** 0.5)
 
 
 def _set_visual_audit_mouse_safe_point(pygame, width: int, height: int) -> None:

@@ -20,6 +20,7 @@ from nexus_tech.frontend_2d.tween import MotionMode
 from nexus_tech.frontend_2d.visual_audit import (
     MAX_BRIGHT_RATIO,
     MAX_EDGE_DENSITY,
+    MIN_CLICK_TARGET_CLEARANCE,
     MIN_CLICK_TARGET_HEIGHT,
     MIN_CLICK_TARGET_WIDTH,
     VisualAuditReport,
@@ -9025,6 +9026,10 @@ def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationC
     )
     min_width = min((cell.min_click_target_size[0] for cell in target_cells), default=0)
     min_height = min((cell.min_click_target_size[1] for cell in target_cells), default=0)
+    min_clearance = min(
+        (cell.min_click_target_clearance for cell in target_cells),
+        default=MIN_CLICK_TARGET_CLEARANCE,
+    )
     actor_clear = all(
         not any(violation.startswith("actor:") for violation in cell.layout_violations)
         for cell in visual_report.cells
@@ -9038,6 +9043,8 @@ def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationC
         findings.append(f"min target width {min_width}<{MIN_CLICK_TARGET_WIDTH}")
     if min_height and min_height < MIN_CLICK_TARGET_HEIGHT:
         findings.append(f"min target height {min_height}<{MIN_CLICK_TARGET_HEIGHT}")
+    if min_clearance < MIN_CLICK_TARGET_CLEARANCE:
+        findings.append(f"min target clearance {min_clearance}<{MIN_CLICK_TARGET_CLEARANCE}")
     if not actor_clear:
         findings.append("actor/control collision")
 
@@ -9045,8 +9052,10 @@ def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationC
         "layout-pass" if not violations else f"layout-violations:{len(violations)}",
         f"target-cells:{len(target_cells)}",
         f"min-target:{min_width}x{min_height}",
+        f"min-clearance:{min_clearance}px",
         "target-bounds",
         "target-size",
+        "target-clearance",
         "actor-control-clearance" if actor_clear else "actor-control-collision",
     )
     return AnimationCoverageCell(
@@ -9055,6 +9064,7 @@ def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationC
             "layout-pass",
             "target-bounds",
             "target-size",
+            "target-clearance",
             "actor-control-clearance",
         ),
         active_layers=active_layers,
@@ -9062,7 +9072,7 @@ def _build_ui_layout_safety_cell(visual_report: VisualAuditReport) -> AnimationC
         notes=(
             (
                 f"{len(target_cells)} target captures, min target {min_width}x{min_height}, "
-                "actor/control clear"
+                f"min clearance {min_clearance}px, actor/control clear"
             )
             if not findings
             else "; ".join(findings[:4])
