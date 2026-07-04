@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.237.0 - 2026-07-04
+
+- Widened the compact 2D run action footer on 820-class windows so click targets and action labels are easier to read
+- Added a shared responsive footer-column helper so outer footer sizing and draw-time button layout stay aligned
+- Added regression coverage for the readable 5-column action footer breakpoint
+
 ## 0.236.0 - 2026-07-04
 
 - Added a validated animation evidence capture sheet so manual QA rows have result, notes, screenshot/clip, recorder, and follow-up columns before signoff

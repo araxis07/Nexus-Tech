@@ -7587,7 +7587,7 @@ class RunScene(BaseScene):
                     button_cols=button_cols,
                 ),
                 accent=button.accent,
-                title_font=self.fonts.small,
+                title_font=self.fonts.body if button_cols <= 5 else self.fonts.small,
                 detail_font=self.fonts.small,
                 enabled=enabled,
                 selected=selected,
@@ -7619,12 +7619,7 @@ class RunScene(BaseScene):
 
     def _footer_outer_height(self, width: int, height: int) -> int:
         usable_width = width - 40 - 32
-        if usable_width < 620:
-            button_cols = 4
-        elif usable_width < 720:
-            button_cols = 5
-        else:
-            button_cols = 7
+        button_cols = self._footer_button_columns(usable_width)
         rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
         button_gap = 10
         button_height = 34 if height < 700 else 40 if button_cols <= 5 else 44
@@ -7635,12 +7630,7 @@ class RunScene(BaseScene):
         )
 
     def _footer_layout_metrics(self, inner_width: int, inner_height: int) -> tuple[int, int, int]:
-        if inner_width < 620:
-            button_cols = 4
-        elif inner_width < 720:
-            button_cols = 5
-        else:
-            button_cols = 7
+        button_cols = self._footer_button_columns(inner_width)
         rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
         footer_band_height = 42 if inner_height < 300 else 48 if button_cols >= 5 else 52
         button_gap = 10
@@ -7655,6 +7645,13 @@ class RunScene(BaseScene):
         else:
             button_height = min(58, max(min_button_height, available_per_row))
         return button_cols, button_height, footer_band_height
+
+    def _footer_button_columns(self, available_width: int) -> int:
+        if available_width < 620:
+            return 4
+        if available_width < 860:
+            return 5
+        return 7
 
     def _footer_button_title(self, button: ActionButtonSpec, *, button_cols: int) -> str:
         if button_cols < 7:

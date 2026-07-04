@@ -1367,23 +1367,43 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
             scene._footer_button_title(button, button_cols=button_cols)
             for button in scenes_module._ACTION_BUTTONS
         )
-        end_turn_title = next(title for title in compact_titles if title.startswith("Sp "))
+        end_turn_title = next(title for title in compact_titles if title.startswith("Space "))
         compact_status, compact_hint = scene._footer_status_lines(max_width=720)
         full_status, full_hint = scene._footer_status_lines(max_width=900)
 
         assert len(compact_detail) <= 24
         assert len(narrow_detail) <= 28
-        assert button_cols == 7
+        assert button_cols == 5
         assert footer_band_height == 48
         assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
-        assert compact_outer_height <= 270
-        assert end_turn_title == "Sp End"
-        assert max(len(title) for title in compact_titles) <= 10
+        assert compact_outer_height <= 320
+        assert end_turn_title == "Space End Turn"
+        assert max(len(title) for title in compact_titles) <= 15
         assert len(compact_status) <= 92
         assert len(compact_hint) <= 96
         assert "Actions Left" in full_status
         assert "AP:" in compact_status
         assert full_hint.startswith("Watch:")
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_footer_columns_prioritize_readable_buttons() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=48),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        assert scene._footer_button_columns(600) == 4
+        assert scene._footer_button_columns(748) == 5
+        assert scene._footer_button_columns(860) == 7
     finally:
         pygame.quit()
 
