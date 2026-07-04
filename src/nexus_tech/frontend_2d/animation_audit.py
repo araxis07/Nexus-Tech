@@ -409,6 +409,7 @@ _MOTION_PROFILE_LAYERS = {
 
 _SCENE_MOTION_PROFILES: tuple[tuple[str, str, int], ...] = (
     ("title_menu", "title onboarding", 5),
+    ("title_quick_start", "quick-start onboarding", 5),
     ("title_meta", "meta/archive board", 5),
     ("run_dashboard", "live dashboard", 6),
     ("run_drama_feedback", "product and risk drama", 6),
@@ -425,6 +426,7 @@ _SCENE_MOTION_PROFILES: tuple[tuple[str, str, int], ...] = (
 
 _READABILITY_ACTOR_SCENES = {
     "title_menu",
+    "title_quick_start",
     "run_dashboard",
     "run_inspector",
     "run_endgame_board",
@@ -455,6 +457,20 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "transition",
             "motion-pulses",
+            "actor-timeline",
+            "sprite-clips",
+            "title-actor",
+            "actor-readability",
+            "actor-pose-depth",
+        ),
+    ),
+    (
+        "title_quick_start",
+        "Quick Start Onboarding",
+        (
+            "transition",
+            "motion-pulses",
+            "quick-start-guide",
             "actor-timeline",
             "sprite-clips",
             "title-actor",

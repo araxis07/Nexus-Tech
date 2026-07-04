@@ -1420,6 +1420,8 @@ class TitleScene(BaseScene):
         self._draw_title_actor_sprite_layer(surface, header_rect)
         if self._mode == "menu":
             self._draw_title_menu(surface, left_rect)
+        elif self._mode == "guide":
+            self._draw_quick_start_guide(surface, left_rect)
         elif self._mode == "meta":
             self._draw_meta_board(surface, left_rect)
         elif self._mode == "slots":
@@ -1543,10 +1545,21 @@ class TitleScene(BaseScene):
                     2: "load_slots",
                     3: "archives",
                     4: "meta",
-                    5: "new_wizard",
-                    6: "quit",
+                    5: "guide",
+                    6: "new_wizard",
+                    7: "quit",
                 }.get(digit, "")
             )
+            return
+        if self._mode == "guide":
+            guide_actions = {
+                1: "continue",
+                6: "new_wizard",
+                9: "menu",
+            }
+            action = guide_actions.get(digit)
+            if action:
+                self._handle_menu_action(action)
             return
         if self._mode == "meta":
             meta_actions = {
@@ -1608,6 +1621,9 @@ class TitleScene(BaseScene):
             return
         if action == "meta":
             self._set_mode("meta")
+            return
+        if action == "guide":
+            self._set_mode("guide")
             return
         if action == "new_wizard":
             self._set_mode("wizard")
@@ -2198,12 +2214,18 @@ class TitleScene(BaseScene):
                 SELECTION,
             ),
             (
-                "5 New Game Wizard",
+                "5 Quick Start",
+                "Learn the goal, first turn, controls, and safe next step.",
+                "guide",
+                GOOD,
+            ),
+            (
+                "6 New Game Wizard",
                 "Choose scenario, difficulty, start, goal, names, slot, and seed.",
                 "new_wizard",
                 INFO,
             ),
-            ("6 Quit", "Leave the frontend shell.", "quit", DANGER),
+            ("7 Quit", "Leave the frontend shell.", "quit", DANGER),
         )
         gap = 10
         use_grid = inner.width >= 640 and inner.height < 430
@@ -2392,6 +2414,133 @@ class TitleScene(BaseScene):
                 max_lines=2,
             )
             left += card_width + gap
+
+    def _draw_quick_start_guide(self, surface, rect) -> None:
+        pygame = self.pygame
+        guide_motion = self._motion_level("title:mode:guide", "title:content")
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title="Quick Start",
+            accent=GOOD,
+            emphasis=guide_motion,
+            lift=int(guide_motion * 3),
+        )
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Quick Start Guide",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
+        compact = inner.width < 760 or inner.height < 430
+        cards = (
+            (
+                "1. Goal",
+                (
+                    "Build enough durable traction to reach IPO, acquisition, or "
+                    "independence before cash, board, or market pressure breaks the company."
+                ),
+                GOOD,
+            ),
+            (
+                "2. First Turn",
+                (
+                    "Start in New Game Wizard, open the live run, then use Coach and the "
+                    "highlighted panels before spending actions."
+                ),
+                INFO,
+            ),
+            (
+                "3. Read The HUD",
+                (
+                    "Watch cash, runway, reputation, board pressure, selected product, "
+                    "action points, and the footer hint before ending the turn."
+                ),
+                WARN,
+            ),
+            (
+                "4. Recovery",
+                (
+                    "Use P for Pause, Esc for Back, F1 for Help, S to Save, and Space to "
+                    "resolve only after warnings are clear."
+                ),
+                SELECTION,
+            ),
+        )
+        action_height = 46
+        gap = 10
+        grid_bottom = inner.bottom - action_height - 14
+        card_area_height = max(120, grid_bottom - inner.top)
+        cols = 2 if not compact else 1
+        rows = max(1, (len(cards) + cols - 1) // cols)
+        card_width = int((inner.width - gap * max(0, cols - 1)) / cols)
+        card_height = max(58, int((card_area_height - gap * max(0, rows - 1)) / rows))
+        for index, (title, detail, accent) in enumerate(cards):
+            row = index // cols
+            col = index % cols
+            card_rect = pygame.Rect(
+                inner.left + col * (card_width + gap),
+                inner.top + row * (card_height + gap),
+                card_width,
+                card_height,
+            )
+            pygame.draw.rect(surface, (20, 32, 48), card_rect, border_radius=14)
+            pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=14)
+            pygame.draw.rect(
+                surface,
+                accent,
+                (card_rect.left + 1, card_rect.top + 1, card_rect.width - 2, 4),
+                border_radius=4,
+            )
+            draw_text_line(
+                surface,
+                self.fonts.body if card_height >= 76 else self.fonts.small,
+                title,
+                TEXT,
+                pygame.Rect(card_rect.left + 12, card_rect.top + 10, card_rect.width - 24, 22),
+                valign="top",
+            )
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                detail,
+                MUTED,
+                pygame.Rect(
+                    card_rect.left + 12,
+                    card_rect.top + 34,
+                    card_rect.width - 24,
+                    max(20, card_rect.height - 42),
+                ),
+                line_height=15,
+                max_lines=3 if card_height >= 82 else 2,
+            )
+
+        button_width = int((inner.width - gap * 2) / 3)
+        buttons = (
+            ("6 New Game", "Open wizard.", "new_wizard", INFO),
+            ("1 Continue", "Resume newest save.", "continue", GOOD),
+            ("9 Back", "Return to menu.", "menu", BORDER),
+        )
+        left = inner.left
+        for title, detail, payload, accent in buttons:
+            button_rect = pygame.Rect(
+                left, inner.bottom - action_height, button_width, action_height
+            )
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=title,
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget("menu", payload, button_rect))
+            left += button_width + gap
 
     def _draw_archive_comparison_strip(self, surface, rect, *, compact: bool) -> None:
         if rect.width < 220 or rect.height < 38:
@@ -2886,7 +3035,9 @@ class TitleScene(BaseScene):
             lift=int(footer_motion * 2),
         )
         if self._mode == "menu":
-            message = "Menu: 1 continue, 2 saves, 3 archives, 4 meta board, 5 wizard, 6 quit."
+            message = "Menu: 1 continue, 2 saves, 3 archives, 4 meta, 5 guide, 6 wizard, 7 quit."
+        elif self._mode == "guide":
+            message = "Quick Start: 6 opens wizard, 1 continues a save, 9 or Esc returns to menu."
         elif self._mode == "meta":
             message = "Meta board: 1 archives, 2 saves, 3 wizard, 9 back."
         elif self._mode == "slots":
@@ -2928,6 +3079,13 @@ class TitleScene(BaseScene):
                     )
                 ),
                 f"Meta next reward: {meta.next_reward}",
+            )
+        if self._mode == "guide":
+            return (
+                "Goal: survive pressure and reach IPO, acquisition, or independence.",
+                "First turn: use Coach, inspect panels, then spend action points.",
+                "Controls: P pause, Esc back, F1 help, S save, Space end turn.",
+                f"Next reward: {meta.next_reward}",
             )
         if self._mode == "meta":
             return (

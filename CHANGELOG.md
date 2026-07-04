@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.238.0 - 2026-07-04
+
+- Added a 2D Quick Start guide page from the title menu so new players can read the goal, first-turn loop, HUD priorities, and recovery controls before launching
+- Added Quick Start keyboard/menu routing and footer/sidebar hints for continue, wizard, and back flows
+- Added visual and animation audit coverage plus regression tests for the new onboarding page
+
 ## 0.237.0 - 2026-07-04
 
 - Widened the compact 2D run action footer on 820-class windows so click targets and action labels are easier to read

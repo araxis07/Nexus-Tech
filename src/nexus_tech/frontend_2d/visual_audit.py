@@ -302,6 +302,39 @@ def run_2d_visual_audit(
                     )
                 )
 
+                title_quick_start = TitleScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=create_new_game("NEXUS TECH", "Nexus One"),
+                    rng=RandomSource(seed=seed + 9),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    coordinator=coordinator,
+                    initial_mode="guide",
+                    motion_mode=motion_mode,
+                    entry_transition="boot_title",
+                )
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        title_quick_start,
+                        scene_key="title_quick_start",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "quick-start-guide",
+                                "actor-timeline",
+                                "sprite-clips",
+                                "title-actor",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
                 title_meta = TitleScene(
                     pygame=pygame,
                     fonts=fonts,
@@ -1116,6 +1149,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("sprite-clips")
     if getattr(scene, "title_actor_active", lambda: False)():
         layers.append("title-actor")
+    if scene.__class__.__name__ == "TitleScene" and getattr(scene, "_mode", "") == "guide":
+        layers.append("quick-start-guide")
     if getattr(scene, "archive_comparison_active", lambda: False)():
         layers.append("archive-comparison")
     if getattr(scene, "inspector_actor_active", lambda: False)():

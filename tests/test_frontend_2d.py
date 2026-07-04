@@ -2545,6 +2545,38 @@ def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
         pygame.quit()
 
 
+def test_title_scene_quick_start_guides_first_run_controls(tmp_path: Path) -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-guide.db")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=14),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+        )
+
+        scene._handle_digit_shortcut(5)
+        guide_lines = scene._title_sidebar_lines()
+        scene.draw(surface)
+        guide_targets = {(target.kind, target.payload) for target in scene._click_targets}
+
+        assert scene._mode == "guide"
+        assert any("Goal:" in line for line in guide_lines)
+        assert any("Controls:" in line for line in guide_lines)
+        assert ("menu", "new_wizard") in guide_targets
+        assert ("menu", "menu") in guide_targets
+
+        scene._handle_digit_shortcut(9)
+        assert scene._mode == "menu"
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_meta_board_compacts_summary_when_space_is_tight(tmp_path: Path) -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -3399,6 +3431,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     scene_keys = {cell.scene_key for cell in report.cells}
     assert {
         "title_menu",
+        "title_quick_start",
         "title_meta",
         "run_dashboard",
         "run_drama_feedback",
@@ -3433,6 +3466,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert report.baseline_signature in summary
     assert "`run_dashboard`" in summary
     title_menu = next(cell for cell in report.cells if cell.scene_key == "title_menu")
+    title_quick_start = next(cell for cell in report.cells if cell.scene_key == "title_quick_start")
     title_meta = next(cell for cell in report.cells if cell.scene_key == "title_meta")
     impact = next(cell for cell in report.cells if cell.scene_key == "run_impact_feedback")
     blocked = next(cell for cell in report.cells if cell.scene_key == "run_blocked_feedback")
@@ -3455,6 +3489,9 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-pose-depth" in title_menu.active_layers
     assert any(layer.startswith("actor-state:") for layer in title_menu.active_layers)
     assert any(layer.startswith("actor-pose:") for layer in title_menu.active_layers)
+    assert "quick-start-guide" in title_quick_start.active_layers
+    assert "title-nav-controls" in title_quick_start.active_layers
+    assert "actor-readability" in title_quick_start.active_layers
     assert "archive-comparison" in title_meta.active_layers
     assert "actor-timeline" in dashboard.active_layers
     assert "transition-key:boot_run" in dashboard.active_layers
@@ -3637,7 +3674,7 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     )
 
     assert report.status == "pass"
-    assert report.visual_report.baseline_signature.startswith("13:")
+    assert report.visual_report.baseline_signature.startswith("14:")
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers
