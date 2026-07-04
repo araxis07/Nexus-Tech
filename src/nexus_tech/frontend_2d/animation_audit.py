@@ -6308,6 +6308,10 @@ def write_2d_animation_playtest_route_batch_plan(
         f"- Route/window open items: `{batch_plan.route_open_items}`",
         "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
         "",
+        "## Next Batch Shortcut",
+        "",
+        *animation_playtest_route_batch_shortcut_lines(batch_plan),
+        "",
         "## Batch Summary",
         "",
         "| Batch | Window | Status | Open Items | Visible Commands |",
@@ -6519,6 +6523,14 @@ def validate_2d_animation_playtest_route_batch_plan(
         if line not in text:
             findings.append(f"missing route batch guard: {line}")
 
+    shortcut_lines = (
+        "## Next Batch Shortcut",
+        *animation_playtest_route_batch_shortcut_lines(batch_plan),
+    )
+    for line in shortcut_lines:
+        if line not in text:
+            findings.append(f"missing route batch shortcut guard: {line}")
+
     rows = _extract_markdown_table_rows(text)
     summary_rows = tuple(row for row in rows if len(row) == 5 and row[0].isdigit())
     if len(summary_rows) != len(batch_plan.batches):
@@ -6695,6 +6707,53 @@ def animation_playtest_route_batch_copy_commands(
         lines.append(batch.window_recorder_hint.recorder_command)
 
     return tuple(lines)
+
+
+def animation_playtest_route_batch_shortcut_lines(
+    batch_plan: AnimationPlaytestRouteBatchPlan,
+) -> tuple[str, ...]:
+    """Return the first unfinished route batch as copy-safe operator guidance."""
+
+    batch = next((item for item in batch_plan.batches if item.status != "pass"), None)
+    if batch is None:
+        return (
+            "- Next batch: `none`",
+            "- Window: `-`",
+            "- Status: `pass`",
+            "- Open items: `0`",
+            "- First target: `-`",
+            "- First visible command: `-`",
+            "- First recorder command: `-`",
+            "- Recorder safety: `all route batches are already recorded`",
+        )
+
+    first_item = next((item for item in batch.items if item.status != "pass"), None)
+    if first_item is not None:
+        first_target = f"route {first_item.step}: {first_item.target}/{first_item.motion_mode}"
+        visible_command = first_item.visible_command
+        recorder_command = first_item.recorder_command or "-"
+    elif batch.window_recorder_hint is not None:
+        first_target = f"window summary: {batch.window_size}"
+        visible_command = "# Observe every full/reduced/off route in this batch before recording."
+        recorder_command = batch.window_recorder_hint.recorder_command
+    else:
+        first_target = "-"
+        visible_command = "-"
+        recorder_command = "-"
+
+    return (
+        f"- Next batch: `{batch.batch_number}`",
+        f"- Window: `{batch.window_size}`",
+        f"- Status: `{batch.status}`",
+        f"- Open items: `{batch.open_items}`",
+        f"- First target: `{_markdown_table_cell(first_target)}`",
+        f"- First visible command: `{_markdown_table_cell(visible_command)}`",
+        f"- First recorder command: `{_markdown_table_cell(recorder_command)}`",
+        (
+            "- Recorder safety: `replace recorder placeholders with real visible-window "
+            "notes before running any record command`"
+        ),
+    )
 
 
 def animation_playtest_route_batch_operator_steps(

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.243.0 - 2026-07-05
+
+- Added a next-batch shortcut to visible route-batch artifacts so manual animation QA starts from the first unfinished window without scanning the full packet
+- Included the first target, visible command, recorder command, open-item count, and recorder-safety reminder in the route-batch shortcut
+- Extended route-batch validation and regression coverage so stale or missing next-batch shortcut guidance fails before manual signoff
+
 ## 0.242.0 - 2026-07-05
 
 - Added visual/animation-audit clearance tracking for critical click targets so compact layouts fail before pause, back, inspector, or footer controls become visually cramped

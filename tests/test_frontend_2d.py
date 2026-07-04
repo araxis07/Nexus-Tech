@@ -36,6 +36,7 @@ from nexus_tech.frontend_2d import (
     MotionAuditReport,
     VisualAuditCell,
     VisualAuditReport,
+    animation_playtest_route_batch_shortcut_lines,
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_evidence_sheet,
     build_2d_animation_playtest_execution_guide,
@@ -7125,7 +7126,23 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     ]
     assert all(len(batch.items) == 6 for batch in batch_plan.batches)
     assert batch_plan.route_open_items == 21
+    shortcut = animation_playtest_route_batch_shortcut_lines(batch_plan)
+    assert "- Next batch: `1`" in shortcut
+    assert "- Window: `820x620`" in shortcut
+    assert "- Open items: `7`" in shortcut
+    assert any("route 1: menu/full" in line for line in shortcut)
+    assert any("menu-2d --window-size 820x620 --motion-mode full" in line for line in shortcut)
+    assert any("record-animation-playtest-route" in line for line in shortcut)
+    assert any("replace recorder placeholders" in line for line in shortcut)
     assert "# NEXUS TECH 2D Animation Visible Route Batches" in text
+    assert "## Next Batch Shortcut" in text
+    assert "- Next batch: `1`" in text
+    assert "- First target: `route 1: menu/full`" in text
+    assert (
+        "- First visible command: `.venv313/bin/nexus-tech menu-2d --window-size "
+        "820x620 --motion-mode full`" in text
+    )
+    assert "replace recorder placeholders with real visible-window notes" in text
     assert "## Batch 1: 820x620" in text
     assert "### Batch 1 Preflight Checks" in text
     assert "Open the 820x620 command window exactly; do not resize mid-batch." in text
@@ -7322,7 +7339,6 @@ def test_validate_animation_playtest_route_batch_plan_rejects_stale_artifact(
         output_path.read_text(encoding="utf-8").replace(
             "record-animation-playtest-route",
             "record-animation-playtest-drift",
-            1,
         ),
         encoding="utf-8",
     )
@@ -7335,6 +7351,7 @@ def test_validate_animation_playtest_route_batch_plan_rejects_stale_artifact(
     )
 
     assert validation.status == "fail"
+    assert any("missing route batch shortcut guard" in finding for finding in validation.findings)
     assert "route batch row 1 recorder command is stale" in validation.findings
 
 
