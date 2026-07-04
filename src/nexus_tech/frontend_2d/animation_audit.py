@@ -1477,7 +1477,10 @@ _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] =
     (
         "Manual Route Evidence",
         ("visible route",),
-        "Run every visible test route step and record observed notes for each menu/play launch.",
+        (
+            "Run every visible route and record notes for menu/play, including the "
+            "first-turn guide and Coach path on play routes."
+        ),
     ),
     (
         "Manual Control Checks",
@@ -1487,7 +1490,10 @@ _ANIMATION_PLAYTEST_STATUS_AREAS: tuple[tuple[str, tuple[str, ...], str], ...] =
     (
         "Manual Scene Checks",
         ("scene check",),
-        "Review title, dashboard, picker, pending event, inspector, endgame, summary, and review.",
+        (
+            "Review title, dashboard, first-turn guide, picker, pending event, inspector, "
+            "endgame, summary, and review."
+        ),
     ),
     (
         "Manual Game Feel",
@@ -1611,7 +1617,10 @@ _ANIMATION_UI_TRIAGE_PROFILES: dict[str, tuple[str, str, str]] = {
     "Manual Route Evidence": (
         "P0",
         "Route Flow Coverage",
-        "All 18 menu/play route notes cover target-specific visible evidence after real runs.",
+        (
+            "All 18 menu/play route notes cover target-specific visible evidence after real "
+            "runs, including first-turn guide and Coach path checks on play routes."
+        ),
     ),
     "Manual Control Checks": (
         "P0",
@@ -1625,8 +1634,8 @@ _ANIMATION_UI_TRIAGE_PROFILES: dict[str, tuple[str, str, str]] = {
         "P1",
         "Scene Readability",
         (
-            "Title, dashboard, picker, pending event, inspector, endgame, summary, "
-            "and review scenes stay readable."
+            "Title, dashboard, first-turn guide, picker, pending event, inspector, endgame, "
+            "summary, and review scenes stay readable."
         ),
     ),
     "Manual Game Feel": (

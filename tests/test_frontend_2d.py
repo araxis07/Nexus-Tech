@@ -5920,6 +5920,8 @@ def test_animation_playtest_status_command_groups_incomplete_report(
     assert "Manual Control Checks" in result.output
     assert "Manual Scene Checks" in result.output
     assert "Manual Game Feel" in result.output
+    assert "first-turn guide" in result.output
+    assert "Coach path" in result.output
     assert "Status FAIL" in result.output
 
 
@@ -7970,6 +7972,8 @@ def test_write_animation_playtest_progress_board_tracks_manual_lanes(
     assert "# NEXUS TECH 2D Animation Progress Board" in text
     assert "Manual Window Matrix" in text
     assert "Manual Route Evidence" in text
+    assert "first-turn guide" in text
+    assert "Coach path" in text
     assert "P0/P1 UI Lanes" in text
     assert "## Next Manual Action" in text
     assert "menu-2d --window-size 820x620 --motion-mode full" in text
@@ -9589,6 +9593,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "# NEXUS TECH 2D Animation Progress Board" in progress_text
     assert "- Release gate status: `manual-required`" in progress_text
     assert "Manual Route Evidence" in progress_text
+    assert "first-turn guide" in progress_text
+    assert "Coach path" in progress_text
     assert "does not record tester evidence" in progress_text
     assert "# NEXUS TECH 2D Animation Execution Guide" in execution_guide_text
     assert "## Operator Loop" in execution_guide_text

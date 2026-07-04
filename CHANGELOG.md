@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.241.0 - 2026-07-04
+
+- Updated manual animation QA status, progress board, and UI triage next steps to call out first-turn guide and Coach path checks explicitly
+- Added regression coverage so visible-window QA artifacts keep the first-turn guide and Coach path visible in operator-facing next steps
+- Kept the manual signoff gate blocked until real visible-window evidence records those checks
+
 ## 0.240.0 - 2026-07-04
 
 - Added first-turn guide and Coach path evidence terms to manual 2D playtest command queues, route batches, recorder prompts, and evidence sheets
