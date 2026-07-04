@@ -84,6 +84,7 @@ from nexus_tech.simulation.meta_progression import (
     build_archive_comparison,
     summarize_meta_progression,
 )
+from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
 
 
@@ -106,6 +107,16 @@ class ActionButtonSpec:
     accent: tuple[int, int, int]
     kind: str
     payload: str
+
+
+@dataclass(frozen=True)
+class FirstTurnGuideStep:
+    """One compact onboarding checkpoint rendered inside the live run dashboard."""
+
+    label: str
+    detail: str
+    done: bool
+    accent: tuple[int, int, int]
 
 
 @dataclass
@@ -3875,6 +3886,7 @@ class RunScene(BaseScene):
         self._help_overlay_visible = False
         self._pause_overlay_visible = False
         self._return_scene_factory = return_scene_factory
+        self._first_turn_guide_visible = False
         self._product_index = 0
         self._motion_elapsed = 0.0
         self._tweens = TweenBank(speed=9.0)
@@ -4545,6 +4557,7 @@ class RunScene(BaseScene):
 
         pygame = self.pygame
         self._click_targets = []
+        self._first_turn_guide_visible = False
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
@@ -4573,7 +4586,7 @@ class RunScene(BaseScene):
             width - margin * 2,
             max(0, content_height),
         )
-        use_compact_focus = content_rect.height < 170
+        use_compact_focus = content_rect.height < 200
         if use_compact_focus:
             left_rect = content_rect
             center_rect = pygame.Rect(0, 0, 0, 0)
@@ -4702,6 +4715,32 @@ class RunScene(BaseScene):
             or self._text_input is not None
             or self._pause_overlay_visible
             or self.state.pending_event is not None
+        )
+
+    def first_turn_guide_active(self) -> bool:
+        """Return whether the compact live-run onboarding guide is visible."""
+
+        return self._first_turn_guide_visible
+
+    def _first_turn_guide_active(self) -> bool:
+        if self.state.company.game_over or self.state.victory_achieved:
+            return False
+        if self._overlay_or_pending_active():
+            return False
+        return build_guided_opening(self.state).active
+
+    def _first_turn_guide_steps(self) -> tuple[FirstTurnGuideStep, ...]:
+        opening = build_guided_opening(self.state)
+        first_step_done = bool(opening.steps and opening.steps[0].status == "done")
+        resolved_once = bool(self.state.turn_history) or self.state.company.current_turn > 1
+        spent_actions = self.state.action_points_remaining <= 0 or resolved_once
+        ap_label = f"{max(0, self.state.action_points_remaining)} AP left"
+        command_label = self._compact_button_detail(opening.current_command, max_length=24)
+        return (
+            FirstTurnGuideStep("1 Coach", f"C / click: {command_label}", first_step_done, INFO),
+            FirstTurnGuideStep("2 HUD", "Cash, runway, board, AP", resolved_once, GOOD),
+            FirstTurnGuideStep("3 Spend AP", ap_label, spent_actions, WARN),
+            FirstTurnGuideStep("4 Resolve", "P save | Space end", resolved_once, SELECTION),
         )
 
     def _motion_pressure_ratio(self) -> float:
@@ -7295,6 +7334,13 @@ class RunScene(BaseScene):
             line_height=15,
             max_lines=1,
         )
+        header_guide_rect = pygame.Rect(inner.left, inner.top + 42, copy_width, 28)
+        if (
+            compact
+            and width < 980
+            and self._draw_first_turn_header_strip(surface, header_guide_rect)
+        ):
+            return
         if not compact:
             draw_wrapped_text(
                 surface,
@@ -7323,6 +7369,44 @@ class RunScene(BaseScene):
             chip_rect = pygame.Rect(left, top, chip_width, chip_height)
             self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
             left += chip_width + 12
+
+    def _draw_first_turn_header_strip(self, surface, rect) -> bool:
+        if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 24:
+            return False
+        pygame = self.pygame
+        opening = build_guided_opening(self.state)
+        shimmer = (
+            0.0
+            if self.motion_mode is MotionMode.OFF
+            else 0.5 + 0.5 * sin(self._motion_elapsed * 2.4)
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color((18, 29, 44), INFO, 0.14 + shimmer * 0.04),
+            rect,
+            border_radius=12,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, SELECTION, 0.34 + shimmer * 0.16),
+            rect,
+            width=1,
+            border_radius=12,
+        )
+        self._first_turn_guide_visible = True
+        self._click_targets.append(ClickTarget("coach", "", rect))
+        line = (
+            f"First Turn: C Coach -> {opening.current_command} | "
+            f"{max(0, self.state.action_points_remaining)} AP | P Save/Pause | Space End"
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            line,
+            TEXT,
+            pygame.Rect(rect.left + 10, rect.top + 5, rect.width - 20, rect.height - 10),
+        )
+        return True
 
     def _draw_left_column(self, surface, rect) -> None:
         pygame = self.pygame
@@ -7503,7 +7587,11 @@ class RunScene(BaseScene):
 
     def _draw_right_column(self, surface, rect) -> None:
         pygame = self.pygame
-        coach_height = int(rect.height * 0.5)
+        guide_requested = self._first_turn_guide_active()
+        coach_ratio = 0.62 if guide_requested else 0.5
+        coach_height = int(rect.height * coach_ratio)
+        if guide_requested and rect.height >= 260:
+            coach_height = min(coach_height, rect.height - 96)
         coach_rect = pygame.Rect(rect.left, rect.top, rect.width, coach_height)
         event_rect = pygame.Rect(
             rect.left,
@@ -7531,7 +7619,15 @@ class RunScene(BaseScene):
             valign="top",
         )
         top = coach_inner.top
+        if guide_requested and coach_inner.height >= 142:
+            guide_height = min(82, max(58, int(coach_inner.height * 0.42)))
+            guide_rect = pygame.Rect(coach_inner.left, top, coach_inner.width, guide_height)
+            if self._draw_first_turn_guide_card(surface, guide_rect):
+                top += guide_height + 10
+
         for line in self._view_model.coach_lines:
+            if top + 66 > coach_inner.bottom - 76:
+                break
             card_rect = pygame.Rect(coach_inner.left, top, coach_inner.width, 66)
             line_panel = self._workspace_panel_key_for_command(line.command)
             line_motion = (
@@ -7561,46 +7657,52 @@ class RunScene(BaseScene):
             )
             top += 76
 
-        draw_text_line(
-            surface,
-            self.fonts.small,
-            "Not Now",
-            WARN,
-            pygame.Rect(coach_inner.left, top + 2, coach_inner.width, 18),
-            valign="top",
-        )
-        deferred_top = top + 24
-        for deferred_line in self._view_model.deferred_lines[:2]:
-            consumed = draw_wrapped_text(
+        if top + 46 <= coach_inner.bottom:
+            draw_text_line(
                 surface,
                 self.fonts.small,
-                deferred_line,
-                MUTED,
-                pygame.Rect(coach_inner.left, deferred_top, coach_inner.width, 34),
-                line_height=16,
-                max_lines=2,
+                "Not Now",
+                WARN,
+                pygame.Rect(coach_inner.left, top + 2, coach_inner.width, 18),
+                valign="top",
             )
-            deferred_top += max(22, consumed)
-        draw_text_line(
-            surface,
-            self.fonts.small,
-            "Risk Forecast",
-            DANGER,
-            pygame.Rect(coach_inner.left, deferred_top + 6, coach_inner.width, 18),
-            valign="top",
-        )
-        risk_top = deferred_top + 28
-        for risk_line in self._view_model.risk_lines[:2]:
-            consumed = draw_wrapped_text(
-                surface,
-                self.fonts.small,
-                risk_line,
-                MUTED,
-                pygame.Rect(coach_inner.left, risk_top, coach_inner.width, 22),
-                line_height=16,
-                max_lines=1,
-            )
-            risk_top += max(20, consumed)
+            deferred_top = top + 24
+            for deferred_line in self._view_model.deferred_lines[:2]:
+                consumed = draw_wrapped_text(
+                    surface,
+                    self.fonts.small,
+                    deferred_line,
+                    MUTED,
+                    pygame.Rect(coach_inner.left, deferred_top, coach_inner.width, 34),
+                    line_height=16,
+                    max_lines=2,
+                )
+                deferred_top += max(22, consumed)
+                if deferred_top + 48 > coach_inner.bottom:
+                    break
+            if deferred_top + 46 <= coach_inner.bottom:
+                draw_text_line(
+                    surface,
+                    self.fonts.small,
+                    "Risk Forecast",
+                    DANGER,
+                    pygame.Rect(coach_inner.left, deferred_top + 6, coach_inner.width, 18),
+                    valign="top",
+                )
+                risk_top = deferred_top + 28
+                for risk_line in self._view_model.risk_lines[:2]:
+                    consumed = draw_wrapped_text(
+                        surface,
+                        self.fonts.small,
+                        risk_line,
+                        MUTED,
+                        pygame.Rect(coach_inner.left, risk_top, coach_inner.width, 22),
+                        line_height=16,
+                        max_lines=1,
+                    )
+                    risk_top += max(20, consumed)
+                    if risk_top > coach_inner.bottom:
+                        break
 
         feed_motion = self._motion_level("feed")
         event_inner = draw_panel(
@@ -7675,6 +7777,11 @@ class RunScene(BaseScene):
             valign="top",
         )
         note_top = inner.top + 24
+        guide_rect = pygame.Rect(
+            inner.left, note_top, inner.width, max(18, inner.bottom - note_top)
+        )
+        if self._draw_first_turn_guide_card(surface, guide_rect):
+            return
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -7695,6 +7802,110 @@ class RunScene(BaseScene):
             chip_rect = pygame.Rect(left, chip_top, chip_width, 26)
             self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
             left += chip_width + gap
+
+    def _draw_first_turn_guide_card(self, surface, rect) -> bool:
+        if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 58:
+            return False
+        pygame = self.pygame
+        opening = build_guided_opening(self.state)
+        steps = self._first_turn_guide_steps()
+        shimmer = (
+            0.0
+            if self.motion_mode is MotionMode.OFF
+            else 0.5 + 0.5 * sin(self._motion_elapsed * 2.6)
+        )
+        card_rect = pygame.Rect(rect.left, rect.top, rect.width, min(rect.height, 88))
+        self._first_turn_guide_visible = True
+        pygame.draw.rect(
+            surface,
+            blend_color((18, 29, 44), INFO, 0.12 + shimmer * 0.04),
+            card_rect,
+            border_radius=14,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, SELECTION, 0.28 + shimmer * 0.18),
+            card_rect,
+            width=1,
+            border_radius=14,
+        )
+        self._click_targets.append(ClickTarget("coach", "", card_rect))
+        title = f"First Turn Guide | C Coach -> {opening.current_command}"
+        detail = "Click this guide for coach. P saves/pauses. Space resolves after AP."
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            title,
+            TEXT,
+            pygame.Rect(card_rect.left + 12, card_rect.top + 7, card_rect.width - 24, 18),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            detail,
+            MUTED,
+            pygame.Rect(card_rect.left + 12, card_rect.top + 24, card_rect.width - 24, 16),
+            valign="top",
+        )
+        chip_top = card_rect.top + 44
+        chip_height = max(24, card_rect.bottom - chip_top - 8)
+        chip_gap = 6
+        chip_width = int((card_rect.width - chip_gap * (len(steps) - 1)) / len(steps))
+        left = card_rect.left
+        pending_seen = False
+        for step in steps:
+            if step.done:
+                status = "OK"
+                fill_ratio = 0.22
+                border_ratio = 0.42
+            elif not pending_seen:
+                status = "NEXT"
+                fill_ratio = 0.16 + shimmer * 0.06
+                border_ratio = 0.52
+                pending_seen = True
+            else:
+                status = "WAIT"
+                fill_ratio = 0.07
+                border_ratio = 0.22
+            chip_rect = pygame.Rect(left, chip_top, chip_width, chip_height)
+            pygame.draw.rect(
+                surface,
+                blend_color((24, 36, 52), step.accent, fill_ratio),
+                chip_rect,
+                border_radius=11,
+            )
+            pygame.draw.rect(
+                surface,
+                blend_color(BORDER, step.accent, border_ratio),
+                chip_rect,
+                width=1,
+                border_radius=11,
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                f"{status} {step.label}",
+                TEXT if step.done or status == "NEXT" else MUTED,
+                pygame.Rect(chip_rect.left + 8, chip_rect.top + 4, chip_rect.width - 16, 14),
+                valign="top",
+            )
+            if chip_rect.height >= 30:
+                draw_text_line(
+                    surface,
+                    self.fonts.small,
+                    step.detail,
+                    MUTED,
+                    pygame.Rect(
+                        chip_rect.left + 8,
+                        chip_rect.top + 19,
+                        chip_rect.width - 16,
+                        chip_rect.height - 21,
+                    ),
+                    valign="top",
+                )
+            left += chip_width + chip_gap
+        return True
 
     def _draw_footer(self, surface, rect) -> None:
         pygame = self.pygame

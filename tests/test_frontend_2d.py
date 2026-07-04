@@ -784,6 +784,38 @@ def test_run_scene_opening_endgame_panel_pushes_cockpit_brief_event() -> None:
         pygame.quit()
 
 
+def test_run_scene_first_turn_guide_draws_clickable_coach_path() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=18),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+
+        assert scene._first_turn_guide_active()
+        scene.draw(surface)
+
+        steps = scene._first_turn_guide_steps()
+        assert len(steps) == 4
+        assert steps[0].label == "1 Coach"
+        assert steps[2].detail.endswith("AP left")
+        assert scene.first_turn_guide_active()
+        assert any(target.kind == "coach" for target in scene._click_targets)
+
+        scene._set_pause_overlay_visible(True)
+        scene.draw(surface)
+
+        assert not scene.first_turn_guide_active()
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_endgame_cockpit_command_pushes_handoff_event() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -3501,6 +3533,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "actor-state:handoff" in dashboard.active_layers
     assert "actor-pose:handoff" in dashboard.active_layers
     assert "click-targets" in dashboard.active_layers
+    assert "first-turn-guide" in dashboard.active_layers
     assert "pause-control" in dashboard.active_layers
     assert "back-control" in dashboard.active_layers
     assert "help-control" in dashboard.active_layers

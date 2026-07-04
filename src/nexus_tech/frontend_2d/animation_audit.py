@@ -495,6 +495,7 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "transition",
             "motion-pulses",
             "product-drama",
+            "first-turn-guide",
             "actor-timeline",
             "sprite-clips",
             "actor-readability",

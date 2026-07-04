@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.239.0 - 2026-07-04
+
+- Added a live first-turn guide inside the 2D run dashboard so players can follow Coach, HUD, action-point, pause/save, and end-turn steps while playing
+- Added a clickable guide path that routes into the existing Coach action without adding a separate control flow
+- Added visual and animation audit coverage plus regression tests for the first-turn guide layer
+
 ## 0.238.0 - 2026-07-04
 
 - Added a 2D Quick Start guide page from the title menu so new players can read the goal, first-turn loop, HUD priorities, and recovery controls before launching

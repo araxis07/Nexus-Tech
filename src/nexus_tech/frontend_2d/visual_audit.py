@@ -390,6 +390,7 @@ def run_2d_visual_audit(
                                 "transition",
                                 "motion-pulses",
                                 "product-drama",
+                                "first-turn-guide",
                                 "actor-timeline",
                                 "sprite-clips",
                             ),
@@ -1151,6 +1152,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("title-actor")
     if scene.__class__.__name__ == "TitleScene" and getattr(scene, "_mode", "") == "guide":
         layers.append("quick-start-guide")
+    if getattr(scene, "first_turn_guide_active", lambda: False)():
+        layers.append("first-turn-guide")
     if getattr(scene, "archive_comparison_active", lambda: False)():
         layers.append("archive-comparison")
     if getattr(scene, "inspector_actor_active", lambda: False)():
