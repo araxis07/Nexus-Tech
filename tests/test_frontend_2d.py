@@ -4131,7 +4131,8 @@ def test_validate_2d_animation_playtest_command_queue_rejects_missing_prompt(
         .replace("- Evidence prompts: `required in every command row`\n", "")
         .replace(
             " | Record title/menu, wizard, save-slot, archive, meta-board, hover, "
-            "and text-fit observations for 820x620 full. |",
+            "and text-fit observations for 820x620 full. Required terms: title, "
+            "wizard, save, archive, meta, hover, text. |",
             " |",
             1,
         ),
@@ -4989,13 +4990,13 @@ def _completed_animation_playtest_report_text() -> str:
     for index, item in enumerate(build_2d_animation_playtest_command_queue(), start=1):
         if item.target == "menu":
             note = (
-                "title wizard save archive meta hover text-fit checked "
+                "title wizard save archive meta hover text checked "
                 f"at {item.window_size} with {item.motion_mode} motion"
             )
         else:
             note = (
-                "dashboard action pending inspector endgame summary pause motion checked "
-                f"at {item.window_size} with {item.motion_mode} motion"
+                "dashboard first turn guide coach action pending inspector endgame summary "
+                f"pause motion checked at {item.window_size} with {item.motion_mode} motion"
             )
         route_rows.append(
             "| "
@@ -5165,7 +5166,7 @@ def test_validate_2d_animation_playtest_report_rejects_template_prompt_evidence_
             "| "
             f"1 | `{first_route.target}` | `{first_route.window_size}` | "
             f"`{first_route.motion_mode}` | `pass` | title wizard save archive meta hover "
-            f"text-fit checked at {first_route.window_size} "
+            f"text checked at {first_route.window_size} "
             f"with {first_route.motion_mode} motion |"
         ),
         (
@@ -5295,7 +5296,7 @@ def test_validate_2d_animation_playtest_report_rejects_incomplete_route_terms(
             "| "
             f"1 | `{first_route.target}` | `{first_route.window_size}` | "
             f"`{first_route.motion_mode}` | `pass` | title wizard save archive meta hover "
-            f"text-fit checked at {first_route.window_size} "
+            f"text checked at {first_route.window_size} "
             f"with {first_route.motion_mode} motion |"
         ),
         (
@@ -5325,15 +5326,15 @@ def test_validate_2d_animation_playtest_report_rejects_embedded_route_terms(
         (
             "| "
             f"2 | `{play_route.target}` | `{play_route.window_size}` | "
-            f"`{play_route.motion_mode}` | `pass` | dashboard action pending "
-            "inspector endgame summary pause motion checked "
+            f"`{play_route.motion_mode}` | `pass` | dashboard first turn guide coach action "
+            "pending inspector endgame summary pause motion checked "
             f"at {play_route.window_size} with {play_route.motion_mode} motion |"
         ),
         (
             "| "
             f"2 | `{play_route.target}` | `{play_route.window_size}` | "
-            f"`{play_route.motion_mode}` | `pass` | dashboard interaction pending "
-            "inspector endgame summary pause motion checked "
+            f"`{play_route.motion_mode}` | `pass` | dashboard first turn guide coach "
+            "interaction pending inspector endgame summary pause motion checked "
             f"at {play_route.window_size} with {play_route.motion_mode} motion |"
         ),
     )
@@ -5984,7 +5985,8 @@ def test_animation_playtest_commands_command_writes_queue(tmp_path: Path) -> Non
     assert "- Evidence prompts: `required in every command row`" in report_text
     assert "play-2d --scenario founder_journey --seed 11" in report_text
     assert "menu-2d --window-size 1440x900 --motion-mode off" in report_text
-    assert "Record dashboard, action picker, pending event, inspector" in report_text
+    assert "Record dashboard, first-turn guide, Coach path, action picker" in report_text
+    assert "dashboard, first, turn, guide, coach, action" in report_text
 
 
 def test_animation_playtest_commands_accept_custom_command_prefix(tmp_path: Path) -> None:
@@ -7098,6 +7100,7 @@ def test_write_animation_playtest_route_batch_plan_groups_visible_commands(
     assert "Open the 820x620 command window exactly; do not resize mid-batch." in text
     assert "6 menu/play route row(s) still require observed evidence." in text
     assert "Route evidence terms" in text
+    assert "dashboard, first, turn, guide, coach, action" in text
     assert "Window summary terms" in text
     assert "### Batch 1 Evidence Checklist" in text
     assert "Route 1: menu/full" in text
@@ -8964,6 +8967,7 @@ def test_write_animation_playtest_evidence_sheet_tracks_capture_rows(
     assert "## Evidence Workflow" in text
     assert "## Capture Rows" in text
     assert "pass / watch / fail" in text
+    assert "dashboard, first, turn, guide, coach, action" in text
     assert "nexus-tech-animation-evidence-01-visible-route-visible-route-evidence-1.png" in text
     assert "none / owner-date / blocker-id" in text
     assert "## Defect Intake Reference" in text

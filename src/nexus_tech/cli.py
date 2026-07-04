@@ -4024,11 +4024,14 @@ def _animation_playtest_route_prompt(target: str, window_size: str, motion_mode:
     if target == "menu":
         return (
             "Record title/menu, wizard, save-slot, archive, meta-board, hover, "
-            f"and text-fit observations for {window_context}."
+            f"and text-fit observations for {window_context}. Required terms: title, "
+            "wizard, save, archive, meta, hover, text."
         )
     return (
-        "Record dashboard, action picker, pending event, inspector, endgame, "
-        f"summary, pause/back, and motion-feel observations for {window_context}."
+        "Record dashboard, first-turn guide, Coach path, action picker, pending event, "
+        f"inspector, endgame, summary, pause/back, and motion-feel observations for "
+        f"{window_context}. Required terms: dashboard, first, turn, guide, coach, "
+        "action, pending, inspector, endgame, summary, pause, motion."
     )
 
 

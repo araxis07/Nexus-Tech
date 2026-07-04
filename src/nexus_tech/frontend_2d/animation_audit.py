@@ -64,6 +64,10 @@ MENU_ROUTE_EVIDENCE_TERMS: tuple[str, ...] = (
 )
 PLAY_ROUTE_EVIDENCE_TERMS: tuple[str, ...] = (
     "dashboard",
+    "first",
+    "turn",
+    "guide",
+    "coach",
     "action",
     "pending",
     "inspector",
@@ -1521,8 +1525,8 @@ _MANUAL_ANIMATION_EVIDENCE_CHECKLIST: tuple[tuple[str, str], ...] = (
         (
             "Complete all 18 visible menu/play route rows with target-specific notes: "
             "menu covers title, wizard, save, archive, meta, hover, and text; play "
-            "covers dashboard, action, pending, inspector, endgame, summary, pause, "
-            "and motion."
+            "covers dashboard, first-turn guide, coach, action, pending, inspector, "
+            "endgame, summary, pause, and motion."
         ),
     ),
     (
@@ -1535,8 +1539,8 @@ _MANUAL_ANIMATION_EVIDENCE_CHECKLIST: tuple[tuple[str, str], ...] = (
     (
         "Scene Evidence",
         (
-            "Review title/menu, dashboard, action picker, pending event, inspector, "
-            "endgame board, turn summary, outcome/review, and scene handoffs."
+            "Review title/menu, dashboard, first-turn guide, action picker, pending event, "
+            "inspector, endgame board, turn summary, outcome/review, and scene handoffs."
         ),
     ),
     (
@@ -7535,13 +7539,17 @@ def _animation_playtest_route_evidence(item: AnimationPlaytestCommand) -> str:
 
     window_context = f"{item.window_size} {item.motion_mode}"
     if item.target == "menu":
+        required_terms = ", ".join(MENU_ROUTE_EVIDENCE_TERMS)
         return (
             "Record title/menu, wizard, save-slot, archive, meta-board, hover, "
-            f"and text-fit observations for {window_context}."
+            f"and text-fit observations for {window_context}. Required terms: "
+            f"{required_terms}."
         )
+    required_terms = ", ".join(PLAY_ROUTE_EVIDENCE_TERMS)
     return (
-        "Record dashboard, action picker, pending event, inspector, endgame, "
-        f"summary, pause/back, and motion-feel observations for {window_context}."
+        "Record dashboard, first-turn guide, Coach path, action picker, pending event, "
+        f"inspector, endgame, summary, pause/back, and motion-feel observations for "
+        f"{window_context}. Required terms: {required_terms}."
     )
 
 

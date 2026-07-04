@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.240.0 - 2026-07-04
+
+- Added first-turn guide and Coach path evidence terms to manual 2D playtest command queues, route batches, recorder prompts, and evidence sheets
+- Updated manual animation QA validators so completed play-route notes must mention the first-turn guide and Coach path explicitly
+- Refreshed regression coverage for the stricter manual visible-window QA artifact contract
+
 ## 0.239.0 - 2026-07-04
 
 - Added a live first-turn guide inside the 2D run dashboard so players can follow Coach, HUD, action-point, pause/save, and end-turn steps while playing
