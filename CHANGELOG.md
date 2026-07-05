@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.246.0 - 2026-07-05
+
+- Extended `prepare-animation-playtest-session` to generate the focused next-batch packet alongside the route-batch artifact
+- Added `--next-batch-output` so manual animation QA sessions can choose the packet path without opening the full route-batch plan
+- Added regression coverage so session setup keeps the next-batch packet tied to the current route-batch artifact
+
 ## 0.245.0 - 2026-07-05
 
 - Added `animation-playtest-batch-packet` so manual animation QA can write a focused packet for the first unfinished visible-window batch

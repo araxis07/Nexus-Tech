@@ -448,6 +448,11 @@ ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION = typer.Option(
     "--route-batches-output",
     help="Markdown path for the manual visible-route batch plan.",
 )
+ANIMATION_PLAYTEST_SESSION_NEXT_BATCH_PACKET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-next-batch.md"),
+    "--next-batch-output",
+    help="Markdown path for the focused next visible-route batch packet.",
+)
 ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-ui-triage.md"),
     "--triage-output",
@@ -4252,6 +4257,7 @@ def prepare_animation_playtest_session_command(
     plan_output: Path = ANIMATION_PLAYTEST_SESSION_PLAN_OUTPUT_OPTION,
     recorder_output: Path = ANIMATION_PLAYTEST_SESSION_RECORDER_OUTPUT_OPTION,
     route_batch_output: Path = ANIMATION_PLAYTEST_SESSION_ROUTE_BATCH_OUTPUT_OPTION,
+    next_batch_output: Path = ANIMATION_PLAYTEST_SESSION_NEXT_BATCH_PACKET_OUTPUT_OPTION,
     triage_output: Path = ANIMATION_PLAYTEST_SESSION_TRIAGE_OUTPUT_OPTION,
     release_gate_output: Path = ANIMATION_PLAYTEST_SESSION_RELEASE_GATE_OUTPUT_OPTION,
     progress_output: Path = ANIMATION_PLAYTEST_SESSION_PROGRESS_OUTPUT_OPTION,
@@ -4340,6 +4346,11 @@ def prepare_animation_playtest_session_command(
         command_prefix=command_prefix,
     )
     write_2d_animation_playtest_route_batch_plan(route_batch_plan, route_batch_output)
+    write_2d_animation_playtest_next_batch_packet(
+        route_batch_plan,
+        next_batch_output,
+        route_batch_path=route_batch_output,
+    )
     route_batch_validation = validate_2d_animation_playtest_route_batch_plan(
         route_batch_output,
         report_output,
@@ -4542,6 +4553,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Plan", str(plan_output))
     session_table.add_row("Recorder Queue", str(recorder_output))
     session_table.add_row("Route Batches", str(route_batch_output))
+    session_table.add_row("Next Batch Packet", str(next_batch_output))
     session_table.add_row("UI Triage", str(triage_output))
     session_table.add_row("Release Gate", str(release_gate_output))
     session_table.add_row("Progress Board", str(progress_output))

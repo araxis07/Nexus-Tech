@@ -9659,6 +9659,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     plan_path = tmp_path / "manual-animation-plan.md"
     recorder_queue_path = tmp_path / "manual-animation-recorder-queue.md"
     route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    next_batch_path = tmp_path / "manual-animation-next-batch.md"
     triage_path = tmp_path / "manual-animation-ui-triage.md"
     release_gate_path = tmp_path / "manual-animation-release-gate.md"
     progress_path = tmp_path / "manual-animation-progress.md"
@@ -9686,6 +9687,8 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
             str(recorder_queue_path),
             "--route-batches-output",
             str(route_batch_path),
+            "--next-batch-output",
+            str(next_batch_path),
             "--triage-output",
             str(triage_path),
             "--release-gate-output",
@@ -9739,11 +9742,13 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Sprint Navigation Recording Rows" in result.output
     assert "Sprint P0/P1 Blockers" in result.output
     assert "Blocking Checks" in result.output
+    assert "Next Batch Packet" in result.output
     assert report_path.exists()
     assert commands_path.exists()
     assert plan_path.exists()
     assert recorder_queue_path.exists()
     assert route_batch_path.exists()
+    assert next_batch_path.exists()
     assert triage_path.exists()
     assert release_gate_path.exists()
     assert progress_path.exists()
@@ -9757,6 +9762,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     plan_text = plan_path.read_text(encoding="utf-8")
     recorder_text = recorder_queue_path.read_text(encoding="utf-8")
     route_batch_text = route_batch_path.read_text(encoding="utf-8")
+    next_batch_text = next_batch_path.read_text(encoding="utf-8")
     triage_text = triage_path.read_text(encoding="utf-8")
     release_gate_text = release_gate_path.read_text(encoding="utf-8")
     progress_text = progress_path.read_text(encoding="utf-8")
@@ -9800,6 +9806,13 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "### Batch 1 Post-Recording Commands" in route_batch_text
     assert "animation-playtest-status" in route_batch_text
     assert "record-animation-playtest-window" in route_batch_text
+    assert "# NEXUS TECH 2D Animation Next Batch Packet" in next_batch_text
+    assert "- Full route-batch artifact: `" in next_batch_text
+    assert str(route_batch_path) in next_batch_text
+    assert "## Batch 1: 820x620" in next_batch_text
+    assert "## Batch 2: 960x640" not in next_batch_text
+    assert "### Operator Steps" in next_batch_text
+    assert "validate-animation-playtest-route-batches" in next_batch_text
     assert "# NEXUS TECH 2D Animation UI Triage" in triage_text
     assert "Controls / Navigation" in triage_text
     assert "Motion / Feedback" in triage_text
