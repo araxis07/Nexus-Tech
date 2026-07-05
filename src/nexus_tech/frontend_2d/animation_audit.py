@@ -852,6 +852,21 @@ class AnimationPlaytestRouteBatchPlanValidation:
 
 
 @dataclass(frozen=True)
+class AnimationPlaytestNextBatchPacketValidation:
+    """Validation result for an exported focused next-batch packet artifact."""
+
+    path: str
+    expected_batch: int | None
+    findings: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when the next-batch packet matches current gaps."""
+
+        return "pass" if not self.findings else "fail"
+
+
+@dataclass(frozen=True)
 class AnimationPlaytestSessionValidation:
     """Validation result for a complete manual animation handoff package."""
 
@@ -6649,6 +6664,143 @@ def write_2d_animation_playtest_next_batch_packet(
     )
 
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_2d_animation_playtest_next_batch_packet(
+    packet_path: Path,
+    report_path: Path,
+    command_path: Path,
+    route_batch_path: Path,
+    *,
+    scenario_id: str = "founder_journey",
+    seed: int = 7,
+    windows: tuple[tuple[int, int], ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES,
+    command_prefix: str = "uv run nexus-tech",
+) -> AnimationPlaytestNextBatchPacketValidation:
+    """Validate that the focused next-batch packet matches current QA gaps."""
+
+    text = packet_path.read_text(encoding="utf-8")
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario_id,
+        seed=seed,
+        windows=windows,
+        motion_modes=motion_modes,
+        command_prefix=command_prefix,
+    )
+    batch = next((item for item in batch_plan.batches if item.status != "pass"), None)
+    findings: list[str] = []
+    manual_result = "complete" if batch_plan.status == "pass" else "not completed by automation"
+    required_lines = (
+        "# NEXUS TECH 2D Animation Next Batch Packet",
+        f"- Status: `{batch_plan.status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Command queue: `{batch_plan.commands.status}`",
+        f"- Final report: `{batch_plan.report.status}`",
+        f"- Report open items: `{len(batch_plan.report.findings)}`",
+        f"- Route/window open items: `{batch_plan.route_open_items}`",
+        f"- Full route-batch artifact: `{route_batch_path}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        "## Next Batch Shortcut",
+        *animation_playtest_route_batch_shortcut_lines(batch_plan),
+    )
+    for line in required_lines:
+        if line not in text:
+            findings.append(f"missing next-batch packet guard: {line}")
+
+    if batch is None:
+        if "All visible-route batches already have recorded evidence." not in text:
+            findings.append("missing completed next-batch packet state")
+        return AnimationPlaytestNextBatchPacketValidation(
+            path=str(packet_path),
+            expected_batch=None,
+            findings=tuple(findings),
+        )
+
+    batch_required_lines = (
+        f"## Batch {batch.batch_number}: {batch.window_size}",
+        f"- Batch status: `{batch.status}`",
+        f"- Open items: `{batch.open_items}`",
+        f"- Visible route commands: `{len(batch.items)}`",
+        "### Preflight Checks",
+        "| Check | Required Action |",
+        *(
+            _format_route_batch_preflight_row(row)
+            for row in animation_playtest_route_batch_preflight_rows(batch)
+        ),
+        "### Evidence Checklist",
+        "| Item | Status | Required Evidence | Result Decision | Recorder Timing |",
+        *(
+            _format_route_batch_evidence_checklist_row(row)
+            for row in animation_playtest_route_batch_evidence_checklist_rows(batch)
+        ),
+        "### Result Decision Guide",
+        "| Result | Use When | Recorder Edit | Release Rule |",
+        *(
+            _format_route_batch_result_decision_row(row)
+            for row in animation_playtest_route_batch_result_decision_rows()
+        ),
+        "### Defect Trigger Checklist",
+        "| Trigger | Record Watch When | Record Fail When | Required Action |",
+        *(
+            _format_route_batch_defect_trigger_row(row)
+            for row in animation_playtest_route_batch_defect_trigger_rows()
+        ),
+        "### Defect Intake Template",
+        "| Field | Required Detail |",
+        *(
+            _format_route_batch_defect_intake_row(row)
+            for row in animation_playtest_route_batch_defect_intake_rows(batch)
+        ),
+        "### Copy Commands",
+        *animation_playtest_route_batch_copy_commands(batch),
+        "### Operator Steps",
+        *animation_playtest_route_batch_operator_steps(batch),
+        "### Closure Checklist",
+        "| Check | Required Action |",
+        *(
+            _format_route_batch_closure_row(row)
+            for row in animation_playtest_route_batch_closure_rows(batch)
+        ),
+        "### Post-Recording Commands",
+        *animation_playtest_route_batch_post_recording_commands(
+            batch_plan,
+            route_batch_path,
+        ),
+    )
+    for line in batch_required_lines:
+        if line not in text:
+            findings.append(f"missing next-batch packet line: {line}")
+
+    if batch.window_recorder_hint is not None:
+        hint = batch.window_recorder_hint
+        required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+        window_hint_lines = (
+            "### Window Summary Recorder",
+            f"- Status: `{hint.status}`",
+            f"- Required terms: `{_markdown_table_cell(required_terms)}`",
+            f"- Evidence prompt: {_markdown_table_cell(hint.evidence_prompt)}",
+            f"`{_markdown_table_cell(hint.recorder_command)}`",
+        )
+        for line in window_hint_lines:
+            if line not in text:
+                findings.append(f"missing next-batch window recorder guard: {line}")
+
+    for other_batch in batch_plan.batches:
+        if other_batch.batch_number == batch.batch_number:
+            continue
+        if f"## Batch {other_batch.batch_number}: {other_batch.window_size}" in text:
+            findings.append(
+                f"next-batch packet includes non-focused batch: {other_batch.batch_number}"
+            )
+
+    return AnimationPlaytestNextBatchPacketValidation(
+        path=str(packet_path),
+        expected_batch=batch.batch_number,
+        findings=tuple(findings),
+    )
 
 
 def validate_2d_animation_playtest_route_batch_plan(

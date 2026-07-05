@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.247.0 - 2026-07-05
+
+- Added validation for focused next-batch packets so stale manual QA packets fail before visible-window testing
+- Added `validate-animation-playtest-batch-packet` and wired packet validation into session setup output
+- Added regression coverage for current and stale next-batch packet artifacts
+
 ## 0.246.0 - 2026-07-05
 
 - Extended `prepare-animation-playtest-session` to generate the focused next-batch packet alongside the route-batch artifact

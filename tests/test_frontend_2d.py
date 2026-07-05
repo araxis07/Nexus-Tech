@@ -69,6 +69,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_evidence_sheet,
     validate_2d_animation_playtest_execution_guide,
     validate_2d_animation_playtest_issue_backlog,
+    validate_2d_animation_playtest_next_batch_packet,
     validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
@@ -7257,6 +7258,113 @@ def test_write_animation_playtest_next_batch_packet_focuses_first_open_batch(
     assert "<replace with observed visible-window notes>" in text
 
 
+def test_validate_animation_playtest_next_batch_packet_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    packet_path = tmp_path / "manual-animation-next-batch.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.247.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-07-05",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_2d_animation_playtest_route_batch_plan(batch_plan, route_batch_path)
+    write_2d_animation_playtest_next_batch_packet(
+        batch_plan,
+        packet_path,
+        route_batch_path=route_batch_path,
+    )
+
+    validation = validate_2d_animation_playtest_next_batch_packet(
+        packet_path,
+        report_path,
+        commands_path,
+        route_batch_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.status == "pass"
+    assert validation.expected_batch == 1
+    assert validation.findings == ()
+
+
+def test_validate_animation_playtest_next_batch_packet_rejects_stale_packet(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    packet_path = tmp_path / "manual-animation-next-batch.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.247.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_2d_animation_playtest_route_batch_plan(batch_plan, route_batch_path)
+    write_2d_animation_playtest_next_batch_packet(
+        batch_plan,
+        packet_path,
+        route_batch_path=route_batch_path,
+    )
+    packet_path.write_text(
+        packet_path.read_text(encoding="utf-8").replace(
+            "## Batch 1: 820x620",
+            "## Batch 2: 960x640",
+        ),
+        encoding="utf-8",
+    )
+
+    validation = validate_2d_animation_playtest_next_batch_packet(
+        packet_path,
+        report_path,
+        commands_path,
+        route_batch_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.status == "fail"
+    assert validation.expected_batch == 1
+    assert any(
+        "missing next-batch packet line: ## Batch 1: 820x620" in finding
+        for finding in validation.findings
+    )
+    assert any("non-focused batch: 2" in finding for finding in validation.findings)
+
+
 def test_animation_playtest_route_batches_command_writes_artifact(
     tmp_path: Path,
 ) -> None:
@@ -7443,6 +7551,60 @@ def test_animation_playtest_batch_packet_command_writes_focused_packet(
     assert "## Batch 1: 820x620" in packet_text
     assert "## Batch 2: 960x640" not in packet_text
     assert f"--output {route_batch_path}" in packet_text
+
+
+def test_validate_animation_playtest_batch_packet_command_accepts_current_artifact(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    packet_path = tmp_path / "manual-animation-next-batch.md"
+    route_batch_path = tmp_path / "manual-animation-route-batches.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.247.0",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        commands_path,
+        seed=17,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_2d_animation_playtest_route_batch_plan(batch_plan, route_batch_path)
+    write_2d_animation_playtest_next_batch_packet(
+        batch_plan,
+        packet_path,
+        route_batch_path=route_batch_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-batch-packet",
+            str(packet_path),
+            str(report_path),
+            str(commands_path),
+            str(route_batch_path),
+            "--seed",
+            "17",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Next Batch Packet Validation" in result.output
+    assert "Expected Batch" in result.output
+    assert "PASS" in result.output
+    assert "matches the current report and command queue" in result.output
 
 
 def test_validate_animation_playtest_route_batch_plan_accepts_current_artifact(
@@ -9743,6 +9905,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Sprint P0/P1 Blockers" in result.output
     assert "Blocking Checks" in result.output
     assert "Next Batch Packet" in result.output
+    assert "Next Batch Packet Artifact" in result.output
     assert report_path.exists()
     assert commands_path.exists()
     assert plan_path.exists()
@@ -9790,6 +9953,7 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "Recorder Queue Rows" in result.output
     assert "Route Batch Artifact" in result.output
     assert "Route Batch Open Items" in result.output
+    assert "Next Batch Packet Artifact" in result.output
     assert "UI Triage Artifact" in result.output
     assert "UI Triage Items" in result.output
     assert (

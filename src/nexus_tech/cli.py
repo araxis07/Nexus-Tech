@@ -110,6 +110,7 @@ from nexus_tech.frontend_2d import (
     validate_2d_animation_playtest_evidence_sheet,
     validate_2d_animation_playtest_execution_guide,
     validate_2d_animation_playtest_issue_backlog,
+    validate_2d_animation_playtest_next_batch_packet,
     validate_2d_animation_playtest_progress_board,
     validate_2d_animation_playtest_readiness_plan,
     validate_2d_animation_playtest_recorder_queue,
@@ -549,6 +550,12 @@ ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_ARGUMENT = typer.Argument(
     exists=True,
     dir_okay=False,
     help="Exported animation visible-route batch Markdown file.",
+)
+ANIMATION_PLAYTEST_NEXT_BATCH_PACKET_PATH_ARGUMENT = typer.Argument(
+    ...,
+    exists=True,
+    dir_okay=False,
+    help="Exported animation next-batch packet Markdown file.",
 )
 ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_OPTION = typer.Option(
     None,
@@ -2663,6 +2670,68 @@ def animation_playtest_batch_packet_command(
         raise typer.Exit(code=1)
 
 
+@app.command("validate-animation-playtest-batch-packet")
+def validate_animation_playtest_batch_packet_command(
+    packet_path: Path = ANIMATION_PLAYTEST_NEXT_BATCH_PACKET_PATH_ARGUMENT,
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    route_batch_path: Path = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the focused next-batch packet matches current QA gaps."""
+
+    validate_scenario_id(scenario)
+    validation = validate_2d_animation_playtest_next_batch_packet(
+        packet_path,
+        report_path,
+        command_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title="Animation Playtest Next Batch Packet Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Packet", validation.path)
+    table.add_row(
+        "Expected Batch",
+        "none" if validation.expected_batch is None else str(validation.expected_batch),
+    )
+    table.add_row("Status", validation.status.upper())
+    console.print(table)
+
+    if validation.findings:
+        findings_table = Table(title="Next Batch Packet Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Animation next-batch packet artifact is stale or incomplete.",
+                title="Animation Playtest Next Batch Packet",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            "Animation next-batch packet matches the current report and command queue.",
+            title="Animation Playtest Next Batch Packet",
+            border_style="green",
+        )
+    )
+
+
 @app.command("validate-animation-playtest-route-batches")
 def validate_animation_playtest_route_batches_command(
     batch_path: Path = ANIMATION_PLAYTEST_ROUTE_BATCH_PATH_ARGUMENT,
@@ -4359,6 +4428,15 @@ def prepare_animation_playtest_session_command(
         seed=seed,
         command_prefix=command_prefix,
     )
+    next_batch_validation = validate_2d_animation_playtest_next_batch_packet(
+        next_batch_output,
+        report_output,
+        commands_output,
+        route_batch_output,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
     session_validation = validate_2d_animation_playtest_session(
         report_output,
         commands_output,
@@ -4596,6 +4674,7 @@ def prepare_animation_playtest_session_command(
     session_table.add_row("Plan Artifact", plan_validation.status.upper())
     session_table.add_row("Recorder Artifact", recorder_validation.status.upper())
     session_table.add_row("Route Batch Artifact", route_batch_validation.status.upper())
+    session_table.add_row("Next Batch Packet Artifact", next_batch_validation.status.upper())
     session_table.add_row("UI Triage Artifact", triage_validation.status.upper())
     session_table.add_row("Session Artifacts", session_validation.artifact_status.upper())
     session_table.add_row("Handoff Status", session_validation.handoff_status.upper())
@@ -4623,6 +4702,13 @@ def prepare_animation_playtest_session_command(
         findings_table = Table(title="Animation Route Batch Artifact Findings")
         findings_table.add_column("Finding", style="yellow")
         for finding in route_batch_validation.findings:
+            findings_table.add_row(finding)
+        console.print(findings_table)
+        raise typer.Exit(code=1)
+    if next_batch_validation.findings:
+        findings_table = Table(title="Animation Next Batch Packet Artifact Findings")
+        findings_table.add_column("Finding", style="yellow")
+        for finding in next_batch_validation.findings:
             findings_table.add_row(finding)
         console.print(findings_table)
         raise typer.Exit(code=1)
