@@ -89,6 +89,11 @@ jobs:
             --evidence-sheet-output /tmp/nexus-tech-animation-evidence-sheet.md \
             --handoff-output /tmp/nexus-tech-animation-handoff.md
 
+      - name: Validate manual animation QA session bundle
+        run: |
+          uv run nexus-tech validate-animation-playtest-session-bundle \
+            --command-prefix "uv run nexus-tech"
+
       - name: Upload 2D visual audit captures
         if: always()
         uses: actions/upload-artifact@v4

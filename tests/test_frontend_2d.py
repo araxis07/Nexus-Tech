@@ -10036,6 +10036,55 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "## Next Visible Command" in handoff_text
     assert "record-animation-playtest-route" in handoff_text
 
+    bundle_result = runner.invoke(
+        app,
+        [
+            "validate-animation-playtest-session-bundle",
+            "--scenario",
+            "founder_journey",
+            "--seed",
+            "17",
+            "--command-prefix",
+            "uv run nexus-tech",
+            "--report",
+            str(report_path),
+            "--commands",
+            str(commands_path),
+            "--plan",
+            str(plan_path),
+            "--recorder-queue",
+            str(recorder_queue_path),
+            "--route-batches",
+            str(route_batch_path),
+            "--next-batch",
+            str(next_batch_path),
+            "--triage",
+            str(triage_path),
+            "--release-gate",
+            str(release_gate_path),
+            "--progress",
+            str(progress_path),
+            "--execution-guide",
+            str(execution_guide_path),
+            "--issue-backlog",
+            str(issue_backlog_path),
+            "--sprint",
+            str(sprint_path),
+            "--evidence-sheet",
+            str(evidence_sheet_path),
+            "--handoff",
+            str(handoff_path),
+        ],
+    )
+
+    assert bundle_result.exit_code == 0
+    assert "Animation Playtest Session Bundle Validation" in bundle_result.output
+    assert "Session core" in bundle_result.output
+    assert "Next batch packet" in bundle_result.output
+    assert "Evidence sheet" in bundle_result.output
+    assert "Handoff sheet" in bundle_result.output
+    assert "internally consistent" in bundle_result.output
+
 
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -10052,6 +10101,7 @@ def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     ) in workflow
     assert "nexus-tech-2d-animation-playtest-prep" in workflow
     assert "uv run nexus-tech prepare-animation-playtest-session" in workflow
+    assert "uv run nexus-tech validate-animation-playtest-session-bundle" in workflow
     assert "--auto-commit" in workflow
     assert "--prefill-automated-gates" in workflow
     assert '--command-prefix "uv run nexus-tech"' in workflow

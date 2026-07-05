@@ -494,6 +494,104 @@ ANIMATION_PLAYTEST_SESSION_HANDOFF_OUTPUT_OPTION = typer.Option(
     "--handoff-output",
     help="Markdown path for the manual animation handoff sheet.",
 )
+ANIMATION_PLAYTEST_BUNDLE_REPORT_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-report.md"),
+    "--report",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation report Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_COMMANDS_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-commands.md"),
+    "--commands",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation command queue Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_PLAN_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-playtest-plan.md"),
+    "--plan",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation readiness plan Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_RECORDER_QUEUE_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-recorder-queue.md"),
+    "--recorder-queue",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation recorder queue Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_ROUTE_BATCH_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-route-batches.md"),
+    "--route-batches",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation route-batch Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_NEXT_BATCH_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-next-batch.md"),
+    "--next-batch",
+    exists=True,
+    dir_okay=False,
+    help="Focused next-batch packet Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_TRIAGE_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-ui-triage.md"),
+    "--triage",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation UI triage Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_RELEASE_GATE_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-release-gate.md"),
+    "--release-gate",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation release-gate Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_PROGRESS_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-progress.md"),
+    "--progress",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation progress board Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_EXECUTION_GUIDE_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-execution-guide.md"),
+    "--execution-guide",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation execution guide Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_ISSUE_BACKLOG_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-issues.md"),
+    "--issue-backlog",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation issue backlog Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_SPRINT_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-sprint.md"),
+    "--sprint",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation sprint packet Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_EVIDENCE_SHEET_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-evidence-sheet.md"),
+    "--evidence-sheet",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation evidence sheet Markdown file in the session bundle.",
+)
+ANIMATION_PLAYTEST_BUNDLE_HANDOFF_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-handoff.md"),
+    "--handoff",
+    exists=True,
+    dir_okay=False,
+    help="Manual animation handoff Markdown file in the session bundle.",
+)
 ANIMATION_PLAYTEST_REPORT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-report.md"),
     "--output",
@@ -3901,6 +3999,219 @@ def validate_animation_playtest_evidence_sheet_command(
         Panel.fit(
             "Animation evidence capture sheet matches the current QA sprint.",
             title="Animation Playtest Evidence Sheet Validation",
+            border_style="green",
+        )
+    )
+
+
+@app.command("validate-animation-playtest-session-bundle")
+def validate_animation_playtest_session_bundle_command(
+    report_path: Path = ANIMATION_PLAYTEST_BUNDLE_REPORT_PATH_OPTION,
+    command_path: Path = ANIMATION_PLAYTEST_BUNDLE_COMMANDS_PATH_OPTION,
+    plan_path: Path = ANIMATION_PLAYTEST_BUNDLE_PLAN_PATH_OPTION,
+    recorder_queue_path: Path = ANIMATION_PLAYTEST_BUNDLE_RECORDER_QUEUE_PATH_OPTION,
+    route_batch_path: Path = ANIMATION_PLAYTEST_BUNDLE_ROUTE_BATCH_PATH_OPTION,
+    next_batch_path: Path = ANIMATION_PLAYTEST_BUNDLE_NEXT_BATCH_PATH_OPTION,
+    triage_path: Path = ANIMATION_PLAYTEST_BUNDLE_TRIAGE_PATH_OPTION,
+    release_gate_path: Path = ANIMATION_PLAYTEST_BUNDLE_RELEASE_GATE_PATH_OPTION,
+    progress_path: Path = ANIMATION_PLAYTEST_BUNDLE_PROGRESS_PATH_OPTION,
+    execution_guide_path: Path = ANIMATION_PLAYTEST_BUNDLE_EXECUTION_GUIDE_PATH_OPTION,
+    issue_backlog_path: Path = ANIMATION_PLAYTEST_BUNDLE_ISSUE_BACKLOG_PATH_OPTION,
+    sprint_path: Path = ANIMATION_PLAYTEST_BUNDLE_SPRINT_PATH_OPTION,
+    evidence_sheet_path: Path = ANIMATION_PLAYTEST_BUNDLE_EVIDENCE_SHEET_PATH_OPTION,
+    handoff_path: Path = ANIMATION_PLAYTEST_BUNDLE_HANDOFF_PATH_OPTION,
+    max_observation_steps: int = ANIMATION_PLAYTEST_SPRINT_MAX_STEPS_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate every generated manual animation QA session artifact before upload."""
+
+    validate_scenario_id(scenario)
+    session_validation = validate_2d_animation_playtest_session(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    next_batch_validation = validate_2d_animation_playtest_next_batch_packet(
+        next_batch_path,
+        report_path,
+        command_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    triage_validation = validate_2d_animation_playtest_ui_triage_plan(
+        triage_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    release_gate_validation = validate_2d_animation_playtest_release_gate(
+        release_gate_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    progress_validation = validate_2d_animation_playtest_progress_board(
+        progress_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    execution_guide_validation = validate_2d_animation_playtest_execution_guide(
+        execution_guide_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    issue_backlog_validation = validate_2d_animation_playtest_issue_backlog(
+        issue_backlog_path,
+        report_path,
+    )
+    sprint_validation = validate_2d_animation_playtest_sprint_packet(
+        sprint_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    evidence_sheet_validation = validate_2d_animation_playtest_evidence_sheet(
+        evidence_sheet_path,
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        triage_path,
+        route_batch_path,
+        progress_path=progress_path,
+        execution_guide_path=execution_guide_path,
+        issue_backlog_path=issue_backlog_path,
+        sprint_path=sprint_path,
+        max_observation_steps=max_observation_steps,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    handoff = build_2d_animation_playtest_handoff(
+        report_path,
+        command_path,
+        plan_path,
+        recorder_queue_path,
+        route_batch_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    handoff_text = handoff_path.read_text(encoding="utf-8")
+    handoff_findings = [
+        marker
+        for marker in (
+            "# NEXUS TECH 2D Animation Manual Handoff",
+            f"- Handoff status: `{handoff.status}`",
+            f"- Report: `{report_path}`",
+            f"- Commands: `{command_path}`",
+            f"- Plan: `{plan_path}`",
+            f"- Recorder queue: `{recorder_queue_path}`",
+            f"- Route batches: `{route_batch_path}`",
+            "## Next Visible Command",
+            "## Next Recorder Command",
+        )
+        if marker not in handoff_text
+    ]
+
+    artifact_rows = (
+        ("Session core", session_validation.artifact_status, session_validation.findings),
+        ("Next batch packet", next_batch_validation.status, next_batch_validation.findings),
+        ("UI triage", triage_validation.status, triage_validation.findings),
+        ("Release gate", release_gate_validation.status, release_gate_validation.findings),
+        ("Progress board", progress_validation.status, progress_validation.findings),
+        ("Execution guide", execution_guide_validation.status, execution_guide_validation.findings),
+        ("Issue backlog", issue_backlog_validation.status, issue_backlog_validation.findings),
+        ("Sprint packet", sprint_validation.status, sprint_validation.findings),
+        ("Evidence sheet", evidence_sheet_validation.status, evidence_sheet_validation.findings),
+        ("Handoff sheet", "pass" if not handoff_findings else "fail", tuple(handoff_findings)),
+    )
+
+    table = Table(title="Animation Playtest Session Bundle Validation")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Status")
+    table.add_column("Findings", justify="right")
+    for name, status, findings in artifact_rows:
+        table.add_row(name, status.upper(), str(len(findings)))
+    console.print(table)
+
+    findings_by_artifact = [
+        (name, findings) for name, _status, findings in artifact_rows if findings
+    ]
+    if findings_by_artifact:
+        findings_table = Table(title="Animation Session Bundle Findings")
+        findings_table.add_column("Artifact", style="cyan")
+        findings_table.add_column("Finding", style="yellow")
+        for name, findings in findings_by_artifact:
+            for finding in findings:
+                findings_table.add_row(name, finding)
+        console.print(findings_table)
+        console.print(
+            Panel.fit(
+                "Manual animation QA session bundle is stale or incomplete.",
+                title="Animation Playtest Session Bundle",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel.fit(
+            (
+                "Manual animation QA session bundle is internally consistent. "
+                f"Handoff status remains {session_validation.handoff_status.upper()} until "
+                "real visible-window evidence is recorded."
+            ),
+            title="Animation Playtest Session Bundle",
             border_style="green",
         )
     )

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.249.0 - 2026-07-06
+
+- Added `validate-animation-playtest-session-bundle` to validate every generated manual animation QA artifact before upload
+- Wired the full session-bundle validator into CI after manual animation QA session generation
+- Documented the bundle validation gate so local and CI release preflights catch stale or incomplete manual QA packets
+
 ## 0.248.0 - 2026-07-06
 
 - Added CI generation and upload for the full manual animation QA session artifact bundle
