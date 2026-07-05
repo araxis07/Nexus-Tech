@@ -125,6 +125,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_execution_guide,
     write_2d_animation_playtest_handoff,
     write_2d_animation_playtest_issue_backlog,
+    write_2d_animation_playtest_next_batch_packet,
     write_2d_animation_playtest_prep_report,
     write_2d_animation_playtest_progress_board,
     write_2d_animation_playtest_readiness_plan,
@@ -399,6 +400,16 @@ ANIMATION_PLAYTEST_ROUTE_BATCH_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the manual visible-route batch plan.",
+)
+ANIMATION_PLAYTEST_NEXT_BATCH_PACKET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-next-batch.md"),
+    "--output",
+    help="Markdown path for the focused next visible-route batch packet.",
+)
+ANIMATION_PLAYTEST_ROUTE_BATCH_REFRESH_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-route-batches.md"),
+    "--route-batches-output",
+    help="Full route-batch artifact path used by post-recording refresh commands.",
 )
 ANIMATION_PLAYTEST_RECORDER_QUEUE_PATH_ARGUMENT = typer.Argument(
     ...,
@@ -2560,6 +2571,86 @@ def animation_playtest_batch_next_command(
             ),
             title="Animation Playtest Next Batch",
             border_style=border_style,
+        )
+    )
+
+    if fail_on_incomplete and batch_plan.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-batch-packet")
+def animation_playtest_batch_packet_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    output: Path = ANIMATION_PLAYTEST_NEXT_BATCH_PACKET_OUTPUT_OPTION,
+    route_batches_output: Path = ANIMATION_PLAYTEST_ROUTE_BATCH_REFRESH_OUTPUT_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Write a focused manual QA packet for the first unfinished route batch."""
+
+    validate_scenario_id(scenario)
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    next_batch = next((batch for batch in batch_plan.batches if batch.status != "pass"), None)
+
+    table = Table(title="Animation Playtest Next Batch Packet")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", batch_plan.status.upper())
+    table.add_row("Packet", str(output))
+    table.add_row("Route batches refresh target", str(route_batches_output))
+    table.add_row("Route/window open items", str(batch_plan.route_open_items))
+    table.add_row("Report open items", str(len(batch_plan.report.findings)))
+    if next_batch is None:
+        table.add_row("Next batch", "none")
+        table.add_row("Window", "-")
+        table.add_row("Open items", "0")
+    else:
+        table.add_row("Next batch", str(next_batch.batch_number))
+        table.add_row("Window", next_batch.window_size)
+        table.add_row("Open items", str(next_batch.open_items))
+    console.print(table)
+
+    console.print("[bold cyan]Next Batch Shortcut[/bold cyan]")
+    for line in animation_playtest_route_batch_shortcut_lines(batch_plan):
+        console.print(line)
+
+    if next_batch is not None:
+        console.print("[bold cyan]Next Batch Packet Copy Commands[/bold cyan]")
+        for line in animation_playtest_route_batch_copy_commands(next_batch):
+            console.print(line)
+        console.print("[bold cyan]Next Batch Packet Operator Steps[/bold cyan]")
+        for line in animation_playtest_route_batch_operator_steps(next_batch):
+            console.print(line)
+        console.print("[bold cyan]Next Batch Packet Post-Recording Commands[/bold cyan]")
+        for line in animation_playtest_route_batch_post_recording_commands(
+            batch_plan,
+            route_batches_output,
+        ):
+            console.print(line)
+
+    write_2d_animation_playtest_next_batch_packet(
+        batch_plan,
+        output,
+        route_batch_path=route_batches_output,
+    )
+    console.print(
+        Panel.fit(
+            f"Animation next-batch packet written to {output}",
+            title="Animation Playtest Next Batch Packet",
+            border_style="cyan",
         )
     )
 

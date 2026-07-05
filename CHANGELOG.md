@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.245.0 - 2026-07-05
+
+- Added `animation-playtest-batch-packet` so manual animation QA can write a focused packet for the first unfinished visible-window batch
+- Included next-batch shortcut, copy commands, operator steps, closure checks, and post-recording refresh commands in the focused packet
+- Added regression coverage for focused next-batch packet generation and CLI output
+
 ## 0.244.0 - 2026-07-05
 
 - Added `animation-playtest-batch-next` so manual animation QA can print the first unfinished route batch without opening the full route-batch artifact

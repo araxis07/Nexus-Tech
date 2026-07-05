@@ -6484,6 +6484,173 @@ def write_2d_animation_playtest_route_batch_plan(
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_2d_animation_playtest_next_batch_packet(
+    batch_plan: AnimationPlaytestRouteBatchPlan,
+    output_path: Path,
+    *,
+    route_batch_path: Path,
+) -> None:
+    """Write a focused packet for the first unfinished visible-window route batch."""
+
+    batch = next((item for item in batch_plan.batches if item.status != "pass"), None)
+    manual_result = "complete" if batch_plan.status == "pass" else "not completed by automation"
+    lines = [
+        "# NEXUS TECH 2D Animation Next Batch Packet",
+        "",
+        f"- Status: `{batch_plan.status}`",
+        f"- Manual result: `{manual_result}`",
+        f"- Command queue: `{batch_plan.commands.status}`",
+        f"- Final report: `{batch_plan.report.status}`",
+        f"- Report open items: `{len(batch_plan.report.findings)}`",
+        f"- Route/window open items: `{batch_plan.route_open_items}`",
+        f"- Full route-batch artifact: `{route_batch_path}`",
+        "- Completion gate: `validate-animation-playtest-report must pass before signoff`",
+        "",
+        "## Next Batch Shortcut",
+        "",
+        *animation_playtest_route_batch_shortcut_lines(batch_plan),
+    ]
+
+    if batch is None:
+        lines.extend(
+            [
+                "",
+                "## Batch Status",
+                "",
+                "All visible-route batches already have recorded evidence.",
+            ]
+        )
+        output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+
+    lines.extend(
+        [
+            "",
+            f"## Batch {batch.batch_number}: {batch.window_size}",
+            "",
+            f"- Batch status: `{batch.status}`",
+            f"- Open items: `{batch.open_items}`",
+            f"- Visible route commands: `{len(batch.items)}`",
+            "",
+            "### Preflight Checks",
+            "",
+            "| Check | Required Action |",
+            "| --- | --- |",
+        ]
+    )
+    for row in animation_playtest_route_batch_preflight_rows(batch):
+        lines.append(_format_route_batch_preflight_row(row))
+
+    lines.extend(
+        [
+            "",
+            "### Evidence Checklist",
+            "",
+            "| Item | Status | Required Evidence | Result Decision | Recorder Timing |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for row in animation_playtest_route_batch_evidence_checklist_rows(batch):
+        lines.append(_format_route_batch_evidence_checklist_row(row))
+
+    lines.extend(
+        [
+            "",
+            "### Result Decision Guide",
+            "",
+            "| Result | Use When | Recorder Edit | Release Rule |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for row in animation_playtest_route_batch_result_decision_rows():
+        lines.append(_format_route_batch_result_decision_row(row))
+
+    lines.extend(
+        [
+            "",
+            "### Defect Trigger Checklist",
+            "",
+            "| Trigger | Record Watch When | Record Fail When | Required Action |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for row in animation_playtest_route_batch_defect_trigger_rows():
+        lines.append(_format_route_batch_defect_trigger_row(row))
+
+    lines.extend(
+        [
+            "",
+            "### Defect Intake Template",
+            "",
+            "| Field | Required Detail |",
+            "| --- | --- |",
+        ]
+    )
+    for row in animation_playtest_route_batch_defect_intake_rows(batch):
+        lines.append(_format_route_batch_defect_intake_row(row))
+
+    lines.extend(
+        [
+            "",
+            "### Copy Commands",
+            "",
+            "```bash",
+            *animation_playtest_route_batch_copy_commands(batch),
+            "```",
+            "",
+            "### Operator Steps",
+            "",
+            "```bash",
+            *animation_playtest_route_batch_operator_steps(batch),
+            "```",
+        ]
+    )
+
+    if batch.window_recorder_hint is not None:
+        hint = batch.window_recorder_hint
+        required_terms = ", ".join(hint.required_terms) if hint.required_terms else "-"
+        lines.extend(
+            [
+                "",
+                "### Window Summary Recorder",
+                "",
+                f"- Status: `{hint.status}`",
+                f"- Required terms: `{_markdown_table_cell(required_terms)}`",
+                f"- Evidence prompt: {_markdown_table_cell(hint.evidence_prompt)}",
+                "",
+                f"`{_markdown_table_cell(hint.recorder_command)}`",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "### Closure Checklist",
+            "",
+            "| Check | Required Action |",
+            "| --- | --- |",
+        ]
+    )
+    for row in animation_playtest_route_batch_closure_rows(batch):
+        lines.append(_format_route_batch_closure_row(row))
+
+    lines.extend(
+        [
+            "",
+            "### Post-Recording Commands",
+            "",
+            "```bash",
+            *animation_playtest_route_batch_post_recording_commands(
+                batch_plan,
+                route_batch_path,
+            ),
+            "```",
+        ]
+    )
+
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def validate_2d_animation_playtest_route_batch_plan(
     batch_path: Path,
     report_path: Path,
