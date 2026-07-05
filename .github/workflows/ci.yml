@@ -68,6 +68,27 @@ jobs:
       - name: Prepare 2D animation playtest report
         run: uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
 
+      - name: Prepare manual animation QA session artifacts
+        run: |
+          uv run nexus-tech prepare-animation-playtest-session \
+            --auto-commit \
+            --prefill-automated-gates \
+            --command-prefix "uv run nexus-tech" \
+            --report-output /tmp/nexus-tech-animation-playtest-report.md \
+            --commands-output /tmp/nexus-tech-animation-playtest-commands.md \
+            --plan-output /tmp/nexus-tech-animation-playtest-plan.md \
+            --recorder-output /tmp/nexus-tech-animation-recorder-queue.md \
+            --route-batches-output /tmp/nexus-tech-animation-route-batches.md \
+            --next-batch-output /tmp/nexus-tech-animation-next-batch.md \
+            --triage-output /tmp/nexus-tech-animation-ui-triage.md \
+            --release-gate-output /tmp/nexus-tech-animation-release-gate.md \
+            --progress-output /tmp/nexus-tech-animation-progress.md \
+            --execution-guide-output /tmp/nexus-tech-animation-execution-guide.md \
+            --issue-backlog-output /tmp/nexus-tech-animation-issues.md \
+            --sprint-output /tmp/nexus-tech-animation-sprint.md \
+            --evidence-sheet-output /tmp/nexus-tech-animation-evidence-sheet.md \
+            --handoff-output /tmp/nexus-tech-animation-handoff.md
+
       - name: Upload 2D visual audit captures
         if: always()
         uses: actions/upload-artifact@v4
@@ -92,5 +113,28 @@ jobs:
         with:
           name: nexus-tech-2d-animation-playtest-prep
           path: /tmp/nexus-tech-animation-playtest-prep.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload manual animation QA session artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-manual-animation-session
+          path: |
+            /tmp/nexus-tech-animation-playtest-report.md
+            /tmp/nexus-tech-animation-playtest-commands.md
+            /tmp/nexus-tech-animation-playtest-plan.md
+            /tmp/nexus-tech-animation-recorder-queue.md
+            /tmp/nexus-tech-animation-route-batches.md
+            /tmp/nexus-tech-animation-next-batch.md
+            /tmp/nexus-tech-animation-ui-triage.md
+            /tmp/nexus-tech-animation-release-gate.md
+            /tmp/nexus-tech-animation-progress.md
+            /tmp/nexus-tech-animation-execution-guide.md
+            /tmp/nexus-tech-animation-issues.md
+            /tmp/nexus-tech-animation-sprint.md
+            /tmp/nexus-tech-animation-evidence-sheet.md
+            /tmp/nexus-tech-animation-handoff.md
           if-no-files-found: warn
           retention-days: 7

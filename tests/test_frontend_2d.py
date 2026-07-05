@@ -10051,6 +10051,16 @@ def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
         "--output /tmp/nexus-tech-animation-playtest-prep.md"
     ) in workflow
     assert "nexus-tech-2d-animation-playtest-prep" in workflow
+    assert "uv run nexus-tech prepare-animation-playtest-session" in workflow
+    assert "--auto-commit" in workflow
+    assert "--prefill-automated-gates" in workflow
+    assert '--command-prefix "uv run nexus-tech"' in workflow
+    assert "--next-batch-output /tmp/nexus-tech-animation-next-batch.md" in workflow
+    assert "nexus-tech-manual-animation-session" in workflow
+    assert "/tmp/nexus-tech-animation-playtest-report.md" in workflow
+    assert "/tmp/nexus-tech-animation-route-batches.md" in workflow
+    assert "/tmp/nexus-tech-animation-next-batch.md" in workflow
+    assert "/tmp/nexus-tech-animation-handoff.md" in workflow
 
 
 def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.248.0 - 2026-07-06
+
+- Added CI generation and upload for the full manual animation QA session artifact bundle
+- Included the focused next-batch packet in CI and manual/local animation QA workflows
+- Added regression coverage so CI keeps publishing session, route-batch, next-batch, and handoff artifacts
+
 ## 0.247.0 - 2026-07-05
 
 - Added validation for focused next-batch packets so stale manual QA packets fail before visible-window testing
