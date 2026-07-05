@@ -75,6 +75,7 @@ from nexus_tech.frontend_2d import (
     animation_playtest_route_batch_post_recording_commands,
     animation_playtest_route_batch_preflight_rows,
     animation_playtest_route_batch_result_decision_rows,
+    animation_playtest_route_batch_shortcut_lines,
     animation_playtest_sprint_blocker_dependency,
     animation_playtest_sprint_blocker_next_action,
     animation_playtest_sprint_blocker_phase,
@@ -2500,6 +2501,67 @@ def animation_playtest_route_batches_command(
                 border_style="cyan",
             )
         )
+
+    if fail_on_incomplete and batch_plan.status != "pass":
+        raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-batch-next")
+def animation_playtest_batch_next_command(
+    report_path: Path = ANIMATION_PLAYTEST_REPORT_PATH_ARGUMENT,
+    command_path: Path = ANIMATION_PLAYTEST_COMMANDS_PATH_ARGUMENT,
+    scenario: str = SCENARIO_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the visible play-2d command queue.",
+    ),
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+    fail_on_incomplete: bool = ANIMATION_PLAYTEST_PLAN_FAIL_OPTION,
+) -> None:
+    """Print the first unfinished visible-window batch for manual animation QA."""
+
+    validate_scenario_id(scenario)
+    batch_plan = build_2d_animation_playtest_route_batch_plan(
+        report_path,
+        command_path,
+        scenario_id=scenario,
+        seed=seed,
+        command_prefix=command_prefix,
+    )
+    next_batch = next((batch for batch in batch_plan.batches if batch.status != "pass"), None)
+
+    table = Table(title="Animation Playtest Next Batch")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", batch_plan.status.upper())
+    table.add_row("Route/window open items", str(batch_plan.route_open_items))
+    table.add_row("Report open items", str(len(batch_plan.report.findings)))
+    if next_batch is None:
+        table.add_row("Next batch", "none")
+        table.add_row("Window", "-")
+        table.add_row("Open items", "0")
+    else:
+        table.add_row("Next batch", str(next_batch.batch_number))
+        table.add_row("Window", next_batch.window_size)
+        table.add_row("Open items", str(next_batch.open_items))
+    console.print(table)
+
+    console.print("[bold cyan]Next Batch Shortcut[/bold cyan]")
+    for line in animation_playtest_route_batch_shortcut_lines(batch_plan):
+        console.print(line)
+
+    border_style = "green" if batch_plan.status == "pass" else "yellow"
+    console.print(
+        Panel.fit(
+            (
+                f"Next batch status: {batch_plan.status.upper()} | "
+                f"{batch_plan.route_open_items} route/window item(s) remain."
+            ),
+            title="Animation Playtest Next Batch",
+            border_style=border_style,
+        )
+    )
 
     if fail_on_incomplete and batch_plan.status != "pass":
         raise typer.Exit(code=1)

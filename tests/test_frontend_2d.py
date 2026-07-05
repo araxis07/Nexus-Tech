@@ -7274,6 +7274,53 @@ def test_animation_playtest_route_batches_command_writes_artifact(
     assert "validate-animation-playtest-report must pass before signoff" in output_text
 
 
+def test_animation_playtest_batch_next_command_prints_shortcut(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / ANIMATION_PLAYTEST_REPORT_NAME
+    commands_path = tmp_path / "manual-animation-commands.md"
+    write_2d_animation_playtest_report_template(
+        report_path,
+        version="0.244.0",
+        commit="abc1234",
+        tester="araxis07",
+        platform="macOS local",
+        date="2026-07-05",
+        prefill_automated_gates=True,
+    )
+    write_2d_animation_playtest_command_queue(
+        build_2d_animation_playtest_command_queue(
+            seed=17,
+            command_prefix=".venv313/bin/nexus-tech",
+        ),
+        commands_path,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-batch-next",
+            str(report_path),
+            str(commands_path),
+            "--seed",
+            "17",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest Next Batch" in result.output
+    assert "Next Batch Shortcut" in result.output
+    assert "Next batch" in result.output
+    assert "820x620" in result.output
+    assert "Open items" in result.output
+    assert "route 1: menu/full" in result.output
+    assert "menu-2d --window-size 820x620 --motion-mode full" in result.output
+    assert "record-animation-playtest-route" in result.output
+    assert "replace recorder placeholders with real visible-window notes" in result.output
+
+
 def test_validate_animation_playtest_route_batch_plan_accepts_current_artifact(
     tmp_path: Path,
 ) -> None:

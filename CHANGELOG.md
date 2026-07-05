@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.244.0 - 2026-07-05
+
+- Added `animation-playtest-batch-next` so manual animation QA can print the first unfinished route batch without opening the full route-batch artifact
+- Reused the validated next-batch shortcut lines in the CLI output so the visible command, recorder command, open-item count, and recorder-safety reminder stay in sync with Markdown artifacts
+- Added regression coverage for the next-batch CLI shortcut
+
 ## 0.243.0 - 2026-07-05
 
 - Added a next-batch shortcut to visible route-batch artifacts so manual animation QA starts from the first unfinished window without scanning the full packet
