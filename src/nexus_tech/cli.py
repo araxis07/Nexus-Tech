@@ -382,6 +382,21 @@ ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION = typer.Option(
     "--output",
     help="Markdown path for the open-window animation playtest prep artifact.",
 )
+ANIMATION_PLAYTEST_BATCH_PREFLIGHT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-batch-820x620-preflight.md"),
+    "--output",
+    help="Markdown path for the focused 820x620 animation batch preflight artifact.",
+)
+ANIMATION_PLAYTEST_BATCH_PREFLIGHT_WINDOW_OPTION = typer.Option(
+    "820x620",
+    "--window-size",
+    help="Focused manual animation batch window size to preflight as WIDTHxHEIGHT.",
+)
+ANIMATION_PLAYTEST_BATCH_PREFLIGHT_DB_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-animation-batch-preflight.db"),
+    "--db-path",
+    help="Scratch database path for focused animation batch preflight launches.",
+)
 ANIMATION_PLAYTEST_COMMANDS_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
@@ -1749,6 +1764,220 @@ def prepare_2d_animation_playtest_command(
         )
     )
     if prep_report.status != "ready":
+        raise typer.Exit(code=1)
+
+
+@app.command("animation-playtest-batch-preflight")
+def animation_playtest_batch_preflight_command(
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the focused visible play-2d batch.",
+    ),
+    window_size: str = ANIMATION_PLAYTEST_BATCH_PREFLIGHT_WINDOW_OPTION,
+    frames: int = typer.Option(
+        2,
+        "--frames",
+        min=1,
+        help="Headless frames to run for each focused menu/play command.",
+    ),
+    output: Path = ANIMATION_PLAYTEST_BATCH_PREFLIGHT_OUTPUT_OPTION,
+    db_path: Path = ANIMATION_PLAYTEST_BATCH_PREFLIGHT_DB_PATH_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Run a focused headless preflight for the first manual animation QA batch."""
+
+    validate_scenario_id(scenario)
+    validate_campaign_start_id(campaign_start)
+    resolved_window = parse_2d_window_size(window_size)
+    normalized_window = f"{resolved_window[0]}x{resolved_window[1]}"
+    modes = (MotionMode.FULL, MotionMode.REDUCED, MotionMode.OFF)
+    rows: list[tuple[int, str, str, str, str, str, str, str]] = []
+    failures: list[str] = []
+
+    try:
+        step = 1
+        for mode in modes:
+            menu_visible_command = (
+                f"{command_prefix} menu-2d --window-size {normalized_window} "
+                f"--motion-mode {mode.value}"
+            )
+            menu_preflight_command = (
+                f"{command_prefix} menu-2d --headless --max-frames {frames} "
+                f"--window-size {normalized_window} --motion-mode {mode.value}"
+            )
+            menu_result = launch_2d_menu(
+                db_path=db_path,
+                headless=True,
+                window_size=resolved_window,
+                max_frames=frames,
+                motion_mode=mode,
+            )
+            menu_status = "pass" if menu_result.exit_reason == "max_frames" else "fail"
+            if menu_status != "pass":
+                failures.append(
+                    f"menu/{mode.value} exited with {menu_result.exit_reason}, expected max_frames"
+                )
+            rows.append(
+                (
+                    step,
+                    "menu",
+                    mode.value,
+                    menu_visible_command,
+                    menu_preflight_command,
+                    menu_result.exit_reason,
+                    str(menu_result.saved_on_exit).lower(),
+                    menu_status,
+                )
+            )
+            step += 1
+
+            play_visible_command = (
+                f"{command_prefix} play-2d --scenario {scenario} --seed {seed} "
+                f"--window-size {normalized_window} --motion-mode {mode.value}"
+            )
+            play_preflight_command = (
+                f"{command_prefix} play-2d --scenario {scenario} --seed {seed} --headless "
+                f"--max-frames {frames} --window-size {normalized_window} "
+                f"--motion-mode {mode.value}"
+            )
+            state = create_new_game(
+                company_name=None,
+                product_name=None,
+                scenario_id=scenario,
+                difficulty_mode=difficulty,
+                campaign_goal_id=goal,
+                campaign_start_id=campaign_start,
+            )
+            play_result = launch_2d_frontend(
+                state=state,
+                rng=RandomSource(seed=seed),
+                db_path=db_path,
+                slot_name=f"preflight-{mode.value}",
+                headless=True,
+                window_size=resolved_window,
+                max_frames=frames,
+                motion_mode=mode,
+            )
+            play_status = "pass" if play_result.exit_reason == "max_frames" else "fail"
+            if play_status != "pass":
+                failures.append(
+                    f"play/{mode.value} exited with {play_result.exit_reason}, expected max_frames"
+                )
+            rows.append(
+                (
+                    step,
+                    "play",
+                    mode.value,
+                    play_visible_command,
+                    play_preflight_command,
+                    play_result.exit_reason,
+                    str(play_result.saved_on_exit).lower(),
+                    play_status,
+                )
+            )
+            step += 1
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    status = "pass" if not failures else "fail"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH 2D Animation 820x620 Batch Preflight",
+        "",
+        f"- Status: `{status}`",
+        "- Manual result: `not completed by automation`",
+        f"- Window: `{normalized_window}`",
+        f"- Scenario: `{scenario}`",
+        f"- Seed: `{seed}`",
+        f"- Headless frames per command: `{frames}`",
+        f"- Commands checked: `{len(rows)}`",
+        "- Batch scope: `menu/play across full, reduced, and off motion modes`",
+        "- Evidence policy: `preflight never replaces visible-window tester evidence`",
+        "",
+        "## Headless Command Results",
+        "",
+        (
+            "| Step | Target | Motion | Status | Exit Reason | Saved On Exit | "
+            "Visible Command | Headless Preflight Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for (
+        step,
+        target,
+        motion,
+        visible_command,
+        preflight_command,
+        exit_reason,
+        saved_on_exit,
+        row_status,
+    ) in rows:
+        lines.append(
+            (
+                f"| {step} | `{target}` | `{motion}` | `{row_status}` | `{exit_reason}` | "
+                f"`{saved_on_exit}` | `{visible_command}` | `{preflight_command}` |"
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Manual Follow-up",
+            "",
+            "- Run the visible commands without `--headless` before recording any route evidence.",
+            (
+                "- Keep the manual report `manual-required` until real notes replace "
+                "recorder placeholders."
+            ),
+            (
+                "- Mark any layout, navigation, readability, or motion blocker as watch/fail "
+                "before release."
+            ),
+        ]
+    )
+    if failures:
+        lines.extend(["", "## Failures", "", *(f"- {failure}" for failure in failures)])
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    table = Table(title="Animation Playtest 820x620 Batch Preflight")
+    table.add_column("Step", justify="right")
+    table.add_column("Target", style="cyan")
+    table.add_column("Motion")
+    table.add_column("Status")
+    table.add_column("Exit")
+    for step, target, motion, _visible, _preflight, exit_reason, _saved, row_status in rows:
+        table.add_row(str(step), target, motion, row_status.upper(), exit_reason)
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"Focused {normalized_window} batch preflight {status.upper()} | "
+                f"{len(rows)} headless command(s) checked | manual evidence still required"
+            ),
+            title="Animation Playtest Batch Preflight",
+            border_style="green" if status == "pass" else "red",
+        )
+    )
+    console.print(
+        Panel.fit(
+            f"Animation batch preflight report written to {output}",
+            title="Animation Playtest Batch Preflight Artifact",
+            border_style="cyan",
+        )
+    )
+
+    if failures:
         raise typer.Exit(code=1)
 
 

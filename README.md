@@ -266,6 +266,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Built-in first-run tutorial and glossary commands for new players
 - Built-in `play-2d`, `load-game-2d`, `continue-last-game-2d`, `menu-2d`, `audit-2d-motion`, `audit-2d-visual`, `audit-2d-animation`, `audit-2d-animation-matrix`, `prepare-2d-animation-playtest`, `prepare-animation-playtest-session`, `draft-animation-playtest-report`, `animation-playtest-status`, `animation-playtest-commands`, `validate-animation-playtest-commands`, `animation-playtest-plan`, `animation-playtest-next`, `animation-playtest-recorder-next`, `animation-playtest-route-batches`, `validate-animation-playtest-route-batches`, `animation-playtest-ui-triage`, `validate-animation-playtest-ui-triage`, `animation-playtest-release-gate`, `validate-animation-playtest-release-gate`, `animation-playtest-progress`, `validate-animation-playtest-progress`, `animation-playtest-execution-guide`, `validate-animation-playtest-execution-guide`, `animation-playtest-issue-backlog`, `validate-animation-playtest-issue-backlog`, `animation-playtest-sprint`, `validate-animation-playtest-sprint`, `animation-playtest-evidence-sheet`, `validate-animation-playtest-evidence-sheet`, `animation-playtest-recorder-queue`, `validate-animation-playtest-recorder-queue`, `validate-animation-playtest-plan`, `validate-animation-playtest-session`, `animation-playtest-handoff`, and `validate-animation-playtest-report` commands for the animated frontend shell, now with shared `--motion-mode full|reduced|off` and `--window-size WIDTHxHEIGHT` launch controls, motion-mode differentiation gates, shared boot/title/run/summary/review transition sweeps, stat/product/panel entity-motion strips, scene-specific actor sprite clips, actor-state and actor-readability audit layers, readability guards, visual-fatigue and animation-pacing audit budgets, scene motion-profile gates, long-session motion stress gates, long-session visual readiness gates, command-specific action feedback cues, blocked-action feedback coverage, late-game command choreography cards, pending-event option previews, deterministic visual QA captures with baseline signatures, summary Markdown, and CI artifact export for visual captures, animation readiness matrices, open-window playtest prep reports, manual session setup with validated plan artifacts, validated manual command queues, validated route-batch plans, validated UI triage backlogs, validated release gates, validated progress boards, validated execution guides, validated issue backlogs, validated sprint packets, validated evidence capture sheets, validated recorder queues, validated session packages, manual handoff sheets, validated grouped next-step animation playtest plans, single-next-action manual QA prompts, strict manual signoff report drafts, evidence-note validation for manual reports, grouped manual playtest status summaries, animation-completeness gates with advisory gaps, broad scenario/seed animation matrix gates with Markdown artifacts, a new-game wizard, save-slot management, archive browsing, a dedicated meta board, a dedicated endgame board, responsive layouts, interactive inspector overlays with remembered section/page state, adaptive per-window paging, actionable/hotspot controls, hover/help guidance, disabled-action explanations, staged post-turn summaries with outcome lanes, outcome cinematic overlays, cockpit brief and handoff events, quieter event-feed coalescing, adaptive feed-card pacing, queue-aware feed TTL tuning, prioritized turn-resolution cards, compact overlay action copy, contextual action-bar status lines, destination-aware cockpit tooltips, full surfaced-command specific choreography coverage, review/report-specific motion routing, and a shared motion layer that reacts to stat, product, overlay, governance, actor, and endgame deltas
 - Focused manual animation QA helpers include `animation-playtest-batch-next`, `animation-playtest-batch-packet`, and `validate-animation-playtest-batch-packet` so the next open visible-window packet stays tied to the route-batch artifact
+- Focused batch automation includes `animation-playtest-batch-preflight`, which runs the 820x620 menu/play commands headlessly across full, reduced, and off modes before manual visible-window evidence begins
 - Session bundle validation includes `validate-animation-playtest-session-bundle`, which checks the manual report, queue, plan, recorder queue, route batches, focused next-batch packet, triage, release gate, progress, execution guide, backlog, sprint, evidence sheet, and handoff before CI uploads artifacts
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand
@@ -557,6 +558,7 @@ Prepare the manual open-window playtest report from the same broad matrix eviden
 
 ```bash
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+uv run nexus-tech animation-playtest-batch-preflight --output /tmp/nexus-tech-animation-batch-820x620-preflight.md
 ```
 
 Create the strict manual report draft that the validator expects after the real open-window pass:
@@ -612,7 +614,8 @@ If `uv` is not installed in the local shell, keep the same workflow but add
 `animation-playtest-issue-backlog`, `validate-animation-playtest-issue-backlog`,
 `animation-playtest-sprint`, `validate-animation-playtest-sprint`,
 `animation-playtest-evidence-sheet`, `validate-animation-playtest-evidence-sheet`,
-`validate-animation-playtest-plan`, `prepare-animation-playtest-session`,
+`animation-playtest-batch-preflight`, `validate-animation-playtest-plan`,
+`prepare-animation-playtest-session`,
 `validate-animation-playtest-session-bundle`,
 `validate-animation-playtest-session`, and `animation-playtest-handoff` so
 generated visible-window commands match the local virtualenv launcher.
@@ -705,6 +708,11 @@ valid.
 validator plus handoff sheet checks in one command, so CI and local release
 preflight fail if the manual report bundle is stale, incomplete, or missing the
 focused next visible-window action before artifacts are uploaded.
+`animation-playtest-batch-preflight` runs the first 820x620 batch in headless
+mode across menu/play plus full, reduced, and off motion modes and writes a
+Markdown preflight artifact. It only proves the launchers and focused batch
+commands still run; visible-window tester notes are still required before any
+route recorder command is valid.
 The plan also includes a validated `Manual Evidence Checklist` for the window
 matrix, route notes, controls, scenes, game feel, and signoff fields so the
 non-route manual evidence cannot be dropped from handoff notes.
@@ -733,7 +741,7 @@ feel, release blockers, and decision sections.
 They must also remove leftover draft warning copy and `owner/date if not pass`
 follow-up placeholders before final validation.
 
-The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep`, validates the complete manual QA session bundle with `validate-animation-playtest-session-bundle`, and uploads the manual report, command queue, route batches, focused next-batch packet, triage, release gate, progress board, execution guide, backlog, sprint, evidence sheet, and handoff as `nexus-tech-manual-animation-session` after the CI animation gates.
+The visual audit output also includes a deterministic baseline signature, and you can add `--output-dir /tmp/nexus-tech-visual-audit` when you want PNG captures plus `visual-audit-summary.md` for manual review without writing generated images into the repository. GitHub Actions uploads the full/off visual captures and summaries as `nexus-tech-2d-visual-audit`, uploads the broad animation matrix report as `nexus-tech-2d-animation-matrix`, uploads the window/motion checklist report as `nexus-tech-2d-animation-playtest-prep`, uploads the focused 820x620 headless batch preflight as `nexus-tech-820x620-animation-batch-preflight`, validates the complete manual QA session bundle with `validate-animation-playtest-session-bundle`, and uploads the manual report, command queue, route batches, focused next-batch packet, triage, release gate, progress board, execution guide, backlog, sprint, evidence sheet, and handoff as `nexus-tech-manual-animation-session` after the CI animation gates.
 
 Use `--motion-mode reduced` or `--motion-mode off` on `play-2d`, `menu-2d`, `audit-2d-motion`, and `audit-2d-visual` when you want quieter highlight, entity, action-feedback, late-game choreography, pending-preview, summary-lane, and scene-transition animation while keeping the same gameplay state and controls. Use `--window-size 820x620`, `--window-size 960x640`, or `--window-size 1440x900` on visible `play-2d` and `menu-2d` runs to match the manual animation window matrix exactly. Use repeated `audit-2d-visual --viewport WIDTHxHEIGHT` values to capture only the responsive sizes under review; omit the option for the full CI matrix.
 
@@ -814,6 +822,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-m
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+uv run nexus-tech animation-playtest-batch-preflight --output /tmp/nexus-tech-animation-batch-820x620-preflight.md
 uv run nexus-tech draft-animation-playtest-report --auto-commit --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md

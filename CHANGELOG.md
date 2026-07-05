@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.250.0 - 2026-07-06
+
+- Added `animation-playtest-batch-preflight` for focused 820x620 menu/play headless batch checks across full, reduced, and off motion modes
+- Added CI execution and artifact upload for the focused 820x620 animation batch preflight
+- Documented the first-batch preflight as an automated guard that still requires real visible-window tester evidence before signoff
+
 ## 0.249.0 - 2026-07-06
 
 - Added `validate-animation-playtest-session-bundle` to validate every generated manual animation QA artifact before upload

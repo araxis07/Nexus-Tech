@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -3321,6 +3322,76 @@ def test_launch_2d_menu_headless_exits_after_frame_cap(tmp_path: Path) -> None:
 
     assert result.exit_reason == "max_frames"
     assert result.saved_on_exit is False
+
+
+def test_animation_playtest_batch_preflight_command_runs_820_batch(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    def fake_launch_2d_menu(**kwargs):
+        calls.append(("menu", kwargs))
+        return SimpleNamespace(exit_reason="max_frames", saved_on_exit=False)
+
+    def fake_launch_2d_frontend(**kwargs):
+        calls.append(("play", kwargs))
+        return SimpleNamespace(exit_reason="max_frames", saved_on_exit=False)
+
+    monkeypatch.setattr(cli_module, "launch_2d_menu", fake_launch_2d_menu)
+    monkeypatch.setattr(cli_module, "launch_2d_frontend", fake_launch_2d_frontend)
+
+    output_path = tmp_path / "batch-820x620-preflight.md"
+    result = runner.invoke(
+        app,
+        [
+            "animation-playtest-batch-preflight",
+            "--seed",
+            "17",
+            "--frames",
+            "3",
+            "--db-path",
+            str(tmp_path / "batch-preflight.db"),
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Animation Playtest 820x620 Batch Preflight" in result.output
+    assert [target for target, _kwargs in calls] == [
+        "menu",
+        "play",
+        "menu",
+        "play",
+        "menu",
+        "play",
+    ]
+    assert [kwargs["motion_mode"] for _target, kwargs in calls] == [
+        MotionMode.FULL,
+        MotionMode.FULL,
+        MotionMode.REDUCED,
+        MotionMode.REDUCED,
+        MotionMode.OFF,
+        MotionMode.OFF,
+    ]
+    assert all(kwargs["headless"] is True for _target, kwargs in calls)
+    assert all(kwargs["max_frames"] == 3 for _target, kwargs in calls)
+    assert all(kwargs["window_size"] == (820, 620) for _target, kwargs in calls)
+
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Status: `pass`" in report_text
+    assert "- Manual result: `not completed by automation`" in report_text
+    assert "preflight never replaces visible-window tester evidence" in report_text
+    assert ".venv313/bin/nexus-tech menu-2d --window-size 820x620 --motion-mode full" in (
+        report_text
+    )
+    assert (
+        ".venv313/bin/nexus-tech play-2d --scenario founder_journey --seed 17 "
+        "--window-size 820x620 --motion-mode off"
+    ) in report_text
 
 
 def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
@@ -10100,6 +10171,9 @@ def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
         "--output /tmp/nexus-tech-animation-playtest-prep.md"
     ) in workflow
     assert "nexus-tech-2d-animation-playtest-prep" in workflow
+    assert "uv run nexus-tech animation-playtest-batch-preflight" in workflow
+    assert "/tmp/nexus-tech-animation-batch-820x620-preflight.md" in workflow
+    assert "nexus-tech-820x620-animation-batch-preflight" in workflow
     assert "uv run nexus-tech prepare-animation-playtest-session" in workflow
     assert "uv run nexus-tech validate-animation-playtest-session-bundle" in workflow
     assert "--auto-commit" in workflow

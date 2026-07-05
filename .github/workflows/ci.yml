@@ -68,6 +68,12 @@ jobs:
       - name: Prepare 2D animation playtest report
         run: uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
 
+      - name: Run 820x620 animation batch preflight
+        run: >
+          uv run nexus-tech animation-playtest-batch-preflight
+          --command-prefix "uv run nexus-tech"
+          --output /tmp/nexus-tech-animation-batch-820x620-preflight.md
+
       - name: Prepare manual animation QA session artifacts
         run: |
           uv run nexus-tech prepare-animation-playtest-session \
@@ -118,6 +124,15 @@ jobs:
         with:
           name: nexus-tech-2d-animation-playtest-prep
           path: /tmp/nexus-tech-animation-playtest-prep.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload 820x620 animation batch preflight artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-820x620-animation-batch-preflight
+          path: /tmp/nexus-tech-animation-batch-820x620-preflight.md
           if-no-files-found: warn
           retention-days: 7
 
