@@ -89,6 +89,26 @@ class OnboardingVisiblePlaytestPacket:
         return "manual-required"
 
 
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestValidationReport:
+    """Validation report for a visible-window onboarding QA packet."""
+
+    packet_path: Path
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when every packet integrity check passes."""
+
+        return "pass" if all(check.status == "pass" for check in self.checks) else "fail"
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return packet checks that still block the handoff."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
 def run_onboarding_flow_audit(
     *,
     scenario_id: str = DEFAULT_SCENARIO_ID,
@@ -416,6 +436,108 @@ def write_onboarding_visible_playtest_packet(
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def validate_onboarding_visible_playtest_packet(
+    packet_path: Path,
+    *,
+    scenario_id: str = DEFAULT_SCENARIO_ID,
+    difficulty_mode: DifficultyMode | None = DifficultyMode.BUILDER,
+    campaign_start_id: str = STANDARD_CAMPAIGN_START_ID,
+    seed: int = DEMO_SEED_EXAMPLE,
+    command_prefix: str = "uv run nexus-tech",
+    windows: tuple[tuple[int, int], ...] = DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES,
+) -> OnboardingVisiblePlaytestValidationReport:
+    """Validate that a visible-window onboarding packet matches current expectations."""
+
+    expected = build_onboarding_visible_playtest_packet(
+        scenario_id=scenario_id,
+        difficulty_mode=difficulty_mode,
+        campaign_start_id=campaign_start_id,
+        seed=seed,
+        command_prefix=command_prefix,
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+    if not packet_path.exists():
+        return OnboardingVisiblePlaytestValidationReport(
+            packet_path=packet_path,
+            checks=(
+                _build_check(
+                    area="Packet File",
+                    passed=False,
+                    summary="The onboarding visible playtest packet file must exist.",
+                    evidence=(f"missing:{packet_path}",),
+                ),
+            ),
+        )
+
+    text = packet_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Playtest Packet",
+        f"- Scenario: `{expected.scenario_id}`",
+        f"- Difficulty: `{expected.difficulty}`",
+        f"- Campaign start: `{expected.campaign_start_id}`",
+        f"- Seed: `{expected.seed}`",
+        f"- Command prefix: `{expected.command_prefix}`",
+        "- Status: `manual-required`",
+        "- Manual result: `not completed by automation`",
+    )
+    window_labels = ", ".join(f"{width}x{height}" for width, height in expected.windows)
+    command_markers = tuple(step.command for step in expected.steps)
+    route_markers = tuple(f"`{step.route}`" for step in expected.steps)
+    evidence_markers = tuple(
+        marker for step in expected.steps for marker in (*step.required_evidence, step.objective)
+    )
+    guardrail_markers = (
+        "Run these commands in a real visible window.",
+        "Do not mark onboarding beta-ready",
+        "- `pass`: the player can identify the next command",
+        "- `watch`: playable, but copy, contrast, motion, or placement slows understanding.",
+        "- `fail`: the player cannot find the next command",
+        "Keep `MANUAL-REQUIRED` until visible-window observations replace",
+    )
+    checks = (
+        _build_presence_check(
+            area="Packet Metadata",
+            text=text,
+            markers=(
+                *metadata_markers,
+                f"- Windows: `{window_labels}`",
+                f"- Motion modes: `{', '.join(expected.motion_modes)}`",
+            ),
+            summary="Metadata matches the current onboarding visible playtest target.",
+        ),
+        _build_presence_check(
+            area="Visible Commands",
+            text=text,
+            markers=command_markers,
+            summary="Every expected guide/tutorial/audit/menu/play command is present.",
+        ),
+        _build_presence_check(
+            area="Route Matrix",
+            text=text,
+            markers=route_markers,
+            summary="Every expected terminal, title, and first-turn route row is present.",
+        ),
+        _build_presence_check(
+            area="Evidence Prompts",
+            text=text,
+            markers=evidence_markers,
+            summary="Tester-facing evidence prompts and objectives are intact.",
+        ),
+        _build_presence_check(
+            area="Manual Guardrails",
+            text=text,
+            markers=guardrail_markers,
+            summary="The packet still blocks beta signoff until real visible QA is recorded.",
+        ),
+    )
+    return OnboardingVisiblePlaytestValidationReport(
+        packet_path=packet_path,
+        checks=checks,
+    )
+
+
 def _build_check(
     *,
     area: str,
@@ -426,6 +548,29 @@ def _build_check(
     return OnboardingFlowAuditCheck(
         area=area,
         status="pass" if passed else "fail",
+        summary=summary,
+        evidence=evidence,
+    )
+
+
+def _build_presence_check(
+    *,
+    area: str,
+    text: str,
+    markers: tuple[str, ...],
+    summary: str,
+) -> OnboardingFlowAuditCheck:
+    missing = tuple(marker for marker in markers if marker not in text)
+    evidence = (
+        (f"present:{len(markers)}",)
+        if not missing
+        else tuple(f"missing:{marker}" for marker in missing[:8])
+    )
+    if len(missing) > 8:
+        evidence = (*evidence, f"missing-more:{len(missing) - 8}")
+    return _build_check(
+        area=area,
+        passed=not missing,
         summary=summary,
         evidence=evidence,
     )

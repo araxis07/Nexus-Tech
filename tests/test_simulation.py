@@ -148,6 +148,7 @@ from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     run_onboarding_flow_audit,
+    validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_packet,
 )
@@ -12272,6 +12273,47 @@ def test_onboarding_visible_playtest_packet_lists_visible_commands(
     assert "- Status: `manual-required`" in text
     assert "MANUAL-REQUIRED" in text
     assert "pause/back/menu" in text
+
+
+def test_validate_onboarding_visible_playtest_packet_blocks_stale_artifacts(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    output_path = tmp_path / "onboarding-visible-playtest.md"
+    write_onboarding_visible_playtest_packet(packet, output_path)
+
+    report = validate_onboarding_visible_playtest_packet(
+        output_path,
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+
+    assert report.status == "pass"
+    assert not report.failed_checks
+
+    text = output_path.read_text(encoding="utf-8")
+    output_path.write_text(
+        text.replace(
+            "menu-2d --window-size 820x620 --motion-mode reduced",
+            "menu-2d --window-size 1280x720 --motion-mode reduced",
+        ),
+        encoding="utf-8",
+    )
+
+    stale_report = validate_onboarding_visible_playtest_packet(
+        output_path,
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+
+    assert stale_report.status == "fail"
+    assert any(check.area == "Visible Commands" for check in stale_report.failed_checks)
 
 
 def test_risk_forecast_emits_valid_mitigation_commands() -> None:

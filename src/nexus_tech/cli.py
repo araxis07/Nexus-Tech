@@ -231,6 +231,7 @@ from nexus_tech.simulation.onboarding_flow import (
     DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
     build_onboarding_visible_playtest_packet,
     run_onboarding_flow_audit,
+    validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_packet,
 )
@@ -349,6 +350,11 @@ ONBOARDING_VISIBLE_PACKET_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-playtest.md"),
     "--output",
     help="Markdown path for the visible-window onboarding playtest packet.",
+)
+ONBOARDING_VISIBLE_PACKET_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest.md"),
+    "--input",
+    help="Markdown path for the visible-window onboarding playtest packet to validate.",
 )
 ONBOARDING_VISIBLE_WINDOW_OPTION = typer.Option(
     None,
@@ -5872,6 +5878,71 @@ def onboarding_visible_playtest_packet_command(
             border_style="yellow",
         )
     )
+
+
+@app.command("validate-onboarding-visible-playtest-packet")
+def validate_onboarding_visible_playtest_packet_command(
+    input_path: Path = ONBOARDING_VISIBLE_PACKET_INPUT_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected by the visible onboarding packet.",
+    ),
+    window_size: list[str] | None = ONBOARDING_VISIBLE_WINDOW_OPTION,
+    motion_mode: list[MotionMode] | None = ONBOARDING_VISIBLE_MOTION_MODE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate that the visible-window onboarding packet is current and complete."""
+
+    parsed_windows = resolve_2d_visual_audit_viewports(window_size)
+    windows = parsed_windows if parsed_windows is not None else DEFAULT_ONBOARDING_VISIBLE_WINDOWS
+    motion_modes = (
+        tuple(mode.value for mode in motion_mode)
+        if motion_mode
+        else DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES
+    )
+    packet_difficulty = difficulty or DifficultyMode.BUILDER
+    report = validate_onboarding_visible_playtest_packet(
+        input_path,
+        scenario_id=scenario,
+        difficulty_mode=packet_difficulty,
+        campaign_start_id=campaign_start,
+        seed=seed,
+        command_prefix=command_prefix,
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+
+    table = Table(title=f"Onboarding Visible Packet Validation | {input_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in report.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if report.status == "pass" else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible packet validation: {report.status.upper()} "
+                f"across {len(report.checks)} checks."
+            ),
+            title="Onboarding Visible Packet Validation",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
 
 
 @app.command("glossary")

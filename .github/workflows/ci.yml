@@ -46,6 +46,12 @@ jobs:
           --command-prefix "uv run nexus-tech"
           --output /tmp/nexus-tech-onboarding-visible-playtest.md
 
+      - name: Validate onboarding visible playtest packet
+        run: >
+          uv run nexus-tech validate-onboarding-visible-playtest-packet
+          --command-prefix "uv run nexus-tech"
+          --input /tmp/nexus-tech-onboarding-visible-playtest.md
+
       - name: Run tests
         run: uv run pytest -q
 

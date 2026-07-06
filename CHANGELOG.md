@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.254.0 - 2026-07-07
+
+- Added `validate-onboarding-visible-playtest-packet` to block stale or incomplete manual onboarding visible QA packets
+- Wired the onboarding visible packet validator into CI before artifact upload
+- Documented the packet validation step in the local release checklist
+
 ## 0.253.0 - 2026-07-07
 
 - Added `onboarding-visible-playtest-packet` to prepare manual visible-window tutorial/menu/play QA across target windows and motion modes
