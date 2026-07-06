@@ -227,8 +227,12 @@ from nexus_tech.simulation.meta_progression import (
     summarize_meta_progression,
 )
 from nexus_tech.simulation.onboarding_flow import (
+    DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES,
+    DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
+    build_onboarding_visible_playtest_packet,
     run_onboarding_flow_audit,
     write_onboarding_flow_audit_report,
+    write_onboarding_visible_playtest_packet,
 )
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.roadmap import get_roadmap_profile
@@ -340,6 +344,27 @@ ONBOARDING_FLOW_AUDIT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-flow-audit.md"),
     "--output",
     help="Markdown path for the first-time player onboarding flow audit.",
+)
+ONBOARDING_VISIBLE_PACKET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest.md"),
+    "--output",
+    help="Markdown path for the visible-window onboarding playtest packet.",
+)
+ONBOARDING_VISIBLE_WINDOW_OPTION = typer.Option(
+    None,
+    "--window-size",
+    help=(
+        "Optional onboarding visible-playtest window as WIDTHxHEIGHT. Repeat to "
+        "audit a focused subset; omit for 820x620, 1280x720, and 1440x900."
+    ),
+)
+ONBOARDING_VISIBLE_MOTION_MODE_OPTION = typer.Option(
+    None,
+    "--motion-mode",
+    help=(
+        "Optional onboarding visible-playtest motion mode. Repeat to focus the packet; "
+        "omit for full, reduced, and off."
+    ),
 )
 HEADLESS_2D_OPTION = typer.Option(
     False,
@@ -5776,6 +5801,77 @@ def audit_onboarding_flow_command(
     )
     if report.status == "fail":
         raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-playtest-packet")
+def onboarding_visible_playtest_packet_command(
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed for deterministic first-turn visible onboarding checks.",
+    ),
+    output: Path = ONBOARDING_VISIBLE_PACKET_OUTPUT_OPTION,
+    window_size: list[str] | None = ONBOARDING_VISIBLE_WINDOW_OPTION,
+    motion_mode: list[MotionMode] | None = ONBOARDING_VISIBLE_MOTION_MODE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the manual visible-window onboarding playtest packet."""
+
+    parsed_windows = resolve_2d_visual_audit_viewports(window_size)
+    windows = parsed_windows if parsed_windows is not None else DEFAULT_ONBOARDING_VISIBLE_WINDOWS
+    motion_modes = (
+        tuple(mode.value for mode in motion_mode)
+        if motion_mode
+        else DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES
+    )
+    packet_difficulty = difficulty or DifficultyMode.BUILDER
+    packet = build_onboarding_visible_playtest_packet(
+        scenario_id=scenario,
+        difficulty_mode=packet_difficulty,
+        campaign_start_id=campaign_start,
+        seed=seed,
+        command_prefix=command_prefix,
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+    write_onboarding_visible_playtest_packet(packet, output)
+
+    table = Table(
+        title=(
+            "Onboarding Visible Playtest Packet | "
+            f"{packet.scenario_id} | {packet.difficulty} | seed {packet.seed}"
+        )
+    )
+    table.add_column("#", justify="right")
+    table.add_column("Route", style="cyan")
+    table.add_column("Window", justify="right")
+    table.add_column("Motion")
+    table.add_column("Command")
+    table.add_column("Evidence")
+    for step in packet.steps:
+        table.add_row(
+            str(step.rank),
+            step.route,
+            step.window,
+            step.motion_mode,
+            step.command,
+            ", ".join(step.required_evidence),
+        )
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible playtest packet is {packet.status.upper()} with "
+                f"{len(packet.steps)} commands. Manual visible-window onboarding QA "
+                f"is still required. Packet written to {output}."
+            ),
+            title="Manual Visible-Window QA Required",
+            border_style="yellow",
+        )
+    )
 
 
 @app.command("glossary")

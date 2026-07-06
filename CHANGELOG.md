@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.253.0 - 2026-07-07
+
+- Added `onboarding-visible-playtest-packet` to prepare manual visible-window tutorial/menu/play QA across target windows and motion modes
+- Added CI execution and artifact upload for the onboarding visible playtest packet
+- Documented the packet as the next manual QA handoff after the automated onboarding flow audit
+
 ## 0.252.0 - 2026-07-06
 
 - Added `audit-onboarding-flow` to validate first-time player guidance across Guided Opening, Turn Coach, and Risk Forecast

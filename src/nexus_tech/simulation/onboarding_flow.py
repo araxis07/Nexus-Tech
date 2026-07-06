@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from nexus_tech.config import DEFAULT_SCENARIO_ID
+from nexus_tech.config import DEFAULT_SCENARIO_ID, DEMO_SEED_EXAMPLE
 from nexus_tech.domain.models import DifficultyMode, TurnAction
 from nexus_tech.simulation.campaign_starts import STANDARD_CAMPAIGN_START_ID
 from nexus_tech.simulation.engine import create_new_game
@@ -14,6 +14,13 @@ from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.turn_coach import build_turn_coach
 
 ONBOARDING_FLOW_AUDIT_REPORT_NAME = "onboarding-flow-audit.md"
+ONBOARDING_VISIBLE_PLAYTEST_PACKET_NAME = "onboarding-visible-playtest.md"
+DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
+    (820, 620),
+    (1280, 720),
+    (1440, 900),
+)
+DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES: tuple[str, ...] = ("full", "reduced", "off")
 _PLACEHOLDER_TERMS = ("todo", "placeholder", "tbd", "unknown")
 
 
@@ -47,6 +54,39 @@ class OnboardingFlowAuditReport:
         """Return checks that still block the onboarding gate."""
 
         return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestStep:
+    """One visible-window onboarding playtest command."""
+
+    rank: int
+    route: str
+    command: str
+    objective: str
+    required_evidence: tuple[str, ...]
+    window: str = "terminal"
+    motion_mode: str = "n/a"
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestPacket:
+    """Manual visible-window packet for first-time player QA."""
+
+    scenario_id: str
+    difficulty: str
+    campaign_start_id: str
+    seed: int
+    command_prefix: str
+    windows: tuple[tuple[int, int], ...]
+    motion_modes: tuple[str, ...]
+    steps: tuple[OnboardingVisiblePlaytestStep, ...]
+
+    @property
+    def status(self) -> str:
+        """Visible-window packets always require human execution."""
+
+        return "manual-required"
 
 
 def run_onboarding_flow_audit(
@@ -168,6 +208,110 @@ def run_onboarding_flow_audit(
     )
 
 
+def build_onboarding_visible_playtest_packet(
+    *,
+    scenario_id: str = DEFAULT_SCENARIO_ID,
+    difficulty_mode: DifficultyMode | None = DifficultyMode.BUILDER,
+    campaign_start_id: str = STANDARD_CAMPAIGN_START_ID,
+    seed: int = DEMO_SEED_EXAMPLE,
+    command_prefix: str = "uv run nexus-tech",
+    windows: tuple[tuple[int, int], ...] = DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
+    motion_modes: tuple[str, ...] = DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES,
+) -> OnboardingVisiblePlaytestPacket:
+    """Build the manual visible-window packet for first-time player QA."""
+
+    difficulty = difficulty_mode.value if difficulty_mode is not None else "scenario"
+    base_play_args = f"--scenario {scenario_id} --campaign-start {campaign_start_id} --seed {seed}"
+    if difficulty_mode is not None:
+        base_play_args = f"{base_play_args} --difficulty {difficulty_mode.value}"
+
+    steps: list[OnboardingVisiblePlaytestStep] = [
+        OnboardingVisiblePlaytestStep(
+            rank=1,
+            route="terminal-guide",
+            command=f"{command_prefix} guide",
+            objective="Confirm the quick guide tells a first-time player where to look first.",
+            required_evidence=("Opening flow", "Risk Forecast", "Difficulty cues"),
+        ),
+        OnboardingVisiblePlaytestStep(
+            rank=2,
+            route="terminal-tutorial",
+            command=f"{command_prefix} tutorial",
+            objective="Confirm the tutorial names the safe first actions and watch-for fields.",
+            required_evidence=("hire_employee", "Turn Summary", "Watch For"),
+        ),
+        OnboardingVisiblePlaytestStep(
+            rank=3,
+            route="automated-clarity-gate",
+            command=(
+                f"{command_prefix} audit-onboarding-flow "
+                "--output /tmp/nexus-tech-onboarding-flow-audit.md"
+            ),
+            objective="Refresh automated onboarding clarity evidence before the visible pass.",
+            required_evidence=("Guided Opening", "Turn Coach", "Risk Forecast"),
+        ),
+    ]
+
+    for width, height in windows:
+        window = f"{width}x{height}"
+        for motion_mode in motion_modes:
+            steps.append(
+                OnboardingVisiblePlaytestStep(
+                    rank=len(steps) + 1,
+                    route="title-onboarding",
+                    command=(
+                        f"{command_prefix} menu-2d --window-size {window} "
+                        f"--motion-mode {motion_mode}"
+                    ),
+                    objective=(
+                        "Verify the title menu, wizard path, help affordance, and save/meta "
+                        "navigation are discoverable without source-code knowledge."
+                    ),
+                    required_evidence=(
+                        "title",
+                        "wizard",
+                        "help",
+                        "back/menu",
+                    ),
+                    window=window,
+                    motion_mode=motion_mode,
+                )
+            )
+            steps.append(
+                OnboardingVisiblePlaytestStep(
+                    rank=len(steps) + 1,
+                    route="first-turn-play",
+                    command=(
+                        f"{command_prefix} play-2d {base_play_args} "
+                        f"--window-size {window} --motion-mode {motion_mode}"
+                    ),
+                    objective=(
+                        "Verify a new player can read the first-turn coach, risk forecast, "
+                        "action bar, pause/back/menu controls, and next command."
+                    ),
+                    required_evidence=(
+                        "coach",
+                        "risk",
+                        "next command",
+                        "pause/back/menu",
+                    ),
+                    window=window,
+                    motion_mode=motion_mode,
+                )
+            )
+
+    return OnboardingVisiblePlaytestPacket(
+        scenario_id=scenario_id,
+        difficulty=difficulty,
+        campaign_start_id=campaign_start_id,
+        seed=seed,
+        command_prefix=command_prefix,
+        windows=windows,
+        motion_modes=motion_modes,
+        steps=tuple(steps),
+    )
+
+
 def write_onboarding_flow_audit_report(
     report: OnboardingFlowAuditReport,
     output_path: Path,
@@ -209,6 +353,64 @@ def write_onboarding_flow_audit_report(
             "- Run the visible tutorial/menu/play path before beta signoff.",
             "- Confirm a new player can identify the next command without reading source code.",
             "- Keep `MANUAL-REQUIRED` if tutorial, coach, risk, or button copy feels ambiguous.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_onboarding_visible_playtest_packet(
+    packet: OnboardingVisiblePlaytestPacket,
+    output_path: Path,
+) -> None:
+    """Write a Markdown visible-window onboarding QA packet."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    window_labels = ", ".join(f"{width}x{height}" for width, height in packet.windows)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Playtest Packet",
+        "",
+        f"- Scenario: `{packet.scenario_id}`",
+        f"- Difficulty: `{packet.difficulty}`",
+        f"- Campaign start: `{packet.campaign_start_id}`",
+        f"- Seed: `{packet.seed}`",
+        f"- Command prefix: `{packet.command_prefix}`",
+        f"- Windows: `{window_labels}`",
+        f"- Motion modes: `{', '.join(packet.motion_modes)}`",
+        f"- Status: `{packet.status}`",
+        "- Manual result: `not completed by automation`",
+        "",
+        "Run these commands in a real visible window. Do not mark onboarding beta-ready until "
+        "a tester records concrete notes for each route.",
+        "",
+        "| # | Route | Window | Motion | Command | Required Evidence | Objective |",
+        "| ---: | --- | --- | --- | --- | --- | --- |",
+    ]
+    for step in packet.steps:
+        lines.append(
+            "| "
+            f"{step.rank} | "
+            f"`{step.route}` | "
+            f"`{step.window}` | "
+            f"`{step.motion_mode}` | "
+            f"`{_markdown_escape(step.command)}` | "
+            f"{_markdown_escape(', '.join(step.required_evidence))} | "
+            f"{_markdown_escape(step.objective)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Result Rules",
+            "",
+            "- `pass`: the player can identify the next command and recover with pause/back/menu.",
+            "- `watch`: playable, but copy, contrast, motion, or placement slows understanding.",
+            (
+                "- `fail`: the player cannot find the next command, recover navigation, "
+                "or read a key panel."
+            ),
+            (
+                "- Keep `MANUAL-REQUIRED` until visible-window observations replace "
+                "these instructions."
+            ),
         ]
     )
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

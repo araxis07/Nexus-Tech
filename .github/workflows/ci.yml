@@ -40,6 +40,12 @@ jobs:
       - name: Run onboarding flow audit
         run: uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
 
+      - name: Prepare onboarding visible playtest packet
+        run: >
+          uv run nexus-tech onboarding-visible-playtest-packet
+          --command-prefix "uv run nexus-tech"
+          --output /tmp/nexus-tech-onboarding-visible-playtest.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -127,6 +133,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-flow-audit
           path: /tmp/nexus-tech-onboarding-flow-audit.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible playtest packet artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-playtest
+          path: /tmp/nexus-tech-onboarding-visible-playtest.md
           if-no-files-found: warn
           retention-days: 7
 

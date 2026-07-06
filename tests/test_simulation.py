@@ -146,8 +146,10 @@ from nexus_tech.simulation.meta_progression import (
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
+    build_onboarding_visible_playtest_packet,
     run_onboarding_flow_audit,
     write_onboarding_flow_audit_report,
+    write_onboarding_visible_playtest_packet,
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.operations import calculate_operations_summary
@@ -12238,6 +12240,38 @@ def test_onboarding_flow_audit_passes_default_first_time_path(tmp_path: Path) ->
     assert "- Status: `pass`" in text
     assert "- Manual result: `not completed by automation`" in text
     assert "MANUAL-REQUIRED" in text
+
+
+def test_onboarding_visible_playtest_packet_lists_visible_commands(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+
+    assert packet.status == "manual-required"
+    assert len(packet.steps) == 5
+    assert any(
+        "menu-2d --window-size 820x620 --motion-mode reduced" in step.command
+        for step in packet.steps
+    )
+    assert any(
+        "play-2d --scenario founder_journey" in step.command
+        and "--window-size 820x620" in step.command
+        and "--motion-mode reduced" in step.command
+        for step in packet.steps
+    )
+
+    output_path = tmp_path / "onboarding-visible-playtest.md"
+    write_onboarding_visible_playtest_packet(packet, output_path)
+
+    text = output_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Playtest Packet" in text
+    assert "- Status: `manual-required`" in text
+    assert "MANUAL-REQUIRED" in text
+    assert "pause/back/menu" in text
 
 
 def test_risk_forecast_emits_valid_mitigation_commands() -> None:

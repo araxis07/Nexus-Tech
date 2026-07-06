@@ -251,6 +251,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "balance-report",
         "tutorial",
         "audit-onboarding-flow",
+        "onboarding-visible-playtest-packet",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -881,6 +882,36 @@ def test_audit_onboarding_flow_command_writes_report(
     assert "NEXUS TECH Onboarding Flow Audit" in output_path.read_text(encoding="utf-8")
 
 
+def test_onboarding_visible_playtest_packet_command_writes_packet(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "onboarding-visible.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-packet",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Onboarding Visible Playtest Packet" in result.output
+    text = output_path.read_text(encoding="utf-8")
+    assert "menu-2d --window-size 820x620 --motion-mode reduced" in text
+    assert "play-2d --scenario founder_journey" in text
+    assert "--difficulty builder" in text
+    assert "- Status: `manual-required`" in text
+    assert "- Manual result: `not completed by automation`" in text
+
+
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 
@@ -889,6 +920,9 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     ) in workflow
     assert "nexus-tech-onboarding-flow-audit" in workflow
     assert "path: /tmp/nexus-tech-onboarding-flow-audit.md" in workflow
+    assert "uv run nexus-tech onboarding-visible-playtest-packet" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
+    assert "nexus-tech-onboarding-visible-playtest" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:
