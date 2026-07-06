@@ -234,6 +234,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
+    summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
@@ -6161,6 +6162,71 @@ def validate_onboarding_visible_playtest_report_command(
     )
     if not validation.ok:
         raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-playtest-status")
+def onboarding_visible_playtest_status_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Show visible onboarding QA progress and the next recording command."""
+
+    try:
+        summary = summarize_onboarding_visible_playtest_status(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Status Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    table = Table(title=f"Onboarding Visible QA Status | {report_path}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Pass", justify="right")
+    table.add_column("Watch", justify="right")
+    table.add_column("Fail", justify="right")
+    table.add_column("Todo", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        summary.status.upper(),
+        str(summary.total_rows),
+        str(summary.pass_count),
+        str(summary.watch_count),
+        str(summary.fail_count),
+        str(summary.todo_count),
+        str(summary.incomplete_count),
+    )
+    console.print(table)
+
+    if summary.next_row is not None:
+        next_table = Table(title="Next Visible-Window Onboarding Action")
+        next_table.add_column("Rank", justify="right")
+        next_table.add_column("Route")
+        next_table.add_column("Window")
+        next_table.add_column("Motion")
+        next_table.add_column("Required Evidence")
+        next_table.add_row(
+            str(summary.next_row.rank),
+            summary.next_row.route,
+            summary.next_row.window,
+            summary.next_row.motion_mode,
+            ", ".join(summary.next_row.required_evidence),
+        )
+        console.print(next_table)
+    console.print(
+        Panel.fit(
+            summary.next_recorder_command,
+            title="Next Recorder Command",
+            border_style="yellow" if summary.next_row is not None else "green",
+        )
+    )
 
 
 @app.command("glossary")

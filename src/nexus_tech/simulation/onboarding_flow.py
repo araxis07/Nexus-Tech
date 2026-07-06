@@ -202,6 +202,22 @@ class OnboardingVisiblePlaytestReportValidation:
         return tuple(check for check in self.checks if check.status != "pass")
 
 
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestStatusSummary:
+    """Status and next action for onboarding visible QA evidence."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    pass_count: int
+    watch_count: int
+    fail_count: int
+    todo_count: int
+    incomplete_count: int
+    next_row: OnboardingVisiblePlaytestReportRow | None
+    next_recorder_command: str
+
+
 def run_onboarding_flow_audit(
     *,
     scenario_id: str = DEFAULT_SCENARIO_ID,
@@ -878,6 +894,44 @@ def validate_onboarding_visible_playtest_evidence_report(
     )
 
 
+def summarize_onboarding_visible_playtest_status(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisiblePlaytestStatusSummary:
+    """Return visible onboarding QA progress and the next recorder command."""
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    pass_count = sum(1 for row in report.rows if row.result == "pass")
+    watch_count = sum(1 for row in report.rows if row.result == "watch")
+    fail_count = sum(1 for row in report.rows if row.result == "fail")
+    todo_count = sum(1 for row in report.rows if row.result == "todo")
+    next_row = report.incomplete_rows[0] if report.incomplete_rows else None
+    next_recorder_command = (
+        _build_onboarding_visible_recorder_command(
+            report_path,
+            next_row,
+            command_prefix=command_prefix,
+        )
+        if next_row is not None
+        else (
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        )
+    )
+    return OnboardingVisiblePlaytestStatusSummary(
+        report_path=report_path,
+        status=report.status,
+        total_rows=len(report.rows),
+        pass_count=pass_count,
+        watch_count=watch_count,
+        fail_count=fail_count,
+        todo_count=todo_count,
+        incomplete_count=len(report.incomplete_rows),
+        next_row=next_row,
+        next_recorder_command=next_recorder_command,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -991,6 +1045,21 @@ def _find_onboarding_visible_report_row(
     if len(matches) > 1:
         raise ValueError("Selector matched multiple onboarding visible report rows; add --rank.")
     return matches[0]
+
+
+def _build_onboarding_visible_recorder_command(
+    report_path: Path,
+    row: OnboardingVisiblePlaytestReportRow,
+    *,
+    command_prefix: str,
+) -> str:
+    return (
+        f"{command_prefix} record-onboarding-visible-playtest-route "
+        f"--report {report_path} "
+        f"--rank {row.rank} "
+        "--result pass "
+        f'--notes "{ONBOARDING_VISIBLE_NOTE_PLACEHOLDER}"'
+    )
 
 
 def _extract_backtick_metadata(text: str, label: str) -> str:

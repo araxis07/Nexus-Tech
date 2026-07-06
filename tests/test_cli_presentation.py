@@ -256,6 +256,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "onboarding-visible-playtest-report",
         "record-onboarding-visible-playtest-route",
         "validate-onboarding-visible-playtest-report",
+        "onboarding-visible-playtest-status",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -1035,6 +1036,21 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "MANUAL-REQUIRED" in validation_result.output
     assert "Observed the 820x620 title menu" in report_path.read_text(encoding="utf-8")
 
+    status_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-status",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+        ],
+    )
+    assert status_result.exit_code == 0
+    assert "Onboarding Visible QA Status" in status_result.output
+    assert "Next Recorder Command" in status_result.output
+    assert "record-onboarding-visible-playtest-route" in status_result.output
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1048,6 +1064,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-playtest-packet" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-report" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-report" in workflow
+    assert "uv run nexus-tech onboarding-visible-playtest-status" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow

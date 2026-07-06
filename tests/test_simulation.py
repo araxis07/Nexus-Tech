@@ -150,6 +150,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
+    summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
@@ -12360,6 +12361,45 @@ def test_onboarding_visible_playtest_report_records_real_observations(
     recorded_text = report_path.read_text(encoding="utf-8")
     assert "| 4 | `title-onboarding` | `820x620` | `reduced` | `pass` |" in recorded_text
     assert "Observed the 820x620 title menu" in recorded_text
+
+
+def test_onboarding_visible_playtest_status_points_to_next_incomplete_row(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=1,
+        result="pass",
+        evidence_notes=(
+            "Observed the terminal guide output directly; opening flow, risk forecast, "
+            "and difficulty cues were readable before launching the window."
+        ),
+    )
+
+    summary = summarize_onboarding_visible_playtest_status(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert summary.status == "manual-required"
+    assert summary.total_rows == 5
+    assert summary.pass_count == 1
+    assert summary.todo_count == 4
+    assert summary.next_row is not None
+    assert summary.next_row.rank == 2
+    assert "record-onboarding-visible-playtest-route" in summary.next_recorder_command
+    assert "--rank 2" in summary.next_recorder_command
+    assert "<replace with observed visible-window notes>" in summary.next_recorder_command
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

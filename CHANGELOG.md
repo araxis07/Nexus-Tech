@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.256.0 - 2026-07-07
+
+- Added `onboarding-visible-playtest-status` to summarize visible onboarding QA progress and surface the next recorder command
+- Wired the onboarding visible status check into CI so the report handoff always exposes the next manual action
+- Documented the status command in the onboarding visible QA workflow and local release checklist
+
 ## 0.255.0 - 2026-07-07
 
 - Added onboarding visible playtest evidence reports plus route-level recording for real visible-window observations
