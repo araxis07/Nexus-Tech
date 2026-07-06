@@ -6222,6 +6222,13 @@ def onboarding_visible_playtest_status_command(
         console.print(next_table)
     console.print(
         Panel.fit(
+            summary.next_visible_command,
+            title="Next Visible Command",
+            border_style="cyan" if summary.next_row is not None else "green",
+        )
+    )
+    console.print(
+        Panel.fit(
             summary.next_recorder_command,
             title="Next Recorder Command",
             border_style="yellow" if summary.next_row is not None else "green",

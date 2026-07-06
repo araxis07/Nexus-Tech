@@ -133,6 +133,7 @@ class OnboardingVisiblePlaytestReportRow:
     route: str
     window: str
     motion_mode: str
+    command: str
     result: str
     evidence_notes: str
     required_evidence: tuple[str, ...]
@@ -215,6 +216,7 @@ class OnboardingVisiblePlaytestStatusSummary:
     todo_count: int
     incomplete_count: int
     next_row: OnboardingVisiblePlaytestReportRow | None
+    next_visible_command: str
     next_recorder_command: str
 
 
@@ -558,6 +560,7 @@ def build_onboarding_visible_playtest_evidence_report(
             route=step.route,
             window=step.window,
             motion_mode=step.motion_mode,
+            command=step.command,
             result="todo",
             evidence_notes=ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
             required_evidence=step.required_evidence,
@@ -589,8 +592,8 @@ def write_onboarding_visible_playtest_evidence_report(
         "This report stores human-visible onboarding evidence. Generated `todo` rows are "
         "not signoff; replace them only after opening the game window and observing the route.",
         "",
-        "| # | Route | Window | Motion | Result | Evidence Notes | Required Evidence |",
-        "| ---: | --- | --- | --- | --- | --- | --- |",
+        "| # | Route | Window | Motion | Command | Result | Evidence Notes | Required Evidence |",
+        "| ---: | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in report.rows:
         lines.append(_format_onboarding_visible_report_row(row))
@@ -742,6 +745,7 @@ def record_onboarding_visible_playtest_route(
         route=report.rows[matched_index].route,
         window=report.rows[matched_index].window,
         motion_mode=report.rows[matched_index].motion_mode,
+        command=report.rows[matched_index].command,
         result=normalized_result,
         evidence_notes=evidence_notes.strip(),
         required_evidence=report.rows[matched_index].required_evidence,
@@ -807,11 +811,20 @@ def validate_onboarding_visible_playtest_evidence_report(
         )
 
     expected_keys = tuple(
-        (step.rank, step.route, step.window, step.motion_mode) for step in packet.steps
+        (step.rank, step.route, step.window, step.motion_mode, step.command)
+        for step in packet.steps
     )
-    row_keys = tuple((row.rank, row.route, row.window, row.motion_mode) for row in report.rows)
+    row_keys = tuple(
+        (row.rank, row.route, row.window, row.motion_mode, row.command) for row in report.rows
+    )
     expected_required = {
-        (step.rank, step.route, step.window, step.motion_mode): step.required_evidence
+        (
+            step.rank,
+            step.route,
+            step.window,
+            step.motion_mode,
+            step.command,
+        ): step.required_evidence
         for step in packet.steps
     }
     invalid_results = tuple(
@@ -821,7 +834,10 @@ def validate_onboarding_visible_playtest_evidence_report(
         f"{row.rank}:{row.route}"
         for row in report.rows
         if row.required_evidence
-        != expected_required.get((row.rank, row.route, row.window, row.motion_mode), ())
+        != expected_required.get(
+            (row.rank, row.route, row.window, row.motion_mode, row.command),
+            (),
+        )
     )
     bad_notes = tuple(
         f"{row.rank}:{row.route}"
@@ -837,7 +853,10 @@ def validate_onboarding_visible_playtest_evidence_report(
                 "# NEXUS TECH Onboarding Visible Playtest Report",
                 "- Evidence policy: `real visible-window observations required`",
                 "- Recorder command: `record-onboarding-visible-playtest-route`",
-                "| # | Route | Window | Motion | Result | Evidence Notes | Required Evidence |",
+                (
+                    "| # | Route | Window | Motion | Command | Result | Evidence Notes | "
+                    "Required Evidence |"
+                ),
                 "## Result Rules",
             ),
             summary="The evidence report keeps the required sections and recorder guidance.",
@@ -907,6 +926,13 @@ def summarize_onboarding_visible_playtest_status(
     fail_count = sum(1 for row in report.rows if row.result == "fail")
     todo_count = sum(1 for row in report.rows if row.result == "todo")
     next_row = report.incomplete_rows[0] if report.incomplete_rows else None
+    next_visible_command = (
+        next_row.command
+        if next_row is not None
+        else (
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        )
+    )
     next_recorder_command = (
         _build_onboarding_visible_recorder_command(
             report_path,
@@ -928,6 +954,7 @@ def summarize_onboarding_visible_playtest_status(
         todo_count=todo_count,
         incomplete_count=len(report.incomplete_rows),
         next_row=next_row,
+        next_visible_command=next_visible_command,
         next_recorder_command=next_recorder_command,
     )
 
@@ -994,6 +1021,7 @@ def _format_onboarding_visible_report_row(row: OnboardingVisiblePlaytestReportRo
         f"`{row.route}` | "
         f"`{row.window}` | "
         f"`{row.motion_mode}` | "
+        f"`{_markdown_escape(row.command)}` | "
         f"`{row.result}` | "
         f"{_markdown_escape(row.evidence_notes)} | "
         f"{_markdown_escape(', '.join(row.required_evidence))} |"
@@ -1006,17 +1034,18 @@ def _parse_onboarding_visible_report_row(
     if not line.startswith("| "):
         return None
     cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-    if len(cells) != 7 or not cells[0].isdigit():
+    if len(cells) != 8 or not cells[0].isdigit():
         return None
     return OnboardingVisiblePlaytestReportRow(
         rank=int(cells[0]),
         route=_strip_backticks(cells[1]),
         window=_strip_backticks(cells[2]),
         motion_mode=_strip_backticks(cells[3]),
-        result=_strip_backticks(cells[4]).lower(),
-        evidence_notes=cells[5].replace("\\|", "|").strip(),
+        command=_strip_backticks(cells[4]).replace("\\|", "|").strip(),
+        result=_strip_backticks(cells[5]).lower(),
+        evidence_notes=cells[6].replace("\\|", "|").strip(),
         required_evidence=tuple(
-            item.strip() for item in cells[6].replace("\\|", "|").split(",") if item.strip()
+            item.strip() for item in cells[7].replace("\\|", "|").split(",") if item.strip()
         ),
     )
 

@@ -12359,7 +12359,12 @@ def test_onboarding_visible_playtest_report_records_real_observations(
     assert record.result == "pass"
 
     recorded_text = report_path.read_text(encoding="utf-8")
-    assert "| 4 | `title-onboarding` | `820x620` | `reduced` | `pass` |" in recorded_text
+    assert "| # | Route | Window | Motion | Command | Result | Evidence Notes |" in recorded_text
+    assert (
+        "| 4 | `title-onboarding` | `820x620` | `reduced` | "
+        "`.venv313/bin/nexus-tech menu-2d --window-size 820x620 --motion-mode reduced` | "
+        "`pass` |"
+    ) in recorded_text
     assert "Observed the 820x620 title menu" in recorded_text
 
 
@@ -12397,6 +12402,7 @@ def test_onboarding_visible_playtest_status_points_to_next_incomplete_row(
     assert summary.todo_count == 4
     assert summary.next_row is not None
     assert summary.next_row.rank == 2
+    assert summary.next_visible_command == ".venv313/bin/nexus-tech tutorial"
     assert "record-onboarding-visible-playtest-route" in summary.next_recorder_command
     assert "--rank 2" in summary.next_recorder_command
     assert "<replace with observed visible-window notes>" in summary.next_recorder_command
@@ -12426,7 +12432,10 @@ def test_onboarding_visible_playtest_report_rejects_placeholder_recording(
 
     text = report_path.read_text(encoding="utf-8")
     report_path.write_text(
-        text.replace("| 4 | `title-onboarding`", "| 4 | `stale-title`"),
+        text.replace(
+            ".venv313/bin/nexus-tech menu-2d --window-size 820x620 --motion-mode reduced",
+            ".venv313/bin/nexus-tech menu-2d --window-size 1280x720 --motion-mode reduced",
+        ),
         encoding="utf-8",
     )
 

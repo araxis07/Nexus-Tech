@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.257.0 - 2026-07-07
+
+- Added visible route commands directly to onboarding visible evidence report rows
+- Extended `onboarding-visible-playtest-status` to print both the next visible command and the next recorder command
+- Updated regression coverage so stale report commands fail against the current onboarding packet
+
 ## 0.256.0 - 2026-07-07
 
 - Added `onboarding-visible-playtest-status` to summarize visible onboarding QA progress and surface the next recorder command

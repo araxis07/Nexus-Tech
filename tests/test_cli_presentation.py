@@ -1048,6 +1048,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     )
     assert status_result.exit_code == 0
     assert "Onboarding Visible QA Status" in status_result.output
+    assert "Next Visible Command" in status_result.output
     assert "Next Recorder Command" in status_result.output
     assert "record-onboarding-visible-playtest-route" in status_result.output
 
