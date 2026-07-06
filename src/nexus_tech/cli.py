@@ -226,6 +226,10 @@ from nexus_tech.simulation.meta_progression import (
     is_reward_unlocked,
     summarize_meta_progression,
 )
+from nexus_tech.simulation.onboarding_flow import (
+    run_onboarding_flow_audit,
+    write_onboarding_flow_audit_report,
+)
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.roadmap import get_roadmap_profile
 from nexus_tech.simulation.scenarios import (
@@ -332,6 +336,11 @@ BALANCE_GOAL_OPTION = typer.Option(
 )
 CSV_OUTPUT_OPTION = typer.Option(..., "--output", help="CSV path to write.")
 BALANCE_REPORT_OUTPUT_OPTION = typer.Option(..., "--output", help="Markdown path to write.")
+ONBOARDING_FLOW_AUDIT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-flow-audit.md"),
+    "--output",
+    help="Markdown path for the first-time player onboarding flow audit.",
+)
 HEADLESS_2D_OPTION = typer.Option(
     False,
     "--headless",
@@ -5706,6 +5715,67 @@ def tutorial_command() -> None:
     """Print a first-run tutorial path for demos and new players."""
 
     render_tutorial(console)
+
+
+@app.command("audit-onboarding-flow")
+def audit_onboarding_flow_command(
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    output: Path = ONBOARDING_FLOW_AUDIT_OUTPUT_OPTION,
+) -> None:
+    """Validate the first-time player guide, coach, and risk handoff."""
+
+    try:
+        report = run_onboarding_flow_audit(
+            scenario_id=scenario,
+            difficulty_mode=difficulty,
+            campaign_start_id=campaign_start,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Flow Audit Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_flow_audit_report(report, output)
+
+    table = Table(
+        title=(
+            "Onboarding Flow Audit | "
+            f"{report.scenario_id} | {report.difficulty} | {report.campaign_start_id}"
+        )
+    )
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in report.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if report.status == "pass" else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding flow status: {report.status.upper()} across "
+                f"{len(report.checks)} checks. Report written to {output}."
+            ),
+            title="Onboarding Flow Audit",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
 
 
 @app.command("glossary")

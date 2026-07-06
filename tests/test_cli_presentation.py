@@ -71,6 +71,10 @@ from nexus_tech.simulation.balance_lab import (
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.end_turn_preview import EndTurnPreviewSummary
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
+from nexus_tech.simulation.onboarding_flow import (
+    OnboardingFlowAuditCheck,
+    OnboardingFlowAuditReport,
+)
 from nexus_tech.simulation.randomness import RandomSource
 
 runner = CliRunner()
@@ -246,6 +250,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "export-balance-csv",
         "balance-report",
         "tutorial",
+        "audit-onboarding-flow",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -822,6 +827,68 @@ def test_tutorial_command_renders_first_run_path() -> None:
     assert "new-game" in result.output
     assert "Risk Forecast" in result.output
     assert "Difficulty Profile" in result.output
+
+
+def test_audit_onboarding_flow_command_writes_report(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    report = OnboardingFlowAuditReport(
+        scenario_id="founder_journey",
+        difficulty="builder",
+        campaign_start_id="standard",
+        checks=(
+            OnboardingFlowAuditCheck(
+                area="Guided Opening",
+                status="pass",
+                summary="Opening has a valid current command.",
+                evidence=("current:hire_employee", "steps:6"),
+            ),
+        ),
+    )
+    calls: dict[str, object] = {}
+
+    def fake_run_onboarding_flow_audit(**kwargs):
+        calls.update(kwargs)
+        return report
+
+    monkeypatch.setattr(
+        cli_module,
+        "run_onboarding_flow_audit",
+        fake_run_onboarding_flow_audit,
+    )
+    output_path = tmp_path / "onboarding.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "audit-onboarding-flow",
+            "--scenario",
+            "founder_journey",
+            "--difficulty",
+            "builder",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Onboarding Flow Audit" in result.output
+    assert "Onboarding flow status: PASS" in result.output
+    assert calls["scenario_id"] == "founder_journey"
+    assert calls["difficulty_mode"] is DifficultyMode.BUILDER
+    assert output_path.exists()
+    assert "NEXUS TECH Onboarding Flow Audit" in output_path.read_text(encoding="utf-8")
+
+
+def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
+    workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+
+    assert (
+        "uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md"
+    ) in workflow
+    assert "nexus-tech-onboarding-flow-audit" in workflow
+    assert "path: /tmp/nexus-tech-onboarding-flow-audit.md" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

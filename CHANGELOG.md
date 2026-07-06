@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.252.0 - 2026-07-06
+
+- Added `audit-onboarding-flow` to validate first-time player guidance across Guided Opening, Turn Coach, and Risk Forecast
+- Added CI execution and artifact upload for the onboarding flow audit report
+- Documented the onboarding audit as an automated clarity gate before visible-window tutorial playtests
+
 ## 0.251.0 - 2026-07-06
 
 - Added `audit-2d-layout-matrix` to turn visual audit captures into a responsive layout and typography gate across viewports and motion modes

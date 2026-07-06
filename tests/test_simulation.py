@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -144,6 +145,10 @@ from nexus_tech.simulation.meta_progression import (
 )
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
+from nexus_tech.simulation.onboarding_flow import (
+    run_onboarding_flow_audit,
+    write_onboarding_flow_audit_report,
+)
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.operations import calculate_operations_summary
 from nexus_tech.simulation.partnerships import (
@@ -12210,6 +12215,29 @@ def test_guided_opening_points_to_hire_then_assign_in_early_turns() -> None:
         TurnAction.IMPROVE_QUALITY.value,
         TurnAction.MARKET_PRODUCT.value,
     }
+
+
+def test_onboarding_flow_audit_passes_default_first_time_path(tmp_path: Path) -> None:
+    report = run_onboarding_flow_audit()
+
+    assert report.status == "pass"
+    assert {check.area for check in report.checks} == {
+        "Guided Opening",
+        "Safe First Actions",
+        "Turn Coach",
+        "Risk Forecast",
+        "Cross-Panel Handoff",
+    }
+    assert all(check.evidence for check in report.checks)
+
+    output_path = tmp_path / "onboarding-flow-audit.md"
+    write_onboarding_flow_audit_report(report, output_path)
+
+    text = output_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Flow Audit" in text
+    assert "- Status: `pass`" in text
+    assert "- Manual result: `not completed by automation`" in text
+    assert "MANUAL-REQUIRED" in text
 
 
 def test_risk_forecast_emits_valid_mitigation_commands() -> None:

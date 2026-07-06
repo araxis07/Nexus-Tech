@@ -37,6 +37,9 @@ jobs:
       - name: Validate content catalog
         run: uv run nexus-tech validate-content
 
+      - name: Run onboarding flow audit
+        run: uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -116,6 +119,15 @@ jobs:
           name: nexus-tech-2d-visual-audit
           path: /tmp/nexus-tech-visual-audit
           if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload onboarding flow audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-flow-audit
+          path: /tmp/nexus-tech-onboarding-flow-audit.md
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Upload 2D animation matrix artifact
