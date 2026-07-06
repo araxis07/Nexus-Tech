@@ -253,6 +253,9 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "audit-onboarding-flow",
         "onboarding-visible-playtest-packet",
         "validate-onboarding-visible-playtest-packet",
+        "onboarding-visible-playtest-report",
+        "record-onboarding-visible-playtest-route",
+        "validate-onboarding-visible-playtest-report",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -953,6 +956,86 @@ def test_validate_onboarding_visible_playtest_packet_command_passes_current_pack
     assert "PASS" in result.output
 
 
+def test_onboarding_visible_playtest_report_commands_record_evidence(
+    tmp_path: Path,
+) -> None:
+    packet_path = tmp_path / "onboarding-visible.md"
+    report_path = tmp_path / "onboarding-visible-report.md"
+    packet_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-packet",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--output",
+            str(packet_path),
+        ],
+    )
+    assert packet_result.exit_code == 0
+
+    report_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-report",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--input",
+            str(packet_path),
+            "--output",
+            str(report_path),
+        ],
+    )
+    assert report_result.exit_code == 0
+    assert "MANUAL-REQUIRED" in report_result.output
+
+    record_result = runner.invoke(
+        app,
+        [
+            "record-onboarding-visible-playtest-route",
+            "--report",
+            str(report_path),
+            "--rank",
+            "4",
+            "--result",
+            "pass",
+            "--notes",
+            (
+                "Observed the 820x620 title menu in a real window; wizard, help, "
+                "and back/menu affordances were readable and separated."
+            ),
+        ],
+    )
+    assert record_result.exit_code == 0
+    assert "Onboarding Visible Evidence Recorded" in record_result.output
+
+    validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-playtest-report",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+        ],
+    )
+    assert validation_result.exit_code == 0
+    assert "Onboarding Visible Report Validation" in validation_result.output
+    assert "MANUAL-REQUIRED" in validation_result.output
+    assert "Observed the 820x620 title menu" in report_path.read_text(encoding="utf-8")
+
+
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 
@@ -963,8 +1046,12 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "path: /tmp/nexus-tech-onboarding-flow-audit.md" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-packet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-packet" in workflow
+    assert "uv run nexus-tech onboarding-visible-playtest-report" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-playtest-report" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
+    assert "nexus-tech-onboarding-visible-playtest-report" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

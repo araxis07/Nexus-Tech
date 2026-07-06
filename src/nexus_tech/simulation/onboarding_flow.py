@@ -15,13 +15,29 @@ from nexus_tech.simulation.turn_coach import build_turn_coach
 
 ONBOARDING_FLOW_AUDIT_REPORT_NAME = "onboarding-flow-audit.md"
 ONBOARDING_VISIBLE_PLAYTEST_PACKET_NAME = "onboarding-visible-playtest.md"
+ONBOARDING_VISIBLE_PLAYTEST_REPORT_NAME = "onboarding-visible-playtest-report.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
     (1440, 900),
 )
 DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES: tuple[str, ...] = ("full", "reduced", "off")
+ONBOARDING_VISIBLE_RESULT_VALUES: tuple[str, ...] = ("todo", "pass", "watch", "fail")
+ONBOARDING_VISIBLE_NOTE_PLACEHOLDER = "<replace with observed visible-window notes>"
 _PLACEHOLDER_TERMS = ("todo", "placeholder", "tbd", "unknown")
+_GENERIC_NOTE_TERMS = (
+    "ok",
+    "good",
+    "fine",
+    "pass",
+    "passed",
+    "works",
+    "n/a",
+    "na",
+    "none",
+    "เรียบร้อย",
+    "โอเค",
+)
 
 
 @dataclass(frozen=True)
@@ -105,6 +121,83 @@ class OnboardingVisiblePlaytestValidationReport:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return packet checks that still block the handoff."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestReportRow:
+    """One visible-window onboarding evidence row."""
+
+    rank: int
+    route: str
+    window: str
+    motion_mode: str
+    result: str
+    evidence_notes: str
+    required_evidence: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestEvidenceReport:
+    """Manual visible-window onboarding evidence report."""
+
+    packet_path: Path
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+
+    @property
+    def status(self) -> str:
+        """Return release status from recorded visible-window evidence."""
+
+        if any(row.result == "fail" for row in self.rows):
+            return "fail"
+        if self.rows and all(
+            row.result == "pass" and _has_real_observation_notes(row.evidence_notes)
+            for row in self.rows
+        ):
+            return "pass"
+        return "manual-required"
+
+    @property
+    def incomplete_rows(self) -> tuple[OnboardingVisiblePlaytestReportRow, ...]:
+        """Return rows that still need real visible-window observations."""
+
+        return tuple(
+            row
+            for row in self.rows
+            if row.result != "pass" or not _has_real_observation_notes(row.evidence_notes)
+        )
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestEvidenceRecord:
+    """Result of recording one onboarding visible QA row."""
+
+    rank: int
+    route: str
+    window: str
+    motion_mode: str
+    result: str
+    evidence_notes: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestReportValidation:
+    """Validation report for onboarding visible QA evidence."""
+
+    report_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the evidence report structure is valid."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return report checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -436,6 +529,69 @@ def write_onboarding_visible_playtest_packet(
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def build_onboarding_visible_playtest_evidence_report(
+    packet: OnboardingVisiblePlaytestPacket,
+    *,
+    packet_path: Path = Path("/tmp/nexus-tech-onboarding-visible-playtest.md"),
+) -> OnboardingVisiblePlaytestEvidenceReport:
+    """Build a manual evidence report draft from a visible onboarding packet."""
+
+    rows = tuple(
+        OnboardingVisiblePlaytestReportRow(
+            rank=step.rank,
+            route=step.route,
+            window=step.window,
+            motion_mode=step.motion_mode,
+            result="todo",
+            evidence_notes=ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
+            required_evidence=step.required_evidence,
+        )
+        for step in packet.steps
+    )
+    return OnboardingVisiblePlaytestEvidenceReport(
+        packet_path=packet_path,
+        rows=rows,
+    )
+
+
+def write_onboarding_visible_playtest_evidence_report(
+    report: OnboardingVisiblePlaytestEvidenceReport,
+    output_path: Path,
+) -> None:
+    """Write a Markdown evidence report for real visible-window onboarding QA."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Playtest Report",
+        "",
+        f"- Packet: `{report.packet_path}`",
+        f"- Status: `{report.status}`",
+        f"- Rows: `{len(report.rows)}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Recorder command: `record-onboarding-visible-playtest-route`",
+        "",
+        "This report stores human-visible onboarding evidence. Generated `todo` rows are "
+        "not signoff; replace them only after opening the game window and observing the route.",
+        "",
+        "| # | Route | Window | Motion | Result | Evidence Notes | Required Evidence |",
+        "| ---: | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in report.rows:
+        lines.append(_format_onboarding_visible_report_row(row))
+    lines.extend(
+        [
+            "",
+            "## Result Rules",
+            "",
+            "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+            "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+            "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+            "- Keep `manual-required` until every row is recorded from a real window.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def validate_onboarding_visible_playtest_packet(
     packet_path: Path,
     *,
@@ -538,6 +694,207 @@ def validate_onboarding_visible_playtest_packet(
     )
 
 
+def record_onboarding_visible_playtest_route(
+    report_path: Path,
+    *,
+    result: str,
+    evidence_notes: str,
+    rank: int | None = None,
+    route: str | None = None,
+    window: str | None = None,
+    motion_mode: str | None = None,
+) -> OnboardingVisiblePlaytestEvidenceRecord:
+    """Record one real visible-window onboarding QA observation."""
+
+    normalized_result = result.strip().lower()
+    if normalized_result not in {"pass", "watch", "fail"}:
+        raise ValueError("Result must be one of: pass, watch, fail.")
+    if not _has_real_observation_notes(evidence_notes):
+        raise ValueError(
+            "Evidence notes must describe a real visible-window observation, not a placeholder."
+        )
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    matched_index = _find_onboarding_visible_report_row(
+        report.rows,
+        rank=rank,
+        route=route,
+        window=window,
+        motion_mode=motion_mode,
+    )
+    updated_row = OnboardingVisiblePlaytestReportRow(
+        rank=report.rows[matched_index].rank,
+        route=report.rows[matched_index].route,
+        window=report.rows[matched_index].window,
+        motion_mode=report.rows[matched_index].motion_mode,
+        result=normalized_result,
+        evidence_notes=evidence_notes.strip(),
+        required_evidence=report.rows[matched_index].required_evidence,
+    )
+    updated_rows = (
+        *report.rows[:matched_index],
+        updated_row,
+        *report.rows[matched_index + 1 :],
+    )
+    write_onboarding_visible_playtest_evidence_report(
+        OnboardingVisiblePlaytestEvidenceReport(
+            packet_path=report.packet_path,
+            rows=updated_rows,
+        ),
+        report_path,
+    )
+    return OnboardingVisiblePlaytestEvidenceRecord(
+        rank=updated_row.rank,
+        route=updated_row.route,
+        window=updated_row.window,
+        motion_mode=updated_row.motion_mode,
+        result=updated_row.result,
+        evidence_notes=updated_row.evidence_notes,
+    )
+
+
+def validate_onboarding_visible_playtest_evidence_report(
+    report_path: Path,
+    *,
+    packet: OnboardingVisiblePlaytestPacket,
+) -> OnboardingVisiblePlaytestReportValidation:
+    """Validate a manual visible-window onboarding evidence report artifact."""
+
+    if not report_path.exists():
+        return OnboardingVisiblePlaytestReportValidation(
+            report_path=report_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Evidence Report File",
+                    passed=False,
+                    summary="The onboarding visible playtest evidence report must exist.",
+                    evidence=(f"missing:{report_path}",),
+                ),
+            ),
+        )
+
+    text = report_path.read_text(encoding="utf-8")
+    try:
+        report = read_onboarding_visible_playtest_evidence_report(report_path)
+    except ValueError as error:
+        return OnboardingVisiblePlaytestReportValidation(
+            report_path=report_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Evidence Report Parse",
+                    passed=False,
+                    summary="The onboarding visible playtest report must be parseable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+
+    expected_keys = tuple(
+        (step.rank, step.route, step.window, step.motion_mode) for step in packet.steps
+    )
+    row_keys = tuple((row.rank, row.route, row.window, row.motion_mode) for row in report.rows)
+    expected_required = {
+        (step.rank, step.route, step.window, step.motion_mode): step.required_evidence
+        for step in packet.steps
+    }
+    invalid_results = tuple(
+        row.result for row in report.rows if row.result not in ONBOARDING_VISIBLE_RESULT_VALUES
+    )
+    stale_required = tuple(
+        f"{row.rank}:{row.route}"
+        for row in report.rows
+        if row.required_evidence
+        != expected_required.get((row.rank, row.route, row.window, row.motion_mode), ())
+    )
+    bad_notes = tuple(
+        f"{row.rank}:{row.route}"
+        for row in report.rows
+        if row.result in {"pass", "watch", "fail"}
+        and not _has_real_observation_notes(row.evidence_notes)
+    )
+    checks = (
+        _build_presence_check(
+            area="Evidence Report Structure",
+            text=text,
+            markers=(
+                "# NEXUS TECH Onboarding Visible Playtest Report",
+                "- Evidence policy: `real visible-window observations required`",
+                "- Recorder command: `record-onboarding-visible-playtest-route`",
+                "| # | Route | Window | Motion | Result | Evidence Notes | Required Evidence |",
+                "## Result Rules",
+            ),
+            summary="The evidence report keeps the required sections and recorder guidance.",
+        ),
+        _build_check(
+            area="Route Rows",
+            passed=row_keys == expected_keys,
+            summary="The evidence report rows match the current onboarding visible packet.",
+            evidence=(
+                f"expected:{len(expected_keys)}",
+                f"actual:{len(row_keys)}",
+            )
+            if row_keys == expected_keys
+            else (
+                f"missing:{len(set(expected_keys) - set(row_keys))}",
+                f"unexpected:{len(set(row_keys) - set(expected_keys))}",
+            ),
+        ),
+        _build_check(
+            area="Result Values",
+            passed=not invalid_results,
+            summary="Every evidence row uses a supported result value.",
+            evidence=("valid",)
+            if not invalid_results
+            else tuple(f"invalid:{value}" for value in invalid_results[:8]),
+        ),
+        _build_check(
+            area="Required Evidence",
+            passed=not stale_required,
+            summary="Required evidence prompts still match the packet.",
+            evidence=("current",)
+            if not stale_required
+            else tuple(f"stale:{value}" for value in stale_required[:8]),
+        ),
+        _build_check(
+            area="Recorded Notes",
+            passed=not bad_notes,
+            summary="Recorded pass/watch/fail rows use real visible-window notes.",
+            evidence=("todo rows allowed",)
+            if not bad_notes
+            else tuple(f"placeholder:{value}" for value in bad_notes[:8]),
+        ),
+        _build_check(
+            area="Status Line",
+            passed=f"- Status: `{report.status}`" in text,
+            summary="The report status line matches the recorded rows.",
+            evidence=(f"status:{report.status}",),
+        ),
+    )
+    return OnboardingVisiblePlaytestReportValidation(
+        report_path=report_path,
+        status=report.status if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def read_onboarding_visible_playtest_evidence_report(
+    report_path: Path,
+) -> OnboardingVisiblePlaytestEvidenceReport:
+    """Read a Markdown onboarding visible QA report."""
+
+    text = report_path.read_text(encoding="utf-8")
+    packet_path = Path(_extract_backtick_metadata(text, "Packet"))
+    rows = tuple(_parse_onboarding_visible_report_row(line) for line in text.splitlines())
+    rows = tuple(row for row in rows if row is not None)
+    if not rows:
+        raise ValueError("Onboarding visible playtest report has no evidence rows.")
+    return OnboardingVisiblePlaytestEvidenceReport(
+        packet_path=packet_path,
+        rows=rows,
+    )
+
+
 def _build_check(
     *,
     area: str,
@@ -574,6 +931,92 @@ def _build_presence_check(
         summary=summary,
         evidence=evidence,
     )
+
+
+def _format_onboarding_visible_report_row(row: OnboardingVisiblePlaytestReportRow) -> str:
+    return (
+        "| "
+        f"{row.rank} | "
+        f"`{row.route}` | "
+        f"`{row.window}` | "
+        f"`{row.motion_mode}` | "
+        f"`{row.result}` | "
+        f"{_markdown_escape(row.evidence_notes)} | "
+        f"{_markdown_escape(', '.join(row.required_evidence))} |"
+    )
+
+
+def _parse_onboarding_visible_report_row(
+    line: str,
+) -> OnboardingVisiblePlaytestReportRow | None:
+    if not line.startswith("| "):
+        return None
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if len(cells) != 7 or not cells[0].isdigit():
+        return None
+    return OnboardingVisiblePlaytestReportRow(
+        rank=int(cells[0]),
+        route=_strip_backticks(cells[1]),
+        window=_strip_backticks(cells[2]),
+        motion_mode=_strip_backticks(cells[3]),
+        result=_strip_backticks(cells[4]).lower(),
+        evidence_notes=cells[5].replace("\\|", "|").strip(),
+        required_evidence=tuple(
+            item.strip() for item in cells[6].replace("\\|", "|").split(",") if item.strip()
+        ),
+    )
+
+
+def _find_onboarding_visible_report_row(
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...],
+    *,
+    rank: int | None,
+    route: str | None,
+    window: str | None,
+    motion_mode: str | None,
+) -> int:
+    matches: list[int] = []
+    for index, row in enumerate(rows):
+        if rank is not None and row.rank != rank:
+            continue
+        if route is not None and row.route != route:
+            continue
+        if window is not None and row.window != window:
+            continue
+        if motion_mode is not None and row.motion_mode != motion_mode:
+            continue
+        matches.append(index)
+    if not matches:
+        raise ValueError("No onboarding visible report row matched the provided selector.")
+    if len(matches) > 1:
+        raise ValueError("Selector matched multiple onboarding visible report rows; add --rank.")
+    return matches[0]
+
+
+def _extract_backtick_metadata(text: str, label: str) -> str:
+    prefix = f"- {label}: `"
+    for line in text.splitlines():
+        if line.startswith(prefix) and line.endswith("`"):
+            return line[len(prefix) : -1]
+    raise ValueError(f"missing metadata line: {label}")
+
+
+def _strip_backticks(value: str) -> str:
+    value = value.strip()
+    if value.startswith("`") and value.endswith("`"):
+        return value[1:-1]
+    return value
+
+
+def _has_real_observation_notes(notes: str) -> bool:
+    normalized = " ".join(notes.strip().lower().split())
+    if len(normalized) < 30:
+        return False
+    if ONBOARDING_VISIBLE_NOTE_PLACEHOLDER.strip("<>").lower() in normalized:
+        return False
+    if any(term in normalized for term in ("<replace", "placeholder", "todo", "tbd")):
+        return False
+    return normalized not in _GENERIC_NOTE_TERMS
 
 
 def _safe_first_actions_present(commands: tuple[str, ...]) -> bool:

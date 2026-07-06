@@ -229,10 +229,15 @@ from nexus_tech.simulation.meta_progression import (
 from nexus_tech.simulation.onboarding_flow import (
     DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES,
     DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
+    ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
+    build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_packet,
+    record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
+    validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
+    write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_packet,
 )
 from nexus_tech.simulation.randomness import RandomSource
@@ -355,6 +360,16 @@ ONBOARDING_VISIBLE_PACKET_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-playtest.md"),
     "--input",
     help="Markdown path for the visible-window onboarding playtest packet to validate.",
+)
+ONBOARDING_VISIBLE_REPORT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest-report.md"),
+    "--output",
+    help="Markdown path for the visible-window onboarding evidence report.",
+)
+ONBOARDING_VISIBLE_REPORT_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest-report.md"),
+    "--report",
+    help="Markdown path for the visible-window onboarding evidence report.",
 )
 ONBOARDING_VISIBLE_WINDOW_OPTION = typer.Option(
     None,
@@ -5942,6 +5957,209 @@ def validate_onboarding_visible_playtest_packet_command(
         )
     )
     if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-playtest-report")
+def onboarding_visible_playtest_report_command(
+    packet_path: Path = ONBOARDING_VISIBLE_PACKET_INPUT_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected by the visible onboarding report.",
+    ),
+    output: Path = ONBOARDING_VISIBLE_REPORT_OUTPUT_OPTION,
+    window_size: list[str] | None = ONBOARDING_VISIBLE_WINDOW_OPTION,
+    motion_mode: list[MotionMode] | None = ONBOARDING_VISIBLE_MOTION_MODE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the manual visible-window onboarding evidence report draft."""
+
+    parsed_windows = resolve_2d_visual_audit_viewports(window_size)
+    windows = parsed_windows if parsed_windows is not None else DEFAULT_ONBOARDING_VISIBLE_WINDOWS
+    motion_modes = (
+        tuple(mode.value for mode in motion_mode)
+        if motion_mode
+        else DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES
+    )
+    packet_difficulty = difficulty or DifficultyMode.BUILDER
+    packet = build_onboarding_visible_playtest_packet(
+        scenario_id=scenario,
+        difficulty_mode=packet_difficulty,
+        campaign_start_id=campaign_start,
+        seed=seed,
+        command_prefix=command_prefix,
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+    report = build_onboarding_visible_playtest_evidence_report(
+        packet,
+        packet_path=packet_path,
+    )
+    write_onboarding_visible_playtest_evidence_report(report, output)
+
+    table = Table(title=f"Onboarding Visible Playtest Report | {output}")
+    table.add_column("Rows", justify="right")
+    table.add_column("Status")
+    table.add_column("Packet")
+    table.add_row(str(len(report.rows)), report.status.upper(), str(packet_path))
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible evidence report is {report.status.upper()}. "
+                f"Replace `{ONBOARDING_VISIBLE_NOTE_PLACEHOLDER}` only after real "
+                f"visible-window observations."
+            ),
+            title="Manual Evidence Required",
+            border_style="yellow",
+        )
+    )
+
+
+@app.command("record-onboarding-visible-playtest-route")
+def record_onboarding_visible_playtest_route_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    result: str = typer.Option(
+        ...,
+        "--result",
+        help="Observed result for this visible route: pass, watch, or fail.",
+    ),
+    notes: str = typer.Option(
+        ...,
+        "--notes",
+        help="Concrete notes from the real visible-window observation.",
+    ),
+    rank: int | None = typer.Option(
+        None,
+        "--rank",
+        help="Evidence row number to record. Preferred when route appears multiple times.",
+    ),
+    route: str | None = typer.Option(
+        None,
+        "--route",
+        help="Optional route id to record, for example title-onboarding.",
+    ),
+    window: str | None = typer.Option(
+        None,
+        "--window",
+        help="Optional window label to record, for example 820x620.",
+    ),
+    motion_mode: str | None = typer.Option(
+        None,
+        "--motion-mode",
+        help="Optional motion mode to record: full, reduced, off, or n/a.",
+    ),
+) -> None:
+    """Record one real visible-window onboarding QA row."""
+
+    try:
+        record = record_onboarding_visible_playtest_route(
+            report_path,
+            result=result,
+            evidence_notes=notes,
+            rank=rank,
+            route=route,
+            window=window,
+            motion_mode=motion_mode,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Evidence Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    table = Table(title="Onboarding Visible Evidence Recorded")
+    table.add_column("Rank", justify="right")
+    table.add_column("Route")
+    table.add_column("Window")
+    table.add_column("Motion")
+    table.add_column("Result")
+    table.add_column("Notes")
+    table.add_row(
+        str(record.rank),
+        record.route,
+        record.window,
+        record.motion_mode,
+        record.result.upper(),
+        record.evidence_notes,
+    )
+    console.print(table)
+
+
+@app.command("validate-onboarding-visible-playtest-report")
+def validate_onboarding_visible_playtest_report_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected by the visible onboarding report.",
+    ),
+    window_size: list[str] | None = ONBOARDING_VISIBLE_WINDOW_OPTION,
+    motion_mode: list[MotionMode] | None = ONBOARDING_VISIBLE_MOTION_MODE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the manual visible-window onboarding evidence report."""
+
+    parsed_windows = resolve_2d_visual_audit_viewports(window_size)
+    windows = parsed_windows if parsed_windows is not None else DEFAULT_ONBOARDING_VISIBLE_WINDOWS
+    motion_modes = (
+        tuple(mode.value for mode in motion_mode)
+        if motion_mode
+        else DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES
+    )
+    packet_difficulty = difficulty or DifficultyMode.BUILDER
+    packet = build_onboarding_visible_playtest_packet(
+        scenario_id=scenario,
+        difficulty_mode=packet_difficulty,
+        campaign_start_id=campaign_start,
+        seed=seed,
+        command_prefix=command_prefix,
+        windows=windows,
+        motion_modes=motion_modes,
+    )
+    validation = validate_onboarding_visible_playtest_evidence_report(
+        report_path,
+        packet=packet,
+    )
+
+    table = Table(title=f"Onboarding Visible Report Validation | {report_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible report validation: "
+                f"{'PASS' if validation.ok else 'FAIL'}; report status "
+                f"{validation.status.upper()}."
+            ),
+            title="Onboarding Visible Report Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
         raise typer.Exit(code=1)
 
 

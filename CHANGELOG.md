@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.255.0 - 2026-07-07
+
+- Added onboarding visible playtest evidence reports plus route-level recording for real visible-window observations
+- Added validation for onboarding visible evidence reports so stale rows and placeholder notes are blocked
+- Wired the onboarding visible report draft and validator into CI with a dedicated artifact upload
+
 ## 0.254.0 - 2026-07-07
 
 - Added `validate-onboarding-visible-playtest-packet` to block stale or incomplete manual onboarding visible QA packets

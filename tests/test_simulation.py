@@ -146,10 +146,14 @@ from nexus_tech.simulation.meta_progression import (
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
+    build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_packet,
+    record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
+    validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
+    write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_packet,
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
@@ -12314,6 +12318,85 @@ def test_validate_onboarding_visible_playtest_packet_blocks_stale_artifacts(
 
     assert stale_report.status == "fail"
     assert any(check.area == "Visible Commands" for check in stale_report.failed_checks)
+
+
+def test_onboarding_visible_playtest_report_records_real_observations(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    report = build_onboarding_visible_playtest_evidence_report(
+        packet,
+        packet_path=tmp_path / "packet.md",
+    )
+    write_onboarding_visible_playtest_evidence_report(report, report_path)
+
+    draft_validation = validate_onboarding_visible_playtest_evidence_report(
+        report_path,
+        packet=packet,
+    )
+
+    assert draft_validation.ok
+    assert draft_validation.status == "manual-required"
+    assert "<replace with observed visible-window notes>" in report_path.read_text(encoding="utf-8")
+
+    record = record_onboarding_visible_playtest_route(
+        report_path,
+        rank=4,
+        result="pass",
+        evidence_notes=(
+            "Observed the 820x620 title menu in a real window; wizard, help, and "
+            "back/menu affordances were readable and separated."
+        ),
+    )
+
+    assert record.route == "title-onboarding"
+    assert record.result == "pass"
+
+    recorded_text = report_path.read_text(encoding="utf-8")
+    assert "| 4 | `title-onboarding` | `820x620` | `reduced` | `pass` |" in recorded_text
+    assert "Observed the 820x620 title menu" in recorded_text
+
+
+def test_onboarding_visible_playtest_report_rejects_placeholder_recording(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    with pytest.raises(ValueError, match="Evidence notes"):
+        record_onboarding_visible_playtest_route(
+            report_path,
+            rank=4,
+            result="pass",
+            evidence_notes="<replace with observed visible-window notes>",
+        )
+
+    text = report_path.read_text(encoding="utf-8")
+    report_path.write_text(
+        text.replace("| 4 | `title-onboarding`", "| 4 | `stale-title`"),
+        encoding="utf-8",
+    )
+
+    validation = validate_onboarding_visible_playtest_evidence_report(
+        report_path,
+        packet=packet,
+    )
+
+    assert not validation.ok
+    assert any(check.area == "Route Rows" for check in validation.failed_checks)
 
 
 def test_risk_forecast_emits_valid_mitigation_commands() -> None:
