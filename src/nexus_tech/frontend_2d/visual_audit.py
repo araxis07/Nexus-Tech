@@ -38,6 +38,11 @@ DEFAULT_VISUAL_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
     (1280, 720),
     (1440, 900),
 )
+DEFAULT_LAYOUT_MATRIX_MOTION_MODES: tuple[MotionMode, ...] = (
+    MotionMode.FULL,
+    MotionMode.REDUCED,
+    MotionMode.OFF,
+)
 MIN_UNIQUE_COLOR_SAMPLES = 18
 MIN_LUMINANCE_SPREAD = 28
 MIN_NON_DARK_RATIO = 0.05
@@ -228,6 +233,214 @@ class VisualAuditReport:
             )
             digest = zlib.adler32(payload.encode("utf-8"), digest)
         return f"{len(self.cells)}:{digest:08x}"
+
+
+@dataclass(frozen=True)
+class VisualLayoutMatrixCell:
+    """One layout/readability row derived from a deterministic visual capture."""
+
+    motion_mode: str
+    scene_key: str
+    width: int
+    height: int
+    status: str
+    notes: str
+    click_target_count: int
+    min_click_target_size: tuple[int, int]
+    min_click_target_clearance: int
+    layout_violations: tuple[str, ...] = ()
+    typography_violations: tuple[str, ...] = ()
+    text_fit_count: int = 0
+    wrapped_clamp_count: int = 0
+    min_text_fit_ratio: float = 1.0
+
+    @property
+    def viewport(self) -> str:
+        """Return the captured viewport label."""
+
+        return f"{self.width}x{self.height}"
+
+
+@dataclass(frozen=True)
+class VisualLayoutMatrixReport:
+    """Focused responsive-layout and typography matrix for 2D QA."""
+
+    scenario_id: str
+    difficulty: str
+    seed: int
+    motion_modes: tuple[str, ...]
+    sizes: tuple[tuple[int, int], ...]
+    cells: tuple[VisualLayoutMatrixCell, ...]
+    source_baselines: tuple[str, ...]
+
+    @property
+    def status(self) -> str:
+        """Return pass only when every visual-layout matrix row passes."""
+
+        return "pass" if all(cell.status == "pass" for cell in self.cells) else "fail"
+
+    @property
+    def failed_cells(self) -> tuple[VisualLayoutMatrixCell, ...]:
+        """Return all failing matrix rows."""
+
+        return tuple(cell for cell in self.cells if cell.status != "pass")
+
+    @property
+    def layout_violation_count(self) -> int:
+        """Return the total count of layout containment findings."""
+
+        return sum(len(cell.layout_violations) for cell in self.cells)
+
+    @property
+    def typography_violation_count(self) -> int:
+        """Return the total count of typography safety findings."""
+
+        return sum(len(cell.typography_violations) for cell in self.cells)
+
+    @property
+    def minimum_text_fit_ratio(self) -> float:
+        """Return the lowest observed fitted-text ratio across the matrix."""
+
+        return min((cell.min_text_fit_ratio for cell in self.cells), default=1.0)
+
+    @property
+    def minimum_click_target_clearance(self) -> int:
+        """Return the tightest observed critical click-target clearance."""
+
+        return min((cell.min_click_target_clearance for cell in self.cells), default=0)
+
+
+def run_2d_layout_matrix_audit(
+    *,
+    scenario_id: str,
+    difficulty_mode: DifficultyMode | None,
+    seed: int,
+    sizes: tuple[tuple[int, int], ...] = DEFAULT_VISUAL_AUDIT_SIZES,
+    motion_modes: tuple[MotionMode | str, ...] = DEFAULT_LAYOUT_MATRIX_MOTION_MODES,
+) -> VisualLayoutMatrixReport:
+    """Run visual audits across viewports and motion modes for layout QA."""
+
+    normalized_modes = tuple(normalize_motion_mode(mode) for mode in motion_modes)
+    cells: list[VisualLayoutMatrixCell] = []
+    baselines: list[str] = []
+    difficulty = "scenario"
+
+    for motion_mode in normalized_modes:
+        visual_report = run_2d_visual_audit(
+            scenario_id=scenario_id,
+            difficulty_mode=difficulty_mode,
+            seed=seed,
+            sizes=sizes,
+            motion_mode=motion_mode,
+            output_dir=None,
+        )
+        difficulty = visual_report.difficulty
+        baselines.append(f"{motion_mode.value}:{visual_report.baseline_signature}")
+        for cell in visual_report.cells:
+            cells.append(
+                VisualLayoutMatrixCell(
+                    motion_mode=motion_mode.value,
+                    scene_key=cell.scene_key,
+                    width=cell.width,
+                    height=cell.height,
+                    status=cell.status,
+                    notes=cell.notes,
+                    click_target_count=cell.click_target_count,
+                    min_click_target_size=cell.min_click_target_size,
+                    min_click_target_clearance=cell.min_click_target_clearance,
+                    layout_violations=cell.layout_violations,
+                    typography_violations=cell.typography_violations,
+                    text_fit_count=cell.text_fit_count,
+                    wrapped_clamp_count=cell.wrapped_clamp_count,
+                    min_text_fit_ratio=cell.min_text_fit_ratio,
+                )
+            )
+
+    return VisualLayoutMatrixReport(
+        scenario_id=scenario_id,
+        difficulty=difficulty,
+        seed=seed,
+        motion_modes=tuple(mode.value for mode in normalized_modes),
+        sizes=sizes,
+        cells=tuple(cells),
+        source_baselines=tuple(baselines),
+    )
+
+
+def write_2d_layout_matrix_report(report: VisualLayoutMatrixReport, output_path: Path) -> None:
+    """Write a Markdown artifact for the responsive layout matrix."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    passed = len(report.cells) - len(report.failed_cells)
+    viewport_labels = ", ".join(f"{width}x{height}" for width, height in report.sizes)
+    lines = [
+        "# NEXUS TECH 2D Layout Matrix",
+        "",
+        f"- Scenario: `{report.scenario_id}`",
+        f"- Difficulty: `{report.difficulty}`",
+        f"- Seed: `{report.seed}`",
+        f"- Motion modes: `{', '.join(report.motion_modes)}`",
+        f"- Viewports: `{viewport_labels}`",
+        f"- Status: `{report.status}`",
+        f"- Captures: `{len(report.cells)}` total, `{passed}` pass, "
+        f"`{len(report.failed_cells)}` fail",
+        f"- Layout violations: `{report.layout_violation_count}`",
+        f"- Typography violations: `{report.typography_violation_count}`",
+        f"- Minimum click-target clearance: `{report.minimum_click_target_clearance}px`",
+        f"- Minimum text-fit ratio: `{report.minimum_text_fit_ratio:.2f}`",
+        f"- Source baselines: `{', '.join(report.source_baselines)}`",
+        "- Manual result: `not completed by automation`",
+        "",
+        "This automated matrix guards responsive containment, target spacing, and text fitting. "
+        "It does not replace visible-window playtest evidence.",
+        "",
+        "| Motion | Scene | Viewport | Status | Targets | Min Target | Clearance | "
+        "Text Fit | Clamp | Notes |",
+        "| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | --- |",
+    ]
+    for cell in report.cells:
+        min_target = (
+            f"{cell.min_click_target_size[0]}x{cell.min_click_target_size[1]}"
+            if cell.min_click_target_size != (0, 0)
+            else "-"
+        )
+        note_parts = [cell.notes]
+        if cell.layout_violations:
+            note_parts.append(f"layout: {', '.join(cell.layout_violations[:3])}")
+        if cell.typography_violations:
+            note_parts.append(f"typography: {', '.join(cell.typography_violations[:3])}")
+        lines.append(
+            "| "
+            f"`{cell.motion_mode}` | "
+            f"`{cell.scene_key}` | "
+            f"`{cell.viewport}` | "
+            f"`{cell.status}` | "
+            f"`{cell.click_target_count}` | "
+            f"`{min_target}` | "
+            f"`{cell.min_click_target_clearance}` | "
+            f"`{cell.min_text_fit_ratio:.2f}` | "
+            f"`{cell.wrapped_clamp_count}` | "
+            f"{_markdown_escape('; '.join(note_parts))} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Manual Follow-up",
+            "",
+            "- Run the visible-window commands for any failing or cramped rows.",
+            "- Treat layout overlap, clipped labels, offscreen controls, or unreadable text as "
+            "`MANUAL-REQUIRED` until verified in a real window.",
+            "- Keep this artifact attached to the manual animation QA session.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _markdown_escape(value: str) -> str:
+    """Escape compact table text for Markdown output."""
+
+    return value.replace("|", "\\|").replace("\n", " ")
 
 
 def run_2d_visual_audit(

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.251.0 - 2026-07-06
+
+- Added `audit-2d-layout-matrix` to turn visual audit captures into a responsive layout and typography gate across viewports and motion modes
+- Added CI execution and artifact upload for the 2D layout matrix report
+- Documented the layout matrix as an automated pre-manual QA guard for target spacing, text fitting, and containment
+
 ## 0.250.0 - 2026-07-06
 
 - Added `animation-playtest-batch-preflight` for focused 820x620 menu/play headless batch checks across full, reduced, and off motion modes

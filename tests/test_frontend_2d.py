@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 import nexus_tech.cli as cli_module
 import nexus_tech.frontend_2d.animation_audit as animation_audit_module
 import nexus_tech.frontend_2d.scenes as scenes_module
+import nexus_tech.frontend_2d.visual_audit as visual_audit_module
 from nexus_tech.cli import app
 from nexus_tech.domain.models import (
     CandidateTrait,
@@ -37,6 +38,8 @@ from nexus_tech.frontend_2d import (
     MotionAuditReport,
     VisualAuditCell,
     VisualAuditReport,
+    VisualLayoutMatrixCell,
+    VisualLayoutMatrixReport,
     animation_playtest_route_batch_shortcut_lines,
     build_2d_animation_playtest_command_queue,
     build_2d_animation_playtest_evidence_sheet,
@@ -63,6 +66,7 @@ from nexus_tech.frontend_2d import (
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
     run_2d_flow_audit,
+    run_2d_layout_matrix_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
@@ -96,6 +100,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_route_batch_plan,
     write_2d_animation_playtest_sprint_packet,
     write_2d_animation_playtest_ui_triage_plan,
+    write_2d_layout_matrix_report,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -5638,6 +5643,157 @@ def test_audit_2d_visual_command_rejects_invalid_focused_viewport(monkeypatch) -
     assert "Use WIDTHxHEIGHT" in result.output
 
 
+def test_run_2d_layout_matrix_audit_aggregates_motion_modes(monkeypatch) -> None:
+    calls: list[tuple[MotionMode, tuple[tuple[int, int], ...]]] = []
+
+    def fake_run_2d_visual_audit(**kwargs):
+        calls.append((kwargs["motion_mode"], kwargs["sizes"]))
+        return VisualAuditReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            motion_mode=kwargs["motion_mode"].value,
+            cells=(
+                VisualAuditCell(
+                    scene_key="run_dashboard",
+                    width=820,
+                    height=620,
+                    checksum=42,
+                    unique_color_samples=48,
+                    luminance_spread=140,
+                    non_dark_ratio=0.32,
+                    active_layers=("transition", "run-dashboard"),
+                    expected_layers=("transition", "run-dashboard"),
+                    click_target_count=5,
+                    min_click_target_size=(44, 28),
+                    min_click_target_clearance=12,
+                    text_fit_count=3,
+                    min_text_fit_ratio=0.88,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(visual_audit_module, "run_2d_visual_audit", fake_run_2d_visual_audit)
+
+    report = run_2d_layout_matrix_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        sizes=((820, 620),),
+        motion_modes=(MotionMode.FULL, MotionMode.OFF),
+    )
+
+    assert report.status == "pass"
+    assert report.motion_modes == ("full", "off")
+    assert calls == [
+        (MotionMode.FULL, ((820, 620),)),
+        (MotionMode.OFF, ((820, 620),)),
+    ]
+    assert len(report.cells) == 2
+    assert report.minimum_text_fit_ratio == 0.88
+    assert report.minimum_click_target_clearance == 12
+    assert report.source_baselines[0].startswith("full:")
+
+
+def test_write_2d_layout_matrix_report_flags_manual_followup(tmp_path: Path) -> None:
+    report = VisualLayoutMatrixReport(
+        scenario_id="founder_journey",
+        difficulty="scenario",
+        seed=7,
+        motion_modes=("full",),
+        sizes=((820, 620),),
+        source_baselines=("full:1:abc123",),
+        cells=(
+            VisualLayoutMatrixCell(
+                motion_mode="full",
+                scene_key="run_dashboard",
+                width=820,
+                height=620,
+                status="fail",
+                notes="layout target-overlap",
+                click_target_count=4,
+                min_click_target_size=(32, 24),
+                min_click_target_clearance=0,
+                layout_violations=("target-overlap:pause_toggle:run_back",),
+                typography_violations=("button-fit:0.20",),
+                text_fit_count=2,
+                wrapped_clamp_count=1,
+                min_text_fit_ratio=0.2,
+            ),
+        ),
+    )
+    output_path = tmp_path / "layout-matrix.md"
+
+    write_2d_layout_matrix_report(report, output_path)
+
+    text = output_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH 2D Layout Matrix" in text
+    assert "- Status: `fail`" in text
+    assert "- Manual result: `not completed by automation`" in text
+    assert "target-overlap:pause_toggle:run_back" in text
+    assert "`MANUAL-REQUIRED`" in text
+
+
+def test_audit_2d_layout_matrix_command_writes_report(monkeypatch, tmp_path: Path) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_run_2d_layout_matrix_audit(**kwargs):
+        calls.update(kwargs)
+        return VisualLayoutMatrixReport(
+            scenario_id=kwargs["scenario_id"],
+            difficulty="scenario",
+            seed=kwargs["seed"],
+            motion_modes=tuple(mode.value for mode in kwargs["motion_modes"]),
+            sizes=kwargs["sizes"],
+            source_baselines=("reduced:1:abc123", "off:1:def456"),
+            cells=(
+                VisualLayoutMatrixCell(
+                    motion_mode="reduced",
+                    scene_key="title_menu",
+                    width=820,
+                    height=620,
+                    status="pass",
+                    notes="captured",
+                    click_target_count=6,
+                    min_click_target_size=(42, 28),
+                    min_click_target_clearance=10,
+                    text_fit_count=2,
+                    min_text_fit_ratio=0.92,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        cli_module,
+        "run_2d_layout_matrix_audit",
+        fake_run_2d_layout_matrix_audit,
+    )
+
+    output_path = tmp_path / "layout-matrix.md"
+    result = runner.invoke(
+        app,
+        [
+            "audit-2d-layout-matrix",
+            "--viewport",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--motion-mode",
+            "off",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "2D Layout Matrix" in result.output
+    assert "Layout matrix status: PASS" in result.output
+    assert calls["sizes"] == ((820, 620),)
+    assert calls["motion_modes"] == (MotionMode.REDUCED, MotionMode.OFF)
+    assert output_path.exists()
+    assert "NEXUS TECH 2D Layout Matrix" in output_path.read_text(encoding="utf-8")
+
+
 def test_audit_2d_animation_command_reports_completeness_matrix(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
@@ -10166,6 +10322,9 @@ def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     ) in workflow
     assert "nexus-tech-2d-animation-matrix" in workflow
     assert "path: /tmp/nexus-tech-animation-matrix.md" in workflow
+    assert "uv run nexus-tech audit-2d-layout-matrix" in workflow
+    assert "--output /tmp/nexus-tech-2d-layout-matrix.md" in workflow
+    assert "nexus-tech-2d-layout-matrix" in workflow
     assert (
         "uv run nexus-tech prepare-2d-animation-playtest --frames 1 "
         "--output /tmp/nexus-tech-animation-playtest-prep.md"

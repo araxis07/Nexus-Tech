@@ -62,6 +62,15 @@ jobs:
           uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off --output-dir /tmp/nexus-tech-visual-audit/off
           uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 
+      - name: Run 2D layout matrix gate
+        run: >
+          uv run nexus-tech audit-2d-layout-matrix
+          --scenario founder_journey
+          --seed 7
+          --viewport 820x620
+          --viewport 1280x720
+          --output /tmp/nexus-tech-2d-layout-matrix.md
+
       - name: Run 2D animation matrix audit
         run: uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 
@@ -115,6 +124,15 @@ jobs:
         with:
           name: nexus-tech-2d-animation-matrix
           path: /tmp/nexus-tech-animation-matrix.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload 2D layout matrix artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-2d-layout-matrix
+          path: /tmp/nexus-tech-2d-layout-matrix.md
           if-no-files-found: warn
           retention-days: 7
 

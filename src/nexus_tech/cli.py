@@ -60,6 +60,7 @@ from nexus_tech.domain.models import (
 from nexus_tech.frontend_2d import (
     DEFAULT_ANIMATION_MATRIX_SCENARIOS,
     DEFAULT_ANIMATION_MATRIX_SEEDS,
+    DEFAULT_LAYOUT_MATRIX_MOTION_MODES,
     AnimationPlaytestCommand,
     AnimationPlaytestReadinessPlan,
     AnimationPlaytestRecorderHint,
@@ -103,6 +104,7 @@ from nexus_tech.frontend_2d import (
     record_2d_animation_playtest_window_evidence,
     run_2d_animation_audit,
     run_2d_animation_matrix_audit,
+    run_2d_layout_matrix_audit,
     run_2d_motion_audit,
     run_2d_visual_audit,
     summarize_2d_animation_playtest_report,
@@ -136,6 +138,7 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_route_batch_plan,
     write_2d_animation_playtest_sprint_packet,
     write_2d_animation_playtest_ui_triage_plan,
+    write_2d_layout_matrix_report,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
@@ -362,6 +365,19 @@ VISUAL_AUDIT_VIEWPORT_OPTION = typer.Option(
     help=(
         "Optional visual-audit viewport as WIDTHxHEIGHT. Repeat to audit a focused "
         "subset; omit to run the full matrix."
+    ),
+)
+LAYOUT_MATRIX_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-2d-layout-matrix.md"),
+    "--output",
+    help="Markdown path for the responsive 2D layout matrix artifact.",
+)
+LAYOUT_MATRIX_MOTION_MODE_OPTION = typer.Option(
+    None,
+    "--motion-mode",
+    help=(
+        "Optional 2D layout-matrix motion mode. Repeat to audit a focused subset; "
+        "omit to run full, reduced, and off."
     ),
 )
 ANIMATION_MATRIX_SEED_OPTION = typer.Option(
@@ -1491,6 +1507,96 @@ def audit_2d_visual_command(
                 f"{len(report.cells)} captures. Baseline {report.baseline_signature}."
             ),
             title="2D Visual Audit",
+            border_style=border_style,
+        )
+    )
+    if report.status == "fail":
+        raise typer.Exit(code=1)
+
+
+@app.command("audit-2d-layout-matrix")
+def audit_2d_layout_matrix_command(
+    scenario: str = SCENARIO_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed for deterministic 2D layout matrix setup.",
+    ),
+    output: Path = LAYOUT_MATRIX_OUTPUT_OPTION,
+    viewport: list[str] | None = VISUAL_AUDIT_VIEWPORT_OPTION,
+    motion_mode: list[MotionMode] | None = LAYOUT_MATRIX_MOTION_MODE_OPTION,
+) -> None:
+    """Audit responsive 2D layout safety across viewports and motion modes."""
+
+    sizes = resolve_2d_visual_audit_viewports(viewport)
+    motion_modes = tuple(motion_mode) if motion_mode else DEFAULT_LAYOUT_MATRIX_MOTION_MODES
+    try:
+        audit_kwargs = dict(
+            scenario_id=scenario,
+            difficulty_mode=difficulty,
+            seed=seed,
+            motion_modes=motion_modes,
+        )
+        if sizes is not None:
+            audit_kwargs["sizes"] = sizes
+        report = run_2d_layout_matrix_audit(**audit_kwargs)
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_2d_layout_matrix_report(report, output)
+
+    table = Table(
+        title=(
+            f"2D Layout Matrix | {report.scenario_id} | {report.difficulty} | seed {report.seed}"
+        )
+    )
+    table.add_column("Motion", style="cyan")
+    table.add_column("Scene")
+    table.add_column("Viewport", justify="right")
+    table.add_column("Targets", justify="right")
+    table.add_column("Min Target", justify="right")
+    table.add_column("Clearance", justify="right")
+    table.add_column("Text Fit", justify="right")
+    table.add_column("Status", justify="center")
+    table.add_column("Notes")
+    for cell in report.cells:
+        min_target = (
+            f"{cell.min_click_target_size[0]}x{cell.min_click_target_size[1]}"
+            if cell.min_click_target_size != (0, 0)
+            else "-"
+        )
+        table.add_row(
+            cell.motion_mode,
+            cell.scene_key,
+            cell.viewport,
+            str(cell.click_target_count),
+            min_target,
+            f"{cell.min_click_target_clearance}px",
+            f"{cell.min_text_fit_ratio:.2f}",
+            cell.status.upper(),
+            cell.notes,
+        )
+    console.print(table)
+
+    border_style = "green" if report.status == "pass" else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Layout matrix status: {report.status.upper()} across "
+                f"{len(report.cells)} captures. "
+                f"Layout violations {report.layout_violation_count}; "
+                f"typography violations {report.typography_violation_count}. "
+                f"Report written to {output}."
+            ),
+            title="2D Layout Matrix",
             border_style=border_style,
         )
     )
