@@ -258,6 +258,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-playtest-report",
         "onboarding-visible-playtest-status",
         "onboarding-visible-playtest-next",
+        "validate-onboarding-visible-playtest-next",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -1074,6 +1075,22 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert ".venv313/bin/nexus-tech guide" in next_text
     assert "record-onboarding-visible-playtest-route --report" in next_text
 
+    next_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-playtest-next",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(next_path),
+        ],
+    )
+    assert next_validation_result.exit_code == 0
+    assert "Onboarding Visible Next-Step Validation" in next_validation_result.output
+    assert "PASS" in next_validation_result.output
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1089,6 +1106,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-playtest-report" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-status" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-next" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-playtest-next" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow

@@ -78,6 +78,13 @@ jobs:
           --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
           --output /tmp/nexus-tech-onboarding-visible-playtest-next.md
 
+      - name: Validate onboarding visible next-step handoff
+        run: >
+          uv run nexus-tech validate-onboarding-visible-playtest-next
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --input /tmp/nexus-tech-onboarding-visible-playtest-next.md
+
       - name: Run tests
         run: uv run pytest -q
 

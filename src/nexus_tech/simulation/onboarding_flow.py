@@ -240,6 +240,27 @@ class OnboardingVisiblePlaytestNextStep:
     status_command: str
 
 
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestNextStepValidation:
+    """Validation report for the next visible-window onboarding QA handoff."""
+
+    next_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the next-step handoff matches the current report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return next-step handoff checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
 def run_onboarding_flow_audit(
     *,
     scenario_id: str = DEFAULT_SCENARIO_ID,
@@ -1047,6 +1068,12 @@ def write_onboarding_visible_playtest_next_step(
                 "```bash",
                 next_step.status_command,
                 "```",
+                "",
+                "## Result Rules",
+                "",
+                "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+                "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+                "- `fail`: route blocks navigation, readability, or first-turn understanding.",
             ]
         )
     else:
@@ -1105,6 +1132,127 @@ def write_onboarding_visible_playtest_next_step(
             ]
         )
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_playtest_next_step(
+    next_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisiblePlaytestNextStepValidation:
+    """Validate that a next-step handoff matches the current visible QA report."""
+
+    try:
+        expected = build_onboarding_visible_playtest_next_step(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisiblePlaytestNextStepValidation(
+            next_path=next_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not next_path.exists():
+        return OnboardingVisiblePlaytestNextStepValidation(
+            next_path=next_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Next Step File",
+                    passed=False,
+                    summary="The onboarding visible next-step handoff file must exist.",
+                    evidence=(f"missing:{next_path}",),
+                ),
+            ),
+        )
+
+    text = next_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Next Step",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Pass: `{expected.pass_count}`",
+        f"- Watch: `{expected.watch_count}`",
+        f"- Fail: `{expected.fail_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        f"- Incomplete: `{expected.incomplete_count}`",
+        "- Evidence policy: `real visible-window observations required`",
+    )
+    if expected.next_row is None:
+        action_markers = (
+            "All visible onboarding rows are recorded as `pass` with concrete notes.",
+            "Run validation before treating the onboarding visible gate as closed.",
+            expected.validate_command,
+            expected.status_command,
+        )
+        checklist_markers: tuple[str, ...] = ()
+    else:
+        row = expected.next_row
+        action_markers = (
+            "| Rank | Route | Window | Motion | Result |",
+            (
+                f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.result}` |"
+            ),
+            "## Copy Commands",
+            "### 1. Open The Visible Route",
+            expected.next_visible_command,
+            "### 2. Record The Observation After Playing",
+            expected.next_recorder_command,
+            "### 3. Validate And Refresh Status",
+            expected.validate_command,
+            expected.status_command,
+        )
+        checklist_markers = (
+            *row.required_evidence,
+            "Text stays inside its panel and remains readable.",
+            "Pause/back/menu recovery affordance is visible where the route needs it.",
+            "Notes mention the route, window/motion mode, and observed UI behavior.",
+        )
+    checks = (
+        _build_presence_check(
+            area="Next Step Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The next-step handoff metadata matches the current report.",
+        ),
+        _build_presence_check(
+            area="Next Action",
+            text=text,
+            markers=action_markers,
+            summary="The next-step handoff points to the current next visible route.",
+        ),
+        _build_presence_check(
+            area="Evidence Checklist",
+            text=text,
+            markers=checklist_markers,
+            summary="The next-step evidence checklist matches the current route.",
+        ),
+        _build_presence_check(
+            area="Result Rules",
+            text=text,
+            markers=(
+                "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+                "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+                "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+            ),
+            summary="The next-step handoff keeps manual result rules visible.",
+        ),
+    )
+    return OnboardingVisiblePlaytestNextStepValidation(
+        next_path=next_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
 
 
 def read_onboarding_visible_playtest_evidence_report(

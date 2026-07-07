@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.259.0 - 2026-07-07
+
+- Added `validate-onboarding-visible-playtest-next` to block stale next-step handoffs against the current visible QA report
+- Added next-step validation coverage for stale visible commands and copy-ready handoff metadata
+- Wired next-step validation into CI before uploading the onboarding visible next-step artifact
+
 ## 0.258.0 - 2026-07-07
 
 - Added `onboarding-visible-playtest-next` to write a copy-ready next-step handoff for the next real visible-window onboarding QA route

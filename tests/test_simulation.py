@@ -153,6 +153,7 @@ from nexus_tech.simulation.onboarding_flow import (
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_playtest_evidence_report,
+    validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
@@ -12451,6 +12452,52 @@ def test_onboarding_visible_playtest_next_step_writes_copy_ready_handoff(
     assert "--rank 2" in text
     assert "Text stays inside its panel and remains readable." in text
     assert "real visible-window observations required" in text
+
+
+def test_validate_onboarding_visible_playtest_next_step_blocks_stale_handoff(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    next_path = tmp_path / "onboarding-visible-next.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+    next_step = build_onboarding_visible_playtest_next_step(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_playtest_next_step(next_step, next_path)
+
+    validation = validate_onboarding_visible_playtest_next_step(
+        next_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = next_path.read_text(encoding="utf-8").replace(
+        ".venv313/bin/nexus-tech guide",
+        ".venv313/bin/nexus-tech tutorial",
+    )
+    next_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_playtest_next_step(
+        next_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Next Action" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

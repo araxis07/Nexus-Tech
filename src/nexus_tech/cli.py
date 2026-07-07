@@ -237,6 +237,7 @@ from nexus_tech.simulation.onboarding_flow import (
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_playtest_evidence_report,
+    validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
@@ -378,6 +379,11 @@ ONBOARDING_VISIBLE_NEXT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-playtest-next.md"),
     "--output",
     help="Markdown path for the next visible-window onboarding QA handoff.",
+)
+ONBOARDING_VISIBLE_NEXT_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest-next.md"),
+    "--input",
+    help="Markdown path for the next visible-window onboarding QA handoff to validate.",
 )
 ONBOARDING_VISIBLE_WINDOW_OPTION = typer.Option(
     None,
@@ -6311,6 +6317,50 @@ def onboarding_visible_playtest_next_command(
             )
         )
     console.print(f"Next-step handoff written to {output}")
+
+
+@app.command("validate-onboarding-visible-playtest-next")
+def validate_onboarding_visible_playtest_next_command(
+    next_path: Path = ONBOARDING_VISIBLE_NEXT_INPUT_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the next visible onboarding QA handoff against the report."""
+
+    validation = validate_onboarding_visible_playtest_next_step(
+        next_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible Next-Step Validation | {next_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible next-step validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible Next-Step Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
 
 
 @app.command("glossary")
