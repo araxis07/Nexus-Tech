@@ -259,6 +259,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "onboarding-visible-playtest-status",
         "onboarding-visible-playtest-next",
         "validate-onboarding-visible-playtest-next",
+        "onboarding-visible-terminal-batch",
+        "validate-onboarding-visible-terminal-batch",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -965,6 +967,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     packet_path = tmp_path / "onboarding-visible.md"
     report_path = tmp_path / "onboarding-visible-report.md"
     next_path = tmp_path / "onboarding-visible-next.md"
+    batch_path = tmp_path / "onboarding-visible-terminal-batch.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1091,6 +1094,42 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible Next-Step Validation" in next_validation_result.output
     assert "PASS" in next_validation_result.output
 
+    batch_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-terminal-batch",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--output",
+            str(batch_path),
+        ],
+    )
+    assert batch_result.exit_code == 0
+    assert "Onboarding Visible Terminal Batch" in batch_result.output
+    assert "Terminal batch handoff written" in batch_result.output
+    batch_text = batch_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Terminal Batch" in batch_text
+    assert ".venv313/bin/nexus-tech guide" in batch_text
+    assert ".venv313/bin/nexus-tech tutorial" in batch_text
+
+    batch_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-terminal-batch",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(batch_path),
+        ],
+    )
+    assert batch_validation_result.exit_code == 0
+    assert "Onboarding Visible Terminal Batch Validation" in batch_validation_result.output
+    assert "PASS" in batch_validation_result.output
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1107,12 +1146,16 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech onboarding-visible-playtest-status" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-next" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-next" in workflow
+    assert "uv run nexus-tech onboarding-visible-terminal-batch" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-terminal-batch" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-terminal-batch.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
+    assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

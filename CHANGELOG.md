@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.260.0 - 2026-07-08
+
+- Added `onboarding-visible-terminal-batch` to package the first three terminal onboarding QA routes into one copy-ready handoff
+- Added `validate-onboarding-visible-terminal-batch` to block stale terminal route commands and recorder commands
+- Wired terminal batch handoff generation, validation, and artifact upload into CI
+
 ## 0.259.0 - 2026-07-07
 
 - Added `validate-onboarding-visible-playtest-next` to block stale next-step handoffs against the current visible QA report

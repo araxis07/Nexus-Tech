@@ -17,6 +17,7 @@ ONBOARDING_FLOW_AUDIT_REPORT_NAME = "onboarding-flow-audit.md"
 ONBOARDING_VISIBLE_PLAYTEST_PACKET_NAME = "onboarding-visible-playtest.md"
 ONBOARDING_VISIBLE_PLAYTEST_REPORT_NAME = "onboarding-visible-playtest-report.md"
 ONBOARDING_VISIBLE_PLAYTEST_NEXT_NAME = "onboarding-visible-playtest-next.md"
+ONBOARDING_VISIBLE_TERMINAL_BATCH_NAME = "onboarding-visible-terminal-batch.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -257,6 +258,42 @@ class OnboardingVisiblePlaytestNextStepValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return next-step handoff checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleTerminalBatch:
+    """Copy-ready handoff for the first terminal onboarding visible QA batch."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    terminal_rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    incomplete_terminal_rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    recorder_commands: tuple[str, ...]
+    validate_command: str
+    status_command: str
+    next_step_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleTerminalBatchValidation:
+    """Validation report for the terminal onboarding visible QA batch handoff."""
+
+    batch_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the terminal batch matches the current report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return terminal batch checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -1250,6 +1287,259 @@ def validate_onboarding_visible_playtest_next_step(
     )
     return OnboardingVisiblePlaytestNextStepValidation(
         next_path=next_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def build_onboarding_visible_terminal_batch(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleTerminalBatch:
+    """Build a focused terminal-route batch from the current visible QA report."""
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    terminal_rows = tuple(row for row in report.rows if row.window == "terminal")
+    incomplete_terminal_rows = tuple(
+        row
+        for row in terminal_rows
+        if row.result != "pass" or not _has_real_observation_notes(row.evidence_notes)
+    )
+    recorder_commands = tuple(
+        _build_onboarding_visible_recorder_command(
+            report_path,
+            row,
+            command_prefix=command_prefix,
+        )
+        for row in terminal_rows
+    )
+    return OnboardingVisibleTerminalBatch(
+        report_path=report_path,
+        status=report.status,
+        total_rows=len(report.rows),
+        terminal_rows=terminal_rows,
+        incomplete_terminal_rows=incomplete_terminal_rows,
+        recorder_commands=recorder_commands,
+        validate_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+        next_step_command=(
+            f"{command_prefix} onboarding-visible-playtest-next --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_terminal_batch(
+    batch: OnboardingVisibleTerminalBatch,
+    output_path: Path,
+) -> None:
+    """Write a focused Markdown handoff for terminal onboarding visible QA."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Terminal Batch",
+        "",
+        f"- Report: `{batch.report_path}`",
+        f"- Status: `{batch.status}`",
+        f"- Rows: `{batch.total_rows}`",
+        f"- Terminal rows: `{len(batch.terminal_rows)}`",
+        f"- Incomplete terminal rows: `{len(batch.incomplete_terminal_rows)}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "",
+        (
+            "This focused batch closes the terminal onboarding routes before the 2D "
+            "window and motion matrix begins."
+        ),
+        "",
+        "| Rank | Route | Result | Command | Required Evidence |",
+        "| ---: | --- | --- | --- | --- |",
+    ]
+    for row in batch.terminal_rows:
+        lines.append(
+            "| "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.result}` | "
+            f"`{_markdown_escape(row.command)}` | "
+            f"{_markdown_escape(', '.join(row.required_evidence))} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Copy Commands",
+            "",
+        ]
+    )
+    for row, recorder_command in zip(batch.terminal_rows, batch.recorder_commands, strict=True):
+        lines.extend(
+            [
+                f"### Rank {row.rank}: {row.route}",
+                "",
+                "Open the route:",
+                "",
+                "```bash",
+                row.command,
+                "```",
+                "",
+                "Record the observation after playing:",
+                "",
+                "```bash",
+                recorder_command,
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Batch Closure",
+            "",
+            "Run these after recording terminal-route observations:",
+            "",
+            "```bash",
+            batch.validate_command,
+            batch.status_command,
+            batch.next_step_command,
+            "```",
+            "",
+            "## Evidence Checklist",
+            "",
+            "- Terminal guide exposes the opening flow, Risk Forecast, and difficulty cues.",
+            "- Tutorial names safe first actions, Turn Summary, and Watch For fields.",
+            "- Automated clarity gate refreshes Guided Opening, Turn Coach, and Risk Forecast.",
+            "- Notes mention the route, exact terminal output observed, and any unclear copy.",
+            "- Keep `manual-required` until every terminal row has concrete observed notes.",
+            "",
+            "## Result Rules",
+            "",
+            "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+            "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+            "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_terminal_batch(
+    batch_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleTerminalBatchValidation:
+    """Validate that a terminal batch handoff matches the current report."""
+
+    try:
+        expected = build_onboarding_visible_terminal_batch(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleTerminalBatchValidation(
+            batch_path=batch_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not batch_path.exists():
+        return OnboardingVisibleTerminalBatchValidation(
+            batch_path=batch_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Terminal Batch File",
+                    passed=False,
+                    summary="The terminal onboarding batch handoff file must exist.",
+                    evidence=(f"missing:{batch_path}",),
+                ),
+            ),
+        )
+
+    text = batch_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Terminal Batch",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Terminal rows: `{len(expected.terminal_rows)}`",
+        f"- Incomplete terminal rows: `{len(expected.incomplete_terminal_rows)}`",
+        "- Evidence policy: `real visible-window observations required`",
+    )
+    route_markers = tuple(
+        marker
+        for row in expected.terminal_rows
+        for marker in (
+            f"| {row.rank} | `{row.route}` | `{row.result}` |",
+            row.command,
+            *row.required_evidence,
+        )
+    )
+    command_markers = tuple(
+        marker
+        for row, recorder_command in zip(
+            expected.terminal_rows,
+            expected.recorder_commands,
+            strict=True,
+        )
+        for marker in (
+            f"### Rank {row.rank}: {row.route}",
+            row.command,
+            recorder_command,
+        )
+    )
+    closure_markers = (
+        expected.validate_command,
+        expected.status_command,
+        expected.next_step_command,
+    )
+    checks = (
+        _build_presence_check(
+            area="Terminal Batch Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The terminal batch metadata matches the current visible QA report.",
+        ),
+        _build_presence_check(
+            area="Terminal Route Rows",
+            text=text,
+            markers=route_markers,
+            summary="The terminal batch includes the current terminal onboarding routes.",
+        ),
+        _build_presence_check(
+            area="Copy Commands",
+            text=text,
+            markers=command_markers,
+            summary="The terminal batch has current open and recorder commands.",
+        ),
+        _build_presence_check(
+            area="Batch Closure",
+            text=text,
+            markers=closure_markers,
+            summary="The terminal batch points back to report validation and next-step refresh.",
+        ),
+        _build_presence_check(
+            area="Manual Guardrails",
+            text=text,
+            markers=(
+                "real visible-window observations required",
+                "Keep `manual-required` until every terminal row has concrete observed notes.",
+                "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+                "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+                "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+            ),
+            summary="The terminal batch keeps manual evidence rules visible.",
+        ),
+    )
+    return OnboardingVisibleTerminalBatchValidation(
+        batch_path=batch_path,
         status="pass" if all(check.status == "pass" for check in checks) else "fail",
         checks=checks,
     )
