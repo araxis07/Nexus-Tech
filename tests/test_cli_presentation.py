@@ -257,6 +257,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "record-onboarding-visible-playtest-route",
         "validate-onboarding-visible-playtest-report",
         "onboarding-visible-playtest-status",
+        "onboarding-visible-playtest-next",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -962,6 +963,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
 ) -> None:
     packet_path = tmp_path / "onboarding-visible.md"
     report_path = tmp_path / "onboarding-visible-report.md"
+    next_path = tmp_path / "onboarding-visible-next.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1052,6 +1054,26 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Next Recorder Command" in status_result.output
     assert "record-onboarding-visible-playtest-route" in status_result.output
 
+    next_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-next",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--output",
+            str(next_path),
+        ],
+    )
+    assert next_result.exit_code == 0
+    assert "Onboarding Visible Next Step" in next_result.output
+    assert "Next-step handoff written" in next_result.output
+    next_text = next_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Next Step" in next_text
+    assert ".venv313/bin/nexus-tech guide" in next_text
+    assert "record-onboarding-visible-playtest-route --report" in next_text
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1066,10 +1088,13 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech onboarding-visible-playtest-report" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-report" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-status" in workflow
+    assert "uv run nexus-tech onboarding-visible-playtest-next" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
+    assert "nexus-tech-onboarding-visible-playtest-next" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

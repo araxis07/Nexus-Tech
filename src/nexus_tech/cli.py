@@ -231,6 +231,7 @@ from nexus_tech.simulation.onboarding_flow import (
     DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
     ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
     build_onboarding_visible_playtest_evidence_report,
+    build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
@@ -239,6 +240,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
+    write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
 )
 from nexus_tech.simulation.randomness import RandomSource
@@ -371,6 +373,11 @@ ONBOARDING_VISIBLE_REPORT_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-playtest-report.md"),
     "--report",
     help="Markdown path for the visible-window onboarding evidence report.",
+)
+ONBOARDING_VISIBLE_NEXT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest-next.md"),
+    "--output",
+    help="Markdown path for the next visible-window onboarding QA handoff.",
 )
 ONBOARDING_VISIBLE_WINDOW_OPTION = typer.Option(
     None,
@@ -6234,6 +6241,76 @@ def onboarding_visible_playtest_status_command(
             border_style="yellow" if summary.next_row is not None else "green",
         )
     )
+
+
+@app.command("onboarding-visible-playtest-next")
+def onboarding_visible_playtest_next_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_NEXT_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write a copy-ready handoff for the next visible onboarding QA route."""
+
+    try:
+        next_step = build_onboarding_visible_playtest_next_step(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Next Step Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_playtest_next_step(next_step, output)
+
+    table = Table(title=f"Onboarding Visible Next Step | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Pass", justify="right")
+    table.add_column("Watch", justify="right")
+    table.add_column("Fail", justify="right")
+    table.add_column("Todo", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        next_step.status.upper(),
+        str(next_step.total_rows),
+        str(next_step.pass_count),
+        str(next_step.watch_count),
+        str(next_step.fail_count),
+        str(next_step.todo_count),
+        str(next_step.incomplete_count),
+    )
+    console.print(table)
+
+    if next_step.next_row is not None:
+        console.print(
+            Panel.fit(
+                (
+                    f"Rank {next_step.next_row.rank}: {next_step.next_row.route} | "
+                    f"{next_step.next_row.window} | {next_step.next_row.motion_mode}"
+                ),
+                title="Next Visible Route",
+                border_style="cyan",
+            )
+        )
+        console.print("Next visible command:")
+        console.print(next_step.next_visible_command)
+        console.print("Next recorder command:")
+        console.print(next_step.next_recorder_command)
+    else:
+        console.print(
+            Panel.fit(
+                "All visible onboarding rows are recorded. Run validation before signoff.",
+                title="Onboarding Visible Gate",
+                border_style="green",
+            )
+        )
+    console.print(f"Next-step handoff written to {output}")
 
 
 @app.command("glossary")

@@ -16,6 +16,7 @@ from nexus_tech.simulation.turn_coach import build_turn_coach
 ONBOARDING_FLOW_AUDIT_REPORT_NAME = "onboarding-flow-audit.md"
 ONBOARDING_VISIBLE_PLAYTEST_PACKET_NAME = "onboarding-visible-playtest.md"
 ONBOARDING_VISIBLE_PLAYTEST_REPORT_NAME = "onboarding-visible-playtest-report.md"
+ONBOARDING_VISIBLE_PLAYTEST_NEXT_NAME = "onboarding-visible-playtest-next.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -218,6 +219,25 @@ class OnboardingVisiblePlaytestStatusSummary:
     next_row: OnboardingVisiblePlaytestReportRow | None
     next_visible_command: str
     next_recorder_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestNextStep:
+    """Copy-ready handoff for the next visible-window onboarding QA action."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    pass_count: int
+    watch_count: int
+    fail_count: int
+    todo_count: int
+    incomplete_count: int
+    next_row: OnboardingVisiblePlaytestReportRow | None
+    next_visible_command: str
+    next_recorder_command: str
+    validate_command: str
+    status_command: str
 
 
 def run_onboarding_flow_audit(
@@ -957,6 +977,134 @@ def summarize_onboarding_visible_playtest_status(
         next_visible_command=next_visible_command,
         next_recorder_command=next_recorder_command,
     )
+
+
+def build_onboarding_visible_playtest_next_step(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisiblePlaytestNextStep:
+    """Build a copy-ready next-step packet from the current visible QA report."""
+
+    summary = summarize_onboarding_visible_playtest_status(
+        report_path,
+        command_prefix=command_prefix,
+    )
+    validate_command = (
+        f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+    )
+    status_command = f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+    return OnboardingVisiblePlaytestNextStep(
+        report_path=summary.report_path,
+        status=summary.status,
+        total_rows=summary.total_rows,
+        pass_count=summary.pass_count,
+        watch_count=summary.watch_count,
+        fail_count=summary.fail_count,
+        todo_count=summary.todo_count,
+        incomplete_count=summary.incomplete_count,
+        next_row=summary.next_row,
+        next_visible_command=summary.next_visible_command,
+        next_recorder_command=summary.next_recorder_command,
+        validate_command=validate_command,
+        status_command=status_command,
+    )
+
+
+def write_onboarding_visible_playtest_next_step(
+    next_step: OnboardingVisiblePlaytestNextStep,
+    output_path: Path,
+) -> None:
+    """Write a copy-ready Markdown packet for the next manual visible QA action."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Next Step",
+        "",
+        f"- Report: `{next_step.report_path}`",
+        f"- Status: `{next_step.status}`",
+        f"- Rows: `{next_step.total_rows}`",
+        f"- Pass: `{next_step.pass_count}`",
+        f"- Watch: `{next_step.watch_count}`",
+        f"- Fail: `{next_step.fail_count}`",
+        f"- Todo: `{next_step.todo_count}`",
+        f"- Incomplete: `{next_step.incomplete_count}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "",
+    ]
+    if next_step.next_row is None:
+        lines.extend(
+            [
+                "## Next Action",
+                "",
+                "All visible onboarding rows are recorded as `pass` with concrete notes.",
+                "Run validation before treating the onboarding visible gate as closed.",
+                "",
+                "```bash",
+                next_step.validate_command,
+                "```",
+                "",
+                "```bash",
+                next_step.status_command,
+                "```",
+            ]
+        )
+    else:
+        row = next_step.next_row
+        lines.extend(
+            [
+                "## Next Action",
+                "",
+                "| Rank | Route | Window | Motion | Result |",
+                "| ---: | --- | --- | --- | --- |",
+                (
+                    f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                    f"`{row.motion_mode}` | `{row.result}` |"
+                ),
+                "",
+                "## Copy Commands",
+                "",
+                "### 1. Open The Visible Route",
+                "",
+                "```bash",
+                next_step.next_visible_command,
+                "```",
+                "",
+                "### 2. Record The Observation After Playing",
+                "",
+                "Replace the placeholder notes with concrete visible-window observations.",
+                "",
+                "```bash",
+                next_step.next_recorder_command,
+                "```",
+                "",
+                "### 3. Validate And Refresh Status",
+                "",
+                "```bash",
+                next_step.validate_command,
+                next_step.status_command,
+                "```",
+                "",
+                "## Evidence Checklist",
+                "",
+                *(
+                    f"- {item}"
+                    for item in (
+                        *row.required_evidence,
+                        "Text stays inside its panel and remains readable.",
+                        "Pause/back/menu recovery affordance is visible where the route needs it.",
+                        "Notes mention the route, window/motion mode, and observed UI behavior.",
+                    )
+                ),
+                "",
+                "## Result Rules",
+                "",
+                "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+                "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+                "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+            ]
+        )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def read_onboarding_visible_playtest_evidence_report(

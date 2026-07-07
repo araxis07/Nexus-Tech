@@ -147,6 +147,7 @@ from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_evidence_report,
+    build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
@@ -155,6 +156,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
+    write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
@@ -12406,6 +12408,49 @@ def test_onboarding_visible_playtest_status_points_to_next_incomplete_row(
     assert "record-onboarding-visible-playtest-route" in summary.next_recorder_command
     assert "--rank 2" in summary.next_recorder_command
     assert "<replace with observed visible-window notes>" in summary.next_recorder_command
+
+
+def test_onboarding_visible_playtest_next_step_writes_copy_ready_handoff(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    next_path = tmp_path / "onboarding-visible-next.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=1,
+        result="pass",
+        evidence_notes=(
+            "Observed the terminal guide output directly; opening flow, risk forecast, "
+            "and difficulty cues were readable before launching the window."
+        ),
+    )
+
+    next_step = build_onboarding_visible_playtest_next_step(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_playtest_next_step(next_step, next_path)
+
+    text = next_path.read_text(encoding="utf-8")
+    assert next_step.next_row is not None
+    assert next_step.next_row.rank == 2
+    assert "# NEXUS TECH Onboarding Visible Next Step" in text
+    assert "## Copy Commands" in text
+    assert "`.venv313/bin/nexus-tech tutorial`" not in text
+    assert ".venv313/bin/nexus-tech tutorial" in text
+    assert "record-onboarding-visible-playtest-route --report" in text
+    assert "--rank 2" in text
+    assert "Text stays inside its panel and remains readable." in text
+    assert "real visible-window observations required" in text
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

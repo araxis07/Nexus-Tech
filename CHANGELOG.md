@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.258.0 - 2026-07-07
+
+- Added `onboarding-visible-playtest-next` to write a copy-ready next-step handoff for the next real visible-window onboarding QA route
+- Included the exact visible command, recorder command, validation refresh commands, and evidence checklist in the next-step handoff
+- Wired the onboarding visible next-step handoff into CI artifact generation for manual QA continuation
+
 ## 0.257.0 - 2026-07-07
 
 - Added visible route commands directly to onboarding visible evidence report rows
