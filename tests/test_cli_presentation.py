@@ -263,6 +263,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-terminal-batch",
         "onboarding-visible-terminal-evidence-sheet",
         "validate-onboarding-visible-terminal-evidence-sheet",
+        "onboarding-visible-window-evidence-sheet",
+        "validate-onboarding-visible-window-evidence-sheet",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -971,6 +973,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     next_path = tmp_path / "onboarding-visible-next.md"
     batch_path = tmp_path / "onboarding-visible-terminal-batch.md"
     sheet_path = tmp_path / "onboarding-visible-terminal-evidence-sheet.md"
+    window_sheet_path = tmp_path / "onboarding-visible-820x620-evidence-sheet.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1169,6 +1172,48 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible Terminal Evidence Sheet Validation" in sheet_validation_result.output
     assert "PASS" in sheet_validation_result.output
 
+    window_sheet_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-window-evidence-sheet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--window",
+            "820x620",
+            "--output",
+            str(window_sheet_path),
+        ],
+    )
+    assert window_sheet_result.exit_code == 0
+    assert "Onboarding Visible Window Evidence Sheet" in window_sheet_result.output
+    assert "Window evidence worksheet written" in window_sheet_result.output
+    window_sheet_text = window_sheet_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Window Evidence Sheet" in window_sheet_text
+    assert ".venv313/bin/nexus-tech menu-2d --window-size 820x620" in window_sheet_text
+    assert "Text stays inside panels and remains readable at 820x620." in window_sheet_text
+
+    window_sheet_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-window-evidence-sheet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--window",
+            "820x620",
+            "--input",
+            str(window_sheet_path),
+        ],
+    )
+    assert window_sheet_validation_result.exit_code == 0
+    assert "Onboarding Visible Window Evidence Sheet Validation" in (
+        window_sheet_validation_result.output
+    )
+    assert "PASS" in window_sheet_validation_result.output
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1189,16 +1234,20 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-terminal-batch" in workflow
     assert "uv run nexus-tech onboarding-visible-terminal-evidence-sheet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-terminal-evidence-sheet" in workflow
+    assert "uv run nexus-tech onboarding-visible-window-evidence-sheet" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-window-evidence-sheet" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-batch.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
     assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
     assert "nexus-tech-onboarding-visible-terminal-evidence-sheet" in workflow
+    assert "nexus-tech-onboarding-visible-820x620-evidence-sheet" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

@@ -235,6 +235,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
@@ -243,12 +244,14 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_window_evidence_sheet,
 )
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.roadmap import get_roadmap_profile
@@ -410,6 +413,21 @@ ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md"),
     "--input",
     help="Markdown path for the terminal onboarding visible QA evidence worksheet to validate.",
+)
+ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md"),
+    "--output",
+    help="Markdown path for the visible-window onboarding QA evidence worksheet.",
+)
+ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md"),
+    "--input",
+    help="Markdown path for the visible-window onboarding QA evidence worksheet to validate.",
+)
+ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
+    "820x620",
+    "--window",
+    help="Visible onboarding window label to worksheet, for example 820x620.",
 )
 ONBOARDING_VISIBLE_WINDOW_OPTION = typer.Option(
     None,
@@ -6554,6 +6572,96 @@ def validate_onboarding_visible_terminal_evidence_sheet_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible Terminal Evidence Sheet Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-window-evidence-sheet")
+def onboarding_visible_window_evidence_sheet_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_OUTPUT_OPTION,
+    window: str = ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write a focused visible-window onboarding QA evidence worksheet."""
+
+    try:
+        sheet = build_onboarding_visible_window_evidence_sheet(
+            report_path,
+            window=window,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Window Evidence Sheet Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_window_evidence_sheet(sheet, output)
+
+    table = Table(title=f"Onboarding Visible Window Evidence Sheet | {output}")
+    table.add_column("Status")
+    table.add_column("Window")
+    table.add_column("Rows", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        sheet.status.upper(),
+        sheet.window,
+        str(len(sheet.window_rows)),
+        str(len(sheet.incomplete_window_rows)),
+    )
+    console.print(table)
+    for row in sheet.window_rows:
+        console.print(f"Rank {row.rank}: {row.route} | {row.motion_mode} -> {row.command}")
+    console.print(f"Window evidence worksheet written to {output}")
+
+
+@app.command("validate-onboarding-visible-window-evidence-sheet")
+def validate_onboarding_visible_window_evidence_sheet_command(
+    sheet_path: Path = ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_INPUT_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    window: str = ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate a visible-window onboarding evidence worksheet against the report."""
+
+    validation = validate_onboarding_visible_window_evidence_sheet(
+        sheet_path,
+        report_path=report_path,
+        window=window,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible Window Evidence Sheet Validation | {sheet_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible window evidence sheet validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible Window Evidence Sheet Validation",
             border_style=border_style,
         )
     )

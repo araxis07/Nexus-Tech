@@ -19,6 +19,7 @@ ONBOARDING_VISIBLE_PLAYTEST_REPORT_NAME = "onboarding-visible-playtest-report.md
 ONBOARDING_VISIBLE_PLAYTEST_NEXT_NAME = "onboarding-visible-playtest-next.md"
 ONBOARDING_VISIBLE_TERMINAL_BATCH_NAME = "onboarding-visible-terminal-batch.md"
 ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_NAME = "onboarding-visible-terminal-evidence-sheet.md"
+ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_NAME = "onboarding-visible-window-evidence-sheet.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -330,6 +331,42 @@ class OnboardingVisibleTerminalEvidenceSheetValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return terminal evidence sheet checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleWindowEvidenceSheet:
+    """Evidence worksheet for one visible-window onboarding QA slice."""
+
+    report_path: Path
+    status: str
+    window: str
+    window_rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    incomplete_window_rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    recorder_commands: tuple[str, ...]
+    validate_command: str
+    status_command: str
+    next_step_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleWindowEvidenceSheetValidation:
+    """Validation report for a visible-window onboarding evidence worksheet."""
+
+    sheet_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the visible-window evidence sheet matches the report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return visible-window evidence sheet checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -1823,6 +1860,287 @@ def validate_onboarding_visible_terminal_evidence_sheet(
     )
 
 
+def build_onboarding_visible_window_evidence_sheet(
+    report_path: Path,
+    *,
+    window: str = "820x620",
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleWindowEvidenceSheet:
+    """Build an evidence worksheet for one visible onboarding window."""
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    window_rows = tuple(row for row in report.rows if row.window == window)
+    if not window_rows:
+        raise ValueError(f"No onboarding visible report rows found for window {window}.")
+    incomplete_window_rows = tuple(
+        row
+        for row in window_rows
+        if row.result != "pass" or not _has_real_observation_notes(row.evidence_notes)
+    )
+    recorder_commands = tuple(
+        _build_onboarding_visible_recorder_command(
+            report_path,
+            row,
+            command_prefix=command_prefix,
+        )
+        for row in window_rows
+    )
+    return OnboardingVisibleWindowEvidenceSheet(
+        report_path=report_path,
+        status=report.status,
+        window=window,
+        window_rows=window_rows,
+        incomplete_window_rows=incomplete_window_rows,
+        recorder_commands=recorder_commands,
+        validate_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+        next_step_command=(
+            f"{command_prefix} onboarding-visible-playtest-next --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_window_evidence_sheet(
+    sheet: OnboardingVisibleWindowEvidenceSheet,
+    output_path: Path,
+) -> None:
+    """Write a visible-window onboarding evidence worksheet for human QA."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Window Evidence Sheet",
+        "",
+        f"- Report: `{sheet.report_path}`",
+        f"- Status: `{sheet.status}`",
+        f"- Window: `{sheet.window}`",
+        f"- Window rows: `{len(sheet.window_rows)}`",
+        f"- Incomplete window rows: `{len(sheet.incomplete_window_rows)}`",
+        "- Evidence policy: `observe the visible 2D window before recording`",
+        "- Recorder safety: `replace placeholder notes with real observed UI behavior`",
+        "",
+        (
+            "Use this worksheet to close the compact visible-window onboarding rows. "
+            "It does not mark a row complete by itself."
+        ),
+        "",
+        (
+            "| Rank | Route | Motion | Result | Open Command | Observation Prompt | "
+            "Recorder Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row, recorder_command in zip(sheet.window_rows, sheet.recorder_commands, strict=True):
+        lines.append(
+            "| "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.motion_mode}` | "
+            f"`{row.result}` | "
+            f"`{_markdown_escape(row.command)}` | "
+            f"{_markdown_escape(_build_window_observation_prompt(row))} | "
+            f"`{_markdown_escape(recorder_command)}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Operator Loop",
+            "",
+        ]
+    )
+    for row, recorder_command in zip(sheet.window_rows, sheet.recorder_commands, strict=True):
+        lines.extend(
+            [
+                f"### Rank {row.rank}: {row.route} | {row.motion_mode}",
+                "",
+                "1. Run the visible 2D route:",
+                "",
+                "```bash",
+                row.command,
+                "```",
+                "",
+                "2. Observe the compact-window UX checks:",
+                "",
+                "- Text stays inside panels and remains readable at 820x620.",
+                "- Buttons, footer controls, and action targets stay separated.",
+                "- Pause/back/menu affordance is visible and recoverable.",
+                "- Motion does not cover text, controls, or feedback states.",
+                *(f"- Required evidence: {item}" for item in row.required_evidence),
+                "",
+                "3. Record only after replacing the placeholder with observed UI notes:",
+                "",
+                "```bash",
+                recorder_command,
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Closure Commands",
+            "",
+            "Run these after all rows for this window have real observations:",
+            "",
+            "```bash",
+            sheet.validate_command,
+            sheet.status_command,
+            sheet.next_step_command,
+            "```",
+            "",
+            "## Evidence Rules",
+            "",
+            "- `pass`: layout is readable, navigable, and the next player action is clear.",
+            "- `watch`: playable, but copy, contrast, motion, or placement slows understanding.",
+            "- `fail`: layout blocks reading, navigation recovery, or first-turn understanding.",
+            "- Keep `manual-required` until report rows contain observed visible-window notes.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_window_evidence_sheet(
+    sheet_path: Path,
+    *,
+    report_path: Path,
+    window: str = "820x620",
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleWindowEvidenceSheetValidation:
+    """Validate a visible-window evidence worksheet against the current report."""
+
+    try:
+        expected = build_onboarding_visible_window_evidence_sheet(
+            report_path,
+            window=window,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleWindowEvidenceSheetValidation(
+            sheet_path=sheet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must include the requested window.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not sheet_path.exists():
+        return OnboardingVisibleWindowEvidenceSheetValidation(
+            sheet_path=sheet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Window Evidence Sheet File",
+                    passed=False,
+                    summary="The visible-window evidence worksheet file must exist.",
+                    evidence=(f"missing:{sheet_path}",),
+                ),
+            ),
+        )
+
+    text = sheet_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Window Evidence Sheet",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Window: `{expected.window}`",
+        f"- Window rows: `{len(expected.window_rows)}`",
+        f"- Incomplete window rows: `{len(expected.incomplete_window_rows)}`",
+        "- Evidence policy: `observe the visible 2D window before recording`",
+        "- Recorder safety: `replace placeholder notes with real observed UI behavior`",
+    )
+    row_markers = tuple(
+        marker
+        for row, recorder_command in zip(
+            expected.window_rows,
+            expected.recorder_commands,
+            strict=True,
+        )
+        for marker in (
+            f"| {row.rank} | `{row.route}` | `{row.motion_mode}` | `{row.result}` |",
+            row.command,
+            _build_window_observation_prompt(row),
+            recorder_command,
+        )
+    )
+    loop_markers = tuple(
+        marker
+        for row, recorder_command in zip(
+            expected.window_rows,
+            expected.recorder_commands,
+            strict=True,
+        )
+        for marker in (
+            f"### Rank {row.rank}: {row.route} | {row.motion_mode}",
+            row.command,
+            *row.required_evidence,
+            recorder_command,
+        )
+    )
+    closure_markers = (
+        expected.validate_command,
+        expected.status_command,
+        expected.next_step_command,
+    )
+    checks = (
+        _build_presence_check(
+            area="Window Evidence Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The window evidence worksheet metadata matches the report.",
+        ),
+        _build_presence_check(
+            area="Window Evidence Rows",
+            text=text,
+            markers=row_markers,
+            summary="The worksheet lists current window rows and recorder commands.",
+        ),
+        _build_presence_check(
+            area="Operator Loop",
+            text=text,
+            markers=loop_markers,
+            summary="Each visible route has run, UX check, and record instructions.",
+        ),
+        _build_presence_check(
+            area="Closure Commands",
+            text=text,
+            markers=closure_markers,
+            summary="The worksheet points back to report validation and status refresh.",
+        ),
+        _build_presence_check(
+            area="Evidence Rules",
+            text=text,
+            markers=(
+                "It does not mark a row complete by itself.",
+                "Text stays inside panels and remains readable at 820x620.",
+                "Pause/back/menu affordance is visible and recoverable.",
+                "Motion does not cover text, controls, or feedback states.",
+                "- `pass`: layout is readable, navigable, and the next player action is clear.",
+                (
+                    "- `watch`: playable, but copy, contrast, motion, or placement slows "
+                    "understanding."
+                ),
+                (
+                    "- `fail`: layout blocks reading, navigation recovery, or first-turn "
+                    "understanding."
+                ),
+                "Keep `manual-required` until report rows contain observed visible-window notes.",
+            ),
+            summary="The worksheet keeps compact-window manual evidence rules explicit.",
+        ),
+    )
+    return OnboardingVisibleWindowEvidenceSheetValidation(
+        sheet_path=sheet_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -1945,6 +2263,14 @@ def _build_terminal_observation_prompt(row: OnboardingVisiblePlaytestReportRow) 
         "Confirm terminal output includes "
         f"{', '.join(row.required_evidence)}; notes must mention exact wording, "
         "readability, and whether the next player action is clear."
+    )
+
+
+def _build_window_observation_prompt(row: OnboardingVisiblePlaytestReportRow) -> str:
+    return (
+        f"Confirm {row.window} {row.route} in {row.motion_mode} mode: "
+        "text containment, button spacing, pause/back/menu recovery, and motion readability "
+        f"while checking {', '.join(row.required_evidence)}."
     )
 
 

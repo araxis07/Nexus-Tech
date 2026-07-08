@@ -151,6 +151,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
@@ -159,12 +160,14 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_window_evidence_sheet,
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.operations import calculate_operations_summary
@@ -12619,6 +12622,71 @@ def test_onboarding_visible_terminal_evidence_sheet_writes_and_validates_rows(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Terminal Evidence Rows" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_window_evidence_sheet_writes_compact_window_rows(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620), (1280, 720)),
+        motion_modes=("full", "reduced", "off"),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    sheet_path = tmp_path / "onboarding-visible-820x620-evidence-sheet.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    sheet = build_onboarding_visible_window_evidence_sheet(
+        report_path,
+        window="820x620",
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_window_evidence_sheet(sheet, sheet_path)
+
+    text = sheet_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Window Evidence Sheet" in text
+    assert sheet.window == "820x620"
+    assert len(sheet.window_rows) == 6
+    assert len(sheet.incomplete_window_rows) == 6
+    assert "observe the visible 2D window before recording" in text
+    assert ".venv313/bin/nexus-tech menu-2d --window-size 820x620" in text
+    assert ".venv313/bin/nexus-tech play-2d --scenario founder_journey" in text
+    assert "full mode" in text
+    assert "reduced mode" in text
+    assert "off mode" in text
+    assert "Text stays inside panels and remains readable at 820x620." in text
+    assert "Pause/back/menu affordance is visible and recoverable." in text
+    assert "record-onboarding-visible-playtest-route --report" in text
+
+    validation = validate_onboarding_visible_window_evidence_sheet(
+        sheet_path,
+        report_path=report_path,
+        window="820x620",
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech menu-2d --window-size 820x620",
+        ".venv313/bin/nexus-tech menu-2d --window-size 960x640",
+    )
+    sheet_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_window_evidence_sheet(
+        sheet_path,
+        report_path=report_path,
+        window="820x620",
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Window Evidence Rows" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

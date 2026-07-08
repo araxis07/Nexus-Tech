@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.262.0 - 2026-07-08
+
+- Added `onboarding-visible-window-evidence-sheet` to focus compact 820x620 onboarding QA on visible layout, controls, and motion readability
+- Added `validate-onboarding-visible-window-evidence-sheet` to block stale compact-window commands, prompts, and recorder placeholders
+- Wired 820x620 visible-window evidence sheet generation, validation, and artifact upload into CI
+
 ## 0.261.0 - 2026-07-08
 
 - Added `onboarding-visible-terminal-evidence-sheet` to turn the first terminal onboarding QA rows into a focused observation worksheet
