@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.263.0 - 2026-07-08
+
+- Added CI generation and validation for 1280x720 and 1440x900 onboarding visible-window evidence sheets
+- Uploaded the full onboarding visible-window worksheet matrix as separate CI artifacts
+- Documented local worksheet refresh commands for all target onboarding visible windows
+
 ## 0.262.0 - 2026-07-08
 
 - Added `onboarding-visible-window-evidence-sheet` to focus compact 820x620 onboarding QA on visible layout, controls, and motion readability

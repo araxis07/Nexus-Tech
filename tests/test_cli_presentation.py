@@ -1236,18 +1236,25 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-terminal-evidence-sheet" in workflow
     assert "uv run nexus-tech onboarding-visible-window-evidence-sheet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-window-evidence-sheet" in workflow
+    assert "--window 820x620" in workflow
+    assert "--window 1280x720" in workflow
+    assert "--window 1440x900" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-batch.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-1280x720-evidence-sheet.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
     assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
     assert "nexus-tech-onboarding-visible-terminal-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-820x620-evidence-sheet" in workflow
+    assert "nexus-tech-onboarding-visible-1280x720-evidence-sheet" in workflow
+    assert "nexus-tech-onboarding-visible-1440x900-evidence-sheet" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:
