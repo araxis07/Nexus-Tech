@@ -18,6 +18,7 @@ ONBOARDING_VISIBLE_PLAYTEST_PACKET_NAME = "onboarding-visible-playtest.md"
 ONBOARDING_VISIBLE_PLAYTEST_REPORT_NAME = "onboarding-visible-playtest-report.md"
 ONBOARDING_VISIBLE_PLAYTEST_NEXT_NAME = "onboarding-visible-playtest-next.md"
 ONBOARDING_VISIBLE_TERMINAL_BATCH_NAME = "onboarding-visible-terminal-batch.md"
+ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_NAME = "onboarding-visible-terminal-evidence-sheet.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -294,6 +295,41 @@ class OnboardingVisibleTerminalBatchValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return terminal batch checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleTerminalEvidenceSheet:
+    """Evidence worksheet for closing the terminal onboarding visible QA rows."""
+
+    report_path: Path
+    status: str
+    terminal_rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    incomplete_terminal_rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    recorder_commands: tuple[str, ...]
+    validate_command: str
+    status_command: str
+    batch_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleTerminalEvidenceSheetValidation:
+    """Validation report for the terminal onboarding evidence worksheet."""
+
+    sheet_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the terminal evidence sheet matches the report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return terminal evidence sheet checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -1545,6 +1581,248 @@ def validate_onboarding_visible_terminal_batch(
     )
 
 
+def build_onboarding_visible_terminal_evidence_sheet(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleTerminalEvidenceSheet:
+    """Build a terminal-route evidence worksheet from the current visible QA report."""
+
+    batch = build_onboarding_visible_terminal_batch(
+        report_path,
+        command_prefix=command_prefix,
+    )
+    return OnboardingVisibleTerminalEvidenceSheet(
+        report_path=batch.report_path,
+        status=batch.status,
+        terminal_rows=batch.terminal_rows,
+        incomplete_terminal_rows=batch.incomplete_terminal_rows,
+        recorder_commands=batch.recorder_commands,
+        validate_command=batch.validate_command,
+        status_command=batch.status_command,
+        batch_command=(
+            f"{command_prefix} onboarding-visible-terminal-batch --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_terminal_evidence_sheet(
+    sheet: OnboardingVisibleTerminalEvidenceSheet,
+    output_path: Path,
+) -> None:
+    """Write a terminal onboarding evidence worksheet for human QA."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Terminal Evidence Sheet",
+        "",
+        f"- Report: `{sheet.report_path}`",
+        f"- Status: `{sheet.status}`",
+        f"- Terminal rows: `{len(sheet.terminal_rows)}`",
+        f"- Incomplete terminal rows: `{len(sheet.incomplete_terminal_rows)}`",
+        "- Evidence policy: `observe route output before recording`",
+        "- Recorder safety: `replace placeholder notes with real observed terminal output`",
+        "",
+        (
+            "Use this worksheet while closing the first three terminal onboarding rows. "
+            "It does not mark a row complete by itself."
+        ),
+        "",
+        "| Rank | Route | Result | Open Command | Observation Prompt | Recorder Command |",
+        "| ---: | --- | --- | --- | --- | --- |",
+    ]
+    for row, recorder_command in zip(sheet.terminal_rows, sheet.recorder_commands, strict=True):
+        lines.append(
+            "| "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.result}` | "
+            f"`{_markdown_escape(row.command)}` | "
+            f"{_markdown_escape(_build_terminal_observation_prompt(row))} | "
+            f"`{_markdown_escape(recorder_command)}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Operator Loop",
+            "",
+        ]
+    )
+    for row, recorder_command in zip(sheet.terminal_rows, sheet.recorder_commands, strict=True):
+        lines.extend(
+            [
+                f"### Rank {row.rank}: {row.route}",
+                "",
+                "1. Run the terminal route:",
+                "",
+                "```bash",
+                row.command,
+                "```",
+                "",
+                "2. Check these visible terms in the output:",
+                "",
+                *(f"- {item}" for item in row.required_evidence),
+                "",
+                "3. Record only after replacing the placeholder with observed output notes:",
+                "",
+                "```bash",
+                recorder_command,
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Closure Commands",
+            "",
+            "Run these after all terminal rows have real observations:",
+            "",
+            "```bash",
+            sheet.validate_command,
+            sheet.status_command,
+            sheet.batch_command,
+            "```",
+            "",
+            "## Evidence Rules",
+            "",
+            "- `pass`: output is readable and explains the first-time onboarding cue clearly.",
+            "- `watch`: output is usable but copy, ordering, or wording slows understanding.",
+            "- `fail`: output omits a required cue or leaves the next player action unclear.",
+            "- Keep `manual-required` until the report rows contain observed terminal notes.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_terminal_evidence_sheet(
+    sheet_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleTerminalEvidenceSheetValidation:
+    """Validate that a terminal evidence worksheet matches the current report."""
+
+    try:
+        expected = build_onboarding_visible_terminal_evidence_sheet(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleTerminalEvidenceSheetValidation(
+            sheet_path=sheet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not sheet_path.exists():
+        return OnboardingVisibleTerminalEvidenceSheetValidation(
+            sheet_path=sheet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Terminal Evidence Sheet File",
+                    passed=False,
+                    summary="The terminal evidence worksheet file must exist.",
+                    evidence=(f"missing:{sheet_path}",),
+                ),
+            ),
+        )
+
+    text = sheet_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Terminal Evidence Sheet",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Terminal rows: `{len(expected.terminal_rows)}`",
+        f"- Incomplete terminal rows: `{len(expected.incomplete_terminal_rows)}`",
+        "- Evidence policy: `observe route output before recording`",
+        "- Recorder safety: `replace placeholder notes with real observed terminal output`",
+    )
+    row_markers = tuple(
+        marker
+        for row, recorder_command in zip(
+            expected.terminal_rows,
+            expected.recorder_commands,
+            strict=True,
+        )
+        for marker in (
+            f"| {row.rank} | `{row.route}` | `{row.result}` |",
+            row.command,
+            _build_terminal_observation_prompt(row),
+            recorder_command,
+        )
+    )
+    loop_markers = tuple(
+        marker
+        for row, recorder_command in zip(
+            expected.terminal_rows,
+            expected.recorder_commands,
+            strict=True,
+        )
+        for marker in (
+            f"### Rank {row.rank}: {row.route}",
+            row.command,
+            *row.required_evidence,
+            recorder_command,
+        )
+    )
+    closure_markers = (
+        expected.validate_command,
+        expected.status_command,
+        expected.batch_command,
+    )
+    checks = (
+        _build_presence_check(
+            area="Terminal Evidence Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The terminal evidence worksheet metadata matches the report.",
+        ),
+        _build_presence_check(
+            area="Terminal Evidence Rows",
+            text=text,
+            markers=row_markers,
+            summary="The worksheet lists current terminal rows and recorder commands.",
+        ),
+        _build_presence_check(
+            area="Operator Loop",
+            text=text,
+            markers=loop_markers,
+            summary="Each terminal route has run, check, and record instructions.",
+        ),
+        _build_presence_check(
+            area="Closure Commands",
+            text=text,
+            markers=closure_markers,
+            summary="The worksheet points back to validation, status, and batch refresh.",
+        ),
+        _build_presence_check(
+            area="Evidence Rules",
+            text=text,
+            markers=(
+                "It does not mark a row complete by itself.",
+                "Record only after replacing the placeholder with observed output notes:",
+                "- `pass`: output is readable and explains the first-time onboarding cue clearly.",
+                "- `watch`: output is usable but copy, ordering, or wording slows understanding.",
+                "- `fail`: output omits a required cue or leaves the next player action unclear.",
+                "Keep `manual-required` until the report rows contain observed terminal notes.",
+            ),
+            summary="The worksheet keeps manual evidence rules explicit.",
+        ),
+    )
+    return OnboardingVisibleTerminalEvidenceSheetValidation(
+        sheet_path=sheet_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -1660,6 +1938,14 @@ def _find_onboarding_visible_report_row(
     if len(matches) > 1:
         raise ValueError("Selector matched multiple onboarding visible report rows; add --rank.")
     return matches[0]
+
+
+def _build_terminal_observation_prompt(row: OnboardingVisiblePlaytestReportRow) -> str:
+    return (
+        "Confirm terminal output includes "
+        f"{', '.join(row.required_evidence)}; notes must mention exact wording, "
+        "readability, and whether the next player action is clear."
+    )
 
 
 def _build_onboarding_visible_recorder_command(

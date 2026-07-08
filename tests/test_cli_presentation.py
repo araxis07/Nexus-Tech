@@ -261,6 +261,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-playtest-next",
         "onboarding-visible-terminal-batch",
         "validate-onboarding-visible-terminal-batch",
+        "onboarding-visible-terminal-evidence-sheet",
+        "validate-onboarding-visible-terminal-evidence-sheet",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -968,6 +970,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     report_path = tmp_path / "onboarding-visible-report.md"
     next_path = tmp_path / "onboarding-visible-next.md"
     batch_path = tmp_path / "onboarding-visible-terminal-batch.md"
+    sheet_path = tmp_path / "onboarding-visible-terminal-evidence-sheet.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1130,6 +1133,42 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible Terminal Batch Validation" in batch_validation_result.output
     assert "PASS" in batch_validation_result.output
 
+    sheet_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-terminal-evidence-sheet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--output",
+            str(sheet_path),
+        ],
+    )
+    assert sheet_result.exit_code == 0
+    assert "Onboarding Visible Terminal Evidence Sheet" in sheet_result.output
+    assert "Terminal evidence worksheet written" in sheet_result.output
+    sheet_text = sheet_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Terminal Evidence Sheet" in sheet_text
+    assert ".venv313/bin/nexus-tech guide" in sheet_text
+    assert "Record only after replacing the placeholder" in sheet_text
+
+    sheet_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-terminal-evidence-sheet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(sheet_path),
+        ],
+    )
+    assert sheet_validation_result.exit_code == 0
+    assert "Onboarding Visible Terminal Evidence Sheet Validation" in sheet_validation_result.output
+    assert "PASS" in sheet_validation_result.output
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1148,14 +1187,18 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-playtest-next" in workflow
     assert "uv run nexus-tech onboarding-visible-terminal-batch" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-terminal-batch" in workflow
+    assert "uv run nexus-tech onboarding-visible-terminal-evidence-sheet" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-terminal-evidence-sheet" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-batch.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
     assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
+    assert "nexus-tech-onboarding-visible-terminal-evidence-sheet" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.261.0 - 2026-07-08
+
+- Added `onboarding-visible-terminal-evidence-sheet` to turn the first terminal onboarding QA rows into a focused observation worksheet
+- Added `validate-onboarding-visible-terminal-evidence-sheet` to block stale worksheet commands, prompts, and recorder placeholders
+- Wired terminal evidence sheet generation, validation, and artifact upload into CI
+
 ## 0.260.0 - 2026-07-08
 
 - Added `onboarding-visible-terminal-batch` to package the first three terminal onboarding QA routes into one copy-ready handoff

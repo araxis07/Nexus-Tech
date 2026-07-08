@@ -99,6 +99,20 @@ jobs:
           --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
           --input /tmp/nexus-tech-onboarding-visible-terminal-batch.md
 
+      - name: Prepare onboarding visible terminal evidence sheet
+        run: >
+          uv run nexus-tech onboarding-visible-terminal-evidence-sheet
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --output /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md
+
+      - name: Validate onboarding visible terminal evidence sheet
+        run: >
+          uv run nexus-tech validate-onboarding-visible-terminal-evidence-sheet
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --input /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -222,6 +236,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-terminal-batch
           path: /tmp/nexus-tech-onboarding-visible-terminal-batch.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible terminal evidence sheet artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-terminal-evidence-sheet
+          path: /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md
           if-no-files-found: warn
           retention-days: 7
 

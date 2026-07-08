@@ -150,6 +150,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
+    build_onboarding_visible_terminal_evidence_sheet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
@@ -157,11 +158,13 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
+    validate_onboarding_visible_terminal_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
+    write_onboarding_visible_terminal_evidence_sheet,
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.operations import calculate_operations_summary
@@ -12558,6 +12561,64 @@ def test_onboarding_visible_terminal_batch_writes_and_validates_focused_handoff(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Copy Commands" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_terminal_evidence_sheet_writes_and_validates_rows(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    sheet_path = tmp_path / "onboarding-visible-terminal-evidence-sheet.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    sheet = build_onboarding_visible_terminal_evidence_sheet(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_terminal_evidence_sheet(sheet, sheet_path)
+
+    text = sheet_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Terminal Evidence Sheet" in text
+    assert len(sheet.terminal_rows) == 3
+    assert len(sheet.incomplete_terminal_rows) == 3
+    assert "observe route output before recording" in text
+    assert ".venv313/bin/nexus-tech guide" in text
+    assert ".venv313/bin/nexus-tech tutorial" in text
+    assert "Confirm terminal output includes Opening flow" in text
+    assert "record-onboarding-visible-playtest-route --report" in text
+    assert "Record only after replacing the placeholder" in text
+
+    validation = validate_onboarding_visible_terminal_evidence_sheet(
+        sheet_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech tutorial",
+        ".venv313/bin/nexus-tech glossary",
+    )
+    sheet_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_terminal_evidence_sheet(
+        sheet_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Terminal Evidence Rows" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(
