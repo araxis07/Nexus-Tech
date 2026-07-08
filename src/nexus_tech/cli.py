@@ -437,6 +437,16 @@ ONBOARDING_VISIBLE_EVIDENCE_MATRIX_INPUT_OPTION = typer.Option(
     "--input",
     help="Markdown path for the onboarding visible QA evidence matrix to validate.",
 )
+ONBOARDING_VISIBLE_WINDOW_PREFLIGHT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-window-preflight.md"),
+    "--output",
+    help="Markdown path for the onboarding visible 2D window headless preflight.",
+)
+ONBOARDING_VISIBLE_WINDOW_PREFLIGHT_DB_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-window-preflight.db"),
+    "--db-path",
+    help="Scratch database path for onboarding visible window preflight launches.",
+)
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
     "--window",
@@ -6773,6 +6783,254 @@ def validate_onboarding_visible_evidence_matrix_command(
         )
     )
     if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-window-preflight")
+def onboarding_visible_window_preflight_command(
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the onboarding visible play-2d rows.",
+    ),
+    window_size: Optional[list[str]] = ONBOARDING_VISIBLE_WINDOW_OPTION,
+    motion_mode: list[MotionMode] | None = ONBOARDING_VISIBLE_MOTION_MODE_OPTION,
+    frames: int = typer.Option(
+        1,
+        "--frames",
+        min=1,
+        help="Headless frames to run for each onboarding visible menu/play command.",
+    ),
+    output: Path = ONBOARDING_VISIBLE_WINDOW_PREFLIGHT_OUTPUT_OPTION,
+    db_path: Path = ONBOARDING_VISIBLE_WINDOW_PREFLIGHT_DB_PATH_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Run headless 2D launch checks for onboarding visible window rows."""
+
+    validate_scenario_id(scenario)
+    validate_campaign_start_id(campaign_start)
+    try:
+        windows = (
+            tuple(parse_2d_window_size(value) for value in window_size)
+            if window_size
+            else DEFAULT_ONBOARDING_VISIBLE_WINDOWS
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Invalid Onboarding Visible Window",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+    modes = (
+        tuple(motion_mode) if motion_mode else (MotionMode.FULL, MotionMode.REDUCED, MotionMode.OFF)
+    )
+    difficulty_arg = f" --difficulty {difficulty.value}" if difficulty is not None else ""
+    goal_arg = f" --goal {goal.value}" if goal is not None else ""
+    rows: list[tuple[int, str, str, str, str, str, str, str, str]] = []
+    failures: list[str] = []
+
+    try:
+        step = 1
+        for width, height in windows:
+            window_label = f"{width}x{height}"
+            for mode in modes:
+                menu_visible_command = (
+                    f"{command_prefix} menu-2d --window-size {window_label} "
+                    f"--motion-mode {mode.value}"
+                )
+                menu_preflight_command = (
+                    f"{command_prefix} menu-2d --headless --max-frames {frames} "
+                    f"--window-size {window_label} --motion-mode {mode.value}"
+                )
+                menu_result = launch_2d_menu(
+                    db_path=db_path,
+                    headless=True,
+                    window_size=(width, height),
+                    max_frames=frames,
+                    motion_mode=mode,
+                )
+                menu_status = "pass" if menu_result.exit_reason == "max_frames" else "fail"
+                if menu_status != "pass":
+                    failures.append(
+                        (
+                            f"menu/{window_label}/{mode.value} exited with "
+                            f"{menu_result.exit_reason}, expected max_frames"
+                        )
+                    )
+                rows.append(
+                    (
+                        step,
+                        "title-onboarding",
+                        window_label,
+                        mode.value,
+                        menu_status,
+                        menu_result.exit_reason,
+                        str(menu_result.saved_on_exit).lower(),
+                        menu_visible_command,
+                        menu_preflight_command,
+                    )
+                )
+                step += 1
+
+                play_visible_command = (
+                    f"{command_prefix} play-2d --scenario {scenario} "
+                    f"--campaign-start {campaign_start} --seed {seed}{difficulty_arg}{goal_arg} "
+                    f"--window-size {window_label} --motion-mode {mode.value}"
+                )
+                play_preflight_command = (
+                    f"{command_prefix} play-2d --scenario {scenario} "
+                    f"--campaign-start {campaign_start} --seed {seed}{difficulty_arg}{goal_arg} "
+                    f"--headless --max-frames {frames} --window-size {window_label} "
+                    f"--motion-mode {mode.value}"
+                )
+                state = create_new_game(
+                    company_name=None,
+                    product_name=None,
+                    scenario_id=scenario,
+                    difficulty_mode=difficulty,
+                    campaign_goal_id=goal,
+                    campaign_start_id=campaign_start,
+                )
+                play_result = launch_2d_frontend(
+                    state=state,
+                    rng=RandomSource(seed=seed),
+                    db_path=db_path,
+                    slot_name=f"onboarding-preflight-{window_label}-{mode.value}",
+                    headless=True,
+                    window_size=(width, height),
+                    max_frames=frames,
+                    motion_mode=mode,
+                )
+                play_status = "pass" if play_result.exit_reason == "max_frames" else "fail"
+                if play_status != "pass":
+                    failures.append(
+                        (
+                            f"play/{window_label}/{mode.value} exited with "
+                            f"{play_result.exit_reason}, expected max_frames"
+                        )
+                    )
+                rows.append(
+                    (
+                        step,
+                        "first-turn-play",
+                        window_label,
+                        mode.value,
+                        play_status,
+                        play_result.exit_reason,
+                        str(play_result.saved_on_exit).lower(),
+                        play_visible_command,
+                        play_preflight_command,
+                    )
+                )
+                step += 1
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    status = "pass" if not failures else "fail"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Window Preflight",
+        "",
+        f"- Status: `{status}`",
+        "- Manual result: `not completed by automation`",
+        f"- Scenario: `{scenario}`",
+        f"- Campaign start: `{campaign_start}`",
+        f"- Seed: `{seed}`",
+        f"- Headless frames per command: `{frames}`",
+        f"- Windows: `{', '.join(f'{width}x{height}' for width, height in windows)}`",
+        f"- Motion modes: `{', '.join(mode.value for mode in modes)}`",
+        f"- Commands checked: `{len(rows)}`",
+        "- Batch scope: `title-onboarding and first-turn-play for every requested window/motion`",
+        "- Evidence policy: `preflight never replaces visible-window tester evidence`",
+        "",
+        "## Headless Command Results",
+        "",
+        (
+            "| Step | Route | Window | Motion | Status | Exit Reason | Saved On Exit | "
+            "Visible Command | Headless Preflight Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for (
+        step,
+        route,
+        window_label,
+        mode,
+        row_status,
+        exit_reason,
+        saved_on_exit,
+        visible_command,
+        preflight_command,
+    ) in rows:
+        lines.append(
+            (
+                f"| {step} | `{route}` | `{window_label}` | `{mode}` | `{row_status}` | "
+                f"`{exit_reason}` | `{saved_on_exit}` | `{visible_command}` | "
+                f"`{preflight_command}` |"
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Manual Follow-up",
+            "",
+            "- Run the visible commands without `--headless` before recording route evidence.",
+            (
+                "- Keep the onboarding report `manual-required` until real notes replace "
+                "recorder placeholders."
+            ),
+            (
+                "- Mark layout, navigation, readability, pause/back/menu, or motion blockers "
+                "as watch/fail before release."
+            ),
+        ]
+    )
+    if failures:
+        lines.extend(["", "## Failures", "", *(f"- {failure}" for failure in failures)])
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    table = Table(title="Onboarding Visible Window Preflight")
+    table.add_column("Step", justify="right")
+    table.add_column("Route", style="cyan")
+    table.add_column("Window")
+    table.add_column("Motion")
+    table.add_column("Status")
+    table.add_column("Exit")
+    for step, route, window_label, mode, row_status, exit_reason, *_rest in rows:
+        table.add_row(str(step), route, window_label, mode, row_status.upper(), exit_reason)
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible window preflight {status.upper()} | "
+                f"{len(rows)} headless command(s) checked | manual evidence still required"
+            ),
+            title="Onboarding Visible Window Preflight",
+            border_style="green" if status == "pass" else "red",
+        )
+    )
+    console.print(
+        Panel.fit(
+            f"Onboarding visible window preflight report written to {output}",
+            title="Onboarding Visible Window Preflight Artifact",
+            border_style="cyan",
+        )
+    )
+    if failures:
         raise typer.Exit(code=1)
 
 

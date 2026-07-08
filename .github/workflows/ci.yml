@@ -175,6 +175,14 @@ jobs:
           --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
           --input /tmp/nexus-tech-onboarding-visible-evidence-matrix.md
 
+      - name: Run onboarding visible window preflight
+        run: >
+          uv run nexus-tech onboarding-visible-window-preflight
+          --command-prefix "uv run nexus-tech"
+          --frames 1
+          --db-path /tmp/nexus-tech-onboarding-visible-window-preflight.db
+          --output /tmp/nexus-tech-onboarding-visible-window-preflight.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -343,6 +351,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-evidence-matrix
           path: /tmp/nexus-tech-onboarding-visible-evidence-matrix.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible window preflight artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-window-preflight
+          path: /tmp/nexus-tech-onboarding-visible-window-preflight.md
           if-no-files-found: warn
           retention-days: 7
 

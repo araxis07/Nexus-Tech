@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.265.0 - 2026-07-09
+
+- Added `onboarding-visible-window-preflight` to headlessly launch title and first-turn onboarding routes across requested windows and motion modes
+- Wired the onboarding visible window preflight into CI with a Markdown artifact upload before manual evidence signoff
+- Documented the preflight command while keeping manual onboarding evidence `manual-required` until real visible-window notes are recorded
+
 ## 0.264.0 - 2026-07-09
 
 - Added `onboarding-visible-evidence-matrix` to summarize terminal and all visible-window onboarding QA rows in one closeout artifact

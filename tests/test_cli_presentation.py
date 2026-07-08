@@ -267,6 +267,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-window-evidence-sheet",
         "onboarding-visible-evidence-matrix",
         "validate-onboarding-visible-evidence-matrix",
+        "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -1255,6 +1256,44 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "PASS" in matrix_validation_result.output
 
 
+def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "onboarding-visible-window-preflight.md"
+    db_path = tmp_path / "onboarding-visible-window-preflight.db"
+
+    result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-window-preflight",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "off",
+            "--frames",
+            "1",
+            "--db-path",
+            str(db_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Onboarding Visible Window Preflight" in result.output
+    text = output_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Window Preflight" in text
+    assert "- Status: `pass`" in text
+    assert "- Manual result: `not completed by automation`" in text
+    assert "manual-required" in text
+    assert "preflight never replaces visible-window tester evidence" in text
+    assert "title-onboarding" in text
+    assert "first-turn-play" in text
+    assert "menu-2d --headless --max-frames 1 --window-size 820x620" in text
+    assert "play-2d --scenario founder_journey" in text
+    assert "--headless --max-frames 1 --window-size 820x620" in text
+
+
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 
@@ -1278,9 +1317,11 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-window-evidence-sheet" in workflow
     assert "uv run nexus-tech onboarding-visible-evidence-matrix" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-evidence-matrix" in workflow
+    assert "uv run nexus-tech onboarding-visible-window-preflight" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
+    assert "--frames 1" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
@@ -1290,6 +1331,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-1280x720-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-evidence-matrix.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-window-preflight.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1299,6 +1341,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-1280x720-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-1440x900-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-evidence-matrix" in workflow
+    assert "nexus-tech-onboarding-visible-window-preflight" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:
