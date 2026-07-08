@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.264.0 - 2026-07-09
+
+- Added `onboarding-visible-evidence-matrix` to summarize terminal and all visible-window onboarding QA rows in one closeout artifact
+- Added `validate-onboarding-visible-evidence-matrix` to block stale matrix summaries, row commands, recorder commands, and manual guardrails
+- Wired evidence matrix generation, validation, docs, regression coverage, and CI artifact upload into the onboarding visible QA gate
+
 ## 0.263.0 - 2026-07-08
 
 - Added CI generation and validation for 1280x720 and 1440x900 onboarding visible-window evidence sheets

@@ -265,6 +265,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-terminal-evidence-sheet",
         "onboarding-visible-window-evidence-sheet",
         "validate-onboarding-visible-window-evidence-sheet",
+        "onboarding-visible-evidence-matrix",
+        "validate-onboarding-visible-evidence-matrix",
         "validate-content",
         "list-saves",
         "check-saves",
@@ -974,6 +976,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     batch_path = tmp_path / "onboarding-visible-terminal-batch.md"
     sheet_path = tmp_path / "onboarding-visible-terminal-evidence-sheet.md"
     window_sheet_path = tmp_path / "onboarding-visible-820x620-evidence-sheet.md"
+    matrix_path = tmp_path / "onboarding-visible-evidence-matrix.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1214,6 +1217,43 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     )
     assert "PASS" in window_sheet_validation_result.output
 
+    matrix_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-evidence-matrix",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--output",
+            str(matrix_path),
+        ],
+    )
+    assert matrix_result.exit_code == 0
+    assert "Onboarding Visible Evidence Matrix" in matrix_result.output
+    assert "Evidence matrix written" in matrix_result.output
+    matrix_text = matrix_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Evidence Matrix" in matrix_text
+    assert "| `terminal` |" in matrix_text
+    assert "| `820x620` |" in matrix_text
+    assert "record-onboarding-visible-playtest-route --report" in matrix_text
+
+    matrix_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-evidence-matrix",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(matrix_path),
+        ],
+    )
+    assert matrix_validation_result.exit_code == 0
+    assert "Onboarding Visible Evidence Matrix Validation" in (matrix_validation_result.output)
+    assert "PASS" in matrix_validation_result.output
+
 
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -1236,6 +1276,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-terminal-evidence-sheet" in workflow
     assert "uv run nexus-tech onboarding-visible-window-evidence-sheet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-window-evidence-sheet" in workflow
+    assert "uv run nexus-tech onboarding-visible-evidence-matrix" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-evidence-matrix" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1247,6 +1289,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-1280x720-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-evidence-matrix.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1255,6 +1298,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-820x620-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-1280x720-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-1440x900-evidence-sheet" in workflow
+    assert "nexus-tech-onboarding-visible-evidence-matrix" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

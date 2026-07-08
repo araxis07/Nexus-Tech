@@ -20,6 +20,7 @@ ONBOARDING_VISIBLE_PLAYTEST_NEXT_NAME = "onboarding-visible-playtest-next.md"
 ONBOARDING_VISIBLE_TERMINAL_BATCH_NAME = "onboarding-visible-terminal-batch.md"
 ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_NAME = "onboarding-visible-terminal-evidence-sheet.md"
 ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_NAME = "onboarding-visible-window-evidence-sheet.md"
+ONBOARDING_VISIBLE_EVIDENCE_MATRIX_NAME = "onboarding-visible-evidence-matrix.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -367,6 +368,62 @@ class OnboardingVisibleWindowEvidenceSheetValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return visible-window evidence sheet checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleEvidenceMatrixGroup:
+    """One terminal or visible-window group inside the onboarding evidence matrix."""
+
+    name: str
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    recorder_commands: tuple[str, ...]
+    pass_count: int
+    watch_count: int
+    fail_count: int
+    todo_count: int
+    incomplete_count: int
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleEvidenceMatrix:
+    """Cross-window onboarding evidence matrix for manual QA closeout."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    pass_count: int
+    watch_count: int
+    fail_count: int
+    todo_count: int
+    incomplete_count: int
+    groups: tuple[OnboardingVisibleEvidenceMatrixGroup, ...]
+    next_row: OnboardingVisiblePlaytestReportRow | None
+    next_visible_command: str
+    next_recorder_command: str
+    validate_command: str
+    status_command: str
+    next_step_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleEvidenceMatrixValidation:
+    """Validation report for the onboarding visible evidence matrix artifact."""
+
+    matrix_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the matrix artifact matches the current report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return matrix checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -2141,6 +2198,347 @@ def validate_onboarding_visible_window_evidence_sheet(
     )
 
 
+def build_onboarding_visible_evidence_matrix(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleEvidenceMatrix:
+    """Build a cross-window evidence closeout matrix from the visible QA report."""
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    rows = report.rows
+    group_names = _ordered_onboarding_visible_group_names(rows)
+    groups = tuple(
+        _build_onboarding_visible_evidence_matrix_group(
+            report_path,
+            name=name,
+            rows=tuple(row for row in rows if _onboarding_visible_group_name(row) == name),
+            command_prefix=command_prefix,
+        )
+        for name in group_names
+    )
+    next_row = report.incomplete_rows[0] if report.incomplete_rows else None
+    next_recorder_command = (
+        _build_onboarding_visible_recorder_command(
+            report_path,
+            next_row,
+            command_prefix=command_prefix,
+        )
+        if next_row is not None
+        else ""
+    )
+    return OnboardingVisibleEvidenceMatrix(
+        report_path=report_path,
+        status=report.status,
+        total_rows=len(rows),
+        pass_count=sum(1 for row in rows if row.result == "pass"),
+        watch_count=sum(1 for row in rows if row.result == "watch"),
+        fail_count=sum(1 for row in rows if row.result == "fail"),
+        todo_count=sum(1 for row in rows if row.result == "todo"),
+        incomplete_count=len(report.incomplete_rows),
+        groups=groups,
+        next_row=next_row,
+        next_visible_command=next_row.command if next_row is not None else "",
+        next_recorder_command=next_recorder_command,
+        validate_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+        next_step_command=(
+            f"{command_prefix} onboarding-visible-playtest-next --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_evidence_matrix(
+    matrix: OnboardingVisibleEvidenceMatrix,
+    output_path: Path,
+) -> None:
+    """Write a cross-window onboarding evidence closeout matrix."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Evidence Matrix",
+        "",
+        f"- Report: `{matrix.report_path}`",
+        f"- Status: `{matrix.status}`",
+        f"- Rows: `{matrix.total_rows}`",
+        f"- Pass: `{matrix.pass_count}`",
+        f"- Watch: `{matrix.watch_count}`",
+        f"- Fail: `{matrix.fail_count}`",
+        f"- Todo: `{matrix.todo_count}`",
+        f"- Incomplete: `{matrix.incomplete_count}`",
+        f"- Groups: `{len(matrix.groups)}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Recorder safety: `matrix does not replace observed terminal or 2D window notes`",
+        "",
+        (
+            "Use this matrix as the final preflight before manual onboarding QA. "
+            "It summarizes terminal rows and every visible window worksheet in one place."
+        ),
+        "",
+        "## Group Summary",
+        "",
+        "| Group | Rows | Pass | Watch | Fail | Todo | Incomplete |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for group in matrix.groups:
+        lines.append(
+            "| "
+            f"`{group.name}` | "
+            f"{len(group.rows)} | "
+            f"{group.pass_count} | "
+            f"{group.watch_count} | "
+            f"{group.fail_count} | "
+            f"{group.todo_count} | "
+            f"{group.incomplete_count} |"
+        )
+    lines.extend(["", "## Matrix Rows", ""])
+    for group in matrix.groups:
+        lines.extend(
+            [
+                f"### {group.name}",
+                "",
+                "| Rank | Route | Window | Motion | Result | Open Command | Recorder Command |",
+                "| ---: | --- | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row, recorder_command in zip(group.rows, group.recorder_commands, strict=True):
+            lines.append(
+                "| "
+                f"{row.rank} | "
+                f"`{row.route}` | "
+                f"`{row.window}` | "
+                f"`{row.motion_mode}` | "
+                f"`{row.result}` | "
+                f"`{_markdown_escape(row.command)}` | "
+                f"`{_markdown_escape(recorder_command)}` |"
+            )
+        lines.append("")
+    lines.extend(["## Next Action", ""])
+    if matrix.next_row is None:
+        lines.extend(
+            [
+                "All onboarding visible groups are recorded as `pass` with concrete notes.",
+                "Run closure validation before treating the onboarding visible gate as closed.",
+                "",
+                "```bash",
+                matrix.validate_command,
+                matrix.status_command,
+                "```",
+                "",
+            ]
+        )
+    else:
+        row = matrix.next_row
+        lines.extend(
+            [
+                "| Rank | Route | Window | Motion | Result |",
+                "| ---: | --- | --- | --- | --- |",
+                (
+                    f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                    f"`{row.motion_mode}` | `{row.result}` |"
+                ),
+                "",
+                "Open the current incomplete route:",
+                "",
+                "```bash",
+                matrix.next_visible_command,
+                "```",
+                "",
+                (
+                    "Record only after replacing placeholder notes with observed output "
+                    "or UI behavior:"
+                ),
+                "",
+                "```bash",
+                matrix.next_recorder_command,
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Closure Commands",
+            "",
+            "Run these after terminal and all window groups have real observations:",
+            "",
+            "```bash",
+            matrix.validate_command,
+            matrix.status_command,
+            matrix.next_step_command,
+            "```",
+            "",
+            "## Evidence Rules",
+            "",
+            "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+            "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+            "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+            "- Keep `manual-required` until every group contains concrete observed notes.",
+            "- The matrix is a closeout index; it does not fabricate manual observations.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_evidence_matrix(
+    matrix_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleEvidenceMatrixValidation:
+    """Validate that the evidence matrix matches the current visible QA report."""
+
+    try:
+        expected = build_onboarding_visible_evidence_matrix(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleEvidenceMatrixValidation(
+            matrix_path=matrix_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not matrix_path.exists():
+        return OnboardingVisibleEvidenceMatrixValidation(
+            matrix_path=matrix_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Evidence Matrix File",
+                    passed=False,
+                    summary="The onboarding visible evidence matrix file must exist.",
+                    evidence=(f"missing:{matrix_path}",),
+                ),
+            ),
+        )
+
+    text = matrix_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Evidence Matrix",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Pass: `{expected.pass_count}`",
+        f"- Watch: `{expected.watch_count}`",
+        f"- Fail: `{expected.fail_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        f"- Incomplete: `{expected.incomplete_count}`",
+        f"- Groups: `{len(expected.groups)}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Recorder safety: `matrix does not replace observed terminal or 2D window notes`",
+    )
+    group_markers = tuple(
+        "| "
+        f"`{group.name}` | "
+        f"{len(group.rows)} | "
+        f"{group.pass_count} | "
+        f"{group.watch_count} | "
+        f"{group.fail_count} | "
+        f"{group.todo_count} | "
+        f"{group.incomplete_count} |"
+        for group in expected.groups
+    )
+    row_markers = tuple(
+        marker
+        for group in expected.groups
+        for row, recorder_command in zip(group.rows, group.recorder_commands, strict=True)
+        for marker in (
+            f"### {group.name}",
+            (
+                f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.result}` |"
+            ),
+            row.command,
+            recorder_command,
+        )
+    )
+    if expected.next_row is None:
+        next_markers = (
+            "All onboarding visible groups are recorded as `pass` with concrete notes.",
+            "Run closure validation before treating the onboarding visible gate as closed.",
+            expected.validate_command,
+            expected.status_command,
+        )
+    else:
+        row = expected.next_row
+        next_markers = (
+            "| Rank | Route | Window | Motion | Result |",
+            (
+                f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.result}` |"
+            ),
+            "Open the current incomplete route:",
+            expected.next_visible_command,
+            "Record only after replacing placeholder notes with observed output or UI behavior:",
+            expected.next_recorder_command,
+        )
+    closure_markers = (
+        expected.validate_command,
+        expected.status_command,
+        expected.next_step_command,
+    )
+    checks = (
+        _build_presence_check(
+            area="Evidence Matrix Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The evidence matrix metadata matches the current visible QA report.",
+        ),
+        _build_presence_check(
+            area="Group Summary",
+            text=text,
+            markers=group_markers,
+            summary="The matrix summarizes all terminal and visible-window groups.",
+        ),
+        _build_presence_check(
+            area="Matrix Rows",
+            text=text,
+            markers=row_markers,
+            summary="The matrix lists current open and recorder commands for every row.",
+        ),
+        _build_presence_check(
+            area="Next Action",
+            text=text,
+            markers=next_markers,
+            summary="The matrix points to the current next incomplete evidence row.",
+        ),
+        _build_presence_check(
+            area="Closure Commands",
+            text=text,
+            markers=closure_markers,
+            summary="The matrix points back to report validation, status, and next-step refresh.",
+        ),
+        _build_presence_check(
+            area="Manual Guardrails",
+            text=text,
+            markers=(
+                "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+                "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+                "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+                "Keep `manual-required` until every group contains concrete observed notes.",
+                "The matrix is a closeout index; it does not fabricate manual observations.",
+            ),
+            summary="The matrix keeps manual evidence rules and no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleEvidenceMatrixValidation(
+        matrix_path=matrix_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -2256,6 +2654,59 @@ def _find_onboarding_visible_report_row(
     if len(matches) > 1:
         raise ValueError("Selector matched multiple onboarding visible report rows; add --rank.")
     return matches[0]
+
+
+def _onboarding_visible_group_name(row: OnboardingVisiblePlaytestReportRow) -> str:
+    return "terminal" if row.window == "terminal" else row.window
+
+
+def _ordered_onboarding_visible_group_names(
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...],
+) -> tuple[str, ...]:
+    default_windows = tuple(
+        f"{width}x{height}" for width, height in DEFAULT_ONBOARDING_VISIBLE_WINDOWS
+    )
+    report_windows = tuple(dict.fromkeys(row.window for row in rows if row.window != "terminal"))
+    ordered_windows = tuple(window for window in default_windows if window in report_windows)
+    ordered_windows = (
+        *ordered_windows,
+        *(window for window in report_windows if window not in ordered_windows),
+    )
+    groups = []
+    if any(row.window == "terminal" for row in rows):
+        groups.append("terminal")
+    groups.extend(ordered_windows)
+    return tuple(groups)
+
+
+def _build_onboarding_visible_evidence_matrix_group(
+    report_path: Path,
+    *,
+    name: str,
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...],
+    command_prefix: str,
+) -> OnboardingVisibleEvidenceMatrixGroup:
+    return OnboardingVisibleEvidenceMatrixGroup(
+        name=name,
+        rows=rows,
+        recorder_commands=tuple(
+            _build_onboarding_visible_recorder_command(
+                report_path,
+                row,
+                command_prefix=command_prefix,
+            )
+            for row in rows
+        ),
+        pass_count=sum(1 for row in rows if row.result == "pass"),
+        watch_count=sum(1 for row in rows if row.result == "watch"),
+        fail_count=sum(1 for row in rows if row.result == "fail"),
+        todo_count=sum(1 for row in rows if row.result == "todo"),
+        incomplete_count=sum(
+            1
+            for row in rows
+            if row.result != "pass" or not _has_real_observation_notes(row.evidence_notes)
+        ),
+    )
 
 
 def _build_terminal_observation_prompt(row: OnboardingVisiblePlaytestReportRow) -> str:

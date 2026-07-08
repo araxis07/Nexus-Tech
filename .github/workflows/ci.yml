@@ -161,6 +161,20 @@ jobs:
           --window 1440x900
           --input /tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md
 
+      - name: Prepare onboarding visible evidence matrix
+        run: >
+          uv run nexus-tech onboarding-visible-evidence-matrix
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --output /tmp/nexus-tech-onboarding-visible-evidence-matrix.md
+
+      - name: Validate onboarding visible evidence matrix
+        run: >
+          uv run nexus-tech validate-onboarding-visible-evidence-matrix
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --input /tmp/nexus-tech-onboarding-visible-evidence-matrix.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -320,6 +334,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-1440x900-evidence-sheet
           path: /tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible evidence matrix artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-evidence-matrix
+          path: /tmp/nexus-tech-onboarding-visible-evidence-matrix.md
           if-no-files-found: warn
           retention-days: 7
 

@@ -146,6 +146,7 @@ from nexus_tech.simulation.meta_progression import (
 from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
+    build_onboarding_visible_evidence_matrix,
     build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
@@ -155,6 +156,7 @@ from nexus_tech.simulation.onboarding_flow import (
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
+    validate_onboarding_visible_evidence_matrix,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
@@ -162,6 +164,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
+    write_onboarding_visible_evidence_matrix,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
@@ -12687,6 +12690,69 @@ def test_onboarding_visible_window_evidence_sheet_writes_compact_window_rows(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Window Evidence Rows" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_evidence_matrix_writes_full_closeout_index(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620), (1280, 720)),
+        motion_modes=("full", "reduced", "off"),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    matrix_path = tmp_path / "onboarding-visible-evidence-matrix.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    matrix = build_onboarding_visible_evidence_matrix(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_evidence_matrix(matrix, matrix_path)
+
+    text = matrix_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Evidence Matrix" in text
+    assert matrix.status == "manual-required"
+    assert matrix.total_rows == 15
+    assert matrix.incomplete_count == 15
+    assert [group.name for group in matrix.groups] == ["terminal", "820x620", "1280x720"]
+    assert "| `terminal` | 3 | 0 | 0 | 0 | 3 | 3 |" in text
+    assert "| `820x620` | 6 | 0 | 0 | 0 | 6 | 6 |" in text
+    assert "| `1280x720` | 6 | 0 | 0 | 0 | 6 | 6 |" in text
+    assert ".venv313/bin/nexus-tech guide" in text
+    assert ".venv313/bin/nexus-tech menu-2d --window-size 820x620" in text
+    assert ".venv313/bin/nexus-tech play-2d --scenario founder_journey" in text
+    assert "record-onboarding-visible-playtest-route --report" in text
+    assert "matrix does not replace observed terminal or 2D window notes" in text
+    assert "does not fabricate manual observations" in text
+
+    validation = validate_onboarding_visible_evidence_matrix(
+        matrix_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech menu-2d --window-size 820x620",
+        ".venv313/bin/nexus-tech menu-2d --window-size 960x640",
+    )
+    matrix_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_evidence_matrix(
+        matrix_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Matrix Rows" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

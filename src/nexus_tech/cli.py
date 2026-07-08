@@ -230,6 +230,7 @@ from nexus_tech.simulation.onboarding_flow import (
     DEFAULT_ONBOARDING_VISIBLE_MOTION_MODES,
     DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
     ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
+    build_onboarding_visible_evidence_matrix,
     build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
@@ -239,6 +240,7 @@ from nexus_tech.simulation.onboarding_flow import (
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
+    validate_onboarding_visible_evidence_matrix,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
@@ -246,6 +248,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
+    write_onboarding_visible_evidence_matrix,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
@@ -423,6 +426,16 @@ ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md"),
     "--input",
     help="Markdown path for the visible-window onboarding QA evidence worksheet to validate.",
+)
+ONBOARDING_VISIBLE_EVIDENCE_MATRIX_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-evidence-matrix.md"),
+    "--output",
+    help="Markdown path for the onboarding visible QA evidence closeout matrix.",
+)
+ONBOARDING_VISIBLE_EVIDENCE_MATRIX_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-evidence-matrix.md"),
+    "--input",
+    help="Markdown path for the onboarding visible QA evidence matrix to validate.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -6662,6 +6675,100 @@ def validate_onboarding_visible_window_evidence_sheet_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible Window Evidence Sheet Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-evidence-matrix")
+def onboarding_visible_evidence_matrix_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_EVIDENCE_MATRIX_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the full onboarding visible QA evidence closeout matrix."""
+
+    try:
+        matrix = build_onboarding_visible_evidence_matrix(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Evidence Matrix Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_evidence_matrix(matrix, output)
+
+    table = Table(title=f"Onboarding Visible Evidence Matrix | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Groups", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        matrix.status.upper(),
+        str(matrix.total_rows),
+        str(len(matrix.groups)),
+        str(matrix.incomplete_count),
+    )
+    console.print(table)
+    for group in matrix.groups:
+        console.print(
+            f"Group {group.name}: {len(group.rows)} rows, {group.incomplete_count} incomplete"
+        )
+    if matrix.next_row is not None:
+        console.print(
+            "Next incomplete row: "
+            f"rank {matrix.next_row.rank} | {matrix.next_row.route} | "
+            f"{matrix.next_row.window} | {matrix.next_row.motion_mode}"
+        )
+    console.print(f"Evidence matrix written to {output}")
+
+
+@app.command("validate-onboarding-visible-evidence-matrix")
+def validate_onboarding_visible_evidence_matrix_command(
+    matrix_path: Path = ONBOARDING_VISIBLE_EVIDENCE_MATRIX_INPUT_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible evidence matrix against the report."""
+
+    validation = validate_onboarding_visible_evidence_matrix(
+        matrix_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible Evidence Matrix Validation | {matrix_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible evidence matrix validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible Evidence Matrix Validation",
             border_style=border_style,
         )
     )
