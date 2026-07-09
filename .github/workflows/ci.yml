@@ -211,6 +211,22 @@ jobs:
           --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
           --input /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
 
+      - name: Prepare onboarding visible UX fix plan
+        run: >
+          uv run nexus-tech onboarding-visible-ux-fix-plan
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --input /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          --output /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
+
+      - name: Validate onboarding visible UX fix plan
+        run: >
+          uv run nexus-tech validate-onboarding-visible-ux-fix-plan
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --intake /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          --input /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -406,6 +422,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-ux-issue-intake
           path: /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible UX fix plan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-ux-fix-plan
+          path: /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
           if-no-files-found: warn
           retention-days: 7
 

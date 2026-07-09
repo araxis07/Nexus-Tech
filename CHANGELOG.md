@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.268.0 - 2026-07-09
+
+- Added `onboarding-visible-ux-fix-plan` to prioritize observed P0/P1/P2 onboarding UX findings from the issue intake
+- Added `validate-onboarding-visible-ux-fix-plan` to block stale fix plans, release gates, row commands, and no-fabrication guardrails
+- Wired the UX fix plan into docs, regression coverage, CI validation, and artifact upload before UI signoff
+
 ## 0.267.0 - 2026-07-09
 
 - Added `onboarding-visible-ux-issue-intake` to capture observed UX/UI findings from real onboarding manual playtests

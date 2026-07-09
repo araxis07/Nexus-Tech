@@ -271,6 +271,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-manual-session",
         "onboarding-visible-ux-issue-intake",
         "validate-onboarding-visible-ux-issue-intake",
+        "onboarding-visible-ux-fix-plan",
+        "validate-onboarding-visible-ux-fix-plan",
         "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
@@ -984,6 +986,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     matrix_path = tmp_path / "onboarding-visible-evidence-matrix.md"
     session_path = tmp_path / "onboarding-visible-manual-session.md"
     intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
+    fix_plan_path = tmp_path / "onboarding-visible-ux-fix-plan.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1335,6 +1338,47 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible UX Issue Intake Validation" in (intake_validation_result.output)
     assert "PASS" in intake_validation_result.output
 
+    fix_plan_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-ux-fix-plan",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(intake_path),
+            "--output",
+            str(fix_plan_path),
+        ],
+    )
+    assert fix_plan_result.exit_code == 0
+    assert "Onboarding Visible UX Fix Plan" in fix_plan_result.output
+    assert "UX fix plan written" in fix_plan_result.output
+    fix_plan_text = fix_plan_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Fix Plan" in fix_plan_text
+    assert "validate-onboarding-visible-ux-issue-intake" in fix_plan_text
+    assert "no P0/P1 and no todo severities before UI signoff" in fix_plan_text
+    assert "This fix plan is not manual evidence" in fix_plan_text
+
+    fix_plan_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-ux-fix-plan",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(fix_plan_path),
+            "--intake",
+            str(intake_path),
+        ],
+    )
+    assert fix_plan_validation_result.exit_code == 0
+    assert "Onboarding Visible UX Fix Plan Validation" in (fix_plan_validation_result.output)
+    assert "PASS" in fix_plan_validation_result.output
+
 
 def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     tmp_path: Path,
@@ -1402,6 +1446,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-manual-session" in workflow
     assert "uv run nexus-tech onboarding-visible-ux-issue-intake" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-ux-issue-intake" in workflow
+    assert "uv run nexus-tech onboarding-visible-ux-fix-plan" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-ux-fix-plan" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1418,6 +1464,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-window-preflight.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-manual-session.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-issue-intake.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-ux-fix-plan.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1430,6 +1477,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-window-preflight" in workflow
     assert "nexus-tech-onboarding-visible-manual-session" in workflow
     assert "nexus-tech-onboarding-visible-ux-issue-intake" in workflow
+    assert "nexus-tech-onboarding-visible-ux-fix-plan" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

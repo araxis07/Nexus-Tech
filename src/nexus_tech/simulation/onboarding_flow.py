@@ -23,6 +23,7 @@ ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_NAME = "onboarding-visible-window-evide
 ONBOARDING_VISIBLE_EVIDENCE_MATRIX_NAME = "onboarding-visible-evidence-matrix.md"
 ONBOARDING_VISIBLE_MANUAL_SESSION_NAME = "onboarding-visible-manual-session.md"
 ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_NAME = "onboarding-visible-ux-issue-intake.md"
+ONBOARDING_VISIBLE_UX_FIX_PLAN_NAME = "onboarding-visible-ux-fix-plan.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -497,6 +498,68 @@ class OnboardingVisibleUxIssueIntakeValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return UX issue intake checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxFixPlanRow:
+    """One UX issue triage row carried from the visible onboarding intake."""
+
+    group: str
+    rank: int
+    route: str
+    window: str
+    motion_mode: str
+    result: str
+    command: str
+    ux_areas: str
+    severity: str
+    issue_notes: str
+    follow_up: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxFixPlan:
+    """Prioritized UX fix plan derived from real visible onboarding issue intake."""
+
+    report_path: Path
+    intake_path: Path
+    status: str
+    rows: tuple[OnboardingVisibleUxFixPlanRow, ...]
+    p0_count: int
+    p1_count: int
+    p2_count: int
+    none_count: int
+    todo_count: int
+    validate_intake_command: str
+    validate_report_command: str
+    status_command: str
+
+    @property
+    def total_rows(self) -> int:
+        """Return the number of visible onboarding UX rows in the plan."""
+
+        return len(self.rows)
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxFixPlanValidation:
+    """Validation report for the onboarding visible UX fix plan artifact."""
+
+    plan_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the UX fix plan matches the current intake."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return UX fix plan checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -3142,6 +3205,272 @@ def validate_onboarding_visible_ux_issue_intake(
     )
 
 
+def build_onboarding_visible_ux_fix_plan(
+    intake_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxFixPlan:
+    """Build a prioritized UX fix plan from the visible onboarding issue intake."""
+
+    intake_validation = validate_onboarding_visible_ux_issue_intake(
+        intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not intake_validation.ok:
+        failed = ", ".join(check.area for check in intake_validation.failed_checks)
+        raise ValueError(f"UX issue intake must validate before fix planning: {failed}")
+
+    text = intake_path.read_text(encoding="utf-8")
+    rows = tuple(
+        row
+        for line in text.splitlines()
+        if (row := _parse_onboarding_visible_ux_issue_row(line)) is not None
+    )
+    if not rows:
+        raise ValueError("Onboarding visible UX issue intake has no issue rows.")
+
+    p0_count = sum(1 for row in rows if row.severity == "P0")
+    p1_count = sum(1 for row in rows if row.severity == "P1")
+    p2_count = sum(1 for row in rows if row.severity == "P2")
+    none_count = sum(1 for row in rows if row.severity == "none")
+    todo_count = sum(1 for row in rows if row.severity == "todo")
+    if todo_count:
+        status = "triage-required"
+    elif p0_count or p1_count:
+        status = "fix-required"
+    else:
+        status = "ready-for-manual-evidence"
+
+    return OnboardingVisibleUxFixPlan(
+        report_path=report_path,
+        intake_path=intake_path,
+        status=status,
+        rows=rows,
+        p0_count=p0_count,
+        p1_count=p1_count,
+        p2_count=p2_count,
+        none_count=none_count,
+        todo_count=todo_count,
+        validate_intake_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
+            f"--report {report_path} --input {intake_path}"
+        ),
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_fix_plan(
+    plan: OnboardingVisibleUxFixPlan,
+    output_path: Path,
+) -> None:
+    """Write a prioritized UX fix plan without converting it into evidence."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Fix Plan",
+        "",
+        f"- Report: `{plan.report_path}`",
+        f"- Intake: `{plan.intake_path}`",
+        f"- Status: `{plan.status}`",
+        f"- Rows: `{plan.total_rows}`",
+        f"- P0: `{plan.p0_count}`",
+        f"- P1: `{plan.p1_count}`",
+        f"- P2: `{plan.p2_count}`",
+        f"- None: `{plan.none_count}`",
+        f"- Todo: `{plan.todo_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `fix plan must come from observed intake rows`",
+        "- Release gate: `no P0/P1 and no todo severities before UI signoff`",
+        "",
+        (
+            "Use this fix plan after the UX issue intake is filled from real visible "
+            "play. It is a prioritization artifact, not proof that the UI was fixed."
+        ),
+        "",
+        "## Required Refresh",
+        "",
+        "```bash",
+        plan.validate_intake_command,
+        plan.validate_report_command,
+        plan.status_command,
+        "```",
+        "",
+        "## Fix Queue",
+        "",
+        (
+            "| Priority | Group | Rank | Route | Window | Motion | Severity | "
+            "UX Areas | Issue Notes | Follow-up | Open Command |"
+        ),
+        "| --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in plan.rows:
+        lines.append(
+            "| "
+            f"`{_onboarding_visible_ux_fix_priority(row)}` | "
+            f"`{row.group}` | "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.window}` | "
+            f"`{row.motion_mode}` | "
+            f"`{row.severity}` | "
+            f"`{_markdown_escape(row.ux_areas)}` | "
+            f"{_markdown_escape(row.issue_notes)} | "
+            f"{_markdown_escape(row.follow_up)} | "
+            f"`{_markdown_escape(row.command)}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Release Gate Rules",
+            "",
+            "- P0 and P1 counts must be zero before UI signoff.",
+            "- `todo` severities mean manual UX triage is incomplete.",
+            "- `none` rows still need real evidence notes in the onboarding report.",
+            "- Re-run the intake validator after editing any issue row.",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This fix plan is not manual evidence; it only prioritizes observed issues.",
+            "- Do not create fixes from placeholder intake rows.",
+            "- Do not mark UI signoff complete until visible-window notes exist.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_fix_plan(
+    plan_path: Path,
+    *,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxFixPlanValidation:
+    """Validate that the UX fix plan matches the current issue intake."""
+
+    try:
+        expected = build_onboarding_visible_ux_fix_plan(
+            intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxFixPlanValidation(
+            plan_path=plan_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Intake",
+                    passed=False,
+                    summary="The source UX issue intake must validate before fix planning.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not plan_path.exists():
+        return OnboardingVisibleUxFixPlanValidation(
+            plan_path=plan_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Fix Plan File",
+                    passed=False,
+                    summary="The onboarding visible UX fix plan file must exist.",
+                    evidence=(f"missing:{plan_path}",),
+                ),
+            ),
+        )
+
+    text = plan_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Fix Plan",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- P0: `{expected.p0_count}`",
+        f"- P1: `{expected.p1_count}`",
+        f"- P2: `{expected.p2_count}`",
+        f"- None: `{expected.none_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `fix plan must come from observed intake rows`",
+        "- Release gate: `no P0/P1 and no todo severities before UI signoff`",
+    )
+    command_markers = (
+        expected.validate_intake_command,
+        expected.validate_report_command,
+        expected.status_command,
+    )
+    row_markers = tuple(
+        marker
+        for row in expected.rows
+        for marker in (
+            (
+                f"| `{_onboarding_visible_ux_fix_priority(row)}` | `{row.group}` | "
+                f"{row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.severity}` |"
+            ),
+            row.ux_areas,
+            row.issue_notes,
+            row.follow_up,
+            row.command,
+        )
+    )
+    checks = (
+        _build_presence_check(
+            area="UX Fix Plan Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX fix plan metadata matches the current issue intake.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary="The UX fix plan includes current intake, report, and status commands.",
+        ),
+        _build_presence_check(
+            area="Fix Queue Rows",
+            text=text,
+            markers=row_markers,
+            summary="The UX fix plan lists every current issue intake row.",
+        ),
+        _build_presence_check(
+            area="Release Gate Rules",
+            text=text,
+            markers=(
+                "P0 and P1 counts must be zero before UI signoff.",
+                "`todo` severities mean manual UX triage is incomplete.",
+                "`none` rows still need real evidence notes in the onboarding report.",
+                "Re-run the intake validator after editing any issue row.",
+            ),
+            summary="The UX fix plan keeps UI signoff gates visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This fix plan is not manual evidence; it only prioritizes observed issues.",
+                "Do not create fixes from placeholder intake rows.",
+                "Do not mark UI signoff complete until visible-window notes exist.",
+            ),
+            summary="The UX fix plan keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxFixPlanValidation(
+        plan_path=plan_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -3332,6 +3661,55 @@ def _onboarding_visible_ux_issue_areas(row: OnboardingVisiblePlaytestReportRow) 
     if row.window == "terminal":
         return "copy/readability/navigation"
     return "text containment/button spacing/pause-back-menu/motion readability"
+
+
+def _parse_onboarding_visible_ux_issue_row(
+    line: str,
+) -> OnboardingVisibleUxFixPlanRow | None:
+    if not line.startswith("| `"):
+        return None
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    if len(cells) != 11 or not cells[1].isdigit():
+        return None
+    severity = _normalize_onboarding_visible_ux_severity(_strip_backticks(cells[8]))
+    return OnboardingVisibleUxFixPlanRow(
+        group=_strip_backticks(cells[0]),
+        rank=int(cells[1]),
+        route=_strip_backticks(cells[2]),
+        window=_strip_backticks(cells[3]),
+        motion_mode=_strip_backticks(cells[4]),
+        result=_strip_backticks(cells[5]),
+        command=_strip_backticks(cells[6]).replace("\\|", "|").strip(),
+        ux_areas=_strip_backticks(cells[7]).replace("\\|", "|").strip(),
+        severity=severity,
+        issue_notes=_strip_backticks(cells[9]).replace("\\|", "|").strip(),
+        follow_up=_strip_backticks(cells[10]).replace("\\|", "|").strip(),
+    )
+
+
+def _normalize_onboarding_visible_ux_severity(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized in {"p0", "0", "blocker"}:
+        return "P0"
+    if normalized in {"p1", "1", "high"}:
+        return "P1"
+    if normalized in {"p2", "2", "polish"}:
+        return "P2"
+    if normalized in {"none", "no issue", "no-issue", "clear"}:
+        return "none"
+    return "todo"
+
+
+def _onboarding_visible_ux_fix_priority(row: OnboardingVisibleUxFixPlanRow) -> str:
+    if row.severity == "P0":
+        return "blocker"
+    if row.severity == "P1":
+        return "high"
+    if row.severity == "P2":
+        return "polish"
+    if row.severity == "none":
+        return "no-issue"
+    return "triage"
 
 
 def _build_onboarding_visible_recorder_command(
