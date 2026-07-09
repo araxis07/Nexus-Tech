@@ -197,6 +197,20 @@ jobs:
           --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
           --input /tmp/nexus-tech-onboarding-visible-manual-session.md
 
+      - name: Prepare onboarding visible UX issue intake
+        run: >
+          uv run nexus-tech onboarding-visible-ux-issue-intake
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --output /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+
+      - name: Validate onboarding visible UX issue intake
+        run: >
+          uv run nexus-tech validate-onboarding-visible-ux-issue-intake
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --input /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -383,6 +397,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-manual-session
           path: /tmp/nexus-tech-onboarding-visible-manual-session.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible UX issue intake artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-ux-issue-intake
+          path: /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
           if-no-files-found: warn
           retention-days: 7
 

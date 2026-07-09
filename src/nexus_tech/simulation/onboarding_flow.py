@@ -22,6 +22,7 @@ ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_NAME = "onboarding-visible-terminal-e
 ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_NAME = "onboarding-visible-window-evidence-sheet.md"
 ONBOARDING_VISIBLE_EVIDENCE_MATRIX_NAME = "onboarding-visible-evidence-matrix.md"
 ONBOARDING_VISIBLE_MANUAL_SESSION_NAME = "onboarding-visible-manual-session.md"
+ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_NAME = "onboarding-visible-ux-issue-intake.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -460,6 +461,42 @@ class OnboardingVisibleManualSessionValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return manual session checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxIssueIntake:
+    """UX issue intake sheet for real onboarding visible QA observations."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    incomplete_count: int
+    groups: tuple[OnboardingVisibleEvidenceMatrixGroup, ...]
+    manual_session_command: str
+    preflight_command: str
+    validate_report_command: str
+    status_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxIssueIntakeValidation:
+    """Validation report for the onboarding visible UX issue intake artifact."""
+
+    intake_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the UX issue intake matches the current report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return UX issue intake checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -2852,6 +2889,259 @@ def validate_onboarding_visible_manual_session(
     )
 
 
+def build_onboarding_visible_ux_issue_intake(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxIssueIntake:
+    """Build a UX issue intake sheet for real visible onboarding QA findings."""
+
+    matrix = build_onboarding_visible_evidence_matrix(
+        report_path,
+        command_prefix=command_prefix,
+    )
+    return OnboardingVisibleUxIssueIntake(
+        report_path=matrix.report_path,
+        status=matrix.status,
+        total_rows=matrix.total_rows,
+        incomplete_count=matrix.incomplete_count,
+        groups=matrix.groups,
+        manual_session_command=(
+            f"{command_prefix} onboarding-visible-manual-session "
+            f"--report {report_path} "
+            "--output /tmp/nexus-tech-onboarding-visible-manual-session.md"
+        ),
+        preflight_command=(
+            f"{command_prefix} onboarding-visible-window-preflight --frames 1 "
+            "--output /tmp/nexus-tech-onboarding-visible-window-preflight.md"
+        ),
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_issue_intake(
+    intake: OnboardingVisibleUxIssueIntake,
+    output_path: Path,
+) -> None:
+    """Write a UX issue intake sheet for manual visible-window observations."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Issue Intake",
+        "",
+        f"- Report: `{intake.report_path}`",
+        f"- Status: `{intake.status}`",
+        f"- Rows: `{intake.total_rows}`",
+        f"- Incomplete: `{intake.incomplete_count}`",
+        f"- Groups: `{len(intake.groups)}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `record only issues observed during real visible-window play`",
+        "- Intake safety: `todo rows are issue slots, not proof of defects`",
+        "",
+        (
+            "Use this intake after running the manual visible onboarding session. "
+            "Record concrete UX/UI issues that were observed in the actual terminal "
+            "or 2D window; leave rows as `todo` until a real observation exists."
+        ),
+        "",
+        "## Required Refresh",
+        "",
+        "```bash",
+        intake.manual_session_command,
+        intake.preflight_command,
+        intake.validate_report_command,
+        intake.status_command,
+        "```",
+        "",
+        "## Issue Intake Rows",
+        "",
+        (
+            "| Group | Rank | Route | Window | Motion | Result | Open Command | "
+            "UX Areas | Severity | Issue Notes | Follow-up |"
+        ),
+        "| --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for group in intake.groups:
+        for row in group.rows:
+            lines.append(
+                "| "
+                f"`{group.name}` | "
+                f"{row.rank} | "
+                f"`{row.route}` | "
+                f"`{row.window}` | "
+                f"`{row.motion_mode}` | "
+                f"`{row.result}` | "
+                f"`{_markdown_escape(row.command)}` | "
+                f"`{_onboarding_visible_ux_issue_areas(row)}` | "
+                "`todo` | "
+                "`<record observed UX issue or none>` | "
+                "`owner/date or none` |"
+            )
+    lines.extend(
+        [
+            "",
+            "## Severity Rules",
+            "",
+            (
+                "- `P0`: blocks reading, navigation, save/load, pause/back/menu, "
+                "or first-turn action."
+            ),
+            "- `P1`: playable but materially slows first-time understanding.",
+            "- `P2`: polish issue that should not block manual evidence.",
+            (
+                "- `none`: no issue observed; still record evidence notes in the "
+                "main report separately."
+            ),
+            "",
+            "## Closure Commands",
+            "",
+            "```bash",
+            intake.validate_report_command,
+            intake.status_command,
+            "```",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This intake is not evidence; it only captures observed UX issues.",
+            "- Do not invent defects to make a row look tested.",
+            (
+                "- Keep onboarding manual-required until report rows contain real "
+                "visible-window notes."
+            ),
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_issue_intake(
+    intake_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxIssueIntakeValidation:
+    """Validate that the UX issue intake matches the current visible QA report."""
+
+    try:
+        expected = build_onboarding_visible_ux_issue_intake(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxIssueIntakeValidation(
+            intake_path=intake_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not intake_path.exists():
+        return OnboardingVisibleUxIssueIntakeValidation(
+            intake_path=intake_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Issue Intake File",
+                    passed=False,
+                    summary="The onboarding visible UX issue intake file must exist.",
+                    evidence=(f"missing:{intake_path}",),
+                ),
+            ),
+        )
+
+    text = intake_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Issue Intake",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Incomplete: `{expected.incomplete_count}`",
+        f"- Groups: `{len(expected.groups)}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `record only issues observed during real visible-window play`",
+        "- Intake safety: `todo rows are issue slots, not proof of defects`",
+    )
+    command_markers = (
+        expected.manual_session_command,
+        expected.preflight_command,
+        expected.validate_report_command,
+        expected.status_command,
+    )
+    row_markers = tuple(
+        marker
+        for group in expected.groups
+        for row in group.rows
+        for marker in (
+            (
+                f"| `{group.name}` | {row.rank} | `{row.route}` | "
+                f"`{row.window}` | `{row.motion_mode}` | `{row.result}` |"
+            ),
+            row.command,
+            _onboarding_visible_ux_issue_areas(row),
+        )
+    )
+    checks = (
+        _build_presence_check(
+            area="UX Intake Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX issue intake metadata matches the current visible QA report.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary=(
+                "The UX issue intake includes current session, preflight, and closure commands."
+            ),
+        ),
+        _build_presence_check(
+            area="Issue Intake Rows",
+            text=text,
+            markers=row_markers,
+            summary="The UX issue intake lists every current row with matching open commands.",
+        ),
+        _build_presence_check(
+            area="Severity Rules",
+            text=text,
+            markers=(
+                "`P0`: blocks reading, navigation, save/load, pause/back/menu",
+                "`P1`: playable but materially slows first-time understanding.",
+                "`P2`: polish issue that should not block manual evidence.",
+                "`none`: no issue observed; still record evidence notes",
+            ),
+            summary="The UX issue intake keeps severity rules visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This intake is not evidence; it only captures observed UX issues.",
+                "Do not invent defects to make a row look tested.",
+                (
+                    "Keep onboarding manual-required until report rows contain real "
+                    "visible-window notes."
+                ),
+            ),
+            summary="The UX issue intake keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxIssueIntakeValidation(
+        intake_path=intake_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -3036,6 +3326,12 @@ def _build_window_observation_prompt(row: OnboardingVisiblePlaytestReportRow) ->
         "text containment, button spacing, pause/back/menu recovery, and motion readability "
         f"while checking {', '.join(row.required_evidence)}."
     )
+
+
+def _onboarding_visible_ux_issue_areas(row: OnboardingVisiblePlaytestReportRow) -> str:
+    if row.window == "terminal":
+        return "copy/readability/navigation"
+    return "text containment/button spacing/pause-back-menu/motion readability"
 
 
 def _build_onboarding_visible_recorder_command(

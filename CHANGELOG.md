@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.267.0 - 2026-07-09
+
+- Added `onboarding-visible-ux-issue-intake` to capture observed UX/UI findings from real onboarding manual playtests
+- Added `validate-onboarding-visible-ux-issue-intake` to block stale issue rows, refresh commands, severity rules, and no-fabrication guardrails
+- Wired the UX issue intake into docs, regression coverage, CI validation, and artifact upload while keeping onboarding evidence manual-required
+
 ## 0.266.0 - 2026-07-09
 
 - Added `onboarding-visible-manual-session` to assemble the real-window onboarding QA operator packet from the current report

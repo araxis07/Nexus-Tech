@@ -269,6 +269,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-evidence-matrix",
         "onboarding-visible-manual-session",
         "validate-onboarding-visible-manual-session",
+        "onboarding-visible-ux-issue-intake",
+        "validate-onboarding-visible-ux-issue-intake",
         "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
@@ -981,6 +983,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     window_sheet_path = tmp_path / "onboarding-visible-820x620-evidence-sheet.md"
     matrix_path = tmp_path / "onboarding-visible-evidence-matrix.md"
     session_path = tmp_path / "onboarding-visible-manual-session.md"
+    intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1295,6 +1298,43 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible Manual Session Validation" in (session_validation_result.output)
     assert "PASS" in session_validation_result.output
 
+    intake_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-ux-issue-intake",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--output",
+            str(intake_path),
+        ],
+    )
+    assert intake_result.exit_code == 0
+    assert "Onboarding Visible UX Issue Intake" in intake_result.output
+    assert "UX issue intake written" in intake_result.output
+    intake_text = intake_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Issue Intake" in intake_text
+    assert "onboarding-visible-manual-session --report" in intake_text
+    assert "onboarding-visible-window-preflight --frames 1" in intake_text
+    assert "This intake is not evidence; it only captures observed UX issues." in intake_text
+
+    intake_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-ux-issue-intake",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(intake_path),
+        ],
+    )
+    assert intake_validation_result.exit_code == 0
+    assert "Onboarding Visible UX Issue Intake Validation" in (intake_validation_result.output)
+    assert "PASS" in intake_validation_result.output
+
 
 def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     tmp_path: Path,
@@ -1360,6 +1400,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech onboarding-visible-window-preflight" in workflow
     assert "uv run nexus-tech onboarding-visible-manual-session" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-manual-session" in workflow
+    assert "uv run nexus-tech onboarding-visible-ux-issue-intake" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-ux-issue-intake" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1375,6 +1417,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-evidence-matrix.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-window-preflight.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-manual-session.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-ux-issue-intake.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1386,6 +1429,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-evidence-matrix" in workflow
     assert "nexus-tech-onboarding-visible-window-preflight" in workflow
     assert "nexus-tech-onboarding-visible-manual-session" in workflow
+    assert "nexus-tech-onboarding-visible-ux-issue-intake" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

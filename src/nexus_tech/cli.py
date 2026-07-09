@@ -237,6 +237,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_ux_issue_intake,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
@@ -248,6 +249,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_ux_issue_intake,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
@@ -257,6 +259,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_ux_issue_intake,
     write_onboarding_visible_window_evidence_sheet,
 )
 from nexus_tech.simulation.randomness import RandomSource
@@ -459,6 +462,16 @@ ONBOARDING_VISIBLE_MANUAL_SESSION_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-manual-session.md"),
     "--input",
     help="Markdown path for the onboarding visible manual QA session packet to validate.",
+)
+ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-issue-intake.md"),
+    "--output",
+    help="Markdown path for the onboarding visible UX issue intake sheet.",
+)
+ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-issue-intake.md"),
+    "--input",
+    help="Markdown path for the onboarding visible UX issue intake sheet to validate.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -6881,6 +6894,95 @@ def validate_onboarding_visible_manual_session_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible Manual Session Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-ux-issue-intake")
+def onboarding_visible_ux_issue_intake_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the real-window onboarding UX issue intake sheet."""
+
+    try:
+        intake = build_onboarding_visible_ux_issue_intake(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Issue Intake Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_ux_issue_intake(intake, output)
+
+    table = Table(title=f"Onboarding Visible UX Issue Intake | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Groups", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        intake.status.upper(),
+        str(intake.total_rows),
+        str(len(intake.groups)),
+        str(intake.incomplete_count),
+    )
+    console.print(table)
+    for group in intake.groups:
+        console.print(
+            f"UX issue group {group.name}: {len(group.rows)} rows, "
+            f"{group.incomplete_count} incomplete"
+        )
+    console.print(f"UX issue intake written to {output}")
+
+
+@app.command("validate-onboarding-visible-ux-issue-intake")
+def validate_onboarding_visible_ux_issue_intake_command(
+    intake_path: Path = ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_INPUT_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible UX issue intake against the report."""
+
+    validation = validate_onboarding_visible_ux_issue_intake(
+        intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible UX Issue Intake Validation | {intake_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible UX issue intake validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible UX Issue Intake Validation",
             border_style=border_style,
         )
     )

@@ -153,6 +153,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_ux_issue_intake,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
@@ -164,6 +165,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_ux_issue_intake,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
@@ -173,6 +175,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_ux_issue_intake,
     write_onboarding_visible_window_evidence_sheet,
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
@@ -12819,6 +12822,67 @@ def test_onboarding_visible_manual_session_writes_ordered_operator_packet(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Operator Order" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_ux_issue_intake_tracks_real_issue_slots(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620), (1280, 720)),
+        motion_modes=("full", "reduced", "off"),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    intake = build_onboarding_visible_ux_issue_intake(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_issue_intake(intake, intake_path)
+
+    text = intake_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Issue Intake" in text
+    assert intake.status == "manual-required"
+    assert intake.total_rows == 15
+    assert intake.incomplete_count == 15
+    assert "onboarding-visible-manual-session --report" in text
+    assert "onboarding-visible-window-preflight --frames 1" in text
+    assert "| `terminal` | 1 | `terminal-guide` | `terminal` | `n/a` | `todo` |" in text
+    assert "| `820x620` | 4 | `title-onboarding` | `820x620` | `full` | `todo` |" in text
+    assert "copy/readability/navigation" in text
+    assert "text containment/button spacing/pause-back-menu/motion readability" in text
+    assert "`P0`: blocks reading, navigation, save/load, pause/back/menu" in text
+    assert "This intake is not evidence; it only captures observed UX issues." in text
+
+    validation = validate_onboarding_visible_ux_issue_intake(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech menu-2d --window-size 820x620",
+        ".venv313/bin/nexus-tech menu-2d --window-size 960x640",
+    )
+    intake_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_ux_issue_intake(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Issue Intake Rows" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(
