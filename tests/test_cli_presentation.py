@@ -275,6 +275,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-ux-fix-plan",
         "onboarding-visible-ux-triage-sprint",
         "validate-onboarding-visible-ux-triage-sprint",
+        "onboarding-visible-ux-triage-next",
+        "validate-onboarding-visible-ux-triage-next",
         "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
@@ -990,6 +992,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
     fix_plan_path = tmp_path / "onboarding-visible-ux-fix-plan.md"
     sprint_path = tmp_path / "onboarding-visible-ux-triage-sprint.md"
+    triage_next_path = tmp_path / "onboarding-visible-ux-triage-next.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1427,6 +1430,55 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible UX Triage Sprint Validation" in (sprint_validation_result.output)
     assert "PASS" in sprint_validation_result.output
 
+    triage_next_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-ux-triage-next",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--intake",
+            str(intake_path),
+            "--plan",
+            str(fix_plan_path),
+            "--sprint",
+            str(sprint_path),
+            "--output",
+            str(triage_next_path),
+        ],
+    )
+    assert triage_next_result.exit_code == 0
+    assert "Onboarding Visible UX Triage Next Step" in triage_next_result.output
+    assert "UX triage next-step handoff written" in triage_next_result.output
+    triage_next_text = triage_next_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Triage Next Step" in triage_next_text
+    assert "record-onboarding-visible-playtest-route" in triage_next_text
+    assert "open the route and update intake/report from real observation" in triage_next_text
+    assert "This next-step handoff is not evidence" in triage_next_text
+
+    triage_next_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-ux-triage-next",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(triage_next_path),
+            "--intake",
+            str(intake_path),
+            "--plan",
+            str(fix_plan_path),
+            "--sprint",
+            str(sprint_path),
+        ],
+    )
+    assert triage_next_validation_result.exit_code == 0
+    assert "Onboarding Visible UX Triage Next Validation" in (triage_next_validation_result.output)
+    assert "PASS" in triage_next_validation_result.output
+
 
 def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     tmp_path: Path,
@@ -1498,6 +1550,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-ux-fix-plan" in workflow
     assert "uv run nexus-tech onboarding-visible-ux-triage-sprint" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-ux-triage-sprint" in workflow
+    assert "uv run nexus-tech onboarding-visible-ux-triage-next" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-ux-triage-next" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1516,6 +1570,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-ux-issue-intake.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-fix-plan.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-ux-triage-next.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1530,6 +1585,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-ux-issue-intake" in workflow
     assert "nexus-tech-onboarding-visible-ux-fix-plan" in workflow
     assert "nexus-tech-onboarding-visible-ux-triage-sprint" in workflow
+    assert "nexus-tech-onboarding-visible-ux-triage-next" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

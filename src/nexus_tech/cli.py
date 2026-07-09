@@ -239,6 +239,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_terminal_evidence_sheet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
+    build_onboarding_visible_ux_triage_next_step,
     build_onboarding_visible_ux_triage_sprint,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
@@ -253,6 +254,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
+    validate_onboarding_visible_ux_triage_next_step,
     validate_onboarding_visible_ux_triage_sprint,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
@@ -265,6 +267,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_terminal_evidence_sheet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
+    write_onboarding_visible_ux_triage_next_step,
     write_onboarding_visible_ux_triage_sprint,
     write_onboarding_visible_window_evidence_sheet,
 )
@@ -508,6 +511,21 @@ ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-ux-fix-plan.md"),
     "--plan",
     help="Markdown path for the onboarding visible UX fix plan source.",
+)
+ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-triage-next.md"),
+    "--output",
+    help="Markdown path for the onboarding visible UX triage next-step handoff.",
+)
+ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-triage-next.md"),
+    "--input",
+    help="Markdown path for the onboarding visible UX triage next-step handoff to validate.",
+)
+ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md"),
+    "--sprint",
+    help="Markdown path for the onboarding visible UX triage sprint source.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -7209,6 +7227,109 @@ def validate_onboarding_visible_ux_triage_sprint_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible UX Triage Sprint Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-ux-triage-next")
+def onboarding_visible_ux_triage_next_command(
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the next onboarding visible UX triage action from the sprint."""
+
+    try:
+        next_step = build_onboarding_visible_ux_triage_next_step(
+            sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Triage Next Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_ux_triage_next_step(next_step, output)
+
+    table = Table(title=f"Onboarding Visible UX Triage Next Step | {output}")
+    table.add_column("Status")
+    table.add_column("Priority")
+    table.add_column("Rank", justify="right")
+    table.add_column("Route")
+    table.add_column("Window")
+    table.add_column("Motion")
+    table.add_column("Severity")
+    row = next_step.row
+    table.add_row(
+        next_step.status.upper(),
+        next_step.priority,
+        str(row.rank),
+        row.route,
+        row.window,
+        row.motion_mode,
+        row.severity,
+    )
+    console.print(table)
+    console.print(f"UX triage next-step handoff written to {output}")
+
+
+@app.command("validate-onboarding-visible-ux-triage-next")
+def validate_onboarding_visible_ux_triage_next_command(
+    next_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_INPUT_OPTION,
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible UX triage next-step handoff."""
+
+    validation = validate_onboarding_visible_ux_triage_next_step(
+        next_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible UX Triage Next Validation | {next_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible UX triage next validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible UX Triage Next Validation",
             border_style=border_style,
         )
     )

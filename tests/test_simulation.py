@@ -155,6 +155,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_terminal_evidence_sheet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
+    build_onboarding_visible_ux_triage_next_step,
     build_onboarding_visible_ux_triage_sprint,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
@@ -169,6 +170,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
+    validate_onboarding_visible_ux_triage_next_step,
     validate_onboarding_visible_ux_triage_sprint,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
@@ -181,6 +183,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_terminal_evidence_sheet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
+    write_onboarding_visible_ux_triage_next_step,
     write_onboarding_visible_ux_triage_sprint,
     write_onboarding_visible_window_evidence_sheet,
 )
@@ -13057,6 +13060,105 @@ def test_onboarding_visible_ux_triage_sprint_sequences_blockers_and_todo_rows(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Sprint Queue Rows" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_ux_triage_next_step_targets_first_open_row(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620), (1280, 720)),
+        motion_modes=("full", "reduced", "off"),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
+    plan_path = tmp_path / "onboarding-visible-ux-fix-plan.md"
+    sprint_path = tmp_path / "onboarding-visible-ux-triage-sprint.md"
+    next_path = tmp_path / "onboarding-visible-ux-triage-next.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    intake = build_onboarding_visible_ux_issue_intake(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_issue_intake(intake, intake_path)
+    intake_text = intake_path.read_text(encoding="utf-8")
+    intake_text = intake_text.replace(
+        "`todo` | `<record observed UX issue or none>` | `owner/date or none` |",
+        (
+            "`P1` | `Observed compact window button spacing makes pause/back/menu "
+            "recovery hard to identify.` | `UX owner / 2026-07-10` |"
+        ),
+        1,
+    )
+    intake_path.write_text(intake_text, encoding="utf-8")
+
+    plan = build_onboarding_visible_ux_fix_plan(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_fix_plan(plan, plan_path)
+    sprint = build_onboarding_visible_ux_triage_sprint(
+        plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_triage_sprint(sprint, sprint_path)
+
+    next_step = build_onboarding_visible_ux_triage_next_step(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_triage_next_step(next_step, next_path)
+
+    text = next_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Triage Next Step" in text
+    assert next_step.status == "fix-before-signoff"
+    assert next_step.priority == "high"
+    assert next_step.row.rank == 1
+    assert "- Intake row: `terminal` rank `1` route `terminal-guide`" in text
+    assert ".venv313/bin/nexus-tech guide" in text
+    assert "record-onboarding-visible-playtest-route" in text
+    assert "This next-step handoff is not evidence" in text
+
+    validation = validate_onboarding_visible_ux_triage_next_step(
+        next_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech guide",
+        ".venv313/bin/nexus-tech glossary",
+    )
+    next_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_ux_triage_next_step(
+        next_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Refresh Commands" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

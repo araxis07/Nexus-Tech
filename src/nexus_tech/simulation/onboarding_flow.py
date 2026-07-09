@@ -25,6 +25,7 @@ ONBOARDING_VISIBLE_MANUAL_SESSION_NAME = "onboarding-visible-manual-session.md"
 ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_NAME = "onboarding-visible-ux-issue-intake.md"
 ONBOARDING_VISIBLE_UX_FIX_PLAN_NAME = "onboarding-visible-ux-fix-plan.md"
 ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_NAME = "onboarding-visible-ux-triage-sprint.md"
+ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_NAME = "onboarding-visible-ux-triage-next.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -615,6 +616,50 @@ class OnboardingVisibleUxTriageSprintValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return triage sprint checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxTriageNextStep:
+    """Copy-ready next action from the onboarding visible UX triage sprint."""
+
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    sprint_path: Path
+    status: str
+    row: OnboardingVisibleUxFixPlanRow
+    phase: str
+    priority: str
+    open_command: str
+    report_recorder_command: str
+    validate_intake_command: str
+    rebuild_fix_plan_command: str
+    validate_fix_plan_command: str
+    rebuild_sprint_command: str
+    validate_sprint_command: str
+    validate_report_command: str
+    status_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxTriageNextStepValidation:
+    """Validation report for the onboarding visible UX triage next-step artifact."""
+
+    next_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the next-step handoff matches the current sprint."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return next-step checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -3802,6 +3847,304 @@ def validate_onboarding_visible_ux_triage_sprint(
     )
     return OnboardingVisibleUxTriageSprintValidation(
         sprint_path=sprint_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def build_onboarding_visible_ux_triage_next_step(
+    sprint_path: Path,
+    *,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxTriageNextStep:
+    """Build the next copy-ready manual UX triage action from the sprint."""
+
+    sprint_validation = validate_onboarding_visible_ux_triage_sprint(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not sprint_validation.ok:
+        failed = ", ".join(check.area for check in sprint_validation.failed_checks)
+        raise ValueError(f"UX triage sprint must validate before next-step handoff: {failed}")
+
+    sprint = build_onboarding_visible_ux_triage_sprint(
+        plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not sprint.rows:
+        raise ValueError("Onboarding visible UX triage sprint has no rows.")
+
+    row = next(
+        (
+            candidate
+            for candidate in sprint.rows
+            if candidate.severity in {"P0", "P1", "todo", "P2"}
+        ),
+        sprint.rows[0],
+    )
+    phase = _onboarding_visible_ux_sprint_phase(row)
+    priority = _onboarding_visible_ux_fix_priority(row)
+    return OnboardingVisibleUxTriageNextStep(
+        report_path=report_path,
+        intake_path=intake_path,
+        plan_path=plan_path,
+        sprint_path=sprint_path,
+        status=phase,
+        row=row,
+        phase=phase,
+        priority=priority,
+        open_command=row.command,
+        report_recorder_command=(
+            f"{command_prefix} record-onboarding-visible-playtest-route "
+            f"--report {report_path} --rank {row.rank} --result watch "
+            f'--notes "<replace with observed visible-window notes mentioning '
+            f'{row.ux_areas}>"'
+        ),
+        validate_intake_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
+            f"--report {report_path} --input {intake_path}"
+        ),
+        rebuild_fix_plan_command=(
+            f"{command_prefix} onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --input {intake_path} --output {plan_path}"
+        ),
+        validate_fix_plan_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --intake {intake_path} --input {plan_path}"
+        ),
+        rebuild_sprint_command=(
+            f"{command_prefix} onboarding-visible-ux-triage-sprint "
+            f"--report {report_path} --intake {intake_path} "
+            f"--plan {plan_path} --output {sprint_path}"
+        ),
+        validate_sprint_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-triage-sprint "
+            f"--report {report_path} --intake {intake_path} "
+            f"--plan {plan_path} --input {sprint_path}"
+        ),
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_triage_next_step(
+    next_step: OnboardingVisibleUxTriageNextStep,
+    output_path: Path,
+) -> None:
+    """Write the next UX triage handoff without recording tester evidence."""
+
+    row = next_step.row
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Triage Next Step",
+        "",
+        f"- Report: `{next_step.report_path}`",
+        f"- Intake: `{next_step.intake_path}`",
+        f"- Fix Plan: `{next_step.plan_path}`",
+        f"- Sprint: `{next_step.sprint_path}`",
+        f"- Status: `{next_step.status}`",
+        f"- Phase: `{next_step.phase}`",
+        f"- Priority: `{next_step.priority}`",
+        f"- Group: `{row.group}`",
+        f"- Rank: `{row.rank}`",
+        f"- Route: `{row.route}`",
+        f"- Window: `{row.window}`",
+        f"- Motion: `{row.motion_mode}`",
+        f"- Severity: `{row.severity}`",
+        f"- UX Areas: `{_markdown_escape(row.ux_areas)}`",
+        "- Manual result: `not completed by automation`",
+        "- Handoff policy: `open the route and update intake/report from real observation`",
+        "",
+        "## Next Manual Action",
+        "",
+        f"- Phase: `{next_step.phase}`",
+        f"- Priority: `{next_step.priority}`",
+        f"- Step: {_markdown_escape(_onboarding_visible_ux_sprint_step(row))}",
+        f"- Intake row: `{row.group}` rank `{row.rank}` route `{row.route}`",
+        "",
+        "Open the route first:",
+        "",
+        "```bash",
+        next_step.open_command,
+        "```",
+        "",
+        "Record report notes only after observing the visible route:",
+        "",
+        "```bash",
+        next_step.report_recorder_command,
+        "```",
+        "",
+        "Then edit the intake row severity/issue/follow-up manually from the observation.",
+        "",
+        "## Refresh Commands",
+        "",
+        "```bash",
+        next_step.validate_intake_command,
+        next_step.rebuild_fix_plan_command,
+        next_step.validate_fix_plan_command,
+        next_step.rebuild_sprint_command,
+        next_step.validate_sprint_command,
+        next_step.validate_report_command,
+        next_step.status_command,
+        "```",
+        "",
+        "## Exit Criteria",
+        "",
+        "- The selected row is no longer `todo` after real visible play.",
+        "- If severity is P0/P1, the UI is fixed and reopened before signoff.",
+        "- Report notes mention window, motion mode, readability, controls, and blocker status.",
+        "- Intake, fix plan, sprint, next-step, and report validators pass after updates.",
+        "",
+        "## No-Fabrication Guardrail",
+        "",
+        "- This next-step handoff is not evidence; it only points to the next row.",
+        "- Do not run the recorder command until the visible route has been opened.",
+        "- Do not downgrade severity without observed notes that explain why.",
+    ]
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_triage_next_step(
+    next_path: Path,
+    *,
+    sprint_path: Path,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxTriageNextStepValidation:
+    """Validate that the UX triage next-step matches the current sprint."""
+
+    try:
+        expected = build_onboarding_visible_ux_triage_next_step(
+            sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxTriageNextStepValidation(
+            next_path=next_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Sprint",
+                    passed=False,
+                    summary="The source UX triage sprint must validate before next-step.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not next_path.exists():
+        return OnboardingVisibleUxTriageNextStepValidation(
+            next_path=next_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Triage Next-Step File",
+                    passed=False,
+                    summary="The onboarding visible UX triage next-step file must exist.",
+                    evidence=(f"missing:{next_path}",),
+                ),
+            ),
+        )
+
+    row = expected.row
+    text = next_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Triage Next Step",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Fix Plan: `{expected.plan_path}`",
+        f"- Sprint: `{expected.sprint_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Phase: `{expected.phase}`",
+        f"- Priority: `{expected.priority}`",
+        f"- Group: `{row.group}`",
+        f"- Rank: `{row.rank}`",
+        f"- Route: `{row.route}`",
+        f"- Window: `{row.window}`",
+        f"- Motion: `{row.motion_mode}`",
+        f"- Severity: `{row.severity}`",
+        "- Manual result: `not completed by automation`",
+        "- Handoff policy: `open the route and update intake/report from real observation`",
+    )
+    command_markers = (
+        expected.open_command,
+        expected.report_recorder_command,
+        expected.validate_intake_command,
+        expected.rebuild_fix_plan_command,
+        expected.validate_fix_plan_command,
+        expected.rebuild_sprint_command,
+        expected.validate_sprint_command,
+        expected.validate_report_command,
+        expected.status_command,
+    )
+    checks = (
+        _build_presence_check(
+            area="UX Triage Next-Step Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX triage next-step metadata matches the current sprint.",
+        ),
+        _build_presence_check(
+            area="Next Manual Action",
+            text=text,
+            markers=(
+                f"- Step: {_markdown_escape(_onboarding_visible_ux_sprint_step(row))}",
+                f"- Intake row: `{row.group}` rank `{row.rank}` route `{row.route}`",
+                "Open the route first:",
+                "Record report notes only after observing the visible route:",
+                "Then edit the intake row severity/issue/follow-up manually",
+            ),
+            summary="The next-step handoff names the exact manual action and row.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary="The next-step handoff includes current open, recorder, and refresh commands.",
+        ),
+        _build_presence_check(
+            area="Exit Criteria",
+            text=text,
+            markers=(
+                "The selected row is no longer `todo` after real visible play.",
+                "If severity is P0/P1, the UI is fixed and reopened before signoff.",
+                (
+                    "Report notes mention window, motion mode, readability, controls, "
+                    "and blocker status."
+                ),
+                "Intake, fix plan, sprint, next-step, and report validators pass after updates.",
+            ),
+            summary="The next-step handoff keeps completion gates visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This next-step handoff is not evidence; it only points to the next row.",
+                "Do not run the recorder command until the visible route has been opened.",
+                "Do not downgrade severity without observed notes that explain why.",
+            ),
+            summary="The next-step handoff keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxTriageNextStepValidation(
+        next_path=next_path,
         status="pass" if all(check.status == "pass" for check in checks) else "fail",
         checks=checks,
     )

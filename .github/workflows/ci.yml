@@ -245,6 +245,26 @@ jobs:
           --plan /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
           --input /tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md
 
+      - name: Prepare onboarding visible UX triage next step
+        run: >
+          uv run nexus-tech onboarding-visible-ux-triage-next
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --intake /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          --plan /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
+          --sprint /tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md
+          --output /tmp/nexus-tech-onboarding-visible-ux-triage-next.md
+
+      - name: Validate onboarding visible UX triage next step
+        run: >
+          uv run nexus-tech validate-onboarding-visible-ux-triage-next
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --intake /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          --plan /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
+          --sprint /tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md
+          --input /tmp/nexus-tech-onboarding-visible-ux-triage-next.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -458,6 +478,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-ux-triage-sprint
           path: /tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible UX triage next artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-ux-triage-next
+          path: /tmp/nexus-tech-onboarding-visible-ux-triage-next.md
           if-no-files-found: warn
           retention-days: 7
 

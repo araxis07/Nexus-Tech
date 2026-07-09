@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.270.0 - 2026-07-10
+
+- Added `onboarding-visible-ux-triage-next` to pull the next copy-ready manual UX route, recorder command, and intake row from the current triage sprint
+- Added `validate-onboarding-visible-ux-triage-next` to block stale next-step handoffs, missing refresh commands, exit criteria, and no-fabrication guardrails
+- Wired the UX triage next-step handoff into docs, regression coverage, CI validation, and artifact upload before manual onboarding UI triage
+
 ## 0.269.0 - 2026-07-10
 
 - Added `onboarding-visible-ux-triage-sprint` to sequence observed P0/P1 fixes, unclassified `todo` rows, and evidence-confirmation rows from the current UX fix plan
