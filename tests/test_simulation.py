@@ -147,6 +147,7 @@ from nexus_tech.simulation.milestones import resolve_new_milestones
 from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_evidence_matrix,
+    build_onboarding_visible_manual_session,
     build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
@@ -157,6 +158,7 @@ from nexus_tech.simulation.onboarding_flow import (
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_evidence_matrix,
+    validate_onboarding_visible_manual_session,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
@@ -165,6 +167,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
+    write_onboarding_visible_manual_session,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
@@ -12753,6 +12756,69 @@ def test_onboarding_visible_evidence_matrix_writes_full_closeout_index(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Matrix Rows" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_manual_session_writes_ordered_operator_packet(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620), (1280, 720)),
+        motion_modes=("full", "reduced", "off"),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    session_path = tmp_path / "onboarding-visible-manual-session.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    session = build_onboarding_visible_manual_session(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_manual_session(session, session_path)
+
+    text = session_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Manual Session" in text
+    assert session.status == "manual-required"
+    assert session.total_rows == 15
+    assert session.incomplete_count == 15
+    assert "not completed by automation" in text
+    assert "onboarding-visible-window-preflight --frames 1" in text
+    assert "onboarding-visible-evidence-matrix --report" in text
+    assert "onboarding-visible-terminal-evidence-sheet" in text
+    assert "onboarding-visible-window-evidence-sheet --report" in text
+    assert "| `terminal` | 1 | `terminal-guide` | `terminal` | `n/a` | `todo` |" in text
+    assert "| `820x620` | 4 | `title-onboarding` | `820x620` | `full` | `todo` |" in text
+    assert "record-onboarding-visible-playtest-route --report" in text
+    assert "This session packet is a checklist, not evidence." in text
+    assert "Headless preflight confirms launch health only" in text
+
+    validation = validate_onboarding_visible_manual_session(
+        session_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech menu-2d --window-size 820x620",
+        ".venv313/bin/nexus-tech menu-2d --window-size 960x640",
+    )
+    session_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_manual_session(
+        session_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Operator Order" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

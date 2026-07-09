@@ -231,6 +231,7 @@ from nexus_tech.simulation.onboarding_flow import (
     DEFAULT_ONBOARDING_VISIBLE_WINDOWS,
     ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
     build_onboarding_visible_evidence_matrix,
+    build_onboarding_visible_manual_session,
     build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
@@ -241,6 +242,7 @@ from nexus_tech.simulation.onboarding_flow import (
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_evidence_matrix,
+    validate_onboarding_visible_manual_session,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
@@ -249,6 +251,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
+    write_onboarding_visible_manual_session,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
@@ -446,6 +449,16 @@ ONBOARDING_VISIBLE_WINDOW_PREFLIGHT_DB_PATH_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-window-preflight.db"),
     "--db-path",
     help="Scratch database path for onboarding visible window preflight launches.",
+)
+ONBOARDING_VISIBLE_MANUAL_SESSION_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-manual-session.md"),
+    "--output",
+    help="Markdown path for the onboarding visible manual QA session packet.",
+)
+ONBOARDING_VISIBLE_MANUAL_SESSION_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-manual-session.md"),
+    "--input",
+    help="Markdown path for the onboarding visible manual QA session packet to validate.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -6779,6 +6792,95 @@ def validate_onboarding_visible_evidence_matrix_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible Evidence Matrix Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-manual-session")
+def onboarding_visible_manual_session_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_MANUAL_SESSION_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the ordered real-window onboarding visible manual QA session packet."""
+
+    try:
+        session = build_onboarding_visible_manual_session(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Manual Session Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_manual_session(session, output)
+
+    table = Table(title=f"Onboarding Visible Manual Session | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Groups", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        session.status.upper(),
+        str(session.total_rows),
+        str(len(session.groups)),
+        str(session.incomplete_count),
+    )
+    console.print(table)
+    for group in session.groups:
+        console.print(
+            f"Session group {group.name}: {len(group.rows)} rows, "
+            f"{group.incomplete_count} incomplete"
+        )
+    console.print(f"Manual session packet written to {output}")
+
+
+@app.command("validate-onboarding-visible-manual-session")
+def validate_onboarding_visible_manual_session_command(
+    session_path: Path = ONBOARDING_VISIBLE_MANUAL_SESSION_INPUT_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible manual session packet against the report."""
+
+    validation = validate_onboarding_visible_manual_session(
+        session_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible Manual Session Validation | {session_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible manual session validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible Manual Session Validation",
             border_style=border_style,
         )
     )

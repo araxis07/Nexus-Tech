@@ -183,6 +183,20 @@ jobs:
           --db-path /tmp/nexus-tech-onboarding-visible-window-preflight.db
           --output /tmp/nexus-tech-onboarding-visible-window-preflight.md
 
+      - name: Prepare onboarding visible manual session
+        run: >
+          uv run nexus-tech onboarding-visible-manual-session
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --output /tmp/nexus-tech-onboarding-visible-manual-session.md
+
+      - name: Validate onboarding visible manual session
+        run: >
+          uv run nexus-tech validate-onboarding-visible-manual-session
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --input /tmp/nexus-tech-onboarding-visible-manual-session.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -360,6 +374,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-window-preflight
           path: /tmp/nexus-tech-onboarding-visible-window-preflight.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible manual session artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-manual-session
+          path: /tmp/nexus-tech-onboarding-visible-manual-session.md
           if-no-files-found: warn
           retention-days: 7
 

@@ -21,6 +21,7 @@ ONBOARDING_VISIBLE_TERMINAL_BATCH_NAME = "onboarding-visible-terminal-batch.md"
 ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_NAME = "onboarding-visible-terminal-evidence-sheet.md"
 ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_NAME = "onboarding-visible-window-evidence-sheet.md"
 ONBOARDING_VISIBLE_EVIDENCE_MATRIX_NAME = "onboarding-visible-evidence-matrix.md"
+ONBOARDING_VISIBLE_MANUAL_SESSION_NAME = "onboarding-visible-manual-session.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -424,6 +425,41 @@ class OnboardingVisibleEvidenceMatrixValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return matrix checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleManualSession:
+    """Operator session packet for recording real onboarding visible QA evidence."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    incomplete_count: int
+    groups: tuple[OnboardingVisibleEvidenceMatrixGroup, ...]
+    prerequisite_commands: tuple[str, ...]
+    worksheet_commands: tuple[str, ...]
+    closure_commands: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleManualSessionValidation:
+    """Validation report for the onboarding visible manual session artifact."""
+
+    session_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the manual session packet matches the current report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return manual session checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -2534,6 +2570,283 @@ def validate_onboarding_visible_evidence_matrix(
     )
     return OnboardingVisibleEvidenceMatrixValidation(
         matrix_path=matrix_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def build_onboarding_visible_manual_session(
+    report_path: Path,
+    *,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleManualSession:
+    """Build an operator packet for the real onboarding visible manual QA pass."""
+
+    matrix = build_onboarding_visible_evidence_matrix(
+        report_path,
+        command_prefix=command_prefix,
+    )
+    window_groups = tuple(group for group in matrix.groups if group.name != "terminal")
+    prerequisite_commands = (
+        f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}",
+        f"{command_prefix} onboarding-visible-playtest-status --report {report_path}",
+        (
+            f"{command_prefix} onboarding-visible-evidence-matrix --report {report_path} "
+            "--output /tmp/nexus-tech-onboarding-visible-evidence-matrix.md"
+        ),
+        (
+            f"{command_prefix} validate-onboarding-visible-evidence-matrix "
+            f"--report {report_path} "
+            "--input /tmp/nexus-tech-onboarding-visible-evidence-matrix.md"
+        ),
+        (
+            f"{command_prefix} onboarding-visible-window-preflight --frames 1 "
+            "--output /tmp/nexus-tech-onboarding-visible-window-preflight.md"
+        ),
+    )
+    worksheet_commands = (
+        (
+            f"{command_prefix} onboarding-visible-terminal-evidence-sheet "
+            f"--report {report_path} "
+            "--output /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md"
+        ),
+        (
+            f"{command_prefix} validate-onboarding-visible-terminal-evidence-sheet "
+            f"--report {report_path} "
+            "--input /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md"
+        ),
+        *tuple(
+            command
+            for group in window_groups
+            for command in (
+                (
+                    f"{command_prefix} onboarding-visible-window-evidence-sheet "
+                    f"--report {report_path} --window {group.name} "
+                    f"--output /tmp/nexus-tech-onboarding-visible-{group.name}-evidence-sheet.md"
+                ),
+                (
+                    f"{command_prefix} validate-onboarding-visible-window-evidence-sheet "
+                    f"--report {report_path} --window {group.name} "
+                    f"--input /tmp/nexus-tech-onboarding-visible-{group.name}-evidence-sheet.md"
+                ),
+            )
+        ),
+    )
+    closure_commands = (
+        f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}",
+        f"{command_prefix} onboarding-visible-playtest-status --report {report_path}",
+        f"{command_prefix} onboarding-visible-playtest-next --report {report_path}",
+        (
+            f"{command_prefix} validate-onboarding-visible-evidence-matrix "
+            f"--report {report_path} "
+            "--input /tmp/nexus-tech-onboarding-visible-evidence-matrix.md"
+        ),
+    )
+    return OnboardingVisibleManualSession(
+        report_path=matrix.report_path,
+        status=matrix.status,
+        total_rows=matrix.total_rows,
+        incomplete_count=matrix.incomplete_count,
+        groups=matrix.groups,
+        prerequisite_commands=prerequisite_commands,
+        worksheet_commands=worksheet_commands,
+        closure_commands=closure_commands,
+    )
+
+
+def write_onboarding_visible_manual_session(
+    session: OnboardingVisibleManualSession,
+    output_path: Path,
+) -> None:
+    """Write a real-window onboarding manual QA operator packet."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Manual Session",
+        "",
+        f"- Report: `{session.report_path}`",
+        f"- Status: `{session.status}`",
+        f"- Rows: `{session.total_rows}`",
+        f"- Incomplete: `{session.incomplete_count}`",
+        f"- Groups: `{len(session.groups)}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Recorder safety: `replace placeholder notes only after playing the visible route`",
+        "",
+        (
+            "Use this packet as the ordered operator checklist for the real onboarding "
+            "visible QA pass. Automation can prepare it, but only observed notes close rows."
+        ),
+        "",
+        "## Preflight Refresh",
+        "",
+        "Run these before recording manual evidence:",
+        "",
+        "```bash",
+        *session.prerequisite_commands,
+        "```",
+        "",
+        "## Worksheet Refresh",
+        "",
+        "Regenerate worksheets before opening the real windows:",
+        "",
+        "```bash",
+        *session.worksheet_commands,
+        "```",
+        "",
+        "## Operator Order",
+        "",
+        "| Group | Rank | Route | Window | Motion | Result | Open Command | Recorder Command |",
+        "| --- | ---: | --- | --- | --- | --- | --- | --- |",
+    ]
+    for group in session.groups:
+        for row, recorder_command in zip(group.rows, group.recorder_commands, strict=True):
+            lines.append(
+                "| "
+                f"`{group.name}` | "
+                f"{row.rank} | "
+                f"`{row.route}` | "
+                f"`{row.window}` | "
+                f"`{row.motion_mode}` | "
+                f"`{row.result}` | "
+                f"`{_markdown_escape(row.command)}` | "
+                f"`{_markdown_escape(recorder_command)}` |"
+            )
+    lines.extend(
+        [
+            "",
+            "## Recording Rules",
+            "",
+            "- Open the visible route first; never record from source-code assumptions.",
+            "- Notes must mention window size, motion mode, readability, controls, and blockers.",
+            "- Use `watch` for concrete UX concerns and `fail` for blocked navigation/readability.",
+            "- Keep `manual-required` until every pass/watch/fail row has observed notes.",
+            "",
+            "## Closure Commands",
+            "",
+            "Run these after each manual recording batch:",
+            "",
+            "```bash",
+            *session.closure_commands,
+            "```",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This session packet is a checklist, not evidence.",
+            "- Headless preflight confirms launch health only; it does not prove UI readability.",
+            "- Do not mark onboarding complete until real visible-window observations validate.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_manual_session(
+    session_path: Path,
+    *,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleManualSessionValidation:
+    """Validate that the manual session packet matches the current report."""
+
+    try:
+        expected = build_onboarding_visible_manual_session(
+            report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleManualSessionValidation(
+            session_path=session_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not session_path.exists():
+        return OnboardingVisibleManualSessionValidation(
+            session_path=session_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Manual Session File",
+                    passed=False,
+                    summary="The onboarding visible manual session file must exist.",
+                    evidence=(f"missing:{session_path}",),
+                ),
+            ),
+        )
+
+    text = session_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Manual Session",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Incomplete: `{expected.incomplete_count}`",
+        f"- Groups: `{len(expected.groups)}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Recorder safety: `replace placeholder notes only after playing the visible route`",
+    )
+    command_markers = (
+        *expected.prerequisite_commands,
+        *expected.worksheet_commands,
+        *expected.closure_commands,
+    )
+    row_markers = tuple(
+        marker
+        for group in expected.groups
+        for row, recorder_command in zip(group.rows, group.recorder_commands, strict=True)
+        for marker in (
+            (
+                f"| `{group.name}` | {row.rank} | `{row.route}` | "
+                f"`{row.window}` | `{row.motion_mode}` | `{row.result}` |"
+            ),
+            row.command,
+            recorder_command,
+        )
+    )
+    checks = (
+        _build_presence_check(
+            area="Manual Session Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The manual session metadata matches the current visible QA report.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary=(
+                "The manual session includes current preflight, worksheet, and closure commands."
+            ),
+        ),
+        _build_presence_check(
+            area="Operator Order",
+            text=text,
+            markers=row_markers,
+            summary="The manual session lists each current row with matching recorder command.",
+        ),
+        _build_presence_check(
+            area="Manual Evidence Rules",
+            text=text,
+            markers=(
+                "Open the visible route first; never record from source-code assumptions.",
+                "Notes must mention window size, motion mode, readability, controls, and blockers.",
+                "Keep `manual-required` until every pass/watch/fail row has observed notes.",
+                "This session packet is a checklist, not evidence.",
+                "Headless preflight confirms launch health only; it does not prove UI readability.",
+                "Do not mark onboarding complete until real visible-window observations validate.",
+            ),
+            summary="The manual session keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleManualSessionValidation(
+        session_path=session_path,
         status="pass" if all(check.status == "pass" for check in checks) else "fail",
         checks=checks,
     )

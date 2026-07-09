@@ -267,6 +267,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-window-evidence-sheet",
         "onboarding-visible-evidence-matrix",
         "validate-onboarding-visible-evidence-matrix",
+        "onboarding-visible-manual-session",
+        "validate-onboarding-visible-manual-session",
         "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
@@ -978,6 +980,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     sheet_path = tmp_path / "onboarding-visible-terminal-evidence-sheet.md"
     window_sheet_path = tmp_path / "onboarding-visible-820x620-evidence-sheet.md"
     matrix_path = tmp_path / "onboarding-visible-evidence-matrix.md"
+    session_path = tmp_path / "onboarding-visible-manual-session.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1255,6 +1258,43 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible Evidence Matrix Validation" in (matrix_validation_result.output)
     assert "PASS" in matrix_validation_result.output
 
+    session_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-manual-session",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--output",
+            str(session_path),
+        ],
+    )
+    assert session_result.exit_code == 0
+    assert "Onboarding Visible Manual Session" in session_result.output
+    assert "Manual session packet written" in session_result.output
+    session_text = session_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Manual Session" in session_text
+    assert "onboarding-visible-window-preflight --frames 1" in session_text
+    assert "record-onboarding-visible-playtest-route --report" in session_text
+    assert "This session packet is a checklist, not evidence." in session_text
+
+    session_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-manual-session",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(session_path),
+        ],
+    )
+    assert session_validation_result.exit_code == 0
+    assert "Onboarding Visible Manual Session Validation" in (session_validation_result.output)
+    assert "PASS" in session_validation_result.output
+
 
 def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     tmp_path: Path,
@@ -1318,6 +1358,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech onboarding-visible-evidence-matrix" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-evidence-matrix" in workflow
     assert "uv run nexus-tech onboarding-visible-window-preflight" in workflow
+    assert "uv run nexus-tech onboarding-visible-manual-session" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-manual-session" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1332,6 +1374,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-evidence-matrix.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-window-preflight.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-manual-session.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1342,6 +1385,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-1440x900-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-evidence-matrix" in workflow
     assert "nexus-tech-onboarding-visible-window-preflight" in workflow
+    assert "nexus-tech-onboarding-visible-manual-session" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.266.0 - 2026-07-09
+
+- Added `onboarding-visible-manual-session` to assemble the real-window onboarding QA operator packet from the current report
+- Added `validate-onboarding-visible-manual-session` to block stale session packets, recorder commands, worksheet refreshes, and no-fabrication guardrails
+- Wired the manual session packet into docs, regression coverage, CI validation, and artifact upload before visible evidence recording
+
 ## 0.265.0 - 2026-07-09
 
 - Added `onboarding-visible-window-preflight` to headlessly launch title and first-turn onboarding routes across requested windows and motion modes
