@@ -24,6 +24,7 @@ ONBOARDING_VISIBLE_EVIDENCE_MATRIX_NAME = "onboarding-visible-evidence-matrix.md
 ONBOARDING_VISIBLE_MANUAL_SESSION_NAME = "onboarding-visible-manual-session.md"
 ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_NAME = "onboarding-visible-ux-issue-intake.md"
 ONBOARDING_VISIBLE_UX_FIX_PLAN_NAME = "onboarding-visible-ux-fix-plan.md"
+ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_NAME = "onboarding-visible-ux-triage-sprint.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -560,6 +561,60 @@ class OnboardingVisibleUxFixPlanValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return UX fix plan checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxTriageSprint:
+    """Focused sprint packet for closing visible onboarding UX triage and fixes."""
+
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    status: str
+    rows: tuple[OnboardingVisibleUxFixPlanRow, ...]
+    p0_count: int
+    p1_count: int
+    p2_count: int
+    none_count: int
+    todo_count: int
+    rebuild_fix_plan_command: str
+    validate_fix_plan_command: str
+    validate_intake_command: str
+    validate_report_command: str
+    status_command: str
+
+    @property
+    def total_rows(self) -> int:
+        """Return the number of rows carried into the UX triage sprint."""
+
+        return len(self.rows)
+
+    @property
+    def blocker_count(self) -> int:
+        """Return P0/P1 blockers that must close before UI signoff."""
+
+        return self.p0_count + self.p1_count
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxTriageSprintValidation:
+    """Validation report for the onboarding visible UX triage sprint artifact."""
+
+    sprint_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the sprint packet matches the current fix plan."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return triage sprint checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -3471,6 +3526,287 @@ def validate_onboarding_visible_ux_fix_plan(
     )
 
 
+def build_onboarding_visible_ux_triage_sprint(
+    plan_path: Path,
+    *,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxTriageSprint:
+    """Build a focused sprint packet from the current visible UX fix plan."""
+
+    plan_validation = validate_onboarding_visible_ux_fix_plan(
+        plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not plan_validation.ok:
+        failed = ", ".join(check.area for check in plan_validation.failed_checks)
+        raise ValueError(f"UX fix plan must validate before sprint planning: {failed}")
+
+    plan = build_onboarding_visible_ux_fix_plan(
+        intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    blocker_count = plan.p0_count + plan.p1_count
+    if blocker_count:
+        status = "fix-and-triage-required" if plan.todo_count else "fix-required"
+    elif plan.todo_count:
+        status = "triage-required"
+    elif plan.p2_count:
+        status = "polish-ready"
+    else:
+        status = "ready-for-manual-evidence"
+
+    return OnboardingVisibleUxTriageSprint(
+        report_path=report_path,
+        intake_path=intake_path,
+        plan_path=plan_path,
+        status=status,
+        rows=tuple(sorted(plan.rows, key=_onboarding_visible_ux_sprint_sort_key)),
+        p0_count=plan.p0_count,
+        p1_count=plan.p1_count,
+        p2_count=plan.p2_count,
+        none_count=plan.none_count,
+        todo_count=plan.todo_count,
+        rebuild_fix_plan_command=(
+            f"{command_prefix} onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --input {intake_path} --output {plan_path}"
+        ),
+        validate_fix_plan_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --intake {intake_path} --input {plan_path}"
+        ),
+        validate_intake_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
+            f"--report {report_path} --input {intake_path}"
+        ),
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_triage_sprint(
+    sprint: OnboardingVisibleUxTriageSprint,
+    output_path: Path,
+) -> None:
+    """Write the focused UX triage sprint without fabricating manual evidence."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Triage Sprint",
+        "",
+        f"- Report: `{sprint.report_path}`",
+        f"- Intake: `{sprint.intake_path}`",
+        f"- Fix Plan: `{sprint.plan_path}`",
+        f"- Status: `{sprint.status}`",
+        f"- Rows: `{sprint.total_rows}`",
+        f"- P0: `{sprint.p0_count}`",
+        f"- P1: `{sprint.p1_count}`",
+        f"- P2: `{sprint.p2_count}`",
+        f"- None: `{sprint.none_count}`",
+        f"- Todo: `{sprint.todo_count}`",
+        f"- Blockers: `{sprint.blocker_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Sprint policy: `triage todo rows and close P0/P1 before UI signoff`",
+        "",
+        (
+            "Use this sprint as the operator handoff for the next visible-window UX pass. "
+            "It orders observed P0/P1 rows first, then unclassified `todo` rows, without "
+            "claiming that manual evidence was captured."
+        ),
+        "",
+        "## Required Refresh",
+        "",
+        "```bash",
+        sprint.validate_intake_command,
+        sprint.rebuild_fix_plan_command,
+        sprint.validate_fix_plan_command,
+        sprint.validate_report_command,
+        sprint.status_command,
+        "```",
+        "",
+        "## Sprint Queue",
+        "",
+        (
+            "| Phase | Priority | Group | Rank | Route | Window | Motion | Severity | "
+            "Manual Step | Open Command |"
+        ),
+        "| --- | --- | --- | ---: | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in sprint.rows:
+        lines.append(
+            "| "
+            f"`{_onboarding_visible_ux_sprint_phase(row)}` | "
+            f"`{_onboarding_visible_ux_fix_priority(row)}` | "
+            f"`{row.group}` | "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.window}` | "
+            f"`{row.motion_mode}` | "
+            f"`{row.severity}` | "
+            f"{_markdown_escape(_onboarding_visible_ux_sprint_step(row))} | "
+            f"`{_markdown_escape(row.command)}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Exit Criteria",
+            "",
+            "- Every `todo` severity is replaced with P0, P1, P2, or none after visible play.",
+            "- P0 and P1 counts are zero before UI signoff.",
+            "- Main report rows contain real visible-window notes, not placeholders.",
+            "- Fix plan, intake, report, and sprint validators all pass after edits.",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This sprint packet is not evidence; it only sequences triage and fix work.",
+            "- Do not mark a row fixed unless the visible route was opened again.",
+            "- Do not close onboarding UX until the report and intake agree on real observations.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_triage_sprint(
+    sprint_path: Path,
+    *,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxTriageSprintValidation:
+    """Validate that the UX triage sprint matches the current fix plan."""
+
+    try:
+        expected = build_onboarding_visible_ux_triage_sprint(
+            plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxTriageSprintValidation(
+            sprint_path=sprint_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Fix Plan",
+                    passed=False,
+                    summary="The source UX fix plan must validate before sprint planning.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not sprint_path.exists():
+        return OnboardingVisibleUxTriageSprintValidation(
+            sprint_path=sprint_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Triage Sprint File",
+                    passed=False,
+                    summary="The onboarding visible UX triage sprint file must exist.",
+                    evidence=(f"missing:{sprint_path}",),
+                ),
+            ),
+        )
+
+    text = sprint_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Triage Sprint",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Fix Plan: `{expected.plan_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- P0: `{expected.p0_count}`",
+        f"- P1: `{expected.p1_count}`",
+        f"- P2: `{expected.p2_count}`",
+        f"- None: `{expected.none_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        f"- Blockers: `{expected.blocker_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Sprint policy: `triage todo rows and close P0/P1 before UI signoff`",
+    )
+    command_markers = (
+        expected.validate_intake_command,
+        expected.rebuild_fix_plan_command,
+        expected.validate_fix_plan_command,
+        expected.validate_report_command,
+        expected.status_command,
+    )
+    row_markers = tuple(
+        marker
+        for row in expected.rows
+        for marker in (
+            (
+                f"| `{_onboarding_visible_ux_sprint_phase(row)}` | "
+                f"`{_onboarding_visible_ux_fix_priority(row)}` | `{row.group}` | "
+                f"{row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.severity}` |"
+            ),
+            _onboarding_visible_ux_sprint_step(row),
+            row.command,
+        )
+    )
+    checks = (
+        _build_presence_check(
+            area="UX Triage Sprint Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX triage sprint metadata matches the current fix plan.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary="The sprint includes current intake, fix plan, report, and status commands.",
+        ),
+        _build_presence_check(
+            area="Sprint Queue Rows",
+            text=text,
+            markers=row_markers,
+            summary="The sprint lists every current fix-plan row with matching open command.",
+        ),
+        _build_presence_check(
+            area="Exit Criteria",
+            text=text,
+            markers=(
+                "Every `todo` severity is replaced with P0, P1, P2, or none after visible play.",
+                "P0 and P1 counts are zero before UI signoff.",
+                "Main report rows contain real visible-window notes, not placeholders.",
+                "Fix plan, intake, report, and sprint validators all pass after edits.",
+            ),
+            summary="The sprint keeps completion gates visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This sprint packet is not evidence; it only sequences triage and fix work.",
+                "Do not mark a row fixed unless the visible route was opened again.",
+                (
+                    "Do not close onboarding UX until the report and intake agree on real "
+                    "observations."
+                ),
+            ),
+            summary="The sprint keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxTriageSprintValidation(
+        sprint_path=sprint_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -3710,6 +4046,50 @@ def _onboarding_visible_ux_fix_priority(row: OnboardingVisibleUxFixPlanRow) -> s
     if row.severity == "none":
         return "no-issue"
     return "triage"
+
+
+def _onboarding_visible_ux_sprint_sort_key(
+    row: OnboardingVisibleUxFixPlanRow,
+) -> tuple[int, int, int]:
+    severity_order = {"P0": 0, "P1": 1, "todo": 2, "P2": 3, "none": 4}
+    group_order = {"terminal": 0, "820x620": 1, "1280x720": 2, "1440x900": 3}
+    return (
+        severity_order.get(row.severity, 5),
+        group_order.get(row.group, 9),
+        row.rank,
+    )
+
+
+def _onboarding_visible_ux_sprint_phase(row: OnboardingVisibleUxFixPlanRow) -> str:
+    if row.severity in {"P0", "P1"}:
+        return "fix-before-signoff"
+    if row.severity == "todo":
+        return "triage-visible"
+    if row.severity == "P2":
+        return "polish-backlog"
+    return "evidence-confirm"
+
+
+def _onboarding_visible_ux_sprint_step(row: OnboardingVisibleUxFixPlanRow) -> str:
+    if row.severity in {"P0", "P1"}:
+        return (
+            "Fix the observed UX blocker, reopen this route, then update report notes "
+            "and regenerate the intake/fix plan."
+        )
+    if row.severity == "todo":
+        return (
+            "Open this route in the real visible window, classify severity, and replace "
+            "placeholder issue notes before coding."
+        )
+    if row.severity == "P2":
+        return (
+            "Keep as polish backlog after P0/P1 are closed, then verify the row still "
+            "has real visible notes."
+        )
+    return (
+        "Confirm report evidence remains real and keep this row as no-issue unless a "
+        "new visible defect appears."
+    )
 
 
 def _build_onboarding_visible_recorder_command(

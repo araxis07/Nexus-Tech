@@ -239,6 +239,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_terminal_evidence_sheet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
+    build_onboarding_visible_ux_triage_sprint,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
     run_onboarding_flow_audit,
@@ -252,6 +253,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
+    validate_onboarding_visible_ux_triage_sprint,
     validate_onboarding_visible_window_evidence_sheet,
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
@@ -263,6 +265,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_terminal_evidence_sheet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
+    write_onboarding_visible_ux_triage_sprint,
     write_onboarding_visible_window_evidence_sheet,
 )
 from nexus_tech.simulation.randomness import RandomSource
@@ -490,6 +493,21 @@ ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-ux-issue-intake.md"),
     "--intake",
     help="Markdown path for the onboarding visible UX issue intake source.",
+)
+ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md"),
+    "--output",
+    help="Markdown path for the onboarding visible UX triage sprint packet.",
+)
+ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md"),
+    "--input",
+    help="Markdown path for the onboarding visible UX triage sprint packet to validate.",
+)
+ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-fix-plan.md"),
+    "--plan",
+    help="Markdown path for the onboarding visible UX fix plan source.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -7095,6 +7113,102 @@ def validate_onboarding_visible_ux_fix_plan_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible UX Fix Plan Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-ux-triage-sprint")
+def onboarding_visible_ux_triage_sprint_command(
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the focused onboarding visible UX triage and fix sprint packet."""
+
+    try:
+        sprint = build_onboarding_visible_ux_triage_sprint(
+            plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Triage Sprint Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_ux_triage_sprint(sprint, output)
+
+    table = Table(title=f"Onboarding Visible UX Triage Sprint | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Blockers", justify="right")
+    table.add_column("P0", justify="right")
+    table.add_column("P1", justify="right")
+    table.add_column("Todo", justify="right")
+    table.add_row(
+        sprint.status.upper(),
+        str(sprint.total_rows),
+        str(sprint.blocker_count),
+        str(sprint.p0_count),
+        str(sprint.p1_count),
+        str(sprint.todo_count),
+    )
+    console.print(table)
+    console.print(f"UX triage sprint written to {output}")
+
+
+@app.command("validate-onboarding-visible-ux-triage-sprint")
+def validate_onboarding_visible_ux_triage_sprint_command(
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_INPUT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible UX triage sprint against the fix plan."""
+
+    validation = validate_onboarding_visible_ux_triage_sprint(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible UX Triage Sprint Validation | {sprint_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible UX triage sprint validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible UX Triage Sprint Validation",
             border_style=border_style,
         )
     )

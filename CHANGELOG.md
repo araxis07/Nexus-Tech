@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.269.0 - 2026-07-10
+
+- Added `onboarding-visible-ux-triage-sprint` to sequence observed P0/P1 fixes, unclassified `todo` rows, and evidence-confirmation rows from the current UX fix plan
+- Added `validate-onboarding-visible-ux-triage-sprint` to block stale sprint packets, source fix-plan drift, missing exit criteria, and no-fabrication guardrails
+- Wired the UX triage sprint into docs, regression coverage, CI validation, and artifact upload before onboarding UI signoff
+
 ## 0.268.0 - 2026-07-09
 
 - Added `onboarding-visible-ux-fix-plan` to prioritize observed P0/P1/P2 onboarding UX findings from the issue intake
