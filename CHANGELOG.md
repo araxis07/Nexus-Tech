@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.271.0 - 2026-07-10
+
+- Added `record-onboarding-visible-ux-issue` to update one onboarding UX intake row from real visible-window observation notes without manual Markdown editing
+- Added validation coverage so UX intake severity cannot be recorded as `todo`, issue notes must be concrete, and follow-up must be explicit
+- Wired the UX issue recorder into docs, CLI help coverage, fix-plan regression flow, and next-step handoffs while keeping manual evidence no-fabrication guardrails intact
+
 ## 0.270.0 - 2026-07-10
 
 - Added `onboarding-visible-ux-triage-next` to pull the next copy-ready manual UX route, recorder command, and intake row from the current triage sprint

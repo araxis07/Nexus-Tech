@@ -243,6 +243,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_ux_triage_sprint,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
+    record_onboarding_visible_ux_issue,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_evidence_matrix,
@@ -7042,6 +7043,88 @@ def validate_onboarding_visible_ux_issue_intake_command(
     )
     if not validation.ok:
         raise typer.Exit(code=1)
+
+
+@app.command("record-onboarding-visible-ux-issue")
+def record_onboarding_visible_ux_issue_command(
+    intake_path: Path = ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_INPUT_OPTION,
+    severity: str = typer.Option(
+        ...,
+        "--severity",
+        help="Observed UX severity for this intake row: P0, P1, P2, or none.",
+    ),
+    issue_notes: str = typer.Option(
+        ...,
+        "--issue-notes",
+        help="Concrete UX notes from the real visible-window observation.",
+    ),
+    follow_up: str = typer.Option(
+        ...,
+        "--follow-up",
+        help="Owner/date follow-up, or none when no issue was observed.",
+    ),
+    rank: int | None = typer.Option(
+        None,
+        "--rank",
+        help="UX intake row number to update. Preferred when route appears multiple times.",
+    ),
+    route: str | None = typer.Option(
+        None,
+        "--route",
+        help="Optional route id to update, for example title-onboarding.",
+    ),
+    window: str | None = typer.Option(
+        None,
+        "--window",
+        help="Optional window label to update, for example 820x620.",
+    ),
+    motion_mode: str | None = typer.Option(
+        None,
+        "--motion-mode",
+        help="Optional motion mode to update: full, reduced, off, or n/a.",
+    ),
+) -> None:
+    """Record one observed onboarding visible UX issue intake row."""
+
+    try:
+        record = record_onboarding_visible_ux_issue(
+            intake_path,
+            severity=severity,
+            issue_notes=issue_notes,
+            follow_up=follow_up,
+            rank=rank,
+            route=route,
+            window=window,
+            motion_mode=motion_mode,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Issue Record Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    row = record.row
+    table = Table(title=f"Onboarding Visible UX Issue Recorded | {intake_path}")
+    table.add_column("Rank", justify="right")
+    table.add_column("Route")
+    table.add_column("Window")
+    table.add_column("Motion")
+    table.add_column("Severity")
+    table.add_column("Follow-up")
+    table.add_row(
+        str(row.rank),
+        row.route,
+        row.window,
+        row.motion_mode,
+        row.severity,
+        row.follow_up,
+    )
+    console.print(table)
+    console.print(f"UX issue intake updated at {record.intake_path}")
 
 
 @app.command("onboarding-visible-ux-fix-plan")

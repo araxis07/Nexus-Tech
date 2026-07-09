@@ -271,6 +271,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-manual-session",
         "onboarding-visible-ux-issue-intake",
         "validate-onboarding-visible-ux-issue-intake",
+        "record-onboarding-visible-ux-issue",
         "onboarding-visible-ux-fix-plan",
         "validate-onboarding-visible-ux-fix-plan",
         "onboarding-visible-ux-triage-sprint",
@@ -1344,6 +1345,30 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible UX Issue Intake Validation" in (intake_validation_result.output)
     assert "PASS" in intake_validation_result.output
 
+    ux_record_result = runner.invoke(
+        app,
+        [
+            "record-onboarding-visible-ux-issue",
+            "--input",
+            str(intake_path),
+            "--rank",
+            "4",
+            "--severity",
+            "P1",
+            "--issue-notes",
+            (
+                "Observed the compact title menu in a real window; menu recovery was "
+                "readable but pause/back/menu spacing slowed first-time navigation."
+            ),
+            "--follow-up",
+            "UX owner / 2026-07-10",
+        ],
+    )
+    assert ux_record_result.exit_code == 0
+    assert "Onboarding Visible UX Issue Recorded" in ux_record_result.output
+    assert "UX issue intake updated" in ux_record_result.output
+    assert "`P1`" in intake_path.read_text(encoding="utf-8")
+
     fix_plan_result = runner.invoke(
         app,
         [
@@ -1364,6 +1389,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     fix_plan_text = fix_plan_path.read_text(encoding="utf-8")
     assert "# NEXUS TECH Onboarding Visible UX Fix Plan" in fix_plan_text
     assert "validate-onboarding-visible-ux-issue-intake" in fix_plan_text
+    assert "Observed the compact title menu" in fix_plan_text
     assert "no P0/P1 and no todo severities before UI signoff" in fix_plan_text
     assert "This fix plan is not manual evidence" in fix_plan_text
 
@@ -1454,6 +1480,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     triage_next_text = triage_next_path.read_text(encoding="utf-8")
     assert "# NEXUS TECH Onboarding Visible UX Triage Next Step" in triage_next_text
     assert "record-onboarding-visible-playtest-route" in triage_next_text
+    assert "record-onboarding-visible-ux-issue" in triage_next_text
     assert "open the route and update intake/report from real observation" in triage_next_text
     assert "This next-step handoff is not evidence" in triage_next_text
 

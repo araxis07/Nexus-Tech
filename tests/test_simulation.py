@@ -159,6 +159,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_ux_triage_sprint,
     build_onboarding_visible_window_evidence_sheet,
     record_onboarding_visible_playtest_route,
+    record_onboarding_visible_ux_issue,
     run_onboarding_flow_audit,
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_evidence_matrix,
@@ -12892,6 +12893,73 @@ def test_onboarding_visible_ux_issue_intake_tracks_real_issue_slots(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Issue Intake Rows" for check in stale_validation.failed_checks)
+
+
+def test_record_onboarding_visible_ux_issue_updates_intake_row(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    intake = build_onboarding_visible_ux_issue_intake(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_issue_intake(intake, intake_path)
+
+    record = record_onboarding_visible_ux_issue(
+        intake_path,
+        rank=4,
+        severity="P1",
+        issue_notes=(
+            "Observed the compact title window after real play; menu recovery was readable "
+            "but pause/back/menu spacing | recovery target slowed first-time navigation."
+        ),
+        follow_up="UX owner / 2026-07-10",
+    )
+
+    assert record.row.rank == 4
+    assert record.row.severity == "P1"
+    assert "pause/back/menu spacing | recovery target" in record.row.issue_notes
+
+    text = intake_path.read_text(encoding="utf-8")
+    assert "| `820x620` | 4 | `title-onboarding` | `820x620` | `reduced` |" in text
+    assert "pause/back/menu spacing \\| recovery target" in text
+    assert "`P1`" in text
+    assert "`UX owner / 2026-07-10`" in text
+
+    validation = validate_onboarding_visible_ux_issue_intake(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert validation.ok
+
+    plan = build_onboarding_visible_ux_fix_plan(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert plan.p1_count == 1
+    assert plan.todo_count == 4
+
+    with pytest.raises(ValueError, match="Severity must be one of"):
+        record_onboarding_visible_ux_issue(
+            intake_path,
+            rank=5,
+            severity="todo",
+            issue_notes="Observed enough real visible UI notes to classify the row clearly.",
+            follow_up="UX owner / 2026-07-10",
+        )
 
 
 def test_onboarding_visible_ux_fix_plan_prioritizes_intake_severity(

@@ -522,6 +522,14 @@ class OnboardingVisibleUxFixPlanRow:
 
 
 @dataclass(frozen=True)
+class OnboardingVisibleUxIssueRecord:
+    """One recorded UX issue intake row update."""
+
+    intake_path: Path
+    row: OnboardingVisibleUxFixPlanRow
+
+
+@dataclass(frozen=True)
 class OnboardingVisibleUxFixPlan:
     """Prioritized UX fix plan derived from real visible onboarding issue intake."""
 
@@ -634,6 +642,7 @@ class OnboardingVisibleUxTriageNextStep:
     priority: str
     open_command: str
     report_recorder_command: str
+    intake_recorder_command: str
     validate_intake_command: str
     rebuild_fix_plan_command: str
     validate_fix_plan_command: str
@@ -3305,6 +3314,65 @@ def validate_onboarding_visible_ux_issue_intake(
     )
 
 
+def record_onboarding_visible_ux_issue(
+    intake_path: Path,
+    *,
+    severity: str,
+    issue_notes: str,
+    follow_up: str,
+    rank: int | None = None,
+    route: str | None = None,
+    window: str | None = None,
+    motion_mode: str | None = None,
+) -> OnboardingVisibleUxIssueRecord:
+    """Record one observed UX issue classification in the intake sheet."""
+
+    normalized_severity = _normalize_onboarding_visible_ux_severity(severity)
+    if normalized_severity == "todo":
+        raise ValueError("Severity must be one of: P0, P1, P2, none.")
+    if not _has_real_observation_notes(issue_notes):
+        raise ValueError(
+            "Issue notes must describe a real visible-window observation, not a placeholder."
+        )
+    if not _is_clear_follow_up(follow_up):
+        raise ValueError("Follow-up must name an owner/date or explicitly say none.")
+    if not intake_path.exists():
+        raise ValueError(f"Onboarding visible UX issue intake not found: {intake_path}")
+
+    lines = intake_path.read_text(encoding="utf-8").splitlines()
+    parsed_rows = tuple(
+        (index, row)
+        for index, line in enumerate(lines)
+        if (row := _parse_onboarding_visible_ux_issue_row(line)) is not None
+    )
+    matched_index, matched_row = _find_onboarding_visible_ux_issue_row(
+        parsed_rows,
+        rank=rank,
+        route=route,
+        window=window,
+        motion_mode=motion_mode,
+    )
+    updated_row = OnboardingVisibleUxFixPlanRow(
+        group=matched_row.group,
+        rank=matched_row.rank,
+        route=matched_row.route,
+        window=matched_row.window,
+        motion_mode=matched_row.motion_mode,
+        result=matched_row.result,
+        command=matched_row.command,
+        ux_areas=matched_row.ux_areas,
+        severity=normalized_severity,
+        issue_notes=issue_notes.strip(),
+        follow_up=follow_up.strip(),
+    )
+    lines[matched_index] = _format_onboarding_visible_ux_issue_row(updated_row)
+    intake_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return OnboardingVisibleUxIssueRecord(
+        intake_path=intake_path,
+        row=updated_row,
+    )
+
+
 def build_onboarding_visible_ux_fix_plan(
     intake_path: Path,
     *,
@@ -3908,6 +3976,12 @@ def build_onboarding_visible_ux_triage_next_step(
             f'--notes "<replace with observed visible-window notes mentioning '
             f'{row.ux_areas}>"'
         ),
+        intake_recorder_command=(
+            f"{command_prefix} record-onboarding-visible-ux-issue "
+            f"--input {intake_path} --rank {row.rank} --severity P1 "
+            f'--issue-notes "<replace with observed UX issue or no-issue notes '
+            f'mentioning {row.ux_areas}>" --follow-up "owner/date or none"'
+        ),
         validate_intake_command=(
             f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
             f"--report {report_path} --input {intake_path}"
@@ -3986,7 +4060,11 @@ def write_onboarding_visible_ux_triage_next_step(
         next_step.report_recorder_command,
         "```",
         "",
-        "Then edit the intake row severity/issue/follow-up manually from the observation.",
+        "Then update the intake row from the same observation after replacing placeholders:",
+        "",
+        "```bash",
+        next_step.intake_recorder_command,
+        "```",
         "",
         "## Refresh Commands",
         "",
@@ -4085,6 +4163,7 @@ def validate_onboarding_visible_ux_triage_next_step(
     command_markers = (
         expected.open_command,
         expected.report_recorder_command,
+        expected.intake_recorder_command,
         expected.validate_intake_command,
         expected.rebuild_fix_plan_command,
         expected.validate_fix_plan_command,
@@ -4108,7 +4187,10 @@ def validate_onboarding_visible_ux_triage_next_step(
                 f"- Intake row: `{row.group}` rank `{row.rank}` route `{row.route}`",
                 "Open the route first:",
                 "Record report notes only after observing the visible route:",
-                "Then edit the intake row severity/issue/follow-up manually",
+                (
+                    "Then update the intake row from the same observation after "
+                    "replacing placeholders:"
+                ),
             ),
             summary="The next-step handoff names the exact manual action and row.",
         ),
@@ -4347,7 +4429,7 @@ def _parse_onboarding_visible_ux_issue_row(
 ) -> OnboardingVisibleUxFixPlanRow | None:
     if not line.startswith("| `"):
         return None
-    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    cells = _split_markdown_table_cells(line)
     if len(cells) != 11 or not cells[1].isdigit():
         return None
     severity = _normalize_onboarding_visible_ux_severity(_strip_backticks(cells[8]))
@@ -4364,6 +4446,62 @@ def _parse_onboarding_visible_ux_issue_row(
         issue_notes=_strip_backticks(cells[9]).replace("\\|", "|").strip(),
         follow_up=_strip_backticks(cells[10]).replace("\\|", "|").strip(),
     )
+
+
+def _split_markdown_table_cells(line: str) -> list[str]:
+    cells: list[str] = []
+    cell: list[str] = []
+    for character in line.strip().strip("|"):
+        if character == "|" and (not cell or cell[-1] != "\\"):
+            cells.append("".join(cell).strip())
+            cell = []
+            continue
+        cell.append(character)
+    cells.append("".join(cell).strip())
+    return cells
+
+
+def _format_onboarding_visible_ux_issue_row(row: OnboardingVisibleUxFixPlanRow) -> str:
+    return (
+        "| "
+        f"`{row.group}` | "
+        f"{row.rank} | "
+        f"`{row.route}` | "
+        f"`{row.window}` | "
+        f"`{row.motion_mode}` | "
+        f"`{row.result}` | "
+        f"`{_markdown_escape(row.command)}` | "
+        f"`{_markdown_escape(row.ux_areas)}` | "
+        f"`{row.severity}` | "
+        f"`{_markdown_escape(row.issue_notes)}` | "
+        f"`{_markdown_escape(row.follow_up)}` |"
+    )
+
+
+def _find_onboarding_visible_ux_issue_row(
+    rows: tuple[tuple[int, OnboardingVisibleUxFixPlanRow], ...],
+    *,
+    rank: int | None,
+    route: str | None,
+    window: str | None,
+    motion_mode: str | None,
+) -> tuple[int, OnboardingVisibleUxFixPlanRow]:
+    matches: list[tuple[int, OnboardingVisibleUxFixPlanRow]] = []
+    for index, row in rows:
+        if rank is not None and row.rank != rank:
+            continue
+        if route is not None and row.route != route:
+            continue
+        if window is not None and row.window != window:
+            continue
+        if motion_mode is not None and row.motion_mode != motion_mode:
+            continue
+        matches.append((index, row))
+    if not matches:
+        raise ValueError("No onboarding visible UX issue intake row matched the selector.")
+    if len(matches) > 1:
+        raise ValueError("Selector matched multiple UX issue rows; add --rank.")
+    return matches[0]
 
 
 def _normalize_onboarding_visible_ux_severity(value: str) -> str:
@@ -4493,6 +4631,13 @@ def _safe_first_actions_present(commands: tuple[str, ...]) -> bool:
 def _is_clear_copy(*values: str) -> bool:
     normalized = " ".join(value.strip().lower() for value in values if value.strip())
     return bool(normalized) and not any(term in normalized for term in _PLACEHOLDER_TERMS)
+
+
+def _is_clear_follow_up(value: str) -> bool:
+    normalized = " ".join(value.strip().lower().split())
+    if normalized == "none":
+        return True
+    return len(normalized) >= 4 and not any(term in normalized for term in _PLACEHOLDER_TERMS)
 
 
 def _markdown_escape(value: str) -> str:
