@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.273.0 - 2026-07-10
+
+- Added `onboarding-visible-ux-progress` to summarize report evidence, intake classification, blockers, queue rows, and next manual UX action
+- Added `validate-onboarding-visible-ux-progress` to block stale progress boards, missing next-action commands, closure criteria, and no-fabrication guardrails
+- Wired the UX progress board into docs, regression coverage, CI validation, and artifact upload before final onboarding UX signoff
+
 ## 0.272.0 - 2026-07-10
 
 - Added `onboarding-visible-ux-recording-queue` to package every open onboarding UX row with open, report-recorder, and intake-recorder commands for the next manual pass

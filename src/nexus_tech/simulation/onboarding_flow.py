@@ -27,6 +27,7 @@ ONBOARDING_VISIBLE_UX_FIX_PLAN_NAME = "onboarding-visible-ux-fix-plan.md"
 ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_NAME = "onboarding-visible-ux-triage-sprint.md"
 ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_NAME = "onboarding-visible-ux-triage-next.md"
 ONBOARDING_VISIBLE_UX_RECORDING_QUEUE_NAME = "onboarding-visible-ux-recording-queue.md"
+ONBOARDING_VISIBLE_UX_PROGRESS_NAME = "onboarding-visible-ux-progress.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -730,6 +731,61 @@ class OnboardingVisibleUxRecordingQueueValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return recording queue checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxProgressBoard:
+    """Progress board for onboarding visible UX evidence closure."""
+
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    sprint_path: Path
+    queue_path: Path
+    status: str
+    total_rows: int
+    report_complete_count: int
+    report_incomplete_count: int
+    intake_classified_count: int
+    intake_todo_count: int
+    blocker_count: int
+    queue_count: int
+    next_row: OnboardingVisibleUxRecordingQueueRow | None
+    validate_report_command: str
+    validate_intake_command: str
+    rebuild_queue_command: str
+    validate_queue_command: str
+    status_command: str
+
+    @property
+    def completion_percent(self) -> int:
+        """Return percent of rows with both report evidence and intake classification."""
+
+        if self.total_rows <= 0:
+            return 100
+        closed_rows = min(self.report_complete_count, self.intake_classified_count)
+        return round((closed_rows / self.total_rows) * 100)
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxProgressBoardValidation:
+    """Validation report for the onboarding visible UX progress board artifact."""
+
+    progress_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the progress board matches the current queue."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return progress board checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -4611,6 +4667,357 @@ def validate_onboarding_visible_ux_recording_queue(
     )
     return OnboardingVisibleUxRecordingQueueValidation(
         queue_path=queue_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def build_onboarding_visible_ux_progress_board(
+    queue_path: Path,
+    *,
+    sprint_path: Path,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxProgressBoard:
+    """Build a progress board from the current UX report, intake, and queue."""
+
+    queue_validation = validate_onboarding_visible_ux_recording_queue(
+        queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not queue_validation.ok:
+        failed = ", ".join(check.area for check in queue_validation.failed_checks)
+        raise ValueError(f"UX recording queue must validate before progress board: {failed}")
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    plan = build_onboarding_visible_ux_fix_plan(
+        intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    queue = build_onboarding_visible_ux_recording_queue(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    report_complete_count = len(report.rows) - len(report.incomplete_rows)
+    intake_classified_count = plan.p0_count + plan.p1_count + plan.p2_count + plan.none_count
+    if plan.p0_count or plan.p1_count:
+        status = "fix-required"
+    elif plan.todo_count or report.incomplete_rows:
+        status = "manual-required"
+    elif plan.p2_count:
+        status = "polish-ready"
+    else:
+        status = "ready-for-signoff"
+
+    return OnboardingVisibleUxProgressBoard(
+        report_path=report_path,
+        intake_path=intake_path,
+        plan_path=plan_path,
+        sprint_path=sprint_path,
+        queue_path=queue_path,
+        status=status,
+        total_rows=len(report.rows),
+        report_complete_count=report_complete_count,
+        report_incomplete_count=len(report.incomplete_rows),
+        intake_classified_count=intake_classified_count,
+        intake_todo_count=plan.todo_count,
+        blocker_count=plan.p0_count + plan.p1_count,
+        queue_count=queue.total_rows,
+        next_row=queue.rows[0] if queue.rows else None,
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        validate_intake_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
+            f"--report {report_path} --input {intake_path}"
+        ),
+        rebuild_queue_command=(
+            f"{command_prefix} onboarding-visible-ux-recording-queue "
+            f"--report {report_path} --intake {intake_path} --plan {plan_path} "
+            f"--sprint {sprint_path} --output {queue_path}"
+        ),
+        validate_queue_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-recording-queue "
+            f"--report {report_path} --intake {intake_path} --plan {plan_path} "
+            f"--sprint {sprint_path} --input {queue_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_progress_board(
+    progress: OnboardingVisibleUxProgressBoard,
+    output_path: Path,
+) -> None:
+    """Write the visible UX progress board without marking evidence complete."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Progress",
+        "",
+        f"- Report: `{progress.report_path}`",
+        f"- Intake: `{progress.intake_path}`",
+        f"- Fix Plan: `{progress.plan_path}`",
+        f"- Sprint: `{progress.sprint_path}`",
+        f"- Queue: `{progress.queue_path}`",
+        f"- Status: `{progress.status}`",
+        f"- Rows: `{progress.total_rows}`",
+        f"- Completion: `{progress.completion_percent}%`",
+        f"- Report Complete: `{progress.report_complete_count}`",
+        f"- Report Incomplete: `{progress.report_incomplete_count}`",
+        f"- Intake Classified: `{progress.intake_classified_count}`",
+        f"- Intake Todo: `{progress.intake_todo_count}`",
+        f"- Blockers: `{progress.blocker_count}`",
+        f"- Queue Rows: `{progress.queue_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `progress is derived from report/intake rows only`",
+        "",
+        "## Progress Lanes",
+        "",
+        "| Lane | Done | Open | Gate |",
+        "| --- | ---: | ---: | --- |",
+        (
+            f"| `report evidence` | {progress.report_complete_count} | "
+            f"{progress.report_incomplete_count} | `real visible-window notes required` |"
+        ),
+        (
+            f"| `ux intake` | {progress.intake_classified_count} | "
+            f"{progress.intake_todo_count} | `todo must become P0/P1/P2/none` |"
+        ),
+        (
+            f"| `blockers` | {progress.total_rows - progress.blocker_count} | "
+            f"{progress.blocker_count} | `P0/P1 must be fixed and reopened` |"
+        ),
+        (
+            f"| `recording queue` | {progress.total_rows - progress.queue_count} | "
+            f"{progress.queue_count} | `queue must be empty before signoff` |"
+        ),
+        "",
+        "## Next Manual Action",
+        "",
+    ]
+    if progress.next_row is None:
+        lines.extend(
+            [
+                "- Next row: `none`",
+                "- Action: validate report, intake, queue, and prepare final signoff.",
+            ]
+        )
+    else:
+        row = progress.next_row.row
+        lines.extend(
+            [
+                f"- Phase: `{progress.next_row.phase}`",
+                f"- Priority: `{progress.next_row.priority}`",
+                f"- Rank: `{row.rank}`",
+                f"- Route: `{row.route}`",
+                f"- Window: `{row.window}`",
+                f"- Motion: `{row.motion_mode}`",
+                f"- Severity: `{row.severity}`",
+                "",
+                "Open command:",
+                "",
+                "```bash",
+                progress.next_row.open_command,
+                "```",
+                "",
+                "Report recorder:",
+                "",
+                "```bash",
+                progress.next_row.report_recorder_command,
+                "```",
+                "",
+                "UX intake recorder:",
+                "",
+                "```bash",
+                progress.next_row.intake_recorder_command,
+                "```",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Refresh Commands",
+            "",
+            "```bash",
+            progress.validate_report_command,
+            progress.validate_intake_command,
+            progress.rebuild_queue_command,
+            progress.validate_queue_command,
+            progress.status_command,
+            "```",
+            "",
+            "## Exit Criteria",
+            "",
+            "- Report incomplete count is zero after real visible-window notes are recorded.",
+            "- Intake todo count is zero after matching UX severity is recorded.",
+            "- Blocker count is zero after P0/P1 rows are fixed and reopened.",
+            "- Queue rows are zero before final onboarding UX signoff.",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This progress board is not evidence; it only summarizes recorded rows.",
+            "- Do not reduce counts manually; update report and intake with recorder commands.",
+            "- Keep status manual-required until real visible-window evidence closes the rows.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_progress_board(
+    progress_path: Path,
+    *,
+    queue_path: Path,
+    sprint_path: Path,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxProgressBoardValidation:
+    """Validate the visible UX progress board against the current queue."""
+
+    try:
+        expected = build_onboarding_visible_ux_progress_board(
+            queue_path,
+            sprint_path=sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxProgressBoardValidation(
+            progress_path=progress_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Queue",
+                    passed=False,
+                    summary="The UX recording queue must validate before progress.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not progress_path.exists():
+        return OnboardingVisibleUxProgressBoardValidation(
+            progress_path=progress_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Progress File",
+                    passed=False,
+                    summary="The onboarding visible UX progress board file must exist.",
+                    evidence=(f"missing:{progress_path}",),
+                ),
+            ),
+        )
+
+    text = progress_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Progress",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Fix Plan: `{expected.plan_path}`",
+        f"- Sprint: `{expected.sprint_path}`",
+        f"- Queue: `{expected.queue_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Completion: `{expected.completion_percent}%`",
+        f"- Report Complete: `{expected.report_complete_count}`",
+        f"- Report Incomplete: `{expected.report_incomplete_count}`",
+        f"- Intake Classified: `{expected.intake_classified_count}`",
+        f"- Intake Todo: `{expected.intake_todo_count}`",
+        f"- Blockers: `{expected.blocker_count}`",
+        f"- Queue Rows: `{expected.queue_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `progress is derived from report/intake rows only`",
+    )
+    command_markers = (
+        expected.validate_report_command,
+        expected.validate_intake_command,
+        expected.rebuild_queue_command,
+        expected.validate_queue_command,
+        expected.status_command,
+    )
+    next_markers: tuple[str, ...]
+    if expected.next_row is None:
+        next_markers = ("- Next row: `none`",)
+    else:
+        row = expected.next_row.row
+        next_markers = (
+            f"- Phase: `{expected.next_row.phase}`",
+            f"- Rank: `{row.rank}`",
+            f"- Route: `{row.route}`",
+            expected.next_row.open_command,
+            expected.next_row.report_recorder_command,
+            expected.next_row.intake_recorder_command,
+        )
+    checks = (
+        _build_presence_check(
+            area="UX Progress Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX progress metadata matches the current report, intake, and queue.",
+        ),
+        _build_presence_check(
+            area="Progress Lanes",
+            text=text,
+            markers=(
+                "| `report evidence` |",
+                "| `ux intake` |",
+                "| `blockers` |",
+                "| `recording queue` |",
+            ),
+            summary="The progress board lists report, intake, blocker, and queue lanes.",
+        ),
+        _build_presence_check(
+            area="Next Manual Action",
+            text=text,
+            markers=next_markers,
+            summary="The progress board exposes the next row and recorder commands.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary="The progress board includes current validation and rebuild commands.",
+        ),
+        _build_presence_check(
+            area="Exit Criteria",
+            text=text,
+            markers=(
+                "Report incomplete count is zero after real visible-window notes are recorded.",
+                "Intake todo count is zero after matching UX severity is recorded.",
+                "Blocker count is zero after P0/P1 rows are fixed and reopened.",
+                "Queue rows are zero before final onboarding UX signoff.",
+            ),
+            summary="The progress board keeps closure gates visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This progress board is not evidence; it only summarizes recorded rows.",
+                "Do not reduce counts manually; update report and intake with recorder commands.",
+                ("Keep status manual-required until real visible-window evidence closes the rows."),
+            ),
+            summary="The progress board keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxProgressBoardValidation(
+        progress_path=progress_path,
         status="pass" if all(check.status == "pass" for check in checks) else "fail",
         checks=checks,
     )

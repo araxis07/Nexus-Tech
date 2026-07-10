@@ -239,6 +239,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_terminal_evidence_sheet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
+    build_onboarding_visible_ux_progress_board,
     build_onboarding_visible_ux_recording_queue,
     build_onboarding_visible_ux_triage_next_step,
     build_onboarding_visible_ux_triage_sprint,
@@ -256,6 +257,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
+    validate_onboarding_visible_ux_progress_board,
     validate_onboarding_visible_ux_recording_queue,
     validate_onboarding_visible_ux_triage_next_step,
     validate_onboarding_visible_ux_triage_sprint,
@@ -270,6 +272,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_terminal_evidence_sheet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
+    write_onboarding_visible_ux_progress_board,
     write_onboarding_visible_ux_recording_queue,
     write_onboarding_visible_ux_triage_next_step,
     write_onboarding_visible_ux_triage_sprint,
@@ -540,6 +543,21 @@ ONBOARDING_VISIBLE_UX_RECORDING_QUEUE_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-ux-recording-queue.md"),
     "--input",
     help="Markdown path for the onboarding visible UX recording queue to validate.",
+)
+ONBOARDING_VISIBLE_UX_PROGRESS_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-progress.md"),
+    "--output",
+    help="Markdown path for the onboarding visible UX progress board.",
+)
+ONBOARDING_VISIBLE_UX_PROGRESS_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-progress.md"),
+    "--input",
+    help="Markdown path for the onboarding visible UX progress board to validate.",
+)
+ONBOARDING_VISIBLE_UX_PROGRESS_QUEUE_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-recording-queue.md"),
+    "--queue",
+    help="Markdown path for the onboarding visible UX recording queue source.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -7522,6 +7540,112 @@ def validate_onboarding_visible_ux_recording_queue_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible UX Recording Queue Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-ux-progress")
+def onboarding_visible_ux_progress_command(
+    queue_path: Path = ONBOARDING_VISIBLE_UX_PROGRESS_QUEUE_OPTION,
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_UX_PROGRESS_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write the onboarding visible UX evidence progress board."""
+
+    try:
+        progress = build_onboarding_visible_ux_progress_board(
+            queue_path,
+            sprint_path=sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Progress Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_ux_progress_board(progress, output)
+
+    table = Table(title=f"Onboarding Visible UX Progress | {output}")
+    table.add_column("Status")
+    table.add_column("Completion", justify="right")
+    table.add_column("Rows", justify="right")
+    table.add_column("Report Open", justify="right")
+    table.add_column("Intake Todo", justify="right")
+    table.add_column("Blockers", justify="right")
+    table.add_column("Queue", justify="right")
+    table.add_row(
+        progress.status.upper(),
+        f"{progress.completion_percent}%",
+        str(progress.total_rows),
+        str(progress.report_incomplete_count),
+        str(progress.intake_todo_count),
+        str(progress.blocker_count),
+        str(progress.queue_count),
+    )
+    console.print(table)
+    console.print(f"UX progress board written to {output}")
+
+
+@app.command("validate-onboarding-visible-ux-progress")
+def validate_onboarding_visible_ux_progress_command(
+    progress_path: Path = ONBOARDING_VISIBLE_UX_PROGRESS_INPUT_OPTION,
+    queue_path: Path = ONBOARDING_VISIBLE_UX_PROGRESS_QUEUE_OPTION,
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible UX progress board."""
+
+    validation = validate_onboarding_visible_ux_progress_board(
+        progress_path,
+        queue_path=queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible UX Progress Validation | {progress_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible UX progress validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible UX Progress Validation",
             border_style=border_style,
         )
     )

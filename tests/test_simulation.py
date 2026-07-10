@@ -155,6 +155,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_terminal_evidence_sheet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
+    build_onboarding_visible_ux_progress_board,
     build_onboarding_visible_ux_recording_queue,
     build_onboarding_visible_ux_triage_next_step,
     build_onboarding_visible_ux_triage_sprint,
@@ -172,6 +173,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_terminal_evidence_sheet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
+    validate_onboarding_visible_ux_progress_board,
     validate_onboarding_visible_ux_recording_queue,
     validate_onboarding_visible_ux_triage_next_step,
     validate_onboarding_visible_ux_triage_sprint,
@@ -186,6 +188,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_terminal_evidence_sheet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
+    write_onboarding_visible_ux_progress_board,
     write_onboarding_visible_ux_recording_queue,
     write_onboarding_visible_ux_triage_next_step,
     write_onboarding_visible_ux_triage_sprint,
@@ -13331,6 +13334,132 @@ def test_onboarding_visible_ux_recording_queue_lists_open_manual_rows(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Recording Queue Rows" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_ux_progress_board_summarizes_evidence_closure(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    intake_path = tmp_path / "onboarding-visible-ux-issue-intake.md"
+    plan_path = tmp_path / "onboarding-visible-ux-fix-plan.md"
+    sprint_path = tmp_path / "onboarding-visible-ux-triage-sprint.md"
+    queue_path = tmp_path / "onboarding-visible-ux-recording-queue.md"
+    progress_path = tmp_path / "onboarding-visible-ux-progress.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=1,
+        result="pass",
+        evidence_notes=(
+            "Observed terminal guide in a real terminal window; opening flow, risk "
+            "forecast, and difficulty cues were readable and next action was clear."
+        ),
+    )
+    intake = build_onboarding_visible_ux_issue_intake(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_issue_intake(intake, intake_path)
+    record_onboarding_visible_ux_issue(
+        intake_path,
+        rank=1,
+        severity="none",
+        issue_notes=(
+            "Observed terminal guide in a real terminal window; copy was readable, "
+            "navigation was clear, and no UX issue appeared."
+        ),
+        follow_up="none",
+    )
+
+    plan = build_onboarding_visible_ux_fix_plan(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_fix_plan(plan, plan_path)
+    sprint = build_onboarding_visible_ux_triage_sprint(
+        plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_triage_sprint(sprint, sprint_path)
+    queue = build_onboarding_visible_ux_recording_queue(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_recording_queue(queue, queue_path)
+
+    progress = build_onboarding_visible_ux_progress_board(
+        queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_progress_board(progress, progress_path)
+
+    text = progress_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Progress" in text
+    assert progress.status == "manual-required"
+    assert progress.total_rows == 5
+    assert progress.report_complete_count == 1
+    assert progress.report_incomplete_count == 4
+    assert progress.intake_classified_count == 1
+    assert progress.intake_todo_count == 4
+    assert progress.queue_count == 4
+    assert progress.completion_percent == 20
+    assert "- Completion: `20%`" in text
+    assert "| `report evidence` | 1 | 4 |" in text
+    assert "| `ux intake` | 1 | 4 |" in text
+    assert "record-onboarding-visible-ux-issue" in text
+    assert "This progress board is not evidence" in text
+
+    validation = validate_onboarding_visible_ux_progress_board(
+        progress_path,
+        queue_path=queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech tutorial",
+        ".venv313/bin/nexus-tech glossary",
+    )
+    progress_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_ux_progress_board(
+        progress_path,
+        queue_path=queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Next Manual Action" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(
