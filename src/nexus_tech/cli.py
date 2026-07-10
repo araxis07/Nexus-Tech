@@ -237,6 +237,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_ux_batch_packet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
     build_onboarding_visible_ux_progress_board,
@@ -255,6 +256,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_ux_batch_packet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
     validate_onboarding_visible_ux_progress_board,
@@ -270,6 +272,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_ux_batch_packet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
     write_onboarding_visible_ux_progress_board,
@@ -558,6 +561,22 @@ ONBOARDING_VISIBLE_UX_PROGRESS_QUEUE_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-ux-recording-queue.md"),
     "--queue",
     help="Markdown path for the onboarding visible UX recording queue source.",
+)
+ONBOARDING_VISIBLE_UX_BATCH_PACKET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md"),
+    "--output",
+    help="Markdown path for the onboarding visible UX focused batch packet.",
+)
+ONBOARDING_VISIBLE_UX_BATCH_PACKET_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md"),
+    "--input",
+    help="Markdown path for the onboarding visible UX focused batch packet to validate.",
+)
+ONBOARDING_VISIBLE_UX_BATCH_SIZE_OPTION = typer.Option(
+    3,
+    "--batch-size",
+    min=1,
+    help="Number of open onboarding visible UX rows to include in the focused batch.",
 )
 ONBOARDING_VISIBLE_FOCUSED_WINDOW_OPTION = typer.Option(
     "820x620",
@@ -7646,6 +7665,114 @@ def validate_onboarding_visible_ux_progress_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible UX Progress Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-ux-batch-packet")
+def onboarding_visible_ux_batch_packet_command(
+    queue_path: Path = ONBOARDING_VISIBLE_UX_PROGRESS_QUEUE_OPTION,
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_UX_BATCH_PACKET_OUTPUT_OPTION,
+    batch_size: int = ONBOARDING_VISIBLE_UX_BATCH_SIZE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write a focused onboarding visible UX manual batch packet."""
+
+    try:
+        packet = build_onboarding_visible_ux_batch_packet(
+            queue_path,
+            sprint_path=sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            batch_size=batch_size,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Batch Packet Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_ux_batch_packet(packet, output)
+
+    table = Table(title=f"Onboarding Visible UX Batch Packet | {output}")
+    table.add_column("Status")
+    table.add_column("Batch", justify="right")
+    table.add_column("Queue", justify="right")
+    table.add_column("Remaining", justify="right")
+    table.add_column("Blockers", justify="right")
+    table.add_column("Todo", justify="right")
+    table.add_row(
+        packet.status.upper(),
+        str(packet.batch_count),
+        str(packet.total_queue_rows),
+        str(packet.remaining_after_batch),
+        str(packet.blocker_count),
+        str(packet.todo_count),
+    )
+    console.print(table)
+    console.print(f"UX batch packet written to {output}")
+
+
+@app.command("validate-onboarding-visible-ux-batch-packet")
+def validate_onboarding_visible_ux_batch_packet_command(
+    packet_path: Path = ONBOARDING_VISIBLE_UX_BATCH_PACKET_INPUT_OPTION,
+    queue_path: Path = ONBOARDING_VISIBLE_UX_PROGRESS_QUEUE_OPTION,
+    sprint_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_SPRINT_OPTION,
+    plan_path: Path = ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_PLAN_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    batch_size: int = ONBOARDING_VISIBLE_UX_BATCH_SIZE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the onboarding visible UX manual batch packet."""
+
+    validation = validate_onboarding_visible_ux_batch_packet(
+        packet_path,
+        queue_path=queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        batch_size=batch_size,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible UX Batch Packet Validation | {packet_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible UX batch packet validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible UX Batch Packet Validation",
             border_style=border_style,
         )
     )

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.274.0 - 2026-07-10
+
+- Added `onboarding-visible-ux-batch-packet` to scope the next short real-window UX pass from the current recording queue
+- Added `validate-onboarding-visible-ux-batch-packet` to block stale batch rows, recorder commands, refresh commands, exit criteria, and no-fabrication guardrails
+- Wired the focused UX batch packet into docs, regression coverage, CI validation, and artifact upload before manual onboarding UX closeout
+
 ## 0.273.0 - 2026-07-10
 
 - Added `onboarding-visible-ux-progress` to summarize report evidence, intake classification, blockers, queue rows, and next manual UX action

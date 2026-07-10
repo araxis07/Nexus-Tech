@@ -282,6 +282,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-ux-recording-queue",
         "onboarding-visible-ux-progress",
         "validate-onboarding-visible-ux-progress",
+        "onboarding-visible-ux-batch-packet",
+        "validate-onboarding-visible-ux-batch-packet",
         "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
@@ -1000,6 +1002,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     triage_next_path = tmp_path / "onboarding-visible-ux-triage-next.md"
     recording_queue_path = tmp_path / "onboarding-visible-ux-recording-queue.md"
     progress_path = tmp_path / "onboarding-visible-ux-progress.md"
+    ux_batch_path = tmp_path / "onboarding-visible-ux-batch-packet.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1616,6 +1619,64 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible UX Progress Validation" in progress_validation_result.output
     assert "PASS" in progress_validation_result.output
 
+    ux_batch_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-ux-batch-packet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--intake",
+            str(intake_path),
+            "--plan",
+            str(fix_plan_path),
+            "--sprint",
+            str(sprint_path),
+            "--queue",
+            str(recording_queue_path),
+            "--batch-size",
+            "2",
+            "--output",
+            str(ux_batch_path),
+        ],
+    )
+    assert ux_batch_result.exit_code == 0
+    assert "Onboarding Visible UX Batch Packet" in ux_batch_result.output
+    assert "UX batch packet written" in ux_batch_result.output
+    ux_batch_text = ux_batch_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Batch Packet" in ux_batch_text
+    assert "- Batch Size: `2`" in ux_batch_text
+    assert "record-onboarding-visible-playtest-route" in ux_batch_text
+    assert "record-onboarding-visible-ux-issue" in ux_batch_text
+    assert "This batch packet is not evidence" in ux_batch_text
+
+    ux_batch_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-ux-batch-packet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--input",
+            str(ux_batch_path),
+            "--queue",
+            str(recording_queue_path),
+            "--intake",
+            str(intake_path),
+            "--plan",
+            str(fix_plan_path),
+            "--sprint",
+            str(sprint_path),
+            "--batch-size",
+            "2",
+        ],
+    )
+    assert ux_batch_validation_result.exit_code == 0
+    assert "Onboarding Visible UX Batch Packet Validation" in ux_batch_validation_result.output
+    assert "PASS" in ux_batch_validation_result.output
+
 
 def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     tmp_path: Path,
@@ -1693,6 +1754,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-ux-recording-queue" in workflow
     assert "uv run nexus-tech onboarding-visible-ux-progress" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-ux-progress" in workflow
+    assert "uv run nexus-tech onboarding-visible-ux-batch-packet" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-ux-batch-packet" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1714,6 +1777,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-ux-triage-next.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-recording-queue.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-progress.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1731,6 +1795,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-ux-triage-next" in workflow
     assert "nexus-tech-onboarding-visible-ux-recording-queue" in workflow
     assert "nexus-tech-onboarding-visible-ux-progress" in workflow
+    assert "nexus-tech-onboarding-visible-ux-batch-packet" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

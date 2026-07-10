@@ -28,6 +28,7 @@ ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_NAME = "onboarding-visible-ux-triage-sprint.
 ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_NAME = "onboarding-visible-ux-triage-next.md"
 ONBOARDING_VISIBLE_UX_RECORDING_QUEUE_NAME = "onboarding-visible-ux-recording-queue.md"
 ONBOARDING_VISIBLE_UX_PROGRESS_NAME = "onboarding-visible-ux-progress.md"
+ONBOARDING_VISIBLE_UX_BATCH_PACKET_NAME = "onboarding-visible-ux-batch-packet.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -786,6 +787,61 @@ class OnboardingVisibleUxProgressBoardValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return progress board checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxBatchPacket:
+    """Focused packet for one short onboarding visible UX manual pass."""
+
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    sprint_path: Path
+    queue_path: Path
+    status: str
+    batch_size: int
+    rows: tuple[OnboardingVisibleUxRecordingQueueRow, ...]
+    total_queue_rows: int
+    remaining_after_batch: int
+    blocker_count: int
+    todo_count: int
+    validate_report_command: str
+    validate_intake_command: str
+    rebuild_fix_plan_command: str
+    validate_fix_plan_command: str
+    rebuild_sprint_command: str
+    validate_sprint_command: str
+    rebuild_queue_command: str
+    validate_queue_command: str
+    rebuild_progress_command: str
+    status_command: str
+
+    @property
+    def batch_count(self) -> int:
+        """Return the number of rows included in this focused manual packet."""
+
+        return len(self.rows)
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxBatchPacketValidation:
+    """Validation report for the onboarding visible UX batch packet artifact."""
+
+    packet_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the batch packet matches the current recording queue."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return batch packet checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -5018,6 +5074,383 @@ def validate_onboarding_visible_ux_progress_board(
     )
     return OnboardingVisibleUxProgressBoardValidation(
         progress_path=progress_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def build_onboarding_visible_ux_batch_packet(
+    queue_path: Path,
+    *,
+    sprint_path: Path,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    batch_size: int = 3,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxBatchPacket:
+    """Build a focused manual batch from the current onboarding UX queue."""
+
+    if batch_size < 1:
+        raise ValueError("Batch size must be at least 1.")
+    queue_validation = validate_onboarding_visible_ux_recording_queue(
+        queue_path,
+        sprint_path=sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not queue_validation.ok:
+        failed = ", ".join(check.area for check in queue_validation.failed_checks)
+        raise ValueError(f"UX recording queue must validate before batch packet: {failed}")
+
+    queue = build_onboarding_visible_ux_recording_queue(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    rows = queue.rows[:batch_size]
+    remaining_after_batch = max(queue.total_rows - len(rows), 0)
+    status = "ready-for-signoff" if not rows else queue.status
+    progress_path = f"/tmp/nexus-tech-{ONBOARDING_VISIBLE_UX_PROGRESS_NAME}"
+    return OnboardingVisibleUxBatchPacket(
+        report_path=report_path,
+        intake_path=intake_path,
+        plan_path=plan_path,
+        sprint_path=sprint_path,
+        queue_path=queue_path,
+        status=status,
+        batch_size=batch_size,
+        rows=rows,
+        total_queue_rows=queue.total_rows,
+        remaining_after_batch=remaining_after_batch,
+        blocker_count=queue.blocker_count,
+        todo_count=queue.todo_count,
+        validate_report_command=queue.validate_report_command,
+        validate_intake_command=queue.validate_intake_command,
+        rebuild_fix_plan_command=queue.rebuild_fix_plan_command,
+        validate_fix_plan_command=queue.validate_fix_plan_command,
+        rebuild_sprint_command=queue.rebuild_sprint_command,
+        validate_sprint_command=queue.validate_sprint_command,
+        rebuild_queue_command=(
+            f"{command_prefix} onboarding-visible-ux-recording-queue "
+            f"--report {report_path} --intake {intake_path} --plan {plan_path} "
+            f"--sprint {sprint_path} --output {queue_path}"
+        ),
+        validate_queue_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-recording-queue "
+            f"--report {report_path} --intake {intake_path} --plan {plan_path} "
+            f"--sprint {sprint_path} --input {queue_path}"
+        ),
+        rebuild_progress_command=(
+            f"{command_prefix} onboarding-visible-ux-progress "
+            f"--report {report_path} --intake {intake_path} --plan {plan_path} "
+            f"--sprint {sprint_path} --queue {queue_path} --output {progress_path}"
+        ),
+        status_command=queue.status_command,
+    )
+
+
+def write_onboarding_visible_ux_batch_packet(
+    packet: OnboardingVisibleUxBatchPacket,
+    output_path: Path,
+) -> None:
+    """Write a focused onboarding UX manual batch without recording evidence."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Batch Packet",
+        "",
+        f"- Report: `{packet.report_path}`",
+        f"- Intake: `{packet.intake_path}`",
+        f"- Fix Plan: `{packet.plan_path}`",
+        f"- Sprint: `{packet.sprint_path}`",
+        f"- Queue: `{packet.queue_path}`",
+        f"- Status: `{packet.status}`",
+        f"- Batch Size: `{packet.batch_size}`",
+        f"- Batch Rows: `{packet.batch_count}`",
+        f"- Queue Rows: `{packet.total_queue_rows}`",
+        f"- Remaining After Batch: `{packet.remaining_after_batch}`",
+        f"- Blockers: `{packet.blocker_count}`",
+        f"- Todo: `{packet.todo_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `batch packet is an operator checklist, not playtest proof`",
+        "",
+        (
+            "Use this packet for one short visible-window pass. Complete rows in order, "
+            "record report notes and UX severity from the same observation, then rebuild "
+            "the queue and progress board."
+        ),
+        "",
+        "## Operator Order",
+        "",
+        "- Open each listed route in the real terminal or visible 2D window.",
+        "- Inspect text containment, controls, pause/back/menu recovery, and motion readability.",
+        "- Record report notes first, then classify the UX intake row from the same observation.",
+        "- Stop after this batch and refresh queue/progress before taking the next batch.",
+        "",
+        "## Batch Rows",
+        "",
+        ("| Order | Phase | Priority | Rank | Route | Window | Motion | Severity | Open Command |"),
+        "| ---: | --- | --- | ---: | --- | --- | --- | --- | --- |",
+    ]
+    if not packet.rows:
+        lines.append(
+            "| 0 | `ready-for-signoff` | `none` | 0 | `complete` | `n/a` | `n/a` | `none` | `n/a` |"
+        )
+    for order, queue_row in enumerate(packet.rows, start=1):
+        row = queue_row.row
+        lines.append(
+            "| "
+            f"{order} | "
+            f"`{queue_row.phase}` | "
+            f"`{queue_row.priority}` | "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.window}` | "
+            f"`{row.motion_mode}` | "
+            f"`{row.severity}` | "
+            f"`{_markdown_escape(queue_row.open_command)}` |"
+        )
+    lines.extend(["", "## Row Commands", ""])
+    if not packet.rows:
+        lines.extend(
+            [
+                "- No queued rows remain. Run validation and prepare final onboarding UX signoff.",
+                "",
+            ]
+        )
+    for order, queue_row in enumerate(packet.rows, start=1):
+        row = queue_row.row
+        lines.extend(
+            [
+                f"### Row {order}: rank {row.rank} `{row.route}`",
+                "",
+                f"- Phase: `{queue_row.phase}`",
+                f"- Priority: `{queue_row.priority}`",
+                f"- Window: `{row.window}`",
+                f"- Motion: `{row.motion_mode}`",
+                f"- UX Areas: `{_markdown_escape(row.ux_areas)}`",
+                (
+                    "- Observation checklist: text containment, button spacing, "
+                    "pause/back/menu recovery, motion readability, and next action clarity."
+                ),
+                "",
+                "Open first:",
+                "",
+                "```bash",
+                queue_row.open_command,
+                "```",
+                "",
+                "Record report notes after the visible observation:",
+                "",
+                "```bash",
+                queue_row.report_recorder_command,
+                "```",
+                "",
+                "Record UX issue classification from the same observation:",
+                "",
+                "```bash",
+                queue_row.intake_recorder_command,
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Refresh Commands",
+            "",
+            "```bash",
+            packet.validate_report_command,
+            packet.validate_intake_command,
+            packet.rebuild_fix_plan_command,
+            packet.validate_fix_plan_command,
+            packet.rebuild_sprint_command,
+            packet.validate_sprint_command,
+            packet.rebuild_queue_command,
+            packet.validate_queue_command,
+            packet.rebuild_progress_command,
+            packet.status_command,
+            "```",
+            "",
+            "## Exit Criteria",
+            "",
+            "- Every batch row is opened before any recorder command is run.",
+            "- Every batch row has report notes with real visible-window observations.",
+            "- Every batch row has UX severity changed from `todo` to P0/P1/P2/none.",
+            "- Queue and progress are rebuilt after the batch before selecting more rows.",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This batch packet is not evidence; it only scopes the next manual pass.",
+            "- Do not paste recorder commands until the matching route was observed.",
+            "- Do not mark `none` or `pass` unless notes explain what was checked.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_batch_packet(
+    packet_path: Path,
+    *,
+    queue_path: Path,
+    sprint_path: Path,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    batch_size: int = 3,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxBatchPacketValidation:
+    """Validate that the onboarding UX batch packet matches the current queue."""
+
+    try:
+        expected = build_onboarding_visible_ux_batch_packet(
+            queue_path,
+            sprint_path=sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            batch_size=batch_size,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxBatchPacketValidation(
+            packet_path=packet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Queue",
+                    passed=False,
+                    summary="The UX recording queue must validate before batch packet.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not packet_path.exists():
+        return OnboardingVisibleUxBatchPacketValidation(
+            packet_path=packet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Batch Packet File",
+                    passed=False,
+                    summary="The onboarding visible UX batch packet file must exist.",
+                    evidence=(f"missing:{packet_path}",),
+                ),
+            ),
+        )
+
+    text = packet_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Batch Packet",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Fix Plan: `{expected.plan_path}`",
+        f"- Sprint: `{expected.sprint_path}`",
+        f"- Queue: `{expected.queue_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Batch Size: `{expected.batch_size}`",
+        f"- Batch Rows: `{expected.batch_count}`",
+        f"- Queue Rows: `{expected.total_queue_rows}`",
+        f"- Remaining After Batch: `{expected.remaining_after_batch}`",
+        f"- Blockers: `{expected.blocker_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `batch packet is an operator checklist, not playtest proof`",
+    )
+    command_markers = (
+        expected.validate_report_command,
+        expected.validate_intake_command,
+        expected.rebuild_fix_plan_command,
+        expected.validate_fix_plan_command,
+        expected.rebuild_sprint_command,
+        expected.validate_sprint_command,
+        expected.rebuild_queue_command,
+        expected.validate_queue_command,
+        expected.rebuild_progress_command,
+        expected.status_command,
+    )
+    row_markers = tuple(
+        marker
+        for order, queue_row in enumerate(expected.rows, start=1)
+        for row in (queue_row.row,)
+        for marker in (
+            (
+                f"| {order} | `{queue_row.phase}` | `{queue_row.priority}` | "
+                f"{row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.severity}` |"
+            ),
+            f"### Row {order}: rank {row.rank} `{row.route}`",
+            queue_row.open_command,
+            queue_row.report_recorder_command,
+            queue_row.intake_recorder_command,
+        )
+    )
+    if not row_markers:
+        row_markers = ("| 0 | `ready-for-signoff` | `none` | 0 |",)
+    checks = (
+        _build_presence_check(
+            area="UX Batch Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX batch packet metadata matches the current queue.",
+        ),
+        _build_presence_check(
+            area="Operator Order",
+            text=text,
+            markers=(
+                "Open each listed route in the real terminal or visible 2D window.",
+                (
+                    "Inspect text containment, controls, pause/back/menu recovery, "
+                    "and motion readability."
+                ),
+                (
+                    "Record report notes first, then classify the UX intake row from "
+                    "the same observation."
+                ),
+                "Stop after this batch and refresh queue/progress before taking the next batch.",
+            ),
+            summary="The batch packet states the manual order before recorder commands.",
+        ),
+        _build_presence_check(
+            area="Batch Rows",
+            text=text,
+            markers=row_markers,
+            summary="The batch packet lists the current focused queue rows and commands.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary="The batch packet includes current validation and rebuild commands.",
+        ),
+        _build_presence_check(
+            area="Exit Criteria",
+            text=text,
+            markers=(
+                "Every batch row is opened before any recorder command is run.",
+                "Every batch row has report notes with real visible-window observations.",
+                "Every batch row has UX severity changed from `todo` to P0/P1/P2/none.",
+                "Queue and progress are rebuilt after the batch before selecting more rows.",
+            ),
+            summary="The batch packet keeps completion gates visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This batch packet is not evidence; it only scopes the next manual pass.",
+                "Do not paste recorder commands until the matching route was observed.",
+                "Do not mark `none` or `pass` unless notes explain what was checked.",
+            ),
+            summary="The batch packet keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxBatchPacketValidation(
+        packet_path=packet_path,
         status="pass" if all(check.status == "pass" for check in checks) else "fail",
         checks=checks,
     )
