@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.272.0 - 2026-07-10
+
+- Added `onboarding-visible-ux-recording-queue` to package every open onboarding UX row with open, report-recorder, and intake-recorder commands for the next manual pass
+- Added `validate-onboarding-visible-ux-recording-queue` to block stale queue paths, recorder commands, refresh commands, exit criteria, and no-fabrication guardrails
+- Wired the UX recording queue into docs, regression coverage, CI validation, and artifact upload without converting automation into manual evidence
+
 ## 0.271.0 - 2026-07-10
 
 - Added `record-onboarding-visible-ux-issue` to update one onboarding UX intake row from real visible-window observation notes without manual Markdown editing

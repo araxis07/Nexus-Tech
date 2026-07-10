@@ -26,6 +26,7 @@ ONBOARDING_VISIBLE_UX_ISSUE_INTAKE_NAME = "onboarding-visible-ux-issue-intake.md
 ONBOARDING_VISIBLE_UX_FIX_PLAN_NAME = "onboarding-visible-ux-fix-plan.md"
 ONBOARDING_VISIBLE_UX_TRIAGE_SPRINT_NAME = "onboarding-visible-ux-triage-sprint.md"
 ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_NAME = "onboarding-visible-ux-triage-next.md"
+ONBOARDING_VISIBLE_UX_RECORDING_QUEUE_NAME = "onboarding-visible-ux-recording-queue.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -669,6 +670,66 @@ class OnboardingVisibleUxTriageNextStepValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return next-step checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxRecordingQueueRow:
+    """One copy-ready manual recording row from the onboarding UX sprint."""
+
+    row: OnboardingVisibleUxFixPlanRow
+    phase: str
+    priority: str
+    open_command: str
+    report_recorder_command: str
+    intake_recorder_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxRecordingQueue:
+    """Manual queue for recording onboarding visible UX evidence without fabrication."""
+
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    sprint_path: Path
+    status: str
+    rows: tuple[OnboardingVisibleUxRecordingQueueRow, ...]
+    blocker_count: int
+    todo_count: int
+    validate_intake_command: str
+    rebuild_fix_plan_command: str
+    validate_fix_plan_command: str
+    rebuild_sprint_command: str
+    validate_sprint_command: str
+    validate_report_command: str
+    status_command: str
+
+    @property
+    def total_rows(self) -> int:
+        """Return the number of manual recording rows still needing attention."""
+
+        return len(self.rows)
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxRecordingQueueValidation:
+    """Validation report for the onboarding visible UX recording queue artifact."""
+
+    queue_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the queue matches the current UX triage sprint."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return recording queue checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -4232,6 +4293,329 @@ def validate_onboarding_visible_ux_triage_next_step(
     )
 
 
+def build_onboarding_visible_ux_recording_queue(
+    sprint_path: Path,
+    *,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxRecordingQueue:
+    """Build the copy-ready queue for manual visible UX recording."""
+
+    sprint_validation = validate_onboarding_visible_ux_triage_sprint(
+        sprint_path,
+        plan_path=plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    if not sprint_validation.ok:
+        failed = ", ".join(check.area for check in sprint_validation.failed_checks)
+        raise ValueError(f"UX triage sprint must validate before recording queue: {failed}")
+
+    sprint = build_onboarding_visible_ux_triage_sprint(
+        plan_path,
+        intake_path=intake_path,
+        report_path=report_path,
+        command_prefix=command_prefix,
+    )
+    rows = tuple(
+        _build_onboarding_visible_ux_recording_queue_row(
+            row,
+            report_path=report_path,
+            intake_path=intake_path,
+            command_prefix=command_prefix,
+        )
+        for row in sprint.rows
+        if row.severity in {"P0", "P1", "todo", "P2"}
+    )
+    status = "ready-for-manual-evidence" if not rows else sprint.status
+    return OnboardingVisibleUxRecordingQueue(
+        report_path=report_path,
+        intake_path=intake_path,
+        plan_path=plan_path,
+        sprint_path=sprint_path,
+        status=status,
+        rows=rows,
+        blocker_count=sprint.blocker_count,
+        todo_count=sprint.todo_count,
+        validate_intake_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
+            f"--report {report_path} --input {intake_path}"
+        ),
+        rebuild_fix_plan_command=(
+            f"{command_prefix} onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --input {intake_path} --output {plan_path}"
+        ),
+        validate_fix_plan_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --intake {intake_path} --input {plan_path}"
+        ),
+        rebuild_sprint_command=(
+            f"{command_prefix} onboarding-visible-ux-triage-sprint "
+            f"--report {report_path} --intake {intake_path} "
+            f"--plan {plan_path} --output {sprint_path}"
+        ),
+        validate_sprint_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-triage-sprint "
+            f"--report {report_path} --intake {intake_path} "
+            f"--plan {plan_path} --input {sprint_path}"
+        ),
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_recording_queue(
+    queue: OnboardingVisibleUxRecordingQueue,
+    output_path: Path,
+) -> None:
+    """Write the manual UX recording queue without creating evidence."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Recording Queue",
+        "",
+        f"- Report: `{queue.report_path}`",
+        f"- Intake: `{queue.intake_path}`",
+        f"- Fix Plan: `{queue.plan_path}`",
+        f"- Sprint: `{queue.sprint_path}`",
+        f"- Status: `{queue.status}`",
+        f"- Rows: `{queue.total_rows}`",
+        f"- Blockers: `{queue.blocker_count}`",
+        f"- Todo: `{queue.todo_count}`",
+        "- Manual result: `not completed by automation`",
+        (
+            "- Queue policy: `open each route, then update report and intake "
+            "from the same observation`"
+        ),
+        "",
+        "## Operator Order",
+        "",
+        "- Open the route command first and inspect the real visible output.",
+        "- Record report notes only after observing readability, controls, and motion.",
+        "- Record the UX issue intake row from the same observation before rebuilding plans.",
+        "- Re-run the refresh commands after each completed row or blocker fix.",
+        "",
+        "## Refresh Commands",
+        "",
+        "```bash",
+        queue.validate_intake_command,
+        queue.rebuild_fix_plan_command,
+        queue.validate_fix_plan_command,
+        queue.rebuild_sprint_command,
+        queue.validate_sprint_command,
+        queue.validate_report_command,
+        queue.status_command,
+        "```",
+        "",
+        "## Recording Queue",
+        "",
+        (
+            "| Phase | Priority | Rank | Route | Window | Motion | Severity | "
+            "Open Command | Report Recorder | Intake Recorder |"
+        ),
+        "| --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for queue_row in queue.rows:
+        row = queue_row.row
+        lines.append(
+            "| "
+            f"`{queue_row.phase}` | "
+            f"`{queue_row.priority}` | "
+            f"{row.rank} | "
+            f"`{row.route}` | "
+            f"`{row.window}` | "
+            f"`{row.motion_mode}` | "
+            f"`{row.severity}` | "
+            f"`{_markdown_escape(queue_row.open_command)}` | "
+            f"`{_markdown_escape(queue_row.report_recorder_command)}` | "
+            f"`{_markdown_escape(queue_row.intake_recorder_command)}` |"
+        )
+    if not queue.rows:
+        lines.append(
+            "| `ready-for-manual-evidence` | `none` | 0 | `complete` | `n/a` | "
+            "`n/a` | `none` | `n/a` | `n/a` | `n/a` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Exit Criteria",
+            "",
+            "- Every queued route has real report notes recorded after visible play.",
+            "- Every queued intake row is no longer `todo` after the same observation.",
+            "- P0/P1 rows are fixed, reopened, and reclassified before UI signoff.",
+            "- Intake, fix plan, sprint, queue, and report validators pass after updates.",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This recording queue is not evidence; it only orders the manual work.",
+            "- Do not run recorder commands until the corresponding route was opened.",
+            "- Do not use `pass`, `none`, or lower severity unless the observation supports it.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_recording_queue(
+    queue_path: Path,
+    *,
+    sprint_path: Path,
+    plan_path: Path,
+    intake_path: Path,
+    report_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxRecordingQueueValidation:
+    """Validate that the UX recording queue matches the current sprint."""
+
+    try:
+        expected = build_onboarding_visible_ux_recording_queue(
+            sprint_path,
+            plan_path=plan_path,
+            intake_path=intake_path,
+            report_path=report_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxRecordingQueueValidation(
+            queue_path=queue_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Sprint",
+                    passed=False,
+                    summary="The source UX triage sprint must validate before queueing.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not queue_path.exists():
+        return OnboardingVisibleUxRecordingQueueValidation(
+            queue_path=queue_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Recording Queue File",
+                    passed=False,
+                    summary="The onboarding visible UX recording queue file must exist.",
+                    evidence=(f"missing:{queue_path}",),
+                ),
+            ),
+        )
+
+    text = queue_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Recording Queue",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Fix Plan: `{expected.plan_path}`",
+        f"- Sprint: `{expected.sprint_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Blockers: `{expected.blocker_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        "- Manual result: `not completed by automation`",
+        (
+            "- Queue policy: `open each route, then update report and intake "
+            "from the same observation`"
+        ),
+    )
+    command_markers = (
+        expected.validate_intake_command,
+        expected.rebuild_fix_plan_command,
+        expected.validate_fix_plan_command,
+        expected.rebuild_sprint_command,
+        expected.validate_sprint_command,
+        expected.validate_report_command,
+        expected.status_command,
+    )
+    row_markers = tuple(
+        marker
+        for queue_row in expected.rows
+        for row in (queue_row.row,)
+        for marker in (
+            (
+                f"| `{queue_row.phase}` | `{queue_row.priority}` | {row.rank} | "
+                f"`{row.route}` | `{row.window}` | `{row.motion_mode}` | "
+                f"`{row.severity}` |"
+            ),
+            queue_row.open_command,
+            queue_row.report_recorder_command,
+            queue_row.intake_recorder_command,
+        )
+    )
+    if not row_markers:
+        row_markers = ("| `ready-for-manual-evidence` | `none` | 0 |",)
+    checks = (
+        _build_presence_check(
+            area="UX Recording Queue Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The UX recording queue metadata matches the current sprint.",
+        ),
+        _build_presence_check(
+            area="Operator Order",
+            text=text,
+            markers=(
+                "Open the route command first and inspect the real visible output.",
+                "Record report notes only after observing readability, controls, and motion.",
+                (
+                    "Record the UX issue intake row from the same observation before "
+                    "rebuilding plans."
+                ),
+                "Re-run the refresh commands after each completed row or blocker fix.",
+            ),
+            summary="The queue states the manual order before recorder commands.",
+        ),
+        _build_presence_check(
+            area="Refresh Commands",
+            text=text,
+            markers=command_markers,
+            summary="The queue includes current intake, fix plan, sprint, and report commands.",
+        ),
+        _build_presence_check(
+            area="Recording Queue Rows",
+            text=text,
+            markers=row_markers,
+            summary="The queue lists every open UX recording row with recorder commands.",
+        ),
+        _build_presence_check(
+            area="Exit Criteria",
+            text=text,
+            markers=(
+                "Every queued route has real report notes recorded after visible play.",
+                "Every queued intake row is no longer `todo` after the same observation.",
+                "P0/P1 rows are fixed, reopened, and reclassified before UI signoff.",
+                "Intake, fix plan, sprint, queue, and report validators pass after updates.",
+            ),
+            summary="The queue keeps completion gates visible.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This recording queue is not evidence; it only orders the manual work.",
+                "Do not run recorder commands until the corresponding route was opened.",
+                (
+                    "Do not use `pass`, `none`, or lower severity unless the observation "
+                    "supports it."
+                ),
+            ),
+            summary="The queue keeps no-fabrication guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxRecordingQueueValidation(
+        queue_path=queue_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -4570,6 +4954,34 @@ def _onboarding_visible_ux_sprint_step(row: OnboardingVisibleUxFixPlanRow) -> st
     return (
         "Confirm report evidence remains real and keep this row as no-issue unless a "
         "new visible defect appears."
+    )
+
+
+def _build_onboarding_visible_ux_recording_queue_row(
+    row: OnboardingVisibleUxFixPlanRow,
+    *,
+    report_path: Path,
+    intake_path: Path,
+    command_prefix: str,
+) -> OnboardingVisibleUxRecordingQueueRow:
+    severity_hint = row.severity if row.severity in {"P0", "P1", "P2"} else "P1"
+    return OnboardingVisibleUxRecordingQueueRow(
+        row=row,
+        phase=_onboarding_visible_ux_sprint_phase(row),
+        priority=_onboarding_visible_ux_fix_priority(row),
+        open_command=row.command,
+        report_recorder_command=(
+            f"{command_prefix} record-onboarding-visible-playtest-route "
+            f"--report {report_path} --rank {row.rank} --result watch "
+            f'--notes "<replace with observed visible-window notes mentioning '
+            f'{row.ux_areas}>"'
+        ),
+        intake_recorder_command=(
+            f"{command_prefix} record-onboarding-visible-ux-issue "
+            f"--input {intake_path} --rank {row.rank} --severity {severity_hint} "
+            f'--issue-notes "<replace with observed UX issue or no-issue notes '
+            f'mentioning {row.ux_areas}>" --follow-up "owner/date or none"'
+        ),
     )
 
 
