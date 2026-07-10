@@ -331,6 +331,24 @@ jobs:
           --batch-size 3
           --input /tmp/nexus-tech-onboarding-visible-ux-batch-packet.md
 
+      - name: Prepare onboarding visible UX batch closeout
+        run: >
+          uv run nexus-tech onboarding-visible-ux-batch-closeout
+          --command-prefix "uv run nexus-tech"
+          --batch /tmp/nexus-tech-onboarding-visible-ux-batch-packet.md
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --intake /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          --output /tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md
+
+      - name: Validate onboarding visible UX batch closeout
+        run: >
+          uv run nexus-tech validate-onboarding-visible-ux-batch-closeout
+          --command-prefix "uv run nexus-tech"
+          --batch /tmp/nexus-tech-onboarding-visible-ux-batch-packet.md
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --intake /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
+          --input /tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md
+
       - name: Run tests
         run: uv run pytest -q
 
@@ -580,6 +598,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-ux-batch-packet
           path: /tmp/nexus-tech-onboarding-visible-ux-batch-packet.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible UX batch closeout artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-ux-batch-closeout
+          path: /tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md
           if-no-files-found: warn
           retention-days: 7
 

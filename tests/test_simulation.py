@@ -153,6 +153,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_ux_batch_closeout,
     build_onboarding_visible_ux_batch_packet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
@@ -172,6 +173,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_ux_batch_closeout,
     validate_onboarding_visible_ux_batch_packet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
@@ -188,6 +190,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_ux_batch_closeout,
     write_onboarding_visible_ux_batch_packet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
@@ -13590,6 +13593,162 @@ def test_onboarding_visible_ux_batch_packet_scopes_next_manual_rows(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Batch Rows" for check in stale_validation.failed_checks)
+
+    batch_path.write_text(text, encoding="utf-8")
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=2,
+        result="pass",
+        evidence_notes=(
+            "Observed the tutorial in a real terminal window; hire_employee, Turn Summary, "
+            "and Watch For copy were readable and the next action was clear."
+        ),
+    )
+    classification_closeout = build_onboarding_visible_ux_batch_closeout(
+        batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert classification_closeout.rows[0].status == "classification-required"
+    issue_record = record_onboarding_visible_ux_issue(
+        intake_path,
+        rank=2,
+        severity="none",
+        issue_notes=(
+            "Observed the tutorial in a real terminal window; copy, readability, and "
+            "navigation remained clear with no visible UX issue."
+        ),
+        follow_up="none",
+    )
+    assert issue_record.row.result == "pass"
+    assert validate_onboarding_visible_ux_issue_intake(
+        intake_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    ).ok
+
+    closeout_path = tmp_path / "onboarding-visible-ux-batch-closeout.md"
+    closeout = build_onboarding_visible_ux_batch_closeout(
+        batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_ux_batch_closeout(closeout, closeout_path)
+
+    closeout_text = closeout_path.read_text(encoding="utf-8")
+    assert closeout.status == "manual-required"
+    assert closeout.total_rows == 2
+    assert closeout.complete_count == 1
+    assert closeout.manual_count == 1
+    assert "| 1 | 2 | `terminal-tutorial`" in closeout_text
+    assert "`complete`" in closeout_text
+    assert "| 2 | 3 | `automated-clarity-gate`" in closeout_text
+    assert "`manual-required`" in closeout_text
+    assert "This closeout board reads evidence; it does not create evidence." in closeout_text
+
+    closeout_validation = validate_onboarding_visible_ux_batch_closeout(
+        closeout_path,
+        batch_path=batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert closeout_validation.ok
+    assert closeout_validation.status == "pass"
+
+    closeout_path.write_text(
+        closeout_text.replace("- Complete: `1`", "- Complete: `0`"),
+        encoding="utf-8",
+    )
+    stale_closeout_validation = validate_onboarding_visible_ux_batch_closeout(
+        closeout_path,
+        batch_path=batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert not stale_closeout_validation.ok
+    assert any(
+        check.area == "UX Batch Closeout Metadata"
+        for check in stale_closeout_validation.failed_checks
+    )
+
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=3,
+        result="fail",
+        evidence_notes=(
+            "Observed the automated clarity gate in a real terminal; Guided Opening, "
+            "Turn Coach, and Risk Forecast output exposed a blocking readability issue."
+        ),
+    )
+    record_onboarding_visible_ux_issue(
+        intake_path,
+        rank=3,
+        severity="P1",
+        issue_notes=(
+            "Observed the automated clarity gate output; copy and navigation remained "
+            "available but the risk wording materially slowed first-time understanding."
+        ),
+        follow_up="UX owner before next visible pass",
+    )
+    fix_closeout = build_onboarding_visible_ux_batch_closeout(
+        batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert fix_closeout.status == "fix-required"
+    assert fix_closeout.fix_count == 1
+
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=3,
+        result="pass",
+        evidence_notes=(
+            "Rechecked the automated clarity gate in a real terminal; Guided Opening, "
+            "Turn Coach, and Risk Forecast were readable after the wording repair."
+        ),
+    )
+    record_onboarding_visible_ux_issue(
+        intake_path,
+        rank=3,
+        severity="P2",
+        issue_notes=(
+            "Rechecked the automated clarity gate output; navigation was clear and only "
+            "minor copy polish remained after the readability repair."
+        ),
+        follow_up="Copy owner next polish pass",
+    )
+    polish_closeout = build_onboarding_visible_ux_batch_closeout(
+        batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert polish_closeout.status == "polish-required"
+    assert polish_closeout.polish_count == 1
+
+    record_onboarding_visible_ux_issue(
+        intake_path,
+        rank=3,
+        severity="none",
+        issue_notes=(
+            "Final recheck of the automated clarity gate found readable copy, clear "
+            "navigation, and no remaining visible UX issue."
+        ),
+        follow_up="none",
+    )
+    complete_closeout = build_onboarding_visible_ux_batch_closeout(
+        batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    assert complete_closeout.status == "complete"
+    assert complete_closeout.complete_count == 2
 
 
 def test_onboarding_visible_playtest_report_rejects_placeholder_recording(

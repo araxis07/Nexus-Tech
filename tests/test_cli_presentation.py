@@ -284,6 +284,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-ux-progress",
         "onboarding-visible-ux-batch-packet",
         "validate-onboarding-visible-ux-batch-packet",
+        "onboarding-visible-ux-batch-closeout",
+        "validate-onboarding-visible-ux-batch-closeout",
         "onboarding-visible-window-preflight",
         "validate-content",
         "list-saves",
@@ -1003,6 +1005,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     recording_queue_path = tmp_path / "onboarding-visible-ux-recording-queue.md"
     progress_path = tmp_path / "onboarding-visible-ux-progress.md"
     ux_batch_path = tmp_path / "onboarding-visible-ux-batch-packet.md"
+    ux_batch_closeout_path = tmp_path / "onboarding-visible-ux-batch-closeout.md"
     packet_result = runner.invoke(
         app,
         [
@@ -1677,6 +1680,54 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert "Onboarding Visible UX Batch Packet Validation" in ux_batch_validation_result.output
     assert "PASS" in ux_batch_validation_result.output
 
+    ux_batch_closeout_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-ux-batch-closeout",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--batch",
+            str(ux_batch_path),
+            "--report",
+            str(report_path),
+            "--intake",
+            str(intake_path),
+            "--output",
+            str(ux_batch_closeout_path),
+        ],
+    )
+    assert ux_batch_closeout_result.exit_code == 0
+    assert "Onboarding Visible UX Batch Closeout" in ux_batch_closeout_result.output
+    assert "UX batch closeout written" in ux_batch_closeout_result.output
+    ux_batch_closeout_text = ux_batch_closeout_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible UX Batch Closeout" in ux_batch_closeout_text
+    assert "Refresh Sequence" in ux_batch_closeout_text
+    assert "This closeout board reads evidence; it does not create evidence." in (
+        ux_batch_closeout_text
+    )
+
+    ux_batch_closeout_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-ux-batch-closeout",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--batch",
+            str(ux_batch_path),
+            "--report",
+            str(report_path),
+            "--intake",
+            str(intake_path),
+            "--input",
+            str(ux_batch_closeout_path),
+        ],
+    )
+    assert ux_batch_closeout_validation_result.exit_code == 0
+    assert "Onboarding Visible UX Batch Closeout Validation" in (
+        ux_batch_closeout_validation_result.output
+    )
+    assert "PASS" in ux_batch_closeout_validation_result.output
+
 
 def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     tmp_path: Path,
@@ -1756,6 +1807,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-ux-progress" in workflow
     assert "uv run nexus-tech onboarding-visible-ux-batch-packet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-ux-batch-packet" in workflow
+    assert "uv run nexus-tech onboarding-visible-ux-batch-closeout" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-ux-batch-closeout" in workflow
     assert "--window 820x620" in workflow
     assert "--window 1280x720" in workflow
     assert "--window 1440x900" in workflow
@@ -1778,6 +1831,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-ux-recording-queue.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-progress.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md" in workflow
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
@@ -1796,6 +1850,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-ux-recording-queue" in workflow
     assert "nexus-tech-onboarding-visible-ux-progress" in workflow
     assert "nexus-tech-onboarding-visible-ux-batch-packet" in workflow
+    assert "nexus-tech-onboarding-visible-ux-batch-closeout" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

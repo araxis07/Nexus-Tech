@@ -29,6 +29,7 @@ ONBOARDING_VISIBLE_UX_TRIAGE_NEXT_NAME = "onboarding-visible-ux-triage-next.md"
 ONBOARDING_VISIBLE_UX_RECORDING_QUEUE_NAME = "onboarding-visible-ux-recording-queue.md"
 ONBOARDING_VISIBLE_UX_PROGRESS_NAME = "onboarding-visible-ux-progress.md"
 ONBOARDING_VISIBLE_UX_BATCH_PACKET_NAME = "onboarding-visible-ux-batch-packet.md"
+ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_NAME = "onboarding-visible-ux-batch-closeout.md"
 DEFAULT_ONBOARDING_VISIBLE_WINDOWS: tuple[tuple[int, int], ...] = (
     (820, 620),
     (1280, 720),
@@ -844,6 +845,103 @@ class OnboardingVisibleUxBatchPacketValidation:
         """Return batch packet checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxBatchCloseoutRow:
+    """Current evidence and issue state for one focused UX batch row."""
+
+    order: int
+    rank: int
+    route: str
+    window: str
+    motion_mode: str
+    report_result: str
+    severity: str
+    status: str
+    next_action: str
+    open_command: str
+    report_recorder_command: str
+    intake_recorder_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxBatchCloseout:
+    """Evidence-derived closeout status for one focused onboarding UX batch."""
+
+    batch_path: Path
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    sprint_path: Path
+    queue_path: Path
+    status: str
+    rows: tuple[OnboardingVisibleUxBatchCloseoutRow, ...]
+    complete_count: int
+    manual_count: int
+    fix_count: int
+    polish_count: int
+    validate_report_command: str
+    validate_intake_command: str
+    rebuild_fix_plan_command: str
+    validate_fix_plan_command: str
+    rebuild_sprint_command: str
+    validate_sprint_command: str
+    rebuild_queue_command: str
+    validate_queue_command: str
+    rebuild_progress_command: str
+    next_batch_command: str
+
+    @property
+    def total_rows(self) -> int:
+        """Return the number of rows captured by the source batch snapshot."""
+
+        return len(self.rows)
+
+
+@dataclass(frozen=True)
+class OnboardingVisibleUxBatchCloseoutValidation:
+    """Validation report for a focused onboarding UX batch closeout artifact."""
+
+    closeout_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when closeout matches the current report and intake."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return closeout checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class _OnboardingVisibleUxBatchSnapshotRow:
+    """Immutable row identity parsed from a previously generated batch packet."""
+
+    order: int
+    rank: int
+    route: str
+    window: str
+    motion_mode: str
+    open_command: str
+
+
+@dataclass(frozen=True)
+class _OnboardingVisibleUxBatchSnapshot:
+    """Paths and row identities retained by a focused UX batch packet."""
+
+    report_path: Path
+    intake_path: Path
+    plan_path: Path
+    sprint_path: Path
+    queue_path: Path
+    rows: tuple[_OnboardingVisibleUxBatchSnapshotRow, ...]
 
 
 def run_onboarding_flow_audit(
@@ -3513,6 +3611,11 @@ def record_onboarding_visible_ux_issue(
         raise ValueError(f"Onboarding visible UX issue intake not found: {intake_path}")
 
     lines = intake_path.read_text(encoding="utf-8").splitlines()
+    report_path = Path(_extract_backtick_metadata("\n".join(lines), "Report"))
+    lines = _synchronize_onboarding_visible_ux_intake_rows(
+        lines,
+        report_path=report_path,
+    )
     parsed_rows = tuple(
         (index, row)
         for index, line in enumerate(lines)
@@ -5456,6 +5559,440 @@ def validate_onboarding_visible_ux_batch_packet(
     )
 
 
+def build_onboarding_visible_ux_batch_closeout(
+    batch_path: Path,
+    *,
+    report_path: Path,
+    intake_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxBatchCloseout:
+    """Build an evidence-derived closeout board for one focused UX batch."""
+
+    snapshot = _read_onboarding_visible_ux_batch_snapshot(batch_path)
+    if snapshot.report_path != report_path:
+        raise ValueError(
+            f"Batch report path {snapshot.report_path} does not match requested {report_path}."
+        )
+    if snapshot.intake_path != intake_path:
+        raise ValueError(
+            f"Batch intake path {snapshot.intake_path} does not match requested {intake_path}."
+        )
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    if not intake_path.exists():
+        raise ValueError(f"Onboarding visible UX issue intake not found: {intake_path}")
+    intake_text = intake_path.read_text(encoding="utf-8")
+    intake_report_path = Path(_extract_backtick_metadata(intake_text, "Report"))
+    if intake_report_path != report_path:
+        raise ValueError(
+            f"Intake report path {intake_report_path} does not match requested {report_path}."
+        )
+    parsed_intake_rows = tuple(
+        row
+        for line in intake_text.splitlines()
+        if (row := _parse_onboarding_visible_ux_issue_row(line)) is not None
+    )
+    if not parsed_intake_rows:
+        raise ValueError("Onboarding visible UX issue intake has no issue rows.")
+    report_rows = {row.rank: row for row in report.rows}
+    intake_rows = {row.rank: row for row in parsed_intake_rows}
+    rows: list[OnboardingVisibleUxBatchCloseoutRow] = []
+    for snapshot_row in snapshot.rows:
+        report_row = report_rows.get(snapshot_row.rank)
+        intake_row = intake_rows.get(snapshot_row.rank)
+        if report_row is None or intake_row is None:
+            raise ValueError(
+                f"Batch rank {snapshot_row.rank} is missing from the current report or intake."
+            )
+        identity = (snapshot_row.route, snapshot_row.window, snapshot_row.motion_mode)
+        if identity != (report_row.route, report_row.window, report_row.motion_mode):
+            raise ValueError(f"Batch rank {snapshot_row.rank} no longer matches the report row.")
+        if identity != (intake_row.route, intake_row.window, intake_row.motion_mode):
+            raise ValueError(f"Batch rank {snapshot_row.rank} no longer matches the intake row.")
+        if snapshot_row.open_command != report_row.command:
+            raise ValueError(
+                f"Batch rank {snapshot_row.rank} open command no longer matches report."
+            )
+
+        report_recorded = report_row.result in {"pass", "watch", "fail"} and (
+            _has_real_observation_notes(report_row.evidence_notes)
+        )
+        intake_recorded = (
+            intake_row.severity != "todo"
+            and _has_real_observation_notes(intake_row.issue_notes)
+            and _is_clear_follow_up(intake_row.follow_up)
+        )
+        if not report_recorded:
+            row_status = "manual-required"
+            next_action = "Open the route and record concrete visible report evidence."
+        elif not intake_recorded:
+            row_status = "classification-required"
+            next_action = "Classify UX severity from the same observation and record follow-up."
+        elif intake_row.severity in {"P0", "P1"}:
+            row_status = "fix-required"
+            next_action = "Fix the blocker, reopen the route, then record pass and no issue."
+        elif intake_row.severity == "P2":
+            row_status = "polish-required"
+            next_action = (
+                "Resolve the polish issue, reopen the route, then record pass and no issue."
+            )
+        elif report_row.result != "pass":
+            row_status = "classification-required"
+            next_action = "Align watch/fail report evidence with a concrete UX severity."
+        else:
+            row_status = "complete"
+            next_action = "Keep this row closed unless a new visible regression appears."
+
+        queue_row = _build_onboarding_visible_ux_recording_queue_row(
+            intake_row,
+            report_path=report_path,
+            intake_path=intake_path,
+            command_prefix=command_prefix,
+        )
+        rows.append(
+            OnboardingVisibleUxBatchCloseoutRow(
+                order=snapshot_row.order,
+                rank=snapshot_row.rank,
+                route=snapshot_row.route,
+                window=snapshot_row.window,
+                motion_mode=snapshot_row.motion_mode,
+                report_result=report_row.result,
+                severity=intake_row.severity,
+                status=row_status,
+                next_action=next_action,
+                open_command=snapshot_row.open_command,
+                report_recorder_command=queue_row.report_recorder_command,
+                intake_recorder_command=queue_row.intake_recorder_command,
+            )
+        )
+
+    row_tuple = tuple(rows)
+    complete_count = sum(row.status == "complete" for row in row_tuple)
+    manual_count = sum(
+        row.status in {"manual-required", "classification-required"} for row in row_tuple
+    )
+    fix_count = sum(row.status == "fix-required" for row in row_tuple)
+    polish_count = sum(row.status == "polish-required" for row in row_tuple)
+    if fix_count:
+        status = "fix-required"
+    elif manual_count:
+        status = "manual-required"
+    elif polish_count:
+        status = "polish-required"
+    else:
+        status = "complete"
+
+    progress_path = f"/tmp/nexus-tech-{ONBOARDING_VISIBLE_UX_PROGRESS_NAME}"
+    next_batch_path = "/tmp/nexus-tech-onboarding-visible-ux-next-batch-packet.md"
+    return OnboardingVisibleUxBatchCloseout(
+        batch_path=batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        plan_path=snapshot.plan_path,
+        sprint_path=snapshot.sprint_path,
+        queue_path=snapshot.queue_path,
+        status=status,
+        rows=row_tuple,
+        complete_count=complete_count,
+        manual_count=manual_count,
+        fix_count=fix_count,
+        polish_count=polish_count,
+        validate_report_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        validate_intake_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-issue-intake "
+            f"--report {report_path} --input {intake_path}"
+        ),
+        rebuild_fix_plan_command=(
+            f"{command_prefix} onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --input {intake_path} --output {snapshot.plan_path}"
+        ),
+        validate_fix_plan_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-fix-plan "
+            f"--report {report_path} --intake {intake_path} --input {snapshot.plan_path}"
+        ),
+        rebuild_sprint_command=(
+            f"{command_prefix} onboarding-visible-ux-triage-sprint "
+            f"--report {report_path} --intake {intake_path} "
+            f"--plan {snapshot.plan_path} --output {snapshot.sprint_path}"
+        ),
+        validate_sprint_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-triage-sprint "
+            f"--report {report_path} --intake {intake_path} "
+            f"--plan {snapshot.plan_path} --input {snapshot.sprint_path}"
+        ),
+        rebuild_queue_command=(
+            f"{command_prefix} onboarding-visible-ux-recording-queue "
+            f"--report {report_path} --intake {intake_path} --plan {snapshot.plan_path} "
+            f"--sprint {snapshot.sprint_path} --output {snapshot.queue_path}"
+        ),
+        validate_queue_command=(
+            f"{command_prefix} validate-onboarding-visible-ux-recording-queue "
+            f"--report {report_path} --intake {intake_path} --plan {snapshot.plan_path} "
+            f"--sprint {snapshot.sprint_path} --input {snapshot.queue_path}"
+        ),
+        rebuild_progress_command=(
+            f"{command_prefix} onboarding-visible-ux-progress "
+            f"--report {report_path} --intake {intake_path} --plan {snapshot.plan_path} "
+            f"--sprint {snapshot.sprint_path} --queue {snapshot.queue_path} "
+            f"--output {progress_path}"
+        ),
+        next_batch_command=(
+            f"{command_prefix} onboarding-visible-ux-batch-packet "
+            f"--report {report_path} --intake {intake_path} --plan {snapshot.plan_path} "
+            f"--sprint {snapshot.sprint_path} --queue {snapshot.queue_path} "
+            f"--output {next_batch_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_ux_batch_closeout(
+    closeout: OnboardingVisibleUxBatchCloseout,
+    output_path: Path,
+) -> None:
+    """Write current closeout state without converting automation into evidence."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible UX Batch Closeout",
+        "",
+        f"- Batch: `{closeout.batch_path}`",
+        f"- Report: `{closeout.report_path}`",
+        f"- Intake: `{closeout.intake_path}`",
+        f"- Fix Plan: `{closeout.plan_path}`",
+        f"- Sprint: `{closeout.sprint_path}`",
+        f"- Queue: `{closeout.queue_path}`",
+        f"- Status: `{closeout.status}`",
+        f"- Rows: `{closeout.total_rows}`",
+        f"- Complete: `{closeout.complete_count}`",
+        f"- Manual: `{closeout.manual_count}`",
+        f"- Fix: `{closeout.fix_count}`",
+        f"- Polish: `{closeout.polish_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `closeout status is derived from current report and intake rows`",
+        "",
+        "## Batch State",
+        "",
+        ("| Order | Rank | Route | Window | Motion | Report | Severity | Status | Next Action |"),
+        "| ---: | ---: | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in closeout.rows:
+        lines.append(
+            "| "
+            f"{row.order} | {row.rank} | `{row.route}` | `{row.window}` | "
+            f"`{row.motion_mode}` | `{row.report_result}` | `{row.severity}` | "
+            f"`{row.status}` | {_markdown_escape(row.next_action)} |"
+        )
+    lines.extend(["", "## Open Row Commands", ""])
+    incomplete_rows = tuple(row for row in closeout.rows if row.status != "complete")
+    if not incomplete_rows:
+        lines.extend(["- No open rows remain in this batch.", ""])
+    for row in incomplete_rows:
+        lines.extend(
+            [
+                f"### Row {row.order}: rank {row.rank} `{row.route}`",
+                "",
+                f"- Current status: `{row.status}`",
+                f"- Next action: {row.next_action}",
+                "",
+                "```bash",
+                row.open_command,
+                row.report_recorder_command,
+                row.intake_recorder_command,
+                "```",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Refresh Sequence",
+            "",
+            "```bash",
+            closeout.validate_report_command,
+            closeout.validate_intake_command,
+            closeout.rebuild_fix_plan_command,
+            closeout.validate_fix_plan_command,
+            closeout.rebuild_sprint_command,
+            closeout.validate_sprint_command,
+            closeout.rebuild_queue_command,
+            closeout.validate_queue_command,
+            closeout.rebuild_progress_command,
+            closeout.next_batch_command,
+            "```",
+            "",
+            "## Exit Criteria",
+            "",
+            "- Every batch row has concrete visible report notes and a non-todo result.",
+            "- Every batch row has concrete UX issue notes, severity, and follow-up.",
+            "- P0/P1 rows are fixed and visibly rechecked before they can close.",
+            "- P2 rows remain open until resolved or explicitly rechecked as no issue.",
+            "- A row closes only with report `pass` and intake severity `none`.",
+            "- Queue and progress artifacts are rebuilt before generating the next batch.",
+            "",
+            "## No-Fabrication Guardrail",
+            "",
+            "- This closeout board reads evidence; it does not create evidence.",
+            "- Do not run recorder commands until the matching route was observed.",
+            "- Keep the source batch packet unchanged as the historical batch snapshot.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_ux_batch_closeout(
+    closeout_path: Path,
+    *,
+    batch_path: Path,
+    report_path: Path,
+    intake_path: Path,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisibleUxBatchCloseoutValidation:
+    """Validate a focused UX batch closeout against current evidence sources."""
+
+    try:
+        expected = build_onboarding_visible_ux_batch_closeout(
+            batch_path,
+            report_path=report_path,
+            intake_path=intake_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisibleUxBatchCloseoutValidation(
+            closeout_path=closeout_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Closeout Sources",
+                    passed=False,
+                    summary="The source batch, report, and intake must be readable and aligned.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not closeout_path.exists():
+        return OnboardingVisibleUxBatchCloseoutValidation(
+            closeout_path=closeout_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="UX Batch Closeout File",
+                    passed=False,
+                    summary="The onboarding visible UX batch closeout file must exist.",
+                    evidence=(f"missing:{closeout_path}",),
+                ),
+            ),
+        )
+
+    text = closeout_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible UX Batch Closeout",
+        f"- Batch: `{expected.batch_path}`",
+        f"- Report: `{expected.report_path}`",
+        f"- Intake: `{expected.intake_path}`",
+        f"- Fix Plan: `{expected.plan_path}`",
+        f"- Sprint: `{expected.sprint_path}`",
+        f"- Queue: `{expected.queue_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Complete: `{expected.complete_count}`",
+        f"- Manual: `{expected.manual_count}`",
+        f"- Fix: `{expected.fix_count}`",
+        f"- Polish: `{expected.polish_count}`",
+        "- Manual result: `not completed by automation`",
+        "- Evidence policy: `closeout status is derived from current report and intake rows`",
+    )
+    row_markers = tuple(
+        marker
+        for row in expected.rows
+        for marker in (
+            (
+                f"| {row.order} | {row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.report_result}` | `{row.severity}` | "
+                f"`{row.status}` |"
+            ),
+            row.next_action,
+        )
+    )
+    open_row_markers = tuple(
+        marker
+        for row in expected.rows
+        if row.status != "complete"
+        for marker in (
+            f"### Row {row.order}: rank {row.rank} `{row.route}`",
+            row.open_command,
+            row.report_recorder_command,
+            row.intake_recorder_command,
+        )
+    )
+    if not open_row_markers:
+        open_row_markers = ("No open rows remain in this batch.",)
+    command_markers = (
+        expected.validate_report_command,
+        expected.validate_intake_command,
+        expected.rebuild_fix_plan_command,
+        expected.validate_fix_plan_command,
+        expected.rebuild_sprint_command,
+        expected.validate_sprint_command,
+        expected.rebuild_queue_command,
+        expected.validate_queue_command,
+        expected.rebuild_progress_command,
+        expected.next_batch_command,
+    )
+    checks = (
+        _build_presence_check(
+            area="UX Batch Closeout Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The closeout metadata matches the source batch and current evidence.",
+        ),
+        _build_presence_check(
+            area="Batch Row State",
+            text=text,
+            markers=row_markers,
+            summary="Every source batch row exposes its current evidence-derived state.",
+        ),
+        _build_presence_check(
+            area="Open Row Commands",
+            text=text,
+            markers=open_row_markers,
+            summary="Every open row retains the visible and recorder command sequence.",
+        ),
+        _build_presence_check(
+            area="Refresh Sequence",
+            text=text,
+            markers=command_markers,
+            summary="The closeout includes current rebuild, validation, and next-batch commands.",
+        ),
+        _build_presence_check(
+            area="Exit Criteria",
+            text=text,
+            markers=(
+                "P0/P1 rows are fixed and visibly rechecked before they can close.",
+                "P2 rows remain open until resolved or explicitly rechecked as no issue.",
+                "A row closes only with report `pass` and intake severity `none`.",
+                "Queue and progress artifacts are rebuilt before generating the next batch.",
+            ),
+            summary="The closeout preserves strict UX closure criteria.",
+        ),
+        _build_presence_check(
+            area="No-Fabrication Guardrail",
+            text=text,
+            markers=(
+                "This closeout board reads evidence; it does not create evidence.",
+                "Do not run recorder commands until the matching route was observed.",
+                "Keep the source batch packet unchanged as the historical batch snapshot.",
+            ),
+            summary="The closeout keeps manual evidence guardrails visible.",
+        ),
+    )
+    return OnboardingVisibleUxBatchCloseoutValidation(
+        closeout_path=closeout_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
 def read_onboarding_visible_playtest_evidence_report(
     report_path: Path,
 ) -> OnboardingVisiblePlaytestEvidenceReport:
@@ -5470,6 +6007,59 @@ def read_onboarding_visible_playtest_evidence_report(
     return OnboardingVisiblePlaytestEvidenceReport(
         packet_path=packet_path,
         rows=rows,
+    )
+
+
+def _read_onboarding_visible_ux_batch_snapshot(
+    batch_path: Path,
+) -> _OnboardingVisibleUxBatchSnapshot:
+    """Read stable row identities from a focused batch, even after source rows advance."""
+
+    if not batch_path.exists():
+        raise ValueError(f"Onboarding visible UX batch packet not found: {batch_path}")
+    text = batch_path.read_text(encoding="utf-8")
+    if "# NEXUS TECH Onboarding Visible UX Batch Packet" not in text:
+        raise ValueError("Onboarding visible UX batch packet header is missing.")
+    try:
+        batch_row_count = int(_extract_backtick_metadata(text, "Batch Rows"))
+    except ValueError as error:
+        raise ValueError("Onboarding visible UX batch row count is invalid.") from error
+
+    rows: list[_OnboardingVisibleUxBatchSnapshotRow] = []
+    for line in text.splitlines():
+        if not line.startswith("| "):
+            continue
+        cells = _split_markdown_table_cells(line)
+        if len(cells) != 9 or not cells[0].isdigit() or not cells[3].isdigit():
+            continue
+        order = int(cells[0])
+        if order < 1:
+            continue
+        rows.append(
+            _OnboardingVisibleUxBatchSnapshotRow(
+                order=order,
+                rank=int(cells[3]),
+                route=_strip_backticks(cells[4]),
+                window=_strip_backticks(cells[5]),
+                motion_mode=_strip_backticks(cells[6]),
+                open_command=_strip_backticks(cells[8]).replace("\\|", "|").strip(),
+            )
+        )
+    if len(rows) != batch_row_count:
+        raise ValueError(
+            f"Onboarding visible UX batch expected {batch_row_count} rows but parsed {len(rows)}."
+        )
+    if tuple(row.order for row in rows) != tuple(range(1, len(rows) + 1)):
+        raise ValueError("Onboarding visible UX batch row order must be contiguous.")
+    if len({row.rank for row in rows}) != len(rows):
+        raise ValueError("Onboarding visible UX batch contains duplicate ranks.")
+    return _OnboardingVisibleUxBatchSnapshot(
+        report_path=Path(_extract_backtick_metadata(text, "Report")),
+        intake_path=Path(_extract_backtick_metadata(text, "Intake")),
+        plan_path=Path(_extract_backtick_metadata(text, "Fix Plan")),
+        sprint_path=Path(_extract_backtick_metadata(text, "Sprint")),
+        queue_path=Path(_extract_backtick_metadata(text, "Queue")),
+        rows=tuple(rows),
     )
 
 
@@ -5646,6 +6236,66 @@ def _onboarding_visible_ux_issue_areas(row: OnboardingVisiblePlaytestReportRow) 
     if row.window == "terminal":
         return "copy/readability/navigation"
     return "text containment/button spacing/pause-back-menu/motion readability"
+
+
+def _synchronize_onboarding_visible_ux_intake_rows(
+    lines: list[str],
+    *,
+    report_path: Path,
+) -> list[str]:
+    """Refresh report-derived intake fields without losing recorded UX classifications."""
+
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    expected = build_onboarding_visible_ux_issue_intake(report_path)
+    report_rows = {row.rank: row for row in report.rows}
+    synchronized = list(lines)
+    metadata_updates = {
+        "Status": expected.status,
+        "Rows": str(expected.total_rows),
+        "Incomplete": str(expected.incomplete_count),
+        "Groups": str(len(expected.groups)),
+    }
+    for index, line in enumerate(synchronized):
+        for label, value in metadata_updates.items():
+            if line.startswith(f"- {label}: `"):
+                synchronized[index] = f"- {label}: `{value}`"
+                break
+        intake_row = _parse_onboarding_visible_ux_issue_row(line)
+        if intake_row is None:
+            continue
+        report_row = report_rows.get(intake_row.rank)
+        if report_row is None:
+            raise ValueError(
+                f"UX issue intake rank {intake_row.rank} is missing from source report."
+            )
+        if (
+            intake_row.route,
+            intake_row.window,
+            intake_row.motion_mode,
+        ) != (
+            report_row.route,
+            report_row.window,
+            report_row.motion_mode,
+        ):
+            raise ValueError(
+                f"UX issue intake rank {intake_row.rank} does not match source report identity."
+            )
+        synchronized[index] = _format_onboarding_visible_ux_issue_row(
+            OnboardingVisibleUxFixPlanRow(
+                group=_onboarding_visible_group_name(report_row),
+                rank=report_row.rank,
+                route=report_row.route,
+                window=report_row.window,
+                motion_mode=report_row.motion_mode,
+                result=report_row.result,
+                command=report_row.command,
+                ux_areas=_onboarding_visible_ux_issue_areas(report_row),
+                severity=intake_row.severity,
+                issue_notes=intake_row.issue_notes,
+                follow_up=intake_row.follow_up,
+            )
+        )
+    return synchronized
 
 
 def _parse_onboarding_visible_ux_issue_row(

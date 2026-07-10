@@ -237,6 +237,7 @@ from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_playtest_packet,
     build_onboarding_visible_terminal_batch,
     build_onboarding_visible_terminal_evidence_sheet,
+    build_onboarding_visible_ux_batch_closeout,
     build_onboarding_visible_ux_batch_packet,
     build_onboarding_visible_ux_fix_plan,
     build_onboarding_visible_ux_issue_intake,
@@ -256,6 +257,7 @@ from nexus_tech.simulation.onboarding_flow import (
     validate_onboarding_visible_playtest_packet,
     validate_onboarding_visible_terminal_batch,
     validate_onboarding_visible_terminal_evidence_sheet,
+    validate_onboarding_visible_ux_batch_closeout,
     validate_onboarding_visible_ux_batch_packet,
     validate_onboarding_visible_ux_fix_plan,
     validate_onboarding_visible_ux_issue_intake,
@@ -272,6 +274,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_visible_playtest_packet,
     write_onboarding_visible_terminal_batch,
     write_onboarding_visible_terminal_evidence_sheet,
+    write_onboarding_visible_ux_batch_closeout,
     write_onboarding_visible_ux_batch_packet,
     write_onboarding_visible_ux_fix_plan,
     write_onboarding_visible_ux_issue_intake,
@@ -571,6 +574,21 @@ ONBOARDING_VISIBLE_UX_BATCH_PACKET_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md"),
     "--input",
     help="Markdown path for the onboarding visible UX focused batch packet to validate.",
+)
+ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md"),
+    "--output",
+    help="Markdown path for the onboarding visible UX focused batch closeout.",
+)
+ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md"),
+    "--input",
+    help="Markdown path for the onboarding visible UX focused batch closeout to validate.",
+)
+ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_BATCH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md"),
+    "--batch",
+    help="Markdown path for the historical onboarding visible UX focused batch packet.",
 )
 ONBOARDING_VISIBLE_UX_BATCH_SIZE_OPTION = typer.Option(
     3,
@@ -7773,6 +7791,102 @@ def validate_onboarding_visible_ux_batch_packet_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible UX Batch Packet Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-ux-batch-closeout")
+def onboarding_visible_ux_batch_closeout_command(
+    batch_path: Path = ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_BATCH_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    output: Path = ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_OUTPUT_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write current evidence-derived status for one onboarding UX batch."""
+
+    try:
+        closeout = build_onboarding_visible_ux_batch_closeout(
+            batch_path,
+            report_path=report_path,
+            intake_path=intake_path,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible UX Batch Closeout Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_ux_batch_closeout(closeout, output)
+
+    table = Table(title=f"Onboarding Visible UX Batch Closeout | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Complete", justify="right")
+    table.add_column("Manual", justify="right")
+    table.add_column("Fix", justify="right")
+    table.add_column("Polish", justify="right")
+    table.add_row(
+        closeout.status.upper(),
+        str(closeout.total_rows),
+        str(closeout.complete_count),
+        str(closeout.manual_count),
+        str(closeout.fix_count),
+        str(closeout.polish_count),
+    )
+    console.print(table)
+    console.print(f"UX batch closeout written to {output}")
+
+
+@app.command("validate-onboarding-visible-ux-batch-closeout")
+def validate_onboarding_visible_ux_batch_closeout_command(
+    closeout_path: Path = ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_INPUT_OPTION,
+    batch_path: Path = ONBOARDING_VISIBLE_UX_BATCH_CLOSEOUT_BATCH_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    intake_path: Path = ONBOARDING_VISIBLE_UX_FIX_PLAN_INTAKE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate a focused onboarding visible UX batch closeout."""
+
+    validation = validate_onboarding_visible_ux_batch_closeout(
+        closeout_path,
+        batch_path=batch_path,
+        report_path=report_path,
+        intake_path=intake_path,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible UX Batch Closeout Validation | {closeout_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible UX batch closeout validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible UX Batch Closeout Validation",
             border_style=border_style,
         )
     )

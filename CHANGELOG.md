@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.275.0 - 2026-07-11
+
+- Added `onboarding-visible-ux-batch-closeout` and its validator to classify focused batch rows as manual, fix, polish, or complete from current report/intake evidence
+- Fixed `record-onboarding-visible-ux-issue` so report-derived result rows and intake metadata stay synchronized after the required report-first recording order
+- Wired the batch closeout into docs, regression coverage, CI validation, and artifact upload without treating automation as manual evidence
+
 ## 0.274.0 - 2026-07-10
 
 - Added `onboarding-visible-ux-batch-packet` to scope the next short real-window UX pass from the current recording queue
