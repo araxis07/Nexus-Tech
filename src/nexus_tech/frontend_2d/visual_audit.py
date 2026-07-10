@@ -94,6 +94,7 @@ _CRITICAL_TARGET_OVERLAP_GROUPS = (
             "inspector_cycle_filter",
             "inspector_focus_actionable",
             "inspector_focus_hotspot",
+            "inspector_section",
             "inspector_prev_page",
             "inspector_next_page",
         }
@@ -840,6 +841,37 @@ def run_2d_visual_audit(
                     )
                 )
 
+                help_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 14),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                help_scene._set_help_overlay_visible(True)
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        help_scene,
+                        scene_key="run_help",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "help",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
                 endgame_scene = RunScene(
                     pygame=pygame,
                     fonts=fonts,
@@ -1363,6 +1395,8 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("outcome")
     if getattr(scene, "_inspector_panel_key", None) is not None:
         layers.append("inspector")
+    if getattr(scene, "_help_overlay_visible", False):
+        layers.append("help")
     if getattr(scene, "_action_feedback_cues", ()):
         layers.append("action-feedback")
         if any(cue.targets for cue in scene._action_feedback_cues):

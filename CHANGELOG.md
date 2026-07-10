@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.277.0 - 2026-07-11
+
+- Rebalanced compact title and deep-panel grids by centering unpaired final actions instead of leaving an empty half-row
+- Moved tall overlays below the persistent navigation rail, separated metric cards from section headings, and moved transient feedback into a dedicated top lane
+- Fixed the compact inspector section/Close collision, expanded Help copy and keycaps, and added Help to the automated visual audit matrix
+
 ## 0.276.0 - 2026-07-11
 
 - Fixed terminal onboarding copy so narrow consoles wrap complete guidance instead of clipping sentence endings

@@ -277,6 +277,30 @@ def _fit_modal_rect(pygame, surface, *, width: int, height: int, margin: int = 2
     )
 
 
+def _fit_nav_safe_modal_rect(
+    pygame,
+    surface,
+    *,
+    width: int,
+    height: int,
+    margin: int = 24,
+    nav_bottom: int = 60,
+):
+    """Fit a tall modal inside the workspace below the persistent navigation rail."""
+
+    window_width, window_height = surface.get_size()
+    safe_width = min(width, max(320, window_width - margin * 2))
+    usable_height = max(240, window_height - margin - nav_bottom)
+    safe_height = min(height, usable_height)
+    top = nav_bottom + max(0, (usable_height - safe_height) // 2)
+    return pygame.Rect(
+        window_width // 2 - safe_width // 2,
+        top,
+        safe_width,
+        safe_height,
+    )
+
+
 _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
     ActionButtonSpec("C", "Coach", "Run the top mission-board command.", INFO, "coach", ""),
     ActionButtonSpec(
@@ -2195,7 +2219,7 @@ class TitleScene(BaseScene):
             self.fonts.body,
             subtitle,
             MUTED,
-            pygame.Rect(inner.left, inner.top, copy_width, 24),
+            pygame.Rect(inner.left, inner.top, copy_width, 36),
             line_height=18,
             max_lines=2,
         )
@@ -2269,8 +2293,11 @@ class TitleScene(BaseScene):
         for index, (title, detail, payload, accent) in enumerate(buttons):
             row = index // cols
             col = index % cols
+            button_left = inner.left + col * (button_width + gap)
+            if use_grid and index == len(buttons) - 1 and len(buttons) % cols:
+                button_left = inner.centerx - button_width // 2
             button_rect = pygame.Rect(
-                inner.left + col * (button_width + gap),
+                button_left,
                 inner.top + row * (button_height + gap),
                 button_width,
                 button_height,
@@ -6170,9 +6197,28 @@ class RunScene(BaseScene):
         gap = 8
         left = max(20, width - card_width - 24)
         top = 112 if height < 680 else 146
+        tall_overlay_top_lane = (
+            (
+                self._deep_panel_key is not None
+                or self._inspector_panel_key is not None
+                or self._help_overlay_visible
+            )
+            and self._text_input is None
+            and self._context_picker is None
+        )
+        max_visible = 3
+        if tall_overlay_top_lane:
+            # The left side of this lane belongs to Pause/Back/Help, while the far
+            # right may hold the transition badge. Keep one cue between both.
+            lane_left = 360
+            lane_right = width - (116 if self.scene_transition_active() else 24) - 26
+            card_width = min(330, max(140, lane_right - lane_left))
+            left = max(lane_left, lane_right - card_width)
+            top = 12
+            max_visible = 1
         if self._text_input is not None or self._context_picker is not None:
             top = 24
-        for index, cue in enumerate(self._action_feedback_cues[:3]):
+        for index, cue in enumerate(self._action_feedback_cues[:max_visible]):
             if cue.duration <= 0:
                 continue
             age = max(0.0, cue.duration - cue.time_left)
@@ -6190,6 +6236,17 @@ class RunScene(BaseScene):
                 card_width,
                 card_height,
             )
+            if tall_overlay_top_lane:
+                self._record_layout_separation(
+                    "action-feedback-vs-nav",
+                    rect,
+                    pygame.Rect(0, 0, 360, 54),
+                )
+                self._record_layout_separation(
+                    "action-feedback-vs-overlay",
+                    rect,
+                    pygame.Rect(0, 60, width, max(0, height - 60)),
+                )
             layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             layer_rect = layer.get_rect()
             fill = blend_color(
@@ -8871,7 +8928,13 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("panel"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=940, height=560, margin=24)
+        modal_rect = _fit_nav_safe_modal_rect(
+            pygame,
+            surface,
+            width=940,
+            height=560,
+            margin=24,
+        )
         modal_rect = self._animated_overlay_rect(modal_rect, "panel", shift=38)
         panel_motion = self._motion_level(f"panel:{panel.key}")
         inner = draw_panel(
@@ -8883,8 +8946,19 @@ class RunScene(BaseScene):
             emphasis=max(panel_motion, overlay_motion),
             lift=int(max(panel_motion, overlay_motion) * 5),
         )
+        title_rect = pygame.Rect(
+            inner.left,
+            inner.top - 28,
+            inner.width,
+            self.fonts.title.get_height(),
+        )
         title_surface = self.fonts.title.render(panel.title, True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 28))
+        surface.blit(title_surface, title_rect.topleft)
+        self._record_layout_separation(
+            "deep-panel-title-vs-nav",
+            title_rect,
+            pygame.Rect(0, 0, surface.get_width(), 54),
+        )
         self._draw_panel_entity_strip(
             surface,
             pygame.Rect(inner.right - 190, inner.top - 30, 190, 28),
@@ -8909,6 +8983,7 @@ class RunScene(BaseScene):
         )
         metric_top = inner.top + 54
         metric_width = int((inner.width - 24) / 2)
+        metric_card_rects = []
         for index, metric in enumerate(panel.metrics[:4]):
             row = index // 2
             col = index % 2
@@ -8918,6 +8993,7 @@ class RunScene(BaseScene):
                 metric_width,
                 42,
             )
+            metric_card_rects.append(card_rect)
             pygame.draw.rect(surface, (26, 38, 55), card_rect, border_radius=12)
             pygame.draw.rect(
                 surface,
@@ -8931,14 +9007,21 @@ class RunScene(BaseScene):
             surface.blit(label_surface, (card_rect.left + 10, card_rect.top + 6))
             surface.blit(value_surface, (card_rect.left + 10, card_rect.top + 20))
 
-        content_top = inner.top + 170
+        metric_bottom = (
+            max(card_rect.bottom for card_rect in metric_card_rects)
+            if metric_card_rects
+            else metric_top
+        )
+        heading_top = metric_bottom + 10
+        heading_height = 24
+        content_top = heading_top + heading_height
         footer_top = inner.bottom - 40
         content_bottom = footer_top - 12
         content_height = max(80, content_bottom - content_top)
         detail_rect = pygame.Rect(
             inner.left,
             content_top,
-            int(inner.width * 0.56),
+            int(inner.width * 0.54),
             content_height,
         )
         action_rect = pygame.Rect(
@@ -8947,8 +9030,14 @@ class RunScene(BaseScene):
             inner.right - detail_rect.right - 20,
             content_height,
         )
+        detail_title_rect = pygame.Rect(
+            detail_rect.left,
+            heading_top,
+            detail_rect.width,
+            heading_height,
+        )
         detail_title = self.fonts.heading.render("Live Notes", True, TEXT)
-        surface.blit(detail_title, (detail_rect.left, detail_rect.top - 24))
+        surface.blit(detail_title, detail_title_rect.topleft)
         top = detail_rect.top
         for line in panel.detail_lines:
             consumed = draw_wrapped_text(
@@ -8962,8 +9051,20 @@ class RunScene(BaseScene):
             )
             top += max(26, consumed)
 
+        action_title_rect = pygame.Rect(
+            action_rect.left,
+            heading_top,
+            action_rect.width,
+            heading_height,
+        )
         action_title = self.fonts.heading.render("Panel Actions", True, TEXT)
-        surface.blit(action_title, (action_rect.left, action_rect.top - 24))
+        surface.blit(action_title, action_title_rect.topleft)
+        if metric_card_rects:
+            self._record_layout_separation(
+                "panel-metrics-vs-section-headings",
+                metric_card_rects[0].unionall(metric_card_rects[1:]),
+                detail_title_rect.union(action_title_rect),
+            )
         cols = 2
         button_gap = 10
         button_width = int((action_rect.width - button_gap * (cols - 1)) / cols)
@@ -8982,7 +9083,10 @@ class RunScene(BaseScene):
             if index and index % cols == 0:
                 top += button_height + button_gap
                 left = action_rect.left
-            button_rect = pygame.Rect(left, top, button_width, button_height)
+            button_left = left
+            if index == len(panel.actions) - 1 and len(panel.actions) % cols:
+                button_left = action_rect.centerx - button_width // 2
+            button_rect = pygame.Rect(button_left, top, button_width, button_height)
             action_button_rects.append(button_rect)
             enabled = self._command_disabled_reason(action.command) is None
             draw_button(
@@ -9057,7 +9161,13 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("inspector"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=1040, height=600, margin=24)
+        modal_rect = _fit_nav_safe_modal_rect(
+            pygame,
+            surface,
+            width=1040,
+            height=600,
+            margin=24,
+        )
         modal_rect = self._animated_overlay_rect(modal_rect, "inspector", shift=42)
         panel_motion = self._motion_level(f"panel:{panel.key}")
         inspector_motion = self._motion_level(
@@ -9085,12 +9195,23 @@ class RunScene(BaseScene):
             # Keep header copy out of the actor chip's visual lane on compact overlays.
             actor_reserve = actor_width + 20
         header_text_width = max(220, inner.width - actor_reserve)
+        title_rect = pygame.Rect(
+            inner.left,
+            inner.top - 28,
+            header_text_width,
+            self.fonts.title.get_height(),
+        )
         title_surface = self.fonts.title.render(
             fit_text_line(self.fonts.title, f"{panel.title} Inspector", header_text_width),
             True,
             TEXT,
         )
-        surface.blit(title_surface, (inner.left, inner.top - 28))
+        surface.blit(title_surface, title_rect.topleft)
+        self._record_layout_separation(
+            "inspector-title-vs-nav",
+            title_rect,
+            pygame.Rect(0, 0, surface.get_width(), 54),
+        )
         self._draw_overlay_actor_sprite_layer(
             surface,
             inner,
@@ -9130,7 +9251,7 @@ class RunScene(BaseScene):
 
         nav_top = metric_top + 76
         nav_width = 250
-        nav_rect = pygame.Rect(inner.left, nav_top, nav_width, inner.bottom - nav_top - 56)
+        nav_rect = pygame.Rect(inner.left, nav_top, nav_width, inner.bottom - nav_top)
         focus_rect = pygame.Rect(
             nav_rect.right + 18,
             nav_top,
@@ -9140,7 +9261,7 @@ class RunScene(BaseScene):
         self._draw_inspector_section_nav(surface, nav_rect, panel)
         self._draw_inspector_focus(surface, focus_rect)
 
-        close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 34)
+        close_rect = pygame.Rect(inner.right - 180, modal_rect.bottom - 56, 180, 34)
         draw_button(
             surface,
             pygame,
@@ -9158,8 +9279,21 @@ class RunScene(BaseScene):
         nav_inner = draw_panel(surface, pygame, rect, title="Sections", accent=INFO)
         title_surface = self.fonts.heading.render("Sections", True, TEXT)
         surface.blit(title_surface, (nav_inner.left, nav_inner.top - 24))
-        sort_rect = pygame.Rect(nav_inner.left, nav_inner.top, nav_inner.width, 40)
-        filter_rect = pygame.Rect(nav_inner.left, nav_inner.top + 48, nav_inner.width, 40)
+        compact_nav = nav_inner.height < 300
+        control_height = 34 if compact_nav else 40
+        control_gap = 8
+        sort_rect = pygame.Rect(
+            nav_inner.left,
+            nav_inner.top,
+            nav_inner.width,
+            control_height,
+        )
+        filter_rect = pygame.Rect(
+            nav_inner.left,
+            sort_rect.bottom + control_gap,
+            nav_inner.width,
+            control_height,
+        )
         draw_button(
             surface,
             pygame,
@@ -9183,12 +9317,17 @@ class RunScene(BaseScene):
         self._click_targets.append(ClickTarget("inspector_cycle_sort", "", sort_rect))
         self._click_targets.append(ClickTarget("inspector_cycle_filter", "", filter_rect))
         action_width = int((nav_inner.width - 10) / 2)
-        actionable_rect = pygame.Rect(nav_inner.left, nav_inner.top + 96, action_width, 40)
+        actionable_rect = pygame.Rect(
+            nav_inner.left,
+            filter_rect.bottom + control_gap,
+            action_width,
+            control_height,
+        )
         hotspot_rect = pygame.Rect(
             actionable_rect.right + 10,
-            nav_inner.top + 96,
+            actionable_rect.top,
             nav_inner.width - action_width - 10,
-            40,
+            control_height,
         )
         draw_button(
             surface,
@@ -9212,10 +9351,13 @@ class RunScene(BaseScene):
         )
         self._click_targets.append(ClickTarget("inspector_focus_actionable", "", actionable_rect))
         self._click_targets.append(ClickTarget("inspector_focus_hotspot", "", hotspot_rect))
-        top = nav_inner.top + 148
-        section_gap = 8 if nav_inner.height < 430 else 10
+        top = actionable_rect.bottom + (10 if compact_nav else 12)
         section_count = max(1, len(panel.inspectors))
         section_area_height = max(0, nav_inner.bottom - top)
+        section_gap = 0
+        if section_count > 1:
+            available_gap = max(0, section_area_height - section_count * 32)
+            section_gap = min(8 if compact_nav else 10, available_gap // (section_count - 1))
         section_height = max(
             32,
             min(
@@ -9626,7 +9768,13 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("help"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=860, height=580, margin=28)
+        modal_rect = _fit_nav_safe_modal_rect(
+            pygame,
+            surface,
+            width=860,
+            height=580,
+            margin=28,
+        )
         modal_rect = self._animated_overlay_rect(modal_rect, "help", shift=30)
         inner = draw_panel(
             surface,
@@ -9637,8 +9785,19 @@ class RunScene(BaseScene):
             emphasis=overlay_motion,
             lift=int(overlay_motion * 5),
         )
+        title_rect = pygame.Rect(
+            inner.left,
+            inner.top - 28,
+            inner.width,
+            self.fonts.title.get_height(),
+        )
         title_surface = self.fonts.title.render("2D Control Guide", True, TEXT)
-        surface.blit(title_surface, (inner.left, inner.top - 28))
+        surface.blit(title_surface, title_rect.topleft)
+        self._record_layout_separation(
+            "help-title-vs-nav",
+            title_rect,
+            pygame.Rect(0, 0, surface.get_width(), 54),
+        )
         draw_wrapped_text(
             surface,
             self.fonts.body,
@@ -9648,7 +9807,7 @@ class RunScene(BaseScene):
                 "the endgame board, and turn resolution without dropping back to the CLI."
             ),
             MUTED,
-            pygame.Rect(inner.left, inner.top, inner.width, 48),
+            pygame.Rect(inner.left, inner.top, inner.width, 54),
             line_height=18,
             max_lines=3,
         )

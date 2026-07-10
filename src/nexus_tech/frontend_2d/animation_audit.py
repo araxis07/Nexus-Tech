@@ -423,6 +423,7 @@ _SCENE_MOTION_PROFILES: tuple[tuple[str, str, int], ...] = (
     ("run_blocked_feedback", "blocked-action feedback", 9),
     ("run_picker_feedback", "picker choreography", 9),
     ("run_inspector", "inspector routing", 9),
+    ("run_help", "help overlay", 7),
     ("run_endgame_board", "endgame cockpit", 8),
     ("run_outcome_overlay", "outcome cinematic", 8),
     ("turn_summary", "turn-summary reveal", 7),
@@ -444,6 +445,7 @@ _READABILITY_OVERLAY_SCENES = {
     "run_blocked_feedback",
     "run_picker_feedback",
     "run_inspector",
+    "run_help",
     "run_outcome_overlay",
 }
 
@@ -551,6 +553,11 @@ _REQUIRED_SCENE_LAYERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "actor-readability",
             "actor-pose-depth",
         ),
+    ),
+    (
+        "run_help",
+        "Help Overlay Readability",
+        ("transition", "motion-pulses", "overlay-transition", "help"),
     ),
     (
         "run_endgame_board",

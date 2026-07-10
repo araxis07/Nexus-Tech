@@ -327,19 +327,25 @@ def draw_keycap(surface, pygame, font, *, rect, key_text: str, label: str) -> No
 
     pygame.draw.rect(surface, PANEL_ALT, rect, border_radius=12)
     pygame.draw.rect(surface, BORDER, rect, width=1, border_radius=12)
+    key_width = 72
     draw_text_line(
         surface,
         font,
         key_text,
         TEXT,
-        pygame.Rect(rect.left + 10, rect.top + 5, 44, rect.height - 10),
+        pygame.Rect(rect.left + 10, rect.top + 5, key_width, rect.height - 10),
     )
     draw_text_line(
         surface,
         font,
         label,
         MUTED,
-        pygame.Rect(rect.left + 62, rect.top + 5, rect.width - 72, rect.height - 10),
+        pygame.Rect(
+            rect.left + key_width + 18,
+            rect.top + 5,
+            rect.width - key_width - 28,
+            rect.height - 10,
+        ),
     )
 
 

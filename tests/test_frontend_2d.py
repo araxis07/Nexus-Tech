@@ -2645,6 +2645,35 @@ def test_compact_quick_start_keeps_cards_above_action_row(tmp_path: Path) -> Non
         pygame.quit()
 
 
+def test_compact_title_menu_centers_unpaired_final_action(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=143),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=SaveLoadCoordinator(tmp_path / "title-menu-balanced.db"),
+            initial_mode="menu",
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene.draw(surface)
+
+        quit_target = next(
+            target
+            for target in scene._click_targets
+            if target.kind == "menu" and target.payload == "quit"
+        )
+        assert quit_target.rect.centerx == surface.get_rect().centerx
+        assert scene.layout_safety_violations() == ()
+    finally:
+        pygame.quit()
+
+
 def test_compact_deep_panel_keeps_actions_above_footer_controls() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2676,8 +2705,71 @@ def test_compact_deep_panel_keeps_actions_above_footer_controls() -> None:
         assert max(target.rect.bottom for target in action_targets) <= min(
             target.rect.top for target in footer_targets
         )
+        footer_bounds = footer_targets[0].rect.unionall(
+            [target.rect for target in footer_targets[1:]]
+        )
+        assert action_targets[-1].rect.centerx == footer_bounds.centerx
         assert scene.layout_safety_violations() == ()
         assert all(target.rect.right <= surface.get_width() for target in footer_targets)
+    finally:
+        pygame.quit()
+
+
+def test_compact_inspector_separates_sections_close_and_top_lane() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=144),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.FULL,
+        )
+        scene._set_deep_panel("pipeline")
+        scene._open_inspector("pipeline")
+
+        scene.draw(surface)
+
+        section_targets = [
+            target for target in scene._click_targets if target.kind == "inspector_section"
+        ]
+        close_target = next(
+            target for target in scene._click_targets if target.kind == "close_inspector"
+        )
+        assert section_targets
+        assert all(not target.rect.colliderect(close_target.rect) for target in section_targets)
+        assert close_target.rect.left > max(target.rect.right for target in section_targets)
+        assert scene.layout_safety_violations() == ()
+        violations, *_metrics = visual_audit_module._layout_safety_metrics(scene, 820, 620)
+        assert violations == ()
+    finally:
+        pygame.quit()
+
+
+def test_compact_help_overlay_keeps_title_below_navigation() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=145),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+        scene._help_overlay_visible = True
+
+        scene.draw(surface)
+
+        assert any(target.kind == "close_help" for target in scene._click_targets)
+        assert scene.layout_safety_violations() == ()
     finally:
         pygame.quit()
 
@@ -3615,6 +3707,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "run_blocked_feedback",
         "run_picker_feedback",
         "run_inspector",
+        "run_help",
         "run_endgame_board",
         "run_outcome_overlay",
         "turn_summary",
@@ -3653,6 +3746,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     pending = next(cell for cell in report.cells if cell.scene_key == "run_pending_feedback")
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
+    help_overlay = next(cell for cell in report.cells if cell.scene_key == "run_help")
     endgame = next(cell for cell in report.cells if cell.scene_key == "run_endgame_board")
     outcome = next(cell for cell in report.cells if cell.scene_key == "run_outcome_overlay")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
@@ -3710,6 +3804,9 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "sprite-clips" in inspector.active_layers
     assert "actor-readability" in inspector.active_layers
     assert "actor-pose-depth" in inspector.active_layers
+    assert "help" in help_overlay.active_layers
+    assert "overlay-transition" in help_overlay.active_layers
+    assert "help-control" in help_overlay.active_layers
     assert "endgame-actor" in endgame.active_layers
     assert "deep-panel" in endgame.active_layers
     assert "actor-timeline" in endgame.active_layers
@@ -3888,7 +3985,7 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     )
 
     assert report.status == "pass"
-    assert report.visual_report.baseline_signature.startswith("14:")
+    assert report.visual_report.baseline_signature.startswith("15:")
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers
@@ -3906,6 +4003,8 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     assert "outcome-cinematic" in areas["Outcome Cinematic"].active_layers
     assert areas["Inspector Actors"].status == "pass"
     assert "inspector-actor" in areas["Inspector Actors"].active_layers
+    assert areas["Help Overlay Readability"].status == "pass"
+    assert "help" in areas["Help Overlay Readability"].active_layers
     assert areas["Endgame Board Actors"].status == "pass"
     assert "endgame-actor" in areas["Endgame Board Actors"].active_layers
     assert areas["Review Actors"].status == "pass"
