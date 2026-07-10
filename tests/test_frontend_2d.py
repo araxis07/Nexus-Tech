@@ -2619,6 +2619,69 @@ def test_title_scene_quick_start_guides_first_run_controls(tmp_path: Path) -> No
         pygame.quit()
 
 
+def test_compact_quick_start_keeps_cards_above_action_row(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=141),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=SaveLoadCoordinator(tmp_path / "title-guide-compact.db"),
+            initial_mode="guide",
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene.draw(surface)
+
+        assert scene.layout_safety_violations() == ()
+        guide_targets = [target for target in scene._click_targets if target.kind == "menu"]
+        assert {target.payload for target in guide_targets} >= {"new_wizard", "continue", "menu"}
+        assert all(target.rect.bottom <= surface.get_height() for target in guide_targets)
+    finally:
+        pygame.quit()
+
+
+def test_compact_deep_panel_keeps_actions_above_footer_controls() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=142),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+        scene._set_deep_panel("team")
+
+        scene.draw(surface)
+
+        action_targets = [
+            target for target in scene._click_targets if target.kind == "panel_action"
+        ]
+        footer_targets = [
+            target
+            for target in scene._click_targets
+            if target.kind in {"open_panel_inspector", "close_panel"}
+        ]
+        assert action_targets
+        assert footer_targets
+        assert max(target.rect.bottom for target in action_targets) <= min(
+            target.rect.top for target in footer_targets
+        )
+        assert scene.layout_safety_violations() == ()
+        assert all(target.rect.right <= surface.get_width() for target in footer_targets)
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_meta_board_compacts_summary_when_space_is_tight(tmp_path: Path) -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -3758,6 +3821,20 @@ def test_visual_audit_cell_fails_layout_safety_violations() -> None:
 
     assert unsafe.status == "fail"
     assert "layout target-too-small:pause_toggle:20x18" in unsafe.notes
+
+
+def test_visual_audit_collects_scene_layout_safety_violations() -> None:
+    scene = SimpleNamespace(
+        _click_targets=(),
+        layout_safety_violations=lambda: ("panel-actions-vs-footer:overlap",),
+    )
+
+    violations, target_count, _min_size, _min_clearance = (
+        visual_audit_module._layout_safety_metrics(scene, 820, 620)
+    )
+
+    assert target_count == 0
+    assert violations == ("scene:panel-actions-vs-footer:overlap",)
 
 
 def test_visual_audit_cell_fails_click_target_clearance_violations() -> None:

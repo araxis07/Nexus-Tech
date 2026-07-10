@@ -707,7 +707,10 @@ def render_quick_guide(console: Console) -> None:
             "Forecast, and avoid over-hiring before the first clean growth signal."
         ),
     )
-    console.print(Panel(content, title="Quick Guide", border_style="blue", expand=True))
+    console.print(
+        Panel(content, title="Quick Guide", border_style="blue", expand=True),
+        soft_wrap=False,
+    )
 
 
 def render_tutorial(console: Console) -> None:

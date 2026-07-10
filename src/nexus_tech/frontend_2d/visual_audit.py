@@ -86,6 +86,7 @@ _CRITICAL_TARGET_OVERLAP_GROUPS = (
     frozenset({"review_primary", "review_save"}),
     frozenset({"wizard_launch", "wizard_back"}),
     frozenset({"open_panel_inspector", "close_panel"}),
+    frozenset({"panel_action", "open_panel_inspector", "close_panel"}),
     frozenset(
         {
             "close_inspector",
@@ -1136,6 +1137,10 @@ def _layout_safety_metrics(
     actor_layout_violations = getattr(scene, "actor_sprite_layout_violations", None)
     if callable(actor_layout_violations):
         violations.extend(f"actor:{violation}" for violation in actor_layout_violations())
+
+    scene_layout_violations = getattr(scene, "layout_safety_violations", None)
+    if callable(scene_layout_violations):
+        violations.extend(f"scene:{violation}" for violation in scene_layout_violations())
 
     return tuple(sorted(set(violations))), len(targets), (min_width, min_height), min_clearance
 

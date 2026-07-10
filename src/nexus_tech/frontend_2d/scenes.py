@@ -865,6 +865,7 @@ class BaseScene:
         self._scene_transition_elapsed = 0.0
         self._scene_transition_duration = self._entry_transition_duration(entry_transition)
         self._actor_sprite_bounds: list[ActorSpriteBounds] = []
+        self._layout_separation_guards: list[tuple[str, object, object]] = []
 
     @property
     def scene_transition_key(self) -> str:
@@ -923,6 +924,23 @@ class BaseScene:
 
     def _reset_actor_sprite_bounds(self) -> None:
         self._actor_sprite_bounds = []
+
+    def _reset_layout_separation_guards(self) -> None:
+        self._layout_separation_guards = []
+
+    def _record_layout_separation(self, key: str, first_rect, second_rect) -> None:
+        self._layout_separation_guards.append(
+            (key, self.pygame.Rect(first_rect), self.pygame.Rect(second_rect))
+        )
+
+    def layout_safety_violations(self) -> tuple[str, ...]:
+        """Return named content regions that overlap in the most recent frame."""
+
+        return tuple(
+            f"{key}:overlap"
+            for key, first_rect, second_rect in self._layout_separation_guards
+            if first_rect.colliderect(second_rect)
+        )
 
     def _record_actor_sprite_bounds(self, clip: ActorSpriteClip, rect) -> None:
         self._actor_sprite_bounds.append(
@@ -1378,6 +1396,7 @@ class TitleScene(BaseScene):
         pygame = self.pygame
         self._click_targets = []
         self._reset_actor_sprite_bounds()
+        self._reset_layout_separation_guards()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 20 if width < 900 else 24
@@ -2256,13 +2275,12 @@ class TitleScene(BaseScene):
                 button_width,
                 button_height,
             )
-            compact_detail = self._compact_text(detail, 42 if use_grid else 56)
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
                 title=title,
-                detail=compact_detail,
+                detail=detail,
                 accent=accent,
                 title_font=self.fonts.body,
                 detail_font=self.fonts.small,
@@ -2446,7 +2464,6 @@ class TitleScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
-        compact = inner.width < 760 or inner.height < 430
         cards = (
             (
                 "1. Goal",
@@ -2485,10 +2502,12 @@ class TitleScene(BaseScene):
         gap = 10
         grid_bottom = inner.bottom - action_height - 14
         card_area_height = max(120, grid_bottom - inner.top)
-        cols = 2 if not compact else 1
+        single_column_height = int((card_area_height - gap * (len(cards) - 1)) / len(cards))
+        cols = 1 if inner.width < 620 and single_column_height >= 58 else 2
         rows = max(1, (len(cards) + cols - 1) // cols)
         card_width = int((inner.width - gap * max(0, cols - 1)) / cols)
         card_height = max(58, int((card_area_height - gap * max(0, rows - 1)) / rows))
+        card_rects = []
         for index, (title, detail, accent) in enumerate(cards):
             row = index // cols
             col = index % cols
@@ -2498,6 +2517,7 @@ class TitleScene(BaseScene):
                 card_width,
                 card_height,
             )
+            card_rects.append(card_rect)
             pygame.draw.rect(surface, (20, 32, 48), card_rect, border_radius=14)
             pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=14)
             pygame.draw.rect(
@@ -2536,10 +2556,12 @@ class TitleScene(BaseScene):
             ("9 Back", "Return to menu.", "menu", BORDER),
         )
         left = inner.left
+        button_rects = []
         for title, detail, payload, accent in buttons:
             button_rect = pygame.Rect(
                 left, inner.bottom - action_height, button_width, action_height
             )
+            button_rects.append(button_rect)
             draw_button(
                 surface,
                 pygame,
@@ -2552,6 +2574,12 @@ class TitleScene(BaseScene):
             )
             self._click_targets.append(ClickTarget("menu", payload, button_rect))
             left += button_width + gap
+        if card_rects and button_rects:
+            self._record_layout_separation(
+                "quick-start-cards-vs-actions",
+                card_rects[0].unionall(card_rects[1:]),
+                button_rects[0].unionall(button_rects[1:]),
+            )
 
     def _draw_archive_comparison_strip(self, surface, rect, *, compact: bool) -> None:
         if rect.width < 220 or rect.height < 38:
@@ -4559,6 +4587,7 @@ class RunScene(BaseScene):
         self._click_targets = []
         self._first_turn_guide_visible = False
         self._reset_actor_sprite_bounds()
+        self._reset_layout_separation_guards()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         margin = 20
@@ -8902,14 +8931,21 @@ class RunScene(BaseScene):
             surface.blit(label_surface, (card_rect.left + 10, card_rect.top + 6))
             surface.blit(value_surface, (card_rect.left + 10, card_rect.top + 20))
 
+        content_top = inner.top + 170
+        footer_top = inner.bottom - 40
+        content_bottom = footer_top - 12
+        content_height = max(80, content_bottom - content_top)
         detail_rect = pygame.Rect(
-            inner.left, inner.top + 170, int(inner.width * 0.56), inner.height - 196
+            inner.left,
+            content_top,
+            int(inner.width * 0.56),
+            content_height,
         )
         action_rect = pygame.Rect(
             detail_rect.right + 20,
-            inner.top + 170,
+            content_top,
             inner.right - detail_rect.right - 20,
-            inner.height - 196,
+            content_height,
         )
         detail_title = self.fonts.heading.render("Live Notes", True, TEXT)
         surface.blit(detail_title, (detail_rect.left, detail_rect.top - 24))
@@ -8931,14 +8967,23 @@ class RunScene(BaseScene):
         cols = 2
         button_gap = 10
         button_width = int((action_rect.width - button_gap * (cols - 1)) / cols)
-        button_height = 54
+        action_rows = max(1, (len(panel.actions) + cols - 1) // cols)
+        button_height = min(
+            54,
+            max(
+                34,
+                int((action_rect.height - button_gap * (action_rows - 1)) / action_rows),
+            ),
+        )
         top = action_rect.top
         left = action_rect.left
+        action_button_rects = []
         for index, action in enumerate(panel.actions):
             if index and index % cols == 0:
-                top += button_height + 10
+                top += button_height + button_gap
                 left = action_rect.left
             button_rect = pygame.Rect(left, top, button_width, button_height)
+            action_button_rects.append(button_rect)
             enabled = self._command_disabled_reason(action.command) is None
             draw_button(
                 surface,
@@ -8954,9 +8999,23 @@ class RunScene(BaseScene):
             self._click_targets.append(ClickTarget("panel_action", action.command, button_rect))
             left += button_width + button_gap
 
-        inspect_rect = pygame.Rect(action_rect.left, modal_rect.bottom - 56, 170, 34)
-        close_rect = pygame.Rect(action_rect.left + 184, modal_rect.bottom - 56, 160, 34)
+        footer_gap = 10
+        footer_button_rects = []
         if panel.inspectors:
+            footer_button_width = int((action_rect.width - footer_gap) / 2)
+            inspect_rect = pygame.Rect(
+                action_rect.left,
+                footer_top,
+                footer_button_width,
+                34,
+            )
+            close_rect = pygame.Rect(
+                inspect_rect.right + footer_gap,
+                footer_top,
+                action_rect.right - inspect_rect.right - footer_gap,
+                34,
+            )
+            footer_button_rects.append(inspect_rect)
             draw_button(
                 surface,
                 pygame,
@@ -8968,6 +9027,9 @@ class RunScene(BaseScene):
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget("open_panel_inspector", panel.key, inspect_rect))
+        else:
+            close_rect = pygame.Rect(action_rect.left, footer_top, action_rect.width, 34)
+        footer_button_rects.append(close_rect)
         draw_button(
             surface,
             pygame,
@@ -8979,6 +9041,12 @@ class RunScene(BaseScene):
             detail_font=self.fonts.small,
         )
         self._click_targets.append(ClickTarget("close_panel", "", close_rect))
+        if action_button_rects:
+            self._record_layout_separation(
+                "panel-actions-vs-footer",
+                action_button_rects[0].unionall(action_button_rects[1:]),
+                footer_button_rects[0].unionall(footer_button_rects[1:]),
+            )
 
     def _draw_inspector_overlay(self, surface) -> None:
         pygame = self.pygame

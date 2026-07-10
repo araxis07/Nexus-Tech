@@ -853,6 +853,9 @@ def test_guide_command_renders_quick_start() -> None:
     assert result.exit_code == 0
     assert "Quick Guide" in result.output
     assert "Difficulty cues" in result.output
+    assert "or headcount." in result.output
+    assert "Founder punishes weak runway" in result.output
+    assert "first clean growth signal." in result.output
 
 
 def test_tutorial_command_renders_first_run_path() -> None:
@@ -2406,7 +2409,7 @@ def test_competitor_archetype_catalog_rendering_contains_title() -> None:
 
 
 def test_quick_guide_rendering_contains_opening_flow() -> None:
-    console = Console(record=True, width=120)
+    console = Console(record=True, width=80, soft_wrap=False)
 
     render_quick_guide(console)
     output = console.export_text()
@@ -2415,6 +2418,9 @@ def test_quick_guide_rendering_contains_opening_flow() -> None:
     assert "Opening flow" in output
     assert "Risk Forecast" in output
     assert "Difficulty cues" in output
+    assert "or headcount." in output
+    assert "Founder punishes weak runway" in output
+    assert "first clean growth signal." in output
 
 
 def test_tutorial_rendering_contains_safe_first_actions() -> None:

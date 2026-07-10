@@ -290,6 +290,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Focused manual animation QA helpers include `animation-playtest-batch-next`, `animation-playtest-batch-packet`, and `validate-animation-playtest-batch-packet` so the next open visible-window packet stays tied to the route-batch artifact
 - Focused batch automation includes `animation-playtest-batch-preflight`, which runs the 820x620 menu/play commands headlessly across full, reduced, and off modes before manual visible-window evidence begins
 - Responsive layout automation includes `audit-2d-layout-matrix`, which turns the existing visual captures into a viewport/motion Markdown gate for target spacing, text fitting, and layout containment before manual QA
+- Compact-window layout guards now keep Quick Start cards and deep-panel actions clear of their footer controls, while terminal onboarding guidance wraps complete sentences at narrow console widths
 - Session bundle validation includes `validate-animation-playtest-session-bundle`, which checks the manual report, queue, plan, recorder queue, route batches, focused next-batch packet, triage, release gate, progress, execution guide, backlog, sprint, evidence sheet, and handoff before CI uploads artifacts
 - In-game reporting view for score, valuation, quarter-plan progress, competitor watch, and recent turn history
 - Deterministic `simulate-balance` batch runs for tuning scenarios, difficulties, and goals without playing by hand

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.276.0 - 2026-07-11
+
+- Fixed terminal onboarding copy so narrow consoles wrap complete guidance instead of clipping sentence endings
+- Rebalanced the compact Quick Start card grid and deep-panel action footer so controls remain readable and separated at 820x620
+- Added scene-level separation guards to the visual audit, with regression coverage for compact onboarding and deep-panel layouts
+
 ## 0.275.0 - 2026-07-11
 
 - Added `onboarding-visible-ux-batch-closeout` and its validator to classify focused batch rows as manual, fix, polish, or complete from current report/intake evidence
