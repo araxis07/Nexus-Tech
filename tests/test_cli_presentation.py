@@ -261,6 +261,7 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "validate-onboarding-visible-playtest-next",
         "onboarding-visible-playtest-batch-packet",
         "validate-onboarding-visible-playtest-batch-packet",
+        "onboarding-visible-playtest-batch-preflight",
         "onboarding-visible-terminal-batch",
         "validate-onboarding-visible-terminal-batch",
         "onboarding-visible-terminal-evidence-sheet",
@@ -1814,6 +1815,127 @@ def test_onboarding_visible_window_preflight_runs_focused_headless_routes(
     assert "--headless --max-frames 1 --window-size 820x620" in text
 
 
+def test_onboarding_visible_playtest_batch_preflight_runs_current_window_batch(
+    tmp_path: Path,
+) -> None:
+    packet_path = tmp_path / "onboarding-visible.md"
+    report_path = tmp_path / "onboarding-visible-report.md"
+    output_path = tmp_path / "onboarding-visible-batch-preflight.md"
+    db_path = tmp_path / "onboarding-visible-batch-preflight.db"
+
+    packet_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-packet",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "full",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--output",
+            str(packet_path),
+        ],
+    )
+    assert packet_result.exit_code == 0
+
+    report_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-report",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "full",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--input",
+            str(packet_path),
+            "--output",
+            str(report_path),
+        ],
+    )
+    assert report_result.exit_code == 0
+
+    for rank, note in (
+        (
+            "1",
+            (
+                "Observed terminal guide output directly; Opening flow, Risk Forecast, "
+                "and Difficulty cues were readable before the visible window batch."
+            ),
+        ),
+        (
+            "2",
+            (
+                "Observed terminal tutorial output directly; the first-run table "
+                "explains command order, finance checks, hiring, and expansion timing."
+            ),
+        ),
+        (
+            "3",
+            (
+                "Observed onboarding audit output directly; all automated clarity "
+                "checks passed with concrete command handoff evidence."
+            ),
+        ),
+    ):
+        record_result = runner.invoke(
+            app,
+            [
+                "record-onboarding-visible-playtest-route",
+                "--report",
+                str(report_path),
+                "--rank",
+                rank,
+                "--result",
+                "pass",
+                "--notes",
+                note,
+            ],
+        )
+        assert record_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-batch-preflight",
+            "--report",
+            str(report_path),
+            "--batch-size",
+            "3",
+            "--frames",
+            "1",
+            "--db-path",
+            str(db_path),
+            "--output",
+            str(output_path),
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Onboarding Visible Batch Preflight" in result.output
+    text = output_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Batch Preflight" in text
+    assert "- Status: `pass`" in text
+    assert "- Manual result: `not completed by automation`" in text
+    assert "- Batch rows: `3`" in text
+    assert "- Preflighted 2D rows: `3`" in text
+    assert "- Skipped terminal rows: `0`" in text
+    assert "| 4 | `title-onboarding` | `820x620` | `full` | `pass` |" in text
+    assert "| 5 | `first-turn-play` | `820x620` | `full` | `pass` |" in text
+    assert "| 6 | `title-onboarding` | `820x620` | `reduced` | `pass` |" in text
+    assert "menu-2d --headless --max-frames 1 --window-size 820x620" in text
+    assert "play-2d --scenario founder_journey" in text
+    assert "preflight never replaces visible-window tester evidence" in text
+
+
 def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 
@@ -1831,6 +1953,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech validate-onboarding-visible-playtest-next" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-batch-packet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-batch-packet" in workflow
+    assert "uv run nexus-tech onboarding-visible-playtest-batch-preflight" in workflow
     assert "uv run nexus-tech onboarding-visible-terminal-batch" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-terminal-batch" in workflow
     assert "uv run nexus-tech onboarding-visible-terminal-evidence-sheet" in workflow
@@ -1866,6 +1989,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-batch-preflight.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-batch.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md" in workflow
@@ -1886,6 +2010,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
     assert "nexus-tech-onboarding-visible-playtest-batch-packet" in workflow
+    assert "nexus-tech-onboarding-visible-batch-preflight" in workflow
     assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
     assert "nexus-tech-onboarding-visible-terminal-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-820x620-evidence-sheet" in workflow

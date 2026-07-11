@@ -495,6 +495,16 @@ ONBOARDING_VISIBLE_WINDOW_PREFLIGHT_DB_PATH_OPTION = typer.Option(
     "--db-path",
     help="Scratch database path for onboarding visible window preflight launches.",
 )
+ONBOARDING_VISIBLE_BATCH_PREFLIGHT_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-batch-preflight.md"),
+    "--output",
+    help="Markdown path for the focused onboarding visible batch preflight.",
+)
+ONBOARDING_VISIBLE_BATCH_PREFLIGHT_DB_PATH_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-batch-preflight.db"),
+    "--db-path",
+    help="Scratch database path for focused onboarding visible batch preflight launches.",
+)
 ONBOARDING_VISIBLE_MANUAL_SESSION_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-manual-session.md"),
     "--output",
@@ -8049,6 +8059,281 @@ def validate_onboarding_visible_ux_batch_closeout_command(
         )
     )
     if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-playtest-batch-preflight")
+def onboarding_visible_playtest_batch_preflight_command(
+    scenario: str = SCENARIO_OPTION,
+    campaign_start: str = CAMPAIGN_START_OPTION,
+    difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
+    goal: CampaignGoalId | None = GOAL_OPTION,
+    seed: int = typer.Option(
+        DEMO_SEED_EXAMPLE,
+        "--seed",
+        help="Seed expected in the onboarding visible play-2d rows.",
+    ),
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    batch_size: int = ONBOARDING_VISIBLE_PLAYTEST_BATCH_SIZE_OPTION,
+    frames: int = typer.Option(
+        1,
+        "--frames",
+        min=1,
+        help="Headless frames to run for each 2D route in the focused batch.",
+    ),
+    output: Path = ONBOARDING_VISIBLE_BATCH_PREFLIGHT_OUTPUT_OPTION,
+    db_path: Path = ONBOARDING_VISIBLE_BATCH_PREFLIGHT_DB_PATH_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Run headless launch checks for the current onboarding visible QA batch."""
+
+    validate_scenario_id(scenario)
+    validate_campaign_start_id(campaign_start)
+    try:
+        packet = build_onboarding_visible_playtest_batch_packet(
+            report_path,
+            batch_size=batch_size,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Batch Preflight Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    difficulty_arg = f" --difficulty {difficulty.value}" if difficulty is not None else ""
+    goal_arg = f" --goal {goal.value}" if goal is not None else ""
+    rows: list[tuple[int, str, str, str, str, str, str, str, str]] = []
+    failures: list[str] = []
+
+    try:
+        for row in packet.rows:
+            if row.window == "terminal":
+                rows.append(
+                    (
+                        row.rank,
+                        row.route,
+                        row.window,
+                        row.motion_mode,
+                        "skip",
+                        "terminal-route",
+                        "n/a",
+                        row.command,
+                        row.command,
+                    )
+                )
+                continue
+            try:
+                window = parse_2d_window_size(row.window)
+                motion = MotionMode(row.motion_mode)
+            except ValueError as error:
+                rows.append(
+                    (
+                        row.rank,
+                        row.route,
+                        row.window,
+                        row.motion_mode,
+                        "fail",
+                        str(error),
+                        "n/a",
+                        row.command,
+                        row.command,
+                    )
+                )
+                failures.append(f"rank {row.rank} invalid route target: {error}")
+                continue
+
+            if row.route == "title-onboarding":
+                preflight_command = (
+                    f"{command_prefix} menu-2d --headless --max-frames {frames} "
+                    f"--window-size {row.window} --motion-mode {motion.value}"
+                )
+                result = launch_2d_menu(
+                    db_path=db_path,
+                    headless=True,
+                    window_size=window,
+                    max_frames=frames,
+                    motion_mode=motion,
+                )
+            elif row.route == "first-turn-play":
+                preflight_command = (
+                    f"{command_prefix} play-2d --scenario {scenario} "
+                    f"--campaign-start {campaign_start} --seed {seed}{difficulty_arg}"
+                    f"{goal_arg} --headless --max-frames {frames} "
+                    f"--window-size {row.window} --motion-mode {motion.value}"
+                )
+                state = create_new_game(
+                    company_name=None,
+                    product_name=None,
+                    scenario_id=scenario,
+                    difficulty_mode=difficulty,
+                    campaign_goal_id=goal,
+                    campaign_start_id=campaign_start,
+                )
+                result = launch_2d_frontend(
+                    state=state,
+                    rng=RandomSource(seed=seed),
+                    db_path=db_path,
+                    slot_name=(
+                        f"onboarding-batch-preflight-rank-{row.rank}-{row.window}-{motion.value}"
+                    ),
+                    headless=True,
+                    window_size=window,
+                    max_frames=frames,
+                    motion_mode=motion,
+                )
+            else:
+                rows.append(
+                    (
+                        row.rank,
+                        row.route,
+                        row.window,
+                        row.motion_mode,
+                        "fail",
+                        "unsupported-route",
+                        "n/a",
+                        row.command,
+                        row.command,
+                    )
+                )
+                failures.append(f"rank {row.rank} unsupported route {row.route}")
+                continue
+
+            row_status = "pass" if result.exit_reason == "max_frames" else "fail"
+            if row_status != "pass":
+                failures.append(
+                    (
+                        f"rank {row.rank} {row.route}/{row.window}/{row.motion_mode} "
+                        f"exited with {result.exit_reason}, expected max_frames"
+                    )
+                )
+            rows.append(
+                (
+                    row.rank,
+                    row.route,
+                    row.window,
+                    row.motion_mode,
+                    row_status,
+                    result.exit_reason,
+                    str(result.saved_on_exit).lower(),
+                    row.command,
+                    preflight_command,
+                )
+            )
+    except Frontend2DUnavailableError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="2D Frontend Unavailable",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    status = "pass" if not failures else "fail"
+    preflighted_count = sum(1 for row in rows if row[4] in {"pass", "fail"})
+    skipped_count = sum(1 for row in rows if row[4] == "skip")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Batch Preflight",
+        "",
+        f"- Status: `{status}`",
+        "- Manual result: `not completed by automation`",
+        f"- Report: `{report_path}`",
+        f"- Batch size: `{batch_size}`",
+        f"- Batch rows: `{len(packet.rows)}`",
+        f"- Preflighted 2D rows: `{preflighted_count}`",
+        f"- Skipped terminal rows: `{skipped_count}`",
+        f"- Scenario: `{scenario}`",
+        f"- Campaign start: `{campaign_start}`",
+        f"- Seed: `{seed}`",
+        f"- Headless frames per command: `{frames}`",
+        f"- Commands checked: `{len(rows)}`",
+        "- Evidence policy: `preflight never replaces visible-window tester evidence`",
+        "",
+        "## Headless Batch Results",
+        "",
+        (
+            "| Rank | Route | Window | Motion | Status | Exit Reason | Saved On Exit | "
+            "Visible Command | Headless Preflight Command |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for (
+        rank,
+        route,
+        window_label,
+        motion,
+        row_status,
+        exit_reason,
+        saved_on_exit,
+        visible_command,
+        preflight_command,
+    ) in rows:
+        lines.append(
+            (
+                f"| {rank} | `{route}` | `{window_label}` | `{motion}` | "
+                f"`{row_status}` | `{exit_reason}` | `{saved_on_exit}` | "
+                f"`{visible_command}` | `{preflight_command}` |"
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Manual Follow-up",
+            "",
+            "- Run the visible commands without `--headless` before recording route evidence.",
+            (
+                "- Terminal rows are skipped here; run their visible terminal commands "
+                "directly before recording."
+            ),
+            (
+                "- Keep the onboarding report `manual-required` until real notes replace "
+                "recorder placeholders."
+            ),
+            (
+                "- Mark layout, navigation, readability, pause/back/menu, or motion blockers "
+                "as watch/fail before release."
+            ),
+        ]
+    )
+    if failures:
+        lines.extend(["", "## Failures", "", *(f"- {failure}" for failure in failures)])
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    table = Table(title="Onboarding Visible Batch Preflight")
+    table.add_column("Rank", justify="right")
+    table.add_column("Route", style="cyan")
+    table.add_column("Window")
+    table.add_column("Motion")
+    table.add_column("Status")
+    table.add_column("Exit")
+    for rank, route, window_label, motion, row_status, exit_reason, *_rest in rows:
+        table.add_row(str(rank), route, window_label, motion, row_status.upper(), exit_reason)
+    console.print(table)
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible batch preflight {status.upper()} | "
+                f"{preflighted_count} 2D headless route(s) checked | "
+                f"{skipped_count} terminal route(s) skipped | manual evidence still required"
+            ),
+            title="Onboarding Visible Batch Preflight",
+            border_style="green" if status == "pass" else "red",
+        )
+    )
+    console.print(
+        Panel.fit(
+            f"Onboarding visible batch preflight report written to {output}",
+            title="Onboarding Visible Batch Preflight Artifact",
+            border_style="cyan",
+        )
+    )
+    if failures:
         raise typer.Exit(code=1)
 
 

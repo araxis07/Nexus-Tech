@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.279.0 - 2026-07-11
+
+- Added `onboarding-visible-playtest-batch-preflight` to headlessly launch the current focused visible QA batch before real-window evidence recording begins
+- Wired the focused batch preflight into docs, CLI coverage, CI validation, and artifact upload while keeping manual evidence marked as not completed by automation
+
 ## 0.278.0 - 2026-07-11
 
 - Added `onboarding-visible-playtest-batch-packet` and its validator to scope the next focused set of incomplete visible onboarding routes without fabricating manual evidence

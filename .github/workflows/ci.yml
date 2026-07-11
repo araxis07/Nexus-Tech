@@ -99,6 +99,16 @@ jobs:
           --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
           --input /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
 
+      - name: Run onboarding visible focused batch preflight
+        run: >
+          uv run nexus-tech onboarding-visible-playtest-batch-preflight
+          --command-prefix "uv run nexus-tech"
+          --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
+          --batch-size 6
+          --frames 1
+          --db-path /tmp/nexus-tech-onboarding-visible-batch-preflight.db
+          --output /tmp/nexus-tech-onboarding-visible-batch-preflight.md
+
       - name: Prepare onboarding visible terminal batch handoff
         run: >
           uv run nexus-tech onboarding-visible-terminal-batch
@@ -489,6 +499,15 @@ jobs:
         with:
           name: nexus-tech-onboarding-visible-playtest-batch-packet
           path: /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload onboarding visible focused batch preflight artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-onboarding-visible-batch-preflight
+          path: /tmp/nexus-tech-onboarding-visible-batch-preflight.md
           if-no-files-found: warn
           retention-days: 7
 
