@@ -750,7 +750,10 @@ for layout containment, navigation recovery, motion readability, feedback
 clarity, and evidence quality, plus a defect intake template for severity,
 reproduction, evidence, recorder action, and follow-up ownership. That keeps
 watch/fail notes tied to the actual blocker instead of becoming generic polish
-comments. A closure checklist then requires route/window recorders, defect
+comments. Focused batch packets also print safe renderer preview commands for
+game-only PNG captures and layout matrices by window/motion pair, so layout
+checks can happen before manual visible-window notes without taking full-desktop
+screenshots or replacing real evidence. A closure checklist then requires route/window recorders, defect
 classification, artifact refresh, route-batch validation, and status review
 before testers move to the next target window. Post-recording refresh and
 validation commands let testers confirm the batch and report status moved after

@@ -12582,6 +12582,8 @@ def test_onboarding_visible_playtest_batch_packet_scopes_next_open_rows(
     assert ".venv313/bin/nexus-tech audit-onboarding-flow" in text
     assert "--rank 2" in text
     assert "--rank 3" in text
+    assert "## Safe Renderer Preview" in text
+    assert "terminal-only" in text
     assert "This packet scopes manual work" in text
 
     validation = validate_onboarding_visible_playtest_batch_packet(
@@ -12610,6 +12612,56 @@ def test_onboarding_visible_playtest_batch_packet_scopes_next_open_rows(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Copy Commands" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_playtest_batch_packet_adds_safe_window_previews(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    batch_path = tmp_path / "onboarding-visible-batch.md"
+    report = build_onboarding_visible_playtest_evidence_report(packet)
+    write_onboarding_visible_playtest_evidence_report(report, report_path)
+    for row in report.rows[:3]:
+        record_onboarding_visible_playtest_route(
+            report_path,
+            rank=row.rank,
+            result="pass",
+            evidence_notes=(
+                f"Observed {row.route} in {row.window} with {row.motion_mode} motion; "
+                f"{', '.join(row.required_evidence)} evidence was readable, and the "
+                "pause/back/menu recovery path was clear where required."
+            ),
+        )
+
+    batch = build_onboarding_visible_playtest_batch_packet(
+        report_path,
+        batch_size=2,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_playtest_batch_packet(batch, batch_path)
+
+    text = batch_path.read_text(encoding="utf-8")
+    assert [row.rank for row in batch.rows] == [4, 5]
+    assert text.count("audit-2d-visual --viewport 820x620 --motion-mode reduced") == 1
+    assert text.count("audit-2d-layout-matrix --viewport 820x620 --motion-mode reduced") == 1
+    assert "/tmp/nexus-tech-onboarding-visible-preview-820x620-reduced" in text
+    assert "/tmp/nexus-tech-onboarding-visible-layout-820x620-reduced.md" in text
+    assert "Preview output does not complete or replace visible-window evidence." in text
+
+    validation = validate_onboarding_visible_playtest_batch_packet(
+        batch_path,
+        report_path=report_path,
+        batch_size=2,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
 
 
 def test_onboarding_visible_terminal_batch_writes_and_validates_focused_handoff(

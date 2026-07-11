@@ -291,6 +291,8 @@ class OnboardingVisiblePlaytestBatchPacket:
     rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
     visible_commands: tuple[str, ...]
     recorder_commands: tuple[str, ...]
+    renderer_preview_commands: tuple[str, ...]
+    layout_preview_commands: tuple[str, ...]
     validate_command: str
     status_command: str
     next_step_command: str
@@ -2017,6 +2019,14 @@ def build_onboarding_visible_playtest_batch_packet(
             )
             for row in rows
         ),
+        renderer_preview_commands=_build_onboarding_visible_batch_renderer_preview_commands(
+            rows,
+            command_prefix=command_prefix,
+        ),
+        layout_preview_commands=_build_onboarding_visible_batch_layout_preview_commands(
+            rows,
+            command_prefix=command_prefix,
+        ),
         validate_command=(
             f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
         ),
@@ -2027,6 +2037,59 @@ def build_onboarding_visible_playtest_batch_packet(
             f"{command_prefix} onboarding-visible-playtest-next --report {report_path}"
         ),
     )
+
+
+def _build_onboarding_visible_batch_renderer_preview_commands(
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...],
+    *,
+    command_prefix: str,
+) -> tuple[str, ...]:
+    commands: list[str] = []
+    for window, motion_mode in _iter_onboarding_visible_preview_pairs(rows):
+        slug = _onboarding_visible_preview_slug(window, motion_mode)
+        commands.append(
+            f"{command_prefix} audit-2d-visual --viewport {window} "
+            f"--motion-mode {motion_mode} "
+            f"--output-dir /tmp/nexus-tech-onboarding-visible-preview-{slug}"
+        )
+    return tuple(commands)
+
+
+def _build_onboarding_visible_batch_layout_preview_commands(
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...],
+    *,
+    command_prefix: str,
+) -> tuple[str, ...]:
+    commands: list[str] = []
+    for window, motion_mode in _iter_onboarding_visible_preview_pairs(rows):
+        slug = _onboarding_visible_preview_slug(window, motion_mode)
+        commands.append(
+            f"{command_prefix} audit-2d-layout-matrix --viewport {window} "
+            f"--motion-mode {motion_mode} "
+            f"--output /tmp/nexus-tech-onboarding-visible-layout-{slug}.md"
+        )
+    return tuple(commands)
+
+
+def _iter_onboarding_visible_preview_pairs(
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...],
+) -> tuple[tuple[str, str], ...]:
+    pairs: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        if row.window == "terminal":
+            continue
+        pair = (row.window, row.motion_mode)
+        if pair in seen:
+            continue
+        seen.add(pair)
+        pairs.append(pair)
+    return tuple(pairs)
+
+
+def _onboarding_visible_preview_slug(window: str, motion_mode: str) -> str:
+    raw_slug = f"{window}-{motion_mode}".lower()
+    return raw_slug.replace(" ", "-").replace("_", "-")
 
 
 def write_onboarding_visible_playtest_batch_packet(
@@ -2102,6 +2165,34 @@ def write_onboarding_visible_playtest_batch_packet(
                     "```bash",
                     command,
                     "```",
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "## Safe Renderer Preview",
+                "",
+                "These commands render game-only preview artifacts without taking a full-desktop "
+                "screenshot. Use them to inspect layout, text containment, and button spacing "
+                "before the visible-window pass.",
+                "",
+                "- Preview output does not complete or replace visible-window evidence.",
+                "- Recorders still require real observed notes from the open game window.",
+                "",
+            ]
+        )
+        if packet.renderer_preview_commands or packet.layout_preview_commands:
+            lines.extend(["### Visual PNG Captures", ""])
+            for command in packet.renderer_preview_commands:
+                lines.extend(["```bash", command, "```", ""])
+            lines.extend(["### Layout Matrix Gates", ""])
+            for command in packet.layout_preview_commands:
+                lines.extend(["```bash", command, "```", ""])
+        else:
+            lines.extend(
+                [
+                    "No 2D renderer preview commands in this batch because the next rows are "
+                    "terminal-only.",
                     "",
                 ]
             )
@@ -2247,10 +2338,27 @@ def validate_onboarding_visible_playtest_batch_packet(
         command_markers = (
             *expected.visible_commands,
             *expected.recorder_commands,
+            *expected.renderer_preview_commands,
+            *expected.layout_preview_commands,
             expected.validate_command,
             expected.status_command,
             expected.next_step_command,
         )
+        preview_markers = (
+            "## Safe Renderer Preview",
+            "These commands render game-only preview artifacts without taking a full-desktop "
+            "screenshot.",
+            "- Preview output does not complete or replace visible-window evidence.",
+            "- Recorders still require real observed notes from the open game window.",
+            *expected.renderer_preview_commands,
+            *expected.layout_preview_commands,
+        )
+        if not expected.renderer_preview_commands and not expected.layout_preview_commands:
+            preview_markers = (
+                *preview_markers,
+                "No 2D renderer preview commands in this batch because the next rows are "
+                "terminal-only.",
+            )
         checklist_markers = tuple(
             marker
             for row in expected.rows
@@ -2279,6 +2387,12 @@ def validate_onboarding_visible_playtest_batch_packet(
             text=text,
             markers=command_markers,
             summary="The focused batch commands open and record the current rows.",
+        ),
+        _build_presence_check(
+            area="Safe Renderer Preview",
+            text=text,
+            markers=preview_markers,
+            summary="The focused batch includes safe preview commands before manual evidence.",
         ),
         _build_presence_check(
             area="Evidence Checklist",
