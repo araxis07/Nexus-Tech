@@ -8407,6 +8407,118 @@ def write_2d_animation_matrix_report(
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def read_2d_animation_matrix_report(input_path: Path) -> AnimationMatrixReport:
+    """Read and validate a matrix artifact produced by the matrix audit command."""
+
+    text = input_path.read_text(encoding="utf-8")
+    if "# NEXUS TECH 2D Animation Matrix" not in text:
+        raise ValueError("matrix artifact is missing its NEXUS TECH heading")
+
+    metadata: dict[str, str] = {}
+    for line in text.splitlines():
+        match = re.fullmatch(r"- ([A-Za-z ]+): `(.+)`", line.strip())
+        if match is not None:
+            metadata[match.group(1)] = match.group(2)
+
+    required_keys = ("Status", "Difficulty", "Scenarios", "Seeds", "Frames")
+    missing_keys = tuple(key for key in required_keys if not metadata.get(key))
+    if missing_keys:
+        raise ValueError(f"matrix artifact is missing metadata: {', '.join(missing_keys)}")
+
+    scenario_ids = tuple(item.strip() for item in metadata["Scenarios"].split(",") if item.strip())
+    if not scenario_ids:
+        raise ValueError("matrix artifact has no scenarios")
+    try:
+        seeds = tuple(int(item.strip()) for item in metadata["Seeds"].split(",") if item.strip())
+        frames = int(metadata["Frames"])
+    except ValueError as error:
+        raise ValueError("matrix artifact has invalid seeds or frame count") from error
+    if not seeds or frames < 1:
+        raise ValueError("matrix artifact must contain seeds and a positive frame count")
+
+    cells_summary = re.search(
+        r"^- Cells: `(\d+)` total, `(\d+)` pass, `(\d+)` fail$",
+        text,
+        re.MULTILINE,
+    )
+    if cells_summary is None:
+        raise ValueError("matrix artifact has an invalid cell summary")
+    expected_total, expected_passed, expected_failed = (
+        int(value) for value in cells_summary.groups()
+    )
+
+    cells: list[AnimationMatrixCell] = []
+    for row in _extract_markdown_table_rows(text):
+        if len(row) != 6 or _normalize_report_key(row[0]) == "scenario":
+            continue
+        scenario_id = _strip_markdown_code(row[0])
+        if scenario_id not in scenario_ids:
+            continue
+        try:
+            seed = int(_strip_markdown_code(row[1]))
+        except ValueError as error:
+            raise ValueError(f"matrix artifact has invalid seed for {scenario_id}") from error
+        if seed not in seeds:
+            raise ValueError(f"matrix artifact has unexpected seed {seed} for {scenario_id}")
+        status = _normalize_report_result(row[2])
+        if status not in {"pass", "fail"}:
+            raise ValueError(f"matrix artifact has invalid status for {scenario_id}/{seed}")
+        baseline = _strip_markdown_code(row[3])
+        if not baseline or baseline == "-":
+            raise ValueError(f"matrix artifact has no baseline for {scenario_id}/{seed}")
+        failed_areas = tuple(
+            area.strip() for area in row[4].split(",") if area.strip() and area.strip() != "-"
+        )
+        try:
+            advisory_count = int(_strip_markdown_code(row[5]))
+        except ValueError as error:
+            raise ValueError(
+                f"matrix artifact has invalid advisory count for {scenario_id}/{seed}"
+            ) from error
+        if advisory_count < 0:
+            raise ValueError(
+                f"matrix artifact has a negative advisory count for {scenario_id}/{seed}"
+            )
+        cells.append(
+            AnimationMatrixCell(
+                scenario_id=scenario_id,
+                difficulty=metadata["Difficulty"],
+                seed=seed,
+                status=status,
+                visual_baseline=baseline,
+                failed_areas=failed_areas,
+                advisory_gaps=tuple("artifact advisory" for _ in range(advisory_count)),
+            )
+        )
+
+    if len(cells) != expected_total:
+        raise ValueError(
+            f"matrix artifact says {expected_total} cells but contains {len(cells)} matrix rows"
+        )
+    expected_pairs = {(scenario_id, seed) for scenario_id in scenario_ids for seed in seeds}
+    actual_pairs = {(cell.scenario_id, cell.seed) for cell in cells}
+    if len(actual_pairs) != len(cells) or actual_pairs != expected_pairs:
+        raise ValueError(
+            "matrix artifact does not cover every requested scenario and seed exactly once"
+        )
+    passed = sum(cell.status == "pass" for cell in cells)
+    failed = len(cells) - passed
+    if (passed, failed) != (expected_passed, expected_failed):
+        raise ValueError("matrix artifact cell summary does not match its matrix rows")
+
+    report = AnimationMatrixReport(
+        scenario_ids=scenario_ids,
+        difficulty=metadata["Difficulty"],
+        seeds=seeds,
+        frames=frames,
+        cells=tuple(cells),
+    )
+    declared_status = _normalize_report_result(metadata["Status"])
+    if declared_status != report.status:
+        raise ValueError("matrix artifact status does not match its matrix rows")
+    return report
+
+
 def build_2d_animation_playtest_prep_report(
     *,
     version: str,

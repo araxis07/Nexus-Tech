@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.277.1 - 2026-07-11
+
+- Reused the already-passing 2D animation matrix artifact when preparing the manual playtest packet, removing a duplicate flaky matrix render from CI
+- Added strict matrix-artifact parsing so CI rejects missing, stale, or internally inconsistent readiness evidence before generating the playtest packet
+
 ## 0.277.0 - 2026-07-11
 
 - Rebalanced compact title and deep-panel grids by centering unpaired final actions instead of leaving an empty half-row

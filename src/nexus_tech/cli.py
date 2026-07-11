@@ -96,6 +96,7 @@ from nexus_tech.frontend_2d import (
     build_2d_animation_playtest_ui_triage_plan,
     launch_2d_frontend,
     launch_2d_menu,
+    read_2d_animation_matrix_report,
     record_2d_animation_playtest_control_evidence,
     record_2d_animation_playtest_feedback_evidence,
     record_2d_animation_playtest_field,
@@ -677,6 +678,17 @@ ANIMATION_MATRIX_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for the broad animation readiness matrix artifact.",
+)
+ANIMATION_PLAYTEST_MATRIX_INPUT_OPTION = typer.Option(
+    None,
+    "--matrix-input",
+    exists=True,
+    dir_okay=False,
+    readable=True,
+    help=(
+        "Reuse a validated audit-2d-animation-matrix Markdown artifact instead of rerunning "
+        "the matrix. This takes precedence over scenario, difficulty, seed, and frames."
+    ),
 )
 ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-animation-playtest-prep.md"),
@@ -2058,6 +2070,7 @@ def prepare_2d_animation_playtest_command(
     scenario: Optional[list[str]] = ANIMATION_MATRIX_SCENARIOS_OPTION,
     difficulty: DifficultyMode | None = DIFFICULTY_OPTION,
     seed: Optional[list[int]] = ANIMATION_MATRIX_SEED_OPTION,
+    matrix_input: Path | None = ANIMATION_PLAYTEST_MATRIX_INPUT_OPTION,
     output: Path = ANIMATION_PLAYTEST_PREP_OUTPUT_OPTION,
     frames: int = typer.Option(
         1,
@@ -2068,26 +2081,42 @@ def prepare_2d_animation_playtest_command(
 ) -> None:
     """Prepare the automated evidence and checklist for manual 2D animation playtest."""
 
-    scenario_ids = tuple(scenario) if scenario is not None else DEFAULT_ANIMATION_MATRIX_SCENARIOS
-    for scenario_id in scenario_ids:
-        validate_scenario_id(scenario_id)
-    seeds = tuple(seed) if seed is not None else DEFAULT_ANIMATION_MATRIX_SEEDS
-    try:
-        matrix_report = run_2d_animation_matrix_audit(
-            scenario_ids=scenario_ids,
-            difficulty_mode=difficulty,
-            seeds=seeds,
-            frames=frames,
-        )
-    except Frontend2DUnavailableError as error:
-        console.print(
-            Panel.fit(
-                str(error),
-                title="2D Frontend Unavailable",
-                border_style="red",
+    if matrix_input is not None:
+        try:
+            matrix_report = read_2d_animation_matrix_report(matrix_input)
+        except (OSError, ValueError) as error:
+            console.print(
+                Panel.fit(
+                    str(error),
+                    title="Invalid 2D Animation Matrix Artifact",
+                    border_style="red",
+                )
             )
+            raise typer.Exit(code=1) from error
+        console.print(f"Reusing 2D animation matrix artifact: {matrix_input}")
+    else:
+        scenario_ids = (
+            tuple(scenario) if scenario is not None else DEFAULT_ANIMATION_MATRIX_SCENARIOS
         )
-        raise typer.Exit(code=1) from error
+        for scenario_id in scenario_ids:
+            validate_scenario_id(scenario_id)
+        seeds = tuple(seed) if seed is not None else DEFAULT_ANIMATION_MATRIX_SEEDS
+        try:
+            matrix_report = run_2d_animation_matrix_audit(
+                scenario_ids=scenario_ids,
+                difficulty_mode=difficulty,
+                seeds=seeds,
+                frames=frames,
+            )
+        except Frontend2DUnavailableError as error:
+            console.print(
+                Panel.fit(
+                    str(error),
+                    title="2D Frontend Unavailable",
+                    border_style="red",
+                )
+            )
+            raise typer.Exit(code=1) from error
 
     prep_report = build_2d_animation_playtest_prep_report(
         version=__version__,

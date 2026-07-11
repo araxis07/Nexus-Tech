@@ -387,7 +387,10 @@ jobs:
         run: uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
 
       - name: Prepare 2D animation playtest report
-        run: uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+        run: >
+          uv run nexus-tech prepare-2d-animation-playtest
+          --matrix-input /tmp/nexus-tech-animation-matrix.md
+          --output /tmp/nexus-tech-animation-playtest-prep.md
 
       - name: Run 820x620 animation batch preflight
         run: >

@@ -6198,6 +6198,104 @@ def test_prepare_2d_animation_playtest_command_writes_prep_report(
     assert calls["frames"] == 1
 
 
+def test_prepare_2d_animation_playtest_command_reuses_matrix_artifact(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    matrix_report = AnimationMatrixReport(
+        scenario_ids=("founder_journey",),
+        difficulty="scenario",
+        seeds=(7,),
+        frames=1,
+        cells=(
+            AnimationMatrixCell(
+                scenario_id="founder_journey",
+                difficulty="scenario",
+                seed=7,
+                status="pass",
+                visual_baseline="15:abc12345",
+                failed_areas=(),
+                advisory_gaps=("Manual open-window playtest is still required.",),
+            ),
+        ),
+    )
+    matrix_path = tmp_path / ANIMATION_MATRIX_REPORT_NAME
+    write_2d_animation_matrix_report(matrix_report, matrix_path)
+
+    def unexpected_matrix_audit(**kwargs):
+        raise AssertionError(f"matrix audit should not run: {kwargs}")
+
+    monkeypatch.setattr(
+        cli_module,
+        "run_2d_animation_matrix_audit",
+        unexpected_matrix_audit,
+    )
+    output_path = tmp_path / ANIMATION_PLAYTEST_PREP_REPORT_NAME
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-2d-animation-playtest",
+            "--matrix-input",
+            str(matrix_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Reusing 2D animation matrix artifact" in result.output
+    report_text = output_path.read_text(encoding="utf-8")
+    assert "- Matrix cells: `1` total, `1` pass, `0` fail" in report_text
+    assert "`founder_journey` | `7` | `pass` | `15:abc12345`" in report_text
+
+
+def test_prepare_2d_animation_playtest_command_rejects_incomplete_matrix_artifact(
+    tmp_path: Path,
+) -> None:
+    matrix_report = AnimationMatrixReport(
+        scenario_ids=("founder_journey",),
+        difficulty="scenario",
+        seeds=(7,),
+        frames=1,
+        cells=(
+            AnimationMatrixCell(
+                scenario_id="founder_journey",
+                difficulty="scenario",
+                seed=7,
+                status="pass",
+                visual_baseline="15:abc12345",
+                failed_areas=(),
+                advisory_gaps=(),
+            ),
+        ),
+    )
+    matrix_path = tmp_path / ANIMATION_MATRIX_REPORT_NAME
+    write_2d_animation_matrix_report(matrix_report, matrix_path)
+    matrix_path.write_text(
+        matrix_path.read_text(encoding="utf-8").replace(
+            "- Scenarios: `founder_journey`",
+            "- Scenarios: `founder_journey, bootstrap_studio`",
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-2d-animation-playtest",
+            "--matrix-input",
+            str(matrix_path),
+            "--output",
+            str(tmp_path / ANIMATION_PLAYTEST_PREP_REPORT_NAME),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Invalid 2D Animation Matrix Artifact" in result.output
+    assert "does not cover every" in result.output
+
+
 def test_draft_animation_playtest_report_command_writes_strict_template(
     tmp_path: Path,
 ) -> None:
@@ -10501,10 +10599,9 @@ def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     assert "uv run nexus-tech audit-2d-layout-matrix" in workflow
     assert "--output /tmp/nexus-tech-2d-layout-matrix.md" in workflow
     assert "nexus-tech-2d-layout-matrix" in workflow
-    assert (
-        "uv run nexus-tech prepare-2d-animation-playtest --frames 1 "
-        "--output /tmp/nexus-tech-animation-playtest-prep.md"
-    ) in workflow
+    assert "uv run nexus-tech prepare-2d-animation-playtest" in workflow
+    assert "--matrix-input /tmp/nexus-tech-animation-matrix.md" in workflow
+    assert "--output /tmp/nexus-tech-animation-playtest-prep.md" in workflow
     assert "nexus-tech-2d-animation-playtest-prep" in workflow
     assert "uv run nexus-tech animation-playtest-batch-preflight" in workflow
     assert "/tmp/nexus-tech-animation-batch-820x620-preflight.md" in workflow
