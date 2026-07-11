@@ -635,6 +635,16 @@ def _short_actor_text(value: str, max_length: int) -> str:
     return f"{value[: max(1, max_length - 1)]}."
 
 
+def _fit_actor_caption(font: object, clip: ActorSpriteClip, max_width: int) -> str:
+    """Keep the actor's role readable before falling back to its lane."""
+
+    candidates = (f"{clip.role} / {clip.lane}", clip.role, clip.lane)
+    for candidate in candidates:
+        if font.size(candidate)[0] <= max_width:
+            return candidate
+    return fit_text_line(font, clip.role, max_width)
+
+
 def _actor_state_badge(state: str) -> str:
     return {
         "alert": "!",
@@ -847,12 +857,13 @@ def _draw_actor_sprite_clip(
         pygame.Rect(text_left, 8, local_rect.width - text_left - 12, 18),
         valign="top",
     )
+    caption_rect = pygame.Rect(text_left, 27, local_rect.width - text_left - 12, 18)
     draw_text_line(
         local,
         fonts.small,
-        _short_actor_text(f"{clip.role} / {clip.lane}", 22),
+        _fit_actor_caption(fonts.small, clip, caption_rect.width),
         blend_color(MUTED, accent, 0.45),
-        pygame.Rect(text_left, 27, local_rect.width - text_left - 12, 18),
+        caption_rect,
         valign="top",
     )
     surface.blit(local, rect.topleft)
@@ -9766,7 +9777,9 @@ class RunScene(BaseScene):
         pygame = self.pygame
         overlay_motion = self._overlay_motion_level("help")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        overlay.fill(self._overlay_fill("help"))
+        overlay_fill = self._overlay_fill("help")
+        # The guide is dense enough that the live header must not compete with it.
+        overlay.fill((*overlay_fill[:3], max(226, overlay_fill[3])))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_nav_safe_modal_rect(
             pygame,

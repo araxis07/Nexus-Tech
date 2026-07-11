@@ -248,6 +248,26 @@ def test_2d_font_pack_keeps_compact_layout_metrics_stable() -> None:
         pygame.quit()
 
 
+def test_actor_caption_keeps_role_readable_before_lane_detail() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        clip = scenes_module.ActorSpriteClip(
+            key="founder",
+            label="Founder",
+            role="Strategy",
+            state="handoff",
+            accent=(115, 207, 255),
+            lane="command",
+        )
+
+        caption = scenes_module._fit_actor_caption(fonts.small, clip, 82)
+
+        assert caption == "Strategy"
+        assert fonts.small.size(caption)[0] <= 82
+    finally:
+        pygame.quit()
+
+
 def test_2d_widget_wrapping_and_buttons_stay_inside_compact_rects() -> None:
     pygame, fonts, surface = _build_pygame_bundle()
     try:
