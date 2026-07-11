@@ -6521,6 +6521,15 @@ def onboarding_visible_playtest_status_command(
             border_style="yellow" if summary.next_row is not None else "green",
         )
     )
+    preview_commands = (*summary.renderer_preview_commands, *summary.layout_preview_commands)
+    if preview_commands:
+        console.print(
+            Panel.fit(
+                "\n".join(preview_commands),
+                title="Safe Renderer Preview Commands",
+                border_style="magenta",
+            )
+        )
 
 
 @app.command("onboarding-visible-playtest-next")

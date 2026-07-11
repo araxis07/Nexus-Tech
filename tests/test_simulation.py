@@ -12452,6 +12452,8 @@ def test_onboarding_visible_playtest_status_points_to_next_incomplete_row(
     assert "record-onboarding-visible-playtest-route" in summary.next_recorder_command
     assert "--rank 2" in summary.next_recorder_command
     assert "<replace with observed visible-window notes>" in summary.next_recorder_command
+    assert summary.renderer_preview_commands == ()
+    assert summary.layout_preview_commands == ()
 
 
 def test_onboarding_visible_playtest_next_step_writes_copy_ready_handoff(
@@ -12495,6 +12497,56 @@ def test_onboarding_visible_playtest_next_step_writes_copy_ready_handoff(
     assert "--rank 2" in text
     assert "Text stays inside its panel and remains readable." in text
     assert "real visible-window observations required" in text
+    assert "No renderer preview applies to this terminal-only route." in text
+
+
+def test_onboarding_visible_playtest_next_step_includes_safe_window_previews(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    next_path = tmp_path / "onboarding-visible-next.md"
+    report = build_onboarding_visible_playtest_evidence_report(packet)
+    write_onboarding_visible_playtest_evidence_report(report, report_path)
+    for row in report.rows[:3]:
+        record_onboarding_visible_playtest_route(
+            report_path,
+            rank=row.rank,
+            result="pass",
+            evidence_notes=(
+                f"Observed {row.route} in {row.window} with {row.motion_mode} motion; "
+                f"{', '.join(row.required_evidence)} evidence was readable, and "
+                "pause/back/menu recovery was clear where required."
+            ),
+        )
+
+    next_step = build_onboarding_visible_playtest_next_step(
+        report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_playtest_next_step(next_step, next_path)
+
+    text = next_path.read_text(encoding="utf-8")
+    assert next_step.next_row is not None
+    assert next_step.next_row.rank == 4
+    assert "### 2. Safe Renderer Preview Before Playing" in text
+    assert "audit-2d-visual --viewport 820x620 --motion-mode reduced" in text
+    assert "audit-2d-layout-matrix --viewport 820x620 --motion-mode reduced" in text
+    assert "/tmp/nexus-tech-onboarding-visible-preview-820x620-reduced" in text
+    assert "/tmp/nexus-tech-onboarding-visible-layout-820x620-reduced.md" in text
+
+    validation = validate_onboarding_visible_playtest_next_step(
+        next_path,
+        report_path=report_path,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
 
 
 def test_validate_onboarding_visible_playtest_next_step_blocks_stale_handoff(

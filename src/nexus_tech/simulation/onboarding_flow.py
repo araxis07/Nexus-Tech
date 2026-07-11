@@ -233,6 +233,8 @@ class OnboardingVisiblePlaytestStatusSummary:
     next_row: OnboardingVisiblePlaytestReportRow | None
     next_visible_command: str
     next_recorder_command: str
+    renderer_preview_commands: tuple[str, ...]
+    layout_preview_commands: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -250,6 +252,8 @@ class OnboardingVisiblePlaytestNextStep:
     next_row: OnboardingVisiblePlaytestReportRow | None
     next_visible_command: str
     next_recorder_command: str
+    renderer_preview_commands: tuple[str, ...]
+    layout_preview_commands: tuple[str, ...]
     validate_command: str
     status_command: str
 
@@ -1713,6 +1717,7 @@ def summarize_onboarding_visible_playtest_status(
             f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
         )
     )
+    next_rows = (next_row,) if next_row is not None else ()
     return OnboardingVisiblePlaytestStatusSummary(
         report_path=report_path,
         status=report.status,
@@ -1725,6 +1730,14 @@ def summarize_onboarding_visible_playtest_status(
         next_row=next_row,
         next_visible_command=next_visible_command,
         next_recorder_command=next_recorder_command,
+        renderer_preview_commands=_build_onboarding_visible_batch_renderer_preview_commands(
+            next_rows,
+            command_prefix=command_prefix,
+        ),
+        layout_preview_commands=_build_onboarding_visible_batch_layout_preview_commands(
+            next_rows,
+            command_prefix=command_prefix,
+        ),
     )
 
 
@@ -1755,6 +1768,8 @@ def build_onboarding_visible_playtest_next_step(
         next_row=summary.next_row,
         next_visible_command=summary.next_visible_command,
         next_recorder_command=summary.next_recorder_command,
+        renderer_preview_commands=summary.renderer_preview_commands,
+        layout_preview_commands=summary.layout_preview_commands,
         validate_command=validate_command,
         status_command=status_command,
     )
@@ -1825,7 +1840,25 @@ def write_onboarding_visible_playtest_next_step(
                 next_step.next_visible_command,
                 "```",
                 "",
-                "### 2. Record The Observation After Playing",
+                "### 2. Safe Renderer Preview Before Playing",
+                "",
+                "These game-only preview commands help check layout/text containment before "
+                "manual observation. They do not complete visible-window evidence.",
+                "",
+            ]
+        )
+        if next_step.renderer_preview_commands or next_step.layout_preview_commands:
+            lines.extend(["#### Visual PNG Captures", ""])
+            for command in next_step.renderer_preview_commands:
+                lines.extend(["```bash", command, "```", ""])
+            lines.extend(["#### Layout Matrix Gates", ""])
+            for command in next_step.layout_preview_commands:
+                lines.extend(["```bash", command, "```", ""])
+        else:
+            lines.extend(["No renderer preview applies to this terminal-only route.", ""])
+        lines.extend(
+            [
+                "### 3. Record The Observation After Playing",
                 "",
                 "Replace the placeholder notes with concrete visible-window observations.",
                 "",
@@ -1833,7 +1866,7 @@ def write_onboarding_visible_playtest_next_step(
                 next_step.next_recorder_command,
                 "```",
                 "",
-                "### 3. Validate And Refresh Status",
+                "### 4. Validate And Refresh Status",
                 "",
                 "```bash",
                 next_step.validate_command,
@@ -1934,12 +1967,22 @@ def validate_onboarding_visible_playtest_next_step(
             "## Copy Commands",
             "### 1. Open The Visible Route",
             expected.next_visible_command,
-            "### 2. Record The Observation After Playing",
+            "### 2. Safe Renderer Preview Before Playing",
+            "These game-only preview commands help check layout/text containment before "
+            "manual observation.",
+            *expected.renderer_preview_commands,
+            *expected.layout_preview_commands,
+            "### 3. Record The Observation After Playing",
             expected.next_recorder_command,
-            "### 3. Validate And Refresh Status",
+            "### 4. Validate And Refresh Status",
             expected.validate_command,
             expected.status_command,
         )
+        if not expected.renderer_preview_commands and not expected.layout_preview_commands:
+            action_markers = (
+                *action_markers,
+                "No renderer preview applies to this terminal-only route.",
+            )
         checklist_markers = (
             *row.required_evidence,
             "Text stays inside its panel and remains readable.",
