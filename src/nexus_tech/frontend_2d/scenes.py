@@ -9778,8 +9778,8 @@ class RunScene(BaseScene):
         overlay_motion = self._overlay_motion_level("help")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay_fill = self._overlay_fill("help")
-        # The guide is dense enough that the live header must not compete with it.
-        overlay.fill((*overlay_fill[:3], max(226, overlay_fill[3])))
+        # Dim the live header without making the motion-off backdrop unreadably dark.
+        overlay.fill((*overlay_fill[:3], max(206, overlay_fill[3])))
         surface.blit(overlay, (0, 0))
         modal_rect = _fit_nav_safe_modal_rect(
             pygame,
