@@ -1100,9 +1100,8 @@ class BaseScene:
                 pygame.draw.line(overlay, (*accent, line_alpha), (0, y), (width, y), 1)
 
         surface.blit(overlay, (0, 0))
-        if progress < 0.62 and intensity > 0.5:
-            badge_width = min(140, max(80, self.fonts.small.size(label)[0] + 18))
-            badge_rect = self.pygame.Rect(width - badge_width - 28, 28, badge_width, 24)
+        badge_rect = self._scene_transition_badge_rect(surface)
+        if badge_rect is not None:
             pad = 9
             panel_rect = pygame.Rect(
                 badge_rect.left,
@@ -1121,6 +1120,19 @@ class BaseScene:
                     panel_rect.left + pad, panel_rect.top + 2, panel_rect.width - pad * 2, 20
                 ),
             )
+
+    def _scene_transition_badge_rect(self, surface):
+        if not self.scene_transition_active():
+            return None
+        if self.scene_transition_progress() >= 0.62 or self._transition_intensity() <= 0.5:
+            return None
+        width, _height = surface.get_size()
+        label, _accent = _SCENE_TRANSITION_LABELS.get(
+            self._scene_transition_key,
+            ("Scene Shift", INFO),
+        )
+        badge_width = min(140, max(80, self.fonts.small.size(label)[0] + 18))
+        return self.pygame.Rect(width - badge_width - 28, 28, badge_width, 24)
 
 
 class TitleScene(BaseScene):
@@ -6208,27 +6220,30 @@ class RunScene(BaseScene):
         gap = 8
         left = max(20, width - card_width - 24)
         top = 112 if height < 680 else 146
+        transition_badge_rect = self._scene_transition_badge_rect(surface)
+        modal_overlay_active = self._text_input is not None or self._context_picker is not None
         tall_overlay_top_lane = (
-            (
-                self._deep_panel_key is not None
-                or self._inspector_panel_key is not None
-                or self._help_overlay_visible
-            )
-            and self._text_input is None
-            and self._context_picker is None
+            self._deep_panel_key is not None
+            or self._inspector_panel_key is not None
+            or self._help_overlay_visible
         )
         max_visible = 3
         if tall_overlay_top_lane:
             # The left side of this lane belongs to Pause/Back/Help, while the far
             # right may hold the transition badge. Keep one cue between both.
             lane_left = 360
-            lane_right = width - (116 if self.scene_transition_active() else 24) - 26
+            lane_right = (
+                transition_badge_rect.left - 42 if transition_badge_rect is not None else width - 26
+            )
             card_width = min(330, max(140, lane_right - lane_left))
             left = max(lane_left, lane_right - card_width)
             top = 12
             max_visible = 1
-        if self._text_input is not None or self._context_picker is not None:
-            top = 24
+        elif modal_overlay_active:
+            top = 62 if transition_badge_rect is not None else 24
+            max_visible = 1
+            if transition_badge_rect is not None:
+                left = min(left, max(20, transition_badge_rect.left - card_width - 24))
         for index, cue in enumerate(self._action_feedback_cues[:max_visible]):
             if cue.duration <= 0:
                 continue
@@ -6257,6 +6272,12 @@ class RunScene(BaseScene):
                     "action-feedback-vs-overlay",
                     rect,
                     pygame.Rect(0, 60, width, max(0, height - 60)),
+                )
+            if transition_badge_rect is not None:
+                self._record_layout_separation(
+                    "action-feedback-vs-transition-badge",
+                    rect,
+                    transition_badge_rect.inflate(10, 10),
                 )
             layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             layer_rect = layer.get_rect()
@@ -6358,23 +6379,36 @@ class RunScene(BaseScene):
         card_height = 56
         left = max(24, (width - card_width) // 2)
         top = 76 if height < 680 else 100
-        if self._context_picker is not None or self._text_input is not None:
-            top = max(24, height - 146)
-        for index, cue in enumerate(self._late_game_choreography_cues[:2]):
+        max_visible = 2
+        modal_overlay_active = self._context_picker is not None or self._text_input is not None
+        if modal_overlay_active:
+            top = max(72, height - card_height - 54)
+            max_visible = 1
+        for index, cue in enumerate(self._late_game_choreography_cues[:max_visible]):
             if cue.duration <= 0:
                 continue
             age = max(0.0, cue.duration - cue.time_left)
             enter_ratio = min(1.0, age / 0.2)
             ttl_ratio = max(0.0, min(1.0, cue.time_left / cue.duration))
             intensity = ttl_ratio * (0.56 if self.motion_mode is MotionMode.REDUCED else 1.0)
-            lift = int((1.0 - enter_ratio) * 22)
-            wave = sin(self._entity_motion_phase(offset=index * 1.2, speed=2.0)) * 3 * intensity
+            lift = 0 if modal_overlay_active else int((1.0 - enter_ratio) * 22)
+            wave = (
+                0
+                if modal_overlay_active
+                else sin(self._entity_motion_phase(offset=index * 1.2, speed=2.0)) * 3 * intensity
+            )
             rect = pygame.Rect(
                 left,
                 int(top + index * (card_height + 8) - lift + wave),
                 card_width,
                 card_height,
             )
+            if modal_overlay_active:
+                self._record_layout_separation(
+                    "late-game-choreography-vs-modal-controls",
+                    rect,
+                    pygame.Rect(0, height - 54, width, 54),
+                )
             layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             layer_rect = layer.get_rect()
             fill = blend_color((8, 13, 22), cue.accent, 0.18 + intensity * 0.12)

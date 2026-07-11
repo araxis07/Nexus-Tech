@@ -2794,6 +2794,35 @@ def test_compact_help_overlay_keeps_title_below_navigation() -> None:
         pygame.quit()
 
 
+def test_picker_feedback_cues_do_not_cover_nav_or_modal_controls() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=146),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.FULL,
+            entry_transition="boot_run",
+        )
+
+        scene._run_command(TurnAction.SET_CAPITAL_PLAN.value)
+        scene.draw(surface)
+
+        assert scene._context_picker is not None
+        assert scene._action_feedback_cues
+        assert scene.late_game_choreography_active()
+        assert scene.layout_safety_violations() == ()
+        violations, *_metrics = visual_audit_module._layout_safety_metrics(scene, 820, 620)
+        assert violations == ()
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_meta_board_compacts_summary_when_space_is_tight(tmp_path: Path) -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
