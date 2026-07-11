@@ -148,6 +148,7 @@ from nexus_tech.simulation.objectives import evaluate_scenario_objective
 from nexus_tech.simulation.onboarding_flow import (
     build_onboarding_visible_evidence_matrix,
     build_onboarding_visible_manual_session,
+    build_onboarding_visible_playtest_batch_packet,
     build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
@@ -168,6 +169,7 @@ from nexus_tech.simulation.onboarding_flow import (
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_evidence_matrix,
     validate_onboarding_visible_manual_session,
+    validate_onboarding_visible_playtest_batch_packet,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
@@ -185,6 +187,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
     write_onboarding_visible_manual_session,
+    write_onboarding_visible_playtest_batch_packet,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
@@ -12538,6 +12541,75 @@ def test_validate_onboarding_visible_playtest_next_step_blocks_stale_handoff(
     assert not stale_validation.ok
     assert stale_validation.status == "fail"
     assert any(check.area == "Next Action" for check in stale_validation.failed_checks)
+
+
+def test_onboarding_visible_playtest_batch_packet_scopes_next_open_rows(
+    tmp_path: Path,
+) -> None:
+    packet = build_onboarding_visible_playtest_packet(
+        command_prefix=".venv313/bin/nexus-tech",
+        windows=((820, 620),),
+        motion_modes=("reduced",),
+    )
+    report_path = tmp_path / "onboarding-visible-report.md"
+    batch_path = tmp_path / "onboarding-visible-batch.md"
+    write_onboarding_visible_playtest_evidence_report(
+        build_onboarding_visible_playtest_evidence_report(packet),
+        report_path,
+    )
+    record_onboarding_visible_playtest_route(
+        report_path,
+        rank=1,
+        result="pass",
+        evidence_notes=(
+            "Observed the terminal guide output directly; opening flow, risk forecast, "
+            "and difficulty cues were readable before launching the window."
+        ),
+    )
+
+    batch = build_onboarding_visible_playtest_batch_packet(
+        report_path,
+        batch_size=2,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+    write_onboarding_visible_playtest_batch_packet(batch, batch_path)
+
+    text = batch_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Playtest Batch Packet" in text
+    assert len(batch.rows) == 2
+    assert [row.rank for row in batch.rows] == [2, 3]
+    assert ".venv313/bin/nexus-tech tutorial" in text
+    assert ".venv313/bin/nexus-tech audit-onboarding-flow" in text
+    assert "--rank 2" in text
+    assert "--rank 3" in text
+    assert "This packet scopes manual work" in text
+
+    validation = validate_onboarding_visible_playtest_batch_packet(
+        batch_path,
+        report_path=report_path,
+        batch_size=2,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert validation.ok
+    assert validation.status == "pass"
+
+    stale_text = text.replace(
+        ".venv313/bin/nexus-tech tutorial",
+        ".venv313/bin/nexus-tech glossary",
+    )
+    batch_path.write_text(stale_text, encoding="utf-8")
+
+    stale_validation = validate_onboarding_visible_playtest_batch_packet(
+        batch_path,
+        report_path=report_path,
+        batch_size=2,
+        command_prefix=".venv313/bin/nexus-tech",
+    )
+
+    assert not stale_validation.ok
+    assert stale_validation.status == "fail"
+    assert any(check.area == "Copy Commands" for check in stale_validation.failed_checks)
 
 
 def test_onboarding_visible_terminal_batch_writes_and_validates_focused_handoff(

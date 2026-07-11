@@ -259,6 +259,8 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
         "onboarding-visible-playtest-status",
         "onboarding-visible-playtest-next",
         "validate-onboarding-visible-playtest-next",
+        "onboarding-visible-playtest-batch-packet",
+        "validate-onboarding-visible-playtest-batch-packet",
         "onboarding-visible-terminal-batch",
         "validate-onboarding-visible-terminal-batch",
         "onboarding-visible-terminal-evidence-sheet",
@@ -996,6 +998,7 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     packet_path = tmp_path / "onboarding-visible.md"
     report_path = tmp_path / "onboarding-visible-report.md"
     next_path = tmp_path / "onboarding-visible-next.md"
+    playtest_batch_path = tmp_path / "onboarding-visible-batch-packet.md"
     batch_path = tmp_path / "onboarding-visible-terminal-batch.md"
     sheet_path = tmp_path / "onboarding-visible-terminal-evidence-sheet.md"
     window_sheet_path = tmp_path / "onboarding-visible-820x620-evidence-sheet.md"
@@ -1134,6 +1137,47 @@ def test_onboarding_visible_playtest_report_commands_record_evidence(
     assert next_validation_result.exit_code == 0
     assert "Onboarding Visible Next-Step Validation" in next_validation_result.output
     assert "PASS" in next_validation_result.output
+
+    playtest_batch_result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-batch-packet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--batch-size",
+            "2",
+            "--output",
+            str(playtest_batch_path),
+        ],
+    )
+    assert playtest_batch_result.exit_code == 0
+    assert "Onboarding Visible Batch Packet" in playtest_batch_result.output
+    assert "Focused batch packet written" in playtest_batch_result.output
+    playtest_batch_text = playtest_batch_path.read_text(encoding="utf-8")
+    assert "# NEXUS TECH Onboarding Visible Playtest Batch Packet" in playtest_batch_text
+    assert ".venv313/bin/nexus-tech guide" in playtest_batch_text
+    assert ".venv313/bin/nexus-tech tutorial" in playtest_batch_text
+    assert "This packet scopes manual work" in playtest_batch_text
+
+    playtest_batch_validation_result = runner.invoke(
+        app,
+        [
+            "validate-onboarding-visible-playtest-batch-packet",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--report",
+            str(report_path),
+            "--batch-size",
+            "2",
+            "--input",
+            str(playtest_batch_path),
+        ],
+    )
+    assert playtest_batch_validation_result.exit_code == 0
+    assert "Onboarding Visible Batch Packet Validation" in (playtest_batch_validation_result.output)
+    assert "PASS" in playtest_batch_validation_result.output
 
     batch_result = runner.invoke(
         app,
@@ -1785,6 +1829,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "uv run nexus-tech onboarding-visible-playtest-status" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-next" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-next" in workflow
+    assert "uv run nexus-tech onboarding-visible-playtest-batch-packet" in workflow
+    assert "uv run nexus-tech validate-onboarding-visible-playtest-batch-packet" in workflow
     assert "uv run nexus-tech onboarding-visible-terminal-batch" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-terminal-batch" in workflow
     assert "uv run nexus-tech onboarding-visible-terminal-evidence-sheet" in workflow
@@ -1819,6 +1865,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-playtest.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-report.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-playtest-next.md" in workflow
+    assert "/tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-batch.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md" in workflow
@@ -1838,6 +1885,7 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "nexus-tech-onboarding-visible-playtest" in workflow
     assert "nexus-tech-onboarding-visible-playtest-report" in workflow
     assert "nexus-tech-onboarding-visible-playtest-next" in workflow
+    assert "nexus-tech-onboarding-visible-playtest-batch-packet" in workflow
     assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
     assert "nexus-tech-onboarding-visible-terminal-evidence-sheet" in workflow
     assert "nexus-tech-onboarding-visible-820x620-evidence-sheet" in workflow

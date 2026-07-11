@@ -233,6 +233,7 @@ from nexus_tech.simulation.onboarding_flow import (
     ONBOARDING_VISIBLE_NOTE_PLACEHOLDER,
     build_onboarding_visible_evidence_matrix,
     build_onboarding_visible_manual_session,
+    build_onboarding_visible_playtest_batch_packet,
     build_onboarding_visible_playtest_evidence_report,
     build_onboarding_visible_playtest_next_step,
     build_onboarding_visible_playtest_packet,
@@ -253,6 +254,7 @@ from nexus_tech.simulation.onboarding_flow import (
     summarize_onboarding_visible_playtest_status,
     validate_onboarding_visible_evidence_matrix,
     validate_onboarding_visible_manual_session,
+    validate_onboarding_visible_playtest_batch_packet,
     validate_onboarding_visible_playtest_evidence_report,
     validate_onboarding_visible_playtest_next_step,
     validate_onboarding_visible_playtest_packet,
@@ -270,6 +272,7 @@ from nexus_tech.simulation.onboarding_flow import (
     write_onboarding_flow_audit_report,
     write_onboarding_visible_evidence_matrix,
     write_onboarding_visible_manual_session,
+    write_onboarding_visible_playtest_batch_packet,
     write_onboarding_visible_playtest_evidence_report,
     write_onboarding_visible_playtest_next_step,
     write_onboarding_visible_playtest_packet,
@@ -425,6 +428,22 @@ ONBOARDING_VISIBLE_NEXT_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-playtest-next.md"),
     "--input",
     help="Markdown path for the next visible-window onboarding QA handoff to validate.",
+)
+ONBOARDING_VISIBLE_PLAYTEST_BATCH_PACKET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md"),
+    "--output",
+    help="Markdown path for the focused onboarding visible QA route batch.",
+)
+ONBOARDING_VISIBLE_PLAYTEST_BATCH_PACKET_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md"),
+    "--input",
+    help="Markdown path for the focused onboarding visible QA route batch to validate.",
+)
+ONBOARDING_VISIBLE_PLAYTEST_BATCH_SIZE_OPTION = typer.Option(
+    3,
+    "--batch-size",
+    min=1,
+    help="Number of incomplete onboarding visible rows to include in the focused batch.",
 )
 ONBOARDING_VISIBLE_TERMINAL_BATCH_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-visible-terminal-batch.md"),
@@ -6601,6 +6620,116 @@ def validate_onboarding_visible_playtest_next_command(
                 f"{len(validation.checks)} checks."
             ),
             title="Onboarding Visible Next-Step Validation",
+            border_style=border_style,
+        )
+    )
+    if not validation.ok:
+        raise typer.Exit(code=1)
+
+
+@app.command("onboarding-visible-playtest-batch-packet")
+def onboarding_visible_playtest_batch_packet_command(
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    output: Path = ONBOARDING_VISIBLE_PLAYTEST_BATCH_PACKET_OUTPUT_OPTION,
+    batch_size: int = ONBOARDING_VISIBLE_PLAYTEST_BATCH_SIZE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Write a focused batch packet for the next visible onboarding QA routes."""
+
+    try:
+        packet = build_onboarding_visible_playtest_batch_packet(
+            report_path,
+            batch_size=batch_size,
+            command_prefix=command_prefix,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Onboarding Visible Batch Packet Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    write_onboarding_visible_playtest_batch_packet(packet, output)
+
+    table = Table(title=f"Onboarding Visible Batch Packet | {output}")
+    table.add_column("Status")
+    table.add_column("Rows", justify="right")
+    table.add_column("Batch", justify="right")
+    table.add_column("Incomplete", justify="right")
+    table.add_row(
+        packet.status.upper(),
+        str(packet.total_rows),
+        str(len(packet.rows)),
+        str(packet.incomplete_count),
+    )
+    console.print(table)
+    if packet.rows:
+        batch_table = Table(title="Focused Visible Routes")
+        batch_table.add_column("Rank", justify="right")
+        batch_table.add_column("Route")
+        batch_table.add_column("Window")
+        batch_table.add_column("Motion")
+        for row in packet.rows:
+            batch_table.add_row(
+                str(row.rank),
+                row.route,
+                row.window,
+                row.motion_mode,
+            )
+        console.print(batch_table)
+    else:
+        console.print(
+            Panel.fit(
+                "All onboarding visible rows are recorded. Run validation before signoff.",
+                title="Onboarding Visible Gate",
+                border_style="green",
+            )
+        )
+    console.print(f"Focused batch packet written to {output}")
+
+
+@app.command("validate-onboarding-visible-playtest-batch-packet")
+def validate_onboarding_visible_playtest_batch_packet_command(
+    packet_path: Path = ONBOARDING_VISIBLE_PLAYTEST_BATCH_PACKET_INPUT_OPTION,
+    report_path: Path = ONBOARDING_VISIBLE_REPORT_INPUT_OPTION,
+    batch_size: int = ONBOARDING_VISIBLE_PLAYTEST_BATCH_SIZE_OPTION,
+    command_prefix: str = ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION,
+) -> None:
+    """Validate the focused visible onboarding QA batch packet."""
+
+    validation = validate_onboarding_visible_playtest_batch_packet(
+        packet_path,
+        report_path=report_path,
+        batch_size=batch_size,
+        command_prefix=command_prefix,
+    )
+
+    table = Table(title=f"Onboarding Visible Batch Packet Validation | {packet_path}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Summary")
+    table.add_column("Evidence")
+    for check in validation.checks:
+        table.add_row(
+            check.area,
+            check.status.upper(),
+            check.summary,
+            ", ".join(check.evidence),
+        )
+    console.print(table)
+
+    border_style = "green" if validation.ok else "red"
+    console.print(
+        Panel.fit(
+            (
+                f"Onboarding visible batch packet validation: "
+                f"{'PASS' if validation.ok else 'FAIL'} across "
+                f"{len(validation.checks)} checks."
+            ),
+            title="Onboarding Visible Batch Packet Validation",
             border_style=border_style,
         )
     )

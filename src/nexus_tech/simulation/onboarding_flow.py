@@ -17,6 +17,7 @@ ONBOARDING_FLOW_AUDIT_REPORT_NAME = "onboarding-flow-audit.md"
 ONBOARDING_VISIBLE_PLAYTEST_PACKET_NAME = "onboarding-visible-playtest.md"
 ONBOARDING_VISIBLE_PLAYTEST_REPORT_NAME = "onboarding-visible-playtest-report.md"
 ONBOARDING_VISIBLE_PLAYTEST_NEXT_NAME = "onboarding-visible-playtest-next.md"
+ONBOARDING_VISIBLE_PLAYTEST_BATCH_PACKET_NAME = "onboarding-visible-playtest-batch-packet.md"
 ONBOARDING_VISIBLE_TERMINAL_BATCH_NAME = "onboarding-visible-terminal-batch.md"
 ONBOARDING_VISIBLE_TERMINAL_EVIDENCE_SHEET_NAME = "onboarding-visible-terminal-evidence-sheet.md"
 ONBOARDING_VISIBLE_WINDOW_EVIDENCE_SHEET_NAME = "onboarding-visible-window-evidence-sheet.md"
@@ -270,6 +271,48 @@ class OnboardingVisiblePlaytestNextStepValidation:
     @property
     def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
         """Return next-step handoff checks that still block validation."""
+
+        return tuple(check for check in self.checks if check.status != "pass")
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestBatchPacket:
+    """Focused packet for the next incomplete onboarding visible QA rows."""
+
+    report_path: Path
+    status: str
+    total_rows: int
+    pass_count: int
+    watch_count: int
+    fail_count: int
+    todo_count: int
+    incomplete_count: int
+    batch_size: int
+    rows: tuple[OnboardingVisiblePlaytestReportRow, ...]
+    visible_commands: tuple[str, ...]
+    recorder_commands: tuple[str, ...]
+    validate_command: str
+    status_command: str
+    next_step_command: str
+
+
+@dataclass(frozen=True)
+class OnboardingVisiblePlaytestBatchPacketValidation:
+    """Validation report for a focused onboarding visible QA batch packet."""
+
+    packet_path: Path
+    status: str
+    checks: tuple[OnboardingFlowAuditCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """Return true when the batch packet matches the current report."""
+
+        return all(check.status == "pass" for check in self.checks)
+
+    @property
+    def failed_checks(self) -> tuple[OnboardingFlowAuditCheck, ...]:
+        """Return batch-packet checks that still block validation."""
 
         return tuple(check for check in self.checks if check.status != "pass")
 
@@ -1933,6 +1976,330 @@ def validate_onboarding_visible_playtest_next_step(
     )
     return OnboardingVisiblePlaytestNextStepValidation(
         next_path=next_path,
+        status="pass" if all(check.status == "pass" for check in checks) else "fail",
+        checks=checks,
+    )
+
+
+def build_onboarding_visible_playtest_batch_packet(
+    report_path: Path,
+    *,
+    batch_size: int = 3,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisiblePlaytestBatchPacket:
+    """Build a focused packet for the next incomplete visible QA rows."""
+
+    if batch_size < 1:
+        raise ValueError("Batch size must be at least 1.")
+    summary = summarize_onboarding_visible_playtest_status(
+        report_path,
+        command_prefix=command_prefix,
+    )
+    report = read_onboarding_visible_playtest_evidence_report(report_path)
+    rows = report.incomplete_rows[:batch_size]
+    return OnboardingVisiblePlaytestBatchPacket(
+        report_path=report_path,
+        status=summary.status,
+        total_rows=summary.total_rows,
+        pass_count=summary.pass_count,
+        watch_count=summary.watch_count,
+        fail_count=summary.fail_count,
+        todo_count=summary.todo_count,
+        incomplete_count=summary.incomplete_count,
+        batch_size=batch_size,
+        rows=rows,
+        visible_commands=tuple(row.command for row in rows),
+        recorder_commands=tuple(
+            _build_onboarding_visible_recorder_command(
+                report_path,
+                row,
+                command_prefix=command_prefix,
+            )
+            for row in rows
+        ),
+        validate_command=(
+            f"{command_prefix} validate-onboarding-visible-playtest-report --report {report_path}"
+        ),
+        status_command=(
+            f"{command_prefix} onboarding-visible-playtest-status --report {report_path}"
+        ),
+        next_step_command=(
+            f"{command_prefix} onboarding-visible-playtest-next --report {report_path}"
+        ),
+    )
+
+
+def write_onboarding_visible_playtest_batch_packet(
+    packet: OnboardingVisiblePlaytestBatchPacket,
+    output_path: Path,
+) -> None:
+    """Write a focused onboarding visible QA batch packet as Markdown."""
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# NEXUS TECH Onboarding Visible Playtest Batch Packet",
+        "",
+        f"- Report: `{packet.report_path}`",
+        f"- Status: `{packet.status}`",
+        f"- Rows: `{packet.total_rows}`",
+        f"- Pass: `{packet.pass_count}`",
+        f"- Watch: `{packet.watch_count}`",
+        f"- Fail: `{packet.fail_count}`",
+        f"- Todo: `{packet.todo_count}`",
+        f"- Incomplete: `{packet.incomplete_count}`",
+        f"- Batch size: `{packet.batch_size}`",
+        f"- Batch rows: `{len(packet.rows)}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Manual result: `not completed by automation`",
+        "",
+    ]
+    if not packet.rows:
+        lines.extend(
+            [
+                "## Batch Status",
+                "",
+                "All onboarding visible rows are already recorded with concrete pass notes.",
+                "Run validation and status before treating the onboarding visible gate as closed.",
+                "",
+                "```bash",
+                packet.validate_command,
+                packet.status_command,
+                "```",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "## Batch Rows",
+                "",
+                "| Rank | Route | Window | Motion | Result | Required Evidence |",
+                "| ---: | --- | --- | --- | --- | --- |",
+            ]
+        )
+        for row in packet.rows:
+            lines.append(
+                (
+                    f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                    f"`{row.motion_mode}` | `{row.result}` | "
+                    f"{_markdown_join(row.required_evidence)} |"
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "## Open Commands",
+                "",
+            ]
+        )
+        for index, (row, command) in enumerate(
+            zip(packet.rows, packet.visible_commands, strict=True),
+            start=1,
+        ):
+            lines.extend(
+                [
+                    f"### {index}. Open Rank {row.rank} `{row.route}`",
+                    "",
+                    "```bash",
+                    command,
+                    "```",
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "## Recorder Commands",
+                "",
+                "Replace placeholder notes only after observing each visible route.",
+                "",
+            ]
+        )
+        for index, (row, command) in enumerate(
+            zip(packet.rows, packet.recorder_commands, strict=True),
+            start=1,
+        ):
+            lines.extend(
+                [
+                    f"### {index}. Record Rank {row.rank} `{row.route}`",
+                    "",
+                    "```bash",
+                    command,
+                    "```",
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "## Evidence Checklist",
+                "",
+                "| Rank | Checklist |",
+                "| ---: | --- |",
+            ]
+        )
+        for row in packet.rows:
+            checklist = (
+                *row.required_evidence,
+                "Text stays inside its panel and remains readable.",
+                "Pause/back/menu recovery affordance is visible where the route needs it.",
+                "Notes mention the route, window/motion mode, and observed UI behavior.",
+            )
+            lines.append(f"| {row.rank} | {_markdown_join(checklist)} |")
+        lines.extend(
+            [
+                "",
+                "## After Batch",
+                "",
+                "```bash",
+                packet.validate_command,
+                packet.status_command,
+                packet.next_step_command,
+                "```",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Result Rules",
+            "",
+            "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+            "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+            "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+            "- This packet scopes manual work; it does not complete evidence by itself.",
+        ]
+    )
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def validate_onboarding_visible_playtest_batch_packet(
+    packet_path: Path,
+    *,
+    report_path: Path,
+    batch_size: int = 3,
+    command_prefix: str = "uv run nexus-tech",
+) -> OnboardingVisiblePlaytestBatchPacketValidation:
+    """Validate that a focused visible QA batch packet matches the report."""
+
+    try:
+        expected = build_onboarding_visible_playtest_batch_packet(
+            report_path,
+            batch_size=batch_size,
+            command_prefix=command_prefix,
+        )
+    except (OSError, ValueError) as error:
+        return OnboardingVisiblePlaytestBatchPacketValidation(
+            packet_path=packet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Source Report",
+                    passed=False,
+                    summary="The source visible QA report must be readable.",
+                    evidence=(str(error),),
+                ),
+            ),
+        )
+    if not packet_path.exists():
+        return OnboardingVisiblePlaytestBatchPacketValidation(
+            packet_path=packet_path,
+            status="fail",
+            checks=(
+                _build_check(
+                    area="Batch Packet File",
+                    passed=False,
+                    summary="The onboarding visible batch packet file must exist.",
+                    evidence=(f"missing:{packet_path}",),
+                ),
+            ),
+        )
+
+    text = packet_path.read_text(encoding="utf-8")
+    metadata_markers = (
+        "# NEXUS TECH Onboarding Visible Playtest Batch Packet",
+        f"- Report: `{expected.report_path}`",
+        f"- Status: `{expected.status}`",
+        f"- Rows: `{expected.total_rows}`",
+        f"- Pass: `{expected.pass_count}`",
+        f"- Watch: `{expected.watch_count}`",
+        f"- Fail: `{expected.fail_count}`",
+        f"- Todo: `{expected.todo_count}`",
+        f"- Incomplete: `{expected.incomplete_count}`",
+        f"- Batch size: `{expected.batch_size}`",
+        f"- Batch rows: `{len(expected.rows)}`",
+        "- Evidence policy: `real visible-window observations required`",
+        "- Manual result: `not completed by automation`",
+    )
+    if not expected.rows:
+        row_markers = (
+            "All onboarding visible rows are already recorded with concrete pass notes.",
+            expected.validate_command,
+            expected.status_command,
+        )
+        command_markers: tuple[str, ...] = ()
+        checklist_markers: tuple[str, ...] = ()
+    else:
+        row_markers = tuple(
+            (
+                f"| {row.rank} | `{row.route}` | `{row.window}` | "
+                f"`{row.motion_mode}` | `{row.result}` | "
+                f"{_markdown_join(row.required_evidence)} |"
+            )
+            for row in expected.rows
+        )
+        command_markers = (
+            *expected.visible_commands,
+            *expected.recorder_commands,
+            expected.validate_command,
+            expected.status_command,
+            expected.next_step_command,
+        )
+        checklist_markers = tuple(
+            marker
+            for row in expected.rows
+            for marker in (
+                *row.required_evidence,
+                "Text stays inside its panel and remains readable.",
+                "Pause/back/menu recovery affordance is visible where the route needs it.",
+                "Notes mention the route, window/motion mode, and observed UI behavior.",
+            )
+        )
+    checks = (
+        _build_presence_check(
+            area="Batch Metadata",
+            text=text,
+            markers=metadata_markers,
+            summary="The focused batch metadata matches the current visible QA report.",
+        ),
+        _build_presence_check(
+            area="Batch Rows",
+            text=text,
+            markers=row_markers,
+            summary="The focused batch rows match the next incomplete routes.",
+        ),
+        _build_presence_check(
+            area="Copy Commands",
+            text=text,
+            markers=command_markers,
+            summary="The focused batch commands open and record the current rows.",
+        ),
+        _build_presence_check(
+            area="Evidence Checklist",
+            text=text,
+            markers=checklist_markers,
+            summary="The focused batch checklist keeps visible UX checks explicit.",
+        ),
+        _build_presence_check(
+            area="Result Rules",
+            text=text,
+            markers=(
+                "- `pass`: readable, navigable, and the next command/recovery path is clear.",
+                "- `watch`: playable, but has a concrete UI, copy, contrast, or motion concern.",
+                "- `fail`: route blocks navigation, readability, or first-turn understanding.",
+                "- This packet scopes manual work; it does not complete evidence by itself.",
+            ),
+            summary="The focused batch keeps manual result rules visible.",
+        ),
+    )
+    return OnboardingVisiblePlaytestBatchPacketValidation(
+        packet_path=packet_path,
         status="pass" if all(check.status == "pass" for check in checks) else "fail",
         checks=checks,
     )
@@ -6113,6 +6480,10 @@ def _format_onboarding_visible_report_row(row: OnboardingVisiblePlaytestReportRo
         f"{_markdown_escape(row.evidence_notes)} | "
         f"{_markdown_escape(', '.join(row.required_evidence))} |"
     )
+
+
+def _markdown_join(values: tuple[str, ...]) -> str:
+    return "<br>".join(_markdown_escape(value) for value in values)
 
 
 def _parse_onboarding_visible_report_row(

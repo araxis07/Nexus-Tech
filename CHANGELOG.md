@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.278.0 - 2026-07-11
+
+- Added `onboarding-visible-playtest-batch-packet` and its validator to scope the next focused set of incomplete visible onboarding routes without fabricating manual evidence
+- Wired the focused visible route batch into docs, regression coverage, CI validation, and artifact upload before terminal/window onboarding worksheets
+
 ## 0.277.1 - 2026-07-11
 
 - Reused the already-passing 2D animation matrix artifact when preparing the manual playtest packet, removing a duplicate flaky matrix render from CI

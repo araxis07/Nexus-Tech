@@ -271,6 +271,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Built-in `onboarding-visible-playtest-status` command shows visible onboarding QA progress plus the next visible command and recorder command for the next incomplete route
 - Built-in `onboarding-visible-playtest-next` command writes a copy-ready next-step handoff with the exact visible command, recorder command, validation command, and evidence checklist
 - Built-in `validate-onboarding-visible-playtest-next` command blocks stale next-step handoffs before CI uploads the manual QA artifact
+- Built-in `onboarding-visible-playtest-batch-packet` and `validate-onboarding-visible-playtest-batch-packet` commands scope and verify the next focused set of incomplete onboarding visible QA routes without treating the packet as evidence
 - Built-in `onboarding-visible-terminal-batch` and `validate-onboarding-visible-terminal-batch` commands package and verify the first three terminal onboarding routes before the 2D window matrix begins
 - Built-in `onboarding-visible-terminal-evidence-sheet` and `validate-onboarding-visible-terminal-evidence-sheet` commands write and verify a terminal-route worksheet before manual observations are recorded
 - Built-in `onboarding-visible-window-evidence-sheet` and `validate-onboarding-visible-window-evidence-sheet` commands write and verify 820x620, 1280x720, and 1440x900 visible-window onboarding worksheets before UI QA begins
@@ -512,6 +513,8 @@ uv run nexus-tech onboarding-visible-playtest-report --input /tmp/nexus-tech-onb
 uv run nexus-tech onboarding-visible-playtest-status --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
 uv run nexus-tech onboarding-visible-playtest-next --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --output /tmp/nexus-tech-onboarding-visible-playtest-next.md
 uv run nexus-tech validate-onboarding-visible-playtest-next --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --input /tmp/nexus-tech-onboarding-visible-playtest-next.md
+uv run nexus-tech onboarding-visible-playtest-batch-packet --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --batch-size 3 --output /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
+uv run nexus-tech validate-onboarding-visible-playtest-batch-packet --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --batch-size 3 --input /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
 uv run nexus-tech onboarding-visible-terminal-batch --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --output /tmp/nexus-tech-onboarding-visible-terminal-batch.md
 uv run nexus-tech validate-onboarding-visible-terminal-batch --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --input /tmp/nexus-tech-onboarding-visible-terminal-batch.md
 uv run nexus-tech onboarding-visible-terminal-evidence-sheet --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --output /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md
@@ -920,6 +923,8 @@ uv run nexus-tech onboarding-visible-playtest-report --input /tmp/nexus-tech-onb
 uv run nexus-tech onboarding-visible-playtest-status --report /tmp/nexus-tech-onboarding-visible-playtest-report.md
 uv run nexus-tech onboarding-visible-playtest-next --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --output /tmp/nexus-tech-onboarding-visible-playtest-next.md
 uv run nexus-tech validate-onboarding-visible-playtest-next --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --input /tmp/nexus-tech-onboarding-visible-playtest-next.md
+uv run nexus-tech onboarding-visible-playtest-batch-packet --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --batch-size 3 --output /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
+uv run nexus-tech validate-onboarding-visible-playtest-batch-packet --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --batch-size 3 --input /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
 uv run nexus-tech onboarding-visible-terminal-batch --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --output /tmp/nexus-tech-onboarding-visible-terminal-batch.md
 uv run nexus-tech validate-onboarding-visible-terminal-batch --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --input /tmp/nexus-tech-onboarding-visible-terminal-batch.md
 uv run nexus-tech onboarding-visible-terminal-evidence-sheet --report /tmp/nexus-tech-onboarding-visible-playtest-report.md --output /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md
