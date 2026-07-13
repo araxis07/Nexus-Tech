@@ -9,6 +9,7 @@ from decimal import Decimal
 from nexus_tech.domain.models import GameState, PendingEvent, Product, TurnAction
 from nexus_tech.domain.money import format_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
+from nexus_tech.simulation.action_catalog import get_action_presentation
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
@@ -20,6 +21,7 @@ from nexus_tech.simulation.engine import TurnResolution
 from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
+from nexus_tech.simulation.run_phase import get_run_phase
 from nexus_tech.simulation.turn_coach import build_turn_coach
 
 
@@ -65,6 +67,8 @@ class CoachLineViewModel:
     """Compact recommendation line."""
 
     command: str
+    label: str
+    family_label: str
     source: str
     detail: str
 
@@ -233,6 +237,7 @@ class GameViewModel:
     difficulty_label: str
     difficulty_summary: str
     turn_label: str
+    phase_label: str
     score_label: str
     market_label: str
     roadmap_label: str
@@ -259,6 +264,7 @@ def build_game_view_model(
     """Build the renderable 2D dashboard state from the simulation state."""
 
     difficulty = get_difficulty_profile(state.difficulty_mode)
+    phase = get_run_phase(state.company.current_turn)
     coach = build_turn_coach(state)
     forecast = build_risk_forecast(state)
     preview = build_end_turn_preview(state)
@@ -350,24 +356,30 @@ def build_game_view_model(
     coach_lines = tuple(
         CoachLineViewModel(
             command=recommendation.command,
+            label=get_action_presentation(recommendation.command).label,
+            family_label=get_action_presentation(recommendation.command).family_label,
             source=recommendation.source,
             detail=recommendation.rationale,
         )
         for recommendation in coach.recommendations[:3]
     )
     deferred_lines = tuple(
-        f"{action.command}: {action.reason}" for action in coach.deferred_actions[:2]
+        f"{get_action_presentation(action.command).label}: {action.reason}"
+        for action in coach.deferred_actions[:2]
     ) or ("No deferred actions are flashing right now.",)
     risk_lines = tuple(
-        f"{item.area}: {item.command} ({item.severity})" for item in forecast.items[:3]
+        f"{item.area}: {get_action_presentation(item.command).label} ({item.severity})"
+        for item in forecast.items[:3]
     ) or ("No elevated operating risk is flashing right now.",)
-    header_note = f"Product {selected_product.name} | Coach {coach.primary_command}"
+    primary_action = get_action_presentation(coach.primary_command)
+    header_note = f"{phase.objective} | Next: {primary_action.label}"
     return GameViewModel(
         company_name=state.company.name,
         scenario_title=state.scenario_title,
         difficulty_label=state.difficulty_mode.value,
         difficulty_summary=difficulty.summary,
         turn_label=f"Turn {state.company.current_turn}",
+        phase_label=f"{phase.title} / {phase.turn_window}",
         score_label=f"{score.total_score} ({score.score_tier})",
         market_label=state.market_cycle.value,
         roadmap_label=state.roadmap_focus.value,

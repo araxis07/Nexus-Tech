@@ -838,6 +838,11 @@ def test_run_scene_first_turn_guide_draws_clickable_coach_path() -> None:
         assert scene.first_turn_guide_active()
         assert any(target.kind == "coach" for target in scene._click_targets)
 
+        scene.draw(pygame.Surface((1280, 720)))
+
+        assert scene.first_turn_guide_active()
+        assert any(target.kind == "coach" for target in scene._click_targets)
+
         scene._set_pause_overlay_visible(True)
         scene.draw(surface)
 
@@ -1422,13 +1427,19 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
             enabled=True,
             button_cols=5,
         )
-        button_cols, button_height, footer_band_height = scene._footer_layout_metrics(820, 320)
-        rows = max(1, (len(scenes_module._ACTION_BUTTONS) + button_cols - 1) // button_cols)
+        visible_buttons = scene._footer_action_buttons()
+        button_cols, button_height, footer_band_height = scene._footer_layout_metrics(
+            820,
+            320,
+            button_count=len(visible_buttons),
+        )
+        rows = max(1, (len(visible_buttons) + button_cols - 1) // button_cols)
         compact_outer_height = scene._footer_outer_height(820, 620)
         compact_titles = tuple(
             scene._footer_button_title(button, button_cols=button_cols)
-            for button in scenes_module._ACTION_BUTTONS
+            for button in visible_buttons
         )
+        visible_titles = {button.title for button in visible_buttons}
         end_turn_title = next(title for title in compact_titles if title.startswith("Space "))
         compact_status, compact_hint = scene._footer_status_lines(max_width=720)
         full_status, full_hint = scene._footer_status_lines(max_width=900)
@@ -1437,6 +1448,10 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(narrow_detail) <= 28
         assert button_cols == 5
         assert footer_band_height == 48
+        assert len(visible_buttons) < len(scenes_module._ACTION_BUTTONS)
+        assert len(visible_buttons) <= 18
+        assert {"Save", "End Turn"} <= visible_titles
+        assert "Endgame" not in visible_titles
         assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
         assert compact_outer_height <= 320
         assert end_turn_title == "Space End Turn"
@@ -1446,6 +1461,10 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert "Actions Left" in full_status
         assert "AP:" in compact_status
         assert full_hint.startswith("Watch:")
+
+        scene.state.company.current_turn = 10
+        scene._refresh_view_model()
+        assert "Endgame" in {button.title for button in scene._footer_action_buttons()}
     finally:
         pygame.quit()
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.models import (
+    BoardAsk,
     BudgetStance,
     CampaignGoalId,
     CapitalPlanMode,
@@ -651,9 +652,9 @@ def _choose_action(state: GameState) -> PlannedAction:
             TurnAction.HIRE_EMPLOYEE,
             ActionContext(
                 hire_full_name=f"Autohire {state.company.current_turn}",
-                hire_role=EmployeeRole.ENGINEER,
+                hire_role=_choose_opening_hire_role(state),
                 hire_seniority=Seniority.MID,
-                hire_specialization="platform",
+                hire_specialization="opening",
             ),
         )
 
@@ -677,6 +678,9 @@ def _choose_action(state: GameState) -> PlannedAction:
             ActionContext(budget_stance=_choose_budget_stance(state)),
         )
 
+    if _can_execute_board_response(state):
+        return PlannedAction(TurnAction.EXECUTE_BOARD_RESPONSE, ActionContext())
+
     support_exposure = calculate_support_queue_exposure(state)
     liquidity_floor = max(
         BALANCE.event_investor_cash_threshold,
@@ -695,6 +699,61 @@ def _choose_action(state: GameState) -> PlannedAction:
         and state.finance.debt_principal < BALANCE.finance_max_total_debt
     ):
         return PlannedAction(TurnAction.TAKE_LOAN, ActionContext())
+
+    consolidation_candidate = _pick_profit_consolidation_candidate(state)
+    if consolidation_candidate is not None:
+        return PlannedAction(
+            TurnAction.SUNSET_PRODUCT,
+            ActionContext(target_product_id=consolidation_candidate.id),
+        )
+
+    strongest_product = _pick_primary_product(state)
+    worst_product = _pick_worst_product(state)
+    operations = calculate_operations_summary(
+        state.products,
+        state.employees,
+        current_turn=state.company.current_turn,
+        customer_accounts=state.customer_accounts,
+    )
+
+    if _should_repair_product(state, worst_product):
+        return PlannedAction(
+            TurnAction.IMPROVE_QUALITY,
+            ActionContext(target_product_id=worst_product.id),
+        )
+
+    if _should_frontload_debt_growth(state, strongest_product):
+        return PlannedAction(
+            TurnAction.MARKET_PRODUCT,
+            ActionContext(target_product_id=strongest_product.id),
+        )
+
+    if _should_accelerate_debt_paydown(state, strongest_product):
+        return PlannedAction(TurnAction.REPAY_DEBT, ActionContext())
+
+    if _should_stabilize_growth(state, strongest_product):
+        if state.company.strategy is not CompanyStrategy.GROWTH:
+            return PlannedAction(
+                TurnAction.SET_COMPANY_STRATEGY,
+                ActionContext(strategy=CompanyStrategy.GROWTH),
+            )
+        if state.roadmap_focus is not RoadmapFocus.GROWTH_PUSH:
+            return PlannedAction(
+                TurnAction.SET_ROADMAP,
+                ActionContext(roadmap_focus=RoadmapFocus.GROWTH_PUSH),
+            )
+        return PlannedAction(
+            TurnAction.MARKET_PRODUCT,
+            ActionContext(target_product_id=strongest_product.id),
+        )
+
+    if (
+        state.finance.board_pressure >= BALANCE.board_pressure_warning_threshold
+        and state.finance.board_recovery_turns_remaining == 0
+        and state.company.cash_on_hand
+        >= BALANCE.board_recovery_plan_cost + BALANCE.base_operating_cost
+    ):
+        return PlannedAction(TurnAction.START_BOARD_RECOVERY_PLAN, ActionContext())
 
     if (
         support_exposure.hotspot_lane_overflow > 0
@@ -735,7 +794,6 @@ def _choose_action(state: GameState) -> PlannedAction:
             ActionContext(roadmap_focus=_choose_roadmap_focus(state)),
         )
 
-    strongest_product = _pick_primary_product(state)
     if (
         state.finance.debt_principal > 0
         and state.company.cash_on_hand
@@ -749,6 +807,19 @@ def _choose_action(state: GameState) -> PlannedAction:
     ):
         return PlannedAction(TurnAction.REPAY_DEBT, ActionContext())
 
+    if (
+        state.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE
+        and strongest_product.user_count >= 45
+        and strongest_product.quality >= 68
+        and strongest_product.market_fit >= 60
+        and strongest_product.bug_level <= 18
+        and strongest_product.revenue_per_user < Decimal("36.00")
+    ):
+        return PlannedAction(
+            TurnAction.RUN_PRICE_INCREASE,
+            ActionContext(target_product_id=strongest_product.id),
+        )
+
     if _should_create_product(state):
         template_id = _choose_next_template_id(state)
         return PlannedAction(
@@ -759,30 +830,29 @@ def _choose_action(state: GameState) -> PlannedAction:
             ),
         )
 
-    worst_product = _pick_worst_product(state)
-    operations = calculate_operations_summary(
-        state.products,
-        state.employees,
-        current_turn=state.company.current_turn,
-        customer_accounts=state.customer_accounts,
-    )
-
-    if worst_product.bug_level >= 28 or worst_product.quality <= 42:
-        return PlannedAction(
-            TurnAction.IMPROVE_QUALITY,
-            ActionContext(target_product_id=worst_product.id),
-        )
     if worst_product.technical_debt >= 42 or operations.overload >= 4:
         return PlannedAction(
             TurnAction.REDUCE_TECHNICAL_DEBT,
             ActionContext(target_product_id=worst_product.id),
         )
-    if worst_product.market_fit < 44 or (
-        worst_product.feature_count < 2
-        and worst_product.market_fit < 52
-        and worst_product.quality >= 58
-        and worst_product.bug_level <= 18
-        and state.company.cash_on_hand > BALANCE.finance_pressure_relief_cash_threshold
+    if (
+        worst_product.market_fit < 44
+        or (
+            worst_product.feature_count < 2
+            and worst_product.market_fit < 58
+            and worst_product.quality >= 58
+            and worst_product.bug_level <= 20
+            and worst_product.technical_debt <= 28
+            and state.company.cash_on_hand > BALANCE.base_operating_cost * 3
+        )
+        or (
+            worst_product.feature_count < 3
+            and worst_product.market_fit < 64
+            and worst_product.quality >= 66
+            and worst_product.bug_level <= 18
+            and worst_product.technical_debt <= 28
+            and state.company.cash_on_hand > BALANCE.base_operating_cost * 3
+        )
     ):
         return PlannedAction(
             TurnAction.ADD_FEATURE,
@@ -809,7 +879,9 @@ def _choose_action(state: GameState) -> PlannedAction:
         )
     if (
         strongest_product.target_segment is MarketSegment.STARTUP
-        and strongest_product.quality >= 64
+        and strongest_product.user_count >= 60
+        and strongest_product.quality >= 72
+        and strongest_product.market_fit >= 64
     ):
         return PlannedAction(
             TurnAction.SET_TARGET_SEGMENT,
@@ -1044,6 +1116,82 @@ def _choose_hire_role(state: GameState) -> EmployeeRole:
     return EmployeeRole.ENGINEER
 
 
+def _choose_opening_hire_role(state: GameState) -> EmployeeRole:
+    if state.campaign_goal_id is CampaignGoalId.CATEGORY_LEADER:
+        return EmployeeRole.ENGINEER
+    return EmployeeRole.MARKETER
+
+
+def _pick_profit_consolidation_candidate(state: GameState) -> Product | None:
+    active_products = [product for product in state.products if product.is_active]
+    if state.campaign_goal_id is not CampaignGoalId.PROFIT_MACHINE or len(active_products) < 3:
+        return None
+    candidate = min(
+        active_products,
+        key=lambda product: (product.user_count + product.market_fit, product.quality),
+    )
+    if candidate.user_count >= 15 or candidate.market_fit >= 45:
+        return None
+    return candidate
+
+
+def _should_repair_product(state: GameState, product: Product) -> bool:
+    return (
+        product.bug_level >= 24
+        or product.quality < 58
+        or (
+            state.campaign_goal_id is CampaignGoalId.CATEGORY_LEADER
+            and product.quality < BALANCE.campaign_goal_category_leader_quality_target
+            and product.bug_level >= 18
+        )
+    )
+
+
+def _should_frontload_debt_growth(state: GameState, product: Product) -> bool:
+    return (
+        state.company.current_turn == 1
+        and len([item for item in state.products if item.is_active]) == 1
+        and state.finance.debt_principal >= BALANCE.finance_loan_amount
+        and product.acquisition_rate < Decimal("0.0550")
+        and product.quality >= 58
+        and product.bug_level <= 23
+        and state.company.cash_on_hand >= BALANCE.marketing_cost + (BALANCE.base_operating_cost * 5)
+    )
+
+
+def _should_accelerate_debt_paydown(state: GameState, product: Product) -> bool:
+    return (
+        state.company.current_turn <= 2
+        and state.finance.debt_principal >= BALANCE.finance_loan_amount
+        and state.company.cash_on_hand
+        >= max(
+            BALANCE.finance_repayment_min_cash_buffer * 5,
+            BALANCE.base_operating_cost * 6,
+        )
+        and product.quality >= 60
+        and product.market_fit >= 52
+        and product.bug_level <= 23
+    )
+
+
+def _should_stabilize_growth(state: GameState, product: Product) -> bool:
+    if len([item for item in state.products if item.is_active]) != 1:
+        return False
+    user_target = {
+        CampaignGoalId.PROFIT_MACHINE: 72,
+        CampaignGoalId.PORTFOLIO_EMPIRE: 60,
+        CampaignGoalId.CATEGORY_LEADER: 68,
+    }[state.campaign_goal_id]
+    return (
+        product.user_count < user_target
+        and product.acquisition_rate < Decimal("0.1600")
+        and product.quality >= 58
+        and product.bug_level <= 23
+        and state.company.cash_on_hand >= BALANCE.marketing_cost + (BALANCE.base_operating_cost * 3)
+        and state.finance.debt_principal < BALANCE.finance_loan_amount
+    )
+
+
 def _should_expand_headcount(state: GameState) -> bool:
     flagship = _pick_primary_product(state)
     active_products = sum(1 for product in state.products if product.is_active)
@@ -1195,7 +1343,27 @@ def _choose_company_strategy(state: GameState) -> CompanyStrategy:
 def _should_shift_into_cash_guard(state: GameState) -> bool:
     return (
         state.company.cash_on_hand < BALANCE.finance_pressure_relief_cash_threshold
-        or state.finance.board_pressure >= 20
-        or state.finance.investor_pressure >= 18
+        or state.finance.board_pressure >= BALANCE.board_pressure_warning_threshold
+        or state.finance.investor_pressure >= 32
         or state.finance.debt_principal >= BALANCE.finance_loan_amount
     )
+
+
+def _can_execute_board_response(state: GameState) -> bool:
+    finance = state.finance
+    if not finance.board_resolution_due:
+        return False
+    if (
+        finance.board_pressure < BALANCE.board_response_min_pressure_threshold
+        and not finance.board_warning_active
+        and finance.missed_board_targets == 0
+    ):
+        return False
+    ask = finance.active_board_ask
+    if ask is BoardAsk.RELIABILITY:
+        required_cash = BALANCE.board_response_reliability_cost
+    elif ask is BoardAsk.TEAM_HEALTH:
+        required_cash = BALANCE.board_response_team_health_cost
+    else:
+        required_cash = Decimal("0.00")
+    return state.company.cash_on_hand >= required_cash + BALANCE.base_operating_cost

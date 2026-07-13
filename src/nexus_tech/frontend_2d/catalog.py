@@ -14,6 +14,15 @@ from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.meta_progression import is_reward_unlocked
 from nexus_tech.simulation.scenarios import get_available_scenarios
 
+_FEATURED_SCENARIO_TRACKS = {
+    "founder_journey": (1, "Learn", "Opening fundamentals"),
+    "bootstrap_studio": (2, "Profit", "Cash discipline"),
+    "technical_rebuild": (3, "Quality", "Product recovery"),
+    "portfolio_machine": (4, "Portfolio", "Multi-product scale"),
+    "debt_crunch": (5, "Debt", "Capital pressure"),
+    "public_market_countdown": (6, "Endgame", "Exit readiness"),
+}
+
 
 @dataclass(frozen=True)
 class ScenarioChoice:
@@ -25,6 +34,9 @@ class ScenarioChoice:
     objective: str
     default_difficulty: DifficultyMode
     default_goal_id: CampaignGoalId
+    track_label: str
+    stage_hint: str
+    featured_rank: int | None
     locked: bool
     lock_reason: str
 
@@ -65,9 +77,19 @@ def list_scenario_choices(db_path: Path) -> tuple[ScenarioChoice, ...]:
     """Return scenario choices with progression-lock status for the 2D wizard."""
 
     archives = _load_archives(db_path)
-    return tuple(
+    choices = tuple(
         _build_scenario_choice(scenario, archives=archives)
         for scenario in get_available_scenarios()
+    )
+    return tuple(
+        sorted(
+            choices,
+            key=lambda choice: (
+                choice.featured_rank is None,
+                choice.featured_rank or 999,
+                choice.title.casefold(),
+            ),
+        )
     )
 
 
@@ -118,6 +140,7 @@ def _build_scenario_choice(
         reward_type="scenario",
         reward_id=scenario.scenario_id,
     )
+    featured = _FEATURED_SCENARIO_TRACKS.get(scenario.scenario_id)
     return ScenarioChoice(
         scenario_id=scenario.scenario_id,
         title=scenario.title,
@@ -125,6 +148,9 @@ def _build_scenario_choice(
         objective=scenario.objective,
         default_difficulty=scenario.difficulty_mode,
         default_goal_id=scenario.campaign_goal_id,
+        track_label=featured[1] if featured is not None else "Challenge",
+        stage_hint=featured[2] if featured is not None else "Optional specialist scenario",
+        featured_rank=featured[0] if featured is not None else None,
         locked=locked,
         lock_reason=(
             "Archive more completed runs to unlock this scenario."

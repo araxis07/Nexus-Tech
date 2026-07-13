@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.280.0 - 2026-07-13
+
+- Added readable metadata for all 194 turn commands across 12 action families and four run phases, removing raw snake-case commands from Coach guidance
+- Reworked the 2D action footer into a smaller contextual command set while preserving keyboard access, Save, End Turn, and phase-appropriate Board/Endgame routes
+- Promoted six scenarios into a guided new-game journey and added clearer track/stage context to scenario selection
+- Improved deterministic autoplay opening, growth, board-response, and profit-portfolio decisions; added a 20-turn Founder Journey convergence gate across every goal and difficulty
+
 ## 0.279.0 - 2026-07-11
 
 - Added `onboarding-visible-playtest-batch-preflight` to headlessly launch the current focused visible QA batch before real-window evidence recording begins

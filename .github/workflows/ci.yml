@@ -37,6 +37,9 @@ jobs:
       - name: Validate content catalog
         run: uv run nexus-tech validate-content
 
+      - name: Run gameplay convergence gate
+        run: uv run pytest -q tests/test_gameplay_convergence.py
+
       - name: Run onboarding flow audit
         run: uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
 

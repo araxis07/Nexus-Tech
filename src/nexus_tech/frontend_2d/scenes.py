@@ -2925,8 +2925,8 @@ class TitleScene(BaseScene):
         rows = (
             (
                 "Scenario",
-                scenario.title,
-                scenario.description,
+                f"[{scenario.track_label}] {scenario.title}",
+                f"{scenario.stage_hint}. {scenario.description}",
                 "scenario",
                 "wizard_cycle",
                 DANGER if scenario.locked else INFO,
@@ -3154,7 +3154,12 @@ class TitleScene(BaseScene):
             campaign_start = self.selected_campaign_start_choice
             difficulty = self.selected_difficulty_choice
             return (
-                f"Scenario: {scenario.title}",
+                f"Scenario: [{scenario.track_label}] {scenario.title}",
+                (
+                    f"Featured campaign {scenario.featured_rank}/6: {scenario.stage_hint}"
+                    if scenario.featured_rank is not None
+                    else f"Challenge catalog: {scenario.stage_hint}"
+                ),
                 (
                     scenario.lock_reason
                     if scenario.locked
@@ -3167,7 +3172,6 @@ class TitleScene(BaseScene):
                         f"Start hint: {campaign_start.turn_hint} / {campaign_start.pressure_hint}"
                     )
                 ),
-                f"Meta next reward: {meta.next_reward}",
             )
         if self._mode == "guide":
             return (
@@ -7444,7 +7448,7 @@ class RunScene(BaseScene):
             valign="top",
         )
         meta_text = (
-            f"{self._view_model.scenario_title} | difficulty {self._view_model.difficulty_label} | "
+            f"{self._view_model.phase_label} | {self._view_model.scenario_title} | "
             f"score {self._view_model.score_label} | market {self._view_model.market_label}"
         )
         draw_wrapped_text(
@@ -7750,7 +7754,7 @@ class RunScene(BaseScene):
             valign="top",
         )
         top = coach_inner.top
-        if guide_requested and coach_inner.height >= 142:
+        if guide_requested and coach_inner.height >= 100:
             guide_height = min(82, max(58, int(coach_inner.height * 0.42)))
             guide_rect = pygame.Rect(coach_inner.left, top, coach_inner.width, guide_height)
             if self._draw_first_turn_guide_card(surface, guide_rect):
@@ -7768,8 +7772,8 @@ class RunScene(BaseScene):
                 surface,
                 pygame,
                 rect=card_rect,
-                title=line.command,
-                detail=line.source,
+                title=line.label,
+                detail=f"{line.family_label} / {line.source}",
                 accent=INFO,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
@@ -8058,15 +8062,17 @@ class RunScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
+        buttons = self._footer_action_buttons()
         button_cols, button_height, footer_band_height = self._footer_layout_metrics(
             inner.width,
             inner.height,
+            button_count=len(buttons),
         )
         button_gap = 10
         button_width = int((inner.width - button_gap * (button_cols - 1)) / button_cols)
         top = inner.top
         left = inner.left
-        for index, button in enumerate(_ACTION_BUTTONS):
+        for index, button in enumerate(buttons):
             if index and index % button_cols == 0:
                 top += button_height + button_gap
                 left = inner.left
@@ -8120,7 +8126,7 @@ class RunScene(BaseScene):
     def _footer_outer_height(self, width: int, height: int) -> int:
         usable_width = width - 40 - 32
         button_cols = self._footer_button_columns(usable_width)
-        rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
+        rows = max(1, (len(self._footer_action_buttons()) + button_cols - 1) // button_cols)
         button_gap = 10
         button_height = 34 if height < 700 else 40 if button_cols <= 5 else 44
         footer_band_height = 38 if height < 700 else 46
@@ -8129,9 +8135,18 @@ class RunScene(BaseScene):
             panel_chrome + rows * button_height + button_gap * max(0, rows - 1) + footer_band_height
         )
 
-    def _footer_layout_metrics(self, inner_width: int, inner_height: int) -> tuple[int, int, int]:
+    def _footer_layout_metrics(
+        self,
+        inner_width: int,
+        inner_height: int,
+        *,
+        button_count: int | None = None,
+    ) -> tuple[int, int, int]:
         button_cols = self._footer_button_columns(inner_width)
-        rows = max(1, (len(_ACTION_BUTTONS) + button_cols - 1) // button_cols)
+        visible_count = (
+            button_count if button_count is not None else len(self._footer_action_buttons())
+        )
+        rows = max(1, (visible_count + button_cols - 1) // button_cols)
         footer_band_height = 42 if inner_height < 300 else 48 if button_cols >= 5 else 52
         button_gap = 10
         button_area_height = max(
@@ -8145,6 +8160,62 @@ class RunScene(BaseScene):
         else:
             button_height = min(58, max(min_button_height, available_per_row))
         return button_cols, button_height, footer_band_height
+
+    def _footer_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
+        """Keep the live action bar focused while preserving every keyboard route."""
+
+        core_titles = {
+            "Coach",
+            "Team",
+            "Finance",
+            "Customers",
+            "Pipeline",
+            "Report",
+            "Improve",
+            "Feature",
+            "Market",
+            "Debt Down",
+        }
+        final_titles = {"Save", "End Turn"}
+        buttons = [button for button in _ACTION_BUTTONS if button.title in core_titles]
+
+        contextual_panel_titles: set[str] = set()
+        if self.state.partnerships or self.state.company.current_turn >= 5:
+            contextual_panel_titles.add("Partners")
+        if (
+            self.state.finance.board_pressure >= 20
+            or self.state.finance.board_warning_active
+            or self.state.company.current_turn >= 6
+        ):
+            contextual_panel_titles.add("Board")
+        if self.state.company.current_turn >= 10 or self.state.victory_achieved:
+            contextual_panel_titles.add("Endgame")
+        buttons.extend(
+            button
+            for button in _ACTION_BUTTONS
+            if button.title in contextual_panel_titles and button not in buttons
+        )
+
+        recommended_commands = {line.command for line in self._view_model.coach_lines[:3]}
+        contextual_commands = set(recommended_commands)
+        if not self.state.employees:
+            contextual_commands.add(TurnAction.HIRE_EMPLOYEE.value)
+        elif any(employee.assigned_product_id is None for employee in self.state.employees):
+            contextual_commands.add(TurnAction.ASSIGN_EMPLOYEE.value)
+        if (
+            self.state.campaign_goal_id.value == "portfolio_empire"
+            and self.state.company.current_turn >= 4
+        ):
+            contextual_commands.add(TurnAction.CREATE_PRODUCT.value)
+
+        contextual_buttons = [
+            button
+            for button in _ACTION_BUTTONS
+            if button.payload in contextual_commands and button not in buttons
+        ]
+        buttons.extend(contextual_buttons[:3])
+        buttons.extend(button for button in _ACTION_BUTTONS if button.title in final_titles)
+        return tuple(buttons)
 
     def _footer_button_columns(self, available_width: int) -> int:
         if available_width < 620:
