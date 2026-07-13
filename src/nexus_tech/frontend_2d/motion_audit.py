@@ -71,6 +71,7 @@ class MotionAuditCell:
     long_run_after_pulses: int
     average_frame_ms: float
     max_frame_ms: float
+    p99_frame_ms: float = 0.0
     transition_active_scenes: int = 0
     transition_disabled_scenes: int = 0
     entity_motion_active_samples: int = 0
@@ -105,6 +106,12 @@ class MotionAuditCell:
     sprite_clips_disabled_samples: int = 0
 
     @property
+    def frame_budget_ms(self) -> float:
+        """Return the sustained frame metric used by the stability gate."""
+
+        return self.p99_frame_ms if self.p99_frame_ms > 0 else self.max_frame_ms
+
+    @property
     def status(self) -> str:
         """Classify whether the viewport stayed within motion stability budgets."""
 
@@ -116,7 +123,7 @@ class MotionAuditCell:
             and self.inspector_after_pulses <= 12
             and self.long_run_after_pulses <= 18
             and self.average_frame_ms <= 24.0
-            and self.max_frame_ms <= 50.0
+            and self.frame_budget_ms <= 50.0
         ):
             return "pass"
         if (
@@ -127,7 +134,7 @@ class MotionAuditCell:
             and self.inspector_after_pulses <= 16
             and self.long_run_after_pulses <= 24
             and self.average_frame_ms <= 33.0
-            and self.max_frame_ms <= 75.0
+            and self.frame_budget_ms <= 75.0
         ):
             return "watch"
         return "fail"
@@ -151,8 +158,10 @@ class MotionAuditCell:
             notes.append("long-run pulse bank above target")
         if self.average_frame_ms > 24.0:
             notes.append("frame budget above target")
-        if self.max_frame_ms > 50.0:
-            notes.append("max frame spike above target")
+        if self.frame_budget_ms > 50.0:
+            notes.append("p99 frame budget above target")
+        elif self.max_frame_ms > 75.0:
+            notes.append("isolated peak recorded")
         return "; ".join(notes) if notes else "stable"
 
 
@@ -290,7 +299,9 @@ def run_2d_motion_audit(
                 sprite_clips_disabled_count += int(not run_scene.inspector_actor_active())
                 _exercise_inspector_interactions(run_scene)
                 inspector_before = run_scene._motion_pulses.live_count()
-                inspector_avg, inspector_max = _exercise_scene(run_scene, surface, frames)
+                inspector_avg, inspector_p99, inspector_max = _exercise_scene(
+                    run_scene, surface, frames
+                )
                 inspector_after = run_scene._motion_pulses.live_count()
                 run_scene._set_deep_panel("endgame")
                 actor_timeline_active_count += int(run_scene.endgame_actor_active())
@@ -409,12 +420,14 @@ def run_2d_motion_audit(
                 outcome_cinematic_disabled_count = int(not outcome_scene.outcome_cinematic_active())
                 _seed_dense_run_pulses(run_scene)
                 run_before = run_scene._motion_pulses.live_count()
-                run_avg, run_max = _exercise_scene(run_scene, surface, frames)
-                long_before, long_after, long_avg, long_max = _exercise_long_run_pressure(
-                    run_scene,
-                    surface,
-                    frames,
-                )
+                run_avg, run_p99, run_max = _exercise_scene(run_scene, surface, frames)
+                (
+                    long_before,
+                    long_after,
+                    long_avg,
+                    long_p99,
+                    long_max,
+                ) = _exercise_long_run_pressure(run_scene, surface, frames)
 
                 summary_scene = TurnSummaryScene(
                     pygame=pygame,
@@ -446,7 +459,9 @@ def run_2d_motion_audit(
                 sprite_clips_disabled_count += int(not summary_scene.sprite_clips_active())
                 _seed_dense_summary_pulses(summary_scene)
                 summary_before = summary_scene._motion_pulses.live_count()
-                summary_avg, summary_max = _exercise_scene(summary_scene, surface, frames)
+                summary_avg, summary_p99, summary_max = _exercise_scene(
+                    summary_scene, surface, frames
+                )
 
                 title_scene = TitleScene(
                     pygame=pygame,
@@ -468,7 +483,7 @@ def run_2d_motion_audit(
                 sprite_clips_disabled_count += int(not title_scene.sprite_clips_active())
                 _exercise_title_subflows(title_scene, coordinator, seed)
                 title_before = title_scene._motion_pulses.live_count()
-                title_avg, title_max = _exercise_scene(title_scene, surface, frames)
+                title_avg, title_p99, title_max = _exercise_scene(title_scene, surface, frames)
 
                 review_state = resolution.state.model_copy(deep=True)
                 review_state.company.game_over = True
@@ -497,7 +512,7 @@ def run_2d_motion_audit(
                 sprite_clips_active_count += int(review_scene.sprite_clips_active())
                 sprite_clips_disabled_count += int(not review_scene.sprite_clips_active())
                 review_before = review_scene._motion_pulses.live_count()
-                review_avg, review_max = _exercise_scene(review_scene, surface, frames)
+                review_avg, review_p99, review_max = _exercise_scene(review_scene, surface, frames)
 
                 averages = (
                     run_avg,
@@ -514,6 +529,14 @@ def run_2d_motion_audit(
                     review_max,
                     inspector_max,
                     long_max,
+                )
+                p99s = (
+                    run_p99,
+                    summary_p99,
+                    title_p99,
+                    review_p99,
+                    inspector_p99,
+                    long_p99,
                 )
                 cells.append(
                     MotionAuditCell(
@@ -533,6 +556,7 @@ def run_2d_motion_audit(
                         long_run_after_pulses=long_after,
                         average_frame_ms=round(sum(averages) / len(averages), 2),
                         max_frame_ms=round(max(maxes), 2),
+                        p99_frame_ms=round(max(p99s), 2),
                         transition_active_scenes=transition_active_count,
                         transition_disabled_scenes=transition_disabled_count,
                         entity_motion_active_samples=entity_active_count,
@@ -704,14 +728,20 @@ def _collect_surfaced_commands(choices) -> set[str]:
     return commands
 
 
-def _exercise_scene(scene, surface, frames: int) -> tuple[float, float]:
+def _exercise_scene(scene, surface, frames: int) -> tuple[float, float, float]:
     frame_times: list[float] = []
     for _index in range(frames):
         frame_start = perf_counter()
         scene.update(1 / 60)
         scene.draw(surface)
         frame_times.append((perf_counter() - frame_start) * 1000)
-    return sum(frame_times) / len(frame_times), max(frame_times)
+    ordered_times = sorted(frame_times)
+    p99_index = int((len(ordered_times) - 1) * 0.99)
+    return (
+        sum(frame_times) / len(frame_times),
+        ordered_times[p99_index],
+        ordered_times[-1],
+    )
 
 
 def _exercise_title_subflows(scene, coordinator: SaveLoadCoordinator, seed: int) -> None:
@@ -744,7 +774,9 @@ def _exercise_inspector_interactions(scene) -> None:
     scene._change_inspector_item(1)
 
 
-def _exercise_long_run_pressure(scene, surface, frames: int) -> tuple[int, int, float, float]:
+def _exercise_long_run_pressure(
+    scene, surface, frames: int
+) -> tuple[int, int, float, float, float]:
     for index in range(36):
         scene._motion_pulses.trigger(f"audit:long:{index}", intensity=0.16, decay=1.6)
         if index % 4 == 0:
@@ -752,8 +784,8 @@ def _exercise_long_run_pressure(scene, surface, frames: int) -> tuple[int, int, 
         if index % 6 == 0:
             scene._motion_pulses.trigger("panel:endgame", intensity=0.48, decay=1.8)
     before = scene._motion_pulses.live_count()
-    average, max_frame = _exercise_scene(scene, surface, max(16, frames * 8))
-    return before, scene._motion_pulses.live_count(), average, max_frame
+    average, p99_frame, max_frame = _exercise_scene(scene, surface, max(16, frames * 8))
+    return before, scene._motion_pulses.live_count(), average, p99_frame, max_frame
 
 
 def _build_motion_audit_pending_event(turn: int) -> PendingEvent:

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from nexus_tech.domain.models import CampaignGoalId, TurnAction
+from nexus_tech.domain.models import CampaignGoalId, DifficultyMode, TurnAction
 from nexus_tech.frontend_2d.catalog import list_scenario_choices
 from nexus_tech.frontend_2d.viewmodels import build_game_view_model
 from nexus_tech.simulation.action_catalog import ActionFamily, get_action_presentation
 from nexus_tech.simulation.balance_lab import evaluate_balance_cell, run_balance_matrix
+from nexus_tech.simulation.campaign_journey import (
+    get_campaign_journey_progress,
+    list_featured_campaign_journeys,
+)
 from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.run_phase import RunPhaseId, get_run_phase
 
@@ -19,6 +23,8 @@ def test_every_turn_action_has_readable_player_facing_metadata() -> None:
     assert {presentation.family for presentation in presentations} == set(ActionFamily)
     assert all("_" not in presentation.label for presentation in presentations)
     assert all(1 <= len(presentation.label) <= 38 for presentation in presentations)
+    assert len({presentation.program_key for presentation in presentations}) <= 100
+    assert all(presentation.program_label for presentation in presentations)
 
 
 def test_run_phases_cover_opening_through_endgame_boundaries() -> None:
@@ -54,6 +60,27 @@ def test_featured_scenarios_lead_the_wizard_as_a_guided_journey(tmp_path) -> Non
     assert [choice.featured_rank for choice in choices[:6]] == list(range(1, 7))
     assert all(choice.track_label != "Challenge" for choice in choices[:6])
     assert all(choice.stage_hint for choice in choices)
+    assert all(choice.journey_theme for choice in choices[:6])
+    assert all(choice.act_preview.count(" > ") == 2 for choice in choices[:6])
+
+
+def test_featured_campaigns_have_distinct_three_act_progression() -> None:
+    journeys = list_featured_campaign_journeys()
+
+    assert len(journeys) == 6
+    assert [journey.featured_rank for journey in journeys] == list(range(1, 7))
+    assert all(len(journey.chapters) == 3 for journey in journeys)
+    assert len({journey.theme for journey in journeys}) == 6
+
+    for journey in journeys:
+        opening = get_campaign_journey_progress(journey.scenario_id, 1)
+        commitment = get_campaign_journey_progress(journey.scenario_id, 5)
+        consequence = get_campaign_journey_progress(journey.scenario_id, 10)
+
+        assert opening is not None and opening.chapter_index == 0
+        assert commitment is not None and commitment.chapter_index == 1
+        assert consequence is not None and consequence.chapter_index == 2
+        assert len({chapter.objective for chapter in journey.chapters}) == 3
 
 
 def test_game_view_model_uses_phase_and_readable_coach_commands() -> None:
@@ -62,6 +89,9 @@ def test_game_view_model_uses_phase_and_readable_coach_commands() -> None:
     view_model = build_game_view_model(state)
 
     assert view_model.phase_label == "Opening / Turns 1-4"
+    assert view_model.campaign_chapter_label == "Act 1/3: Foundation Loop"
+    assert view_model.campaign_objective
+    assert view_model.campaign_lens
     assert "Next:" in view_model.header_note
     assert view_model.coach_lines
     assert all("_" not in line.label for line in view_model.coach_lines)
@@ -83,3 +113,22 @@ def test_founder_journey_long_session_gate_covers_every_campaign_goal() -> None:
             evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns).status != "fail"
             for cell in matrix.cells
         )
+
+
+def test_debt_crunch_long_session_stays_inside_difficulty_envelope() -> None:
+    matrix = run_balance_matrix(
+        scenario_ids=["debt_crunch"],
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=5,
+        turns=20,
+        seed_base=28100,
+    )
+    cells = {cell.difficulty_mode: cell for cell in matrix.cells}
+
+    assert cells[DifficultyMode.BUILDER].shutdowns == 0
+    assert cells[DifficultyMode.STANDARD].shutdowns == 0
+    assert cells[DifficultyMode.FOUNDER].shutdowns < matrix.runs
+    assert all(
+        evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns).status != "fail"
+        for cell in matrix.cells
+    )

@@ -36,6 +36,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import format_money, format_rate
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
+from nexus_tech.simulation.action_catalog import get_action_label, humanize_action_text
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     BalanceAuditResult,
@@ -1479,10 +1480,16 @@ def render_victory(console: Console, state: GameState) -> None:
     )
     content.add_row("Pressure Note", pressure.summary)
     content.add_row("Outcome Gates", " | ".join(pressure.path_outcome_gates[:2]))
-    content.add_row("Gate Alert", pressure.path_gate_alert)
-    content.add_row("Gate Actions", " | ".join(pressure.path_gate_actions[:2]))
-    content.add_row("Gate Command", pressure.path_gate_command_alert)
-    content.add_row("Gate Commands", " | ".join(pressure.path_gate_commands[:2]))
+    content.add_row("Gate Alert", humanize_action_text(pressure.path_gate_alert))
+    content.add_row(
+        "Gate Actions",
+        " | ".join(humanize_action_text(action) for action in pressure.path_gate_actions[:2]),
+    )
+    content.add_row("Gate Command", get_action_label(pressure.path_gate_command_alert))
+    content.add_row(
+        "Gate Commands",
+        " | ".join(get_action_label(command) for command in pressure.path_gate_commands[:2]),
+    )
     content.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     if state.exit_outcome is not None:
         exit_evaluation = evaluate_exit_outcome(state, run_score)
@@ -1494,10 +1501,23 @@ def render_victory(console: Console, state: GameState) -> None:
         content.add_row("Pressure Readout", exit_evaluation.pressure_readout)
         content.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
         content.add_row("Outcome Gates", " | ".join(exit_evaluation.path_outcome_gates[:2]))
-        content.add_row("Gate Alert", exit_evaluation.path_gate_alert)
-        content.add_row("Gate Actions", " | ".join(exit_evaluation.path_gate_actions[:2]))
-        content.add_row("Gate Command", exit_evaluation.path_gate_command_alert)
-        content.add_row("Gate Commands", " | ".join(exit_evaluation.path_gate_commands[:2]))
+        content.add_row("Gate Alert", humanize_action_text(exit_evaluation.path_gate_alert))
+        content.add_row(
+            "Gate Actions",
+            " | ".join(
+                humanize_action_text(action) for action in exit_evaluation.path_gate_actions[:2]
+            ),
+        )
+        content.add_row(
+            "Gate Command",
+            get_action_label(exit_evaluation.path_gate_command_alert),
+        )
+        content.add_row(
+            "Gate Commands",
+            " | ".join(
+                get_action_label(command) for command in exit_evaluation.path_gate_commands[:2]
+            ),
+        )
         content.add_row("Next Chapter", exit_evaluation.next_chapter)
         content.add_row("Exit Summary", state.exit_summary or exit_evaluation.summary)
     content.add_row("Portfolio Users", str(run_score.total_users))
@@ -1745,28 +1765,28 @@ def _build_turn_coach_panel(state: GameState) -> Panel:
     for recommendation in coach.recommendations:
         table.add_row(
             str(recommendation.rank),
-            recommendation.command,
+            get_action_label(recommendation.command),
             recommendation.source,
             f"{recommendation.horizon_turns}t",
             recommendation.rationale,
             recommendation.consequence,
         )
     footer = Table.grid(padding=(0, 1))
-    footer.add_row("Primary", coach.primary_command)
+    footer.add_row("Primary", get_action_label(coach.primary_command))
     footer.add_row("Focus", coach.focus)
     footer.add_row("Window", coach.mission_window)
-    footer.add_row("Opening", coach.opening_command)
-    footer.add_row("Gate", coach.gate_command)
-    footer.add_row("Finance", coach.finance_command)
-    footer.add_row("Support", coach.support_command)
-    footer.add_row("Channel", coach.channel_command)
+    footer.add_row("Opening", get_action_label(coach.opening_command))
+    footer.add_row("Gate", get_action_label(coach.gate_command))
+    footer.add_row("Finance", get_action_label(coach.finance_command))
+    footer.add_row("Support", get_action_label(coach.support_command))
+    footer.add_row("Channel", get_action_label(coach.channel_command))
     deferred_table = None
     if coach.deferred_actions:
         deferred_table = Table(box=box.SIMPLE_HEAVY, expand=True)
         deferred_table.add_column("Not Now", style="bold yellow")
         deferred_table.add_column("Reason")
         for action in coach.deferred_actions:
-            deferred_table.add_row(action.command, action.reason)
+            deferred_table.add_row(get_action_label(action.command), action.reason)
     content = (
         Group(table, footer, deferred_table) if deferred_table is not None else Group(table, footer)
     )
@@ -1803,13 +1823,13 @@ def _build_risk_forecast_panel(state: GameState) -> Panel:
             item.area,
             item.severity,
             f"{item.horizon_turns}t",
-            item.command,
+            get_action_label(item.command),
             item.summary,
             item.consequence,
         )
 
     footer = Table.grid(padding=(0, 1))
-    footer.add_row("Top Move", forecast.top_command)
+    footer.add_row("Top Move", get_action_label(forecast.top_command))
     footer.add_row("Risk Level", forecast.overall_risk)
     return Panel(
         Group(table, footer),
@@ -1853,7 +1873,7 @@ def _build_end_turn_preview_panel(state: GameState) -> Panel:
             metric.trend,
         )
     footer = Table.grid(padding=(0, 1))
-    footer.add_row("Top Preventive Move", preview.top_command)
+    footer.add_row("Top Preventive Move", get_action_label(preview.top_command))
     footer.add_row("Risk Shift", preview.risk_shift)
     footer.add_row("Projected Outcome", preview.projected_outcome)
     footer.add_row("Warning Level", preview.warning_level)
@@ -1912,7 +1932,7 @@ def _build_postmortem_panel(state: GameState) -> Panel:
             finding.area,
             finding.severity,
             finding.summary,
-            finding.command,
+            get_action_label(finding.command),
             finding.lesson,
         )
     footer = Table.grid(padding=(0, 1))
@@ -3484,7 +3504,7 @@ def _build_onboarding_panel(state: GameState) -> Panel | None:
             str(step.rank),
             step.status,
             step.turn_window,
-            step.command,
+            get_action_label(step.command),
             step.rationale,
         )
     return Panel(
@@ -3745,10 +3765,18 @@ def _build_report_score_panel(state: GameState) -> Panel:
     table.add_row("Pressure Readout", exit_evaluation.pressure_readout)
     table.add_row("Path Scorecard", " | ".join(exit_evaluation.path_scorecard))
     table.add_row("Outcome Gates", " | ".join(exit_evaluation.path_outcome_gates[:2]))
-    table.add_row("Gate Alert", exit_evaluation.path_gate_alert)
-    table.add_row("Gate Actions", " | ".join(exit_evaluation.path_gate_actions[:2]))
-    table.add_row("Gate Command", exit_evaluation.path_gate_command_alert)
-    table.add_row("Gate Commands", " | ".join(exit_evaluation.path_gate_commands[:2]))
+    table.add_row("Gate Alert", humanize_action_text(exit_evaluation.path_gate_alert))
+    table.add_row(
+        "Gate Actions",
+        " | ".join(
+            humanize_action_text(action) for action in exit_evaluation.path_gate_actions[:2]
+        ),
+    )
+    table.add_row("Gate Command", get_action_label(exit_evaluation.path_gate_command_alert))
+    table.add_row(
+        "Gate Commands",
+        " | ".join(get_action_label(command) for command in exit_evaluation.path_gate_commands[:2]),
+    )
     table.add_row("Durability", pressure.operating_durability)
     table.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     table.add_row("Next Chapter", exit_evaluation.next_chapter)
@@ -4126,10 +4154,16 @@ def _build_late_game_panel(state: GameState) -> Panel:
     table.add_row("Path Gap", str(pressure.path_gap))
     table.add_row("Scorecard", " | ".join(pressure.path_scorecard[:2]))
     table.add_row("Outcome Gates", " | ".join(pressure.path_outcome_gates[:2]))
-    table.add_row("Gate Alert", pressure.path_gate_alert)
-    table.add_row("Gate Actions", " | ".join(pressure.path_gate_actions[:2]))
-    table.add_row("Gate Command", pressure.path_gate_command_alert)
-    table.add_row("Gate Commands", " | ".join(pressure.path_gate_commands[:2]))
+    table.add_row("Gate Alert", humanize_action_text(pressure.path_gate_alert))
+    table.add_row(
+        "Gate Actions",
+        " | ".join(humanize_action_text(action) for action in pressure.path_gate_actions[:2]),
+    )
+    table.add_row("Gate Command", get_action_label(pressure.path_gate_command_alert))
+    table.add_row(
+        "Gate Commands",
+        " | ".join(get_action_label(command) for command in pressure.path_gate_commands[:2]),
+    )
     table.add_row("Watchlist", " | ".join(pressure.path_watchlist[:2]))
     table.add_row("At Risk", ", ".join(risk_names[:2]) if risk_names else "-")
     table.add_row("State", late_game.summary)

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.models import GameState, Product, TurnAction
+from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.finance import estimate_runway
 
 
@@ -171,7 +172,7 @@ def build_guided_opening(state: GameState) -> GuidedOpeningSummary:
     )
     active = state.company.current_turn <= 6 or any(step.status != "done" for step in steps[:4])
     summary = (
-        f"Guided opening points to `{current_step.command}` next. "
+        f"Guided opening points to {get_action_label(current_step.command)} next. "
         f"Keep the first loop focused around {flagship.name}."
     )
     return GuidedOpeningSummary(

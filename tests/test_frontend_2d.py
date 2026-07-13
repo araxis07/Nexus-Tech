@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -1440,6 +1441,7 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
             for button in visible_buttons
         )
         visible_titles = {button.title for button in visible_buttons}
+        vital_line = scene._compact_vital_line()
         end_turn_title = next(title for title in compact_titles if title.startswith("Space "))
         compact_status, compact_hint = scene._footer_status_lines(max_width=720)
         full_status, full_hint = scene._footer_status_lines(max_width=900)
@@ -1449,7 +1451,10 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert button_cols == 5
         assert footer_band_height == 48
         assert len(visible_buttons) < len(scenes_module._ACTION_BUTTONS)
-        assert len(visible_buttons) <= 18
+        assert len(visible_buttons) <= 12
+        assert all(label in vital_line for label in ("Cash", "Runway", "Users", "AP"))
+        assert scene._use_compact_run_focus(820, 220)
+        assert not scene._use_compact_run_focus(1280, 220)
         assert {"Save", "End Turn"} <= visible_titles
         assert "Endgame" not in visible_titles
         assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
@@ -3532,9 +3537,11 @@ def test_turn_summary_scene_compacts_focus_command_copy() -> None:
 
         title = scene._summary_focus_command_title()
         detail = scene._summary_focus_command_detail()
+        explanation = scene._summary_compact_explanation()
 
         assert title.startswith("Next ")
         assert len(detail) <= 48
+        assert explanation.startswith("Cash: revenue")
     finally:
         pygame.quit()
 
@@ -3680,7 +3687,35 @@ def test_run_2d_motion_audit_reports_stabilized_pulse_banks() -> None:
     assert cell.sprite_clips_active_samples == 6
     assert cell.sprite_clips_disabled_samples == 0
     assert cell.max_frame_ms >= cell.average_frame_ms
+    assert cell.max_frame_ms >= cell.p99_frame_ms
     assert report.flow_report.status == "pass"
+
+
+def test_motion_budget_uses_p99_without_hiding_isolated_peak() -> None:
+    cell = MotionAuditCell(
+        width=820,
+        height=620,
+        run_before_pulses=20,
+        run_after_pulses=10,
+        summary_before_pulses=12,
+        summary_after_pulses=6,
+        title_before_pulses=10,
+        title_after_pulses=5,
+        review_before_pulses=6,
+        review_after_pulses=3,
+        inspector_before_pulses=8,
+        inspector_after_pulses=4,
+        long_run_before_pulses=30,
+        long_run_after_pulses=8,
+        average_frame_ms=4.0,
+        max_frame_ms=120.0,
+        p99_frame_ms=9.0,
+    )
+
+    assert cell.status == "pass"
+    assert cell.frame_budget_ms == 9.0
+    assert "isolated peak recorded" in cell.notes
+    assert replace(cell, p99_frame_ms=80.0).status == "fail"
 
 
 def test_run_2d_motion_audit_can_disable_highlight_pulses() -> None:

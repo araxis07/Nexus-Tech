@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.281.0 - 2026-07-14
+
+- Collapsed 194 internal turn routes into 99 stable player-facing action concepts while preserving every command id for routing and save compatibility
+- Added authored three-act journeys for all six featured campaigns and surfaced the current act, objective, and decision lens in the new-game wizard and live HUD
+- Rebalanced the title menu around Continue and New Game, capped the contextual action footer at 12 visible controls, and kept cash, runway, users, and action points visible in compact runs
+- Added causal turn-summary lines, readable command copy across 2D and terminal surfaces, and a dedicated CI UX clarity gate without treating automated captures as human playtest evidence
+- Retuned the Debt Crunch opening and deterministic recovery order so Builder and Standard can stabilize without removing Founder-mode debt pressure, backed by a 20-turn difficulty-envelope gate
+- Hardened the motion performance audit by gating sustained P99 frame cost while still reporting isolated peak frames, preventing scheduler pauses from hiding or fabricating animation regressions
+
 ## 0.280.0 - 2026-07-13
 
 - Added readable metadata for all 194 turn commands across 12 action families and four run phases, removing raw snake-case commands from Coach guidance

@@ -692,10 +692,16 @@ def _choose_action(state: GameState) -> PlannedAction:
         liquidity_floor += BALANCE.base_operating_cost
     if state.finance.board_pressure >= (BALANCE.board_pressure_warning_threshold // 4):
         liquidity_floor += BALANCE.base_operating_cost
-    if state.company.cash_on_hand <= liquidity_floor and _can_take_angel_round(state):
+    funding_available = state.finance.last_funding_turn != state.company.current_turn
+    if (
+        state.company.cash_on_hand <= liquidity_floor
+        and funding_available
+        and _can_take_angel_round(state)
+    ):
         return PlannedAction(TurnAction.RAISE_ANGEL, ActionContext())
     if (
         state.company.cash_on_hand <= liquidity_floor
+        and funding_available
         and state.finance.debt_principal < BALANCE.finance_max_total_debt
     ):
         return PlannedAction(TurnAction.TAKE_LOAN, ActionContext())
@@ -1140,6 +1146,11 @@ def _should_repair_product(state: GameState, product: Product) -> bool:
         product.bug_level >= 24
         or product.quality < 58
         or (
+            state.finance.debt_principal >= BALANCE.finance_loan_amount
+            and state.company.current_turn == 1
+            and (product.quality < 64 or product.bug_level > 18)
+        )
+        or (
             state.campaign_goal_id is CampaignGoalId.CATEGORY_LEADER
             and product.quality < BALANCE.campaign_goal_category_leader_quality_target
             and product.bug_level >= 18
@@ -1152,7 +1163,7 @@ def _should_frontload_debt_growth(state: GameState, product: Product) -> bool:
         state.company.current_turn == 1
         and len([item for item in state.products if item.is_active]) == 1
         and state.finance.debt_principal >= BALANCE.finance_loan_amount
-        and product.acquisition_rate < Decimal("0.0550")
+        and product.acquisition_rate < Decimal("0.0450")
         and product.quality >= 58
         and product.bug_level <= 23
         and state.company.cash_on_hand >= BALANCE.marketing_cost + (BALANCE.base_operating_cost * 5)
@@ -1162,6 +1173,8 @@ def _should_frontload_debt_growth(state: GameState, product: Product) -> bool:
 def _should_accelerate_debt_paydown(state: GameState, product: Product) -> bool:
     return (
         state.company.current_turn <= 2
+        and bool(state.turn_history)
+        and state.turn_history[-1].net_cash_flow >= 0
         and state.finance.debt_principal >= BALANCE.finance_loan_amount
         and state.company.cash_on_hand
         >= max(
@@ -1188,13 +1201,22 @@ def _should_stabilize_growth(state: GameState, product: Product) -> bool:
         and product.quality >= 58
         and product.bug_level <= 23
         and state.company.cash_on_hand >= BALANCE.marketing_cost + (BALANCE.base_operating_cost * 3)
-        and state.finance.debt_principal < BALANCE.finance_loan_amount
+        and (
+            state.company.cash_on_hand >= BALANCE.finance_pressure_relief_cash_threshold
+            or bool(state.turn_history)
+        )
     )
 
 
 def _should_expand_headcount(state: GameState) -> bool:
     flagship = _pick_primary_product(state)
     active_products = sum(1 for product in state.products if product.is_active)
+    if (
+        state.finance.debt_principal >= BALANCE.finance_loan_amount
+        and state.turn_history
+        and state.turn_history[-1].net_cash_flow < 0
+    ):
+        return False
     cash_floor = max(BALANCE.create_product_cost * 4, BALANCE.base_operating_cost * 6)
     if state.company.cash_on_hand < cash_floor:
         return False

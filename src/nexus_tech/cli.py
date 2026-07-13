@@ -189,6 +189,7 @@ from nexus_tech.presentation.dashboard import (
     render_unlock_catalog,
     render_victory,
 )
+from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
     format_balance_matrix_csv,
@@ -1689,7 +1690,8 @@ def audit_2d_motion_command(
     table.add_column("Title/Review", justify="right")
     table.add_column("Inspector/Long", justify="right")
     table.add_column("Avg Frame", justify="right")
-    table.add_column("Max Frame", justify="right")
+    table.add_column("P99 Frame", justify="right")
+    table.add_column("Peak Frame", justify="right")
     table.add_column("Status", justify="center")
     table.add_column("Notes")
     for cell in report.cells:
@@ -1706,6 +1708,7 @@ def audit_2d_motion_command(
                 f"L {cell.long_run_before_pulses}->{cell.long_run_after_pulses}"
             ),
             f"{cell.average_frame_ms:.2f} ms",
+            f"{cell.frame_budget_ms:.2f} ms",
             f"{cell.max_frame_ms:.2f} ms",
             cell.status.upper(),
             cell.notes,
@@ -10926,7 +10929,7 @@ def confirm_end_turn(state: GameState) -> bool:
     summary.add_row("Warning", preview.warning_level)
     summary.add_row("Risk Shift", preview.risk_shift)
     summary.add_row("Projected Outcome", preview.projected_outcome)
-    summary.add_row("Do First", preview.top_command)
+    summary.add_row("Do First", get_action_label(preview.top_command))
     summary.add_row("Reason", preview.confirmation_reason)
     console.print(
         Panel(
@@ -10940,7 +10943,7 @@ def confirm_end_turn(state: GameState) -> bool:
     if not confirmed:
         console.print(
             Panel.fit(
-                f"Turn held open. Run `{preview.top_command}` first.",
+                f"Turn held open. Run {get_action_label(preview.top_command)} first.",
                 title="End Turn Cancelled",
                 border_style="yellow",
             )

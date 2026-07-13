@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from nexus_tech.domain.constants import ZERO_MONEY
 from nexus_tech.domain.models import GameState, SupportLaneFocus, TurnAction
+from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.endgame import calculate_endgame_pressure, calculate_endgame_readiness
 from nexus_tech.simulation.finance import build_finance_planner
@@ -239,13 +240,16 @@ def build_turn_coach(state: GameState) -> TurnCoachSummary:
         portfolio=portfolio,
         flagship=flagship,
     )
+    next_labels = (
+        ", ".join(get_action_label(recommendation.command) for recommendation in ranked[1:3])
+        or "Review Status"
+    )
     summary = (
-        f"Work `{primary}` now, then line up "
-        f"{', '.join(recommendation.command for recommendation in ranked[1:3]) or 'review status'} "
-        f"over the {mission_window}."
+        f"Work {get_action_label(primary)} now, then line up "
+        f"{next_labels} over the {mission_window}."
     )
     if deferred_actions:
-        summary += f" Hold `{deferred_actions[0].command}` for later."
+        summary += f" Hold {get_action_label(deferred_actions[0].command)} for later."
     return TurnCoachSummary(
         primary_command=primary,
         focus=focus,

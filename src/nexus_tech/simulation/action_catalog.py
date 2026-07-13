@@ -1,7 +1,8 @@
-"""Player-facing names and families for internal turn actions."""
+"""Player-facing names, programs, and families for internal turn actions."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -33,6 +34,18 @@ class ActionPresentation:
     label: str
     family: ActionFamily
     family_label: str
+    program_key: str
+    program_label: str
+    stage_label: str
+
+
+@dataclass(frozen=True)
+class _ActionProgramRule:
+    """Collapse implementation-heavy command ladders into one player concept."""
+
+    key: str
+    label: str
+    stems: tuple[str, ...]
 
 
 _FAMILY_LABELS = {
@@ -84,13 +97,60 @@ _COMMON_LABELS = {
     TurnAction.WAIT.value: "Hold Action",
 }
 
-_TIERED_LABEL_STEMS = {
-    "run_enterprise_reference_": "Enterprise Reference",
-    "run_billing_liquidity_": "Billing Liquidity",
-    "run_onboarding_continuity_": "Onboarding Continuity",
-    "run_channel_durability_": "Channel Durability",
-    "set_terminal_solvency_": "Terminal Solvency",
-    "run_white_glove_reference_": "White-glove Reference",
+_PROGRAM_RULES = (
+    _ActionProgramRule(
+        key="enterprise_trust",
+        label="Enterprise Trust",
+        stems=(
+            "run_enterprise_reference_",
+            "run_enterprise_renewal_",
+            "run_enterprise_commitment_",
+        ),
+    ),
+    _ActionProgramRule(
+        key="billing_recovery",
+        label="Billing Recovery",
+        stems=("run_billing_",),
+    ),
+    _ActionProgramRule(
+        key="onboarding_continuity",
+        label="Onboarding Continuity",
+        stems=("run_onboarding_",),
+    ),
+    _ActionProgramRule(
+        key="white_glove_recovery",
+        label="White-glove Recovery",
+        stems=("run_white_glove_",),
+    ),
+    _ActionProgramRule(
+        key="channel_resilience",
+        label="Channel Resilience",
+        stems=("run_channel_",),
+    ),
+    _ActionProgramRule(
+        key="partner_recovery",
+        label="Partner Recovery",
+        stems=("run_partner_",),
+    ),
+    _ActionProgramRule(
+        key="capital_resilience",
+        label="Capital Resilience",
+        stems=(
+            "set_terminal_",
+            "set_path_",
+            "set_endgame_",
+            "set_exit_readiness_",
+            "set_capital_reallocation_",
+            "set_balance_sheet_",
+            "set_board_reset_",
+        ),
+    ),
+)
+
+_CAPITAL_RESILIENCE_COMMANDS = {
+    TurnAction.STEP_UP_RESERVE_DISCIPLINE.value,
+    TurnAction.HARDEN_FINANCING_POSTURE.value,
+    TurnAction.LOCK_CAPITAL_BUFFER.value,
 }
 
 
@@ -99,12 +159,50 @@ def get_action_presentation(action: TurnAction | str) -> ActionPresentation:
 
     command = action.value if isinstance(action, TurnAction) else action
     family = classify_action(command)
+    program = _program_for(command)
+    label = _action_label(command)
+    if program is not None:
+        program_key, program_label, stage_label = program
+        label = program_label
+    else:
+        program_key = command
+        program_label = label
+        stage_label = ""
     return ActionPresentation(
         command=command,
-        label=_action_label(command),
+        label=label,
         family=family,
         family_label=_FAMILY_LABELS[family],
+        program_key=program_key,
+        program_label=program_label,
+        stage_label=stage_label,
     )
+
+
+def get_action_label(action: TurnAction | str, *, include_stage: bool = False) -> str:
+    """Return a concise label suitable for buttons, reports, and narrative text."""
+
+    presentation = get_action_presentation(action)
+    if include_stage and presentation.stage_label:
+        return f"{presentation.label}: {presentation.stage_label}"
+    return presentation.label
+
+
+def humanize_action_text(text: str, *, include_stage: bool = False) -> str:
+    """Replace embedded action identifiers without changing non-command prose."""
+
+    result = text
+    commands = sorted((action.value for action in TurnAction), key=len, reverse=True)
+    for command in commands:
+        if command not in result:
+            continue
+        pattern = rf"(?<![A-Za-z0-9_])`?{re.escape(command)}`?(?![A-Za-z0-9_])"
+        result = re.sub(
+            pattern,
+            get_action_label(command, include_stage=include_stage),
+            result,
+        )
+    return result
 
 
 def classify_action(action: TurnAction | str) -> ActionFamily:
@@ -213,10 +311,6 @@ def _action_label(command: str) -> str:
     common = _COMMON_LABELS.get(command)
     if common is not None:
         return common
-    for stem, title in _TIERED_LABEL_STEMS.items():
-        if command.startswith(stem):
-            tier = command.removeprefix(stem).replace("_", " ").title()
-            return f"{title}: {tier}"
     label = command.replace("_", " ").title()
     replacements = {
         " Ai ": " AI ",
@@ -230,6 +324,18 @@ def _action_label(command: str) -> str:
     for source, target in replacements.items():
         padded = padded.replace(source, target)
     return padded.strip()
+
+
+def _program_for(command: str) -> tuple[str, str, str] | None:
+    if command in _CAPITAL_RESILIENCE_COMMANDS:
+        return ("capital_resilience", "Capital Resilience", _action_label(command))
+    for rule in _PROGRAM_RULES:
+        for stem in rule.stems:
+            if command.startswith(stem):
+                suffix = command.removeprefix(stem)
+                stage_label = _action_label(suffix) if suffix else ""
+                return (rule.key, rule.label, stage_label)
+    return None
 
 
 def _contains_any(command: str, *fragments: str) -> bool:

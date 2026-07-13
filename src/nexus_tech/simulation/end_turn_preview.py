@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from nexus_tech.domain.models import GameState, TurnAction
+from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.engine import get_total_users, resolve_turn
 from nexus_tech.simulation.finance import estimate_runway
 from nexus_tech.simulation.partnerships import calculate_partnership_portfolio
@@ -235,7 +236,9 @@ def _build_warnings(current_forecast, projected_forecast, preview_resolution) ->
             f"Projected {item.area}: {item.summary}" for item in projected_forecast.items[:2]
         )
     elif current_forecast.items:
-        warnings.append(f"Current top preventive move stays `{current_forecast.top_command}`.")
+        warnings.append(
+            f"Current top preventive move stays {get_action_label(current_forecast.top_command)}."
+        )
     return tuple(dict.fromkeys(warnings))
 
 
@@ -262,18 +265,19 @@ def _evaluate_confirmation(
         if projected_forecast.top_command != TurnAction.VIEW_STATUS.value
         else current_forecast.top_command
     )
+    preventive_label = get_action_label(preventive_command)
     if projected_state.company.game_over:
         return (
             "critical",
             True,
-            f"Preview shows a sample shutdown. Run `{preventive_command}` before ending the turn.",
+            f"Preview shows a sample shutdown. Run {preventive_label} before ending the turn.",
         )
     if projected_forecast.overall_risk == "critical":
         return (
             "critical",
             True,
             (
-                f"Projected risk rises to critical. Run `{preventive_command}` before locking in "
+                f"Projected risk rises to critical. Run {preventive_label} before locking in "
                 "the next turn."
             ),
         )
@@ -283,7 +287,7 @@ def _evaluate_confirmation(
             True,
             (
                 f"Projected runway falls to {projected_runway} turn(s). "
-                f"`{preventive_command}` should happen first."
+                f"{preventive_label} should happen first."
             ),
         )
     if projected_board_pressure - current_board_pressure >= 8:
@@ -293,7 +297,7 @@ def _evaluate_confirmation(
             (
                 "Board pressure is projected to jump by "
                 f"{projected_board_pressure - current_board_pressure}. "
-                f"Run `{preventive_command}` before ending the turn."
+                f"Run {preventive_label} before ending the turn."
             ),
         )
     if (
@@ -305,19 +309,19 @@ def _evaluate_confirmation(
         return (
             "elevated",
             False,
-            f"Runway is tightening. `{preventive_command}` is still the safer move first.",
+            f"Runway is tightening. {preventive_label} is still the safer move first.",
         )
     if projected_forecast.overall_risk == "high":
         return (
             "high",
             False,
-            f"`{preventive_command}` is recommended before ending the turn.",
+            f"{preventive_label} is recommended before ending the turn.",
         )
     if projected_forecast.overall_risk == "elevated":
         return (
             "elevated",
             False,
-            f"`{preventive_command}` would reduce the projected next-turn pressure.",
+            f"{preventive_label} would reduce the projected next-turn pressure.",
         )
     return ("controlled", False, "No elevated end-turn warning is active.")
 

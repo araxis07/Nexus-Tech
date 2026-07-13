@@ -9,7 +9,12 @@ from decimal import Decimal
 from nexus_tech.domain.models import GameState, PendingEvent, Product, TurnAction
 from nexus_tech.domain.money import format_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveSlotSummary
-from nexus_tech.simulation.action_catalog import get_action_presentation
+from nexus_tech.simulation.action_catalog import (
+    get_action_label,
+    get_action_presentation,
+    humanize_action_text,
+)
+from nexus_tech.simulation.campaign_journey import get_campaign_journey_progress
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
@@ -177,8 +182,10 @@ class TurnSummaryViewModel:
     footer: str
     phase_labels: tuple[str, ...]
     strategic_headline: str
+    cause_lines: tuple[str, ...]
     strategic_lines: tuple[str, ...]
     focus_command: str
+    focus_label: str
     focus_detail: str
     metrics: tuple[TurnMetricViewModel, ...]
     product_lines: tuple[TurnProductSummaryViewModel, ...]
@@ -238,6 +245,9 @@ class GameViewModel:
     difficulty_summary: str
     turn_label: str
     phase_label: str
+    campaign_chapter_label: str
+    campaign_objective: str
+    campaign_lens: str
     score_label: str
     market_label: str
     roadmap_label: str
@@ -265,6 +275,10 @@ def build_game_view_model(
 
     difficulty = get_difficulty_profile(state.difficulty_mode)
     phase = get_run_phase(state.company.current_turn)
+    journey_progress = get_campaign_journey_progress(
+        state.scenario_id,
+        state.company.current_turn,
+    )
     coach = build_turn_coach(state)
     forecast = build_risk_forecast(state)
     preview = build_end_turn_preview(state)
@@ -372,7 +386,18 @@ def build_game_view_model(
         for item in forecast.items[:3]
     ) or ("No elevated operating risk is flashing right now.",)
     primary_action = get_action_presentation(coach.primary_command)
-    header_note = f"{phase.objective} | Next: {primary_action.label}"
+    campaign_chapter_label = (
+        journey_progress.act_label if journey_progress is not None else phase.title
+    )
+    campaign_objective = (
+        journey_progress.chapter.objective if journey_progress is not None else phase.objective
+    )
+    campaign_lens = (
+        journey_progress.chapter.decision_lens
+        if journey_progress is not None
+        else difficulty.watch_for
+    )
+    header_note = f"{campaign_objective} | Next: {primary_action.label}"
     return GameViewModel(
         company_name=state.company.name,
         scenario_title=state.scenario_title,
@@ -380,6 +405,9 @@ def build_game_view_model(
         difficulty_summary=difficulty.summary,
         turn_label=f"Turn {state.company.current_turn}",
         phase_label=f"{phase.title} / {phase.turn_window}",
+        campaign_chapter_label=campaign_chapter_label,
+        campaign_objective=campaign_objective,
+        campaign_lens=campaign_lens,
         score_label=f"{score.total_score} ({score.score_tier})",
         market_label=state.market_cycle.value,
         roadmap_label=state.roadmap_focus.value,
@@ -538,6 +566,15 @@ def build_turn_summary_view_model(
     reset_risk_delta = _signed_int(
         current_pressure.board_reset_risk - previous_pressure.board_reset_risk
     )
+    focus = get_action_presentation(current_pressure.path_gate_command_alert)
+    product_cause = (
+        (
+            f"{product_lines[0].name}: {product_lines[0].detail}; "
+            f"revenue {product_lines[0].revenue_text}."
+        )
+        if product_lines
+        else "No active product generated an operating result this turn."
+    )
     return TurnSummaryViewModel(
         title=f"Turn {resolution.resolved_turn} Resolved",
         headline=resolution.scale_pressure_summary,
@@ -546,6 +583,24 @@ def build_turn_summary_view_model(
         phase_labels=("Cash + Demand", "Operating Pressure", "Strategic Outlook"),
         strategic_headline=(
             f"{path_shift} | {current_pressure.dominant_pressure.replace('_', ' ')}"
+        ),
+        cause_lines=(
+            (
+                f"Cash: revenue {format_money(resolution.total_revenue)} minus cost "
+                f"{format_money(resolution.total_operating_cost)} produced "
+                f"{format_money(resolution.net_cash_flow)} net."
+            ),
+            (
+                f"Demand: users moved {_signed_int(total_user_delta)} in a "
+                f"{resolution.market_cycle.value} market; reputation moved "
+                f"{_signed_int(resolution.reputation_delta)}."
+            ),
+            (
+                f"Pressure: board {_signed_int(board_delta)}, support "
+                f"{_signed_int(support_delta)}, blocked gates "
+                f"{previous_blocked_paths} -> {current_blocked_paths}."
+            ),
+            product_cause,
         ),
         strategic_lines=(
             (
@@ -556,11 +611,12 @@ def build_turn_summary_view_model(
                 f"Blocked gates {previous_blocked_paths} -> {current_blocked_paths} | "
                 f"board reset risk {reset_risk_delta}"
             ),
-            f"Focus command: {current_pressure.path_gate_command_alert}",
-            current_pressure.path_gate_alert,
+            f"Next move: {focus.label} ({focus.family_label})",
+            humanize_action_text(current_pressure.path_gate_alert),
         ),
         focus_command=current_pressure.path_gate_command_alert,
-        focus_detail=current_pressure.recommendation,
+        focus_label=focus.label,
+        focus_detail=humanize_action_text(current_pressure.recommendation),
         metrics=metrics,
         product_lines=product_lines,
     )
@@ -1220,7 +1276,7 @@ def _build_endgame_panel(
             ),
             (
                 f"Blocked paths: {blocked_paths}/4 | hotspot {hotspot_label.lower()} | "
-                f"next {pressure.path_gate_command_alert}"
+                f"next {get_action_label(pressure.path_gate_command_alert)}"
             ),
             f"Gate alert: {pressure.path_gate_alert}",
             f"Recommendation: {pressure.recommendation}",
@@ -1355,7 +1411,7 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
             area=finding.area,
             severity=finding.severity,
             summary=finding.summary,
-            command=finding.command,
+            command=get_action_label(finding.command),
             lesson=finding.lesson,
         )
         for finding in postmortem.findings
@@ -2488,7 +2544,10 @@ def _build_endgame_inspectors(
         DeepDiveInspectorItemViewModel(
             title="Cockpit Route",
             detail_lines=(
-                f"Hotspot {hotspot_label.lower()} | next {pressure.path_gate_command_alert}",
+                (
+                    f"Hotspot {hotspot_label.lower()} | next "
+                    f"{get_action_label(pressure.path_gate_command_alert)}"
+                ),
                 pressure.path_gate_alert,
                 pressure.recommendation,
             ),

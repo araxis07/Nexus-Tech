@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from nexus_tech.domain.models import GameState, TurnAction
 from nexus_tech.domain.money import format_money
+from nexus_tech.simulation.action_catalog import get_action_label, humanize_action_text
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
     calculate_endgame_readiness,
@@ -37,8 +38,8 @@ def build_action_events(
 
     events: list[FrontendEvent] = [
         FrontendEvent(
-            title=action_label.replace("_", " ").title(),
-            detail=message,
+            title=get_action_label(action_label),
+            detail=humanize_action_text(message),
             severity="info",
             ttl=4.0,
             motion="slide",
@@ -104,7 +105,8 @@ def build_turn_resolution_events(
         FrontendEvent(
             title="Gate Command",
             detail=(
-                f"{current_pressure.path_gate_command_alert}: {current_pressure.path_gate_alert}"
+                f"{get_action_label(current_pressure.path_gate_command_alert)}: "
+                f"{humanize_action_text(current_pressure.path_gate_alert)}"
             ),
             severity="warning" if current_blocked_paths else "info",
             ttl=5.0,

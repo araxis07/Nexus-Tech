@@ -76,6 +76,7 @@ from nexus_tech.persistence.save_coordinator import (
     SaveLoadCoordinator,
     SaveSlotSummary,
 )
+from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.meta_progression import (
@@ -2275,56 +2276,26 @@ class TitleScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
-        buttons = (
-            ("1 Continue Last", "Open the newest save slot directly.", "continue", INFO),
-            (
-                "2 Manage Saves",
-                "Browse, load, rename, duplicate, or delete save slots.",
-                "load_slots",
-                GOOD,
-            ),
-            ("3 Review Archives", "Inspect completed runs and postmortems.", "archives", WARN),
-            (
-                "4 Meta Board",
-                "See archive progression, dominant path, and next unlocks.",
-                "meta",
-                SELECTION,
-            ),
-            (
-                "5 Quick Start",
-                "Learn the goal, first turn, controls, and safe next step.",
-                "guide",
-                GOOD,
-            ),
-            (
-                "6 New Game Wizard",
-                "Choose scenario, difficulty, start, goal, names, slot, and seed.",
-                "new_wizard",
-                INFO,
-            ),
-            ("7 Quit", "Leave the frontend shell.", "quit", DANGER),
+        primary_buttons = (
+            ("1 Continue Last", "Resume the newest save.", "continue", GOOD),
+            ("6 New Game", "Start a guided campaign.", "new_wizard", INFO),
         )
+        secondary_buttons = (
+            ("5 How to Play", "Goal, controls, and first turn.", "guide", GOOD),
+            ("2 Manage Saves", "Load, rename, copy, or delete.", "load_slots", INFO),
+            ("3 Run Archives", "Completed runs and lessons.", "archives", WARN),
+            ("4 Progress", "Paths, unlocks, and next gap.", "meta", SELECTION),
+        )
+        quit_button = ("7 Quit", "Leave NEXUS TECH.", "quit", DANGER)
         gap = 10
-        use_grid = inner.width >= 640 and inner.height < 430
-        cols = 2 if use_grid else 1
-        rows = max(1, (len(buttons) + cols - 1) // cols)
-        button_height = max(
-            44,
-            min(72, int((inner.height - gap * max(0, rows - 1)) / rows)),
-        )
-        button_width = int((inner.width - gap * max(0, cols - 1)) / cols)
-        for index, (title, detail, payload, accent) in enumerate(buttons):
-            row = index // cols
-            col = index % cols
-            button_left = inner.left + col * (button_width + gap)
-            if use_grid and index == len(buttons) - 1 and len(buttons) % cols:
-                button_left = inner.centerx - button_width // 2
-            button_rect = pygame.Rect(
-                button_left,
-                inner.top + row * (button_height + gap),
-                button_width,
-                button_height,
-            )
+        primary_height = max(52, min(72, int(inner.height * 0.24)))
+        quit_height = max(36, min(44, int(inner.height * 0.14)))
+        secondary_area = max(84, inner.height - primary_height - quit_height - gap * 3)
+        secondary_height = max(38, int((secondary_area - gap) / 2))
+        column_width = int((inner.width - gap) / 2)
+
+        def draw_menu_button(button, button_rect) -> None:
+            title, detail, payload, accent = button
             draw_button(
                 surface,
                 pygame,
@@ -2336,6 +2307,38 @@ class TitleScene(BaseScene):
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget("menu", payload, button_rect))
+
+        for index, button in enumerate(primary_buttons):
+            draw_menu_button(
+                button,
+                pygame.Rect(
+                    inner.left + index * (column_width + gap),
+                    inner.top,
+                    column_width,
+                    primary_height,
+                ),
+            )
+        secondary_top = inner.top + primary_height + gap
+        for index, button in enumerate(secondary_buttons):
+            draw_menu_button(
+                button,
+                pygame.Rect(
+                    inner.left + (index % 2) * (column_width + gap),
+                    secondary_top + (index // 2) * (secondary_height + gap),
+                    column_width,
+                    secondary_height,
+                ),
+            )
+        quit_width = min(column_width, max(220, int(inner.width * 0.46)))
+        draw_menu_button(
+            quit_button,
+            pygame.Rect(
+                inner.centerx - quit_width // 2,
+                inner.bottom - quit_height,
+                quit_width,
+                quit_height,
+            ),
+        )
 
     def _draw_meta_board(self, surface, rect) -> None:
         pygame = self.pygame
@@ -2926,7 +2929,7 @@ class TitleScene(BaseScene):
             (
                 "Scenario",
                 f"[{scenario.track_label}] {scenario.title}",
-                f"{scenario.stage_hint}. {scenario.description}",
+                f"{scenario.stage_hint} Acts: {scenario.act_preview}",
                 "scenario",
                 "wizard_cycle",
                 DANGER if scenario.locked else INFO,
@@ -3160,6 +3163,7 @@ class TitleScene(BaseScene):
                     if scenario.featured_rank is not None
                     else f"Challenge catalog: {scenario.stage_hint}"
                 ),
+                f"Arc: {scenario.act_preview}",
                 (
                     scenario.lock_reason
                     if scenario.locked
@@ -4669,7 +4673,7 @@ class RunScene(BaseScene):
             width - margin * 2,
             max(0, content_height),
         )
-        use_compact_focus = content_rect.height < 200
+        use_compact_focus = self._use_compact_run_focus(width, content_rect.height)
         if use_compact_focus:
             left_rect = content_rect
             center_rect = pygame.Rect(0, 0, 0, 0)
@@ -4818,7 +4822,10 @@ class RunScene(BaseScene):
         resolved_once = bool(self.state.turn_history) or self.state.company.current_turn > 1
         spent_actions = self.state.action_points_remaining <= 0 or resolved_once
         ap_label = f"{max(0, self.state.action_points_remaining)} AP left"
-        command_label = self._compact_button_detail(opening.current_command, max_length=24)
+        command_label = self._compact_button_detail(
+            get_action_label(opening.current_command),
+            max_length=24,
+        )
         return (
             FirstTurnGuideStep("1 Coach", f"C / click: {command_label}", first_step_done, INFO),
             FirstTurnGuideStep("2 HUD", "Cash, runway, board, AP", resolved_once, GOOD),
@@ -7389,7 +7396,10 @@ class RunScene(BaseScene):
         self.push_event(
             FrontendEvent(
                 title="Inspector Action Missing",
-                detail=f"`{action.command}` still needs a 2D request path for this item.",
+                detail=(
+                    f"{get_action_label(action.command)} still needs a 2D request path "
+                    "for this item."
+                ),
                 severity="warning",
                 ttl=5.5,
             )
@@ -7448,7 +7458,7 @@ class RunScene(BaseScene):
             valign="top",
         )
         meta_text = (
-            f"{self._view_model.phase_label} | {self._view_model.scenario_title} | "
+            f"{self._view_model.campaign_chapter_label} | {self._view_model.scenario_title} | "
             f"score {self._view_model.score_label} | market {self._view_model.market_label}"
         )
         draw_wrapped_text(
@@ -7480,7 +7490,10 @@ class RunScene(BaseScene):
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
-                self._view_model.difficulty_summary,
+                (
+                    f"Lens: {self._view_model.campaign_lens} | "
+                    f"Difficulty: {self._view_model.difficulty_summary}"
+                ),
                 MUTED,
                 pygame.Rect(inner.left, inner.top + 42, copy_width, 18),
                 line_height=15,
@@ -7531,7 +7544,7 @@ class RunScene(BaseScene):
         self._first_turn_guide_visible = True
         self._click_targets.append(ClickTarget("coach", "", rect))
         line = (
-            f"First Turn: C Coach -> {opening.current_command} | "
+            f"First Turn: C Coach -> {get_action_label(opening.current_command)} | "
             f"{max(0, self.state.action_points_remaining)} AP | P Save/Pause | Space End"
         )
         draw_text_line(
@@ -7895,14 +7908,7 @@ class RunScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
-        workspace_key = self._active_panel_key()
-        workspace_title = (
-            self._panel_display_name(workspace_key) if workspace_key is not None else "Core HUD"
-        )
-        focus_line = (
-            f"{workspace_title} | {self.selected_product.name} | "
-            f"{self.state.action_points_remaining} actions left"
-        )
+        focus_line = self._compact_vital_line()
         draw_text_line(
             surface,
             self.fonts.body,
@@ -7938,6 +7944,21 @@ class RunScene(BaseScene):
             self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
             left += chip_width + gap
 
+    def _use_compact_run_focus(self, width: int, content_height: int) -> bool:
+        if content_height < 200:
+            return True
+        if width < 940:
+            section_height = int((content_height - 24) / 3)
+            return section_height < 180
+        return False
+
+    def _compact_vital_line(self) -> str:
+        stats = {stat.key: stat.value_text for stat in self._view_model.stats}
+        return (
+            f"Cash {stats.get('cash', '-')} | Runway {stats.get('runway', '-')} | "
+            f"Users {stats.get('users', '-')} | AP {stats.get('actions', '-')}"
+        )
+
     def _draw_first_turn_guide_card(self, surface, rect) -> bool:
         if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 58:
             return False
@@ -7965,7 +7986,7 @@ class RunScene(BaseScene):
             border_radius=14,
         )
         self._click_targets.append(ClickTarget("coach", "", card_rect))
-        title = f"First Turn Guide | C Coach -> {opening.current_command}"
+        title = f"First Turn Guide | C Coach -> {get_action_label(opening.current_command)}"
         detail = "Click this guide for coach. P saves/pauses. Space resolves after AP."
         draw_text_line(
             surface,
@@ -8169,12 +8190,9 @@ class RunScene(BaseScene):
             "Team",
             "Finance",
             "Customers",
-            "Pipeline",
             "Report",
             "Improve",
-            "Feature",
             "Market",
-            "Debt Down",
         }
         final_titles = {"Save", "End Turn"}
         buttons = [button for button in _ACTION_BUTTONS if button.title in core_titles]
@@ -8190,11 +8208,11 @@ class RunScene(BaseScene):
             contextual_panel_titles.add("Board")
         if self.state.company.current_turn >= 10 or self.state.victory_achieved:
             contextual_panel_titles.add("Endgame")
-        buttons.extend(
+        contextual_panels = [
             button
             for button in _ACTION_BUTTONS
             if button.title in contextual_panel_titles and button not in buttons
-        )
+        ]
 
         recommended_commands = {line.command for line in self._view_model.coach_lines[:3]}
         contextual_commands = set(recommended_commands)
@@ -8213,7 +8231,8 @@ class RunScene(BaseScene):
             for button in _ACTION_BUTTONS
             if button.payload in contextual_commands and button not in buttons
         ]
-        buttons.extend(contextual_buttons[:3])
+        contextual_budget = max(0, 12 - len(buttons) - len(final_titles))
+        buttons.extend((contextual_panels + contextual_buttons)[:contextual_budget])
         buttons.extend(button for button in _ACTION_BUTTONS if button.title in final_titles)
         return tuple(buttons)
 
@@ -8372,13 +8391,10 @@ class RunScene(BaseScene):
         return surface.get_size()[0]
 
     def _compact_command_token(self, command: str, *, compact: bool) -> str:
+        label = get_action_label(command)
         if not compact:
-            return command
-        command = command.replace("review_", "review:")
-        command = command.replace("run_", "")
-        command = command.replace("set_", "")
-        command = command.replace("execute_", "")
-        return self._compact_button_detail(command.replace("_", " "), max_length=24)
+            return label
+        return self._compact_button_detail(label, max_length=24)
 
     def _selected_inspector_primary_action_summary(self) -> str:
         item = self._selected_inspector_item()
@@ -10569,7 +10585,12 @@ class TurnSummaryScene(BaseScene):
         margin = 20 if width < 900 else 24
         gap = 12 if height < 700 else 16
         nav_band = 46
-        header_rect = pygame.Rect(margin, margin + nav_band, width - margin * 2, 96)
+        header_rect = pygame.Rect(
+            margin,
+            margin + nav_band,
+            width - margin * 2,
+            self._summary_header_height(height),
+        )
         footer_height = 118 if height < 700 else 94
         footer_rect = pygame.Rect(
             margin,
@@ -10729,24 +10750,22 @@ class TurnSummaryScene(BaseScene):
         )
         if not lane_metrics:
             return
-        compact = width < 900
-        lane_height = 18 if compact else 20
+        lane_height = 18
         lane_gap = 6
-        panel_width = min(width - 72, 620)
-        left = (width - panel_width) // 2
-        top = 178 if height >= 700 else 184
-        if compact:
-            panel_width = min(width - 96, 560)
-            left = (width - panel_width) // 2
+        panel_width = min(620, max(420, int(width * 0.5)))
+        left = 36
+        header_bottom = (20 if width < 900 else 24) + 46 + self._summary_header_height(height)
+        top = header_bottom - lane_height - 8
+        lane_width = int((panel_width - lane_gap * (len(lane_metrics) - 1)) / len(lane_metrics))
         for index, metric in enumerate(lane_metrics):
             progress = self._summary_outcome_lane_progress(index)
             if progress <= 0:
                 continue
             accent = tone_color(metric.tone)
             lane_rect = pygame.Rect(
-                left,
-                top + index * (lane_height + lane_gap),
-                panel_width,
+                left + index * (lane_width + lane_gap),
+                top,
+                lane_width,
                 lane_height,
             )
             fill_alpha = int(46 + progress * 76)
@@ -10763,7 +10782,7 @@ class TurnSummaryScene(BaseScene):
                 width=1,
                 border_radius=lane_height // 2,
             )
-            fill_width = max(8, int(lane_rect.width * metric.ratio * progress))
+            fill_width = max(6, int(lane_rect.width * metric.ratio * progress))
             pygame.draw.rect(
                 surface,
                 (*accent, min(190, fill_alpha + 70)),
@@ -10771,20 +10790,16 @@ class TurnSummaryScene(BaseScene):
                 border_radius=lane_height // 2,
             )
             label = self.fonts.small.render(
-                self._compact_summary_text(metric.label, max_length=16),
+                self._compact_summary_text(metric.label, max_length=9),
                 True,
                 TEXT,
             )
             value = self.fonts.small.render(metric.value_text, True, TEXT)
-            surface.blit(label, (lane_rect.left + 10, lane_rect.top + 3))
+            surface.blit(label, (lane_rect.left + 7, lane_rect.top + 3))
             surface.blit(
                 value,
-                (lane_rect.right - value.get_width() - 10, lane_rect.top + 3),
+                (lane_rect.right - value.get_width() - 7, lane_rect.top + 3),
             )
-            node_x = lane_rect.left + fill_width
-            node_y = lane_rect.centery
-            pygame.draw.circle(surface, blend_color(TEXT, accent, 0.35), (node_x, node_y), 4)
-            pygame.draw.circle(surface, accent, (node_x, node_y), 6, 1)
 
     def _draw_summary_cinematic_overlay(self, surface) -> None:
         if not self.summary_cinematic_active():
@@ -10794,7 +10809,10 @@ class TurnSummaryScene(BaseScene):
         progress = self._summary_cinematic_progress()
         eased = 1.0 - (1.0 - progress) * (1.0 - progress)
         intensity = 0.56 if self.motion_mode is MotionMode.REDUCED else 1.0
-        rail_top = min(height - 52, 214 if height < 700 else 202)
+        margin = 20 if width < 900 else 24
+        gap = 12 if height < 700 else 16
+        header_bottom = margin + 46 + self._summary_header_height(height)
+        rail_top = header_bottom + max(2, int((gap - 8) / 2))
         rail_rect = pygame.Rect(36, rail_top, width - 72, 8)
         fill_alpha = int((1.0 - progress * 0.55) * 78 * intensity)
         pygame.draw.rect(
@@ -10816,9 +10834,7 @@ class TurnSummaryScene(BaseScene):
             border_radius=5,
         )
         phase_labels = self._view_model.phase_labels or ("Input", "Impact", "Next")
-        show_phase_chips = width >= 900
-        chip_width = min(136, max(72, int((rail_rect.width - 24) / max(1, len(phase_labels)))))
-        for index, label in enumerate(phase_labels):
+        for index, _label in enumerate(phase_labels):
             marker_ratio = index / max(1, len(phase_labels) - 1)
             marker_x = rail_rect.left + int(rail_rect.width * marker_ratio)
             active = progress >= marker_ratio * 0.82
@@ -10829,29 +10845,9 @@ class TurnSummaryScene(BaseScene):
                 (marker_x, rail_rect.centery),
                 6,
             )
-            if not show_phase_chips:
-                continue
-            chip_rect = pygame.Rect(
-                max(rail_rect.left, min(rail_rect.right - chip_width, marker_x - chip_width // 2)),
-                rail_rect.top - 28,
-                chip_width,
-                22,
-            )
-            pygame.draw.rect(
-                surface,
-                (
-                    *blend_color((20, 31, 45), color, 0.18 if active else 0.06),
-                    min(220, fill_alpha + 110),
-                ),
-                chip_rect,
-                border_radius=11,
-            )
-            chip_surface = self.fonts.small.render(
-                self._compact_summary_text(label, max_length=14),
-                True,
-                TEXT if active else MUTED,
-            )
-            surface.blit(chip_surface, (chip_rect.left + 8, chip_rect.top + 5))
+
+    def _summary_header_height(self, _height: int) -> int:
+        return 118
 
     def _build_return_focus_event(self, panel_key: str | None) -> FrontendEvent | None:
         if not self._view_model.focus_command:
@@ -10863,7 +10859,7 @@ class TurnSummaryScene(BaseScene):
         severity = "warning" if panel_key in warning_panels else "info"
         return FrontendEvent(
             title="Next Focus",
-            detail=f"{self._view_model.focus_command}: {self._view_model.focus_detail}",
+            detail=f"{self._view_model.focus_label}: {self._view_model.focus_detail}",
             severity=severity,
             ttl=5.2 if severity == "warning" else 4.8,
             motion="flash" if severity == "warning" else "slide",
@@ -11179,11 +11175,7 @@ class TurnSummaryScene(BaseScene):
             pygame.Rect(inner.left, inner.top, inner.width, 22),
             valign="top",
         )
-        event_text = (
-            self._events[0].detail
-            if self._events
-            else self._view_model.strategic_headline or self._view_model.footer
-        )
+        event_text = self._summary_compact_explanation()
         draw_wrapped_text(
             surface,
             self.fonts.small,
@@ -11193,6 +11185,13 @@ class TurnSummaryScene(BaseScene):
             line_height=15,
             max_lines=2,
         )
+
+    def _summary_compact_explanation(self) -> str:
+        if self._view_model.cause_lines:
+            return self._view_model.cause_lines[0]
+        if self._events:
+            return self._events[0].detail
+        return self._view_model.strategic_headline or self._view_model.footer
 
     def _summary_strategy_height(self, total_height: int) -> int:
         if total_height < 220:
@@ -11243,7 +11242,9 @@ class TurnSummaryScene(BaseScene):
             selected=self._phase_index() >= 2,
         )
         top = command_rect.bottom + 12
-        visible_lines = self._view_model.strategic_lines[: (2 if compact else 3)]
+        visible_lines = (self._view_model.cause_lines + self._view_model.strategic_lines)[
+            : (2 if compact else 3)
+        ]
         for line in visible_lines:
             consumed = draw_wrapped_text(
                 surface,
@@ -11258,13 +11259,13 @@ class TurnSummaryScene(BaseScene):
 
     def _summary_focus_command_title(self, *, max_length: int = 28) -> str:
         command = self._compact_summary_text(
-            self._view_model.focus_command,
+            self._view_model.focus_label,
             max_length=max_length,
         )
         return f"Next {command}"
 
     def _summary_focus_command_detail(self) -> str:
-        return ""
+        return self._compact_summary_text(self._view_model.focus_detail, max_length=48)
 
     def _compact_summary_text(self, detail: str, *, max_length: int) -> str:
         compact = detail.strip().replace("`", "")

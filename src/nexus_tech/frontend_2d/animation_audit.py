@@ -9135,10 +9135,10 @@ def _build_long_session_motion_cell(motion_report: MotionAuditReport) -> Animati
         default=0,
     )
     max_average_frame = max((cell.average_frame_ms for cell in motion_report.cells), default=0.0)
-    max_frame_spike = max((cell.max_frame_ms for cell in motion_report.cells), default=0.0)
+    max_p99_frame = max((cell.frame_budget_ms for cell in motion_report.cells), default=0.0)
     status = (
         "pass"
-        if max_after <= 18 and max_average_frame <= 24.0 and max_frame_spike <= 50.0
+        if max_after <= 18 and max_average_frame <= 24.0 and max_p99_frame <= 50.0
         else "fail"
     )
     active_layers = (
@@ -9146,14 +9146,14 @@ def _build_long_session_motion_cell(motion_report: MotionAuditReport) -> Animati
         f"after:{max_after}",
         f"recovered:{min_recovery}",
         f"avg-frame:{max_average_frame:.2f}ms",
-        f"max-frame:{max_frame_spike:.2f}ms",
+        f"p99-frame:{max_p99_frame:.2f}ms",
     )
     notes = (
         f"long-run pulses cooled to {max_after} after dense stress"
         if status == "pass"
         else (
             f"long-run after {max_after}, avg {max_average_frame:.2f} ms, "
-            f"max {max_frame_spike:.2f} ms"
+            f"p99 {max_p99_frame:.2f} ms"
         )
     )
     return AnimationCoverageCell(
@@ -9778,7 +9778,7 @@ def _build_animation_pacing_cell(motion_report: MotionAuditReport) -> AnimationC
         default=0,
     )
     max_average_frame = max((cell.average_frame_ms for cell in motion_report.cells), default=0.0)
-    max_frame_spike = max((cell.max_frame_ms for cell in motion_report.cells), default=0.0)
+    max_p99_frame = max((cell.frame_budget_ms for cell in motion_report.cells), default=0.0)
     max_residual_pulses = max(
         (
             max(
@@ -9794,14 +9794,14 @@ def _build_animation_pacing_cell(motion_report: MotionAuditReport) -> AnimationC
         default=0,
     )
     density_ok = max_active_samples <= MAX_ANIMATION_PACING_ACTIVE_SAMPLES
-    frame_ok = max_average_frame <= 24.0 and max_frame_spike <= 50.0
+    frame_ok = max_average_frame <= 24.0 and max_p99_frame <= 50.0
     cooldown_ok = motion_report.status == "pass"
     status = "pass" if density_ok and frame_ok and cooldown_ok else "fail"
     active_layers = (
         f"active-samples:{max_active_samples}",
         f"residual-pulses:{max_residual_pulses}",
         f"avg-frame:{max_average_frame:.2f}ms",
-        f"max-frame:{max_frame_spike:.2f}ms",
+        f"p99-frame:{max_p99_frame:.2f}ms",
     )
     notes = f"samples <= {MAX_ANIMATION_PACING_ACTIVE_SAMPLES}, frames and cooldowns in budget"
     if not density_ok:
@@ -9810,7 +9810,7 @@ def _build_animation_pacing_cell(motion_report: MotionAuditReport) -> AnimationC
             f"{MAX_ANIMATION_PACING_ACTIVE_SAMPLES}"
         )
     elif not frame_ok:
-        notes = f"frame budget avg {max_average_frame:.2f} ms / spike {max_frame_spike:.2f} ms"
+        notes = f"frame budget avg {max_average_frame:.2f} ms / p99 {max_p99_frame:.2f} ms"
     elif not cooldown_ok:
         notes = f"motion report status {motion_report.status}"
     return AnimationCoverageCell(

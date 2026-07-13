@@ -9,19 +9,11 @@ from nexus_tech.content.models import ScenarioDefinition
 from nexus_tech.domain.models import CampaignGoalId, DifficultyMode
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveLoadCoordinator
 from nexus_tech.simulation.campaign import list_campaign_goals
+from nexus_tech.simulation.campaign_journey import get_campaign_journey
 from nexus_tech.simulation.campaign_starts import CampaignStartDefinition, list_campaign_starts
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.meta_progression import is_reward_unlocked
 from nexus_tech.simulation.scenarios import get_available_scenarios
-
-_FEATURED_SCENARIO_TRACKS = {
-    "founder_journey": (1, "Learn", "Opening fundamentals"),
-    "bootstrap_studio": (2, "Profit", "Cash discipline"),
-    "technical_rebuild": (3, "Quality", "Product recovery"),
-    "portfolio_machine": (4, "Portfolio", "Multi-product scale"),
-    "debt_crunch": (5, "Debt", "Capital pressure"),
-    "public_market_countdown": (6, "Endgame", "Exit readiness"),
-}
 
 
 @dataclass(frozen=True)
@@ -36,6 +28,8 @@ class ScenarioChoice:
     default_goal_id: CampaignGoalId
     track_label: str
     stage_hint: str
+    journey_theme: str
+    act_preview: str
     featured_rank: int | None
     locked: bool
     lock_reason: str
@@ -140,7 +134,7 @@ def _build_scenario_choice(
         reward_type="scenario",
         reward_id=scenario.scenario_id,
     )
-    featured = _FEATURED_SCENARIO_TRACKS.get(scenario.scenario_id)
+    journey = get_campaign_journey(scenario.scenario_id)
     return ScenarioChoice(
         scenario_id=scenario.scenario_id,
         title=scenario.title,
@@ -148,9 +142,17 @@ def _build_scenario_choice(
         objective=scenario.objective,
         default_difficulty=scenario.difficulty_mode,
         default_goal_id=scenario.campaign_goal_id,
-        track_label=featured[1] if featured is not None else "Challenge",
-        stage_hint=featured[2] if featured is not None else "Optional specialist scenario",
-        featured_rank=featured[0] if featured is not None else None,
+        track_label=journey.track_label if journey is not None else "Challenge",
+        stage_hint=(
+            journey.chapters[0].objective if journey is not None else "Optional specialist scenario"
+        ),
+        journey_theme=journey.theme if journey is not None else scenario.objective,
+        act_preview=(
+            " > ".join(chapter.title for chapter in journey.chapters)
+            if journey is not None
+            else "Specialist challenge"
+        ),
+        featured_rank=journey.featured_rank if journey is not None else None,
         locked=locked,
         lock_reason=(
             "Archive more completed runs to unlock this scenario."
