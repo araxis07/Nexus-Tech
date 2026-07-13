@@ -5,13 +5,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from nexus_tech.domain.models import GameState
 from nexus_tech.frontend_2d.accessibility import ContrastMode, UiScale
-from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
+from nexus_tech.frontend_2d.tween import MotionMode
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.user_preferences import FrontendPreferences
 
 
 class Frontend2DUnavailableError(RuntimeError):
@@ -38,13 +40,12 @@ def launch_2d_frontend(
     headless: bool = False,
     max_frames: int | None = None,
     window_size: tuple[int, int] = (1440, 900),
-    motion_mode: MotionMode | str = MotionMode.FULL,
-    ui_scale: UiScale | str = UiScale.STANDARD,
-    contrast_mode: ContrastMode | str = ContrastMode.STANDARD,
+    motion_mode: MotionMode | str | None = None,
+    ui_scale: UiScale | str | None = None,
+    contrast_mode: ContrastMode | str | None = None,
 ) -> FrontendRunResult:
     """Launch the lightweight animated 2D dashboard."""
 
-    motion_mode = normalize_motion_mode(motion_mode)
     if headless:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -64,15 +65,23 @@ def launch_2d_frontend(
     )
 
     previous_contrast_mode = active_contrast_mode()
-    configure_contrast_mode(contrast_mode, mirror_modules=(scenes,))
     try:
         pygame.init()
         pygame.font.init()
         flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
         surface = pygame.display.set_mode(window_size, flags)
         pygame.display.set_caption(f"NEXUS TECH 2D | {state.company.name}")
-        fonts = create_fonts(pygame, ui_scale)
         coordinator = SaveLoadCoordinator(db_path)
+        preferences, fonts, apply_preferences, preference_provider = _build_preference_runtime(
+            pygame=pygame,
+            scenes=scenes,
+            coordinator=coordinator,
+            create_fonts=create_fonts,
+            configure_contrast_mode=configure_contrast_mode,
+            motion_mode=motion_mode,
+            ui_scale=ui_scale,
+            contrast_mode=contrast_mode,
+        )
         scene = scenes.RunScene(
             pygame=pygame,
             fonts=fonts,
@@ -84,7 +93,10 @@ def launch_2d_frontend(
                 game_state,
                 game_rng,
             ),
-            motion_mode=motion_mode,
+            motion_mode=preferences.motion_mode,
+            preferences=preferences,
+            preference_callback=apply_preferences,
+            preference_provider=preference_provider,
             entry_transition="boot_run",
         )
     except Exception:
@@ -109,13 +121,12 @@ def launch_2d_menu(
     headless: bool = False,
     max_frames: int | None = None,
     window_size: tuple[int, int] = (1440, 900),
-    motion_mode: MotionMode | str = MotionMode.FULL,
-    ui_scale: UiScale | str = UiScale.STANDARD,
-    contrast_mode: ContrastMode | str = ContrastMode.STANDARD,
+    motion_mode: MotionMode | str | None = None,
+    ui_scale: UiScale | str | None = None,
+    contrast_mode: ContrastMode | str | None = None,
 ) -> FrontendRunResult:
     """Launch the title/save-load scene for the 2D frontend."""
 
-    motion_mode = normalize_motion_mode(motion_mode)
     if headless:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
         os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -135,15 +146,23 @@ def launch_2d_menu(
     )
 
     previous_contrast_mode = active_contrast_mode()
-    configure_contrast_mode(contrast_mode, mirror_modules=(scenes,))
     try:
         pygame.init()
         pygame.font.init()
         flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
         surface = pygame.display.set_mode(window_size, flags)
         pygame.display.set_caption("NEXUS TECH 2D | Menu")
-        fonts = create_fonts(pygame, ui_scale)
         coordinator = SaveLoadCoordinator(db_path)
+        preferences, fonts, apply_preferences, preference_provider = _build_preference_runtime(
+            pygame=pygame,
+            scenes=scenes,
+            coordinator=coordinator,
+            create_fonts=create_fonts,
+            configure_contrast_mode=configure_contrast_mode,
+            motion_mode=motion_mode,
+            ui_scale=ui_scale,
+            contrast_mode=contrast_mode,
+        )
         scene = scenes.TitleScene(
             pygame=pygame,
             fonts=fonts,
@@ -157,7 +176,10 @@ def launch_2d_menu(
             ),
             coordinator=coordinator,
             info_message="Load a save, review archives, or boot the default run from inside 2D.",
-            motion_mode=motion_mode,
+            motion_mode=preferences.motion_mode,
+            preferences=preferences,
+            preference_callback=apply_preferences,
+            preference_provider=preference_provider,
             entry_transition="boot_title",
         )
     except Exception:
@@ -174,6 +196,45 @@ def launch_2d_menu(
         )
     finally:
         configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
+
+
+def _build_preference_runtime(
+    *,
+    pygame,
+    scenes,
+    coordinator: SaveLoadCoordinator,
+    create_fonts,
+    configure_contrast_mode,
+    motion_mode: MotionMode | str | None,
+    ui_scale: UiScale | str | None,
+    contrast_mode: ContrastMode | str | None,
+) -> tuple[
+    FrontendPreferences,
+    object,
+    Callable[[FrontendPreferences], object],
+    Callable[[], FrontendPreferences],
+]:
+    """Build one mutable preference bridge shared by every scene transition."""
+
+    current = coordinator.load_frontend_preferences().with_overrides(
+        motion_mode=motion_mode,
+        ui_scale=ui_scale,
+        contrast_mode=contrast_mode,
+    )
+    configure_contrast_mode(current.contrast_mode, mirror_modules=(scenes,))
+    fonts = create_fonts(pygame, current.ui_scale)
+
+    def apply_preferences(preferences: FrontendPreferences):
+        nonlocal current
+        coordinator.save_frontend_preferences(preferences)
+        configure_contrast_mode(preferences.contrast_mode, mirror_modules=(scenes,))
+        current = preferences
+        return create_fonts(pygame, preferences.ui_scale)
+
+    def preference_provider() -> FrontendPreferences:
+        return current
+
+    return current, fonts, apply_preferences, preference_provider
 
 
 def _run_frontend_loop(

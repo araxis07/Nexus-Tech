@@ -3,40 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from math import exp
 
-
-class MotionMode(StrEnum):
-    """User-selectable 2D motion intensity mode."""
-
-    FULL = "full"
-    REDUCED = "reduced"
-    OFF = "off"
-
-    @property
-    def pulse_scale(self) -> float:
-        """Return the multiplier applied to highlight pulse intensity."""
-
-        if self is MotionMode.FULL:
-            return 1.0
-        if self is MotionMode.REDUCED:
-            return 0.38
-        return 0.0
-
-
-def normalize_motion_mode(value: MotionMode | str | None) -> MotionMode:
-    """Normalize API/CLI values into a supported motion mode."""
-
-    if value is None:
-        return MotionMode.FULL
-    if isinstance(value, MotionMode):
-        return value
-    try:
-        return MotionMode(str(value).lower())
-    except ValueError as error:
-        valid_values = ", ".join(mode.value for mode in MotionMode)
-        raise ValueError(f"motion mode must be one of: {valid_values}") from error
+from nexus_tech.user_preferences import MotionMode as MotionMode
+from nexus_tech.user_preferences import normalize_motion_mode as normalize_motion_mode
 
 
 @dataclass
@@ -130,6 +100,13 @@ class PulseBank:
         """Return the configured intensity multiplier for new pulses."""
 
         return self._intensity_scale
+
+    def configure_intensity_scale(self, value: float, *, clear: bool = False) -> None:
+        """Update future pulse intensity and optionally clear existing motion."""
+
+        self._intensity_scale = max(0.0, min(1.0, value))
+        if clear or self._intensity_scale <= 0:
+            self._values.clear()
 
     def trigger(self, key: str, *, intensity: float = 1.0, decay: float | None = None) -> None:
         """Start or refresh one pulse."""

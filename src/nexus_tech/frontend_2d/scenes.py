@@ -34,6 +34,7 @@ from nexus_tech.frontend_2d.event_queue import (
     build_turn_resolution_events,
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
+from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
@@ -55,6 +56,7 @@ from nexus_tech.frontend_2d.widgets import (
     GOOD,
     INFO,
     MUTED,
+    PANEL,
     SELECTION,
     TEXT,
     WARN,
@@ -87,6 +89,7 @@ from nexus_tech.simulation.meta_progression import (
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.user_preferences import FrontendPreferences
 
 
 @dataclass(frozen=True)
@@ -885,6 +888,9 @@ class BaseScene:
         dirty: bool = False,
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "boot_run",
+        preferences: FrontendPreferences | None = None,
+        preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
+        preference_provider: Callable[[], FrontendPreferences] | None = None,
     ) -> None:
         self.pygame = pygame
         self.fonts = fonts
@@ -893,7 +899,13 @@ class BaseScene:
         self.slot_name = slot_name
         self._save_callback = save_callback
         self._dirty = dirty
-        self.motion_mode = normalize_motion_mode(motion_mode)
+        self.preferences = preferences or FrontendPreferences.from_values(
+            motion_mode=motion_mode,
+        )
+        self.motion_mode = normalize_motion_mode(self.preferences.motion_mode)
+        self._preference_callback = preference_callback
+        self._preference_provider = preference_provider
+        self._preference_status = "Changes are stored locally for future 2D sessions."
         self.should_exit = False
         self.exit_reason = "quit"
         self._next_scene: BaseScene | None = None
@@ -902,6 +914,159 @@ class BaseScene:
         self._scene_transition_duration = self._entry_transition_duration(entry_transition)
         self._actor_sprite_bounds: list[ActorSpriteBounds] = []
         self._layout_separation_guards: list[tuple[str, object, object]] = []
+
+    def _current_frontend_preferences(self) -> FrontendPreferences:
+        if self._preference_provider is not None:
+            return self._preference_provider()
+        return self.preferences
+
+    def _apply_frontend_preferences(self, preferences: FrontendPreferences) -> bool:
+        """Apply one settings change live and persist it through the app bridge."""
+
+        try:
+            fonts = (
+                self._preference_callback(preferences)
+                if self._preference_callback is not None
+                else None
+            )
+        except PersistenceError as error:
+            self._preference_status = f"Could not save settings: {error}"
+            return False
+
+        if fonts is not None:
+            self.fonts = fonts
+        self.preferences = preferences
+        self.motion_mode = preferences.motion_mode
+        motion_pulses = getattr(self, "_motion_pulses", None)
+        if motion_pulses is not None:
+            motion_pulses.configure_intensity_scale(
+                self.motion_mode.pulse_scale,
+                clear=self.motion_mode is MotionMode.OFF,
+            )
+        if self.motion_mode is MotionMode.OFF:
+            self._scene_transition_duration = 0.0
+            self._scene_transition_elapsed = 0.0
+        self._preference_status = "Saved locally and applied to every 2D scene."
+        return True
+
+    def _cycle_frontend_preference(self, field: str) -> bool:
+        return self._apply_frontend_preferences(self._current_frontend_preferences().cycle(field))
+
+    def _reset_frontend_preferences(self) -> bool:
+        return self._apply_frontend_preferences(FrontendPreferences())
+
+    def _synchronize_frontend_preferences(self) -> None:
+        current = self._current_frontend_preferences()
+        if current != self.preferences:
+            self._apply_frontend_preferences(current)
+
+    def _draw_frontend_settings_panel(
+        self,
+        surface,
+        rect,
+        *,
+        target_prefix: str,
+        back_kind: str,
+        back_payload: str = "",
+        panel_title: str = "Settings",
+    ) -> None:
+        """Draw the shared responsive display and motion controls."""
+
+        pygame = self.pygame
+        preferences = self._current_frontend_preferences()
+        inner = draw_panel(
+            surface,
+            pygame,
+            rect,
+            title=panel_title,
+            accent=SELECTION,
+        )
+        draw_text_line(
+            surface,
+            self.fonts.heading,
+            "Display & Motion",
+            TEXT,
+            pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            self._preference_status,
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 20),
+            valign="top",
+        )
+        controls = (
+            (
+                f"Text Scale: {preferences.ui_scale.value.title()}",
+                "Cycle compact, standard, and large type.",
+                f"{target_prefix}_cycle",
+                "ui_scale",
+                INFO,
+            ),
+            (
+                f"Contrast: {preferences.contrast_mode.value.title()}",
+                "Switch between standard and high contrast.",
+                f"{target_prefix}_cycle",
+                "contrast_mode",
+                WARN,
+            ),
+            (
+                f"Motion: {preferences.motion_mode.value.title()}",
+                "Choose full, reduced, or motion off.",
+                f"{target_prefix}_cycle",
+                "motion_mode",
+                GOOD,
+            ),
+            (
+                "Reset Defaults",
+                "Restore standard text, contrast, and full motion.",
+                f"{target_prefix}_reset",
+                "",
+                DANGER,
+            ),
+            (
+                "Back",
+                "Return without losing the applied settings.",
+                back_kind,
+                back_payload,
+                BORDER,
+            ),
+        )
+        gap = 10
+        columns = 3 if inner.height < 190 and inner.width >= 700 else 2 if inner.width >= 560 else 1
+        rows = (len(controls) + columns - 1) // columns
+        button_top = inner.top + 38
+        available_height = max(40, inner.bottom - button_top)
+        button_height = max(
+            40,
+            min(56, int((available_height - gap * max(0, rows - 1)) / rows)),
+        )
+        button_width = int((inner.width - gap * max(0, columns - 1)) / columns)
+        for index, (title, detail, kind, payload, accent) in enumerate(controls):
+            row = index // columns
+            col = index % columns
+            left = inner.left + col * (button_width + gap)
+            if index == len(controls) - 1 and len(controls) % columns:
+                left = inner.centerx - button_width // 2
+            button_rect = pygame.Rect(
+                left,
+                button_top + row * (button_height + gap),
+                button_width,
+                button_height,
+            )
+            draw_button(
+                surface,
+                pygame,
+                rect=button_rect,
+                title=title,
+                detail=detail,
+                accent=accent,
+                title_font=self.fonts.small,
+                detail_font=self.fonts.small,
+            )
+            self._click_targets.append(ClickTarget(kind, payload, button_rect))
 
     @property
     def scene_transition_key(self) -> str:
@@ -1153,6 +1318,9 @@ class TitleScene(BaseScene):
         info_message: str | None = None,
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "boot_title",
+        preferences: FrontendPreferences | None = None,
+        preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
+        preference_provider: Callable[[], FrontendPreferences] | None = None,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -1164,6 +1332,9 @@ class TitleScene(BaseScene):
             dirty=False,
             motion_mode=motion_mode,
             entry_transition=entry_transition,
+            preferences=preferences,
+            preference_callback=preference_callback,
+            preference_provider=preference_provider,
         )
         self.coordinator = coordinator
         self._mode = initial_mode
@@ -1275,6 +1446,7 @@ class TitleScene(BaseScene):
             "slot_detail": "Slot",
             "wizard": "Wizard",
             "archives": "Archive",
+            "settings": "Settings",
         }.get(self._mode, "Archive")
         mode_state = {
             "menu": "handoff",
@@ -1283,6 +1455,7 @@ class TitleScene(BaseScene):
             "slot_detail": "build",
             "wizard": "success",
             "archives": "handoff",
+            "settings": "handoff",
         }.get(self._mode, "handoff")
         archive_state = "success" if self._archive_cards else "idle"
         save_state = "success" if self._save_cards else "build"
@@ -1447,25 +1620,22 @@ class TitleScene(BaseScene):
         self._reset_layout_separation_guards()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 20 if width < 900 else 24
-        gap = 12 if height < 700 else 16
-        nav_band = 46 if self._text_input is None and self._confirm_delete_slot_name is None else 0
-        header_height = 92 if height < 700 else 104
-        footer_height = 72 if height < 700 else 92
-        header_rect = pygame.Rect(
-            margin,
-            margin + nav_band,
-            width - margin * 2,
-            header_height,
+        profile = resolve_layout_profile(width, height)
+        nav_visible = self._text_input is None and self._confirm_delete_slot_name is None
+        frame = build_frame_layout(
+            width,
+            height,
+            header_height=profile.title_header_height,
+            footer_height=profile.title_footer_height,
+            nav_visible=nav_visible,
+            profile=profile,
         )
-        footer_rect = pygame.Rect(
-            margin,
-            height - footer_height - margin,
-            width - margin * 2,
-            footer_height,
-        )
-        content_top = header_rect.bottom + gap
-        content_height = max(80, footer_rect.top - gap - content_top)
+        margin = profile.margin
+        gap = profile.gap
+        header_rect = pygame.Rect(frame.header.as_tuple())
+        footer_rect = pygame.Rect(frame.footer.as_tuple())
+        content_top = frame.content.top
+        content_height = frame.content.height
         if width < 980:
             left_rect = pygame.Rect(margin, content_top, width - margin * 2, content_height)
             right_rect = pygame.Rect(0, 0, 0, 0)
@@ -1508,6 +1678,8 @@ class TitleScene(BaseScene):
             self._draw_slot_detail(surface, left_rect)
         elif self._mode == "wizard":
             self._draw_new_game_wizard(surface, left_rect)
+        elif self._mode == "settings":
+            self._draw_title_settings(surface, left_rect)
         else:
             self._draw_archive_browser(surface, left_rect)
         if right_rect.width > 0 and right_rect.height > 0:
@@ -1581,6 +1753,12 @@ class TitleScene(BaseScene):
         if target.kind == "menu":
             self._handle_menu_action(target.payload)
             return
+        if target.kind == "title_settings_cycle":
+            self._cycle_frontend_preference(target.payload)
+            return
+        if target.kind == "title_settings_reset":
+            self._reset_frontend_preferences()
+            return
         if target.kind == "slot":
             self._open_slot_detail(target.payload)
             return
@@ -1625,7 +1803,8 @@ class TitleScene(BaseScene):
                     4: "load_slots",
                     5: "archives",
                     6: "meta",
-                    7: "quit",
+                    7: "settings",
+                    8: "quit",
                 }.get(digit, "")
             )
             return
@@ -1706,6 +1885,9 @@ class TitleScene(BaseScene):
         if action == "new_wizard":
             self._set_mode("wizard")
             return
+        if action == "settings":
+            self._set_mode("settings")
+            return
         if action == "quit":
             self.should_exit = True
             self.exit_reason = "quit"
@@ -1749,6 +1931,9 @@ class TitleScene(BaseScene):
             slot_name=slot_name,
             save_callback=self._save_callback,
             motion_mode=self.motion_mode,
+            preferences=self._current_frontend_preferences(),
+            preference_callback=self._preference_callback,
+            preference_provider=self._preference_provider,
             entry_transition="title_to_run",
             return_scene_factory=lambda: self._spawn_scene(
                 "menu",
@@ -1775,6 +1960,9 @@ class TitleScene(BaseScene):
             allow_save=False,
             dirty=False,
             motion_mode=self.motion_mode,
+            preferences=self._current_frontend_preferences(),
+            preference_callback=self._preference_callback,
+            preference_provider=self._preference_provider,
             entry_transition="title_to_review",
         )
 
@@ -1785,6 +1973,7 @@ class TitleScene(BaseScene):
         self._set_mode("slot_detail")
 
     def _spawn_scene(self, mode: str, *, entry_transition: str = "review_to_title") -> "TitleScene":
+        self._synchronize_frontend_preferences()
         return TitleScene(
             pygame=self.pygame,
             fonts=self.fonts,
@@ -1795,6 +1984,9 @@ class TitleScene(BaseScene):
             coordinator=self.coordinator,
             initial_mode=mode,
             motion_mode=self.motion_mode,
+            preferences=self._current_frontend_preferences(),
+            preference_callback=self._preference_callback,
+            preference_provider=self._preference_provider,
             entry_transition=entry_transition,
         )
 
@@ -2285,13 +2477,26 @@ class TitleScene(BaseScene):
             ("4 Manage Saves", "Load, rename, copy, or delete.", "load_slots", INFO),
             ("5 Run Archives", "Completed runs and lessons.", "archives", WARN),
             ("6 Progress", "Paths, unlocks, and next gap.", "meta", SELECTION),
+            ("7 Settings", "Text, contrast, and motion.", "settings", INFO),
         )
-        quit_button = ("7 Quit", "Leave NEXUS TECH.", "quit", DANGER)
-        gap = 10
-        primary_height = max(52, min(72, int(inner.height * 0.24)))
+        quit_button = ("8 Quit", "Leave NEXUS TECH.", "quit", DANGER)
+        gap = 8 if inner.height < 250 else 10
+        primary_height = max(46, min(68, int(inner.height * 0.22)))
         quit_height = max(36, min(44, int(inner.height * 0.14)))
-        secondary_area = max(84, inner.height - primary_height - quit_height - gap * 3)
-        secondary_height = max(38, int((secondary_area - gap) / 2))
+        secondary_columns = 3 if inner.height < 250 and inner.width >= 700 else 2
+        secondary_rows = (len(secondary_buttons) + secondary_columns - 1) // secondary_columns
+        fixed_gaps = gap * (secondary_rows + 1)
+        secondary_area = max(
+            secondary_rows * 36,
+            inner.height - primary_height - quit_height - fixed_gaps,
+        )
+        secondary_height = max(
+            36,
+            min(
+                54,
+                int((secondary_area - gap * max(0, secondary_rows - 1)) / secondary_rows),
+            ),
+        )
         column_width = int((inner.width - gap) / 2)
 
         def draw_menu_button(button, button_rect) -> None:
@@ -2320,12 +2525,18 @@ class TitleScene(BaseScene):
             )
         secondary_top = inner.top + primary_height + gap
         for index, button in enumerate(secondary_buttons):
+            secondary_width = int((inner.width - gap * (secondary_columns - 1)) / secondary_columns)
+            column = index % secondary_columns
+            row = index // secondary_columns
+            left = inner.left + column * (secondary_width + gap)
+            if index == len(secondary_buttons) - 1 and len(secondary_buttons) % secondary_columns:
+                left = inner.centerx - secondary_width // 2
             draw_menu_button(
                 button,
                 pygame.Rect(
-                    inner.left + (index % 2) * (column_width + gap),
-                    secondary_top + (index // 2) * (secondary_height + gap),
-                    column_width,
+                    left,
+                    secondary_top + row * (secondary_height + gap),
+                    secondary_width,
                     secondary_height,
                 ),
             )
@@ -2338,6 +2549,15 @@ class TitleScene(BaseScene):
                 quit_width,
                 quit_height,
             ),
+        )
+
+    def _draw_title_settings(self, surface, rect) -> None:
+        self._draw_frontend_settings_panel(
+            surface,
+            rect,
+            target_prefix="title_settings",
+            back_kind="menu",
+            back_payload="menu",
         )
 
     def _draw_meta_board(self, surface, rect) -> None:
@@ -2561,6 +2781,7 @@ class TitleScene(BaseScene):
         card_width = int((inner.width - gap * max(0, cols - 1)) / cols)
         card_height = max(58, int((card_area_height - gap * max(0, rows - 1)) / rows))
         card_rects = []
+        card_fill = blend_color(PANEL, TEXT, 0.08)
         for index, (title, detail, accent) in enumerate(cards):
             row = index // cols
             col = index % cols
@@ -2571,7 +2792,7 @@ class TitleScene(BaseScene):
                 card_height,
             )
             card_rects.append(card_rect)
-            pygame.draw.rect(surface, (20, 32, 48), card_rect, border_radius=14)
+            pygame.draw.rect(surface, card_fill, card_rect, border_radius=14)
             pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=14)
             pygame.draw.rect(
                 surface,
@@ -3128,7 +3349,8 @@ class TitleScene(BaseScene):
         )
         if self._mode == "menu":
             message = (
-                "Menu: 1 continue, 2 new game, 3 guide, 4 saves, 5 archives, 6 progress, 7 quit."
+                "Menu: 1 continue, 2 new, 3 guide, 4 saves, 5 archives, 6 progress, "
+                "7 settings, 8 quit."
             )
         elif self._mode == "guide":
             message = "Quick Start: 2 opens wizard, 1 continues, 9 or Esc returns to menu."
@@ -3140,6 +3362,8 @@ class TitleScene(BaseScene):
             message = "Slot: 1 load, 2 rename, 3 duplicate, 4 delete, 9 back."
         elif self._mode == "wizard":
             message = "Wizard: click rows to cycle/edit. Enter launches. Esc returns to menu."
+        elif self._mode == "settings":
+            message = "Settings apply immediately, persist locally, and follow every 2D scene."
         else:
             message = "Archives: click a card to inspect it. Press 9 or Esc to return."
         draw_text_line(
@@ -3185,6 +3409,14 @@ class TitleScene(BaseScene):
                 "First turn: use Coach, inspect panels, then spend action points.",
                 "Controls: P pause, Esc back, F1 help, S save, Space end turn.",
                 f"Next reward: {meta.next_reward}",
+            )
+        if self._mode == "settings":
+            preferences = self._current_frontend_preferences()
+            return (
+                f"Text scale: {preferences.ui_scale.value}",
+                f"Contrast: {preferences.contrast_mode.value}",
+                f"Motion: {preferences.motion_mode.value}",
+                "Stored only in the local SQLite profile.",
             )
         if self._mode == "meta":
             return (
@@ -3460,6 +3692,9 @@ class ReviewScene(BaseScene):
         dirty: bool,
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "run_to_review",
+        preferences: FrontendPreferences | None = None,
+        preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
+        preference_provider: Callable[[], FrontendPreferences] | None = None,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -3471,6 +3706,9 @@ class ReviewScene(BaseScene):
             dirty=dirty,
             motion_mode=motion_mode,
             entry_transition=entry_transition,
+            preferences=preferences,
+            preference_callback=preference_callback,
+            preference_provider=preference_provider,
         )
         self._view_model = view_model
         self._accent = accent
@@ -3625,23 +3863,20 @@ class ReviewScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 20 if width < 900 else 28
-        gap = 12 if height < 700 else 16
-        nav_band = 46
-        header_rect = pygame.Rect(margin, margin + nav_band, width - margin * 2, 104)
+        profile = resolve_layout_profile(width, height)
         footer_height = 116 if height < 700 else 104
-        footer_rect = pygame.Rect(
-            margin,
-            height - footer_height - margin,
-            width - margin * 2,
-            footer_height,
+        frame = build_frame_layout(
+            width,
+            height,
+            header_height=104,
+            footer_height=footer_height,
+            nav_visible=True,
+            profile=profile,
         )
-        content_rect = pygame.Rect(
-            margin,
-            header_rect.bottom + gap,
-            width - margin * 2,
-            footer_rect.top - gap - header_rect.bottom,
-        )
+        gap = profile.gap
+        header_rect = pygame.Rect(frame.header.as_tuple())
+        footer_rect = pygame.Rect(frame.footer.as_tuple())
+        content_rect = pygame.Rect(frame.content.as_tuple())
         left_width = int((content_rect.width - gap) * 0.58)
         right_width = content_rect.width - gap - left_width
         left_rect = pygame.Rect(
@@ -3941,6 +4176,9 @@ class RunScene(BaseScene):
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "boot_run",
         return_scene_factory: Callable[[], BaseScene] | None = None,
+        preferences: FrontendPreferences | None = None,
+        preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
+        preference_provider: Callable[[], FrontendPreferences] | None = None,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -3952,6 +4190,9 @@ class RunScene(BaseScene):
             dirty=dirty,
             motion_mode=motion_mode,
             entry_transition=entry_transition,
+            preferences=preferences,
+            preference_callback=preference_callback,
+            preference_provider=preference_provider,
         )
         self._events: list[TimedFrontendEvent] = []
         self._action_feedback_cues: list[ActionFeedbackCue] = []
@@ -3973,6 +4214,7 @@ class RunScene(BaseScene):
         self._inspector_memory: dict[str, InspectorMemoryState] = {}
         self._help_overlay_visible = False
         self._pause_overlay_visible = False
+        self._pause_settings_visible = False
         self._focus_mode = True
         self._return_scene_factory = return_scene_factory
         self._first_turn_guide_visible = False
@@ -4054,6 +4296,8 @@ class RunScene(BaseScene):
             keys.add("help")
         if self._pause_overlay_visible:
             keys.add("pause")
+        if self._pause_settings_visible:
+            keys.add("pause_settings")
         if self.state.company.game_over or self.state.victory_achieved:
             keys.add("outcome")
         return keys
@@ -4300,6 +4544,7 @@ class RunScene(BaseScene):
         self._help_overlay_visible = visible
         if visible:
             self._pause_overlay_visible = False
+            self._pause_settings_visible = False
             self._trigger_overlay_motion("help", intensity=0.7)
         elif previous_visible:
             self._trigger_overlay_exit("help")
@@ -4311,7 +4556,16 @@ class RunScene(BaseScene):
             self._help_overlay_visible = False
             self._trigger_overlay_motion("pause", intensity=0.76)
         elif previous_visible:
+            self._pause_settings_visible = False
             self._trigger_overlay_exit("pause")
+
+    def _set_pause_settings_visible(self, visible: bool) -> None:
+        previous_visible = self._pause_settings_visible
+        self._pause_settings_visible = visible and self._pause_overlay_visible
+        if self._pause_settings_visible:
+            self._trigger_overlay_motion("pause_settings", intensity=0.72)
+        elif previous_visible:
+            self._trigger_overlay_exit("pause_settings")
 
     def _open_inspector(self, panel_key: str) -> None:
         self._trigger_overlay_motion("inspector", intensity=0.82)
@@ -4491,6 +4745,9 @@ class RunScene(BaseScene):
                 self._set_help_overlay_visible(False)
                 return
             if self._pause_overlay_visible:
+                if self._pause_settings_visible:
+                    self._set_pause_settings_visible(False)
+                    return
                 self._set_pause_overlay_visible(False)
                 return
             if self._text_input is not None:
@@ -4509,8 +4766,22 @@ class RunScene(BaseScene):
             return
 
         if self._pause_overlay_visible:
+            if self._pause_settings_visible:
+                if event.key == self.pygame.K_1:
+                    self._cycle_frontend_preference("ui_scale")
+                elif event.key == self.pygame.K_2:
+                    self._cycle_frontend_preference("contrast_mode")
+                elif event.key == self.pygame.K_3:
+                    self._cycle_frontend_preference("motion_mode")
+                elif event.key == self.pygame.K_r:
+                    self._reset_frontend_preferences()
+                elif event.key == self.pygame.K_b:
+                    self._set_pause_settings_visible(False)
+                return
             if event.key == self.pygame.K_s:
                 self._save_current_run()
+            elif event.key == self.pygame.K_t:
+                self._set_pause_settings_visible(True)
             elif event.key == self.pygame.K_m:
                 self._return_to_menu_or_quit()
             elif event.key == self.pygame.K_q:
@@ -4655,30 +4926,27 @@ class RunScene(BaseScene):
         self._reset_layout_separation_guards()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 20
-        gap = 12 if height < 700 else 16
-        nav_band = 46 if not self._pause_overlay_visible else 0
-        header_height = 124 if height < 700 else 132
-        header_rect = pygame.Rect(
-            margin,
-            margin + nav_band,
-            width - margin * 2,
-            header_height,
-        )
+        profile = resolve_layout_profile(width, height)
         footer_height = self._footer_outer_height(width, height)
-        footer_rect = pygame.Rect(
-            margin,
-            height - footer_height - margin,
-            width - margin * 2,
-            footer_height,
+        frame = build_frame_layout(
+            width,
+            height,
+            header_height=profile.run_header_height,
+            footer_height=footer_height,
+            nav_visible=not self._pause_overlay_visible,
+            profile=profile,
         )
-        content_top = header_rect.bottom + gap
-        content_height = max(80, footer_rect.top - gap - content_top)
+        margin = profile.margin
+        gap = profile.gap
+        header_rect = pygame.Rect(frame.header.as_tuple())
+        footer_rect = pygame.Rect(frame.footer.as_tuple())
+        content_top = frame.content.top
+        content_height = frame.content.height
         content_rect = pygame.Rect(
             margin,
             content_top,
             width - margin * 2,
-            max(0, content_height),
+            content_height,
         )
         use_compact_focus = self._use_compact_run_focus(width, content_rect.height)
         if use_compact_focus:
@@ -4785,7 +5053,10 @@ class RunScene(BaseScene):
                 tuple(nav_items),
             )
         if self._pause_overlay_visible:
-            self._draw_pause_overlay(surface)
+            if self._pause_settings_visible:
+                self._draw_pause_settings_overlay(surface)
+            else:
+                self._draw_pause_overlay(surface)
         self._sync_mouse_cursor()
         self._draw_hover_tooltip(surface)
         self._draw_scene_transition_overlay(surface)
@@ -6531,6 +6802,18 @@ class RunScene(BaseScene):
         if target.kind == "pause_save":
             self._save_current_run()
             return
+        if target.kind == "pause_settings":
+            self._set_pause_settings_visible(True)
+            return
+        if target.kind == "pause_settings_cycle":
+            self._cycle_frontend_preference(target.payload)
+            return
+        if target.kind == "pause_settings_reset":
+            self._reset_frontend_preferences()
+            return
+        if target.kind == "pause_settings_back":
+            self._set_pause_settings_visible(False)
+            return
         if target.kind == "pause_menu":
             self._return_to_menu_or_quit()
             return
@@ -7105,6 +7388,9 @@ class RunScene(BaseScene):
             selected_product_id=self.selected_product.id.hex,
             dirty=True,
             motion_mode=self.motion_mode,
+            preferences=self._current_frontend_preferences(),
+            preference_callback=self._preference_callback,
+            preference_provider=self._preference_provider,
             entry_transition="run_to_summary",
             return_scene_factory=self._return_scene_factory,
         )
@@ -7139,6 +7425,9 @@ class RunScene(BaseScene):
             allow_save=True,
             dirty=self._dirty,
             motion_mode=self.motion_mode,
+            preferences=self._current_frontend_preferences(),
+            preference_callback=self._preference_callback,
+            preference_provider=self._preference_provider,
             entry_transition="run_to_review",
         )
 
@@ -8751,7 +9040,7 @@ class RunScene(BaseScene):
         if target.kind == "close_summary":
             return "Hover: close the 2D shell from the turn summary."
         if target.kind == "pause_toggle":
-            return "Hover: open Pause for resume, save, menu return, or quit controls."
+            return "Hover: open Pause for resume, save, settings, menu, or quit controls."
         if target.kind == "run_back":
             return "Hover: close the current overlay first; with no overlay open, show Pause."
         if target.kind == "open_help":
@@ -8762,6 +9051,14 @@ class RunScene(BaseScene):
             return "Hover: resume the run without changing the current state."
         if target.kind == "pause_save":
             return "Hover: save the current run to the active slot and stay paused."
+        if target.kind == "pause_settings":
+            return "Hover: adjust text scale, contrast, and motion while the run stays paused."
+        if target.kind == "pause_settings_cycle":
+            return f"Hover: cycle the saved `{target.payload}` preference."
+        if target.kind == "pause_settings_reset":
+            return "Hover: restore the default 2D display and motion profile."
+        if target.kind == "pause_settings_back":
+            return "Hover: return to the main Pause controls."
         if target.kind == "pause_menu":
             return "Hover: save and return to the 2D title menu when this run has a title shell."
         if target.kind == "pause_quit":
@@ -10038,7 +10335,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("pause"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=352, margin=26)
+        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=388, margin=26)
         modal_rect = self._animated_overlay_rect(modal_rect, "pause", shift=24)
         inner = draw_panel(
             surface,
@@ -10100,13 +10397,17 @@ class RunScene(BaseScene):
                 WARN,
                 menu_available,
             ),
+            ("T Settings", "Text, contrast, and motion.", "pause_settings", "", SELECTION, True),
             ("Q Quit", "Close the 2D shell.", "pause_quit", "", DANGER, True),
         )
         for index, (title, button_detail, kind, payload, accent, enabled) in enumerate(buttons):
             row = index // 2
             col = index % 2
+            left = inner.left + col * (button_width + button_gap)
+            if index == len(buttons) - 1 and len(buttons) % 2:
+                left = inner.centerx - button_width // 2
             rect = pygame.Rect(
-                inner.left + col * (button_width + button_gap),
+                left,
                 button_top + row * (button_height + button_gap),
                 button_width,
                 button_height,
@@ -10124,6 +10425,21 @@ class RunScene(BaseScene):
             )
             if enabled:
                 self._click_targets.append(ClickTarget(kind, payload, rect))
+
+    def _draw_pause_settings_overlay(self, surface) -> None:
+        pygame = self.pygame
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill(self._overlay_fill("pause_settings"))
+        surface.blit(overlay, (0, 0))
+        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=440, margin=26)
+        modal_rect = self._animated_overlay_rect(modal_rect, "pause_settings", shift=24)
+        self._draw_frontend_settings_panel(
+            surface,
+            modal_rect,
+            target_prefix="pause_settings",
+            back_kind="pause_settings_back",
+            panel_title="Paused Settings",
+        )
 
     def _draw_help_overlay(self, surface) -> None:
         pygame = self.pygame
@@ -10186,7 +10502,7 @@ class RunScene(BaseScene):
             ("H/A/O", "Hire / assign / partner"),
             ("Y/R/B/U", "Strategy / roadmap / budget / support"),
             ("Space", "End turn"),
-            ("P", "Pause with resume, save, menu, and quit"),
+            ("P", "Pause with resume, save, settings, menu, and quit"),
             ("Esc", "Back out of overlay, then pause"),
             ("Z/X", "Inspector sort / filter"),
             ("A/H", "Inspector actionable / hotspot focus"),
@@ -10519,6 +10835,9 @@ class TurnSummaryScene(BaseScene):
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "run_to_summary",
         return_scene_factory: Callable[[], BaseScene] | None = None,
+        preferences: FrontendPreferences | None = None,
+        preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
+        preference_provider: Callable[[], FrontendPreferences] | None = None,
     ) -> None:
         super().__init__(
             pygame=pygame,
@@ -10530,6 +10849,9 @@ class TurnSummaryScene(BaseScene):
             dirty=dirty,
             motion_mode=motion_mode,
             entry_transition=entry_transition,
+            preferences=preferences,
+            preference_callback=preference_callback,
+            preference_provider=preference_provider,
         )
         self._previous_state = previous_state
         self._resolution = resolution
@@ -10814,24 +11136,22 @@ class TurnSummaryScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        margin = 20 if width < 900 else 24
-        gap = 12 if height < 700 else 16
-        nav_band = 46
-        header_rect = pygame.Rect(
-            margin,
-            margin + nav_band,
-            width - margin * 2,
-            self._summary_header_height(height),
-        )
+        profile = resolve_layout_profile(width, height)
         footer_height = 118 if height < 700 else 94
-        footer_rect = pygame.Rect(
-            margin,
-            height - footer_height - margin,
-            width - margin * 2,
-            footer_height,
+        frame = build_frame_layout(
+            width,
+            height,
+            header_height=self._summary_header_height(height),
+            footer_height=footer_height,
+            nav_visible=True,
+            profile=profile,
         )
-        content_top = header_rect.bottom + gap
-        content_height = max(80, footer_rect.top - gap - content_top)
+        margin = profile.margin
+        gap = profile.gap
+        header_rect = pygame.Rect(frame.header.as_tuple())
+        footer_rect = pygame.Rect(frame.footer.as_tuple())
+        content_top = frame.content.top
+        content_height = frame.content.height
         if width < 1100:
             top_height = int((content_height - gap) * self._summary_top_section_ratio(width))
             left_rect = pygame.Rect(margin, content_top, width - margin * 2, top_height)
@@ -10907,6 +11227,9 @@ class TurnSummaryScene(BaseScene):
                 allow_save=True,
                 dirty=self._dirty,
                 motion_mode=self.motion_mode,
+                preferences=self._current_frontend_preferences(),
+                preference_callback=self._preference_callback,
+                preference_provider=self._preference_provider,
                 entry_transition="summary_to_review",
             )
             return
@@ -10928,6 +11251,9 @@ class TurnSummaryScene(BaseScene):
             dirty=self._dirty,
             show_ready_event=False,
             motion_mode=self.motion_mode,
+            preferences=self._current_frontend_preferences(),
+            preference_callback=self._preference_callback,
+            preference_provider=self._preference_provider,
             entry_transition="summary_to_run",
             return_scene_factory=self._return_scene_factory,
         )

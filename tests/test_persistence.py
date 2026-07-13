@@ -76,6 +76,12 @@ from nexus_tech.persistence.save_coordinator import DEFAULT_SAVE_SLOT, SaveLoadC
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.user_preferences import (
+    ContrastMode,
+    FrontendPreferences,
+    MotionMode,
+    UiScale,
+)
 
 
 def make_state() -> GameState:
@@ -494,6 +500,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "partnerships",
         "capital_plan",
         "run_archives",
+        "frontend_preferences",
     }.issubset(table_names)
 
     with sqlite3.connect(db_path) as connection:
@@ -725,7 +732,7 @@ def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path)
     assert row["campaign_commitment_choice"] == ""
     assert row["campaign_consequence_choice"] == ""
     assert row["terminal_reason"] == ""
-    assert user_version == 24
+    assert user_version == 25
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -1451,3 +1458,37 @@ def test_invalid_rng_state_raises_corrupt_save_error(tmp_path: Path) -> None:
 
     with pytest.raises(CorruptSaveError, match="invalid structured data"):
         SaveLoadCoordinator(db_path).load_game(DEFAULT_SAVE_SLOT)
+
+
+def test_frontend_preferences_round_trip_independently_of_save_slots(tmp_path: Path) -> None:
+    coordinator = SaveLoadCoordinator(tmp_path / "frontend-preferences.db")
+    preferences = FrontendPreferences(
+        ui_scale=UiScale.LARGE,
+        contrast_mode=ContrastMode.HIGH,
+        motion_mode=MotionMode.REDUCED,
+    )
+
+    assert coordinator.load_frontend_preferences() == FrontendPreferences()
+
+    coordinator.save_frontend_preferences(preferences)
+
+    assert coordinator.load_frontend_preferences() == preferences
+    assert coordinator.list_save_slots() == []
+
+
+def test_frontend_preferences_fall_back_when_local_profile_is_malformed(
+    tmp_path: Path,
+) -> None:
+    coordinator = SaveLoadCoordinator(tmp_path / "malformed-preferences.db")
+    coordinator.initialize()
+    with coordinator.database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO frontend_preferences (
+                profile_key, ui_scale, contrast_mode, motion_mode, updated_at
+            )
+            VALUES ('default', 'oversized', 'neon', 'fast', '2026-07-14T00:00:00+00:00')
+            """
+        )
+
+    assert coordinator.load_frontend_preferences() == FrontendPreferences()

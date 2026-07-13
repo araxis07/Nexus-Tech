@@ -15,7 +15,7 @@ from nexus_tech.frontend_2d.accessibility import (
 _STANDARD_PALETTE = {
     "BACKGROUND": (8, 14, 23),
     "GRID": (14, 25, 39),
-    "PANEL": (18, 28, 42),
+    "PANEL": (22, 36, 54),
     "PANEL_ALT": (13, 22, 34),
     "BORDER": (74, 98, 128),
     "TEXT": (232, 239, 245),

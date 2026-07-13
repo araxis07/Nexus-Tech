@@ -67,6 +67,7 @@ from nexus_tech.simulation.endgame import evaluate_exit_outcome
 from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_badges
+from nexus_tech.user_preferences import FrontendPreferences
 
 try:
     UTC = datetime.UTC
@@ -179,6 +180,65 @@ class SaveLoadCoordinator:
         """Create the database and schema if needed."""
 
         self.database.initialize()
+
+    def load_frontend_preferences(self) -> FrontendPreferences:
+        """Load the local 2D display profile, falling back safely if it is malformed."""
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT ui_scale, contrast_mode, motion_mode
+                    FROM frontend_preferences
+                    WHERE profile_key = 'default'
+                    """
+                ).fetchone()
+        except sqlite3.DatabaseError as error:
+            raise PersistenceError(f"Failed to load frontend preferences: {error}") from error
+
+        if row is None:
+            return FrontendPreferences()
+        try:
+            return FrontendPreferences.from_values(
+                ui_scale=row["ui_scale"],
+                contrast_mode=row["contrast_mode"],
+                motion_mode=row["motion_mode"],
+            )
+        except (AttributeError, ValueError):
+            return FrontendPreferences()
+
+    def save_frontend_preferences(self, preferences: FrontendPreferences) -> None:
+        """Persist the single local 2D display profile independently of save slots."""
+
+        try:
+            self.initialize()
+            with self.database.connect() as connection:
+                connection.execute(
+                    """
+                    INSERT INTO frontend_preferences (
+                        profile_key,
+                        ui_scale,
+                        contrast_mode,
+                        motion_mode,
+                        updated_at
+                    )
+                    VALUES ('default', ?, ?, ?, ?)
+                    ON CONFLICT(profile_key) DO UPDATE SET
+                        ui_scale = excluded.ui_scale,
+                        contrast_mode = excluded.contrast_mode,
+                        motion_mode = excluded.motion_mode,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        preferences.ui_scale.value,
+                        preferences.contrast_mode.value,
+                        preferences.motion_mode.value,
+                        utc_now(),
+                    ),
+                )
+        except sqlite3.DatabaseError as error:
+            raise PersistenceError(f"Failed to save frontend preferences: {error}") from error
 
     def save_game(self, slot_name: str, state: GameState, rng: RandomSource) -> None:
         """Persist a full game session into one save slot."""

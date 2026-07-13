@@ -684,6 +684,21 @@ CONTRAST_MODE_2D_OPTION = typer.Option(
     "--contrast-mode",
     help="2D color contrast profile: standard or high.",
 )
+LAUNCH_MOTION_MODE_2D_OPTION = typer.Option(
+    None,
+    "--motion-mode",
+    help="Override saved 2D motion: full, reduced, or off.",
+)
+LAUNCH_UI_SCALE_2D_OPTION = typer.Option(
+    None,
+    "--ui-scale",
+    help="Override saved 2D text scale: compact, standard, or large.",
+)
+LAUNCH_CONTRAST_MODE_2D_OPTION = typer.Option(
+    None,
+    "--contrast-mode",
+    help="Override saved 2D contrast: standard or high.",
+)
 VISUAL_AUDIT_OUTPUT_DIR_OPTION = typer.Option(
     None,
     "--output-dir",
@@ -1633,9 +1648,9 @@ def play_2d_command(
     headless: bool = HEADLESS_2D_OPTION,
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
-    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
-    ui_scale: UiScale = UI_SCALE_2D_OPTION,
-    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
+    motion_mode: MotionMode | None = LAUNCH_MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale | None = LAUNCH_UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode | None = LAUNCH_CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Launch the lightweight 2D dashboard frontend for a new run."""
 
@@ -8884,9 +8899,9 @@ def load_game_2d_command(
     headless: bool = HEADLESS_2D_OPTION,
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
-    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
-    ui_scale: UiScale = UI_SCALE_2D_OPTION,
-    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
+    motion_mode: MotionMode | None = LAUNCH_MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale | None = LAUNCH_UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode | None = LAUNCH_CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Load one named save slot into the lightweight 2D dashboard."""
 
@@ -8943,9 +8958,9 @@ def continue_last_game_2d_command(
     headless: bool = HEADLESS_2D_OPTION,
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
-    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
-    ui_scale: UiScale = UI_SCALE_2D_OPTION,
-    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
+    motion_mode: MotionMode | None = LAUNCH_MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale | None = LAUNCH_UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode | None = LAUNCH_CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Continue the latest save slot in the lightweight 2D dashboard."""
 
@@ -8975,9 +8990,9 @@ def menu_2d_command(
     headless: bool = HEADLESS_2D_OPTION,
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
-    motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
-    ui_scale: UiScale = UI_SCALE_2D_OPTION,
-    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
+    motion_mode: MotionMode | None = LAUNCH_MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale | None = LAUNCH_UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode | None = LAUNCH_CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Open the 2D title scene with save/load and archive review."""
 
@@ -9075,9 +9090,9 @@ def start_new_game_2d(
     headless: bool,
     window_size: tuple[int, int],
     max_frames: int | None,
-    motion_mode: MotionMode,
-    ui_scale: UiScale,
-    contrast_mode: ContrastMode,
+    motion_mode: MotionMode | None,
+    ui_scale: UiScale | None,
+    contrast_mode: ContrastMode | None,
 ) -> None:
     """Create a brand new run and launch the lightweight 2D dashboard."""
 
@@ -9117,9 +9132,9 @@ def launch_2d_session(
     headless: bool,
     window_size: tuple[int, int],
     max_frames: int | None,
-    motion_mode: MotionMode,
-    ui_scale: UiScale,
-    contrast_mode: ContrastMode,
+    motion_mode: MotionMode | None,
+    ui_scale: UiScale | None,
+    contrast_mode: ContrastMode | None,
 ) -> None:
     """Launch one 2D dashboard session and print the closing summary."""
 

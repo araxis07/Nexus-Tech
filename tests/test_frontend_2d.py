@@ -126,6 +126,7 @@ from nexus_tech.frontend_2d.event_queue import (
     describe_action_motion_profile,
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
+from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
     ReviewScene,
@@ -168,6 +169,7 @@ from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.turn_coach import build_turn_coach
+from nexus_tech.user_preferences import FrontendPreferences
 
 runner = CliRunner()
 
@@ -223,6 +225,165 @@ def _build_pygame_bundle():
     pygame.font.init()
     surface = pygame.display.set_mode((960, 640), pygame.HIDDEN)
     return pygame, create_fonts(pygame), surface
+
+
+def _build_test_preference_bridge(pygame, coordinator: SaveLoadCoordinator):
+    current = coordinator.load_frontend_preferences()
+
+    def apply_preferences(preferences: FrontendPreferences):
+        nonlocal current
+        coordinator.save_frontend_preferences(preferences)
+        configure_contrast_mode(preferences.contrast_mode, mirror_modules=(scenes_module,))
+        current = preferences
+        return create_fonts(pygame, preferences.ui_scale)
+
+    def preference_provider() -> FrontendPreferences:
+        return current
+
+    return current, apply_preferences, preference_provider
+
+
+def test_frontend_preferences_cycle_in_deterministic_ui_order() -> None:
+    preferences = FrontendPreferences()
+
+    assert preferences.cycle("ui_scale").ui_scale is UiScale.LARGE
+    assert preferences.cycle("contrast_mode").contrast_mode is ContrastMode.HIGH
+    assert preferences.cycle("motion_mode").motion_mode is MotionMode.REDUCED
+
+    with pytest.raises(ValueError, match="Unknown frontend preference field"):
+        preferences.cycle("sound")
+
+
+@pytest.mark.parametrize("size", [(820, 620), (960, 640), (1280, 720), (1440, 900)])
+def test_shared_frame_layout_reserves_non_overlapping_regions(
+    size: tuple[int, int],
+) -> None:
+    width, height = size
+    profile = resolve_layout_profile(width, height)
+    frame = build_frame_layout(
+        width,
+        height,
+        header_height=profile.run_header_height,
+        footer_height=118,
+        nav_visible=True,
+        profile=profile,
+    )
+
+    assert frame.header.top >= profile.margin + profile.nav_band
+    assert frame.header.top + frame.header.height <= frame.content.top
+    assert frame.content.top + frame.content.height <= frame.footer.top
+    assert frame.footer.top + frame.footer.height <= height - profile.margin
+
+
+def test_title_settings_apply_persist_and_render_at_compact_size(tmp_path: Path) -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    coordinator = SaveLoadCoordinator(tmp_path / "title-settings.db")
+    preferences, apply_preferences, preference_provider = _build_test_preference_bridge(
+        pygame,
+        coordinator,
+    )
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=284),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+            preferences=preferences,
+            preference_callback=apply_preferences,
+            preference_provider=preference_provider,
+            motion_mode=preferences.motion_mode,
+        )
+
+        scene._handle_digit_shortcut(7)
+        assert scene._mode == "settings"
+        scene.draw(surface)
+        target_kinds = {target.kind for target in scene._click_targets}
+        assert {
+            "title_settings_cycle",
+            "title_settings_reset",
+            "menu",
+        }.issubset(target_kinds)
+
+        scene._dispatch_click_target(
+            ClickTarget("title_settings_cycle", "ui_scale", surface.get_rect())
+        )
+        scene._dispatch_click_target(
+            ClickTarget("title_settings_cycle", "contrast_mode", surface.get_rect())
+        )
+        scene._dispatch_click_target(
+            ClickTarget("title_settings_cycle", "motion_mode", surface.get_rect())
+        )
+        start_typography_audit()
+        scene.draw(surface)
+        typography_events = finish_typography_audit()
+
+        assert preference_provider() == FrontendPreferences(
+            ui_scale=UiScale.LARGE,
+            contrast_mode=ContrastMode.HIGH,
+            motion_mode=MotionMode.REDUCED,
+        )
+        assert coordinator.load_frontend_preferences() == preference_provider()
+        assert scene.layout_safety_violations() == ()
+        assert not any(event.severe for event in typography_events)
+
+        scene._dispatch_click_target(ClickTarget("title_settings_reset", "", surface.get_rect()))
+        assert preference_provider() == FrontendPreferences()
+    finally:
+        configure_contrast_mode(ContrastMode.STANDARD, mirror_modules=(scenes_module,))
+        pygame.quit()
+
+
+def test_pause_settings_keep_run_paused_and_return_to_pause_controls(tmp_path: Path) -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    coordinator = SaveLoadCoordinator(tmp_path / "pause-settings.db")
+    preferences, apply_preferences, preference_provider = _build_test_preference_bridge(
+        pygame,
+        coordinator,
+    )
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=285),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            preferences=preferences,
+            preference_callback=apply_preferences,
+            preference_provider=preference_provider,
+            motion_mode=preferences.motion_mode,
+        )
+        scene._set_pause_overlay_visible(True)
+        scene._dispatch_click_target(ClickTarget("pause_settings", "", surface.get_rect()))
+        scene.draw(surface)
+
+        assert scene._pause_overlay_visible
+        assert scene._pause_settings_visible
+        assert {target.kind for target in scene._click_targets} >= {
+            "pause_settings_cycle",
+            "pause_settings_reset",
+            "pause_settings_back",
+        }
+        assert scene.layout_safety_violations() == ()
+
+        scene._dispatch_click_target(
+            ClickTarget("pause_settings_cycle", "motion_mode", surface.get_rect())
+        )
+        assert preference_provider().motion_mode is MotionMode.REDUCED
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
+
+        assert scene._pause_overlay_visible
+        assert not scene._pause_settings_visible
+        assert not scene.should_exit
+    finally:
+        configure_contrast_mode(ContrastMode.STANDARD, mirror_modules=(scenes_module,))
+        pygame.quit()
 
 
 def test_2d_widget_text_fit_ellipsizes_to_available_width() -> None:
@@ -4061,6 +4222,23 @@ def test_run_2d_visual_audit_motion_off_drops_archive_comparison_layer() -> None
     assert report.motion_mode == MotionMode.OFF.value
     assert "archive-comparison" not in title_meta.expected_layers
     assert "archive-comparison" not in title_meta.active_layers
+
+
+def test_title_visual_contrast_holds_across_responsive_breakpoints() -> None:
+    report = run_2d_visual_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        sizes=((960, 640), (1280, 720)),
+        motion_mode=MotionMode.OFF,
+    )
+
+    title_cells = [cell for cell in report.cells if cell.scene_key.startswith("title_")]
+
+    assert report.status == "pass"
+    assert len(title_cells) == 6
+    assert all(cell.status == "pass" for cell in title_cells)
+    assert all(cell.non_dark_ratio >= cell.minimum_non_dark_ratio for cell in title_cells)
 
 
 def test_actor_sprite_pose_key_defaults_to_state_depth() -> None:
@@ -10922,3 +11100,40 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
     assert captured["motion_mode"] is MotionMode.REDUCED
     assert captured["ui_scale"] is UiScale.COMPACT
     assert captured["contrast_mode"] is ContrastMode.HIGH
+
+
+def test_play_2d_omitted_display_flags_defer_to_saved_preferences(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_start_new_game_2d(**kwargs) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(cli_module, "start_new_game_2d", fake_start_new_game_2d)
+
+    result = runner.invoke(app, ["play-2d", "--headless", "--max-frames", "1"])
+
+    assert result.exit_code == 0
+    assert captured["motion_mode"] is None
+    assert captured["ui_scale"] is None
+    assert captured["contrast_mode"] is None
+
+
+def test_launch_2d_menu_uses_saved_preferences_without_cli_overrides(tmp_path: Path) -> None:
+    coordinator = SaveLoadCoordinator(tmp_path / "saved-launch-preferences.db")
+    preferences = FrontendPreferences(
+        ui_scale=UiScale.LARGE,
+        contrast_mode=ContrastMode.HIGH,
+        motion_mode=MotionMode.OFF,
+    )
+    coordinator.save_frontend_preferences(preferences)
+
+    result = launch_2d_menu(
+        db_path=coordinator.db_path,
+        headless=True,
+        max_frames=1,
+        window_size=(820, 620),
+    )
+
+    assert result.exit_reason == "max_frames"
+    assert coordinator.load_frontend_preferences() == preferences
+    assert widgets_module.active_contrast_mode() is ContrastMode.STANDARD

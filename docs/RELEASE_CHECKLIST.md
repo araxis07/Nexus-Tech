@@ -24,6 +24,7 @@ uv run nexus-tech beta-evidence
 uv run nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced
 uv run nexus-tech play-2d --scenario founder_journey --seed 283 --headless --max-frames 2 --window-size 820x620 --motion-mode reduced --ui-scale large --contrast-mode high
 uv run nexus-tech menu-2d --headless --max-frames 2 --motion-mode reduced
+uv run nexus-tech menu-2d --headless --max-frames 2 --window-size 820x620 --ui-scale large --contrast-mode high
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode off
@@ -288,6 +289,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `Archive/Meta Comparison Motion` failures as release blockers before presenting archive or meta-board progression screens.
 - Treat late-game repair cues that do not identify the correct IPO, M&A, independence, or reset target lane as release blockers before presenting endgame/picker polish.
 - Treat text clipping, unreadable compact buttons, or local gameplay database files appearing in `git status` as release blockers before presenting the 2D build.
+- Treat Settings values that do not persist, do not follow scene transitions, or alter gameplay save-slot rows as release blockers; schema 25 must migrate additively.
 - Treat missing visible Back/Pause/Menu controls, missing hover/cursor affordance on primary controls, or `Esc` quitting the run without pause confirmation as release blockers before presenting the 2D build.
 - Treat 820x620 title/run/summary/review captures with overlapping navigation, cut-off cards, or action buttons spilling outside their panels as release blockers before presenting the 2D build.
 - Treat `audit-2d-animation-matrix` failures as release blockers for the default seven-scenario, three-seed presentation matrix.

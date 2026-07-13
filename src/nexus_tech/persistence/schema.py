@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 24
+CURRENT_SCHEMA_VERSION = 25
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 24,
+        schema_version INTEGER NOT NULL DEFAULT 25,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -517,6 +517,15 @@ SCHEMA_STATEMENTS = (
         product_investment_share INTEGER NOT NULL DEFAULT 35,
         go_to_market_share INTEGER NOT NULL DEFAULT 35,
         reserve_share INTEGER NOT NULL DEFAULT 30
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS frontend_preferences (
+        profile_key TEXT PRIMARY KEY,
+        ui_scale TEXT NOT NULL DEFAULT 'standard',
+        contrast_mode TEXT NOT NULL DEFAULT 'standard',
+        motion_mode TEXT NOT NULL DEFAULT 'full',
+        updated_at TEXT NOT NULL
     )
     """,
 )

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.284.0 - 2026-07-14
+
+- Added a persistent local Settings page to the 2D title menu and Pause flow for text scale, contrast, and motion, with immediate application across scene transitions
+- Added shared compact, standard, and spacious frame profiles for Title, Run, Review, and Turn Summary shells to keep navigation, content, and footer regions separated
+- Upgraded SQLite to schema 25 with an additive `frontend_preferences` table that remains independent of gameplay save slots and safely falls back from malformed local values
+- Changed 2D launch display flags into optional session overrides so omitted flags reuse saved preferences while deterministic audit commands retain explicit profiles
+- Raised standard panel contrast so title, guide, progression, and live-run surfaces remain legible across responsive breakpoints
+- Added compact typography, pause navigation, preference persistence, migration, CLI override, and responsive frame regressions without completing human playtest evidence by automation
+
 ## 0.283.0 - 2026-07-14
 
 - Added delayed systemic consequences for all 24 featured campaign choices, with bounded event-weight shifts and a player-facing path outlook
