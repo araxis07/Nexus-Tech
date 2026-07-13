@@ -12,6 +12,7 @@ import nexus_tech.cli as cli_module
 import nexus_tech.frontend_2d.animation_audit as animation_audit_module
 import nexus_tech.frontend_2d.scenes as scenes_module
 import nexus_tech.frontend_2d.visual_audit as visual_audit_module
+import nexus_tech.frontend_2d.widgets as widgets_module
 from nexus_tech.cli import app
 from nexus_tech.domain.models import (
     CandidateTrait,
@@ -34,9 +35,11 @@ from nexus_tech.frontend_2d import (
     AnimationMatrixReport,
     AnimationPlaytestReadinessPlan,
     AnimationPlaytestReportValidation,
+    ContrastMode,
     FlowAuditReport,
     MotionAuditCell,
     MotionAuditReport,
+    UiScale,
     VisualAuditCell,
     VisualAuditReport,
     VisualLayoutMatrixCell,
@@ -146,10 +149,13 @@ from nexus_tech.frontend_2d.visual_audit import (
 )
 from nexus_tech.frontend_2d.widgets import (
     DANGER,
+    configure_contrast_mode,
     create_fonts,
     draw_button,
     draw_wrapped_text,
+    finish_typography_audit,
     fit_text_line,
+    start_typography_audit,
 )
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.endgame import (
@@ -232,6 +238,79 @@ def test_2d_widget_text_fit_ellipsizes_to_available_width() -> None:
         assert fonts.small.size(fitted)[0] <= 118
         assert fit_text_line(fonts.small, "Short label", 118) == "Short label"
     finally:
+        pygame.quit()
+
+
+def test_2d_accessibility_profiles_scale_fonts_and_mirror_palette() -> None:
+    pygame, standard_fonts, _surface = _build_pygame_bundle()
+    original_background = scenes_module.BACKGROUND
+    try:
+        large_fonts = create_fonts(pygame, UiScale.LARGE)
+
+        assert large_fonts.body.get_height() > standard_fonts.body.get_height()
+        assert (
+            configure_contrast_mode(
+                ContrastMode.HIGH,
+                mirror_modules=(scenes_module,),
+            )
+            is ContrastMode.HIGH
+        )
+        assert widgets_module.BACKGROUND == (0, 0, 0)
+        assert scenes_module.BACKGROUND == widgets_module.BACKGROUND
+        assert sum(widgets_module.TEXT) > sum(widgets_module.MUTED)
+        assert widgets_module.SELECTION != widgets_module.INFO
+    finally:
+        configure_contrast_mode(ContrastMode.STANDARD, mirror_modules=(scenes_module,))
+        pygame.quit()
+
+    assert original_background == scenes_module.BACKGROUND
+
+
+def test_2d_accessible_profile_draws_compact_title_and_run_without_hidden_text(
+    tmp_path: Path,
+) -> None:
+    pygame, _standard_fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        fonts = create_fonts(pygame, UiScale.LARGE)
+        configure_contrast_mode(ContrastMode.HIGH, mirror_modules=(scenes_module,))
+        coordinator = SaveLoadCoordinator(tmp_path / "accessible-profile.db")
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scenes = (
+            TitleScene(
+                pygame=pygame,
+                fonts=fonts,
+                state=state,
+                rng=RandomSource(seed=283),
+                slot_name="active",
+                save_callback=lambda *_args: None,
+                coordinator=coordinator,
+                initial_mode="menu",
+                motion_mode=MotionMode.REDUCED,
+            ),
+            RunScene(
+                pygame=pygame,
+                fonts=fonts,
+                state=state,
+                rng=RandomSource(seed=283),
+                slot_name="active",
+                save_callback=lambda *_args: None,
+                show_ready_event=False,
+                motion_mode=MotionMode.REDUCED,
+            ),
+        )
+
+        for scene in scenes:
+            scene.update(1 / 60)
+            start_typography_audit()
+            scene.draw(surface)
+            events = finish_typography_audit()
+
+            assert not [event for event in events if event.severe]
+            assert scene._click_targets
+    finally:
+        finish_typography_audit()
+        configure_contrast_mode(ContrastMode.STANDARD, mirror_modules=(scenes_module,))
         pygame.quit()
 
 
@@ -1451,12 +1530,14 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert button_cols == 5
         assert footer_band_height == 48
         assert len(visible_buttons) < len(scenes_module._ACTION_BUTTONS)
-        assert len(visible_buttons) <= 10
+        assert len(visible_buttons) <= 6
+        assert {"Coach", "Report", "Save", "End Turn"} <= visible_titles
         assert all(label in vital_line for label in ("Cash", "Runway", "Users", "AP"))
         assert scene._use_compact_run_focus(820, 220)
         assert scene._use_compact_run_focus(1280, 220)
         scene._focus_mode = False
         assert not scene._use_compact_run_focus(1280, 220)
+        assert len(scene._footer_action_buttons()) <= 10
         assert {"Save", "End Turn"} <= visible_titles
         assert "Endgame" not in visible_titles
         assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
@@ -1467,7 +1548,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(compact_hint) <= 96
         assert "Actions Left" in full_status
         assert "AP:" in compact_status
-        assert full_hint.startswith("Watch:")
+        assert full_hint.startswith("Why:")
+        assert "0 More" in full_hint
 
         scene.state.company.current_turn = 10
         scene._refresh_view_model()
@@ -3559,6 +3641,25 @@ def test_launch_2d_menu_headless_exits_after_frame_cap(tmp_path: Path) -> None:
 
     assert result.exit_reason == "max_frames"
     assert result.saved_on_exit is False
+
+
+def test_launch_2d_frontend_restores_contrast_when_setup_fails(tmp_path: Path) -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+
+    with pytest.raises(ValueError, match="Unknown UI scale"):
+        launch_2d_frontend(
+            state=state,
+            rng=RandomSource(seed=283),
+            db_path=tmp_path / "setup-failure.db",
+            slot_name="active",
+            headless=True,
+            max_frames=1,
+            ui_scale="oversized",
+            contrast_mode=ContrastMode.HIGH,
+        )
+
+    assert widgets_module.active_contrast_mode() is ContrastMode.STANDARD
+    assert scenes_module.BACKGROUND == widgets_module.BACKGROUND
 
 
 def test_animation_playtest_batch_preflight_command_runs_820_batch(
@@ -10747,6 +10848,10 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
             "820x620",
             "--motion-mode",
             "off",
+            "--ui-scale",
+            "large",
+            "--contrast-mode",
+            "high",
         ],
     )
 
@@ -10757,6 +10862,8 @@ def test_play_2d_command_routes_to_new_frontend_launcher(monkeypatch) -> None:
     assert captured["window_size"] == (820, 620)
     assert captured["max_frames"] == 2
     assert captured["motion_mode"] is MotionMode.OFF
+    assert captured["ui_scale"] is UiScale.LARGE
+    assert captured["contrast_mode"] is ContrastMode.HIGH
 
 
 def test_play_2d_command_rejects_invalid_window_size(monkeypatch) -> None:
@@ -10801,6 +10908,10 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
             "960x640",
             "--motion-mode",
             "reduced",
+            "--ui-scale",
+            "compact",
+            "--contrast-mode",
+            "high",
         ],
     )
 
@@ -10809,3 +10920,5 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
     assert captured["window_size"] == (960, 640)
     assert captured["max_frames"] == 2
     assert captured["motion_mode"] is MotionMode.REDUCED
+    assert captured["ui_scale"] is UiScale.COMPACT
+    assert captured["contrast_mode"] is ContrastMode.HIGH

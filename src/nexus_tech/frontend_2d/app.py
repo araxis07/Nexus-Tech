@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nexus_tech.domain.models import GameState
+from nexus_tech.frontend_2d.accessibility import ContrastMode, UiScale
 from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import create_new_game
@@ -38,6 +39,8 @@ def launch_2d_frontend(
     max_frames: int | None = None,
     window_size: tuple[int, int] = (1440, 900),
     motion_mode: MotionMode | str = MotionMode.FULL,
+    ui_scale: UiScale | str = UiScale.STANDARD,
+    contrast_mode: ContrastMode | str = ContrastMode.STANDARD,
 ) -> FrontendRunResult:
     """Launch the lightweight animated 2D dashboard."""
 
@@ -53,37 +56,51 @@ def launch_2d_frontend(
             "pygame-ce is not installed. Install the optional 2D runtime first."
         ) from error
 
-    from nexus_tech.frontend_2d.scenes import RunScene
-    from nexus_tech.frontend_2d.widgets import create_fonts
+    from nexus_tech.frontend_2d import scenes
+    from nexus_tech.frontend_2d.widgets import (
+        active_contrast_mode,
+        configure_contrast_mode,
+        create_fonts,
+    )
 
-    pygame.init()
-    pygame.font.init()
-    flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
-    surface = pygame.display.set_mode(window_size, flags)
-    pygame.display.set_caption(f"NEXUS TECH 2D | {state.company.name}")
-    fonts = create_fonts(pygame)
-    coordinator = SaveLoadCoordinator(db_path)
-    scene = RunScene(
-        pygame=pygame,
-        fonts=fonts,
-        state=state,
-        rng=rng,
-        slot_name=slot_name,
-        save_callback=lambda game_state, game_rng, current_slot: coordinator.save_game(
-            current_slot,
-            game_state,
-            game_rng,
-        ),
-        motion_mode=motion_mode,
-        entry_transition="boot_run",
-    )
-    return _run_frontend_loop(
-        pygame=pygame,
-        surface=surface,
-        scene=scene,
-        flags=flags,
-        max_frames=max_frames,
-    )
+    previous_contrast_mode = active_contrast_mode()
+    configure_contrast_mode(contrast_mode, mirror_modules=(scenes,))
+    try:
+        pygame.init()
+        pygame.font.init()
+        flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
+        surface = pygame.display.set_mode(window_size, flags)
+        pygame.display.set_caption(f"NEXUS TECH 2D | {state.company.name}")
+        fonts = create_fonts(pygame, ui_scale)
+        coordinator = SaveLoadCoordinator(db_path)
+        scene = scenes.RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=rng,
+            slot_name=slot_name,
+            save_callback=lambda game_state, game_rng, current_slot: coordinator.save_game(
+                current_slot,
+                game_state,
+                game_rng,
+            ),
+            motion_mode=motion_mode,
+            entry_transition="boot_run",
+        )
+    except Exception:
+        pygame.quit()
+        configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
+        raise
+    try:
+        return _run_frontend_loop(
+            pygame=pygame,
+            surface=surface,
+            scene=scene,
+            flags=flags,
+            max_frames=max_frames,
+        )
+    finally:
+        configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
 
 
 def launch_2d_menu(
@@ -93,6 +110,8 @@ def launch_2d_menu(
     max_frames: int | None = None,
     window_size: tuple[int, int] = (1440, 900),
     motion_mode: MotionMode | str = MotionMode.FULL,
+    ui_scale: UiScale | str = UiScale.STANDARD,
+    contrast_mode: ContrastMode | str = ContrastMode.STANDARD,
 ) -> FrontendRunResult:
     """Launch the title/save-load scene for the 2D frontend."""
 
@@ -108,39 +127,53 @@ def launch_2d_menu(
             "pygame-ce is not installed. Install the optional 2D runtime first."
         ) from error
 
-    from nexus_tech.frontend_2d.scenes import TitleScene
-    from nexus_tech.frontend_2d.widgets import create_fonts
+    from nexus_tech.frontend_2d import scenes
+    from nexus_tech.frontend_2d.widgets import (
+        active_contrast_mode,
+        configure_contrast_mode,
+        create_fonts,
+    )
 
-    pygame.init()
-    pygame.font.init()
-    flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
-    surface = pygame.display.set_mode(window_size, flags)
-    pygame.display.set_caption("NEXUS TECH 2D | Menu")
-    fonts = create_fonts(pygame)
-    coordinator = SaveLoadCoordinator(db_path)
-    scene = TitleScene(
-        pygame=pygame,
-        fonts=fonts,
-        state=create_new_game("NEXUS TECH", "Nexus One"),
-        rng=RandomSource(seed=None),
-        slot_name="active",
-        save_callback=lambda game_state, game_rng, current_slot: coordinator.save_game(
-            current_slot,
-            game_state,
-            game_rng,
-        ),
-        coordinator=coordinator,
-        info_message="Load a save, review archives, or boot the default run from inside 2D.",
-        motion_mode=motion_mode,
-        entry_transition="boot_title",
-    )
-    return _run_frontend_loop(
-        pygame=pygame,
-        surface=surface,
-        scene=scene,
-        flags=flags,
-        max_frames=max_frames,
-    )
+    previous_contrast_mode = active_contrast_mode()
+    configure_contrast_mode(contrast_mode, mirror_modules=(scenes,))
+    try:
+        pygame.init()
+        pygame.font.init()
+        flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
+        surface = pygame.display.set_mode(window_size, flags)
+        pygame.display.set_caption("NEXUS TECH 2D | Menu")
+        fonts = create_fonts(pygame, ui_scale)
+        coordinator = SaveLoadCoordinator(db_path)
+        scene = scenes.TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=None),
+            slot_name="active",
+            save_callback=lambda game_state, game_rng, current_slot: coordinator.save_game(
+                current_slot,
+                game_state,
+                game_rng,
+            ),
+            coordinator=coordinator,
+            info_message="Load a save, review archives, or boot the default run from inside 2D.",
+            motion_mode=motion_mode,
+            entry_transition="boot_title",
+        )
+    except Exception:
+        pygame.quit()
+        configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
+        raise
+    try:
+        return _run_frontend_loop(
+            pygame=pygame,
+            surface=surface,
+            scene=scene,
+            flags=flags,
+            max_frames=max_frames,
+        )
+    finally:
+        configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
 
 
 def _run_frontend_loop(

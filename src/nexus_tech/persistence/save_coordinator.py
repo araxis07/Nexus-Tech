@@ -141,6 +141,24 @@ class RunArchiveSummary:
     review_primary_area: str = ""
     review_primary_summary: str = ""
     review_next_focus: str = ""
+    scenario_id: str = ""
+    difficulty_mode: str = "standard"
+    campaign_commitment_choice: str = ""
+    campaign_consequence_choice: str = ""
+    terminal_reason: str = ""
+
+    @property
+    def campaign_path(self) -> tuple[str, ...]:
+        """Return the recorded campaign choices in act order."""
+
+        return tuple(
+            label
+            for label in (
+                self.campaign_commitment_choice,
+                self.campaign_consequence_choice,
+            )
+            if label
+        )
 
 
 class SaveLoadCoordinator:
@@ -514,7 +532,12 @@ class SaveLoadCoordinator:
                         archive_key,
                         slot_name,
                         company_name,
+                        scenario_id,
                         scenario_title,
+                        difficulty_mode,
+                        campaign_commitment_choice,
+                        campaign_consequence_choice,
+                        terminal_reason,
                         completed_turn,
                         victory_achieved,
                         game_over,
@@ -545,7 +568,12 @@ class SaveLoadCoordinator:
                 archive_key=row["archive_key"],
                 slot_name=row["slot_name"],
                 company_name=row["company_name"],
+                scenario_id=row["scenario_id"] or "",
                 scenario_title=row["scenario_title"] or "Unknown scenario",
+                difficulty_mode=row["difficulty_mode"] or "standard",
+                campaign_commitment_choice=row["campaign_commitment_choice"] or "",
+                campaign_consequence_choice=row["campaign_consequence_choice"] or "",
+                terminal_reason=row["terminal_reason"] or "",
                 completed_turn=row["completed_turn"] or 0,
                 victory_achieved=bool(row["victory_achieved"]),
                 game_over=bool(row["game_over"]),
@@ -892,12 +920,21 @@ class SaveLoadCoordinator:
             f"{slot_name}:{state.company.current_turn}:"
             f"{state.exit_outcome.value if state.exit_outcome is not None else 'none'}"
         )
+        from nexus_tech.simulation.campaign_decisions import get_campaign_choice_label
+        from nexus_tech.simulation.campaign_journey import CampaignActId
         from nexus_tech.simulation.reporting import calculate_run_score
 
         run_score = calculate_run_score(state)
         exit_evaluation = evaluate_exit_outcome(state, run_score)
         postmortem = build_run_postmortem(state)
         primary_finding = postmortem.findings[0] if postmortem.findings else None
+        commitment_choice = get_campaign_choice_label(state, CampaignActId.COMMITMENT) or ""
+        consequence_choice = get_campaign_choice_label(state, CampaignActId.CONSEQUENCE) or ""
+        terminal_reason = (
+            state.victory_reason
+            or state.exit_summary
+            or ("Company shutdown" if state.company.game_over else "Run completed")
+        )
         connection.execute(
             """
             INSERT OR REPLACE INTO run_archives (
@@ -906,6 +943,10 @@ class SaveLoadCoordinator:
                 company_name,
                 scenario_id,
                 scenario_title,
+                difficulty_mode,
+                campaign_commitment_choice,
+                campaign_consequence_choice,
+                terminal_reason,
                 completed_turn,
                 victory_achieved,
                 game_over,
@@ -926,7 +967,10 @@ class SaveLoadCoordinator:
                 review_primary_summary,
                 review_next_focus
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
             (
                 archive_key,
@@ -934,6 +978,10 @@ class SaveLoadCoordinator:
                 state.company.name,
                 state.scenario_id,
                 state.scenario_title,
+                state.difficulty_mode.value,
+                commitment_choice,
+                consequence_choice,
+                terminal_reason,
                 state.company.current_turn,
                 int(state.victory_achieved),
                 int(state.company.game_over),

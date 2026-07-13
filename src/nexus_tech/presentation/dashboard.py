@@ -46,6 +46,7 @@ from nexus_tech.simulation.balance_lab import (
     evaluate_balance_cell,
 )
 from nexus_tech.simulation.balance_profiles import BalanceProfile
+from nexus_tech.simulation.beta_evidence import BetaArchiveEvidence
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
 from nexus_tech.simulation.campaign_starts import CampaignStartDefinition
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
@@ -584,6 +585,8 @@ def render_run_archive_catalog(
     table.add_column("Archive", style="bold")
     table.add_column("Company")
     table.add_column("Scenario")
+    table.add_column("Diff")
+    table.add_column("Campaign Path")
     table.add_column("Turn", justify="right")
     table.add_column("Outcome")
     table.add_column("Score", justify="right")
@@ -605,6 +608,8 @@ def render_run_archive_catalog(
             archive.slot_name,
             archive.company_name,
             archive.scenario_title,
+            archive.difficulty_mode,
+            " > ".join(archive.campaign_path) if archive.campaign_path else "-",
             str(archive.completed_turn),
             f"{archive.exit_outcome} / {status}",
             str(archive.total_score),
@@ -656,6 +661,56 @@ def render_run_archive_catalog(
                 Panel(table, title="Run Archives", border_style="green", expand=True),
             ],
             equal=False,
+            expand=True,
+        )
+    )
+
+
+def render_beta_archive_evidence(console: Console, evidence: BetaArchiveEvidence) -> None:
+    """Render local archive coverage without claiming human playtest signoff."""
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Campaign", style="bold")
+    table.add_column("Runs", justify="right")
+    table.add_column("Full Path", justify="right")
+    table.add_column("Difficulties")
+    table.add_column("Status")
+    for lane in evidence.lanes:
+        table.add_row(
+            f"{lane.track_label} / {lane.scenario_id}",
+            str(lane.run_count),
+            str(lane.full_path_count),
+            ", ".join(lane.difficulties) if lane.difficulties else "-",
+            "covered" if lane.covered else "needed",
+        )
+
+    summary = Table.grid(padding=(0, 1))
+    summary.add_row("Status", evidence.status)
+    summary.add_row("Archives", str(evidence.total_archives))
+    summary.add_row("Featured", str(evidence.featured_archives))
+    summary.add_row(
+        "Campaign Coverage", f"{evidence.covered_campaigns}/{evidence.required_campaigns}"
+    )
+    summary.add_row("Full Paths", str(evidence.full_path_archives))
+    summary.add_row(
+        "Difficulties",
+        ", ".join(evidence.covered_difficulties) if evidence.covered_difficulties else "-",
+    )
+    summary.add_row("Next", evidence.next_action)
+    console.print(
+        Panel(
+            Group(
+                summary,
+                "",
+                table,
+                "",
+                (
+                    "[yellow]Manual signoff remains required.[/yellow]\n"
+                    "[dim]Archives do not prove player comprehension or control feel.[/dim]"
+                ),
+            ),
+            title="Beta Archive Evidence",
+            border_style="yellow" if not evidence.ready_for_manual_review else "green",
             expand=True,
         )
     )

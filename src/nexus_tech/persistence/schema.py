@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 23
+CURRENT_SCHEMA_VERSION = 24
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 23,
+        schema_version INTEGER NOT NULL DEFAULT 24,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -61,6 +61,10 @@ SCHEMA_STATEMENTS = (
         company_name TEXT NOT NULL,
         scenario_id TEXT NOT NULL,
         scenario_title TEXT NOT NULL,
+        difficulty_mode TEXT NOT NULL DEFAULT 'standard',
+        campaign_commitment_choice TEXT NOT NULL DEFAULT '',
+        campaign_consequence_choice TEXT NOT NULL DEFAULT '',
+        terminal_reason TEXT NOT NULL DEFAULT '',
         completed_turn INTEGER NOT NULL,
         victory_achieved INTEGER NOT NULL DEFAULT 0,
         game_over INTEGER NOT NULL DEFAULT 0,
@@ -1160,6 +1164,30 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="customer_accounts",
         column_name="renewal_health",
         column_definition="INTEGER NOT NULL DEFAULT 60",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="difficulty_mode",
+        column_definition="TEXT NOT NULL DEFAULT 'standard'",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="campaign_commitment_choice",
+        column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="campaign_consequence_choice",
+        column_definition="TEXT NOT NULL DEFAULT ''",
+    )
+    _ensure_column(
+        connection,
+        table_name="run_archives",
+        column_name="terminal_reason",
+        column_definition="TEXT NOT NULL DEFAULT ''",
     )
     _ensure_column(
         connection,

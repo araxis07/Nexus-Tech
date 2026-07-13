@@ -1,25 +1,39 @@
 from __future__ import annotations
 
 from collections import Counter
+from decimal import Decimal
 
-from nexus_tech.domain.models import EventCategory, EventHistoryEntry
+from nexus_tech.domain.models import (
+    CampaignGoalId,
+    DifficultyMode,
+    EventCategory,
+    EventHistoryEntry,
+)
 from nexus_tech.frontend_2d.viewmodels import (
     build_game_view_model,
     build_run_review_view_model,
 )
-from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
+from nexus_tech.persistence.save_coordinator import RunArchiveSummary, SaveLoadCoordinator
+from nexus_tech.simulation.balance_lab import evaluate_balance_cell, run_balance_matrix
 from nexus_tech.simulation.beta_contract import (
     BETA_CATALOG_CEILING,
     MANUAL_BETA_TARGETS,
     capture_catalog_snapshot,
     catalog_ceiling_violations,
 )
+from nexus_tech.simulation.beta_evidence import build_beta_archive_evidence
 from nexus_tech.simulation.campaign_decisions import (
     build_due_campaign_decision_event,
+    campaign_adjusted_event_weight,
     get_campaign_path_labels,
+    get_campaign_path_outlook,
     list_campaign_decisions,
+    list_campaign_event_biases,
 )
-from nexus_tech.simulation.campaign_journey import CampaignActId
+from nexus_tech.simulation.campaign_journey import (
+    CampaignActId,
+    list_featured_campaign_journeys,
+)
 from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.event_effects import _trim_event_history
 from nexus_tech.simulation.events import resolve_pending_event, resolve_turn_event
@@ -39,6 +53,39 @@ def _history_entry(event_id: str, turn: int) -> EventHistoryEntry:
     )
 
 
+def _archive_summary(
+    scenario_id: str,
+    *,
+    difficulty_mode: str = "standard",
+    commitment: str = "Commitment",
+    consequence: str = "Consequence",
+) -> RunArchiveSummary:
+    return RunArchiveSummary(
+        archive_key=f"{scenario_id}:12:none",
+        slot_name=scenario_id,
+        company_name="Evidence Co",
+        scenario_title=scenario_id.replace("_", " ").title(),
+        completed_turn=12,
+        victory_achieved=True,
+        game_over=False,
+        exit_outcome="none",
+        total_score=180,
+        score_tier="strong",
+        campaign_grade="A",
+        estimated_valuation=Decimal("42000.00"),
+        achievement_badges=(),
+        strategic_outlook="profitable_independence",
+        offer_value=Decimal("0.00"),
+        final_cash=Decimal("12000.00"),
+        final_reputation=64,
+        archived_at="2026-07-14T00:00:00+00:00",
+        scenario_id=scenario_id,
+        difficulty_mode=difficulty_mode,
+        campaign_commitment_choice=commitment,
+        campaign_consequence_choice=consequence,
+    )
+
+
 def test_beta_catalog_is_frozen_at_the_convergence_baseline() -> None:
     snapshot = capture_catalog_snapshot()
 
@@ -51,6 +98,55 @@ def test_beta_playtest_targets_remain_explicitly_manual() -> None:
     assert all(target.manual_evidence_required for target in MANUAL_BETA_TARGETS)
     assert all(target.minimum_sessions >= 6 for target in MANUAL_BETA_TARGETS)
     assert any(target.key == "layout_readability" for target in MANUAL_BETA_TARGETS)
+
+
+def test_featured_campaign_release_matrix_covers_every_difficulty_without_failures() -> None:
+    scenario_ids = [journey.scenario_id for journey in list_featured_campaign_journeys()]
+
+    matrix = run_balance_matrix(
+        scenario_ids=scenario_ids,
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs=1,
+        turns=12,
+        seed_base=28300,
+    )
+
+    assert len(matrix.cells) == len(scenario_ids) * len(DifficultyMode)
+    assert {cell.scenario_id for cell in matrix.cells} == set(scenario_ids)
+    assert {cell.difficulty_mode for cell in matrix.cells} == set(DifficultyMode)
+    assert all(
+        evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns).status != "fail"
+        for cell in matrix.cells
+    )
+
+
+def test_beta_archive_evidence_covers_every_featured_path_without_faking_signoff() -> None:
+    scenario_ids = sorted({decision.scenario_id for decision in list_campaign_decisions()})
+    archives = [
+        _archive_summary(
+            scenario_id,
+            difficulty_mode=("builder", "standard", "founder")[index % 3],
+        )
+        for index, scenario_id in enumerate(scenario_ids)
+    ]
+
+    evidence = build_beta_archive_evidence(archives)
+
+    assert evidence.ready_for_manual_review is True
+    assert evidence.status == "ready-for-manual-review"
+    assert evidence.covered_campaigns == 6
+    assert evidence.covered_difficulties == ("builder", "standard", "founder")
+    assert evidence.manual_signoff_required is True
+    assert "real tester observations" in evidence.next_action
+
+
+def test_beta_archive_evidence_names_the_next_missing_campaign() -> None:
+    evidence = build_beta_archive_evidence([_archive_summary("founder_journey")])
+
+    assert evidence.ready_for_manual_review is False
+    assert evidence.status == "archive-evidence-needed"
+    assert evidence.missing_campaigns
+    assert evidence.next_action == f"Complete and archive {evidence.missing_campaigns[0]}."
 
 
 def test_featured_campaigns_have_two_unique_mechanical_decisions() -> None:
@@ -77,6 +173,21 @@ def test_featured_campaigns_have_two_unique_mechanical_decisions() -> None:
     )
 
 
+def test_every_campaign_option_declares_a_bounded_long_run_event_bias() -> None:
+    option_ids = {
+        option.option_id for decision in list_campaign_decisions() for option in decision.options
+    }
+    biases = list_campaign_event_biases()
+
+    assert len(biases) == 24
+    assert {bias.option_id for bias in biases} == option_ids
+    assert all(bias.summary.endswith(".") for bias in biases)
+    assert all(bias.adjustments for bias in biases)
+    assert all(
+        -35 <= adjustment <= 35 for bias in biases for _category, adjustment in bias.adjustments
+    )
+
+
 def test_campaign_decision_takes_priority_and_records_a_persistent_path() -> None:
     state = create_new_game(scenario_id="founder_journey")
     state.company.current_turn = 4
@@ -85,10 +196,30 @@ def test_campaign_decision_takes_priority_and_records_a_persistent_path() -> Non
 
     assert turn_outcome.pending_event is not None
     assert turn_outcome.pending_event.event_id == "campaign_founder_commitment"
+    assert all("Long-run:" in option.description for option in turn_outcome.pending_event.options)
     resolved = resolve_pending_event(turn_outcome.state, "sharpen_focus")
     assert resolved.message.startswith("The flagship became")
     assert resolved.state.products[0].quality > state.products[0].quality
     assert get_campaign_path_labels(resolved.state) == ("Act 2: Sharpen the Flagship",)
+    assert get_campaign_path_outlook(resolved.state) == (
+        "Fewer product incidents; slightly more market openings."
+    )
+    assert (
+        campaign_adjusted_event_weight(
+            resolved.state,
+            EventCategory.PRODUCT_INCIDENT,
+            100,
+        )
+        == 75
+    )
+    assert (
+        campaign_adjusted_event_weight(
+            resolved.state,
+            EventCategory.MARKET_OPPORTUNITY,
+            100,
+        )
+        == 110
+    )
     assert build_due_campaign_decision_event(resolved.state) is None
 
     resolved.state.company.current_turn = 9
@@ -183,3 +314,47 @@ def test_campaign_pending_event_and_path_round_trip_through_sqlite(tmp_path) -> 
     assert get_campaign_path_labels(loaded_path) == ("Act 2: Freeze for Rebuild",)
     assert live_view.campaign_lens.startswith("Act 2: Freeze for Rebuild")
     assert "Act 2: Freeze for Rebuild" in review_view.badges
+
+
+def test_completed_campaign_archive_preserves_beta_evidence_fields(tmp_path) -> None:
+    coordinator = SaveLoadCoordinator(tmp_path / "campaign-archive.db")
+    state = create_new_game(scenario_id="founder_journey")
+    state.company.current_turn = 12
+    state.difficulty_mode = DifficultyMode.FOUNDER
+    state.victory_achieved = True
+    state.victory_reason = "The company proved a durable path."
+    state.event_history.extend(
+        (
+            EventHistoryEntry(
+                event_id="campaign_founder_commitment",
+                category=EventCategory.MARKET_OPPORTUNITY,
+                title="Founder Commitment",
+                triggered_turn=4,
+                resolved_turn=4,
+                selected_option_id="sharpen_focus",
+                selected_option_label="Sharpen the Flagship",
+                result_text="The flagship became the operating center.",
+            ),
+            EventHistoryEntry(
+                event_id="campaign_founder_consequence",
+                category=EventCategory.FUNDING_OPPORTUNITY,
+                title="Founder Consequence",
+                triggered_turn=9,
+                resolved_turn=9,
+                selected_option_id="defend_control",
+                selected_option_label="Defend Control",
+                result_text="Control stayed with the company.",
+            ),
+        )
+    )
+
+    coordinator.save_game("evidence", state, RandomSource(seed=24))
+    archives = coordinator.list_run_archives()
+
+    assert len(archives) == 1
+    archive = archives[0]
+    assert archive.scenario_id == "founder_journey"
+    assert archive.difficulty_mode == "founder"
+    assert archive.campaign_path == ("Sharpen the Flagship", "Defend Control")
+    assert archive.terminal_reason == "The company proved a durable path."
+    assert coordinator.check_save_health().schema_version == 24

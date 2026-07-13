@@ -77,6 +77,20 @@ class CampaignDecisionDefinition:
         return 1 if self.act_id is CampaignActId.COMMITMENT else 2
 
 
+@dataclass(frozen=True)
+class CampaignEventBias:
+    """Long-run event pressure created by a recorded campaign choice."""
+
+    option_id: str
+    summary: str
+    adjustments: tuple[tuple[EventCategory, int], ...]
+
+    def adjustment_for(self, category: EventCategory) -> int:
+        """Return the percentage-point event-weight adjustment for one category."""
+
+        return sum(amount for target, amount in self.adjustments if target is category)
+
+
 def _effect(result_text: str, **changes: object) -> CampaignChoiceEffect:
     return CampaignChoiceEffect(result_text=result_text, **changes)
 
@@ -542,11 +556,151 @@ _CAMPAIGN_DECISIONS = (
 
 _DECISIONS_BY_EVENT_ID = {definition.event_id: definition for definition in _CAMPAIGN_DECISIONS}
 
+_CAMPAIGN_EVENT_BIASES = {
+    bias.option_id: bias
+    for bias in (
+        CampaignEventBias(
+            "sharpen_focus",
+            "Fewer product incidents; slightly more market openings.",
+            ((EventCategory.PRODUCT_INCIDENT, -25), (EventCategory.MARKET_OPPORTUNITY, 10)),
+        ),
+        CampaignEventBias(
+            "accelerate_demand",
+            "More market openings, but support-driven product incidents rise.",
+            ((EventCategory.MARKET_OPPORTUNITY, 20), (EventCategory.PRODUCT_INCIDENT, 25)),
+        ),
+        CampaignEventBias(
+            "defend_control",
+            "Funding pressure recedes and reputation shocks become less likely.",
+            ((EventCategory.FUNDING_OPPORTUNITY, -20), (EventCategory.REPUTATION_INCIDENT, -10)),
+        ),
+        CampaignEventBias(
+            "accept_growth_capital",
+            "Funding and market events become more frequent under investor attention.",
+            ((EventCategory.FUNDING_OPPORTUNITY, 30), (EventCategory.MARKET_OPPORTUNITY, 10)),
+        ),
+        CampaignEventBias(
+            "protect_margin",
+            "Product incidents ease while disciplined market openings improve.",
+            ((EventCategory.PRODUCT_INCIDENT, -15), (EventCategory.MARKET_OPPORTUNITY, 10)),
+        ),
+        CampaignEventBias(
+            "buy_volume",
+            "Market openings and product-support incidents both become more common.",
+            ((EventCategory.MARKET_OPPORTUNITY, 20), (EventCategory.PRODUCT_INCIDENT, 20)),
+        ),
+        CampaignEventBias(
+            "build_reserve_moat",
+            "Funding and reputation events cool as the reserve absorbs shocks.",
+            ((EventCategory.FUNDING_OPPORTUNITY, -20), (EventCategory.REPUTATION_INCIDENT, -10)),
+        ),
+        CampaignEventBias(
+            "compound_product",
+            "Product incidents ease and stronger market openings become more likely.",
+            ((EventCategory.PRODUCT_INCIDENT, -20), (EventCategory.MARKET_OPPORTUNITY, 10)),
+        ),
+        CampaignEventBias(
+            "freeze_for_rebuild",
+            "Product incidents fall sharply, but employee pressure events rise.",
+            ((EventCategory.PRODUCT_INCIDENT, -35), (EventCategory.EMPLOYEE_ISSUE, 15)),
+        ),
+        CampaignEventBias(
+            "phase_the_rebuild",
+            "Product incidents ease while measured market openings return.",
+            ((EventCategory.PRODUCT_INCIDENT, -20), (EventCategory.MARKET_OPPORTUNITY, 10)),
+        ),
+        CampaignEventBias(
+            "publish_reliability_proof",
+            "Reputation shocks fall and trust-led market openings increase.",
+            ((EventCategory.REPUTATION_INCIDENT, -25), (EventCategory.MARKET_OPPORTUNITY, 15)),
+        ),
+        CampaignEventBias(
+            "promise_velocity",
+            "Market openings rise, alongside a sharp increase in product incidents.",
+            ((EventCategory.MARKET_OPPORTUNITY, 20), (EventCategory.PRODUCT_INCIDENT, 30)),
+        ),
+        CampaignEventBias(
+            "share_the_platform",
+            "Shared systems reduce product incidents but add team coordination pressure.",
+            ((EventCategory.PRODUCT_INCIDENT, -25), (EventCategory.EMPLOYEE_ISSUE, 10)),
+        ),
+        CampaignEventBias(
+            "preserve_autonomy",
+            "Market openings increase while independent products create more incidents.",
+            ((EventCategory.MARKET_OPPORTUNITY, 20), (EventCategory.PRODUCT_INCIDENT, 15)),
+        ),
+        CampaignEventBias(
+            "consolidate_capital",
+            "Funding scrutiny and product incidents both ease.",
+            ((EventCategory.FUNDING_OPPORTUNITY, -10), (EventCategory.PRODUCT_INCIDENT, -10)),
+        ),
+        CampaignEventBias(
+            "fund_the_portfolio",
+            "Market openings rise with product and employee coordination incidents.",
+            (
+                (EventCategory.MARKET_OPPORTUNITY, 15),
+                (EventCategory.PRODUCT_INCIDENT, 20),
+                (EventCategory.EMPLOYEE_ISSUE, 20),
+            ),
+        ),
+        CampaignEventBias(
+            "restructure_operations",
+            "Funding options improve slightly while operating strain reduces employee issues.",
+            ((EventCategory.FUNDING_OPPORTUNITY, 5), (EventCategory.EMPLOYEE_ISSUE, -5)),
+        ),
+        CampaignEventBias(
+            "outgrow_the_debt",
+            "Funding and market events accelerate around the growth gamble.",
+            ((EventCategory.FUNDING_OPPORTUNITY, 25), (EventCategory.MARKET_OPPORTUNITY, 20)),
+        ),
+        CampaignEventBias(
+            "pay_down_principal",
+            "Funding confidence improves slightly while fewer market gambles surface.",
+            ((EventCategory.FUNDING_OPPORTUNITY, 5), (EventCategory.MARKET_OPPORTUNITY, -5)),
+        ),
+        CampaignEventBias(
+            "refinance_for_time",
+            "Funding events rise sharply while the new capital structure is tested.",
+            ((EventCategory.FUNDING_OPPORTUNITY, 35), (EventCategory.MARKET_OPPORTUNITY, 5)),
+        ),
+        CampaignEventBias(
+            "lead_with_controls",
+            "Reputation and funding scrutiny events become less frequent.",
+            ((EventCategory.REPUTATION_INCIDENT, -25), (EventCategory.FUNDING_OPPORTUNITY, -15)),
+        ),
+        CampaignEventBias(
+            "lead_with_growth",
+            "Market momentum rises together with reputation scrutiny.",
+            ((EventCategory.MARKET_OPPORTUNITY, 25), (EventCategory.REPUTATION_INCIDENT, 20)),
+        ),
+        CampaignEventBias(
+            "defend_the_listing",
+            "Funding and reputation scrutiny both cool after readiness work.",
+            ((EventCategory.FUNDING_OPPORTUNITY, -20), (EventCategory.REPUTATION_INCIDENT, -20)),
+        ),
+        CampaignEventBias(
+            "preserve_optionality",
+            "Funding pressure falls while selective market openings remain available.",
+            ((EventCategory.FUNDING_OPPORTUNITY, -30), (EventCategory.MARKET_OPPORTUNITY, 10)),
+        ),
+    )
+}
+
 
 def list_campaign_decisions() -> tuple[CampaignDecisionDefinition, ...]:
     """Return every authored campaign decision in deterministic order."""
 
     return _CAMPAIGN_DECISIONS
+
+
+def list_campaign_event_biases() -> tuple[CampaignEventBias, ...]:
+    """Return every long-run campaign path modifier in deterministic choice order."""
+
+    return tuple(
+        _CAMPAIGN_EVENT_BIASES[option.option_id]
+        for definition in _CAMPAIGN_DECISIONS
+        for option in definition.options
+    )
 
 
 def is_campaign_decision_event(event_id: str) -> bool:
@@ -581,7 +735,10 @@ def build_due_campaign_decision_event(state: GameState) -> PendingEvent | None:
                 EventOption(
                     id=option.option_id,
                     label=option.label,
-                    description=option.description,
+                    description=(
+                        f"{option.description} Long-run: "
+                        f"{_CAMPAIGN_EVENT_BIASES[option.option_id].summary}"
+                    ),
                 )
                 for option in definition.options
             ],
@@ -677,6 +834,36 @@ def get_campaign_path_labels(state: GameState) -> tuple[str, ...]:
         if label is not None:
             labels.append(f"{prefix}: {label}")
     return tuple(labels)
+
+
+def get_campaign_path_outlook(state: GameState) -> str | None:
+    """Return the latest player-facing long-run event outlook for this path."""
+
+    for entry in reversed(state.event_history):
+        if not is_campaign_decision_event(entry.event_id):
+            continue
+        bias = _CAMPAIGN_EVENT_BIASES.get(entry.selected_option_id)
+        if bias is not None:
+            return bias.summary
+    return None
+
+
+def campaign_adjusted_event_weight(
+    state: GameState,
+    category: EventCategory,
+    base_weight: int,
+) -> int:
+    """Apply recorded path pressure to one future systemic-event weight."""
+
+    adjustment = 0
+    for entry in state.event_history:
+        if not is_campaign_decision_event(entry.event_id):
+            continue
+        bias = _CAMPAIGN_EVENT_BIASES.get(entry.selected_option_id)
+        if bias is not None:
+            adjustment += bias.adjustment_for(category)
+    bounded_percent = max(40, min(180, 100 + adjustment))
+    return max(1, round(base_weight * bounded_percent / 100))
 
 
 def _effect_products(state: GameState, effect: CampaignChoiceEffect) -> list[Product]:

@@ -20,7 +20,9 @@ uv run pytest -q tests/test_beta_convergence.py
 uv run nexus-tech --version
 uv run nexus-tech doctor
 uv run nexus-tech validate-content
+uv run nexus-tech beta-evidence
 uv run nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced
+uv run nexus-tech play-2d --scenario founder_journey --seed 283 --headless --max-frames 2 --window-size 820x620 --motion-mode reduced --ui-scale large --contrast-mode high
 uv run nexus-tech menu-2d --headless --max-frames 2 --motion-mode reduced
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 2
 uv run nexus-tech audit-2d-motion --scenario founder_journey --seed 7 --frames 1 --motion-mode reduced
@@ -57,6 +59,7 @@ uv run nexus-tech validate-animation-playtest-issue-backlog /tmp/nexus-tech-anim
 uv run nexus-tech animation-playtest-sprint /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --progress-path /tmp/nexus-tech-animation-progress.md --execution-guide-path /tmp/nexus-tech-animation-execution-guide.md --issue-backlog-path /tmp/nexus-tech-animation-issues.md --output /tmp/nexus-tech-animation-sprint.md
 uv run nexus-tech validate-animation-playtest-sprint /tmp/nexus-tech-animation-sprint.md /tmp/nexus-tech-animation-playtest-report.md /tmp/nexus-tech-animation-playtest-commands.md /tmp/nexus-tech-animation-playtest-plan.md /tmp/nexus-tech-animation-recorder-queue.md /tmp/nexus-tech-animation-ui-triage.md --route-batches /tmp/nexus-tech-animation-route-batches.md --progress-path /tmp/nexus-tech-animation-progress.md --execution-guide-path /tmp/nexus-tech-animation-execution-guide.md --issue-backlog-path /tmp/nexus-tech-animation-issues.md
 uv run nexus-tech balance-audit --scenario founder_journey --scenario debt_crunch --runs 1 --turns 6 --seed-base 7
+uv run nexus-tech balance-audit --scenario founder_journey --scenario bootstrap_studio --scenario technical_rebuild --scenario portfolio_machine --scenario debt_crunch --scenario public_market_countdown --runs 1 --turns 12 --seed-base 28300
 uv run nexus-tech simulate-balance --scenario founder_journey --difficulty founder --runs 2 --turns 10 --seed-base 700
 # After the manual report is filled:
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md

@@ -14,7 +14,10 @@ from nexus_tech.simulation.action_catalog import (
     get_action_presentation,
     humanize_action_text,
 )
-from nexus_tech.simulation.campaign_decisions import get_campaign_path_labels
+from nexus_tech.simulation.campaign_decisions import (
+    get_campaign_path_labels,
+    get_campaign_path_outlook,
+)
 from nexus_tech.simulation.campaign_journey import get_campaign_journey_progress
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
@@ -399,8 +402,9 @@ def build_game_view_model(
         else difficulty.watch_for
     )
     campaign_path_labels = get_campaign_path_labels(state)
+    campaign_path_outlook = get_campaign_path_outlook(state)
     campaign_lens = (
-        f"{campaign_path_labels[-1]} | {base_campaign_lens}"
+        f"{campaign_path_labels[-1]} | {campaign_path_outlook or base_campaign_lens}"
         if campaign_path_labels
         else base_campaign_lens
     )
@@ -1470,8 +1474,18 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
             f"grade {summary.campaign_grade} | cash {format_money(summary.final_cash)}"
         ),
         next_focus=summary.review_next_focus or "view_report",
-        badges=summary.achievement_badges
-        or (summary.exit_outcome, summary.score_tier, summary.campaign_grade),
+        badges=tuple(
+            dict.fromkeys(
+                (
+                    *summary.achievement_badges,
+                    summary.difficulty_mode,
+                    *summary.campaign_path,
+                    summary.exit_outcome,
+                    summary.score_tier,
+                    summary.campaign_grade,
+                )
+            )
+        ),
         findings=tuple(findings[:3]),
     )
 
@@ -1524,12 +1538,16 @@ def build_archive_card_view_models(
                     f"{summary.company_name} | {summary.total_score} | {summary.campaign_grade}"
                 ),
                 detail_lines=(
-                    summary.scenario_title,
+                    f"{summary.scenario_title} | {summary.difficulty_mode}",
                     (
                         f"turn {summary.completed_turn} | exit {summary.exit_outcome} | "
                         f"cash {format_money(summary.final_cash)}"
                     ),
-                    (summary.review_primary_summary or summary.strategic_outlook.replace("_", " ")),
+                    (
+                        " > ".join(summary.campaign_path)
+                        or summary.review_primary_summary
+                        or summary.strategic_outlook.replace("_", " ")
+                    ),
                 ),
                 tone=tone,
             )

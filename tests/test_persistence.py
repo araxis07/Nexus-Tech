@@ -524,6 +524,9 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         finance_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(finance_state)").fetchall()
         }
+        archive_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(run_archives)").fetchall()
+        }
         user_version = connection.execute("PRAGMA user_version").fetchone()[0]
 
     assert {
@@ -565,6 +568,12 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "saved_with_version",
         "schema_version",
     }.issubset(save_slot_columns)
+    assert {
+        "difficulty_mode",
+        "campaign_commitment_choice",
+        "campaign_consequence_choice",
+        "terminal_reason",
+    }.issubset(archive_columns)
     assert {
         "target_segment",
         "packaging_strategy",
@@ -659,6 +668,64 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "win_back_attempts",
     }.issubset(customer_columns)
     assert user_version >= 22
+
+
+def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path) -> None:
+    db_path = tmp_path / "archive-migration.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE run_archives (
+                archive_key TEXT PRIMARY KEY,
+                slot_name TEXT NOT NULL,
+                company_name TEXT NOT NULL,
+                scenario_id TEXT NOT NULL,
+                scenario_title TEXT NOT NULL,
+                completed_turn INTEGER NOT NULL,
+                archived_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO run_archives (
+                archive_key,
+                slot_name,
+                company_name,
+                scenario_id,
+                scenario_title,
+                completed_turn,
+                archived_at
+            )
+            VALUES ('legacy', 'active', 'NEXUS TECH', 'founder_journey',
+                    'Founder Journey', 12, '2026-07-13T01:00:00+00:00')
+            """
+        )
+        connection.execute("PRAGMA user_version = 23")
+
+    DatabaseManager(db_path).initialize()
+
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """
+            SELECT
+                difficulty_mode,
+                campaign_commitment_choice,
+                campaign_consequence_choice,
+                terminal_reason
+            FROM run_archives
+            WHERE archive_key = 'legacy'
+            """
+        ).fetchone()
+        user_version = connection.execute("PRAGMA user_version").fetchone()[0]
+
+    assert row is not None
+    assert row["difficulty_mode"] == "standard"
+    assert row["campaign_commitment_choice"] == ""
+    assert row["campaign_consequence_choice"] == ""
+    assert row["terminal_reason"] == ""
+    assert user_version == 24
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:

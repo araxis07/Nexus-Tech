@@ -65,8 +65,10 @@ from nexus_tech.frontend_2d import (
     AnimationPlaytestReadinessPlan,
     AnimationPlaytestRecorderHint,
     AnimationPlaytestReportValidation,
+    ContrastMode,
     Frontend2DUnavailableError,
     MotionMode,
+    UiScale,
     animation_playtest_route_batch_closure_rows,
     animation_playtest_route_batch_copy_commands,
     animation_playtest_route_batch_defect_intake_rows,
@@ -155,6 +157,7 @@ from nexus_tech.presentation.dashboard import (
     render_balance_lab,
     render_balance_matrix,
     render_balance_profile_catalog,
+    render_beta_archive_evidence,
     render_board_view,
     render_campaign_goal_catalog,
     render_campaign_start_catalog,
@@ -200,6 +203,7 @@ from nexus_tech.simulation.balance_lab import (
     run_balance_matrix,
 )
 from nexus_tech.simulation.balance_profiles import list_balance_profiles
+from nexus_tech.simulation.beta_evidence import build_beta_archive_evidence
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
 from nexus_tech.simulation.campaign_starts import (
     STANDARD_CAMPAIGN_START_ID,
@@ -669,6 +673,16 @@ MOTION_MODE_2D_OPTION = typer.Option(
     MotionMode.FULL,
     "--motion-mode",
     help="2D animation intensity mode: full, reduced, or off.",
+)
+UI_SCALE_2D_OPTION = typer.Option(
+    UiScale.STANDARD,
+    "--ui-scale",
+    help="2D text scale: compact, standard, or large.",
+)
+CONTRAST_MODE_2D_OPTION = typer.Option(
+    ContrastMode.STANDARD,
+    "--contrast-mode",
+    help="2D color contrast profile: standard or high.",
 )
 VISUAL_AUDIT_OUTPUT_DIR_OPTION = typer.Option(
     None,
@@ -1620,6 +1634,8 @@ def play_2d_command(
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale = UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Launch the lightweight 2D dashboard frontend for a new run."""
 
@@ -1637,6 +1653,8 @@ def play_2d_command(
         window_size=resolve_2d_window_size(window_size),
         max_frames=max_frames,
         motion_mode=motion_mode,
+        ui_scale=ui_scale,
+        contrast_mode=contrast_mode,
     )
 
 
@@ -8656,6 +8674,20 @@ def compare_archives_command(
     render_archive_comparison(console, archives)
 
 
+@app.command("beta-evidence")
+def beta_evidence_command(
+    db_path: Path = DB_PATH_OPTION,
+) -> None:
+    """Show local featured-run coverage while preserving manual beta gates."""
+
+    coordinator = SaveLoadCoordinator(db_path)
+    try:
+        archives = coordinator.list_run_archives()
+    except PersistenceError as error:
+        raise_cli_persistence_error("Beta Evidence Read Failed", error)
+    render_beta_archive_evidence(console, build_beta_archive_evidence(archives))
+
+
 @app.command("show-progression")
 def show_progression_command(
     db_path: Path = DB_PATH_OPTION,
@@ -8853,6 +8885,8 @@ def load_game_2d_command(
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale = UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Load one named save slot into the lightweight 2D dashboard."""
 
@@ -8871,6 +8905,8 @@ def load_game_2d_command(
         window_size=resolve_2d_window_size(window_size),
         max_frames=max_frames,
         motion_mode=motion_mode,
+        ui_scale=ui_scale,
+        contrast_mode=contrast_mode,
     )
 
 
@@ -8908,6 +8944,8 @@ def continue_last_game_2d_command(
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale = UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Continue the latest save slot in the lightweight 2D dashboard."""
 
@@ -8926,6 +8964,8 @@ def continue_last_game_2d_command(
         window_size=resolve_2d_window_size(window_size),
         max_frames=max_frames,
         motion_mode=motion_mode,
+        ui_scale=ui_scale,
+        contrast_mode=contrast_mode,
     )
 
 
@@ -8936,6 +8976,8 @@ def menu_2d_command(
     window_size: str = WINDOW_SIZE_2D_OPTION,
     max_frames: int | None = MAX_FRAMES_2D_OPTION,
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale = UI_SCALE_2D_OPTION,
+    contrast_mode: ContrastMode = CONTRAST_MODE_2D_OPTION,
 ) -> None:
     """Open the 2D title scene with save/load and archive review."""
 
@@ -8946,6 +8988,8 @@ def menu_2d_command(
             window_size=resolve_2d_window_size(window_size),
             max_frames=max_frames,
             motion_mode=motion_mode,
+            ui_scale=ui_scale,
+            contrast_mode=contrast_mode,
         )
     except Frontend2DUnavailableError as error:
         console.print(
@@ -9032,6 +9076,8 @@ def start_new_game_2d(
     window_size: tuple[int, int],
     max_frames: int | None,
     motion_mode: MotionMode,
+    ui_scale: UiScale,
+    contrast_mode: ContrastMode,
 ) -> None:
     """Create a brand new run and launch the lightweight 2D dashboard."""
 
@@ -9057,6 +9103,8 @@ def start_new_game_2d(
         window_size=window_size,
         max_frames=max_frames,
         motion_mode=motion_mode,
+        ui_scale=ui_scale,
+        contrast_mode=contrast_mode,
     )
 
 
@@ -9070,6 +9118,8 @@ def launch_2d_session(
     window_size: tuple[int, int],
     max_frames: int | None,
     motion_mode: MotionMode,
+    ui_scale: UiScale,
+    contrast_mode: ContrastMode,
 ) -> None:
     """Launch one 2D dashboard session and print the closing summary."""
 
@@ -9083,6 +9133,8 @@ def launch_2d_session(
             window_size=window_size,
             max_frames=max_frames,
             motion_mode=motion_mode,
+            ui_scale=ui_scale,
+            contrast_mode=contrast_mode,
         )
     except Frontend2DUnavailableError as error:
         console.print(

@@ -1,5 +1,11 @@
 """Minimal 2D frontend for the NEXUS TECH simulation."""
 
+from nexus_tech.frontend_2d.accessibility import (
+    ContrastMode,
+    UiScale,
+    normalize_contrast_mode,
+    normalize_ui_scale,
+)
 from nexus_tech.frontend_2d.animation_audit import (
     ANIMATION_MATRIX_REPORT_NAME,
     ANIMATION_PLAYTEST_PREP_REPORT_NAME,
@@ -201,6 +207,7 @@ __all__ = [
     "AnimationPlaytestUITriageItem",
     "AnimationPlaytestUITriagePlan",
     "AnimationPlaytestUITriageValidation",
+    "ContrastMode",
     "FlowAuditFinding",
     "FlowAuditReport",
     "Frontend2DUnavailableError",
@@ -208,9 +215,12 @@ __all__ = [
     "MotionMode",
     "MotionAuditCell",
     "MotionAuditReport",
+    "UiScale",
     "launch_2d_frontend",
     "launch_2d_menu",
     "normalize_motion_mode",
+    "normalize_contrast_mode",
+    "normalize_ui_scale",
     "build_2d_animation_playtest_execution_guide",
     "build_2d_animation_playtest_handoff",
     "build_2d_animation_playtest_issue_backlog",

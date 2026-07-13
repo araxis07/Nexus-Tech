@@ -6,7 +6,10 @@ from dataclasses import dataclass
 
 from nexus_tech.domain.models import EventHistoryEntry, GameState, PendingEvent
 from nexus_tech.simulation.balance import BALANCE
-from nexus_tech.simulation.campaign_decisions import build_due_campaign_decision_event
+from nexus_tech.simulation.campaign_decisions import (
+    build_due_campaign_decision_event,
+    campaign_adjusted_event_weight,
+)
 from nexus_tech.simulation.event_effects import (
     EventApplicationOutcome,
     apply_pending_event_choice,
@@ -71,20 +74,30 @@ def select_event_definition(
     eligible_definitions = get_eligible_event_definitions(state)
     if not eligible_definitions:
         return None
-    return select_weighted_definition(eligible_definitions, rng)
+    return select_weighted_definition(eligible_definitions, rng, state=state)
 
 
 def select_weighted_definition(
     definitions: list[EventDefinition],
     rng: RandomLike,
+    *,
+    state: GameState | None = None,
 ) -> EventDefinition:
     """Pick one definition based on its configured weight."""
 
-    total_weight = sum(definition.weight for definition in definitions)
+    weights = [
+        (
+            campaign_adjusted_event_weight(state, definition.category, definition.weight)
+            if state is not None
+            else definition.weight
+        )
+        for definition in definitions
+    ]
+    total_weight = sum(weights)
     roll = rng.randint(1, total_weight)
     running_total = 0
-    for definition in definitions:
-        running_total += definition.weight
+    for definition, weight in zip(definitions, weights, strict=True):
+        running_total += weight
         if roll <= running_total:
             return definition
     return definitions[-1]

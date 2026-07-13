@@ -4772,8 +4772,8 @@ class RunScene(BaseScene):
             if width >= 940:
                 nav_items.append(
                     (
-                        "0 Full" if self._focus_mode else "0 Focus",
-                        "Switch between guided focus and the full dashboard.",
+                        "0 More" if self._focus_mode else "0 Focus",
+                        "Open all actions or return to the guided decision view.",
                         "focus_toggle",
                         "",
                         GOOD,
@@ -7988,7 +7988,7 @@ class RunScene(BaseScene):
                 eyebrow="RECOMMENDED NEXT",
                 headline=coach.label if coach is not None else "Review the Run",
                 detail=(
-                    coach.detail
+                    f"Why: {coach.detail}"
                     if coach is not None
                     else "Open Report to inspect the strongest available route."
                 ),
@@ -8008,7 +8008,7 @@ class RunScene(BaseScene):
                     pygame.Rect(inner.left, risk_top, inner.width, risk_height),
                     eyebrow="END-TURN RISK",
                     headline=self._view_model.preview_warning.replace("_", " ").title(),
-                    detail=self._view_model.preview_reason,
+                    detail=f"Before End Turn: {self._view_model.preview_reason}",
                     accent=risk_accent,
                     compact=True,
                 )
@@ -8066,20 +8066,22 @@ class RunScene(BaseScene):
             valign="top",
         )
         detail_top = rect.top + (43 if compact else 45)
-        draw_wrapped_text(
-            surface,
-            self.fonts.small,
-            detail,
-            MUTED,
-            pygame.Rect(
-                rect.left + 12,
-                detail_top,
-                rect.width - 24,
-                rect.bottom - detail_top - 6,
-            ),
-            line_height=15,
-            max_lines=2,
-        )
+        detail_height = rect.bottom - detail_top - 6
+        if detail_height >= 15:
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                detail,
+                MUTED,
+                pygame.Rect(
+                    rect.left + 12,
+                    detail_top,
+                    rect.width - 24,
+                    detail_height,
+                ),
+                line_height=15,
+                max_lines=2,
+            )
         if click_kind is not None:
             self._click_targets.append(ClickTarget(click_kind, "", rect))
 
@@ -8237,7 +8239,7 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect,
-            title="Actions",
+            title="Decisions" if self._focus_mode else "Actions",
             accent=INFO,
             emphasis=footer_motion,
             lift=int(footer_motion * 2),
@@ -8245,7 +8247,7 @@ class RunScene(BaseScene):
         draw_text_line(
             surface,
             self.fonts.heading,
-            "Action Bar",
+            "Decision Bar" if self._focus_mode else "Action Bar",
             TEXT,
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
@@ -8354,6 +8356,9 @@ class RunScene(BaseScene):
     def _footer_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
         """Keep the live action bar focused while preserving every keyboard route."""
 
+        if self._focus_mode:
+            return self._focus_footer_action_buttons()
+
         core_titles = {
             "Coach",
             "Team",
@@ -8406,6 +8411,45 @@ class RunScene(BaseScene):
         buttons.extend(button for button in _ACTION_BUTTONS if button.title in final_titles)
         return tuple(buttons)
 
+    def _focus_footer_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
+        """Expose one guided route, two alternatives, review, save, and resolution."""
+
+        coach_button = next(button for button in _ACTION_BUTTONS if button.title == "Coach")
+        report_button = next(button for button in _ACTION_BUTTONS if button.title == "Report")
+        final_buttons = tuple(
+            button for button in _ACTION_BUTTONS if button.title in {"Save", "End Turn"}
+        )
+        recommended: list[ActionButtonSpec] = []
+        for line in self._view_model.coach_lines[:3]:
+            candidate = next(
+                (
+                    button
+                    for button in _ACTION_BUTTONS
+                    if button.payload == line.command and button.title not in {"Save", "End Turn"}
+                ),
+                None,
+            )
+            if candidate is None:
+                panel_key = self._workspace_panel_key_for_command(line.command)
+                candidate = next(
+                    (
+                        button
+                        for button in _ACTION_BUTTONS
+                        if button.kind == "panel" and button.payload == panel_key
+                    ),
+                    None,
+                )
+            if candidate is not None and candidate not in recommended:
+                recommended.append(candidate)
+            if len(recommended) == 2:
+                break
+
+        if not recommended:
+            recommended.extend(
+                button for button in _ACTION_BUTTONS if button.title in {"Improve", "Market"}
+            )
+        return (coach_button, *recommended[:2], report_button, *final_buttons)
+
     def _footer_button_columns(self, available_width: int) -> int:
         if available_width < 620:
             return 4
@@ -8451,6 +8495,8 @@ class RunScene(BaseScene):
         workspace_title = (
             self._panel_display_name(workspace_key) if workspace_key is not None else "Core HUD"
         )
+        hover_hint = self._hover_hint_line()
+        hint = hover_hint or f"Watch: {self._view_model.watch_for}"
         if self._inspector_panel_key is not None and self.inspector_panel is not None:
             section = self._selected_inspector_section()
             section_title = section.title if section is not None else "Records"
@@ -8474,12 +8520,25 @@ class RunScene(BaseScene):
             )
         elif self._deep_panel_key == "endgame":
             primary = self._endgame_cockpit_status_line()
+        elif self._focus_mode:
+            coach = self._view_model.coach_lines[0] if self._view_model.coach_lines else None
+            primary = (
+                f"Next: {coach.label} | Actions Left: {self.state.action_points_remaining}"
+                if coach is not None
+                else f"Review the run | Actions Left: {self.state.action_points_remaining}"
+            )
+            hint = (
+                f"Why: {coach.detail} | 0 More opens every action"
+                if coach is not None
+                else "0 More opens every action"
+            )
         else:
             primary = (
                 f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
                 f"Actions Left: {self.state.action_points_remaining}"
             )
-        hint = self._hover_hint_line() or f"Watch: {self._view_model.watch_for}"
+        if hover_hint:
+            hint = hover_hint
         if max_width is not None and max_width < 760:
             primary = self._compact_footer_status_line(primary)
             hint = self._compact_footer_hint_line(hint)
@@ -8698,7 +8757,7 @@ class RunScene(BaseScene):
         if target.kind == "open_help":
             return "Hover: open the control guide for keyboard, mouse, pause, and inspector hints."
         if target.kind == "focus_toggle":
-            return "Hover: switch between the guided Focus View and the full dashboard."
+            return "Hover: open every action or return to the guided decision view."
         if target.kind == "pause_resume":
             return "Hover: resume the run without changing the current state."
         if target.kind == "pause_save":
@@ -10120,7 +10179,7 @@ class RunScene(BaseScene):
         keycaps = (
             ("Tab", "Next product / next inspector section"),
             ("1-8", "Open deep panels"),
-            ("0", "Toggle Focus View / Full Workspace"),
+            ("0", "Toggle Focus View / More Actions workspace"),
             ("I", "Inspect the current deep panel"),
             ("C", "Run primary coach command"),
             ("Q/F/M/D", "Product actions"),

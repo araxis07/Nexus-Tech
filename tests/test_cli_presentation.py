@@ -2149,12 +2149,18 @@ def test_list_saves_command_renders_slot_catalog(monkeypatch: MonkeyPatch, tmp_p
     monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
 
     db_path = tmp_path / "saves.db"
-    result = runner.invoke(app, ["list-saves", "--db-path", str(db_path)])
+    result = runner.invoke(
+        app,
+        ["list-saves", "--db-path", str(db_path)],
+        terminal_width=220,
+    )
 
     assert result.exit_code == 0
     assert captured["db_path"] == db_path
     assert "Save Slots" in result.output
     assert "active" in result.output
+    assert "Campaign Path" not in result.output
+    assert "Diff" not in result.output
 
 
 def test_list_archives_command_renders_archive_catalog(
@@ -2167,7 +2173,11 @@ def test_list_archives_command_renders_archive_catalog(
             archive_key="active:8:strategic_acquisition",
             slot_name="active",
             company_name="NEXUS TECH",
+            scenario_id="founder_journey",
             scenario_title="Founder Journey",
+            difficulty_mode="founder",
+            campaign_commitment_choice="Sharpen the Flagship",
+            campaign_consequence_choice="Defend Control",
             completed_turn=8,
             victory_achieved=True,
             game_over=False,
@@ -2199,12 +2209,68 @@ def test_list_archives_command_renders_archive_catalog(
     monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
 
     db_path = tmp_path / "archives.db"
-    result = runner.invoke(app, ["list-archives", "--db-path", str(db_path)])
+    result = runner.invoke(
+        app,
+        ["list-archives", "--db-path", str(db_path)],
+        terminal_width=240,
+    )
 
     assert result.exit_code == 0
     assert captured["db_path"] == db_path
     assert "Run Archives" in result.output
     assert "Next Focus" in result.output
+
+
+def test_beta_evidence_command_reports_archive_coverage_without_manual_signoff(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    archives = [
+        RunArchiveSummary(
+            archive_key="active:12:none",
+            slot_name="active",
+            company_name="NEXUS TECH",
+            scenario_id="founder_journey",
+            scenario_title="Founder Journey",
+            difficulty_mode="standard",
+            campaign_commitment_choice="Sharpen the Flagship",
+            campaign_consequence_choice="Defend Control",
+            completed_turn=12,
+            victory_achieved=True,
+            game_over=False,
+            exit_outcome="profitable_independence",
+            total_score=188,
+            score_tier="strong",
+            campaign_grade="A",
+            estimated_valuation=Decimal("42000.00"),
+            achievement_badges=(),
+            strategic_outlook="profitable_independence",
+            offer_value=Decimal("0.00"),
+            final_cash=Decimal("12400.00"),
+            final_reputation=64,
+            archived_at="2026-07-14T01:00:00+00:00",
+        )
+    ]
+
+    class FakeCoordinator:
+        def __init__(self, db_path: Path) -> None:
+            self.db_path = db_path
+
+        def list_run_archives(self) -> list[RunArchiveSummary]:
+            return archives
+
+    monkeypatch.setattr(cli_module, "SaveLoadCoordinator", FakeCoordinator)
+
+    result = runner.invoke(
+        app,
+        ["beta-evidence", "--db-path", str(tmp_path / "archives.db")],
+    )
+
+    assert result.exit_code == 0
+    assert "Beta Archive Evidence" in result.output
+    assert "archive-evidence-needed" in result.output
+    assert "Manual signoff remains required" in result.output
+    assert "bootstrap_studio" in result.output
 
 
 def test_compare_archives_command_renders_archive_comparison(

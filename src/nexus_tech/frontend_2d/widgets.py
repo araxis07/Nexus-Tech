@@ -3,20 +3,60 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import ModuleType
 
-BACKGROUND = (8, 14, 23)
-GRID = (14, 25, 39)
-PANEL = (18, 28, 42)
-PANEL_ALT = (13, 22, 34)
-BORDER = (74, 98, 128)
-TEXT = (232, 239, 245)
-MUTED = (169, 184, 205)
-GOOD = (72, 210, 139)
-WARN = (250, 199, 83)
-DANGER = (248, 104, 104)
-INFO = (97, 181, 255)
-SELECTION = (115, 207, 255)
-OVERLAY = (8, 10, 14, 180)
+from nexus_tech.frontend_2d.accessibility import (
+    ContrastMode,
+    UiScale,
+    normalize_contrast_mode,
+    normalize_ui_scale,
+)
+
+_STANDARD_PALETTE = {
+    "BACKGROUND": (8, 14, 23),
+    "GRID": (14, 25, 39),
+    "PANEL": (18, 28, 42),
+    "PANEL_ALT": (13, 22, 34),
+    "BORDER": (74, 98, 128),
+    "TEXT": (232, 239, 245),
+    "MUTED": (169, 184, 205),
+    "GOOD": (72, 210, 139),
+    "WARN": (250, 199, 83),
+    "DANGER": (248, 104, 104),
+    "INFO": (97, 181, 255),
+    "SELECTION": (115, 207, 255),
+    "OVERLAY": (8, 10, 14, 180),
+}
+_HIGH_CONTRAST_PALETTE = {
+    "BACKGROUND": (0, 0, 0),
+    "GRID": (28, 34, 42),
+    "PANEL": (12, 18, 24),
+    "PANEL_ALT": (5, 9, 13),
+    "BORDER": (190, 207, 228),
+    "TEXT": (255, 255, 255),
+    "MUTED": (216, 226, 239),
+    "GOOD": (0, 235, 158),
+    "WARN": (255, 215, 74),
+    "DANGER": (255, 118, 140),
+    "INFO": (86, 194, 255),
+    "SELECTION": (255, 226, 92),
+    "OVERLAY": (0, 0, 0, 224),
+}
+_ACTIVE_CONTRAST_MODE = ContrastMode.STANDARD
+
+BACKGROUND = _STANDARD_PALETTE["BACKGROUND"]
+GRID = _STANDARD_PALETTE["GRID"]
+PANEL = _STANDARD_PALETTE["PANEL"]
+PANEL_ALT = _STANDARD_PALETTE["PANEL_ALT"]
+BORDER = _STANDARD_PALETTE["BORDER"]
+TEXT = _STANDARD_PALETTE["TEXT"]
+MUTED = _STANDARD_PALETTE["MUTED"]
+GOOD = _STANDARD_PALETTE["GOOD"]
+WARN = _STANDARD_PALETTE["WARN"]
+DANGER = _STANDARD_PALETTE["DANGER"]
+INFO = _STANDARD_PALETTE["INFO"]
+SELECTION = _STANDARD_PALETTE["SELECTION"]
+OVERLAY = _STANDARD_PALETTE["OVERLAY"]
 
 
 @dataclass(frozen=True)
@@ -58,16 +98,47 @@ def finish_typography_audit() -> tuple[TypographyAuditEvent, ...]:
     return events
 
 
-def create_fonts(pygame) -> FontPack:
+def configure_contrast_mode(
+    value: ContrastMode | str,
+    *,
+    mirror_modules: tuple[ModuleType, ...] = (),
+) -> ContrastMode:
+    """Apply one semantic palette and mirror imported colors into scene modules."""
+
+    global _ACTIVE_CONTRAST_MODE
+
+    mode = normalize_contrast_mode(value)
+    palette = _HIGH_CONTRAST_PALETTE if mode is ContrastMode.HIGH else _STANDARD_PALETTE
+    globals().update(palette)
+    _ACTIVE_CONTRAST_MODE = mode
+    for module in mirror_modules:
+        for name, color in palette.items():
+            if hasattr(module, name):
+                setattr(module, name, color)
+    return mode
+
+
+def active_contrast_mode() -> ContrastMode:
+    """Return the palette profile currently applied to drawing helpers."""
+
+    return _ACTIVE_CONTRAST_MODE
+
+
+def create_fonts(pygame, ui_scale: UiScale | str = UiScale.STANDARD) -> FontPack:
     """Build a compact font set with deterministic metrics across OS runners."""
 
+    scale = normalize_ui_scale(ui_scale).factor
     return FontPack(
-        title=_default_font(pygame, 34, bold=True),
-        heading=_default_font(pygame, 24, bold=True),
-        body=_default_font(pygame, 20),
-        small=_default_font(pygame, 17),
-        mono=_default_font(pygame, 18),
+        title=_default_font(pygame, _scaled_font_size(34, scale), bold=True),
+        heading=_default_font(pygame, _scaled_font_size(24, scale), bold=True),
+        body=_default_font(pygame, _scaled_font_size(20, scale)),
+        small=_default_font(pygame, _scaled_font_size(17, scale)),
+        mono=_default_font(pygame, _scaled_font_size(18, scale)),
     )
+
+
+def _scaled_font_size(size: int, scale: float) -> int:
+    return max(12, round(size * scale))
 
 
 def _default_font(pygame, size: int, *, bold: bool = False):

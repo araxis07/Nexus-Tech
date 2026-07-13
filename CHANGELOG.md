@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.283.0 - 2026-07-14
+
+- Added delayed systemic consequences for all 24 featured campaign choices, with bounded event-weight shifts and a player-facing path outlook
+- Expanded completed-run archives to schema 24 with scenario, difficulty, full campaign path, and terminal reason evidence plus an additive legacy migration
+- Added `beta-evidence` to measure six-campaign archive coverage without converting automation or local archives into human playtest signoff
+- Reduced the default Focus View decision bar to six controls while preserving the full ten-control dashboard behind `0`, and clarified recommendation and end-turn reasoning
+- Added compact, standard, and large 2D text profiles plus a high-contrast palette across new, load, continue, and menu launch paths
+- Added a six-campaign by three-difficulty release matrix, accessible-profile headless smoke, archive UI regressions, and CI beta evidence guardrails
+
 ## 0.282.0 - 2026-07-14
 
 - Turned all six featured three-act journeys into gameplay with mandatory Commitment and Consequence decisions whose product, cash, team, debt, and governance effects persist through existing saves

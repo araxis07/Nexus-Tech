@@ -46,6 +46,22 @@ jobs:
       - name: Run beta convergence gate
         run: uv run pytest -q tests/test_beta_convergence.py
 
+      - name: Check beta archive evidence guardrail
+        run: uv run nexus-tech beta-evidence --db-path /tmp/nexus-tech-beta-evidence.db
+
+      - name: Smoke-test accessible 2D launch profile
+        run: >
+          uv run nexus-tech play-2d
+          --scenario founder_journey
+          --seed 283
+          --headless
+          --max-frames 2
+          --window-size 820x620
+          --motion-mode reduced
+          --ui-scale large
+          --contrast-mode high
+          --db-path /tmp/nexus-tech-accessibility-smoke.db
+
       - name: Run onboarding flow audit
         run: uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
 
