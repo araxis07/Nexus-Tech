@@ -14,6 +14,7 @@ from nexus_tech.simulation.action_catalog import (
     get_action_presentation,
     humanize_action_text,
 )
+from nexus_tech.simulation.campaign_decisions import get_campaign_path_labels
 from nexus_tech.simulation.campaign_journey import get_campaign_journey_progress
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
@@ -392,10 +393,16 @@ def build_game_view_model(
     campaign_objective = (
         journey_progress.chapter.objective if journey_progress is not None else phase.objective
     )
-    campaign_lens = (
+    base_campaign_lens = (
         journey_progress.chapter.decision_lens
         if journey_progress is not None
         else difficulty.watch_for
+    )
+    campaign_path_labels = get_campaign_path_labels(state)
+    campaign_lens = (
+        f"{campaign_path_labels[-1]} | {base_campaign_lens}"
+        if campaign_path_labels
+        else base_campaign_lens
     )
     header_note = f"{campaign_objective} | Next: {primary_action.label}"
     return GameViewModel(
@@ -1404,6 +1411,7 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
         score.score_tier,
         state.exit_outcome.value if state.exit_outcome is not None else "in_progress",
         state.difficulty_mode.value,
+        *get_campaign_path_labels(state),
     )
     findings = tuple(
         ReviewFindingViewModel(

@@ -196,6 +196,8 @@ class SaveLoadCoordinator:
                     schema_version=CURRENT_SCHEMA_VERSION,
                     timestamp=timestamp,
                 )
+                # Remove old event targets before replacing employee/product graph rows.
+                self._save_pending_event(connection, slot_name, None)
                 self.company_repository.save(connection, slot_name, state.company)
                 self.product_repository.save_all(connection, slot_name, state.products)
                 self.employee_repository.save_all(connection, slot_name, state.employees)
@@ -219,6 +221,7 @@ class SaveLoadCoordinator:
                 self._save_event_history(connection, slot_name, state.event_history)
                 self._save_milestone_history(connection, slot_name, state.milestone_history)
                 self._save_turn_history(connection, slot_name, state.turn_history)
+                self.product_repository.delete_missing(connection, slot_name, state.products)
                 self._archive_completed_run(connection, slot_name, state, timestamp)
         except sqlite3.DatabaseError as error:
             raise PersistenceError(f"Failed to save game: {error}") from error

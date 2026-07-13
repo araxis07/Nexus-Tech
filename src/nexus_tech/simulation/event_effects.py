@@ -21,6 +21,10 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.domain.money import quantize_money
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign_decisions import (
+    apply_campaign_decision_choice,
+    is_campaign_decision_event,
+)
 from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.economy import is_game_over
 from nexus_tech.simulation.event_registry import get_designer_or_marketer_support
@@ -40,6 +44,12 @@ class EventApplicationOutcome:
 
     state: GameState
     history_entry: EventHistoryEntry
+
+    @property
+    def message(self) -> str:
+        """Return the player-facing consequence text used by both frontends."""
+
+        return self.history_entry.result_text
 
 
 def apply_pending_event_choice(
@@ -68,6 +78,8 @@ def apply_pending_event_choice(
         raise ValueError("There is no pending event to resolve.")
 
     handler = EVENT_EFFECT_HANDLERS.get(pending_event.event_id)
+    if handler is None and is_campaign_decision_event(pending_event.event_id):
+        handler = apply_campaign_decision_choice
     if handler is None:
         raise ValueError(f"No handler registered for event {pending_event.event_id}.")
 
@@ -95,12 +107,29 @@ def apply_pending_event_choice(
     )
     next_state.event_history.append(history_entry)
     if len(next_state.event_history) > BALANCE.event_history_limit:
-        next_state.event_history = next_state.event_history[-BALANCE.event_history_limit :]
+        next_state.event_history = _trim_event_history(next_state.event_history)
 
     return EventApplicationOutcome(
         state=next_state,
         history_entry=history_entry,
     )
+
+
+def _trim_event_history(entries: list[EventHistoryEntry]) -> list[EventHistoryEntry]:
+    """Keep campaign commitments while pruning the oldest systemic events."""
+
+    campaign_indexes = {
+        index for index, entry in enumerate(entries) if is_campaign_decision_event(entry.event_id)
+    }
+    systemic_budget = max(0, BALANCE.event_history_limit - len(campaign_indexes))
+    systemic_indexes = [
+        index
+        for index, entry in enumerate(entries)
+        if not is_campaign_decision_event(entry.event_id)
+    ]
+    recent_systemic_indexes = systemic_indexes[-systemic_budget:] if systemic_budget else []
+    retained_indexes = campaign_indexes | set(recent_systemic_indexes)
+    return [entry for index, entry in enumerate(entries) if index in retained_indexes]
 
 
 def _apply_severe_bug_incident(state: GameState, event: PendingEvent, option_id: str) -> str:

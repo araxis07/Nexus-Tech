@@ -967,7 +967,7 @@ class BalanceConfig:
 
     event_trigger_min_turn: int = 2
     event_trigger_chance_percent: int = 42
-    event_history_limit: int = 16
+    event_history_limit: int = 64
     competitor_intel_limit: int = 12
 
     release_stability_required_progress: int = 4

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.282.0 - 2026-07-14
+
+- Turned all six featured three-act journeys into gameplay with mandatory Commitment and Consequence decisions whose product, cash, team, debt, and governance effects persist through existing saves
+- Added a default Focus View with an explicit Act Objective, Recommended Next move, and End-Turn Risk hierarchy; `0` switches to the full dashboard on standard windows
+- Reduced the contextual action bar to at most 10 controls, made late-game context priority deterministic, centered partial rows, and normalized title shortcuts into visible numeric order
+- Added a beta feature-freeze contract for the existing 49 scenarios, 194 actions, 99 player programs, and 202 systemic events while keeping human playtest targets explicitly manual
+- Fixed repeated saves for scenario graphs with product foreign keys by upserting parent products before replacing child rows and deleting stale products only after graph persistence completes
+- Added campaign event/path/save regressions, a dedicated CI beta-convergence gate, and responsive visual verification without changing the SQLite schema
+
 ## 0.281.0 - 2026-07-14
 
 - Collapsed 194 internal turn routes into 99 stable player-facing action concepts while preserving every command id for routing and save compatibility

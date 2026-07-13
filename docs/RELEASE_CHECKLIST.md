@@ -16,6 +16,7 @@ uv sync --extra dev
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest -q
+uv run pytest -q tests/test_beta_convergence.py
 uv run nexus-tech --version
 uv run nexus-tech doctor
 uv run nexus-tech validate-content

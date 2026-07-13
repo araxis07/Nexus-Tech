@@ -43,6 +43,9 @@ jobs:
       - name: Run UX clarity gate
         run: uv run pytest -q tests/test_ux_clarity.py
 
+      - name: Run beta convergence gate
+        run: uv run pytest -q tests/test_beta_convergence.py
+
       - name: Run onboarding flow audit
         run: uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
 

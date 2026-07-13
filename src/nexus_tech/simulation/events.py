@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from nexus_tech.domain.models import EventHistoryEntry, GameState, PendingEvent
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign_decisions import build_due_campaign_decision_event
 from nexus_tech.simulation.event_effects import (
     EventApplicationOutcome,
     apply_pending_event_choice,
@@ -91,6 +92,11 @@ def select_weighted_definition(
 
 def resolve_turn_event(state: GameState, rng: RandomLike) -> EventTurnOutcome:
     """Generate a turn event and auto-resolve it when no choice is required."""
+
+    campaign_event = build_due_campaign_decision_event(state)
+    if campaign_event is not None:
+        state.pending_event = campaign_event
+        return EventTurnOutcome(state=state, pending_event=campaign_event)
 
     definition = select_event_definition(state, rng)
     if definition is None:

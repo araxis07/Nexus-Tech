@@ -1,4 +1,12 @@
 .DS_Store
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+.secrets/
 .venv/
 .venv*/
 .mypy_cache/

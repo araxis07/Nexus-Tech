@@ -24,9 +24,16 @@ class ProductRepository:
         slot_name: str,
         products: list[Product],
     ) -> None:
-        """Replace the product portfolio for one slot."""
+        """Upsert the product portfolio without breaking dependent rows."""
 
-        connection.execute("DELETE FROM products WHERE slot_name = ?", (slot_name,))
+        connection.execute(
+            """
+            UPDATE products
+            SET display_order = -(display_order + 1)
+            WHERE slot_name = ?
+            """,
+            (slot_name,),
+        )
         connection.executemany(
             """
             INSERT INTO products (
@@ -53,6 +60,26 @@ class ProductRepository:
                 is_active
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(slot_name, product_id) DO UPDATE SET
+                display_order = excluded.display_order,
+                name = excluded.name,
+                lifecycle_stage = excluded.lifecycle_stage,
+                quality = excluded.quality,
+                bug_level = excluded.bug_level,
+                market_fit = excluded.market_fit,
+                technical_debt = excluded.technical_debt,
+                user_count = excluded.user_count,
+                revenue_per_user = excluded.revenue_per_user,
+                feature_count = excluded.feature_count,
+                maintenance_cost = excluded.maintenance_cost,
+                acquisition_rate = excluded.acquisition_rate,
+                churn_rate = excluded.churn_rate,
+                pricing_tier = excluded.pricing_tier,
+                packaging_strategy = excluded.packaging_strategy,
+                package_catalog_depth = excluded.package_catalog_depth,
+                add_on_catalog_depth = excluded.add_on_catalog_depth,
+                target_segment = excluded.target_segment,
+                is_active = excluded.is_active
             """,
             [
                 (
@@ -80,6 +107,25 @@ class ProductRepository:
                 )
                 for index, product in enumerate(products)
             ],
+        )
+
+    def delete_missing(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        products: list[Product],
+    ) -> None:
+        """Delete stale products after every dependent table has been replaced."""
+
+        product_ids = [str(product.id) for product in products]
+        placeholders = ", ".join("?" for _ in product_ids)
+        connection.execute(
+            f"""
+            DELETE FROM products
+            WHERE slot_name = ?
+              AND product_id NOT IN ({placeholders})
+            """,
+            (slot_name, *product_ids),
         )
 
     def load_all(self, connection: sqlite3.Connection, slot_name: str) -> list[Product]:

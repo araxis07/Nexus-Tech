@@ -1451,9 +1451,11 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert button_cols == 5
         assert footer_band_height == 48
         assert len(visible_buttons) < len(scenes_module._ACTION_BUTTONS)
-        assert len(visible_buttons) <= 12
+        assert len(visible_buttons) <= 10
         assert all(label in vital_line for label in ("Cash", "Runway", "Users", "AP"))
         assert scene._use_compact_run_focus(820, 220)
+        assert scene._use_compact_run_focus(1280, 220)
+        scene._focus_mode = False
         assert not scene._use_compact_run_focus(1280, 220)
         assert {"Save", "End Turn"} <= visible_titles
         assert "Endgame" not in visible_titles
@@ -2646,7 +2648,7 @@ def test_title_scene_quick_start_guides_first_run_controls(tmp_path: Path) -> No
             initial_mode="menu",
         )
 
-        scene._handle_digit_shortcut(5)
+        scene._handle_digit_shortcut(3)
         guide_lines = scene._title_sidebar_lines()
         scene.draw(surface)
         guide_targets = {(target.kind, target.payload) for target in scene._click_targets}

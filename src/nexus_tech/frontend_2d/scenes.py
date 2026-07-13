@@ -1620,11 +1620,11 @@ class TitleScene(BaseScene):
             self._handle_menu_action(
                 {
                     1: "continue",
-                    2: "load_slots",
-                    3: "archives",
-                    4: "meta",
-                    5: "guide",
-                    6: "new_wizard",
+                    2: "new_wizard",
+                    3: "guide",
+                    4: "load_slots",
+                    5: "archives",
+                    6: "meta",
                     7: "quit",
                 }.get(digit, "")
             )
@@ -1632,7 +1632,7 @@ class TitleScene(BaseScene):
         if self._mode == "guide":
             guide_actions = {
                 1: "continue",
-                6: "new_wizard",
+                2: "new_wizard",
                 9: "menu",
             }
             action = guide_actions.get(digit)
@@ -2278,13 +2278,13 @@ class TitleScene(BaseScene):
         )
         primary_buttons = (
             ("1 Continue Last", "Resume the newest save.", "continue", GOOD),
-            ("6 New Game", "Start a guided campaign.", "new_wizard", INFO),
+            ("2 New Game", "Start a guided campaign.", "new_wizard", INFO),
         )
         secondary_buttons = (
-            ("5 How to Play", "Goal, controls, and first turn.", "guide", GOOD),
-            ("2 Manage Saves", "Load, rename, copy, or delete.", "load_slots", INFO),
-            ("3 Run Archives", "Completed runs and lessons.", "archives", WARN),
-            ("4 Progress", "Paths, unlocks, and next gap.", "meta", SELECTION),
+            ("3 How to Play", "Goal, controls, and first turn.", "guide", GOOD),
+            ("4 Manage Saves", "Load, rename, copy, or delete.", "load_slots", INFO),
+            ("5 Run Archives", "Completed runs and lessons.", "archives", WARN),
+            ("6 Progress", "Paths, unlocks, and next gap.", "meta", SELECTION),
         )
         quit_button = ("7 Quit", "Leave NEXUS TECH.", "quit", DANGER)
         gap = 10
@@ -2604,7 +2604,7 @@ class TitleScene(BaseScene):
 
         button_width = int((inner.width - gap * 2) / 3)
         buttons = (
-            ("6 New Game", "Open wizard.", "new_wizard", INFO),
+            ("2 New Game", "Open wizard.", "new_wizard", INFO),
             ("1 Continue", "Resume newest save.", "continue", GOOD),
             ("9 Back", "Return to menu.", "menu", BORDER),
         )
@@ -3127,9 +3127,11 @@ class TitleScene(BaseScene):
             lift=int(footer_motion * 2),
         )
         if self._mode == "menu":
-            message = "Menu: 1 continue, 2 saves, 3 archives, 4 meta, 5 guide, 6 wizard, 7 quit."
+            message = (
+                "Menu: 1 continue, 2 new game, 3 guide, 4 saves, 5 archives, 6 progress, 7 quit."
+            )
         elif self._mode == "guide":
-            message = "Quick Start: 6 opens wizard, 1 continues a save, 9 or Esc returns to menu."
+            message = "Quick Start: 2 opens wizard, 1 continues, 9 or Esc returns to menu."
         elif self._mode == "meta":
             message = "Meta board: 1 archives, 2 saves, 3 wizard, 9 back."
         elif self._mode == "slots":
@@ -3971,6 +3973,7 @@ class RunScene(BaseScene):
         self._inspector_memory: dict[str, InspectorMemoryState] = {}
         self._help_overlay_visible = False
         self._pause_overlay_visible = False
+        self._focus_mode = True
         self._return_scene_factory = return_scene_factory
         self._first_turn_guide_visible = False
         self._product_index = 0
@@ -4592,6 +4595,10 @@ class RunScene(BaseScene):
             self._save_current_run()
             return
 
+        if event.key == self.pygame.K_0:
+            self._toggle_focus_mode()
+            return
+
         if event.key == self.pygame.K_1:
             self._set_deep_panel("team")
             return
@@ -4758,13 +4765,24 @@ class RunScene(BaseScene):
         self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
         if not self._pause_overlay_visible:
+            nav_items = [
+                ("P Pause", "Open pause, save, and menu controls.", "pause_toggle", "", WARN),
+                ("Esc Back", "Close overlay or open pause.", "run_back", "", INFO),
+            ]
+            if width >= 940:
+                nav_items.append(
+                    (
+                        "0 Full" if self._focus_mode else "0 Focus",
+                        "Switch between guided focus and the full dashboard.",
+                        "focus_toggle",
+                        "",
+                        GOOD,
+                    )
+                )
+            nav_items.append(("F1 Help", "Show the controls guide.", "open_help", "", SELECTION))
             self._draw_nav_rail(
                 surface,
-                (
-                    ("P Pause", "Open pause, save, and menu controls.", "pause_toggle", "", WARN),
-                    ("Esc Back", "Close overlay or open pause.", "run_back", "", INFO),
-                    ("F1 Help", "Show the controls guide.", "open_help", "", SELECTION),
-                ),
+                tuple(nav_items),
             )
         if self._pause_overlay_visible:
             self._draw_pause_overlay(surface)
@@ -6504,6 +6522,9 @@ class RunScene(BaseScene):
         if target.kind == "open_help":
             self._set_help_overlay_visible(True)
             return
+        if target.kind == "focus_toggle":
+            self._toggle_focus_mode()
+            return
         if target.kind == "pause_resume":
             self._set_pause_overlay_visible(False)
             return
@@ -7917,23 +7938,81 @@ class RunScene(BaseScene):
             pygame.Rect(inner.left, inner.top, inner.width, 22),
             valign="top",
         )
-        note_top = inner.top + 24
-        guide_rect = pygame.Rect(
-            inner.left, note_top, inner.width, max(18, inner.bottom - note_top)
-        )
-        if self._draw_first_turn_guide_card(surface, guide_rect):
-            return
-        draw_wrapped_text(
-            surface,
-            self.fonts.small,
-            self._hover_hint_line() or self._view_model.watch_for,
-            MUTED,
-            pygame.Rect(inner.left, note_top, inner.width, max(18, inner.height - 54)),
-            line_height=16,
-            max_lines=2,
-        )
+        note_top = inner.top + 28
         chip_top = inner.bottom - 28
-        chips = self._view_model.snapshot_chips[:3]
+        chips = self._view_model.snapshot_chips[: 4 if inner.width >= 900 else 3]
+        body_bottom = chip_top - 10
+        body_height = body_bottom - note_top
+
+        if inner.width < 620 or body_height < 92:
+            guide_rect = pygame.Rect(inner.left, note_top, inner.width, max(18, body_height))
+            if not self._draw_first_turn_guide_card(surface, guide_rect):
+                draw_wrapped_text(
+                    surface,
+                    self.fonts.small,
+                    self._hover_hint_line() or self._view_model.watch_for,
+                    MUTED,
+                    guide_rect,
+                    line_height=16,
+                    max_lines=2,
+                )
+        else:
+            if self._first_turn_guide_active() and body_height < 150:
+                guide_rect = pygame.Rect(inner.left, note_top, inner.width, body_height)
+                self._draw_first_turn_guide_card(surface, guide_rect)
+                return
+            guide_height = 88 if self._first_turn_guide_active() and body_height >= 150 else 0
+            if guide_height:
+                guide_rect = pygame.Rect(inner.left, note_top, inner.width, guide_height)
+                self._draw_first_turn_guide_card(surface, guide_rect)
+                note_top = guide_rect.bottom + 10
+                body_height = body_bottom - note_top
+
+            gap = 10
+            card_height = min(92, max(66, body_height if body_height < 132 else 82))
+            card_width = int((inner.width - gap) / 2)
+            objective_rect = pygame.Rect(inner.left, note_top, card_width, card_height)
+            next_rect = pygame.Rect(objective_rect.right + gap, note_top, card_width, card_height)
+            self._draw_focus_card(
+                surface,
+                objective_rect,
+                eyebrow="ACT OBJECTIVE",
+                headline=self._view_model.campaign_chapter_label,
+                detail=self._view_model.campaign_objective,
+                accent=SELECTION,
+            )
+            coach = self._view_model.coach_lines[0] if self._view_model.coach_lines else None
+            self._draw_focus_card(
+                surface,
+                next_rect,
+                eyebrow="RECOMMENDED NEXT",
+                headline=coach.label if coach is not None else "Review the Run",
+                detail=(
+                    coach.detail
+                    if coach is not None
+                    else "Open Report to inspect the strongest available route."
+                ),
+                accent=GOOD,
+                click_kind="coach" if coach is not None else None,
+            )
+            risk_top = objective_rect.bottom + gap
+            risk_height = body_bottom - risk_top
+            if risk_height >= 48:
+                risk_accent = (
+                    DANGER
+                    if self._view_model.preview_warning == "blocked"
+                    else tone_color(self._view_model.preview_warning)
+                )
+                self._draw_focus_card(
+                    surface,
+                    pygame.Rect(inner.left, risk_top, inner.width, risk_height),
+                    eyebrow="END-TURN RISK",
+                    headline=self._view_model.preview_warning.replace("_", " ").title(),
+                    detail=self._view_model.preview_reason,
+                    accent=risk_accent,
+                    compact=True,
+                )
+
         if chip_top <= note_top + 20 or not chips:
             return
         gap = 8
@@ -7944,13 +8023,101 @@ class RunScene(BaseScene):
             self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
             left += chip_width + gap
 
+    def _draw_focus_card(
+        self,
+        surface,
+        rect,
+        *,
+        eyebrow: str,
+        headline: str,
+        detail: str,
+        accent,
+        click_kind: str | None = None,
+        compact: bool = False,
+    ) -> None:
+        pygame = self.pygame
+        pygame.draw.rect(
+            surface,
+            blend_color((18, 29, 44), accent, 0.12),
+            rect,
+            border_radius=14,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(BORDER, accent, 0.3),
+            rect,
+            width=1,
+            border_radius=14,
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            eyebrow,
+            accent,
+            pygame.Rect(rect.left + 12, rect.top + 8, rect.width - 24, 14),
+            valign="top",
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small if compact else self.fonts.body,
+            headline,
+            TEXT,
+            pygame.Rect(rect.left + 12, rect.top + 25, rect.width - 24, 20),
+            valign="top",
+        )
+        detail_top = rect.top + (43 if compact else 45)
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            detail,
+            MUTED,
+            pygame.Rect(
+                rect.left + 12,
+                detail_top,
+                rect.width - 24,
+                rect.bottom - detail_top - 6,
+            ),
+            line_height=15,
+            max_lines=2,
+        )
+        if click_kind is not None:
+            self._click_targets.append(ClickTarget(click_kind, "", rect))
+
     def _use_compact_run_focus(self, width: int, content_height: int) -> bool:
+        if self._focus_mode:
+            return True
         if content_height < 200:
             return True
         if width < 940:
             section_height = int((content_height - 24) / 3)
             return section_height < 180
         return False
+
+    def _toggle_focus_mode(self) -> None:
+        if self._window_width() < 940:
+            self.push_event(
+                FrontendEvent(
+                    title="Compact View Locked",
+                    detail="This window keeps Focus View active to prevent overlap.",
+                    severity="info",
+                    ttl=3.5,
+                )
+            )
+            return
+        self._focus_mode = not self._focus_mode
+        self._motion_pulses.trigger("panel:coach", intensity=0.62, decay=1.8)
+        self.push_event(
+            FrontendEvent(
+                title="Focus View" if self._focus_mode else "Full Workspace",
+                detail=(
+                    "Showing the guided decision hierarchy."
+                    if self._focus_mode
+                    else "Showing all dashboard columns. Press 0 to return to Focus View."
+                ),
+                severity="success" if self._focus_mode else "info",
+                ttl=3.5,
+            )
+        )
 
     def _compact_vital_line(self) -> str:
         stats = {stat.key: stat.value_text for stat in self._view_model.stats}
@@ -8092,11 +8259,13 @@ class RunScene(BaseScene):
         button_gap = 10
         button_width = int((inner.width - button_gap * (button_cols - 1)) / button_cols)
         top = inner.top
-        left = inner.left
         for index, button in enumerate(buttons):
-            if index and index % button_cols == 0:
-                top += button_height + button_gap
-                left = inner.left
+            if index % button_cols == 0:
+                if index:
+                    top += button_height + button_gap
+                row_count = min(button_cols, len(buttons) - index)
+                row_width = row_count * button_width + (row_count - 1) * button_gap
+                left = inner.centerx - row_width // 2
             button_rect = pygame.Rect(left, top, button_width, button_height)
             enabled = self._button_is_enabled(button)
             selected = button.kind == "panel" and button.payload == self._active_panel_key()
@@ -8197,21 +8366,22 @@ class RunScene(BaseScene):
         final_titles = {"Save", "End Turn"}
         buttons = [button for button in _ACTION_BUTTONS if button.title in core_titles]
 
-        contextual_panel_titles: set[str] = set()
-        if self.state.partnerships or self.state.company.current_turn >= 5:
-            contextual_panel_titles.add("Partners")
+        contextual_panel_titles: list[str] = []
+        if self.state.company.current_turn >= 10 or self.state.victory_achieved:
+            contextual_panel_titles.append("Endgame")
         if (
             self.state.finance.board_pressure >= 20
             or self.state.finance.board_warning_active
             or self.state.company.current_turn >= 6
         ):
-            contextual_panel_titles.add("Board")
-        if self.state.company.current_turn >= 10 or self.state.victory_achieved:
-            contextual_panel_titles.add("Endgame")
+            contextual_panel_titles.append("Board")
+        if self.state.partnerships or self.state.company.current_turn >= 5:
+            contextual_panel_titles.append("Partners")
         contextual_panels = [
             button
+            for title in contextual_panel_titles
             for button in _ACTION_BUTTONS
-            if button.title in contextual_panel_titles and button not in buttons
+            if button.title == title and button not in buttons
         ]
 
         recommended_commands = {line.command for line in self._view_model.coach_lines[:3]}
@@ -8231,7 +8401,7 @@ class RunScene(BaseScene):
             for button in _ACTION_BUTTONS
             if button.payload in contextual_commands and button not in buttons
         ]
-        contextual_budget = max(0, 12 - len(buttons) - len(final_titles))
+        contextual_budget = max(0, 10 - len(buttons) - len(final_titles))
         buttons.extend((contextual_panels + contextual_buttons)[:contextual_budget])
         buttons.extend(button for button in _ACTION_BUTTONS if button.title in final_titles)
         return tuple(buttons)
@@ -8527,6 +8697,8 @@ class RunScene(BaseScene):
             return "Hover: close the current overlay first; with no overlay open, show Pause."
         if target.kind == "open_help":
             return "Hover: open the control guide for keyboard, mouse, pause, and inspector hints."
+        if target.kind == "focus_toggle":
+            return "Hover: switch between the guided Focus View and the full dashboard."
         if target.kind == "pause_resume":
             return "Hover: resume the run without changing the current state."
         if target.kind == "pause_save":
@@ -9948,6 +10120,7 @@ class RunScene(BaseScene):
         keycaps = (
             ("Tab", "Next product / next inspector section"),
             ("1-8", "Open deep panels"),
+            ("0", "Toggle Focus View / Full Workspace"),
             ("I", "Inspect the current deep panel"),
             ("C", "Run primary coach command"),
             ("Q/F/M/D", "Product actions"),
@@ -11242,20 +11415,22 @@ class TurnSummaryScene(BaseScene):
             selected=self._phase_index() >= 2,
         )
         top = command_rect.bottom + 12
+        available_lines = max(0, (inner.bottom - top) // 20)
+        line_limit = min(2 if compact else 3, available_lines)
         visible_lines = (self._view_model.cause_lines + self._view_model.strategic_lines)[
-            : (2 if compact else 3)
+            :line_limit
         ]
         for line in visible_lines:
-            consumed = draw_wrapped_text(
+            draw_wrapped_text(
                 surface,
                 self.fonts.small,
                 line,
                 MUTED,
-                pygame.Rect(inner.left, top, inner.width, 22 if compact else 34),
+                pygame.Rect(inner.left, top, inner.width, min(18, inner.bottom - top)),
                 line_height=15,
-                max_lines=1 if compact else 2,
+                max_lines=1,
             )
-            top += max(20, consumed)
+            top += 20
 
     def _summary_focus_command_title(self, *, max_length: int = 28) -> str:
         command = self._compact_summary_text(
