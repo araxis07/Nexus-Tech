@@ -21,6 +21,7 @@ from rich.table import Table
 from rich.traceback import install as install_rich_traceback
 
 from nexus_tech import __version__
+from nexus_tech.cli_beta_playtest import register_beta_playtest_commands
 from nexus_tech.config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_SCENARIO_ID,
@@ -11472,6 +11473,9 @@ def _build_locked_campaign_start_ids(*, db_path: Path) -> set[str]:
     }
 
 
+register_beta_playtest_commands(app, lambda: console)
+
+
 _PLAYER_FACING_COMMANDS = frozenset(
     {
         "new-game",
@@ -11504,6 +11508,8 @@ _PLAYER_FACING_COMMANDS = frozenset(
 
 
 def _developer_command_area(command_name: str) -> str:
+    if "beta-playtest" in command_name:
+        return "Release Validation"
     if "animation-playtest" in command_name:
         return "Animation QA"
     if "onboarding-visible" in command_name:
@@ -11512,7 +11518,7 @@ def _developer_command_area(command_name: str) -> str:
         return "2D Automated QA"
     if "balance" in command_name or command_name == "campaign-readiness":
         return "Balance & Campaigns"
-    if command_name.startswith(("validate-", "audit-", "beta-evidence")):
+    if command_name.startswith(("validate-", "audit-", "beta-")):
         return "Release Validation"
     if command_name.startswith(("list-", "export-")):
         return "Content Inspection"

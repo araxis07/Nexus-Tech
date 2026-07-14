@@ -3166,7 +3166,10 @@ def test_title_scene_meta_board_compacts_summary_when_space_is_tight(tmp_path: P
         lines = scene._meta_board_summary_lines(compact)
 
         assert compact is True
-        assert len(lines) == 4
+        assert len(lines) == 5
+        assert any("Learn 0/4 | Profit 0/4" in line for line in lines)
+        assert any("Quality 0/4 | Portfolio 0/4" in line for line in lines)
+        assert any("Debt 0/4 | Endgame 0/4" in line for line in lines)
         assert all("Recommendation:" not in line for line in lines)
     finally:
         pygame.quit()

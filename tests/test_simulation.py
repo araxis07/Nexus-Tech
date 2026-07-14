@@ -24658,6 +24658,8 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert summary.outcome_coverage_progress
     assert summary.route_discovery_progress
     assert summary.route_mastery_progress
+    assert summary.route_mastery.required_campaigns == 6
+    assert len(summary.route_mastery.lanes) == 6
     assert summary.reward_mix
     assert summary.campaign_ladder
     assert summary.unlocked_rewards

@@ -1501,6 +1501,32 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
         )
     )
 
+    route_atlas = Table(box=box.SIMPLE_HEAVY, expand=True)
+    route_atlas.add_column("Campaign", style="bold cyan")
+    route_atlas.add_column("Routes", justify="right")
+    route_atlas.add_column("Full Runs", justify="right")
+    route_atlas.add_column("Win / Down", justify="right")
+    route_atlas.add_column("Status")
+    route_atlas.add_column("Next Route", overflow="fold")
+    for lane in summary.route_mastery.lanes:
+        route_atlas.add_row(
+            f"{lane.track_label}\n[dim]{lane.scenario_id}[/dim]",
+            f"{lane.discovered_routes}/{lane.required_routes}",
+            str(lane.full_path_runs),
+            f"{lane.victories} / {lane.shutdowns}",
+            lane.status,
+            lane.next_route_label,
+        )
+    console.print(
+        Panel(
+            route_atlas,
+            title="Campaign Route Atlas",
+            subtitle="Archive-derived discovery; human playtest evidence remains separate",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+
 
 def render_unlock_catalog(console: Console, summary: UnlockCatalogSummary) -> None:
     """Render the explicit archive unlock catalog."""

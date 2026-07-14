@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 25
+CURRENT_SCHEMA_VERSION = 26
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 25,
+        schema_version INTEGER NOT NULL DEFAULT 26,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -526,6 +526,24 @@ SCHEMA_STATEMENTS = (
         contrast_mode TEXT NOT NULL DEFAULT 'standard',
         motion_mode TEXT NOT NULL DEFAULT 'full',
         updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS beta_playtest_sessions (
+        session_key TEXT PRIMARY KEY,
+        tester_code TEXT NOT NULL,
+        scenario_id TEXT NOT NULL,
+        interface_mode TEXT NOT NULL CHECK(interface_mode IN ('terminal', '2d')),
+        viewport TEXT NOT NULL,
+        first_turn_seconds INTEGER NOT NULL CHECK(first_turn_seconds BETWEEN 1 AND 3600),
+        turn_one_unaided INTEGER NOT NULL CHECK(turn_one_unaided IN (0, 1)),
+        pause_back_success INTEGER NOT NULL CHECK(pause_back_success IN (0, 1)),
+        tradeoff_explained INTEGER NOT NULL CHECK(tradeoff_explained IN (0, 1)),
+        reached_act_three INTEGER NOT NULL CHECK(reached_act_three IN (0, 1)),
+        blocker_found INTEGER NOT NULL CHECK(blocker_found IN (0, 1)),
+        notes TEXT NOT NULL,
+        game_version TEXT NOT NULL,
+        recorded_at TEXT NOT NULL
     )
     """,
 )

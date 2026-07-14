@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.288.0 - 2026-07-15
+
+- Added schema-26 structured local storage for observed human beta sessions, with explicit real-session attestation, anonymous tester codes, current-version filtering, duplicate protection, and guards against placeholder or sensitive evidence
+- Added `record-beta-playtest-session` and `beta-playtest-status` as hidden release-validation commands for the six-session campaign, first-turn, navigation, trade-off, Act 3, and blocker gates without converting automation into human signoff
+- Expanded archive progression into a complete six-campaign Route Atlas in terminal and 2D views, showing discovered authored routes, completed paths, outcomes, status, and each next unexplored route
+- Kept the release at late-alpha beta-candidate status with zero recorded current-version human sessions; a human reviewer must still approve the beta release after all six sessions pass
+
 ## 0.287.0 - 2026-07-15
 
 - Added archive-derived route mastery for all 24 authored campaign paths, including discovery, victories, shutdowns, average performance, and the next unexplored route across CLI and 2D progression views

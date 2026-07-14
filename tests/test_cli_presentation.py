@@ -2652,6 +2652,7 @@ def test_show_progression_command_renders_meta_summary(
 
     assert result.exit_code == 0
     assert "Meta Progression" in result.output
+    assert "Campaign Route Atlas" in result.output
     assert "Campaign Tier" in result.output
     assert "Unlocked Rewards" in result.output
     assert "first_victory" in result.output

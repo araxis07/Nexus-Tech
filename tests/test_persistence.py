@@ -732,7 +732,7 @@ def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path)
     assert row["campaign_commitment_choice"] == ""
     assert row["campaign_consequence_choice"] == ""
     assert row["terminal_reason"] == ""
-    assert user_version == 25
+    assert user_version == 26
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:

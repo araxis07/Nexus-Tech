@@ -7,7 +7,10 @@ from decimal import Decimal
 
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
-from nexus_tech.simulation.campaign_mastery import build_campaign_route_mastery
+from nexus_tech.simulation.campaign_mastery import (
+    CampaignRouteMasterySummary,
+    build_campaign_route_mastery,
+)
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,7 @@ class MetaProgressionSummary:
     outcome_coverage_progress: str
     route_discovery_progress: str
     route_mastery_progress: str
+    route_mastery: CampaignRouteMasterySummary
     reward_mix: tuple[str, ...]
     campaign_ladder: tuple[str, ...]
     unlocked_rewards: tuple[str, ...]
@@ -320,6 +324,7 @@ def summarize_meta_progression(
             outcome_coverage_progress="0/3 major endings",
             route_discovery_progress=route_mastery.discovery_progress,
             route_mastery_progress=route_mastery.mastery_progress,
+            route_mastery=route_mastery,
             reward_mix=unlock_catalog.reward_mix,
             campaign_ladder=(
                 "1. foundation [pending]",
@@ -458,6 +463,7 @@ def summarize_meta_progression(
         outcome_coverage_progress=outcome_coverage_progress,
         route_discovery_progress=route_mastery.discovery_progress,
         route_mastery_progress=route_mastery.mastery_progress,
+        route_mastery=route_mastery,
         reward_mix=unlock_catalog.reward_mix,
         campaign_ladder=campaign_ladder,
         unlocked_rewards=unlocked_rewards,

@@ -49,6 +49,9 @@ jobs:
       - name: Check beta archive evidence guardrail
         run: uv run nexus-tech beta-evidence --db-path /tmp/nexus-tech-beta-evidence.db
 
+      - name: Check structured human beta evidence guardrail
+        run: uv run nexus-tech beta-playtest-status --db-path /tmp/nexus-tech-human-beta.db
+
       - name: Check featured campaign branch readiness
         run: >
           uv run nexus-tech campaign-readiness

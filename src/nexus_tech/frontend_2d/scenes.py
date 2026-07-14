@@ -2603,14 +2603,18 @@ class TitleScene(BaseScene):
             )
             top += max(22, consumed)
         if not compact:
-            ladder_title = self.fonts.small.render("Campaign Ladder", True, INFO)
-            surface.blit(ladder_title, (summary_rect.left, top + 6))
+            atlas_title = self.fonts.small.render("Route Atlas", True, INFO)
+            surface.blit(atlas_title, (summary_rect.left, top + 6))
             top += 28
-            for step in self._meta_progression.campaign_ladder[:6]:
+            for lane in self._meta_progression.route_mastery.lanes:
+                route_line = (
+                    f"{lane.track_label}: {lane.discovered_routes}/{lane.required_routes} "
+                    f"routes | {lane.status}"
+                )
                 consumed = draw_wrapped_text(
                     surface,
                     self.fonts.small,
-                    step,
+                    route_line,
                     TEXT,
                     pygame.Rect(summary_rect.left, top, summary_rect.width, 22),
                     line_height=15,
@@ -3463,14 +3467,21 @@ class TitleScene(BaseScene):
         meta = self._meta_progression
         comparison = self._archive_comparison
         if compact:
+            route_rows = tuple(
+                "Atlas: "
+                + " | ".join(
+                    f"{lane.track_label} {lane.discovered_routes}/{lane.required_routes}"
+                    for lane in meta.route_mastery.lanes[index : index + 2]
+                )
+                for index in range(0, len(meta.route_mastery.lanes), 2)
+            )
             return (
                 f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
                 (
                     f"Runs {meta.total_runs} | victories {meta.victories} | "
                     f"best score {meta.best_score}"
                 ),
-                f"Routes: {meta.route_discovery_progress}",
-                f"Next reward: {meta.next_reward}",
+                *route_rows,
             )
         return (
             f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
