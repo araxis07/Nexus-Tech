@@ -891,16 +891,16 @@ uv run nexus-tech delete-save --slot archive --yes
 
 The core loop is simple:
 
-1. Review Turn Coach, Risk Forecast, End-Turn Preview, and Difficulty Profile before spending actions.
+1. Follow the Focus View sequence: read the Act Objective, take or inspect the Recommended Move, then review the End Turn Check.
 2. Spend action points on product or team decisions.
 3. End the turn to resolve revenue, costs, growth, churn, burnout, and event outcomes.
 4. Save locally and continue the run later if needed.
 
 If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to get a compact opening checklist.
 
-For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`; add `--motion-mode reduced` or `--motion-mode off` if you want quieter highlight, entity, actor, action-feedback, and transition animation. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, open the progression board, or press `7` for Settings before entering play. Inside a run you can click product cards, coach cards, modal options, deep-dive panel buttons, and the action bar directly, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `I`, `Q`, `F`, `M`, `D`, `H`, `A`, `O`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, `P`, `Esc`, and `F1`. `P` opens Pause with Resume, Save, Menu, Settings, and Quit controls; `T` opens Settings while paused; and `Esc` returns from Settings to Pause before resuming the run. The shared responsive frame reserves navigation, header, content, and footer regions across title, run, review, and turn-summary scenes. The live run retains its shape-based entity motion, deterministic shape-sprite actors, command feedback, scene transitions, compact action copy, adaptive feed pacing, staged turn summaries, endgame cockpit, and remembered inspector controls. If a button is disabled, the 2D shell still tells you exactly which prerequisite is missing before you waste the click.
+For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`; add `--motion-mode reduced` or `--motion-mode off` if you want quieter highlight, entity, actor, action-feedback, and transition animation. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, open the progression board, or press `7` for Settings before entering play. Inside a run you can click the Recommended Move and End Turn Check cards directly, plus product cards, modal options, deep-dive panel buttons, and the action bar, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `I`, `Q`, `F`, `M`, `D`, `H`, `A`, `O`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, `P`, `Esc`, and `F1`. `P` opens Pause with Resume, Save, Menu, Settings, and Quit controls; `T` opens Settings while paused; and `Esc` returns from Settings to Pause before resuming the run. The shared responsive frame reserves navigation, header, content, and footer regions across title, run, review, and turn-summary scenes. The live run retains its shape-based entity motion, deterministic shape-sprite actors, command feedback, scene transitions, compact action copy, adaptive feed pacing, staged turn summaries, endgame cockpit, and remembered inspector controls. If a button is disabled, the 2D shell still tells you exactly which prerequisite is missing before you waste the click.
 
-For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; CLI flags override that profile for the current launch. Arbitrary key remapping is not included in 0.284.0; the documented keyboard bindings remain fixed for this release.
+For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; CLI flags override that profile for the current launch. Arbitrary key remapping is not included in 0.285.0; the documented keyboard bindings remain fixed for this release.
 
 Difficulty guidance:
 
@@ -941,6 +941,7 @@ uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest -q
 uv run nexus-tech validate-content
+uv run nexus-tech campaign-readiness --runs 1 --turns 12 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
 uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
 uv run nexus-tech onboarding-visible-playtest-packet --output /tmp/nexus-tech-onboarding-visible-playtest.md
 uv run nexus-tech validate-onboarding-visible-playtest-packet --input /tmp/nexus-tech-onboarding-visible-playtest.md

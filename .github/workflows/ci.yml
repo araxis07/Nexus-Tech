@@ -49,6 +49,14 @@ jobs:
       - name: Check beta archive evidence guardrail
         run: uv run nexus-tech beta-evidence --db-path /tmp/nexus-tech-beta-evidence.db
 
+      - name: Check featured campaign branch readiness
+        run: >
+          uv run nexus-tech campaign-readiness
+          --runs 1
+          --turns 12
+          --seed-base 28500
+          --output /tmp/nexus-tech-campaign-readiness.md
+
       - name: Smoke-test accessible 2D launch profile
         run: >
           uv run nexus-tech play-2d
@@ -472,6 +480,15 @@ jobs:
         run: |
           uv run nexus-tech validate-animation-playtest-session-bundle \
             --command-prefix "uv run nexus-tech"
+
+      - name: Upload campaign readiness artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-campaign-readiness
+          path: /tmp/nexus-tech-campaign-readiness.md
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload 2D visual audit captures
         if: always()

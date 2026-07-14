@@ -8236,14 +8236,19 @@ class RunScene(BaseScene):
         if inner.width < 620 or body_height < 92:
             guide_rect = pygame.Rect(inner.left, note_top, inner.width, max(18, body_height))
             if not self._draw_first_turn_guide_card(surface, guide_rect):
+                brief = self._view_model.decision_brief
                 draw_wrapped_text(
                     surface,
                     self.fonts.small,
-                    self._hover_hint_line() or self._view_model.watch_for,
-                    MUTED,
+                    (
+                        f"1 Objective: {brief.objective} | "
+                        f"2 Next: {brief.command_label} ({brief.urgency_label}) | "
+                        f"3 End Turn: {brief.end_turn_label}"
+                    ),
+                    TEXT,
                     guide_rect,
                     line_height=16,
-                    max_lines=2,
+                    max_lines=3,
                 )
         else:
             if self._first_turn_guide_active() and body_height < 150:
@@ -8257,50 +8262,14 @@ class RunScene(BaseScene):
                 note_top = guide_rect.bottom + 10
                 body_height = body_bottom - note_top
 
-            gap = 10
-            card_height = min(92, max(66, body_height if body_height < 132 else 82))
-            card_width = int((inner.width - gap) / 2)
-            objective_rect = pygame.Rect(inner.left, note_top, card_width, card_height)
-            next_rect = pygame.Rect(objective_rect.right + gap, note_top, card_width, card_height)
-            self._draw_focus_card(
+            self._draw_focus_decision_cards(
                 surface,
-                objective_rect,
-                eyebrow="ACT OBJECTIVE",
-                headline=self._view_model.campaign_chapter_label,
-                detail=self._view_model.campaign_objective,
-                accent=SELECTION,
+                left=inner.left,
+                top=note_top,
+                width=inner.width,
+                body_height=body_height,
+                body_bottom=body_bottom,
             )
-            coach = self._view_model.coach_lines[0] if self._view_model.coach_lines else None
-            self._draw_focus_card(
-                surface,
-                next_rect,
-                eyebrow="RECOMMENDED NEXT",
-                headline=coach.label if coach is not None else "Review the Run",
-                detail=(
-                    f"Why: {coach.detail}"
-                    if coach is not None
-                    else "Open Report to inspect the strongest available route."
-                ),
-                accent=GOOD,
-                click_kind="coach" if coach is not None else None,
-            )
-            risk_top = objective_rect.bottom + gap
-            risk_height = body_bottom - risk_top
-            if risk_height >= 48:
-                risk_accent = (
-                    DANGER
-                    if self._view_model.preview_warning == "blocked"
-                    else tone_color(self._view_model.preview_warning)
-                )
-                self._draw_focus_card(
-                    surface,
-                    pygame.Rect(inner.left, risk_top, inner.width, risk_height),
-                    eyebrow="END-TURN RISK",
-                    headline=self._view_model.preview_warning.replace("_", " ").title(),
-                    detail=f"Before End Turn: {self._view_model.preview_reason}",
-                    accent=risk_accent,
-                    compact=True,
-                )
 
         if chip_top <= note_top + 20 or not chips:
             return
@@ -8312,6 +8281,70 @@ class RunScene(BaseScene):
             self._draw_snapshot_chip(surface, chip_rect, chip.label, chip.value_text, chip.tone)
             left += chip_width + gap
 
+    def _draw_focus_decision_cards(
+        self,
+        surface,
+        *,
+        left: int,
+        top: int,
+        width: int,
+        body_height: int,
+        body_bottom: int,
+    ) -> None:
+        pygame = self.pygame
+        brief = self._view_model.decision_brief
+        gap = 10
+        wide_route = width >= 960
+        if wide_route:
+            card_height = min(220, max(66, body_height))
+            card_width = int((width - gap * 2) / 3)
+            objective_rect = pygame.Rect(left, top, card_width, card_height)
+            next_rect = pygame.Rect(objective_rect.right + gap, top, card_width, card_height)
+            risk_rect = pygame.Rect(
+                next_rect.right + gap,
+                top,
+                left + width - next_rect.right - gap,
+                card_height,
+            )
+        else:
+            card_height = min(92, max(66, body_height if body_height < 132 else 82))
+            card_width = int((width - gap) / 2)
+            objective_rect = pygame.Rect(left, top, card_width, card_height)
+            next_rect = pygame.Rect(objective_rect.right + gap, top, card_width, card_height)
+            risk_top = objective_rect.bottom + gap
+            risk_height = body_bottom - risk_top
+            risk_rect = pygame.Rect(left, risk_top, width, risk_height)
+
+        self._draw_focus_card(
+            surface,
+            objective_rect,
+            eyebrow="1 / ACT OBJECTIVE",
+            headline=brief.objective_label,
+            detail=brief.objective,
+            accent=SELECTION,
+        )
+        self._draw_focus_card(
+            surface,
+            next_rect,
+            eyebrow="2 / RECOMMENDED MOVE",
+            headline=brief.command_label,
+            detail=f"{brief.urgency_label}. {brief.command_detail}",
+            accent=GOOD,
+            click_kind="coach",
+        )
+        if risk_rect.height >= 48:
+            self._draw_focus_card(
+                surface,
+                risk_rect,
+                eyebrow="3 / END TURN CHECK",
+                headline=brief.end_turn_label,
+                detail=brief.end_turn_detail,
+                accent=tone_color(brief.end_turn_tone),
+                click_kind="command" if brief.end_turn_enabled else None,
+                click_payload=(TurnAction.END_TURN.value if brief.end_turn_enabled else ""),
+                compact=True,
+            )
+
     def _draw_focus_card(
         self,
         surface,
@@ -8322,6 +8355,7 @@ class RunScene(BaseScene):
         detail: str,
         accent,
         click_kind: str | None = None,
+        click_payload: str = "",
         compact: bool = False,
     ) -> None:
         pygame = self.pygame
@@ -8372,7 +8406,7 @@ class RunScene(BaseScene):
                 max_lines=2,
             )
         if click_kind is not None:
-            self._click_targets.append(ClickTarget(click_kind, "", rect))
+            self._click_targets.append(ClickTarget(click_kind, click_payload, rect))
 
     def _use_compact_run_focus(self, width: int, content_height: int) -> bool:
         if self._focus_mode:
@@ -8810,17 +8844,13 @@ class RunScene(BaseScene):
         elif self._deep_panel_key == "endgame":
             primary = self._endgame_cockpit_status_line()
         elif self._focus_mode:
-            coach = self._view_model.coach_lines[0] if self._view_model.coach_lines else None
+            brief = self._view_model.decision_brief
             primary = (
-                f"Next: {coach.label} | Actions Left: {self.state.action_points_remaining}"
-                if coach is not None
-                else f"Review the run | Actions Left: {self.state.action_points_remaining}"
+                f"Step 2: {brief.command_label} | {brief.urgency_label} | "
+                f"Actions Left: {self.state.action_points_remaining}"
             )
-            hint = (
-                f"Why: {coach.detail} | 0 More opens every action"
-                if coach is not None
-                else "0 More opens every action"
-            )
+            more_hint = " | 0 More opens every action" if self._window_width() >= 940 else ""
+            hint = f"Why: {brief.command_detail} | Step 3: {brief.end_turn_label}{more_hint}"
         else:
             primary = (
                 f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
@@ -9020,7 +9050,15 @@ class RunScene(BaseScene):
         if target.kind == "open_panel_inspector":
             return f"Hover: inspect the `{target.payload}` panel in full detail."
         if target.kind == "coach":
-            return "Hover: run the top mission-board recommendation."
+            brief = self._view_model.decision_brief
+            consequence = self._compact_button_detail(
+                brief.command_consequence,
+                max_length=120,
+            )
+            return (
+                f"Hover: run {brief.command_label} ({brief.urgency_label}). "
+                f"If skipped: {consequence}"
+            )
         if target.kind == "inspector_section":
             return f"Hover: focus the `{target.payload}` inspector section."
         if target.kind == "inspector_item_action":

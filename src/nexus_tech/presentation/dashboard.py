@@ -48,6 +48,10 @@ from nexus_tech.simulation.balance_lab import (
 from nexus_tech.simulation.balance_profiles import BalanceProfile
 from nexus_tech.simulation.beta_evidence import BetaArchiveEvidence
 from nexus_tech.simulation.campaign import CampaignGoalDefinition, evaluate_campaign_goal
+from nexus_tech.simulation.campaign_readiness import (
+    CampaignReadinessMatrix,
+    evaluate_campaign_readiness_cell,
+)
 from nexus_tech.simulation.campaign_starts import CampaignStartDefinition
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
@@ -1150,6 +1154,62 @@ def render_balance_audit(console: Console, audit: BalanceAuditResult) -> None:
                 Panel(table, title="Tuning Findings", border_style="yellow", expand=True),
             ],
             equal=False,
+            expand=True,
+        )
+    )
+
+
+def render_campaign_readiness(console: Console, matrix: CampaignReadinessMatrix) -> None:
+    """Render automated branch reachability without implying human signoff."""
+
+    evaluations = [evaluate_campaign_readiness_cell(cell) for cell in matrix.cells]
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Goal", matrix.campaign_goal_id.value)
+    overview.add_row("Runs / Route", str(matrix.runs_per_route))
+    overview.add_row("Turns", str(matrix.turns))
+    overview.add_row("Campaign Cells", str(len(matrix.cells)))
+    overview.add_row("Routes Exercised", str(matrix.route_count))
+    overview.add_row(
+        "Automated Gate",
+        "pass" if matrix.automated_gate_passed else "fail",
+    )
+    overview.add_row(
+        "Score Review",
+        "enabled" if matrix.runs_per_route >= 3 else "sample only; use --runs 3",
+    )
+    overview.add_row("Human Signoff", "required")
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Scenario", style="bold")
+    table.add_column("Difficulty")
+    table.add_column("Status")
+    table.add_column("Routes", justify="right")
+    table.add_column("Shutdowns", justify="right")
+    table.add_column("Score Spread", justify="right")
+    for cell, evaluation in zip(matrix.cells, evaluations, strict=True):
+        table.add_row(
+            cell.scenario_id,
+            cell.difficulty_mode.value,
+            evaluation.status,
+            f"{cell.ready_routes}/{len(cell.routes)}",
+            f"{cell.shutdowns}/{cell.total_runs}",
+            f"{cell.score_spread:.1f}",
+        )
+
+    console.print(Panel(overview, title="Campaign Readiness", border_style="cyan", expand=True))
+    console.print(
+        Panel(
+            Group(
+                table,
+                "",
+                (
+                    "[yellow]Automated route coverage only.[/yellow]\n"
+                    "[dim]Human signoff is still required for choice comprehension, pacing,\n"
+                    "and control clarity.[/dim]"
+                ),
+            ),
+            title="Four Routes x Three Difficulties",
+            border_style="green" if matrix.automated_gate_passed else "red",
             expand=True,
         )
     )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -224,7 +225,13 @@ def run_balance_batch(
     )
 
 
-def run_autoplay(state: GameState, rng: RandomSource, *, max_turns: int) -> GameState:
+def run_autoplay(
+    state: GameState,
+    rng: RandomSource,
+    *,
+    max_turns: int,
+    event_option_overrides: Mapping[str, str] | None = None,
+) -> GameState:
     """Advance one run using simple deterministic heuristics."""
 
     while (
@@ -233,7 +240,10 @@ def run_autoplay(state: GameState, rng: RandomSource, *, max_turns: int) -> Game
         and state.company.current_turn <= max_turns
     ):
         if state.pending_event is not None:
-            state = _resolve_pending_event_with_policy(state)
+            state = _resolve_pending_event_with_policy(
+                state,
+                event_option_overrides=event_option_overrides,
+            )
 
         while state.action_points_remaining > 0:
             planned_action = _choose_action(state)
@@ -243,7 +253,10 @@ def run_autoplay(state: GameState, rng: RandomSource, *, max_turns: int) -> Game
                 outcome = apply_action(state, TurnAction.WAIT, context=ActionContext())
             state = outcome.state
             if state.pending_event is not None:
-                state = _resolve_pending_event_with_policy(state)
+                state = _resolve_pending_event_with_policy(
+                    state,
+                    event_option_overrides=event_option_overrides,
+                )
             if outcome.turn_should_end:
                 break
 
@@ -909,12 +922,19 @@ def _choose_action(state: GameState) -> PlannedAction:
     )
 
 
-def _resolve_pending_event_with_policy(state: GameState) -> GameState:
+def _resolve_pending_event_with_policy(
+    state: GameState,
+    *,
+    event_option_overrides: Mapping[str, str] | None = None,
+) -> GameState:
     event = state.pending_event
     if event is None:
         return state
 
-    if event.event_id == "severe_bug_incident":
+    selected_override = (event_option_overrides or {}).get(event.event_id)
+    if selected_override is not None:
+        option_id = selected_override
+    elif event.event_id == "severe_bug_incident":
         option_id = (
             "hotfix" if state.company.cash_on_hand > BALANCE.event_bug_hotfix_cost else "delay"
         )

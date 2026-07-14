@@ -2598,6 +2598,7 @@ def test_campaign_goal_progress_completes_when_profit_machine_is_stable() -> Non
         campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
         finance=FinanceState(debt_principal=Decimal("3200.00")),
     )
+    state.scenario_id = "balanced_saas"
     state.turn_history = [
         TurnLedgerEntry(
             turn=6,

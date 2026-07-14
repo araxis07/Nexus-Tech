@@ -68,6 +68,11 @@ from nexus_tech.simulation.balance_lab import (
     BalanceRunResult,
     BalanceScenarioComparison,
 )
+from nexus_tech.simulation.campaign_readiness import (
+    CampaignReadinessCell,
+    CampaignReadinessMatrix,
+    CampaignRouteOutcome,
+)
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.end_turn_preview import EndTurnPreviewSummary
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
@@ -767,6 +772,60 @@ def test_balance_audit_command_renders_findings(monkeypatch: MonkeyPatch) -> Non
     assert "Balance Audit" in result.output
     assert "Tuning Findings" in result.output
     assert "low" in result.output
+
+
+def test_campaign_readiness_command_renders_and_exports_automated_boundary(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    routes = tuple(
+        CampaignRouteOutcome(
+            route_id=f"route-{index}",
+            route_label=f"Commitment {index} -> Consequence {index}",
+            runs=1,
+            full_path_runs=1,
+            act_three_survivors=1,
+            shutdowns=0,
+            victories=0,
+            average_turns=12.0,
+            average_score=180.0 + index,
+            average_cash=Decimal("12000.00"),
+        )
+        for index in range(4)
+    )
+    matrix = CampaignReadinessMatrix(
+        campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+        runs_per_route=1,
+        turns=12,
+        seed_base=28500,
+        cells=(
+            CampaignReadinessCell(
+                scenario_id="founder_journey",
+                difficulty_mode=DifficultyMode.STANDARD,
+                routes=routes,
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_campaign_readiness_matrix", lambda **_: matrix)
+    output = tmp_path / "campaign-readiness.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "campaign-readiness",
+            "--scenario",
+            "founder_journey",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Campaign Readiness" in result.output
+    assert "Automated route coverage only" in result.output
+    assert "Human Signoff" in result.output
+    assert output.exists()
+    assert "Human playtest signoff: `required`" in output.read_text(encoding="utf-8")
 
 
 def test_export_balance_csv_command_writes_matrix_file(

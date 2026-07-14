@@ -72,6 +72,17 @@ def test_live_hud_exposes_current_act_and_readable_next_move() -> None:
     assert "Next:" in view_model.header_note
     assert not _contains_raw_command(view_model.header_note)
     assert all(not _contains_raw_command(line.label) for line in view_model.coach_lines)
+    assert view_model.decision_brief.objective_label == "Act 1/3: Foundation Loop"
+    assert view_model.decision_brief.command == view_model.coach_lines[0].command
+    assert view_model.decision_brief.command_label == view_model.coach_lines[0].label
+    assert view_model.decision_brief.command_consequence
+    assert view_model.decision_brief.urgency_label
+    assert view_model.decision_brief.end_turn_label in {
+        "Ready to Resolve",
+        "Review Risk",
+        "Confirm High Risk",
+    }
+    assert view_model.decision_brief.end_turn_tone in {"success", "warning", "danger"}
 
 
 def test_turn_summary_explains_causes_and_keeps_routing_internal() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 from decimal import Decimal
 
 from nexus_tech.domain.models import (
@@ -8,6 +9,8 @@ from nexus_tech.domain.models import (
     DifficultyMode,
     EventCategory,
     EventHistoryEntry,
+    RoadmapFocus,
+    TurnLedgerEntry,
 )
 from nexus_tech.frontend_2d.viewmodels import (
     build_game_view_model,
@@ -22,6 +25,7 @@ from nexus_tech.simulation.beta_contract import (
     catalog_ceiling_violations,
 )
 from nexus_tech.simulation.beta_evidence import build_beta_archive_evidence
+from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.campaign_decisions import (
     build_due_campaign_decision_event,
     campaign_adjusted_event_weight,
@@ -33,6 +37,12 @@ from nexus_tech.simulation.campaign_decisions import (
 from nexus_tech.simulation.campaign_journey import (
     CampaignActId,
     list_featured_campaign_journeys,
+)
+from nexus_tech.simulation.campaign_readiness import (
+    evaluate_campaign_readiness_cell,
+    format_campaign_readiness_markdown,
+    list_campaign_routes,
+    run_campaign_readiness_matrix,
 )
 from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.event_effects import _trim_event_history
@@ -118,6 +128,100 @@ def test_featured_campaign_release_matrix_covers_every_difficulty_without_failur
         evaluate_balance_cell(cell, runs=matrix.runs, turns=matrix.turns).status != "fail"
         for cell in matrix.cells
     )
+
+
+def test_featured_campaign_route_catalog_exposes_all_four_authored_paths() -> None:
+    journeys = list_featured_campaign_journeys()
+
+    for journey in journeys:
+        routes = list_campaign_routes(journey.scenario_id)
+
+        assert len(routes) == 4
+        assert len({route.route_id for route in routes}) == 4
+        assert all(len(route.choices) == 2 for route in routes)
+        assert all(len(route.option_labels) == 2 for route in routes)
+
+
+def test_campaign_readiness_exercises_every_founder_route_across_difficulties() -> None:
+    matrix = run_campaign_readiness_matrix(
+        scenario_ids=["founder_journey"],
+        runs_per_route=1,
+        turns=12,
+        seed_base=28500,
+    )
+
+    assert len(matrix.cells) == len(DifficultyMode)
+    assert matrix.route_count == 12
+    assert matrix.automated_gate_passed is True
+    assert matrix.manual_signoff_required is True
+    assert all(cell.ready_routes == 4 for cell in matrix.cells)
+    assert all(cell.shutdowns == 0 for cell in matrix.cells)
+    assert all(evaluate_campaign_readiness_cell(cell).status == "pass" for cell in matrix.cells)
+    comparison_cell = replace(
+        matrix.cells[0],
+        routes=tuple(
+            replace(
+                route,
+                runs=3,
+                full_path_runs=3,
+                act_three_survivors=3,
+                average_score=100.0 + index * 60,
+            )
+            for index, route in enumerate(matrix.cells[0].routes)
+        ),
+    )
+    assert evaluate_campaign_readiness_cell(comparison_cell).status == "watch"
+    report = format_campaign_readiness_markdown(matrix)
+    assert "Authored routes exercised: `12`" in report
+    assert "Human playtest signoff: `required`" in report
+
+
+def test_featured_campaign_goal_waits_for_both_authored_decisions() -> None:
+    state = create_new_game(scenario_id="founder_journey")
+    state.company.current_turn = 9
+    state.company.cash_on_hand = Decimal("50000.00")
+    state.finance.debt_principal = Decimal("0.00")
+    state.turn_history = [
+        TurnLedgerEntry(
+            turn=turn,
+            total_revenue=Decimal("3000.00"),
+            total_operating_cost=Decimal("1000.00"),
+            net_cash_flow=Decimal("2000.00"),
+            cash_on_hand=Decimal("50000.00"),
+            reputation=70,
+            total_users=200,
+            headcount=4,
+            roadmap_focus=RoadmapFocus.BALANCED_EXECUTION,
+        )
+        for turn in (6, 7, 8)
+    ]
+
+    before_path = evaluate_campaign_goal(state)
+
+    assert before_path.completed is False
+    assert before_path.progress_lines[-1] == "Campaign decisions: 0/2"
+
+    for event_id, option_id, option_label, turn in (
+        ("campaign_founder_commitment", "sharpen_focus", "Sharpen the Flagship", 4),
+        ("campaign_founder_consequence", "defend_control", "Defend Control", 9),
+    ):
+        state.event_history.append(
+            EventHistoryEntry(
+                event_id=event_id,
+                category=EventCategory.MARKET_OPPORTUNITY,
+                title=option_label,
+                triggered_turn=turn,
+                resolved_turn=turn,
+                selected_option_id=option_id,
+                selected_option_label=option_label,
+                result_text="Recorded campaign choice.",
+            )
+        )
+
+    after_path = evaluate_campaign_goal(state)
+
+    assert after_path.completed is True
+    assert after_path.progress_lines[-1] == "Campaign decisions: 2/2"
 
 
 def test_beta_archive_evidence_covers_every_featured_path_without_faking_signoff() -> None:

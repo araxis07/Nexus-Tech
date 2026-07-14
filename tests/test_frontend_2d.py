@@ -275,6 +275,30 @@ def test_shared_frame_layout_reserves_non_overlapping_regions(
     assert frame.footer.top + frame.footer.height <= height - profile.margin
 
 
+@pytest.mark.parametrize("size", [(1280, 720), (1440, 900)])
+def test_run_header_reserves_space_between_lens_and_snapshot_rows(
+    size: tuple[int, int],
+) -> None:
+    width, height = size
+    profile = resolve_layout_profile(width, height)
+    frame = build_frame_layout(
+        width,
+        height,
+        header_height=profile.run_header_height,
+        footer_height=118,
+        nav_visible=True,
+        profile=profile,
+    )
+    inner_top = frame.header.top + 44
+    lens_bottom = inner_top + 42 + 18
+    snapshot_top = min(
+        inner_top + 66,
+        frame.header.top + frame.header.height - 28 - 10,
+    )
+
+    assert snapshot_top >= lens_bottom + 6
+
+
 def test_title_settings_apply_persist_and_render_at_compact_size(tmp_path: Path) -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     coordinator = SaveLoadCoordinator(tmp_path / "title-settings.db")
@@ -1088,6 +1112,37 @@ def test_run_scene_first_turn_guide_draws_clickable_coach_path() -> None:
         scene.draw(surface)
 
         assert not scene.first_turn_guide_active()
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_wide_focus_route_exposes_recommendation_and_end_turn_cards() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=19),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        surface = pygame.Surface((1280, 240))
+
+        scene._draw_focus_decision_cards(
+            surface,
+            left=20,
+            top=20,
+            width=1200,
+            body_height=130,
+            body_bottom=180,
+        )
+
+        targets = {(target.kind, target.payload) for target in scene._click_targets}
+        assert ("coach", "") in targets
+        assert ("command", TurnAction.END_TURN.value) in targets
     finally:
         pygame.quit()
 

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from nexus_tech.domain.models import CampaignGoalId, GameState, LifecycleStage
 from nexus_tech.simulation.balance import BALANCE
+from nexus_tech.simulation.campaign_decisions import get_campaign_path_labels
+from nexus_tech.simulation.campaign_journey import get_campaign_journey_progress
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ def _evaluate_profit_machine(
         and profitable_streak >= BALANCE.campaign_goal_profit_machine_streak_target
         and state.company.cash_on_hand >= BALANCE.campaign_goal_profit_machine_cash_target
         and state.finance.debt_principal <= BALANCE.campaign_goal_profit_machine_debt_cap
+        and _featured_campaign_path_complete(state)
     )
     return CampaignGoalProgress(
         goal_id=definition.goal_id,
@@ -124,7 +127,8 @@ def _evaluate_profit_machine(
                 "Debt: "
                 f"{state.finance.debt_principal}/{BALANCE.campaign_goal_profit_machine_debt_cap}"
             ),
-        ),
+        )
+        + _featured_campaign_progress_lines(state),
         completed=completed,
     )
 
@@ -141,6 +145,7 @@ def _evaluate_portfolio_empire(
         and len(active_products) >= BALANCE.campaign_goal_portfolio_empire_product_target
         and total_users >= BALANCE.campaign_goal_portfolio_empire_user_target
         and segment_count >= BALANCE.campaign_goal_portfolio_empire_segment_target
+        and _featured_campaign_path_complete(state)
     )
     return CampaignGoalProgress(
         goal_id=definition.goal_id,
@@ -159,7 +164,8 @@ def _evaluate_portfolio_empire(
                 "Segments reached: "
                 f"{segment_count}/{BALANCE.campaign_goal_portfolio_empire_segment_target}"
             ),
-        ),
+        )
+        + _featured_campaign_progress_lines(state),
         completed=completed,
     )
 
@@ -182,6 +188,7 @@ def _evaluate_category_leader(
         and state.company.reputation >= BALANCE.campaign_goal_category_leader_reputation_target
         and mature_products >= BALANCE.campaign_goal_category_leader_mature_product_target
         and average_quality >= BALANCE.campaign_goal_category_leader_quality_target
+        and _featured_campaign_path_complete(state)
     )
     return CampaignGoalProgress(
         goal_id=definition.goal_id,
@@ -200,9 +207,22 @@ def _evaluate_category_leader(
                 "Avg quality: "
                 f"{average_quality}/{BALANCE.campaign_goal_category_leader_quality_target}"
             ),
-        ),
+        )
+        + _featured_campaign_progress_lines(state),
         completed=completed,
     )
+
+
+def _featured_campaign_path_complete(state: GameState) -> bool:
+    if get_campaign_journey_progress(state.scenario_id, state.company.current_turn) is None:
+        return True
+    return len(get_campaign_path_labels(state)) >= 2
+
+
+def _featured_campaign_progress_lines(state: GameState) -> tuple[str, ...]:
+    if get_campaign_journey_progress(state.scenario_id, state.company.current_turn) is None:
+        return ()
+    return (f"Campaign decisions: {len(get_campaign_path_labels(state))}/2",)
 
 
 def _get_profitable_streak(state: GameState) -> int:

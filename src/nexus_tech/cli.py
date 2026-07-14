@@ -160,6 +160,7 @@ from nexus_tech.presentation.dashboard import (
     render_beta_archive_evidence,
     render_board_view,
     render_campaign_goal_catalog,
+    render_campaign_readiness,
     render_campaign_start_catalog,
     render_candidate_pool,
     render_competitor_archetype_catalog,
@@ -205,6 +206,10 @@ from nexus_tech.simulation.balance_lab import (
 from nexus_tech.simulation.balance_profiles import list_balance_profiles
 from nexus_tech.simulation.beta_evidence import build_beta_archive_evidence
 from nexus_tech.simulation.campaign import get_campaign_goal, list_campaign_goals
+from nexus_tech.simulation.campaign_readiness import (
+    format_campaign_readiness_markdown,
+    run_campaign_readiness_matrix,
+)
 from nexus_tech.simulation.campaign_starts import (
     STANDARD_CAMPAIGN_START_ID,
     get_campaign_start_definition,
@@ -364,6 +369,11 @@ COMPARE_SCENARIOS_OPTION = typer.Option(
         "Defaults to all scenarios."
     ),
 )
+CAMPAIGN_READINESS_SCENARIOS_OPTION = typer.Option(
+    None,
+    "--scenario",
+    help="Featured campaign id to audit. Repeat to limit the default six-campaign matrix.",
+)
 ANIMATION_MATRIX_SCENARIOS_OPTION = typer.Option(
     None,
     "--scenario",
@@ -399,6 +409,11 @@ BALANCE_GOAL_OPTION = typer.Option(
 )
 CSV_OUTPUT_OPTION = typer.Option(..., "--output", help="CSV path to write.")
 BALANCE_REPORT_OUTPUT_OPTION = typer.Option(..., "--output", help="Markdown path to write.")
+CAMPAIGN_READINESS_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for detailed automated branch evidence.",
+)
 ONBOARDING_FLOW_AUDIT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-flow-audit.md"),
     "--output",
@@ -5998,6 +6013,61 @@ def balance_audit_command(
         seed_base=seed_base,
     )
     render_balance_audit(console, audit)
+
+
+@app.command("campaign-readiness")
+def campaign_readiness_command(
+    scenario: Optional[list[str]] = CAMPAIGN_READINESS_SCENARIOS_OPTION,
+    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    runs: int = typer.Option(1, "--runs", min=1, help="Runs per authored campaign route."),
+    turns: int = typer.Option(
+        12,
+        "--turns",
+        min=9,
+        help="Maximum turns per route; at least 9 is required for the Act 3 choice.",
+    ),
+    seed_base: int = typer.Option(
+        28500,
+        "--seed-base",
+        help="Base seed shared across route variants for fair branch comparison.",
+    ),
+    output: Optional[Path] = CAMPAIGN_READINESS_OUTPUT_OPTION,
+) -> None:
+    """Exercise all four routes of each featured campaign across every difficulty."""
+
+    if scenario:
+        for scenario_id in scenario:
+            validate_scenario_id(scenario_id)
+    try:
+        matrix = run_campaign_readiness_matrix(
+            scenario_ids=scenario,
+            campaign_goal_id=goal,
+            runs_per_route=runs,
+            turns=turns,
+            seed_base=seed_base,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Campaign Readiness Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    render_campaign_readiness(console, matrix)
+    if output is not None:
+        output.write_text(format_campaign_readiness_markdown(matrix), encoding="utf-8")
+        console.print(
+            Panel.fit(
+                f"Wrote campaign readiness report to {output}",
+                title="Campaign Readiness Export",
+                border_style="green",
+            )
+        )
+    if not matrix.automated_gate_passed:
+        raise typer.Exit(code=1) from None
 
 
 @app.command("export-balance-csv")

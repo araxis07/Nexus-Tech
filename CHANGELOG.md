@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.285.0 - 2026-07-14
+
+- Reframed the 2D Focus View as a numbered Objective, Recommended Move, and End Turn Check route with urgency, consequence, correct risk color, and a directly clickable resolution card
+- Fixed positive-cash-flow runway gauges and high, elevated, critical, and blocked preview tones so the HUD no longer understates healthy runway or disguises end-turn risk
+- Added `campaign-readiness` to exercise all four authored decision paths across every difficulty for the six featured campaigns, with optional detailed Markdown evidence and an explicit manual-signoff boundary
+- Fixed featured campaigns ending before Act 3 by requiring both authored campaign decisions before an otherwise-complete campaign goal can trigger victory
+- Added branch reachability, early-victory, decision-brief, CLI export, and shared-seed comparison regressions without expanding the frozen content catalogs
+
 ## 0.284.0 - 2026-07-14
 
 - Added a persistent local Settings page to the 2D title menu and Pause flow for text scale, contrast, and motion, with immediate application across scene transitions

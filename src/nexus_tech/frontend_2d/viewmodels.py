@@ -80,6 +80,25 @@ class CoachLineViewModel:
     family_label: str
     source: str
     detail: str
+    consequence: str
+    urgency_label: str
+
+
+@dataclass(frozen=True)
+class DecisionBriefViewModel:
+    """One ordered objective-to-resolution route for the live run."""
+
+    objective_label: str
+    objective: str
+    command: str
+    command_label: str
+    command_detail: str
+    command_consequence: str
+    urgency_label: str
+    end_turn_label: str
+    end_turn_detail: str
+    end_turn_tone: str
+    end_turn_enabled: bool
 
 
 @dataclass(frozen=True)
@@ -263,6 +282,7 @@ class GameViewModel:
     snapshot_chips: tuple[SnapshotChipViewModel, ...]
     products: tuple[ProductCardViewModel, ...]
     coach_lines: tuple[CoachLineViewModel, ...]
+    decision_brief: DecisionBriefViewModel
     deferred_lines: tuple[str, ...]
     risk_lines: tuple[str, ...]
     preview_warning: str
@@ -377,7 +397,12 @@ def build_game_view_model(
             label=get_action_presentation(recommendation.command).label,
             family_label=get_action_presentation(recommendation.command).family_label,
             source=recommendation.source,
-            detail=recommendation.rationale,
+            detail=humanize_action_text(recommendation.rationale),
+            consequence=humanize_action_text(recommendation.consequence),
+            urgency_label=_recommendation_urgency_label(
+                recommendation.urgency,
+                recommendation.horizon_turns,
+            ),
         )
         for recommendation in coach.recommendations[:3]
     )
@@ -408,7 +433,18 @@ def build_game_view_model(
         if campaign_path_labels
         else base_campaign_lens
     )
-    header_note = f"{campaign_objective} | Next: {primary_action.label}"
+    decision_brief = _build_decision_brief(
+        campaign_chapter_label=campaign_chapter_label,
+        campaign_objective=campaign_objective,
+        coach_lines=coach_lines,
+        fallback_command=coach.primary_command,
+        fallback_label=primary_action.label,
+        preview=preview,
+    )
+    header_note = (
+        f"Next: {decision_brief.command_label} ({decision_brief.urgency_label}) | "
+        f"End Turn: {decision_brief.end_turn_label}"
+    )
     return GameViewModel(
         company_name=state.company.name,
         scenario_title=state.scenario_title,
@@ -430,6 +466,7 @@ def build_game_view_model(
         snapshot_chips=snapshot_chips,
         products=products,
         coach_lines=coach_lines,
+        decision_brief=decision_brief,
         deferred_lines=deferred_lines,
         risk_lines=risk_lines,
         preview_warning=preview.warning_level,
@@ -2722,6 +2759,8 @@ def _runway_ratio(preview) -> float:
     runway_metric = _preview_metric(preview, "Runway")
     if runway_metric is None:
         return 0.15
+    if runway_metric.projected == "cashflow+":
+        return 1.0
     match = re.search(r"(\d+)", runway_metric.projected)
     runway = int(match.group(1)) if match is not None else None
     if runway is None:
@@ -2730,11 +2769,77 @@ def _runway_ratio(preview) -> float:
 
 
 def _preview_tone(warning_level: str) -> str:
-    if warning_level == "critical":
+    if warning_level in {"blocked", "critical", "high"}:
         return "danger"
-    if warning_level == "warning":
+    if warning_level in {"elevated", "warning"}:
         return "warning"
     return "success"
+
+
+def _recommendation_urgency_label(urgency: int, horizon_turns: int) -> str:
+    if urgency >= 85:
+        priority = "Act now"
+    elif urgency >= 65:
+        priority = "This turn"
+    elif urgency >= 45:
+        priority = "Plan next"
+    else:
+        priority = "Monitor"
+    turn_label = "turn" if horizon_turns == 1 else "turns"
+    return f"{priority} / {horizon_turns} {turn_label}"
+
+
+def _build_decision_brief(
+    *,
+    campaign_chapter_label: str,
+    campaign_objective: str,
+    coach_lines: tuple[CoachLineViewModel, ...],
+    fallback_command: str,
+    fallback_label: str,
+    preview,
+) -> DecisionBriefViewModel:
+    primary = coach_lines[0] if coach_lines else None
+    if preview.blocked:
+        end_turn_label = (
+            "Run Complete"
+            if preview.projected_outcome in {"terminal", "victory"}
+            else "Resolve Required"
+        )
+    elif preview.requires_confirmation:
+        end_turn_label = "Confirm High Risk"
+    elif preview.warning_level in {"high", "elevated"}:
+        end_turn_label = "Review Risk"
+    else:
+        end_turn_label = "Ready to Resolve"
+
+    end_turn_detail = (
+        preview.headline if preview.blocked else preview.confirmation_reason or preview.note
+    )
+    if not end_turn_detail:
+        end_turn_detail = f"Projected result: {preview.projected_outcome}."
+    return DecisionBriefViewModel(
+        objective_label=campaign_chapter_label,
+        objective=campaign_objective,
+        command=primary.command if primary is not None else fallback_command,
+        command_label=primary.label if primary is not None else fallback_label,
+        command_detail=(
+            primary.detail if primary is not None else "Review the current operating report."
+        ),
+        command_consequence=(
+            primary.consequence
+            if primary is not None
+            else "Unreviewed pressure can compound into the next turn."
+        ),
+        urgency_label=primary.urgency_label if primary is not None else "Review now / 1 turn",
+        end_turn_label=end_turn_label,
+        end_turn_detail=end_turn_detail,
+        end_turn_tone=(
+            "success"
+            if preview.blocked and preview.projected_outcome == "victory"
+            else _preview_tone(preview.warning_level)
+        ),
+        end_turn_enabled=not preview.blocked,
+    )
 
 
 def _signed_int(value: int) -> str:

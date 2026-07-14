@@ -74,7 +74,7 @@ def resolve_layout_profile(width: int, height: int) -> ResponsiveLayoutProfile:
             gap=14,
             nav_band=46,
             title_header_height=104,
-            run_header_height=132,
+            run_header_height=148,
             title_footer_height=88,
             minimum_control_height=42,
         )
@@ -84,7 +84,7 @@ def resolve_layout_profile(width: int, height: int) -> ResponsiveLayoutProfile:
         gap=16,
         nav_band=46,
         title_header_height=104,
-        run_header_height=132,
+        run_header_height=148,
         title_footer_height=92,
         minimum_control_height=44,
     )
