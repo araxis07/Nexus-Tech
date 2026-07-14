@@ -677,6 +677,8 @@ def render_beta_archive_evidence(console: Console, evidence: BetaArchiveEvidence
     table.add_column("Campaign", style="bold")
     table.add_column("Runs", justify="right")
     table.add_column("Full Path", justify="right")
+    table.add_column("Routes", justify="right")
+    table.add_column("Win/Down", justify="right")
     table.add_column("Difficulties")
     table.add_column("Status")
     for lane in evidence.lanes:
@@ -684,6 +686,8 @@ def render_beta_archive_evidence(console: Console, evidence: BetaArchiveEvidence
             f"{lane.track_label} / {lane.scenario_id}",
             str(lane.run_count),
             str(lane.full_path_count),
+            f"{lane.discovered_routes}/{lane.required_routes}",
+            f"{lane.victories}/{lane.shutdowns}",
             ", ".join(lane.difficulties) if lane.difficulties else "-",
             "covered" if lane.covered else "needed",
         )
@@ -696,11 +700,14 @@ def render_beta_archive_evidence(console: Console, evidence: BetaArchiveEvidence
         "Campaign Coverage", f"{evidence.covered_campaigns}/{evidence.required_campaigns}"
     )
     summary.add_row("Full Paths", str(evidence.full_path_archives))
+    summary.add_row("Route Discovery", evidence.route_mastery.discovery_progress)
+    summary.add_row("Route Mastery", evidence.route_mastery.mastery_progress)
     summary.add_row(
         "Difficulties",
         ", ".join(evidence.covered_difficulties) if evidence.covered_difficulties else "-",
     )
     summary.add_row("Next", evidence.next_action)
+    summary.add_row("Replay Route", evidence.next_route_action)
     console.print(
         Panel(
             Group(
@@ -1450,6 +1457,8 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
     overview.add_row("Campaign Stage", summary.campaign_stage)
     overview.add_row("Achievement Prog.", summary.achievement_progress)
     overview.add_row("Outcome Coverage", summary.outcome_coverage_progress)
+    overview.add_row("Route Discovery", summary.route_discovery_progress)
+    overview.add_row("Route Mastery", summary.route_mastery_progress)
     overview.add_row("Reward Mix", ", ".join(summary.reward_mix) if summary.reward_mix else "-")
     overview.add_row(
         "Outcomes",
@@ -1478,7 +1487,10 @@ def render_meta_progression(console: Console, summary: MetaProgressionSummary) -
                 Panel(rewards, title="Unlocked Rewards", border_style="yellow", expand=True),
                 Panel(highlights, title="Archive Highlights", border_style="magenta", expand=True),
                 Panel(
-                    f"{summary.next_goal}\n\nNext reward: {summary.next_reward}",
+                    (
+                        f"{summary.next_goal}\n\nNext reward: {summary.next_reward}\n\n"
+                        f"Next route: {summary.next_route}"
+                    ),
                     title="Next Goal",
                     border_style="green",
                     expand=True,

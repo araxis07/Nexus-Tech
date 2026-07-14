@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.287.0 - 2026-07-15
+
+- Added archive-derived route mastery for all 24 authored campaign paths, including discovery, victories, shutdowns, average performance, and the next unexplored route across CLI and 2D progression views
+- Added Campaign Legacy synthesis to live and archived run reviews so both major choices resolve into one route, future event pressure, and a final campaign mandate
+- Made completed-run intent explicit with `Save & Archive` controls and a separate `Exit Unsaved` path instead of treating review dismissal as progression
+- Rebalanced Bootstrap Studio, Technical Rebuild, and Portfolio Machine choices into clearer liquidity, product-compounding, platform-efficiency, and portfolio-growth trade-offs; the three-seed readiness matrix now passes all 18 cells with all 72 routes represented and zero shutdowns
+- Added a 24-turn, three-run-per-route Debt Crunch regression across every difficulty to protect long-session recovery viability
+- Kept route mastery advisory and the release classified as late alpha until six real usability sessions complete the existing comprehension, navigation, readability, and pacing gates
+
 ## 0.286.0 - 2026-07-15
 
 - Changed campaign readiness to audit each featured scenario with its native goal by default and report per-route goal completions, normalized progress, and meaningful score/cash/progress dominance

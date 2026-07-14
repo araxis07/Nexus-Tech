@@ -2347,6 +2347,8 @@ def test_beta_evidence_command_reports_archive_coverage_without_manual_signoff(
     assert "archive-evidence-needed" in result.output
     assert "Manual signoff remains required" in result.output
     assert "bootstrap_studio" in result.output
+    assert "Route Discovery" in result.output
+    assert "Replay Route" in result.output
 
 
 def test_compare_archives_command_renders_archive_comparison(

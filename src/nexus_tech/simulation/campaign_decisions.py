@@ -13,7 +13,7 @@ from nexus_tech.domain.models import (
     Product,
 )
 from nexus_tech.domain.money import quantize_money
-from nexus_tech.simulation.campaign_journey import CampaignActId
+from nexus_tech.simulation.campaign_journey import CampaignActId, get_campaign_journey
 from nexus_tech.simulation.product_progression import infer_lifecycle_stage
 from nexus_tech.simulation.support import clamp_int, clamp_rate
 
@@ -89,6 +89,21 @@ class CampaignEventBias:
         """Return the percentage-point event-weight adjustment for one category."""
 
         return sum(amount for target, amount in self.adjustments if target is category)
+
+
+@dataclass(frozen=True)
+class CampaignPathLegacy:
+    """Player-facing synthesis of both campaign decisions and their lasting pressure."""
+
+    route_label: str
+    summary: str
+    pressure_line: str
+    mandate: str
+    option_ids: tuple[str, ...]
+
+    @property
+    def complete(self) -> bool:
+        return len(self.option_ids) == 2
 
 
 def _effect(result_text: str, **changes: object) -> CampaignChoiceEffect:
@@ -208,11 +223,11 @@ _CAMPAIGN_DECISIONS = (
                 "Buy Volume",
                 "Fund acquisition now and carry a larger support queue.",
                 _effect(
-                    "Volume expanded: users +55 and acquisition improved, backlog +3.",
-                    cash_delta=Decimal("-1000.00"),
-                    support_backlog_delta=3,
-                    users_delta=55,
-                    acquisition_rate_delta=Decimal("0.0090"),
+                    "Volume expanded: users +60 and acquisition improved, backlog +2.",
+                    cash_delta=Decimal("-800.00"),
+                    support_backlog_delta=2,
+                    users_delta=60,
+                    acquisition_rate_delta=Decimal("0.0100"),
                 ),
             ),
         ),
@@ -231,10 +246,10 @@ _CAMPAIGN_DECISIONS = (
                 "Build a Reserve Moat",
                 "Cut recurring maintenance and bank a stronger liquidity buffer.",
                 _effect(
-                    "The reserve moat strengthened: cash +1200 and maintenance cost fell.",
-                    cash_delta=Decimal("1200.00"),
+                    "The reserve moat strengthened: cash +3500 and maintenance cost fell.",
+                    cash_delta=Decimal("3500.00"),
                     board_confidence_delta=3,
-                    maintenance_cost_delta=Decimal("-100.00"),
+                    maintenance_cost_delta=Decimal("-180.00"),
                 ),
             ),
             _option(
@@ -243,18 +258,18 @@ _CAMPAIGN_DECISIONS = (
                 "Reinvest in quality, fit, and pricing power before the final gates.",
                 _effect(
                     (
-                        "The product compounded: advocates +10, reputation +3, "
-                        "quality +5, and fit +4."
+                        "The product compounded: advocates +42, reputation +12, "
+                        "quality +9, and fit +8."
                     ),
-                    cash_delta=Decimal("-400.00"),
-                    reputation_delta=3,
-                    board_confidence_delta=3,
-                    users_delta=10,
-                    quality_delta=5,
-                    market_fit_delta=4,
-                    revenue_per_user_delta=Decimal("0.45"),
-                    acquisition_rate_delta=Decimal("0.0040"),
-                    churn_rate_delta=Decimal("-0.0040"),
+                    cash_delta=Decimal("-2200.00"),
+                    reputation_delta=12,
+                    board_confidence_delta=5,
+                    users_delta=42,
+                    quality_delta=9,
+                    market_fit_delta=8,
+                    revenue_per_user_delta=Decimal("0.80"),
+                    acquisition_rate_delta=Decimal("0.0060"),
+                    churn_rate_delta=Decimal("-0.0080"),
                 ),
             ),
         ),
@@ -332,13 +347,14 @@ _CAMPAIGN_DECISIONS = (
                 "Promise New Velocity",
                 "Push adoption immediately while accepting fresh bug and board pressure.",
                 _effect(
-                    "The velocity promise grew demand: users +55, with bugs, debt, and pressure.",
-                    cash_delta=Decimal("-600.00"),
-                    users_delta=55,
-                    acquisition_rate_delta=Decimal("0.0080"),
-                    bug_delta=6,
-                    technical_debt_delta=6,
-                    board_pressure_delta=4,
+                    "The velocity promise grew demand: users +65, with measured repair pressure.",
+                    cash_delta=Decimal("-200.00"),
+                    reputation_delta=2,
+                    users_delta=65,
+                    acquisition_rate_delta=Decimal("0.0090"),
+                    bug_delta=3,
+                    technical_debt_delta=3,
+                    board_pressure_delta=3,
                 ),
             ),
         ),
@@ -361,7 +377,7 @@ _CAMPAIGN_DECISIONS = (
                     cash_delta=Decimal("-1700.00"),
                     quality_delta=2,
                     technical_debt_delta=-4,
-                    maintenance_cost_delta=Decimal("-120.00"),
+                    maintenance_cost_delta=Decimal("-160.00"),
                     all_active_products=True,
                 ),
             ),
@@ -370,10 +386,10 @@ _CAMPAIGN_DECISIONS = (
                 "Preserve Product Autonomy",
                 "Improve fit and acquisition while carrying duplicate operating cost.",
                 _effect(
-                    "Autonomous products found sharper markets: fit +3 and acquisition improved.",
-                    market_fit_delta=3,
-                    acquisition_rate_delta=Decimal("0.0050"),
-                    maintenance_cost_delta=Decimal("90.00"),
+                    "Autonomous products found sharper markets: fit +4 and acquisition improved.",
+                    market_fit_delta=4,
+                    acquisition_rate_delta=Decimal("0.0060"),
+                    maintenance_cost_delta=Decimal("60.00"),
                     all_active_products=True,
                 ),
             ),
@@ -391,13 +407,18 @@ _CAMPAIGN_DECISIONS = (
             _option(
                 "consolidate_capital",
                 "Consolidate Capital",
-                "Tighten every product and reduce the board's concern about sprawl.",
+                "Tighten every product, prune low-fit demand, and reduce board concern.",
                 _effect(
-                    "Capital was consolidated: cash +2200, quality +2, board confidence +4.",
+                    (
+                        "Capital was consolidated: cash +2200, quality +2, board confidence +4, "
+                        "and low-fit users -10 each."
+                    ),
                     cash_delta=Decimal("2200.00"),
                     board_confidence_delta=4,
                     board_pressure_delta=-3,
                     quality_delta=2,
+                    users_delta=-10,
+                    acquisition_rate_delta=Decimal("-0.0030"),
                     all_active_products=True,
                 ),
             ),
@@ -407,14 +428,15 @@ _CAMPAIGN_DECISIONS = (
                 "Keep every growth loop active while accepting coordination pressure.",
                 _effect(
                     (
-                        "The full portfolio kept growing: fit +2 and acquisition improved, "
-                        "pressure +4."
+                        "The full portfolio kept growing: users +36 each, fit +4, "
+                        "and acquisition improved, with pressure +4."
                     ),
-                    cash_delta=Decimal("-1600.00"),
+                    cash_delta=Decimal("-2200.00"),
                     board_pressure_delta=4,
                     support_backlog_delta=2,
-                    market_fit_delta=2,
-                    acquisition_rate_delta=Decimal("0.0040"),
+                    users_delta=36,
+                    market_fit_delta=4,
+                    acquisition_rate_delta=Decimal("0.0100"),
                     all_active_products=True,
                 ),
             ),
@@ -855,16 +877,60 @@ def get_campaign_path_labels(state: GameState) -> tuple[str, ...]:
     return tuple(labels)
 
 
+def build_campaign_path_legacy(state: GameState) -> CampaignPathLegacy | None:
+    """Synthesize the route, pressure, and late-game mandate from recorded choices."""
+
+    selected_choices: list[tuple[str, str, CampaignEventBias | None]] = []
+    for definition in _scenario_decisions(state.scenario_id):
+        entry = next(
+            (
+                item
+                for item in reversed(state.event_history)
+                if item.event_id == definition.event_id
+            ),
+            None,
+        )
+        if entry is None:
+            continue
+        selected_choices.append(
+            (
+                entry.selected_option_id,
+                entry.selected_option_label,
+                _CAMPAIGN_EVENT_BIASES.get(entry.selected_option_id),
+            )
+        )
+    return _build_campaign_path_legacy(state.scenario_id, tuple(selected_choices))
+
+
+def build_campaign_path_legacy_from_labels(
+    scenario_id: str,
+    labels: tuple[str, ...],
+) -> CampaignPathLegacy | None:
+    """Rebuild a legacy summary from the labels persisted in an archive row."""
+
+    selected_choices: list[tuple[str, str, CampaignEventBias | None]] = []
+    for definition, stored_label in zip(_scenario_decisions(scenario_id), labels, strict=False):
+        label = _clean_campaign_choice_label(stored_label)
+        option = next((item for item in definition.options if item.label == label), None)
+        if option is None:
+            continue
+        selected_choices.append(
+            (
+                option.option_id,
+                option.label,
+                _CAMPAIGN_EVENT_BIASES.get(option.option_id),
+            )
+        )
+    return _build_campaign_path_legacy(scenario_id, tuple(selected_choices))
+
+
 def get_campaign_path_outlook(state: GameState) -> str | None:
     """Return the latest player-facing long-run event outlook for this path."""
 
-    for entry in reversed(state.event_history):
-        if not is_campaign_decision_event(entry.event_id):
-            continue
-        bias = _CAMPAIGN_EVENT_BIASES.get(entry.selected_option_id)
-        if bias is not None:
-            return bias.summary
-    return None
+    legacy = build_campaign_path_legacy(state)
+    if legacy is None:
+        return None
+    return legacy.pressure_line if legacy.complete else legacy.summary
 
 
 def campaign_adjusted_event_weight(
@@ -883,6 +949,73 @@ def campaign_adjusted_event_weight(
             adjustment += bias.adjustment_for(category)
     bounded_percent = max(40, min(180, 100 + adjustment))
     return max(1, round(base_weight * bounded_percent / 100))
+
+
+def _scenario_decisions(scenario_id: str) -> tuple[CampaignDecisionDefinition, ...]:
+    return tuple(
+        sorted(
+            (item for item in _CAMPAIGN_DECISIONS if item.scenario_id == scenario_id),
+            key=lambda item: item.trigger_after_turn,
+        )
+    )
+
+
+def _build_campaign_path_legacy(
+    scenario_id: str,
+    selected_choices: tuple[tuple[str, str, CampaignEventBias | None], ...],
+) -> CampaignPathLegacy | None:
+    if not selected_choices:
+        return None
+
+    labels = tuple(label for _option_id, label, _bias in selected_choices)
+    biases = tuple(bias for _option_id, _label, bias in selected_choices if bias is not None)
+    summaries = tuple(dict.fromkeys(bias.summary for bias in biases))
+    summary = " ".join(summaries) or "The selected route has no additional event pressure."
+    adjustments = {
+        category: sum(bias.adjustment_for(category) for bias in biases)
+        for category in EventCategory
+    }
+    positive = max(adjustments.items(), key=lambda item: item[1])
+    negative = min(adjustments.items(), key=lambda item: item[1])
+    pressure_parts: list[str] = []
+    if positive[1] > 0:
+        pressure_parts.append(f"more {_campaign_category_label(positive[0])}")
+    if negative[1] < 0:
+        pressure_parts.append(f"fewer {_campaign_category_label(negative[0])}")
+    pressure_line = (
+        f"Expect {'; '.join(pressure_parts)}."
+        if pressure_parts
+        else "Event pressure stays balanced across this route."
+    )
+    journey = get_campaign_journey(scenario_id)
+    if journey is None:
+        mandate = "Carry the route trade-offs through the remaining company decisions."
+    else:
+        final_chapter = journey.chapters[-1]
+        mandate = f"{final_chapter.objective} Watch for {final_chapter.primary_risk.lower()}"
+    return CampaignPathLegacy(
+        route_label=" -> ".join(labels),
+        summary=summary,
+        pressure_line=pressure_line,
+        mandate=mandate,
+        option_ids=tuple(option_id for option_id, _label, _bias in selected_choices),
+    )
+
+
+def _clean_campaign_choice_label(label: str) -> str:
+    if label.startswith("Act ") and ": " in label:
+        return label.split(": ", 1)[1]
+    return label
+
+
+def _campaign_category_label(category: EventCategory) -> str:
+    return {
+        EventCategory.PRODUCT_INCIDENT: "product incidents",
+        EventCategory.MARKET_OPPORTUNITY: "market openings",
+        EventCategory.FUNDING_OPPORTUNITY: "funding pressure",
+        EventCategory.REPUTATION_INCIDENT: "reputation shocks",
+        EventCategory.EMPLOYEE_ISSUE: "team issues",
+    }[category]
 
 
 def _effect_products(state: GameState, effect: CampaignChoiceEffect) -> list[Product]:

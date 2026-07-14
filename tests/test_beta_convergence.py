@@ -13,6 +13,7 @@ from nexus_tech.domain.models import (
     TurnLedgerEntry,
 )
 from nexus_tech.frontend_2d.viewmodels import (
+    build_archive_review_view_model,
     build_game_view_model,
     build_run_review_view_model,
 )
@@ -27,6 +28,7 @@ from nexus_tech.simulation.beta_contract import (
 from nexus_tech.simulation.beta_evidence import build_beta_archive_evidence
 from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.campaign_decisions import (
+    build_campaign_path_legacy,
     build_due_campaign_decision_event,
     campaign_adjusted_event_weight,
     get_campaign_path_labels,
@@ -38,6 +40,7 @@ from nexus_tech.simulation.campaign_journey import (
     CampaignActId,
     list_featured_campaign_journeys,
 )
+from nexus_tech.simulation.campaign_mastery import build_campaign_route_mastery
 from nexus_tech.simulation.campaign_readiness import (
     evaluate_campaign_readiness_cell,
     format_campaign_readiness_markdown,
@@ -273,6 +276,36 @@ def test_beta_archive_evidence_names_the_next_missing_campaign() -> None:
     assert evidence.next_action == f"Complete and archive {evidence.missing_campaigns[0]}."
 
 
+def test_archive_route_mastery_tracks_authored_paths_without_closing_manual_gate() -> None:
+    routes = list_campaign_routes("founder_journey")
+    archives = [
+        _archive_summary(
+            "founder_journey",
+            commitment=route.option_labels[0],
+            consequence=route.option_labels[1],
+        )
+        for route in routes[:2]
+    ]
+
+    mastery = build_campaign_route_mastery(archives)
+    evidence = build_beta_archive_evidence(archives)
+    founder_lane = next(lane for lane in mastery.lanes if lane.scenario_id == "founder_journey")
+
+    assert mastery.discovered_routes == 2
+    assert mastery.required_routes == 24
+    assert mastery.mastered_campaigns == 0
+    assert founder_lane.discovered_routes == 2
+    assert founder_lane.required_routes == 4
+    assert founder_lane.victories == 2
+    assert founder_lane.status == "exploring"
+    assert "founder_journey" in mastery.next_route
+    assert evidence.route_mastery == mastery
+    assert evidence.manual_signoff_required is True
+    archive_review = build_archive_review_view_model(archives[0])
+    assert archive_review.campaign_legacy_title == " -> ".join(routes[0].option_labels)
+    assert archive_review.campaign_legacy_detail.startswith("Expect ")
+
+
 def test_featured_campaigns_have_two_unique_mechanical_decisions() -> None:
     decisions = list_campaign_decisions()
     by_scenario = Counter(decision.scenario_id for decision in decisions)
@@ -356,6 +389,27 @@ def test_campaign_decision_takes_priority_and_records_a_persistent_path() -> Non
         "Act 2: Sharpen the Flagship",
         "Act 3: Defend Control",
     )
+    legacy = build_campaign_path_legacy(final.state)
+    assert legacy is not None
+    assert legacy.complete is True
+    assert legacy.route_label == "Sharpen the Flagship -> Defend Control"
+    assert legacy.pressure_line.startswith("Expect ")
+    assert "Clear the path gates" in legacy.mandate
+    assert get_campaign_path_outlook(final.state) == legacy.pressure_line
+    assert build_run_review_view_model(final.state).campaign_legacy_title == legacy.route_label
+
+
+def test_debt_crunch_authored_routes_survive_long_sessions() -> None:
+    matrix = run_campaign_readiness_matrix(
+        scenario_ids=["debt_crunch"],
+        runs_per_route=3,
+        turns=24,
+        seed_base=28700,
+    )
+
+    assert matrix.automated_gate_passed is True
+    assert all(cell.ready_routes == 4 for cell in matrix.cells)
+    assert all(cell.shutdowns == 0 for cell in matrix.cells)
 
 
 def test_every_campaign_option_applies_and_returns_frontend_message() -> None:

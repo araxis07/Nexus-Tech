@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
+from nexus_tech.simulation.campaign_mastery import build_campaign_route_mastery
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,8 @@ class MetaProgressionSummary:
     campaign_stage: str
     achievement_progress: str
     outcome_coverage_progress: str
+    route_discovery_progress: str
+    route_mastery_progress: str
     reward_mix: tuple[str, ...]
     campaign_ladder: tuple[str, ...]
     unlocked_rewards: tuple[str, ...]
@@ -102,6 +105,7 @@ class MetaProgressionSummary:
     archive_highlights: tuple[str, ...]
     next_goal: str
     next_reward: str
+    next_route: str
 
 
 def get_achievement_definitions() -> tuple[AchievementDefinition, ...]:
@@ -301,6 +305,7 @@ def summarize_meta_progression(
 
     if not archives:
         unlock_catalog = build_unlock_catalog(archives)
+        route_mastery = build_campaign_route_mastery(archives)
         return MetaProgressionSummary(
             total_runs=0,
             victories=0,
@@ -313,6 +318,8 @@ def summarize_meta_progression(
             campaign_stage="foundation",
             achievement_progress=f"0/{len(get_achievement_definitions())} core achievements",
             outcome_coverage_progress="0/3 major endings",
+            route_discovery_progress=route_mastery.discovery_progress,
+            route_mastery_progress=route_mastery.mastery_progress,
             reward_mix=unlock_catalog.reward_mix,
             campaign_ladder=(
                 "1. foundation [pending]",
@@ -330,6 +337,7 @@ def summarize_meta_progression(
             archive_highlights=("No archived runs yet.",),
             next_goal="Finish and archive one run to unlock campaign progression.",
             next_reward=unlock_catalog.next_unlock_label,
+            next_route=route_mastery.next_route,
         )
 
     victories = sum(1 for archive in archives if archive.victory_achieved)
@@ -361,6 +369,7 @@ def summarize_meta_progression(
         if unlock_status.get(definition.achievement_id, False)
     )
     unlock_catalog = build_unlock_catalog(archives)
+    route_mastery = build_campaign_route_mastery(archives)
 
     campaign_tier = "bronze"
     if best_archive.total_score >= 180 or victories >= 2:
@@ -389,6 +398,7 @@ def summarize_meta_progression(
             f"Outcome coverage: {len(unique_outcomes)} path(s) across "
             f"{len({archive.campaign_grade for archive in archives})} grade tier(s)."
         ),
+        (f"Route discovery: {route_mastery.discovery_progress}; {route_mastery.mastery_progress}."),
     )
     achievement_progress = f"{len(unlocks)}/{len(achievement_definitions)} core achievements"
     outcome_coverage_progress = f"{len(unique_outcomes)}/3 major endings"
@@ -446,6 +456,8 @@ def summarize_meta_progression(
         campaign_stage=campaign_stage,
         achievement_progress=achievement_progress,
         outcome_coverage_progress=outcome_coverage_progress,
+        route_discovery_progress=route_mastery.discovery_progress,
+        route_mastery_progress=route_mastery.mastery_progress,
         reward_mix=unlock_catalog.reward_mix,
         campaign_ladder=campaign_ladder,
         unlocked_rewards=unlocked_rewards,
@@ -453,6 +465,7 @@ def summarize_meta_progression(
         archive_highlights=archive_highlights,
         next_goal=next_goal,
         next_reward=next_reward,
+        next_route=route_mastery.next_route,
     )
 
 

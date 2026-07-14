@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from nexus_tech.domain.models import DifficultyMode
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
 from nexus_tech.simulation.campaign_journey import list_featured_campaign_journeys
+from nexus_tech.simulation.campaign_mastery import (
+    CampaignRouteMasterySummary,
+    build_campaign_route_mastery,
+)
 
 
 @dataclass(frozen=True)
@@ -17,7 +21,12 @@ class CampaignEvidenceLane:
     track_label: str
     run_count: int
     full_path_count: int
+    discovered_routes: int
+    required_routes: int
+    victories: int
+    shutdowns: int
     difficulties: tuple[str, ...]
+    next_route_label: str
 
     @property
     def covered(self) -> bool:
@@ -38,6 +47,7 @@ class BetaArchiveEvidence:
     covered_difficulties: tuple[str, ...]
     missing_campaigns: tuple[str, ...]
     lanes: tuple[CampaignEvidenceLane, ...]
+    route_mastery: CampaignRouteMasterySummary
     minimum_session_target: int = 6
     manual_signoff_required: bool = True
 
@@ -70,6 +80,12 @@ class BetaArchiveEvidence:
             return f"Complete {remaining} more archived playtest run(s)."
         return "Record real tester observations; archives alone do not complete manual signoff."
 
+    @property
+    def next_route_action(self) -> str:
+        """Return the next optional replay route without changing the manual beta gate."""
+
+        return self.route_mastery.next_route
+
 
 def build_beta_archive_evidence(
     archives: list[RunArchiveSummary],
@@ -78,21 +94,29 @@ def build_beta_archive_evidence(
 
     journeys = list_featured_campaign_journeys()
     featured_ids = {journey.scenario_id for journey in journeys}
+    route_mastery = build_campaign_route_mastery(archives)
+    mastery_by_scenario = {lane.scenario_id: lane for lane in route_mastery.lanes}
     lanes: list[CampaignEvidenceLane] = []
     for journey in journeys:
         matching = [archive for archive in archives if archive.scenario_id == journey.scenario_id]
         full_path_count = sum(len(archive.campaign_path) == 2 for archive in matching)
+        mastery_lane = mastery_by_scenario[journey.scenario_id]
         lanes.append(
             CampaignEvidenceLane(
                 scenario_id=journey.scenario_id,
                 track_label=journey.track_label,
                 run_count=len(matching),
                 full_path_count=full_path_count,
+                discovered_routes=mastery_lane.discovered_routes,
+                required_routes=mastery_lane.required_routes,
+                victories=mastery_lane.victories,
+                shutdowns=mastery_lane.shutdowns,
                 difficulties=tuple(
                     mode.value
                     for mode in DifficultyMode
                     if any(archive.difficulty_mode == mode.value for archive in matching)
                 ),
+                next_route_label=mastery_lane.next_route_label,
             )
         )
 
@@ -112,4 +136,5 @@ def build_beta_archive_evidence(
         covered_difficulties=covered_difficulties,
         missing_campaigns=missing_campaigns,
         lanes=tuple(lanes),
+        route_mastery=route_mastery,
     )

@@ -3444,12 +3444,9 @@ class TitleScene(BaseScene):
                 )
         return (
             f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
-            (
-                f"Archive progress: {meta.achievement_progress} | "
-                f"outcomes {meta.outcome_coverage_progress}"
-            ),
-            f"Next goal: {meta.next_goal}",
+            (f"Archive: {meta.achievement_progress} | routes {meta.route_discovery_progress}"),
             f"Next reward: {meta.next_reward}",
+            f"Next route: {meta.next_route}",
         )
 
     def _title_feed_visible_count(self, event_height: int) -> int:
@@ -3472,8 +3469,8 @@ class TitleScene(BaseScene):
                     f"Runs {meta.total_runs} | victories {meta.victories} | "
                     f"best score {meta.best_score}"
                 ),
+                f"Routes: {meta.route_discovery_progress}",
                 f"Next reward: {meta.next_reward}",
-                f"Coverage gap: {comparison.next_gap}",
             )
         return (
             f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
@@ -3483,9 +3480,10 @@ class TitleScene(BaseScene):
             ),
             f"Next goal: {meta.next_goal}",
             f"Next reward: {meta.next_reward}",
+            f"Route discovery: {meta.route_discovery_progress}",
+            f"Next route: {meta.next_route}",
             f"Dominant path: {comparison.dominant_path}",
             f"Coverage gap: {comparison.next_gap}",
-            f"Recommendation: {comparison.recommendation}",
         )
 
     def _compact_text(self, value: str, max_length: int) -> str:
@@ -3901,7 +3899,15 @@ class ReviewScene(BaseScene):
             )
         ]
         if self._allow_save:
-            items.append(("S Save", "Persist this run.", "review_save", "", GOOD))
+            items.append(
+                (
+                    "S Save & Archive",
+                    "Record this ending for progression.",
+                    "review_save",
+                    "",
+                    GOOD,
+                )
+            )
         self._draw_nav_rail(surface, tuple(items))
         self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
@@ -4083,16 +4089,48 @@ class ReviewScene(BaseScene):
             pygame.Rect(inner.left, inner.top, inner.width, 22),
             valign="top",
         )
+        badge_label_top = inner.top + 30
+        badge_top = inner.top + 52
+        badge_limit = 6
+        if self._view_model.campaign_legacy_title:
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                "Campaign Legacy",
+                MUTED,
+                pygame.Rect(inner.left, inner.top + 30, inner.width, 18),
+                valign="top",
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                self._view_model.campaign_legacy_title,
+                TEXT,
+                pygame.Rect(inner.left, inner.top + 50, inner.width, 18),
+                valign="top",
+            )
+            draw_wrapped_text(
+                surface,
+                self.fonts.small,
+                self._view_model.campaign_legacy_detail,
+                INFO,
+                pygame.Rect(inner.left, inner.top + 70, inner.width, 36),
+                line_height=15,
+                max_lines=2,
+            )
+            badge_label_top = inner.top + 112
+            badge_top = inner.top + 134
+            badge_limit = 4
         draw_text_line(
             surface,
             self.fonts.small,
             "Badges",
             MUTED,
-            pygame.Rect(inner.left, inner.top + 30, inner.width, 18),
+            pygame.Rect(inner.left, badge_label_top, inner.width, 18),
             valign="top",
         )
-        top = inner.top + 52
-        for badge in self._view_model.badges[:6]:
+        top = badge_top
+        for badge in self._view_model.badges[:badge_limit]:
             chip_rect = pygame.Rect(inner.left, top, inner.width, 28)
             pygame.draw.rect(
                 surface,
@@ -4130,7 +4168,14 @@ class ReviewScene(BaseScene):
         )
         actions = [(self._primary_title, self._primary_detail, self._accent, "review_primary")]
         if self._allow_save:
-            actions.append(("S Save Final", "Persist the finished run.", GOOD, "review_save"))
+            actions.append(
+                (
+                    "S Save & Archive",
+                    "Record this ending for progression.",
+                    GOOD,
+                    "review_save",
+                )
+            )
         gap = 12
         button_count = len(actions)
         max_button_width = 300 if button_count == 1 else 260
@@ -10664,8 +10709,8 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect=save_rect,
-            title="S Save",
-            detail="Persist the final run.",
+            title="S Save & Archive",
+            detail="Record this ending for progression.",
             accent=GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
@@ -10674,8 +10719,8 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect=close_rect,
-            title="Esc Close",
-            detail="Leave the 2D shell.",
+            title="Esc Exit Unsaved",
+            detail="Leave without archive progress.",
             accent=accent,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,

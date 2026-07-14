@@ -24656,12 +24656,15 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
     assert summary.campaign_stage in {"operator", "institutional"}
     assert "core achievements" in summary.achievement_progress
     assert summary.outcome_coverage_progress
+    assert summary.route_discovery_progress
+    assert summary.route_mastery_progress
     assert summary.reward_mix
     assert summary.campaign_ladder
     assert summary.unlocked_rewards
     assert summary.archive_highlights
     assert summary.campaign_tier in {"silver", "gold"}
     assert summary.next_reward
+    assert summary.next_route
 
 
 def test_unlock_catalog_surfaces_exact_reward_metadata() -> None:

@@ -15,6 +15,8 @@ from nexus_tech.simulation.action_catalog import (
     humanize_action_text,
 )
 from nexus_tech.simulation.campaign_decisions import (
+    build_campaign_path_legacy,
+    build_campaign_path_legacy_from_labels,
     get_campaign_path_labels,
     get_campaign_path_outlook,
 )
@@ -234,6 +236,8 @@ class RunReviewViewModel:
     headline: str
     summary_line: str
     next_focus: str
+    campaign_legacy_title: str
+    campaign_legacy_detail: str
     badges: tuple[str, ...]
     findings: tuple[ReviewFindingViewModel, ...]
 
@@ -1444,6 +1448,7 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
 
     score = calculate_run_score(state)
     postmortem = build_run_postmortem(state)
+    legacy = build_campaign_path_legacy(state)
     summary_line = (
         f"Turn {state.company.current_turn} | score {score.total_score} ({score.score_tier}) | "
         f"cash {format_money(state.company.cash_on_hand)} | grade {score.campaign_grade}"
@@ -1470,6 +1475,10 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
         headline=postmortem.headline,
         summary_line=summary_line,
         next_focus=postmortem.next_run_focus,
+        campaign_legacy_title=legacy.route_label if legacy is not None else "",
+        campaign_legacy_detail=(
+            f"{legacy.pressure_line} {legacy.mandate}" if legacy is not None else ""
+        ),
         badges=badges,
         findings=findings,
     )
@@ -1479,6 +1488,7 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
     """Build a compact review scene from one archived run summary."""
 
     findings: list[ReviewFindingViewModel] = []
+    legacy = build_campaign_path_legacy_from_labels(summary.scenario_id, summary.campaign_path)
     if summary.review_primary_area:
         findings.append(
             ReviewFindingViewModel(
@@ -1511,6 +1521,10 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
             f"grade {summary.campaign_grade} | cash {format_money(summary.final_cash)}"
         ),
         next_focus=summary.review_next_focus or "view_report",
+        campaign_legacy_title=legacy.route_label if legacy is not None else "",
+        campaign_legacy_detail=(
+            f"{legacy.pressure_line} {legacy.mandate}" if legacy is not None else ""
+        ),
         badges=tuple(
             dict.fromkeys(
                 (
