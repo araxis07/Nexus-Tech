@@ -2,7 +2,7 @@
 
 ## Current Level
 
-NEXUS TECH 0.285.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic reachability evidence across all three difficulties. The 2D shell has persistent local display/motion Settings, shared responsive frame geometry, and one numbered decision route from objective to turn resolution. Schema 25 adds frontend preferences independently of save slots while preserving the schema-24 archive migration and older saves.
+NEXUS TECH 0.286.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. The 2D shell has persistent local display/motion Settings, shared responsive frame geometry, and one numbered decision route from objective to turn resolution. Schema 25 adds frontend preferences independently of save slots while preserving the schema-24 archive migration and older saves.
 
 The project is approximately 80% of the way to a defensible beta. Core simulation, persistence, navigation, responsive 2D presentation, campaign progression, deterministic testing, and release automation exist. The remaining gap is observed usability and tuning with representative players, not another content expansion.
 
@@ -15,7 +15,10 @@ The project is approximately 80% of the way to a defensible beta. Core simulatio
 - Focus View is the default run surface. It presents one decision hierarchy with at most six controls and keeps the full ten-control dashboard available with `0` on windows at least 940 pixels wide.
 - Focus View now numbers Objective, Recommended Move, and End Turn Check; the recommendation includes urgency and skipped-action consequence, while the final card launches the existing preview/confirmation flow directly.
 - Featured campaign goals cannot end a run before both authored campaign decisions are recorded, preventing economically strong branches from skipping Act 3.
-- `campaign-readiness` exercises four authored paths per campaign across Builder, Standard, and Founder with shared seeds, optional Markdown detail, and an explicit boundary between mechanical automation and human evidence.
+- `campaign-readiness` defaults to each scenario's native goal, exercises four authored paths per campaign across Builder, Standard, and Founder with shared seeds, and reports goal completion/progress beside generic score and cash.
+- Portfolio Machine now starts on a viable three-product footing, declares Portfolio Empire as its native goal, and survives the 20-turn three-seed route matrix on every difficulty.
+- Category Leader now measures one established Growth-or-Mature offering with reputation and quality, so focused Technical Rebuild and Public Market runs can complete their native goal without building an unrelated portfolio.
+- Root CLI help now stays player-facing; `developer-tools` indexes hidden balance, audit, CI, and manual-QA commands while preserving direct invocation.
 - All 2D launch paths support `--ui-scale compact|standard|large` and `--contrast-mode standard|high` in addition to motion controls.
 - Title shortcuts now follow their visible order: `1` Continue, `2` New Game, `3` Guide, `4` Saves, `5` Archives, `6` Progress, `7` Settings, and `8` Quit.
 - Title and Pause Settings apply text scale, contrast, and motion live, persist locally, and follow scene transitions without altering gameplay save slots.
@@ -46,7 +49,7 @@ uv run pytest -q
 uv run pytest -q tests/test_beta_convergence.py
 uv run nexus-tech validate-content
 uv run nexus-tech beta-evidence
-uv run nexus-tech campaign-readiness --runs 1 --turns 12 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
+uv run nexus-tech campaign-readiness --runs 3 --turns 20 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
 uv run nexus-tech play-2d --scenario founder_journey --seed 283 --headless --max-frames 2 --window-size 820x620 --motion-mode reduced --ui-scale large --contrast-mode high
 uv run nexus-tech balance-audit --scenario founder_journey --scenario bootstrap_studio --scenario technical_rebuild --scenario portfolio_machine --scenario debt_crunch --scenario public_market_countdown --runs 1 --turns 12 --seed-base 28300
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 282 --viewport 820x620 --viewport 1280x720 --viewport 1440x900
@@ -67,7 +70,7 @@ Automation does not complete these gates:
 
 No test or generated report should mark these observations complete without a human session.
 
-Arbitrary key remapping is not part of 0.285.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
+Arbitrary key remapping is not part of 0.286.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
 
 ## Next Steps
 

@@ -1071,6 +1071,7 @@ def render_balance_matrix(console: Console, matrix: BalanceMatrixResult) -> None
 
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Scenario", style="bold")
+    table.add_column("Goal")
     table.add_column("Difficulty")
     table.add_column("Status")
     table.add_column("Avg Score", justify="right")
@@ -1164,7 +1165,7 @@ def render_campaign_readiness(console: Console, matrix: CampaignReadinessMatrix)
 
     evaluations = [evaluate_campaign_readiness_cell(cell) for cell in matrix.cells]
     overview = Table.grid(padding=(0, 1))
-    overview.add_row("Goal", matrix.campaign_goal_id.value)
+    overview.add_row("Goal Mode", matrix.goal_mode)
     overview.add_row("Runs / Route", str(matrix.runs_per_route))
     overview.add_row("Turns", str(matrix.turns))
     overview.add_row("Campaign Cells", str(len(matrix.cells)))
@@ -1181,19 +1182,23 @@ def render_campaign_readiness(console: Console, matrix: CampaignReadinessMatrix)
 
     table = Table(box=box.SIMPLE_HEAVY, expand=True)
     table.add_column("Scenario", style="bold")
+    table.add_column("Goal")
     table.add_column("Difficulty")
     table.add_column("Status")
     table.add_column("Routes", justify="right")
     table.add_column("Shutdowns", justify="right")
     table.add_column("Score Spread", justify="right")
+    table.add_column("Goal Spread", justify="right")
     for cell, evaluation in zip(matrix.cells, evaluations, strict=True):
         table.add_row(
             cell.scenario_id,
+            cell.campaign_goal_id.value,
             cell.difficulty_mode.value,
             evaluation.status,
             f"{cell.ready_routes}/{len(cell.routes)}",
             f"{cell.shutdowns}/{cell.total_runs}",
             f"{cell.score_spread:.1f}",
+            f"{cell.goal_progress_spread:.1f}",
         )
 
     console.print(Panel(overview, title="Campaign Readiness", border_style="cyan", expand=True))

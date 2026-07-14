@@ -12,7 +12,8 @@ from typing import Optional
 from uuid import UUID
 
 import typer
-from rich.console import Console
+from rich import box
+from rich.console import Console, Group
 from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
@@ -406,6 +407,11 @@ BALANCE_GOAL_OPTION = typer.Option(
     CampaignGoalId.PROFIT_MACHINE,
     "--goal",
     help="Campaign goal used during the balance run batch.",
+)
+CAMPAIGN_READINESS_GOAL_OPTION = typer.Option(
+    None,
+    "--goal",
+    help="Optional goal override. Omit it to audit each featured campaign's native goal.",
 )
 CSV_OUTPUT_OPTION = typer.Option(..., "--output", help="CSV path to write.")
 BALANCE_REPORT_OUTPUT_OPTION = typer.Option(..., "--output", help="Markdown path to write.")
@@ -6018,7 +6024,7 @@ def balance_audit_command(
 @app.command("campaign-readiness")
 def campaign_readiness_command(
     scenario: Optional[list[str]] = CAMPAIGN_READINESS_SCENARIOS_OPTION,
-    goal: CampaignGoalId = BALANCE_GOAL_OPTION,
+    goal: Optional[CampaignGoalId] = CAMPAIGN_READINESS_GOAL_OPTION,
     runs: int = typer.Option(1, "--runs", min=1, help="Runs per authored campaign route."),
     turns: int = typer.Option(
         12,
@@ -9098,6 +9104,65 @@ def menu_2d_command(
     )
 
 
+@app.command("developer-tools")
+def developer_tools_command(
+    search: Optional[str] = typer.Option(
+        None,
+        "--search",
+        help="Filter hidden development commands by name.",
+    ),
+    show_all: bool = typer.Option(
+        False,
+        "--all",
+        help="List every hidden development command instead of category examples.",
+    ),
+) -> None:
+    """Discover balance, audit, CI, and manual-QA commands without crowding player help."""
+
+    query = (search or "").strip().casefold()
+    command_names = [
+        name for name in _DEVELOPER_COMMAND_NAMES if not query or query in name.casefold()
+    ]
+    if query or show_all:
+        table = Table(box=box.SIMPLE_HEAVY, expand=True)
+        table.add_column("Command", style="bold cyan")
+        table.add_column("Area")
+        for name in command_names:
+            table.add_row(name, _developer_command_area(name))
+        console.print(
+            Panel(
+                table,
+                title=f"Developer Tools ({len(command_names)})",
+                border_style="cyan",
+                expand=True,
+            )
+        )
+        return
+
+    categories: dict[str, list[str]] = {}
+    for name in command_names:
+        categories.setdefault(_developer_command_area(name), []).append(name)
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Area", style="bold")
+    table.add_column("Count", justify="right")
+    table.add_column("Examples")
+    for area, names in sorted(categories.items()):
+        table.add_row(area, str(len(names)), ", ".join(names[:3]))
+    console.print(
+        Panel(
+            Group(
+                table,
+                "",
+                "[dim]Use `nexus-tech developer-tools --all` or `--search TEXT`. "
+                "Hidden commands remain directly invocable and available to CI.[/dim]",
+            ),
+            title="Developer Tool Index",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+
+
 def start_new_game(
     company_name: str | None,
     product_name: str | None,
@@ -11405,6 +11470,69 @@ def _build_locked_campaign_start_ids(*, db_path: Path) -> set[str]:
             db_path=db_path,
         )
     }
+
+
+_PLAYER_FACING_COMMANDS = frozenset(
+    {
+        "new-game",
+        "play-2d",
+        "menu-2d",
+        "load-game",
+        "load-game-2d",
+        "continue-last-game",
+        "continue-last-game-2d",
+        "list-scenarios",
+        "list-campaign-starts",
+        "list-templates",
+        "list-goals",
+        "list-rivals",
+        "guide",
+        "tutorial",
+        "glossary",
+        "list-saves",
+        "list-archives",
+        "compare-archives",
+        "show-progression",
+        "list-unlocks",
+        "check-saves",
+        "doctor",
+        "rename-save",
+        "delete-save",
+        "developer-tools",
+    }
+)
+
+
+def _developer_command_area(command_name: str) -> str:
+    if "animation-playtest" in command_name:
+        return "Animation QA"
+    if "onboarding-visible" in command_name:
+        return "Onboarding QA"
+    if command_name.startswith(("audit-2d", "validate-2d", "prepare-2d")):
+        return "2D Automated QA"
+    if "balance" in command_name or command_name == "campaign-readiness":
+        return "Balance & Campaigns"
+    if command_name.startswith(("validate-", "audit-", "beta-evidence")):
+        return "Release Validation"
+    if command_name.startswith(("list-", "export-")):
+        return "Content Inspection"
+    return "Internal & Legacy"
+
+
+def _hide_developer_commands() -> tuple[str, ...]:
+    hidden_names: list[str] = []
+    for command in app.registered_commands:
+        command_name = command.name or command.callback.__name__.removesuffix("_command").replace(
+            "_", "-"
+        )
+        if command_name in _PLAYER_FACING_COMMANDS:
+            continue
+        command.hidden = True
+        hidden_names.append(command_name)
+    return tuple(sorted(hidden_names))
+
+
+_DEVELOPER_COMMAND_NAMES = _hide_developer_commands()
 
 
 def main() -> None:

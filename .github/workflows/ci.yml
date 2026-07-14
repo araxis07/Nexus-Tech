@@ -52,8 +52,8 @@ jobs:
       - name: Check featured campaign branch readiness
         run: >
           uv run nexus-tech campaign-readiness
-          --runs 1
-          --turns 12
+          --runs 3
+          --turns 20
           --seed-base 28500
           --output /tmp/nexus-tech-campaign-readiness.md
 

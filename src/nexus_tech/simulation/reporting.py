@@ -234,8 +234,11 @@ def calculate_run_badges(
 def check_victory(state: GameState) -> str | None:
     """Return a victory reason when the company has reached durable scale."""
 
+    campaign_victory = check_campaign_goal_victory(state)
+    if campaign_victory is not None:
+        return campaign_victory
     if state.company.current_turn < BALANCE.victory_min_turn:
-        return check_campaign_goal_victory(state)
+        return None
 
     score = calculate_run_score(state)
     if (
@@ -252,7 +255,7 @@ def check_victory(state: GameState) -> str | None:
             "You built a durable software company with enough traction, runway, "
             "and portfolio depth to count as a real winner."
         )
-    return check_campaign_goal_victory(state)
+    return None
 
 
 def get_total_users(state: GameState) -> int:

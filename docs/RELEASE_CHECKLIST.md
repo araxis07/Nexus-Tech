@@ -21,7 +21,7 @@ uv run nexus-tech --version
 uv run nexus-tech doctor
 uv run nexus-tech validate-content
 uv run nexus-tech beta-evidence
-uv run nexus-tech campaign-readiness --runs 1 --turns 12 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
+uv run nexus-tech campaign-readiness --runs 3 --turns 20 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
 uv run nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced
 uv run nexus-tech play-2d --scenario founder_journey --seed 283 --headless --max-frames 2 --window-size 820x620 --motion-mode reduced --ui-scale large --contrast-mode high
 uv run nexus-tech menu-2d --headless --max-frames 2 --motion-mode reduced

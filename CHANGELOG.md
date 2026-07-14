@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.286.0 - 2026-07-15
+
+- Changed campaign readiness to audit each featured scenario with its native goal by default and report per-route goal completions, normalized progress, and meaningful score/cash/progress dominance
+- Made Portfolio Machine a real Portfolio Empire campaign, corrected its structurally losing opening, and added a 20-turn three-seed viability regression across every difficulty and authored route
+- Made Category Leader achievable for focused one-product campaigns by measuring an established Growth-or-Mature offering alongside reputation and quality, with campaign-goal victory taking precedence over the generic win copy
+- Rebalanced dominant Founder, Bootstrap, Technical Rebuild, Debt Crunch, and Public Market campaign choices while preserving distinct growth, control, liquidity, and product-quality trade-offs
+- Reduced root CLI help to player-facing commands and added `developer-tools` for discovering hidden balance, audit, CI, and manual-QA commands without removing direct invocation
+- Kept the release classified as late alpha until the existing six-session human usability, control, readability, and campaign-comprehension gates are completed
+
 ## 0.285.0 - 2026-07-14
 
 - Reframed the 2D Focus View as a numbered Objective, Recommended Move, and End Turn Check route with urgency, consequence, correct risk color, and a directly clickable resolution card

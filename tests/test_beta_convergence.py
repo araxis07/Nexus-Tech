@@ -152,10 +152,12 @@ def test_campaign_readiness_exercises_every_founder_route_across_difficulties() 
 
     assert len(matrix.cells) == len(DifficultyMode)
     assert matrix.route_count == 12
+    assert matrix.goal_mode == "scenario_native"
     assert matrix.automated_gate_passed is True
     assert matrix.manual_signoff_required is True
     assert all(cell.ready_routes == 4 for cell in matrix.cells)
     assert all(cell.shutdowns == 0 for cell in matrix.cells)
+    assert all(cell.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE for cell in matrix.cells)
     assert all(evaluate_campaign_readiness_cell(cell).status == "pass" for cell in matrix.cells)
     comparison_cell = replace(
         matrix.cells[0],
@@ -173,7 +175,25 @@ def test_campaign_readiness_exercises_every_founder_route_across_difficulties() 
     assert evaluate_campaign_readiness_cell(comparison_cell).status == "watch"
     report = format_campaign_readiness_markdown(matrix)
     assert "Authored routes exercised: `12`" in report
+    assert "Goal mode: `scenario_native`" in report
     assert "Human playtest signoff: `required`" in report
+
+
+def test_campaign_readiness_uses_native_goals_and_keeps_portfolio_routes_viable() -> None:
+    matrix = run_campaign_readiness_matrix(
+        scenario_ids=["portfolio_machine"],
+        runs_per_route=3,
+        turns=20,
+        seed_base=28800,
+    )
+
+    assert matrix.goal_mode == "scenario_native"
+    assert len(matrix.cells) == len(DifficultyMode)
+    assert all(cell.campaign_goal_id is CampaignGoalId.PORTFOLIO_EMPIRE for cell in matrix.cells)
+    assert all(cell.ready_routes == 4 for cell in matrix.cells)
+    assert all(cell.shutdowns == 0 for cell in matrix.cells)
+    assert sum(route.goal_completions for cell in matrix.cells for route in cell.routes) > 0
+    assert all(evaluate_campaign_readiness_cell(cell).status == "pass" for cell in matrix.cells)
 
 
 def test_featured_campaign_goal_waits_for_both_authored_decisions() -> None:

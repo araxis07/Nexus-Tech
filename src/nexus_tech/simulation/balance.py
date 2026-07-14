@@ -958,12 +958,12 @@ class BalanceConfig:
     campaign_goal_profit_machine_debt_cap: Decimal = Decimal("4500.00")
     campaign_goal_portfolio_empire_min_turn: int = 10
     campaign_goal_portfolio_empire_product_target: int = 3
-    campaign_goal_portfolio_empire_user_target: int = 260
+    campaign_goal_portfolio_empire_user_target: int = 180
     campaign_goal_portfolio_empire_segment_target: int = 3
     campaign_goal_category_leader_min_turn: int = 10
     campaign_goal_category_leader_reputation_target: int = 76
     campaign_goal_category_leader_quality_target: int = 68
-    campaign_goal_category_leader_mature_product_target: int = 2
+    campaign_goal_category_leader_established_product_target: int = 1
 
     event_trigger_min_turn: int = 2
     event_trigger_chance_percent: int = 42

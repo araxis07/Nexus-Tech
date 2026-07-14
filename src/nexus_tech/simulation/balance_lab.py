@@ -727,6 +727,7 @@ def _choose_action(state: GameState) -> PlannedAction:
         )
 
     strongest_product = _pick_primary_product(state)
+    growth_product = _pick_growth_product(state)
     worst_product = _pick_worst_product(state)
     operations = calculate_operations_summary(
         state.products,
@@ -918,7 +919,7 @@ def _choose_action(state: GameState) -> PlannedAction:
         )
     return PlannedAction(
         TurnAction.MARKET_PRODUCT,
-        ActionContext(target_product_id=strongest_product.id),
+        ActionContext(target_product_id=growth_product.id),
     )
 
 
@@ -1120,6 +1121,23 @@ def _pick_primary_product(state: GameState) -> Product:
         key=lambda product: (
             product.user_count + product.market_fit + product.quality,
             -product.bug_level,
+        ),
+    )
+
+
+def _pick_growth_product(state: GameState) -> Product:
+    """Keep portfolio-goal products viable instead of feeding only the flagship."""
+
+    active_products = [product for product in state.products if product.is_active]
+    if state.campaign_goal_id is not CampaignGoalId.PORTFOLIO_EMPIRE:
+        return _pick_primary_product(state)
+    return min(
+        active_products,
+        key=lambda product: (
+            product.user_count,
+            product.acquisition_rate - product.churn_rate,
+            product.market_fit,
+            product.quality,
         ),
     )
 

@@ -59,7 +59,7 @@ _CAMPAIGN_GOALS = {
             "Win on trust and product quality until the company becomes a market reference point."
         ),
         success_text=(
-            "You earned category-leader status through product quality, mature offerings, "
+            "You earned category-leader status through product quality, an established offering, "
             "and a brand the market now trusts."
         ),
     ),
@@ -175,8 +175,10 @@ def _evaluate_category_leader(
     definition: CampaignGoalDefinition,
 ) -> CampaignGoalProgress:
     active_products = [product for product in state.products if product.is_active]
-    mature_products = sum(
-        1 for product in active_products if product.lifecycle_stage is LifecycleStage.MATURE
+    established_products = sum(
+        1
+        for product in active_products
+        if product.lifecycle_stage in {LifecycleStage.GROWTH, LifecycleStage.MATURE}
     )
     average_quality = (
         sum(product.quality for product in active_products) // len(active_products)
@@ -186,7 +188,7 @@ def _evaluate_category_leader(
     completed = (
         state.company.current_turn >= BALANCE.campaign_goal_category_leader_min_turn
         and state.company.reputation >= BALANCE.campaign_goal_category_leader_reputation_target
-        and mature_products >= BALANCE.campaign_goal_category_leader_mature_product_target
+        and established_products >= BALANCE.campaign_goal_category_leader_established_product_target
         and average_quality >= BALANCE.campaign_goal_category_leader_quality_target
         and _featured_campaign_path_complete(state)
     )
@@ -200,8 +202,9 @@ def _evaluate_category_leader(
                 f"{state.company.reputation}/{BALANCE.campaign_goal_category_leader_reputation_target}"
             ),
             (
-                "Mature products: "
-                f"{mature_products}/{BALANCE.campaign_goal_category_leader_mature_product_target}"
+                "Established products: "
+                f"{established_products}/"
+                f"{BALANCE.campaign_goal_category_leader_established_product_target}"
             ),
             (
                 "Avg quality: "

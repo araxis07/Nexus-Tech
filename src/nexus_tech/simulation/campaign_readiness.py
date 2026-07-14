@@ -6,8 +6,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from itertools import product
 
-from nexus_tech.domain.models import CampaignGoalId, DifficultyMode, GameState
+from nexus_tech.content.loader import get_scenario
+from nexus_tech.domain.models import CampaignGoalId, DifficultyMode, GameState, LifecycleStage
+from nexus_tech.domain.money import quantize_money
+from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import run_autoplay
+from nexus_tech.simulation.campaign import evaluate_campaign_goal
 from nexus_tech.simulation.campaign_decisions import (
     get_campaign_path_labels,
     list_campaign_decisions,
@@ -18,6 +22,7 @@ from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.reporting import calculate_run_score
 
 CAMPAIGN_ROUTE_SCORE_SPREAD_WATCH = 45.0
+CAMPAIGN_ROUTE_GOAL_PROGRESS_SPREAD_WATCH = 12.0
 
 
 @dataclass(frozen=True)
@@ -48,9 +53,11 @@ class CampaignRouteOutcome:
     act_three_survivors: int
     shutdowns: int
     victories: int
+    goal_completions: int
     average_turns: float
     average_score: float
     average_cash: Decimal
+    average_goal_progress: float
 
     @property
     def mechanically_ready(self) -> bool:
@@ -65,6 +72,7 @@ class CampaignReadinessCell:
 
     scenario_id: str
     difficulty_mode: DifficultyMode
+    campaign_goal_id: CampaignGoalId
     routes: tuple[CampaignRouteOutcome, ...]
 
     @property
@@ -90,6 +98,31 @@ class CampaignReadinessCell:
         scores = [route.average_score for route in self.routes]
         return max(scores) - min(scores)
 
+    @property
+    def goal_progress_spread(self) -> float:
+        if not self.routes:
+            return 0.0
+        progress = [route.average_goal_progress for route in self.routes]
+        return max(progress) - min(progress)
+
+    @property
+    def dominant_route(self) -> CampaignRouteOutcome | None:
+        """Return a route that leads score, cash, and goal progress at once."""
+
+        if not self.routes:
+            return None
+        best_score = max(route.average_score for route in self.routes)
+        best_cash = max(route.average_cash for route in self.routes)
+        best_progress = max(route.average_goal_progress for route in self.routes)
+        leaders = [
+            route
+            for route in self.routes
+            if route.average_score == best_score
+            and route.average_cash == best_cash
+            and route.average_goal_progress == best_progress
+        ]
+        return leaders[0] if len(leaders) == 1 else None
+
 
 @dataclass(frozen=True)
 class CampaignReadinessEvaluation:
@@ -103,7 +136,7 @@ class CampaignReadinessEvaluation:
 class CampaignReadinessMatrix:
     """Automated branch evidence that does not replace human playtest signoff."""
 
-    campaign_goal_id: CampaignGoalId
+    campaign_goal_id: CampaignGoalId | None
     runs_per_route: int
     turns: int
     seed_base: int
@@ -113,6 +146,14 @@ class CampaignReadinessMatrix:
     @property
     def route_count(self) -> int:
         return sum(len(cell.routes) for cell in self.cells)
+
+    @property
+    def goal_mode(self) -> str:
+        """Return the explicit override or the scenario-native audit mode."""
+
+        if self.campaign_goal_id is None:
+            return "scenario_native"
+        return self.campaign_goal_id.value
 
     @property
     def automated_gate_passed(self) -> bool:
@@ -153,7 +194,7 @@ def list_campaign_routes(scenario_id: str) -> tuple[CampaignRouteDefinition, ...
 def run_campaign_readiness_matrix(
     *,
     scenario_ids: list[str] | None = None,
-    campaign_goal_id: CampaignGoalId = CampaignGoalId.PROFIT_MACHINE,
+    campaign_goal_id: CampaignGoalId | None = None,
     runs_per_route: int = 1,
     turns: int = 12,
     seed_base: int = 28500,
@@ -174,6 +215,7 @@ def run_campaign_readiness_matrix(
         routes = list_campaign_routes(scenario_id)
         if not routes:
             raise ValueError(f"Scenario {scenario_id!r} is not a featured two-decision campaign.")
+        scenario_goal_id = campaign_goal_id or get_scenario(scenario_id).campaign_goal_id
         for difficulty_mode in DifficultyMode:
             outcomes: list[CampaignRouteOutcome] = []
             cell_seed_base = seed_base + seed_offset
@@ -183,7 +225,7 @@ def run_campaign_readiness_matrix(
                     state = create_new_game(
                         scenario_id=scenario_id,
                         difficulty_mode=difficulty_mode,
-                        campaign_goal_id=campaign_goal_id,
+                        campaign_goal_id=scenario_goal_id,
                     )
                     state = run_autoplay(
                         state,
@@ -200,6 +242,7 @@ def run_campaign_readiness_matrix(
                     for state in states
                 )
                 scores = [calculate_run_score(state).total_score for state in states]
+                goal_progress = [_calculate_goal_progress_percent(state) for state in states]
                 outcomes.append(
                     CampaignRouteOutcome(
                         route_id=route.route_id,
@@ -209,17 +252,21 @@ def run_campaign_readiness_matrix(
                         act_three_survivors=act_three_survivors,
                         shutdowns=sum(state.company.game_over for state in states),
                         victories=sum(state.victory_achieved for state in states),
+                        goal_completions=sum(
+                            evaluate_campaign_goal(state).completed for state in states
+                        ),
                         average_turns=(
                             sum(state.company.current_turn for state in states) / len(states)
                         ),
                         average_score=sum(scores) / len(scores),
-                        average_cash=(
+                        average_cash=quantize_money(
                             sum(
                                 (state.company.cash_on_hand for state in states),
                                 Decimal("0.00"),
                             )
                             / Decimal(len(states))
                         ),
+                        average_goal_progress=sum(goal_progress) / len(goal_progress),
                     )
                 )
             seed_offset += max(1, runs_per_route) * 100
@@ -227,6 +274,7 @@ def run_campaign_readiness_matrix(
                 CampaignReadinessCell(
                     scenario_id=scenario_id,
                     difficulty_mode=difficulty_mode,
+                    campaign_goal_id=scenario_goal_id,
                     routes=tuple(outcomes),
                 )
             )
@@ -266,17 +314,25 @@ def evaluate_campaign_readiness_cell(
             "watch",
             f"All routes reached Act 3, but {cell.shutdowns}/{cell.total_runs} run(s) shut down.",
         )
-    if cell.runs_per_route >= 3 and cell.score_spread > CAMPAIGN_ROUTE_SCORE_SPREAD_WATCH:
+    dominant_route = cell.dominant_route
+    if (
+        cell.runs_per_route >= 3
+        and dominant_route is not None
+        and (
+            cell.score_spread > CAMPAIGN_ROUTE_SCORE_SPREAD_WATCH
+            or cell.goal_progress_spread > CAMPAIGN_ROUTE_GOAL_PROGRESS_SPREAD_WATCH
+        )
+    ):
         return CampaignReadinessEvaluation(
             "watch",
             (
-                f"All routes are reachable; score spread {cell.score_spread:.1f} exceeds the "
-                f"{CAMPAIGN_ROUTE_SCORE_SPREAD_WATCH:.1f} review threshold."
+                f"{dominant_route.route_label} leads score, cash, and goal progress; "
+                f"review spreads {cell.score_spread:.1f}/{cell.goal_progress_spread:.1f}."
             ),
         )
     return CampaignReadinessEvaluation(
         "pass",
-        "All four routes recorded both decisions and survived through Act 3.",
+        "All routes survived Act 3 without one route leading every measured outcome.",
     )
 
 
@@ -287,7 +343,7 @@ def format_campaign_readiness_markdown(matrix: CampaignReadinessMatrix) -> str:
     lines = [
         "# NEXUS TECH Campaign Readiness",
         "",
-        f"- Goal: `{matrix.campaign_goal_id.value}`",
+        f"- Goal mode: `{matrix.goal_mode}`",
         f"- Runs per route: `{matrix.runs_per_route}`",
         f"- Max turns: `{matrix.turns}`",
         f"- Seed base: `{matrix.seed_base}`",
@@ -298,15 +354,20 @@ def format_campaign_readiness_markdown(matrix: CampaignReadinessMatrix) -> str:
         "",
         "## Cell Summary",
         "",
-        "| Scenario | Difficulty | Status | Ready Routes | Shutdowns | Score Spread | Summary |",
-        "| --- | --- | --- | ---: | ---: | ---: | --- |",
+        (
+            "| Scenario | Goal | Difficulty | Status | Ready Routes | Shutdowns | "
+            "Score Spread | Goal Spread | Summary |"
+        ),
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
     ]
     for cell, evaluation in zip(matrix.cells, evaluations, strict=True):
         lines.append(
             "| "
-            f"{cell.scenario_id} | {cell.difficulty_mode.value} | {evaluation.status} | "
+            f"{cell.scenario_id} | {cell.campaign_goal_id.value} | "
+            f"{cell.difficulty_mode.value} | {evaluation.status} | "
             f"{cell.ready_routes}/{len(cell.routes)} | {cell.shutdowns}/{cell.total_runs} | "
-            f"{cell.score_spread:.1f} | {evaluation.summary} |"
+            f"{cell.score_spread:.1f} | {cell.goal_progress_spread:.1f} | "
+            f"{evaluation.summary} |"
         )
 
     lines.extend(
@@ -315,19 +376,22 @@ def format_campaign_readiness_markdown(matrix: CampaignReadinessMatrix) -> str:
             "## Route Detail",
             "",
             (
-                "| Scenario | Difficulty | Route | Full Paths | Act 3 Survivors | "
-                "Shutdowns | Avg Score | Avg Cash |"
+                "| Scenario | Goal | Difficulty | Route | Full Paths | Act 3 Survivors | "
+                "Shutdowns | Goal Completions | Avg Score | Avg Cash | Goal Progress |"
             ),
-            "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
+            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
     for cell in matrix.cells:
         for route in cell.routes:
             lines.append(
                 "| "
-                f"{cell.scenario_id} | {cell.difficulty_mode.value} | {route.route_label} | "
+                f"{cell.scenario_id} | {cell.campaign_goal_id.value} | "
+                f"{cell.difficulty_mode.value} | {route.route_label} | "
                 f"{route.full_path_runs}/{route.runs} | {route.act_three_survivors}/{route.runs} | "
-                f"{route.shutdowns} | {route.average_score:.1f} | {route.average_cash} |"
+                f"{route.shutdowns} | {route.goal_completions}/{route.runs} | "
+                f"{route.average_score:.1f} | {route.average_cash} | "
+                f"{route.average_goal_progress:.1f}% |"
             )
 
     lines.extend(
@@ -355,3 +419,50 @@ def _matches_route_path(state: GameState, option_labels: tuple[str, ...]) -> boo
         path_label.endswith(option_label)
         for path_label, option_label in zip(path_labels, option_labels, strict=True)
     )
+
+
+def _calculate_goal_progress_percent(state: GameState) -> float:
+    """Normalize the active campaign goal into a comparable 0-100 signal."""
+
+    if state.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE:
+        profitable_streak = 0
+        for entry in reversed(state.turn_history):
+            if entry.net_cash_flow <= 0:
+                break
+            profitable_streak += 1
+        debt_progress = (
+            1.0
+            if state.finance.debt_principal <= BALANCE.campaign_goal_profit_machine_debt_cap
+            else float(BALANCE.campaign_goal_profit_machine_debt_cap / state.finance.debt_principal)
+        )
+        ratios = (
+            profitable_streak / BALANCE.campaign_goal_profit_machine_streak_target,
+            float(state.company.cash_on_hand / BALANCE.campaign_goal_profit_machine_cash_target),
+            debt_progress,
+        )
+    elif state.campaign_goal_id is CampaignGoalId.PORTFOLIO_EMPIRE:
+        active_products = [product for product in state.products if product.is_active]
+        total_users = sum(product.user_count for product in active_products)
+        segment_count = len({product.target_segment for product in active_products})
+        ratios = (
+            len(active_products) / BALANCE.campaign_goal_portfolio_empire_product_target,
+            total_users / BALANCE.campaign_goal_portfolio_empire_user_target,
+            segment_count / BALANCE.campaign_goal_portfolio_empire_segment_target,
+        )
+    else:
+        active_products = [product for product in state.products if product.is_active]
+        established_products = sum(
+            product.lifecycle_stage in {LifecycleStage.GROWTH, LifecycleStage.MATURE}
+            for product in active_products
+        )
+        average_quality = (
+            sum(product.quality for product in active_products) / len(active_products)
+            if active_products
+            else 0.0
+        )
+        ratios = (
+            state.company.reputation / BALANCE.campaign_goal_category_leader_reputation_target,
+            established_products / BALANCE.campaign_goal_category_leader_established_product_target,
+            average_quality / BALANCE.campaign_goal_category_leader_quality_target,
+        )
+    return 100.0 * sum(min(1.0, max(0.0, ratio)) for ratio in ratios) / len(ratios)

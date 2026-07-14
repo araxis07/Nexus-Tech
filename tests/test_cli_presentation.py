@@ -307,6 +307,20 @@ def test_cli_help_lists_core_commands_and_debug_flag() -> None:
     assert "--debug" in option_names
     assert "--version" in option_names
 
+    help_result = runner.invoke(app, ["--help"])
+    assert help_result.exit_code == 0
+    assert "developer-tools" in help_result.output
+    assert "campaign-readiness" not in help_result.output
+    assert "animation-playtest-plan" not in help_result.output
+
+
+def test_developer_tool_index_keeps_hidden_commands_discoverable() -> None:
+    result = runner.invoke(app, ["developer-tools", "--search", "campaign"])
+
+    assert result.exit_code == 0
+    assert "campaign-readiness" in result.output
+    assert "Balance & Campaigns" in result.output
+
 
 def test_root_command_dispatches_to_start_new_game(
     monkeypatch: MonkeyPatch,
@@ -787,9 +801,11 @@ def test_campaign_readiness_command_renders_and_exports_automated_boundary(
             act_three_survivors=1,
             shutdowns=0,
             victories=0,
+            goal_completions=0,
             average_turns=12.0,
             average_score=180.0 + index,
             average_cash=Decimal("12000.00"),
+            average_goal_progress=72.0 + index,
         )
         for index in range(4)
     )
@@ -802,6 +818,7 @@ def test_campaign_readiness_command_renders_and_exports_automated_boundary(
             CampaignReadinessCell(
                 scenario_id="founder_journey",
                 difficulty_mode=DifficultyMode.STANDARD,
+                campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
                 routes=routes,
             ),
         ),
