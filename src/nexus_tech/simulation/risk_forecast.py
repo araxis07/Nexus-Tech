@@ -174,8 +174,10 @@ def build_risk_forecast(state: GameState) -> RiskForecastSummary:
             )
         )
 
-    if pressure.path_gate_command_alert != TurnAction.VIEW_STATUS.value and (
-        "blocked" in pressure.path_gate_alert or "action:" in pressure.path_gate_alert
+    if (
+        state.company.current_turn >= 10
+        and pressure.path_gate_command_alert != TurnAction.VIEW_STATUS.value
+        and ("blocked" in pressure.path_gate_alert or "action:" in pressure.path_gate_alert)
     ):
         candidates.append(
             (

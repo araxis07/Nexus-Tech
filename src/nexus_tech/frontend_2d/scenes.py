@@ -8444,7 +8444,8 @@ class RunScene(BaseScene):
                     surface,
                     self.fonts.small,
                     (
-                        f"1 Objective: {brief.objective} | "
+                        f"1 Objective: {brief.objective} "
+                        f"(Plan {brief.plan_progress_label.split(' | ', maxsplit=1)[0]}) | "
                         f"2 Next: {brief.command_label} ({brief.urgency_label}) | "
                         f"3 End Turn: {brief.end_turn_label}"
                     ),
@@ -8523,7 +8524,7 @@ class RunScene(BaseScene):
             objective_rect,
             eyebrow="1 / ACT OBJECTIVE",
             headline=brief.objective_label,
-            detail=brief.objective,
+            detail=f"{brief.objective} Plan: {brief.plan_progress_label}.",
             accent=SELECTION,
         )
         self._draw_focus_card(
@@ -8541,7 +8542,7 @@ class RunScene(BaseScene):
                 risk_rect,
                 eyebrow="3 / END TURN CHECK",
                 headline=brief.end_turn_label,
-                detail=brief.end_turn_detail,
+                detail=f"{brief.end_turn_detail} Later: {brief.later_label}.",
                 accent=tone_color(brief.end_turn_tone),
                 click_kind="command" if brief.end_turn_enabled else None,
                 click_payload=(TurnAction.END_TURN.value if brief.end_turn_enabled else ""),
@@ -9066,7 +9067,10 @@ class RunScene(BaseScene):
                 f"Actions Left: {self.state.action_points_remaining}"
             )
             more_hint = " | 0 More opens every action" if self._window_width() >= 940 else ""
-            hint = f"Why: {brief.command_detail} | End Turn: {brief.end_turn_label}{more_hint}"
+            hint = (
+                f"Why: {brief.command_detail} | End Turn: {brief.end_turn_label} | "
+                f"Later: {brief.later_label}{more_hint}"
+            )
         else:
             primary = (
                 f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
@@ -9249,18 +9253,25 @@ class RunScene(BaseScene):
                     return f"Hover: focus {product.name} and route product actions there."
         if target.kind in {"command", "panel_action", "text_command"}:
             reason = self._command_disabled_reason(target.payload)
+            command_label = get_action_label(target.payload)
             if reason is not None:
-                return f"Hover: `{target.payload}` is blocked because {reason}"
+                return f"Hover: {command_label} is blocked because {reason}"
+            if target.payload == TurnAction.END_TURN.value:
+                brief = self._view_model.decision_brief
+                return (
+                    f"Hover: {brief.end_turn_label}. {brief.end_turn_detail} "
+                    f"Later: {brief.later_label} - {brief.later_detail}"
+                )
             if target.kind == "panel_action" and self._deep_panel_key == "endgame":
                 workspace_key = self._workspace_panel_key_for_command(target.payload)
                 inspector_key = self._inspector_key_for_command(target.payload)
                 destination = inspector_key or workspace_key
                 if destination is not None:
                     return (
-                        f"Hover: run `{target.payload}` from the cockpit and hand off into "
+                        f"Hover: run {command_label} from the cockpit and hand off into "
                         f"{self._panel_display_name(destination)}."
                     )
-            return f"Hover: run `{target.payload}` now."
+            return f"Hover: run {command_label} now."
         if target.kind == "panel":
             return f"Hover: open the {target.payload} deep-dive panel."
         if target.kind == "open_panel_inspector":

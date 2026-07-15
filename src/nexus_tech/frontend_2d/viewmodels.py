@@ -34,6 +34,7 @@ from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.run_phase import get_run_phase
+from nexus_tech.simulation.strategic_rhythm import StrategicRhythm, build_strategic_rhythm
 from nexus_tech.simulation.turn_coach import build_turn_coach
 
 
@@ -93,6 +94,11 @@ class DecisionBriefViewModel:
 
     objective_label: str
     objective: str
+    plan_label: str
+    plan_progress_label: str
+    plan_detail: str
+    plan_progress: float
+    plan_tone: str
     command: str
     command_label: str
     command_detail: str
@@ -102,6 +108,8 @@ class DecisionBriefViewModel:
     end_turn_detail: str
     end_turn_tone: str
     end_turn_enabled: bool
+    later_label: str
+    later_detail: str
 
 
 @dataclass(frozen=True)
@@ -323,6 +331,12 @@ def build_game_view_model(
     coach = build_turn_coach(state)
     forecast = build_risk_forecast(state)
     preview = build_end_turn_preview(state)
+    rhythm = build_strategic_rhythm(
+        state,
+        coach=coach,
+        forecast=forecast,
+        preview=preview,
+    )
     first_archive = build_first_archive_mission(state)
     selected_product = _pick_selected_product(state.products, selected_product_id)
     total_users = sum(product.user_count for product in state.products if product.is_active)
@@ -391,6 +405,11 @@ def build_game_view_model(
             first_archive.step_label,
             "success" if first_archive.complete else "info",
         ),
+        SnapshotChipViewModel(
+            "Plan",
+            rhythm.plan_progress_label.split(" | ", maxsplit=1)[0],
+            rhythm.plan_tone,
+        ),
         SnapshotChipViewModel("Team", str(len(state.employees)), "info"),
         SnapshotChipViewModel(
             "Idle",
@@ -436,7 +455,6 @@ def build_game_view_model(
         f"{item.area}: {get_action_presentation(item.command).label} ({item.severity})"
         for item in forecast.items[:3]
     ) or ("No elevated operating risk is flashing right now.",)
-    primary_action = get_action_presentation(coach.primary_command)
     campaign_chapter_label = (
         journey_progress.act_label if journey_progress is not None else phase.title
     )
@@ -455,15 +473,9 @@ def build_game_view_model(
         if campaign_path_labels
         else base_campaign_lens
     )
-    decision_brief = _build_decision_brief(
-        campaign_chapter_label=campaign_chapter_label,
-        campaign_objective=campaign_objective,
-        coach_lines=coach_lines,
-        fallback_command=coach.primary_command,
-        fallback_label=primary_action.label,
-        preview=preview,
-    )
+    decision_brief = _build_decision_brief(rhythm)
     header_note = (
+        f"Plan {decision_brief.plan_progress_label.split(' | ', maxsplit=1)[0]} | "
         f"Next: {decision_brief.command_label} ({decision_brief.urgency_label}) | "
         f"End Turn: {decision_brief.end_turn_label}"
     )
@@ -478,9 +490,9 @@ def build_game_view_model(
         campaign_objective=campaign_objective,
         campaign_lens=campaign_lens,
         score_label=f"{score.total_score} ({score.score_tier})",
-        market_label=state.market_cycle.value,
-        roadmap_label=state.roadmap_focus.value,
-        budget_label=state.quarter_plan.budget_stance.value,
+        market_label=state.market_cycle.value.replace("_", " ").title(),
+        roadmap_label=state.roadmap_focus.value.replace("_", " ").title(),
+        budget_label=state.quarter_plan.budget_stance.value.replace("_", " ").title(),
         action_points_label=str(state.action_points_remaining),
         watch_for=difficulty.watch_for,
         header_note=header_note,
@@ -525,18 +537,11 @@ def build_turn_summary_view_model(
     current_readiness = calculate_endgame_readiness(resolution.state, resolution.run_score)
     previous_pressure = calculate_endgame_pressure(previous_state, previous_readiness)
     current_pressure = calculate_endgame_pressure(resolution.state, current_readiness)
-    previous_outcome = evaluate_exit_outcome(previous_state)
-    current_outcome = evaluate_exit_outcome(resolution.state, resolution.run_score)
     previous_blocked_paths = sum(
         1 for gate in previous_pressure.path_outcome_gates if "blocked" in gate.lower()
     )
     current_blocked_paths = sum(
         1 for gate in current_pressure.path_outcome_gates if "blocked" in gate.lower()
-    )
-    path_shift = (
-        f"{previous_outcome.title} -> {current_outcome.title}"
-        if previous_outcome.title != current_outcome.title
-        else current_outcome.title
     )
     footer = "Press Space or click Continue to return to the run."
     if resolution.pending_event is not None:
@@ -643,7 +648,7 @@ def build_turn_summary_view_model(
     reset_risk_delta = _signed_int(
         current_pressure.board_reset_risk - previous_pressure.board_reset_risk
     )
-    focus = get_action_presentation(current_pressure.path_gate_command_alert)
+    next_rhythm = build_strategic_rhythm(resolution.state)
     product_cause = (
         (
             f"{product_lines[0].name}: {product_lines[0].detail}; "
@@ -659,7 +664,7 @@ def build_turn_summary_view_model(
         footer=footer,
         phase_labels=("Cash + Demand", "Operating Pressure", "Strategic Outlook"),
         strategic_headline=(
-            f"{path_shift} | {current_pressure.dominant_pressure.replace('_', ' ')}"
+            f"{next_rhythm.objective_label} | Plan {next_rhythm.plan_progress_label}"
         ),
         cause_lines=(
             (
@@ -688,12 +693,12 @@ def build_turn_summary_view_model(
                 f"Blocked gates {previous_blocked_paths} -> {current_blocked_paths} | "
                 f"board reset risk {reset_risk_delta}"
             ),
-            f"Next move: {focus.label} ({focus.family_label})",
-            humanize_action_text(current_pressure.path_gate_alert),
+            f"Next move: {next_rhythm.command_label} ({next_rhythm.urgency_label})",
+            f"Later: {next_rhythm.later_label} | {next_rhythm.later_detail}",
         ),
-        focus_command=current_pressure.path_gate_command_alert,
-        focus_label=focus.label,
-        focus_detail=humanize_action_text(current_pressure.recommendation),
+        focus_command=next_rhythm.command,
+        focus_label=next_rhythm.command_label,
+        focus_detail=next_rhythm.command_detail,
         metrics=metrics,
         product_lines=product_lines,
     )
@@ -2868,56 +2873,26 @@ def _recommendation_urgency_label(urgency: int, horizon_turns: int) -> str:
     return f"{priority} / {horizon_turns} {turn_label}"
 
 
-def _build_decision_brief(
-    *,
-    campaign_chapter_label: str,
-    campaign_objective: str,
-    coach_lines: tuple[CoachLineViewModel, ...],
-    fallback_command: str,
-    fallback_label: str,
-    preview,
-) -> DecisionBriefViewModel:
-    primary = coach_lines[0] if coach_lines else None
-    if preview.blocked:
-        end_turn_label = (
-            "Run Complete"
-            if preview.projected_outcome in {"terminal", "victory"}
-            else "Resolve Required"
-        )
-    elif preview.requires_confirmation:
-        end_turn_label = "Confirm High Risk"
-    elif preview.warning_level in {"high", "elevated"}:
-        end_turn_label = "Review Risk"
-    else:
-        end_turn_label = "Ready to Resolve"
-
-    end_turn_detail = (
-        preview.headline if preview.blocked else preview.confirmation_reason or preview.note
-    )
-    if not end_turn_detail:
-        end_turn_detail = f"Projected result: {preview.projected_outcome}."
+def _build_decision_brief(rhythm: StrategicRhythm) -> DecisionBriefViewModel:
     return DecisionBriefViewModel(
-        objective_label=campaign_chapter_label,
-        objective=campaign_objective,
-        command=primary.command if primary is not None else fallback_command,
-        command_label=primary.label if primary is not None else fallback_label,
-        command_detail=(
-            primary.detail if primary is not None else "Review the current operating report."
-        ),
-        command_consequence=(
-            primary.consequence
-            if primary is not None
-            else "Unreviewed pressure can compound into the next turn."
-        ),
-        urgency_label=primary.urgency_label if primary is not None else "Review now / 1 turn",
-        end_turn_label=end_turn_label,
-        end_turn_detail=end_turn_detail,
-        end_turn_tone=(
-            "success"
-            if preview.blocked and preview.projected_outcome == "victory"
-            else _preview_tone(preview.warning_level)
-        ),
-        end_turn_enabled=not preview.blocked,
+        objective_label=rhythm.objective_label,
+        objective=rhythm.objective,
+        plan_label=rhythm.plan_label,
+        plan_progress_label=rhythm.plan_progress_label,
+        plan_detail=rhythm.plan_detail,
+        plan_progress=rhythm.plan_progress,
+        plan_tone=rhythm.plan_tone,
+        command=rhythm.command,
+        command_label=rhythm.command_label,
+        command_detail=rhythm.command_detail,
+        command_consequence=rhythm.command_consequence,
+        urgency_label=rhythm.urgency_label,
+        end_turn_label=rhythm.end_turn_label,
+        end_turn_detail=rhythm.end_turn_detail,
+        end_turn_tone=rhythm.end_turn_tone,
+        end_turn_enabled=rhythm.end_turn_enabled,
+        later_label=rhythm.later_label,
+        later_detail=rhythm.later_detail,
     )
 
 

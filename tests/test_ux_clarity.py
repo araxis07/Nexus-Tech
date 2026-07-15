@@ -18,6 +18,8 @@ from nexus_tech.simulation.campaign_journey import (
 )
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.simulation.strategic_rhythm import build_strategic_rhythm
+from nexus_tech.simulation.turn_coach import build_turn_coach
 
 
 def _contains_raw_command(text: str) -> bool:
@@ -73,7 +75,12 @@ def test_live_hud_exposes_current_act_and_readable_next_move() -> None:
     assert not _contains_raw_command(view_model.header_note)
     assert all(not _contains_raw_command(line.label) for line in view_model.coach_lines)
     assert view_model.decision_brief.objective_label == "Act 1/3: Foundation Loop"
+    assert view_model.decision_brief.plan_label == "Balanced Execution / Balanced budget"
+    assert view_model.decision_brief.plan_progress_label.endswith("turns left")
+    assert 0.0 <= view_model.decision_brief.plan_progress <= 1.0
+    assert view_model.decision_brief.plan_tone in {"info", "warning", "success", "danger"}
     assert view_model.decision_brief.command == view_model.coach_lines[0].command
+    assert view_model.decision_brief.command == TurnAction.HIRE_EMPLOYEE.value
     assert view_model.decision_brief.command_label == view_model.coach_lines[0].label
     assert view_model.decision_brief.command_consequence
     assert view_model.decision_brief.urgency_label
@@ -83,6 +90,51 @@ def test_live_hud_exposes_current_act_and_readable_next_move() -> None:
         "Confirm High Risk",
     }
     assert view_model.decision_brief.end_turn_tone in {"success", "warning", "danger"}
+    assert view_model.decision_brief.later_label
+    assert view_model.decision_brief.later_detail
+    assert any(chip.label == "Plan" for chip in view_model.snapshot_chips)
+    assert not _contains_raw_command(view_model.decision_brief.later_detail)
+    assert all(not line.startswith("endgame:") for line in view_model.risk_lines)
+
+
+def test_strategic_rhythm_marks_stale_plan_and_keeps_follow_on_visible() -> None:
+    state = create_new_game(scenario_id="founder_journey")
+    state.company.current_turn = state.quarter_plan.target_turn + 1
+
+    rhythm = build_strategic_rhythm(state)
+
+    assert rhythm.plan_progress_label.endswith("refresh due")
+    assert rhythm.plan_tone == "danger"
+    assert "Refresh the roadmap" in rhythm.plan_detail
+    assert rhythm.command in TurnAction._value2member_map_
+    assert rhythm.later_label
+    assert rhythm.later_detail
+
+
+def test_strategic_rhythm_uses_current_turn_decision_follow_on() -> None:
+    state = create_new_game(scenario_id="founder_journey")
+    outcome = apply_action(
+        state,
+        TurnAction.IMPROVE_QUALITY,
+        context=ActionContext(target_product_id=state.products[0].id),
+    )
+
+    rhythm = build_strategic_rhythm(outcome.state)
+
+    assert rhythm.later_label == "Improve Quality follow-on"
+    assert "resolves at end of turn" in rhythm.later_detail
+    assert not _contains_raw_command(rhythm.command_detail)
+
+
+def test_endgame_coach_lane_stays_out_of_opening_and_unlocks_in_act_three() -> None:
+    state = create_new_game(scenario_id="founder_journey")
+
+    for turn in (1, 5, 9):
+        state.company.current_turn = turn
+        assert all(item.source != "endgame" for item in build_turn_coach(state).recommendations)
+
+    state.company.current_turn = 10
+    assert any(item.source == "endgame" for item in build_turn_coach(state).recommendations)
 
 
 def test_turn_summary_explains_causes_and_keeps_routing_internal() -> None:
@@ -101,6 +153,9 @@ def test_turn_summary_explains_causes_and_keeps_routing_internal() -> None:
     assert summary.cause_lines[1].startswith("Demand: users")
     assert summary.cause_lines[2].startswith("Pressure: board")
     assert summary.focus_command in TurnAction._value2member_map_
+    assert summary.strategic_headline.startswith("Act 1/3: Foundation Loop | Plan ")
+    assert summary.focus_command != TurnAction.SET_PATH_CASH_WATERFALL.value
     assert not _contains_raw_command(summary.focus_label)
     assert not _contains_raw_command(summary.focus_detail)
+    assert summary.strategic_lines[-1].startswith("Later:")
     assert all(not _contains_raw_command(line) for line in summary.strategic_lines)

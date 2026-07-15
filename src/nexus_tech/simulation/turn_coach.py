@@ -133,20 +133,6 @@ def build_turn_coach(state: GameState) -> TurnCoachSummary:
     candidates: list[TurnCoachRecommendation] = [
         TurnCoachRecommendation(
             rank=0,
-            command=gate_command,
-            title="Clear the most exposed endgame gate",
-            rationale=pressure.path_gate_alert,
-            source="endgame",
-            urgency=_gate_urgency(pressure.path_gate_alert),
-            horizon_turns=1 if _gate_urgency(pressure.path_gate_alert) >= 90 else 2,
-            consequence=(
-                pressure.path_watchlist[0]
-                if pressure.path_watchlist
-                else "Blocked exit paths stay closed until the gate is repaired."
-            ),
-        ),
-        TurnCoachRecommendation(
-            rank=0,
             command=finance_command,
             title="Follow the capital planner",
             rationale=planner.action_sequence[0] if planner.action_sequence else planner.summary,
@@ -187,6 +173,23 @@ def build_turn_coach(state: GameState) -> TurnCoachSummary:
             consequence=_channel_consequence(portfolio),
         ),
     ]
+    if state.company.current_turn >= 10:
+        candidates.append(
+            TurnCoachRecommendation(
+                rank=0,
+                command=gate_command,
+                title="Clear the most exposed endgame gate",
+                rationale=pressure.path_gate_alert,
+                source="endgame",
+                urgency=_gate_urgency(pressure.path_gate_alert),
+                horizon_turns=1 if _gate_urgency(pressure.path_gate_alert) >= 90 else 2,
+                consequence=(
+                    pressure.path_watchlist[0]
+                    if pressure.path_watchlist
+                    else "Blocked exit paths stay closed until the gate is repaired."
+                ),
+            )
+        )
     if opening.active and opening_command not in {
         TurnAction.END_TURN.value,
         TurnAction.VIEW_REPORT.value,

@@ -2556,11 +2556,12 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Market Watch" in output
     assert "Late-Game" in output
     assert "Finance" in output
-    assert "Risk Forecast" in output
+    assert "Strategic Rhythm" in output
+    assert "Goal > Plan > Move > Resolve > Later" in output
     assert "Run Journey / First Archive" in output
     assert "Step 1/6" in output
-    assert "End-Turn Preview" in output
-    assert "Warning Level" in output
+    assert "If Skipped" in output
+    assert "Later" in output
     assert "Board / Governance" in output
     assert "Key Accounts" in output
     assert "Strategy" in output
@@ -2571,7 +2572,6 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Guided Opening" in output
     assert "Difficulty Profile" in output
     assert "Trade-off" in output
-    assert "Not Now" in output
 
 
 def test_turn_resolution_rendering_contains_summary_sections() -> None:

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.292.0 - 2026-07-16
+
+- Added a save-compatible Strategic Rhythm that joins the current campaign objective, Quarter Plan progress, recommended move, end-turn check, and delayed follow-on into one readable loop across terminal and 2D play
+- Replaced the three dense Coach, Risk, and Preview blocks on the live terminal dashboard with one compact rhythm panel while retaining their full diagnostic detail in the Run Report
+- Kept Guided Opening authoritative before Act 3 so first-turn Coach, Focus View, First Archive Mission, risk guidance, and turn summaries no longer conflict with premature endgame recommendations
+- Added plan-progress and delayed-consequence cues to Focus View, turn summaries, snapshot chips, and hover guidance while removing raw command identifiers from actionable tooltips
+- Preserved schema 27, simulation balance, frozen content ceilings, and the explicit `0/6` human-usability boundary
+
 ## 0.291.0 - 2026-07-16
 
 - Added a bounded Decision Ledger for every state-changing player action, including readable immediate impact and follow-on timing in terminal and 2D reports

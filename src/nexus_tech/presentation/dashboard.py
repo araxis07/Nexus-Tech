@@ -100,6 +100,7 @@ from nexus_tech.simulation.roadmap import (
 )
 from nexus_tech.simulation.scaling import calculate_company_scale_pressure
 from nexus_tech.simulation.segments import MarketSegmentProfile
+from nexus_tech.simulation.strategic_rhythm import build_strategic_rhythm
 from nexus_tech.simulation.support_program import (
     calculate_support_account_risk_counts,
     calculate_support_account_risk_values,
@@ -1240,9 +1241,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
 
     console.print(_build_turn_header_panel(state))
     console.print(_build_run_journey_panel(state))
-    console.print(_build_turn_coach_panel(state))
-    console.print(_build_risk_forecast_panel(state))
-    console.print(_build_end_turn_preview_panel(state))
+    console.print(_build_strategic_rhythm_panel(state))
     console.print(
         Columns(
             [
@@ -1733,7 +1732,7 @@ def render_action_feedback(
             f"Cash {format_money(state.company.cash_on_hand)} | "
             f"Reputation {state.company.reputation} | "
             f"Strategy {state.company.strategy.value} | "
-            f"Roadmap {effective_roadmap.value}"
+            f"Roadmap {_enum_label(effective_roadmap.value)}"
         ),
     )
     console.print(Panel(summary, title="Action Summary", border_style="cyan"))
@@ -1910,10 +1909,10 @@ def _build_turn_header_panel(state: GameState) -> Panel:
         f"[bold white]Turn {state.company.current_turn}[/bold white]\n"
         f"[cyan]Scenario:[/cyan] {state.scenario_title}\n"
         f"[cyan]Actions Left:[/cyan] {state.action_points_remaining}\n"
-        f"[cyan]Roadmap:[/cyan] {effective_roadmap.value} ({roadmap_status})\n"
-        f"[cyan]Market:[/cyan] {state.market_cycle.value} | "
-        f"[cyan]Budget:[/cyan] {state.quarter_plan.budget_stance.value}\n"
-        f"[cyan]Org Mix:[/cyan] {state.functional_budget.preset.value}\n"
+        f"[cyan]Roadmap:[/cyan] {_enum_label(effective_roadmap.value)} ({roadmap_status})\n"
+        f"[cyan]Market:[/cyan] {_enum_label(state.market_cycle.value)} | "
+        f"[cyan]Budget:[/cyan] {_enum_label(state.quarter_plan.budget_stance.value)}\n"
+        f"[cyan]Org Mix:[/cyan] {_enum_label(state.functional_budget.preset.value)}\n"
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
     return Panel.fit(body, title="Turn Control", border_style="blue")
@@ -1938,6 +1937,40 @@ def _build_run_journey_panel(state: GameState) -> Panel:
         body,
         title="Run Journey / First Archive",
         border_style="green" if mission.complete else "cyan",
+        expand=True,
+    )
+
+
+def _build_strategic_rhythm_panel(state: GameState) -> Panel:
+    rhythm = build_strategic_rhythm(state)
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Step", style="bold cyan", no_wrap=True)
+    table.add_column("Status", style="bold")
+    table.add_column("Readout")
+    table.add_row("Goal", rhythm.objective_label, rhythm.objective)
+    table.add_row(
+        "Plan",
+        rhythm.plan_progress_label,
+        f"{rhythm.plan_label}. {rhythm.plan_detail}",
+    )
+    table.add_row(
+        "Move Now",
+        f"{rhythm.command_label} | {rhythm.urgency_label}",
+        rhythm.command_detail,
+    )
+    table.add_row("If Skipped", "Trade-off", rhythm.command_consequence)
+    table.add_row("Resolve", rhythm.end_turn_label, rhythm.end_turn_detail)
+    table.add_row("Later", rhythm.later_label, rhythm.later_detail)
+    border_style = {
+        "danger": "red",
+        "warning": "yellow",
+        "success": "green",
+    }.get(rhythm.end_turn_tone, "bright_blue")
+    return Panel(
+        table,
+        title="Strategic Rhythm",
+        subtitle="Goal > Plan > Move > Resolve > Later",
+        border_style=border_style,
         expand=True,
     )
 
@@ -2159,9 +2192,9 @@ def _build_company_panel(state: GameState) -> Panel:
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
     table.add_row("Strategy", state.company.strategy.value)
-    table.add_row("Roadmap", effective_roadmap.value)
-    table.add_row("Budget", state.quarter_plan.budget_stance.value)
-    table.add_row("Org Mix", state.functional_budget.preset.value)
+    table.add_row("Roadmap", _enum_label(effective_roadmap.value))
+    table.add_row("Budget", _enum_label(state.quarter_plan.budget_stance.value))
+    table.add_row("Org Mix", _enum_label(state.functional_budget.preset.value))
     table.add_row(
         "Alloc",
         (
@@ -2172,7 +2205,7 @@ def _build_company_panel(state: GameState) -> Panel:
         ),
     )
     table.add_row("Mix State", functional_budget_profile.summary)
-    table.add_row("Market", state.market_cycle.value)
+    table.add_row("Market", _enum_label(state.market_cycle.value))
     table.add_row("Debt", format_money(state.finance.debt_principal))
     table.add_row("Dilution", format_rate(state.finance.equity_dilution))
     table.add_row("Status", "Game Over" if state.company.game_over else "Operating")
@@ -3755,10 +3788,10 @@ def _build_turn_operating_table(resolution: TurnResolution) -> Table:
     table.add_row("Burned Out", str(resolution.team_condition.burned_out_count))
     table.add_row("Strategy", resolution.state.company.strategy.value)
     table.add_row("Difficulty", resolution.state.difficulty_mode.value)
-    table.add_row("Budget", resolution.state.quarter_plan.budget_stance.value)
-    table.add_row("Org Mix", resolution.state.functional_budget.preset.value)
-    table.add_row("Roadmap", resolution.roadmap_focus.value)
-    table.add_row("Market", resolution.market_cycle.value)
+    table.add_row("Budget", _enum_label(resolution.state.quarter_plan.budget_stance.value))
+    table.add_row("Org Mix", _enum_label(resolution.state.functional_budget.preset.value))
+    table.add_row("Roadmap", _enum_label(resolution.roadmap_focus.value))
+    table.add_row("Market", _enum_label(resolution.market_cycle.value))
     table.add_row("Goal", resolution.campaign_goal_progress.title)
     table.add_row(
         "Goal State",
@@ -3906,11 +3939,11 @@ def _build_report_overview_panel(state: GameState, total_score: int, score_tier:
     table.add_row("Turn", str(state.company.current_turn))
     table.add_row("Cash", format_money(state.company.cash_on_hand))
     table.add_row("Reputation", str(state.company.reputation))
-    table.add_row("Roadmap", effective_roadmap.value)
+    table.add_row("Roadmap", _enum_label(effective_roadmap.value))
     table.add_row("Roadmap State", "due now" if roadmap_due else f"{turns_left} turns left")
-    table.add_row("Budget", state.quarter_plan.budget_stance.value)
-    table.add_row("Org Mix", state.functional_budget.preset.value)
-    table.add_row("Market", state.market_cycle.value)
+    table.add_row("Budget", _enum_label(state.quarter_plan.budget_stance.value))
+    table.add_row("Org Mix", _enum_label(state.functional_budget.preset.value))
+    table.add_row("Market", _enum_label(state.market_cycle.value))
     table.add_row("Run Score", f"{total_score} ({score_tier})")
     table.add_row("Grade", calculate_run_score(state).campaign_grade)
     table.add_row("Goal State", "complete" if goal_progress.completed else "in progress")
@@ -4933,6 +4966,10 @@ def _build_funding_history_table(entries: list[FundingHistoryEntry]) -> Table:
         )
 
     return table
+
+
+def _enum_label(value: str) -> str:
+    return value.replace("_", " ").title()
 
 
 def _format_progress(value: float) -> str:

@@ -297,6 +297,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Treat `audit-2d-animation-matrix` failures as release blockers for the default seven-scenario, three-seed presentation matrix.
 - Treat any non-clear release-blocker field, required fix before presenting, or non-pass validator result as a release blocker even when the release decision says `pass`.
 - Treat missing `blocked-action-feedback` as a release blocker when disabled or rejected command behavior changes.
+- Treat a Strategic Rhythm recommendation that conflicts with Guided Opening, First Archive Mission, or the current campaign act as a release blocker; endgame-gate guidance must not lead before Act 3.
 - Keep `.github/workflows/ci.yml` aligned with these local gates so animation regressions fail before merge, review the uploaded `nexus-tech-2d-visual-audit` artifact summary before opening individual captures, and review the uploaded `nexus-tech-2d-animation-matrix` and `nexus-tech-2d-animation-playtest-prep` artifacts before manual presentation playtests.
 - Use `docs/OPEN_WINDOW_ANIMATION_PLAYTEST.md`, `docs/ANIMATION_PLAYTEST_REPORT_TEMPLATE.md`, and `docs/ANIMATION_PLAYTEST_CHECKLIST_2026-06-06.md` for the remaining open-window readability pass before presenting the 2D build.
 - If `balance-audit` still reports `watch` or worse cells, note whether they are intentional difficulty pressure or candidates for retuning before tagging.

@@ -2184,6 +2184,11 @@ def test_run_scene_hover_hints_cover_pause_back_help_controls() -> None:
             ClickTarget("pause_menu", "", rect)
         )
         assert "close Help" in scene._describe_click_target(ClickTarget("close_help", "", rect))
+        command_hint = scene._describe_click_target(
+            ClickTarget("command", TurnAction.IMPROVE_QUALITY.value, rect)
+        )
+        assert "Improve Quality" in command_hint
+        assert TurnAction.IMPROVE_QUALITY.value not in command_hint
     finally:
         pygame.quit()
 
