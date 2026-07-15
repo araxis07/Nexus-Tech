@@ -227,6 +227,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Compare archived runs directly through score, cash, offer, grade, and outcome coverage so late-game experimentation becomes easier to review
 - Surface path-specific archive leaders, badge coverage, reward mix, and next-gap guidance so the meta layer can point toward what the player has not yet mastered
 - Track discovery, victories, shutdowns, and average performance across all 24 authored campaign routes, then recommend the next unexplored route
+- Connect the opening, both campaign decisions, endgame, final outcome, and first archive through one six-step First Archive Mission in terminal and 2D play
 
 ### 💾 Local Save / Load
 
@@ -235,6 +236,7 @@ Each turn represents a business interval. You review the company, choose actions
 - List, rename, and delete save slots directly from the CLI
 - Archive completed runs and inspect them later through `list-archives`
 - Use an explicit `Save & Archive` action at run review so completed-run progression is never confused with exiting unsaved
+- Confirm completed saves as `Run Archived`, prevent duplicate archive clicks, and direct the player back to Progress for the next route
 - Derive campaign-level progression from archived runs through `show-progression`
 - Review the exact archive-driven unlock catalog through `list-unlocks`
 - Compare archived runs directly through `compare-archives`
@@ -645,7 +647,7 @@ Show archive-driven campaign progression:
 uv run nexus-tech show-progression
 ```
 
-The terminal progression view and the 2D Progress board include a six-campaign Route Atlas. It reports archive-derived route discovery separately from human playtest evidence.
+The terminal dashboard and 2D shell expose a six-step First Archive Mission, while the terminal progression view and 2D Progress board include a six-campaign Route Atlas. Archive-derived progression remains separate from human playtest evidence.
 
 List the archive unlock catalog:
 
@@ -937,11 +939,13 @@ The core loop is simple:
 3. End the turn to resolve revenue, costs, growth, churn, burnout, and event outcomes.
 4. Save locally and continue the run later if needed; after a completed run, choose `Save & Archive` to record route mastery and progression.
 
+The HUD also tracks the full First Archive Mission: Guided Opening, Commitment, Consequence, Enter Endgame, Finish the Run, and Save & Archive. This journey indicator is guidance only and is derived from existing state, so older saves remain compatible.
+
 If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to get a compact opening checklist.
 
 For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`; add `--motion-mode reduced` or `--motion-mode off` if you want quieter highlight, entity, actor, action-feedback, and transition animation. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, open the progression board, or press `7` for Settings before entering play. Inside a run you can click the Recommended Move and End Turn Check cards directly, plus product cards, modal options, deep-dive panel buttons, and the action bar, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `I`, `Q`, `F`, `M`, `D`, `H`, `A`, `O`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, `P`, `Esc`, and `F1`. `P` opens Pause with Resume, Save, Menu, Settings, and Quit controls; `T` opens Settings while paused; and `Esc` returns from Settings to Pause before resuming the run. The shared responsive frame reserves navigation, header, content, and footer regions across title, run, review, and turn-summary scenes. The live run retains its shape-based entity motion, deterministic shape-sprite actors, command feedback, scene transitions, compact action copy, adaptive feed pacing, staged turn summaries, endgame cockpit, and remembered inspector controls. If a button is disabled, the 2D shell still tells you exactly which prerequisite is missing before you waste the click.
 
-For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; CLI flags override that profile for the current launch. Arbitrary key remapping is not included in 0.288.0; the documented keyboard bindings remain fixed for this release.
+For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; CLI flags override that profile for the current launch. Arbitrary key remapping is not included in 0.289.0; the documented keyboard bindings remain fixed for this release.
 
 Difficulty guidance:
 

@@ -2,9 +2,9 @@
 
 ## Current Level
 
-NEXUS TECH 0.288.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. Terminal and 2D progression now show the complete six-campaign Route Atlas. The 2D shell has persistent local display/motion Settings, shared responsive frame geometry, one numbered decision route from objective to turn resolution, and an explicit Save & Archive ending action. Schema 26 adds isolated structured human-session evidence while migrating older saves additively.
+NEXUS TECH 0.289.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission now connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. Schema 26 remains unchanged and retains isolated structured human-session evidence while migrating older saves additively.
 
-The project is approximately 82% of the way to a defensible beta. Core simulation, persistence, navigation, responsive 2D presentation, campaign progression, deterministic testing, archive replay guidance, and release automation exist. The remaining gap is observed usability with representative players, not another content expansion.
+The project is approximately 83% of the way to a defensible beta. Core simulation, persistence, navigation, responsive 2D presentation, campaign progression, deterministic testing, first-run journey guidance, archive replay guidance, and release automation exist. The remaining gap is observed usability with representative players, not another content expansion.
 
 ## Release Changes
 
@@ -17,6 +17,8 @@ The project is approximately 82% of the way to a defensible beta. Core simulatio
 - Terminal and 2D progression expose all six campaign route lanes together instead of showing only aggregate mastery or one next route.
 - Live and archived reviews combine both decisions into one Campaign Legacy with a route label, accumulated event pressure, and final-act mandate.
 - Completed-run review now separates `Save & Archive` from `Exit Unsaved`, making progression intent explicit.
+- First Archive Mission derives six continuous milestones from existing run and archive state, exposes the current step and next action without a save migration, and keeps challenge scenarios on turn-based chapter fallbacks.
+- Terminal saves and 2D reviews now confirm `Run Archived`, suppress duplicate archive actions, and point the player back to Progress for the next route.
 - Focus View is the default run surface. It presents one decision hierarchy with at most six controls and keeps the full ten-control dashboard available with `0` on windows at least 940 pixels wide.
 - Focus View now numbers Objective, Recommended Move, and End Turn Check; the recommendation includes urgency and skipped-action consequence, while the final card launches the existing preview/confirmation flow directly.
 - Featured campaign goals cannot end a run before both authored campaign decisions are recorded, preventing economically strong branches from skipping Act 3.
@@ -63,7 +65,7 @@ uv run nexus-tech balance-audit --scenario founder_journey --scenario bootstrap_
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 282 --viewport 820x620 --viewport 1280x720 --viewport 1440x900
 ```
 
-Automated coverage verifies campaign boundaries and delayed effects, event priority, all 72 campaign-route/difficulty cells, early-victory prevention, path retention, route-mastery derivation, Campaign Legacy synthesis, Save & Archive copy, additive migration through schema 26, archive evidence, structured-session validation, preference persistence/fallback, the 6-by-3 balance matrix, the long-session Debt Crunch envelope, catalog ceilings, Focus View layout, Settings typography, Pause recovery, accessibility-profile launch, and responsive containment.
+Automated coverage verifies campaign boundaries and delayed effects, event priority, all 72 campaign-route/difficulty cells, early-victory prevention, path retention, route-mastery derivation, Campaign Legacy synthesis, all six First Archive Mission states, archive confirmation and duplicate-save prevention, additive migration through schema 26, archive evidence, structured-session validation, preference persistence/fallback, the 6-by-3 balance matrix, the long-session Debt Crunch envelope, catalog ceilings, Focus View layout, Settings typography, Pause recovery, accessibility-profile launch, and responsive containment.
 
 ## Human Evidence Still Required
 
@@ -80,12 +82,13 @@ No test or generated report should mark these observations complete without a hu
 
 The repository baseline is currently `0/6` current-version human sessions. Run `beta-playtest-status` before and after each real session. Only use `record-beta-playtest-session --confirm-human-session ...` after observing the session; the local SQLite row is evidence input, not automatic release approval.
 
-Arbitrary key remapping is not part of 0.288.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
+Arbitrary key remapping is not part of 0.289.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
 
 ## Next Steps
 
-1. Conduct the six-session usability pass and record each actual observation with `record-beta-playtest-session`; current automation and archive metrics do not count as these sessions.
-2. Fix any observed navigation, copy, clipping, overlap, or control blocker before expanding gameplay.
-3. Compare real player choice comprehension and pacing against Campaign Legacy and route-mastery guidance; tune only where observed behavior contradicts the intended trade-off.
-4. Consolidate low-value actions only when playtest evidence shows repeated confusion.
-5. Re-run the release-candidate matrix after any observed fix, then promote to beta only after all manual gates pass.
+1. Complete one owner run from New Game through `Save & Archive` using the First Archive Mission and record only defects actually observed in the real window.
+2. Conduct the six-session usability pass and record each actual observation with `record-beta-playtest-session`; current automation and archive metrics do not count as these sessions.
+3. Fix any observed navigation, copy, clipping, overlap, or control blocker before expanding gameplay.
+4. Compare real player choice comprehension and pacing against Campaign Legacy and route-mastery guidance; tune only where observed behavior contradicts the intended trade-off.
+5. Consolidate low-value actions only when playtest evidence shows repeated confusion.
+6. Re-run the release-candidate matrix after any observed fix, then promote to beta only after all manual gates pass.

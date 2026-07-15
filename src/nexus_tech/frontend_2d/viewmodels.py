@@ -29,6 +29,7 @@ from nexus_tech.simulation.endgame import (
     evaluate_exit_outcome,
 )
 from nexus_tech.simulation.engine import TurnResolution
+from nexus_tech.simulation.first_archive_mission import build_first_archive_mission
 from nexus_tech.simulation.postmortem import build_run_postmortem
 from nexus_tech.simulation.reporting import calculate_run_score
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
@@ -101,6 +102,17 @@ class DecisionBriefViewModel:
     end_turn_detail: str
     end_turn_tone: str
     end_turn_enabled: bool
+
+
+@dataclass(frozen=True)
+class RunJourneyViewModel:
+    """Compact first-run journey state for the live 2D HUD."""
+
+    step_label: str
+    step_title: str
+    progress_label: str
+    progress: float
+    next_action: str
 
 
 @dataclass(frozen=True)
@@ -284,6 +296,7 @@ class GameViewModel:
     header_note: str
     stats: tuple[GaugeViewModel, ...]
     snapshot_chips: tuple[SnapshotChipViewModel, ...]
+    run_journey: RunJourneyViewModel
     products: tuple[ProductCardViewModel, ...]
     coach_lines: tuple[CoachLineViewModel, ...]
     decision_brief: DecisionBriefViewModel
@@ -310,6 +323,7 @@ def build_game_view_model(
     coach = build_turn_coach(state)
     forecast = build_risk_forecast(state)
     preview = build_end_turn_preview(state)
+    first_archive = build_first_archive_mission(state)
     selected_product = _pick_selected_product(state.products, selected_product_id)
     total_users = sum(product.user_count for product in state.products if product.is_active)
     score = calculate_run_score(state)
@@ -372,13 +386,17 @@ def build_game_view_model(
         ),
     )
     snapshot_chips = (
+        SnapshotChipViewModel(
+            "Journey",
+            first_archive.step_label,
+            "success" if first_archive.complete else "info",
+        ),
         SnapshotChipViewModel("Team", str(len(state.employees)), "info"),
         SnapshotChipViewModel(
             "Idle",
             str(sum(1 for employee in state.employees if employee.assigned_product_id is None)),
             "warning",
         ),
-        SnapshotChipViewModel("Partners", str(len(state.partnerships)), "info"),
         SnapshotChipViewModel(
             "Backlog",
             str(state.support_program.backlog_queue),
@@ -468,6 +486,13 @@ def build_game_view_model(
         header_note=header_note,
         stats=stats,
         snapshot_chips=snapshot_chips,
+        run_journey=RunJourneyViewModel(
+            step_label=first_archive.step_label,
+            step_title=first_archive.current_step.title,
+            progress_label=first_archive.progress_label,
+            progress=first_archive.progress,
+            next_action=first_archive.next_action,
+        ),
         products=products,
         coach_lines=coach_lines,
         decision_brief=decision_brief,

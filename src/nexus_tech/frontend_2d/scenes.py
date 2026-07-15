@@ -81,6 +81,10 @@ from nexus_tech.persistence.save_coordinator import (
 from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import ActionContext, apply_action, create_new_game, resolve_turn
+from nexus_tech.simulation.first_archive_mission import (
+    FirstArchiveMission,
+    build_first_archive_mission,
+)
 from nexus_tech.simulation.meta_progression import (
     ArchiveComparisonSummary,
     MetaProgressionSummary,
@@ -1352,6 +1356,7 @@ class TitleScene(BaseScene):
         self._archives_by_key: dict[str, RunArchiveSummary] = {}
         self._meta_progression: MetaProgressionSummary = summarize_meta_progression([])
         self._archive_comparison: ArchiveComparisonSummary = build_archive_comparison([])
+        self._first_archive_mission: FirstArchiveMission = build_first_archive_mission(state)
         self._selected_slot_name: str | None = None
         self._confirm_delete_slot_name: str | None = None
         self._scenario_choices: tuple[ScenarioChoice, ...] = ()
@@ -1738,6 +1743,10 @@ class TitleScene(BaseScene):
         self._archives_by_key = {summary.archive_key: summary for summary in archive_summaries}
         self._meta_progression = summarize_meta_progression(archive_summaries)
         self._archive_comparison = build_archive_comparison(archive_summaries)
+        self._first_archive_mission = build_first_archive_mission(
+            self.state,
+            archive_count=len(archive_summaries),
+        )
         if self._selected_slot_name not in self._save_summaries_by_slot:
             self._selected_slot_name = None
         if self._wizard_state.slot_name in self._save_summaries_by_slot:
@@ -2426,10 +2435,7 @@ class TitleScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 32, copy_width, 30),
             valign="top",
         )
-        subtitle = (
-            "Self-contained frontend shell with loadable saves, archive reviews, "
-            "and live run handoff."
-        )
+        subtitle = "Build, survive, choose an exit, then archive the run to unlock new routes."
         draw_wrapped_text(
             surface,
             self.fonts.body,
@@ -2439,10 +2445,21 @@ class TitleScene(BaseScene):
             line_height=18,
             max_lines=2,
         )
+        archive_mission_label = (
+            "First archive complete"
+            if self._first_archive_mission.complete
+            else (
+                f"First archive {self._first_archive_mission.step_label}: "
+                f"{self._first_archive_mission.current_step.title}"
+            )
+        )
         draw_text_line(
             surface,
             self.fonts.small,
-            f"Save slots {len(self._save_cards)} | archives {len(self._archive_cards)}",
+            (
+                f"Saves {len(self._save_cards)} | archives {len(self._archive_cards)} | "
+                f"{archive_mission_label}"
+            ),
             TEXT,
             pygame.Rect(inner.left, inner.top + 38, copy_width, 18),
             valign="top",
@@ -2468,15 +2485,26 @@ class TitleScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
+        continue_detail = (
+            f"Resume {self._first_archive_mission.current_step.title} "
+            f"({self._first_archive_mission.step_label})."
+            if self._save_cards
+            else "No save yet; start a guided campaign."
+        )
         primary_buttons = (
-            ("1 Continue Last", "Resume the newest save.", "continue", GOOD),
+            ("1 Continue Last", continue_detail, "continue", GOOD),
             ("2 New Game", "Start a guided campaign.", "new_wizard", INFO),
         )
         secondary_buttons = (
             ("3 How to Play", "Goal, controls, and first turn.", "guide", GOOD),
             ("4 Manage Saves", "Load, rename, copy, or delete.", "load_slots", INFO),
             ("5 Run Archives", "Completed runs and lessons.", "archives", WARN),
-            ("6 Progress", "Paths, unlocks, and next gap.", "meta", SELECTION),
+            (
+                "6 Progress",
+                f"First archive {self._first_archive_mission.progress_label}; routes and rewards.",
+                "meta",
+                SELECTION,
+            ),
             ("7 Settings", "Text, contrast, and motion.", "settings", INFO),
         )
         quit_button = ("8 Quit", "Leave NEXUS TECH.", "quit", DANGER)
@@ -2684,8 +2712,16 @@ class TitleScene(BaseScene):
 
     def _draw_meta_compact_guides(self, surface, rect) -> None:
         pygame = self.pygame
+        journey_detail = (
+            "First archive complete"
+            if self._first_archive_mission.complete
+            else (
+                f"Step {self._first_archive_mission.step_label} "
+                f"{self._first_archive_mission.current_step.title}"
+            )
+        )
         cards = (
-            ("Current", f"{len(self._save_cards)} saves ready", INFO),
+            ("Journey", journey_detail, INFO),
             ("Archive", f"{len(self._archive_cards)} runs reviewed", GOOD),
             ("Next", self._compact_text(self._meta_progression.next_reward, 34), WARN),
         )
@@ -3424,6 +3460,14 @@ class TitleScene(BaseScene):
             )
         if self._mode == "meta":
             return (
+                (
+                    "First archive: complete"
+                    if self._first_archive_mission.complete
+                    else (
+                        f"First archive: {self._first_archive_mission.step_label} "
+                        f"{self._first_archive_mission.current_step.title}"
+                    )
+                ),
                 f"Best: IPO {comparison.best_ipo_label} | M&A {comparison.best_acquisition_label}",
                 f"Ind {comparison.best_independence_label} | Focus {comparison.common_next_focus}",
             )
@@ -3448,9 +3492,16 @@ class TitleScene(BaseScene):
                 )
         return (
             f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+            (
+                "First archive: complete"
+                if self._first_archive_mission.complete
+                else (
+                    f"First archive: {self._first_archive_mission.step_label} "
+                    f"{self._first_archive_mission.current_step.title}"
+                )
+            ),
             (f"Archive: {meta.achievement_progress} | routes {meta.route_discovery_progress}"),
             f"Next reward: {meta.next_reward}",
-            f"Next route: {meta.next_route}",
         )
 
     def _title_feed_visible_count(self, event_height: int) -> int:
@@ -3466,6 +3517,14 @@ class TitleScene(BaseScene):
     def _meta_board_summary_lines(self, compact: bool) -> tuple[str, ...]:
         meta = self._meta_progression
         comparison = self._archive_comparison
+        mission_line = (
+            "First archive: complete"
+            if self._first_archive_mission.complete
+            else (
+                f"First archive: Step {self._first_archive_mission.step_label} | "
+                f"{self._first_archive_mission.current_step.title}"
+            )
+        )
         if compact:
             route_rows = tuple(
                 "Atlas: "
@@ -3475,8 +3534,16 @@ class TitleScene(BaseScene):
                 )
                 for index in range(0, len(meta.route_mastery.lanes), 2)
             )
+            compact_mission = (
+                "first archive complete"
+                if self._first_archive_mission.complete
+                else f"first archive {self._first_archive_mission.step_label}"
+            )
             return (
-                f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+                (
+                    f"Campaign: {meta.campaign_tier} / {meta.campaign_stage} | "
+                    f"{compact_mission}"
+                ),
                 (
                     f"Runs {meta.total_runs} | victories {meta.victories} | "
                     f"best score {meta.best_score}"
@@ -3485,6 +3552,7 @@ class TitleScene(BaseScene):
             )
         return (
             f"Campaign tier: {meta.campaign_tier} | stage: {meta.campaign_stage}",
+            mission_line,
             (
                 f"Runs: {meta.total_runs} | victories: {meta.victories} | "
                 f"best score: {meta.best_score}"
@@ -3856,7 +3924,7 @@ class ReviewScene(BaseScene):
         if event.type != self.pygame.KEYDOWN:
             return
         if event.key == self.pygame.K_s and self._allow_save:
-            self._persist_current_run()
+            self._save_review_archive()
             return
         if event.key in (
             self.pygame.K_ESCAPE,
@@ -3928,7 +3996,13 @@ class ReviewScene(BaseScene):
             self._primary_action()
             return
         if target.kind == "review_save" and self._allow_save:
-            self._persist_current_run()
+            self._save_review_archive()
+
+    def _save_review_archive(self) -> None:
+        self._persist_current_run()
+        self._allow_save = False
+        self._primary_detail = "Archive recorded. Return to the menu and open Progress."
+        self._trigger_review_motion("footer", intensity=0.72)
 
     def _primary_action(self) -> None:
         if self._return_scene_factory is not None:
@@ -4273,6 +4347,7 @@ class RunScene(BaseScene):
         self._pause_settings_visible = False
         self._focus_mode = True
         self._return_scene_factory = return_scene_factory
+        self._terminal_archive_saved = False
         self._first_turn_guide_visible = False
         self._product_index = 0
         self._motion_elapsed = 0.0
@@ -7452,11 +7527,20 @@ class RunScene(BaseScene):
         )
 
     def _save_current_run(self) -> None:
+        terminal = self.state.company.game_over or self.state.victory_achieved
+        if terminal and self._terminal_archive_saved:
+            return
         self._persist_current_run()
+        if terminal:
+            self._terminal_archive_saved = True
         self.push_event(
             FrontendEvent(
-                title="Game Saved",
-                detail=f"Saved the 2D run back to slot `{self.slot_name}`.",
+                title="Run Archived" if terminal else "Game Saved",
+                detail=(
+                    "Ending recorded for progression. Return to the menu and open Progress."
+                    if terminal
+                    else f"Saved the 2D run back to slot `{self.slot_name}`."
+                ),
                 severity="success",
             )
         )
@@ -7478,7 +7562,7 @@ class RunScene(BaseScene):
                 else "Leave the 2D shell."
             ),
             return_scene_factory=self._return_scene_factory,
-            allow_save=True,
+            allow_save=not self._terminal_archive_saved,
             dirty=self._dirty,
             motion_mode=self.motion_mode,
             preferences=self._current_frontend_preferences(),
@@ -7910,7 +7994,8 @@ class RunScene(BaseScene):
         self._first_turn_guide_visible = True
         self._click_targets.append(ClickTarget("coach", "", rect))
         line = (
-            f"First Turn: C Coach -> {get_action_label(opening.current_command)} | "
+            f"First Turn | Journey {self._view_model.run_journey.step_label}: "
+            f"C Coach -> {get_action_label(opening.current_command)} | "
             f"{max(0, self.state.action_points_remaining)} AP | P Save/Pause | Space End"
         )
         draw_text_line(
@@ -8504,7 +8589,8 @@ class RunScene(BaseScene):
         stats = {stat.key: stat.value_text for stat in self._view_model.stats}
         return (
             f"Cash {stats.get('cash', '-')} | Runway {stats.get('runway', '-')} | "
-            f"Users {stats.get('users', '-')} | AP {stats.get('actions', '-')}"
+            f"Users {stats.get('users', '-')} | AP {stats.get('actions', '-')} | "
+            f"Journey {self._view_model.run_journey.step_label}"
         )
 
     def _draw_first_turn_guide_card(self, surface, rect) -> bool:
@@ -8534,7 +8620,10 @@ class RunScene(BaseScene):
             border_radius=14,
         )
         self._click_targets.append(ClickTarget("coach", "", card_rect))
-        title = f"First Turn Guide | C Coach -> {get_action_label(opening.current_command)}"
+        title = (
+            f"First Turn Guide | Journey {self._view_model.run_journey.step_label} | "
+            f"C Coach -> {get_action_label(opening.current_command)}"
+        )
         detail = "Click this guide for coach. P saves/pauses. Space resolves after AP."
         draw_text_line(
             surface,
@@ -10686,13 +10775,24 @@ class RunScene(BaseScene):
             emphasis=max(0.32, overlay_motion),
             lift=int(overlay_motion * 4),
         )
-        title = "Victory Achieved" if self.state.victory_achieved else "Company Shutdown"
+        title = (
+            "Archive Recorded"
+            if self._terminal_archive_saved
+            else "Victory Achieved"
+            if self.state.victory_achieved
+            else "Company Shutdown"
+        )
         title_surface = self.fonts.title.render(title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 26))
         detail = (
-            self.state.victory_reason
-            or self.state.exit_summary
-            or "Press S to save or Esc to close the frontend."
+            "This ending now counts toward progression and Route Atlas. "
+            "Open Review, then return to the menu to choose the next route."
+            if self._terminal_archive_saved
+            else (
+                self.state.victory_reason
+                or self.state.exit_summary
+                or "Press S to save or Esc to close the frontend."
+            )
         )
         draw_wrapped_text(
             surface,
@@ -10702,6 +10802,21 @@ class RunScene(BaseScene):
             pygame.Rect(inner.left, inner.top + 8, inner.width, 90),
             line_height=18,
             max_lines=4,
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            (
+                "First archive complete. Open Progress from the title menu."
+                if self._terminal_archive_saved
+                else (
+                    f"Journey {self._view_model.run_journey.step_label}: "
+                    "Save & Archive is the final progression step."
+                )
+            ),
+            GOOD,
+            pygame.Rect(inner.left, inner.bottom - 72, inner.width, 18),
+            valign="top",
         )
         review_rect = pygame.Rect(inner.left, inner.bottom - 46, 160, 36)
         save_rect = pygame.Rect(inner.left + 176, inner.bottom - 46, 160, 36)
@@ -10720,9 +10835,13 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect=save_rect,
-            title="S Save & Archive",
-            detail="Record this ending for progression.",
-            accent=GOOD,
+            title="Archived" if self._terminal_archive_saved else "S Save & Archive",
+            detail=(
+                "Ending recorded for progression."
+                if self._terminal_archive_saved
+                else "Record this ending for progression."
+            ),
+            accent=BORDER if self._terminal_archive_saved else GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
         )
@@ -10730,14 +10849,19 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect=close_rect,
-            title="Esc Exit Unsaved",
-            detail="Leave without archive progress.",
-            accent=accent,
+            title="Esc Exit" if self._terminal_archive_saved else "Esc Exit Unsaved",
+            detail=(
+                "Leave after the archive is recorded."
+                if self._terminal_archive_saved
+                else "Leave without archive progress."
+            ),
+            accent=INFO if self._terminal_archive_saved else accent,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
         )
         self._click_targets.append(ClickTarget("open_review", "", review_rect))
-        self._click_targets.append(ClickTarget("save", "", save_rect))
+        if not self._terminal_archive_saved:
+            self._click_targets.append(ClickTarget("save", "", save_rect))
         self._click_targets.append(ClickTarget("close_outcome", "", close_rect))
 
     def _draw_outcome_cinematic_backdrop(

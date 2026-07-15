@@ -608,7 +608,71 @@ def test_build_game_view_model_exposes_products_and_coach_lines() -> None:
     assert view_model.products
     assert view_model.coach_lines
     assert view_model.snapshot_chips
+    assert view_model.run_journey.step_label == "1/6"
+    assert view_model.snapshot_chips[0].label == "Journey"
     assert any(gauge.title == "Cash" for gauge in view_model.stats)
+
+
+def test_terminal_run_save_confirms_archive_and_blocks_duplicate_save() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    saved: list[tuple[object, ...]] = []
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.company.game_over = True
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=289),
+            slot_name="active",
+            save_callback=lambda *args: saved.append(args),
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._save_current_run()
+        scene._save_current_run()
+
+        assert len(saved) == 1
+        assert scene._terminal_archive_saved
+        assert scene._events[0].payload.title == "Run Archived"
+        scene._click_targets = []
+        scene._draw_outcome_overlay(surface)
+        assert not any(target.kind == "save" for target in scene._click_targets)
+    finally:
+        pygame.quit()
+
+
+def test_review_save_changes_to_archive_recorded_handoff() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    saved: list[tuple[object, ...]] = []
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.victory_achieved = True
+        scene = ReviewScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=290),
+            slot_name="active",
+            save_callback=lambda *args: saved.append(args),
+            view_model=build_run_review_view_model(state),
+            accent=DANGER,
+            primary_title="Back to Menu",
+            primary_detail="Return to the title menu.",
+            return_scene_factory=None,
+            allow_save=True,
+            dirty=True,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._save_review_archive()
+
+        assert len(saved) == 1
+        assert not scene._allow_save
+        assert "Archive recorded" in scene._primary_detail
+    finally:
+        pygame.quit()
 
 
 def test_build_command_request_returns_strategy_picker() -> None:
@@ -2918,6 +2982,7 @@ def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
 
         menu_lines = scene._title_sidebar_lines()
         assert any(line.startswith("Campaign tier:") for line in menu_lines)
+        assert any(line.startswith("First archive:") for line in menu_lines)
         assert any(line.startswith("Next reward:") for line in menu_lines)
 
         scene._mode = "archives"

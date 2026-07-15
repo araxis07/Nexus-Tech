@@ -70,6 +70,7 @@ from nexus_tech.simulation.finance import (
     calculate_cash_flow_forecast_scenarios,
     estimate_runway,
 )
+from nexus_tech.simulation.first_archive_mission import build_first_archive_mission
 from nexus_tech.simulation.functional_budgeting import get_functional_budget_profile
 from nexus_tech.simulation.governance import get_governance_tradeoff_focus
 from nexus_tech.simulation.hiring import CandidateProfile
@@ -1231,6 +1232,7 @@ def render_dashboard(console: Console, state: GameState) -> None:
     """Render the main per-turn dashboard."""
 
     console.print(_build_turn_header_panel(state))
+    console.print(_build_run_journey_panel(state))
     console.print(_build_turn_coach_panel(state))
     console.print(_build_risk_forecast_panel(state))
     console.print(_build_end_turn_preview_panel(state))
@@ -1909,6 +1911,29 @@ def _build_turn_header_panel(state: GameState) -> Panel:
         "Use the action menu below, then end the turn when you are ready to simulate."
     )
     return Panel.fit(body, title="Turn Control", border_style="blue")
+
+
+def _build_run_journey_panel(state: GameState) -> Panel:
+    mission = build_first_archive_mission(state)
+    trail: list[str] = []
+    for index, step in enumerate(mission.steps, start=1):
+        if step.complete:
+            trail.append(f"[green]OK {index} {step.title}[/green]")
+        elif index == mission.current_step_number:
+            trail.append(f"[bold cyan]NOW {index} {step.title}[/bold cyan]")
+        else:
+            trail.append(f"[dim]{index} {step.title}[/dim]")
+    body = (
+        f"[bold]Step {mission.step_label}[/bold] | {mission.progress_label}\n"
+        f"[cyan]Current:[/cyan] {mission.current_step.title} - {mission.current_step.detail}\n"
+        f"[green]Next:[/green] {mission.next_action}\n" + " > ".join(trail)
+    )
+    return Panel(
+        body,
+        title="Run Journey / First Archive",
+        border_style="green" if mission.complete else "cyan",
+        expand=True,
+    )
 
 
 def _build_turn_coach_panel(state: GameState) -> Panel:

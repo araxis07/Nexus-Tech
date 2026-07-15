@@ -2555,6 +2555,8 @@ def test_dashboard_rendering_contains_required_sections() -> None:
     assert "Late-Game" in output
     assert "Finance" in output
     assert "Risk Forecast" in output
+    assert "Run Journey / First Archive" in output
+    assert "Step 1/6" in output
     assert "End-Turn Preview" in output
     assert "Warning Level" in output
     assert "Board / Governance" in output
