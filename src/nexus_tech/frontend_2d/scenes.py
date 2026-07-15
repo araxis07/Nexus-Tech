@@ -3540,10 +3540,7 @@ class TitleScene(BaseScene):
                 else f"first archive {self._first_archive_mission.step_label}"
             )
             return (
-                (
-                    f"Campaign: {meta.campaign_tier} / {meta.campaign_stage} | "
-                    f"{compact_mission}"
-                ),
+                (f"Campaign: {meta.campaign_tier} / {meta.campaign_stage} | {compact_mission}"),
                 (
                     f"Runs {meta.total_runs} | victories {meta.victories} | "
                     f"best score {meta.best_score}"

@@ -6,6 +6,7 @@
 - Surfaced the current journey step and next action in the 2D title header, menu, Progress board, live Focus View, and terminal dashboard so short-term decisions stay connected to the full run
 - Added explicit `Run Archived` and `Archive Recorded` feedback, blocked duplicate terminal archive saves, and handed completed reviews back toward Progress and the next route
 - Kept the feature-freeze catalogs unchanged and the release classified as a late-alpha beta candidate; current-version human usability evidence remains `0/6`
+- Pinned Ruff 0.15.10 so local and CI formatting checks use the same deterministic formatter release
 
 ## 0.288.0 - 2026-07-15
 

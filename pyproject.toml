@@ -30,7 +30,7 @@ Changelog = "https://github.com/araxis07/Nexus-Tech/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3,<9.0",
-  "ruff>=0.11,<1.0",
+  "ruff==0.15.10",
 ]
 
 [project.scripts]
