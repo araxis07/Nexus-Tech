@@ -4589,7 +4589,7 @@ class RunScene(BaseScene):
             panel.detail_lines[0] if panel.detail_lines else panel.summary,
         )
         gate_action = next(
-            (action for action in panel.actions if action.label == "Gate Command"), None
+            (action for action in panel.actions if action.label == "Recommended Fix"), None
         )
         detail = blocked_line
         if gate_action is not None:
@@ -5237,17 +5237,34 @@ class RunScene(BaseScene):
         opening = build_guided_opening(self.state)
         first_step_done = bool(opening.steps and opening.steps[0].status == "done")
         resolved_once = bool(self.state.turn_history) or self.state.company.current_turn > 1
-        spent_actions = self.state.action_points_remaining <= 0 or resolved_once
+        spent_actions = first_step_done and (
+            self.state.action_points_remaining <= 0 or resolved_once
+        )
+        finished_turn = spent_actions and resolved_once
         ap_label = f"{max(0, self.state.action_points_remaining)} AP left"
         command_label = self._compact_button_detail(
             get_action_label(opening.current_command),
             max_length=24,
         )
         return (
-            FirstTurnGuideStep("1 Coach", f"C / click: {command_label}", first_step_done, INFO),
-            FirstTurnGuideStep("2 HUD", "Cash, runway, board, AP", resolved_once, GOOD),
-            FirstTurnGuideStep("3 Spend AP", ap_label, spent_actions, WARN),
-            FirstTurnGuideStep("4 Resolve", "P save | Space end", resolved_once, SELECTION),
+            FirstTurnGuideStep(
+                "1 Coach Move",
+                f"C / click runs {command_label}",
+                first_step_done,
+                INFO,
+            ),
+            FirstTurnGuideStep(
+                "2 Spend AP",
+                ap_label,
+                spent_actions,
+                GOOD,
+            ),
+            FirstTurnGuideStep(
+                "3 End Turn",
+                "Space after spending AP",
+                finished_turn,
+                SELECTION,
+            ),
         )
 
     def _motion_pressure_ratio(self) -> float:
@@ -7991,9 +8008,10 @@ class RunScene(BaseScene):
         self._first_turn_guide_visible = True
         self._click_targets.append(ClickTarget("coach", "", rect))
         line = (
-            f"First Turn | Journey {self._view_model.run_journey.step_label}: "
-            f"C Coach -> {get_action_label(opening.current_command)} | "
-            f"{max(0, self.state.action_points_remaining)} AP | P Save/Pause | Space End"
+            f"Opening {self._view_model.run_journey.step_label} | "
+            f"C Coach: {get_action_label(opening.current_command)} | "
+            f"AP {max(0, self.state.action_points_remaining)} | "
+            "P Pause | S Save | Space End"
         )
         draw_text_line(
             surface,
@@ -8594,7 +8612,6 @@ class RunScene(BaseScene):
         if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 58:
             return False
         pygame = self.pygame
-        opening = build_guided_opening(self.state)
         steps = self._first_turn_guide_steps()
         shimmer = (
             0.0
@@ -8618,10 +8635,10 @@ class RunScene(BaseScene):
         )
         self._click_targets.append(ClickTarget("coach", "", card_rect))
         title = (
-            f"First Turn Guide | Journey {self._view_model.run_journey.step_label} | "
-            f"C Coach -> {get_action_label(opening.current_command)}"
+            f"Guided Opening | Journey {self._view_model.run_journey.step_label} | "
+            "Follow the 3-step checklist"
         )
-        detail = "Click this guide for coach. P saves/pauses. Space resolves after AP."
+        detail = "Coach executes the recommendation. P pause | S save | Space end turn."
         draw_text_line(
             surface,
             self.fonts.small,
@@ -8646,7 +8663,7 @@ class RunScene(BaseScene):
         pending_seen = False
         for step in steps:
             if step.done:
-                status = "OK"
+                status = "DONE"
                 fill_ratio = 0.22
                 border_ratio = 0.42
             elif not pending_seen:
@@ -8655,7 +8672,7 @@ class RunScene(BaseScene):
                 border_ratio = 0.52
                 pending_seen = True
             else:
-                status = "WAIT"
+                status = "LATER"
                 fill_ratio = 0.07
                 border_ratio = 0.22
             chip_rect = pygame.Rect(left, chip_top, chip_width, chip_height)
@@ -8988,11 +9005,11 @@ class RunScene(BaseScene):
         elif self._focus_mode:
             brief = self._view_model.decision_brief
             primary = (
-                f"Step 2: {brief.command_label} | {brief.urgency_label} | "
+                f"Recommended: {brief.command_label} | {brief.urgency_label} | "
                 f"Actions Left: {self.state.action_points_remaining}"
             )
             more_hint = " | 0 More opens every action" if self._window_width() >= 940 else ""
-            hint = f"Why: {brief.command_detail} | Step 3: {brief.end_turn_label}{more_hint}"
+            hint = f"Why: {brief.command_detail} | End Turn: {brief.end_turn_label}{more_hint}"
         else:
             primary = (
                 f"Workspace: {workspace_title} | Product: {self.selected_product.name} | "
@@ -9055,21 +9072,21 @@ class RunScene(BaseScene):
         if panel is None:
             return f"{'Endgame' if compact else 'Workspace'}: {workspace_title}"
         gate_action = next(
-            (action for action in panel.actions if action.label == "Gate Command"),
+            (action for action in panel.actions if action.label == "Recommended Fix"),
             None,
         )
         hotspot_action = next(
-            (action for action in panel.actions if action.label == "Hotspot Review"),
+            (action for action in panel.actions if action.label == "Review Main Risk"),
             None,
         )
         segments = [f"{'Endgame' if compact else 'Workspace'}: {workspace_title}"]
         if gate_action is not None:
             segments.append(
-                f"Gate: {self._compact_command_token(gate_action.command, compact=compact)}"
+                f"Next: {self._compact_command_token(gate_action.command, compact=compact)}"
             )
         if hotspot_action is not None:
             segments.append(
-                f"Hotspot: {self._compact_command_token(hotspot_action.command, compact=compact)}"
+                f"Risk: {self._compact_command_token(hotspot_action.command, compact=compact)}"
             )
         segments.append(f"Actions Left: {self.state.action_points_remaining}")
         return " | ".join(segments)

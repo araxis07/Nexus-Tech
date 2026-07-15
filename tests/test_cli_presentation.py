@@ -2295,6 +2295,8 @@ def test_list_archives_command_renders_archive_catalog(
     assert captured["db_path"] == db_path
     assert "Run Archives" in result.output
     assert "Next Focus" in result.output
+    assert "Review Finance" in result.output
+    assert "review_finance" not in result.output
 
 
 def test_beta_evidence_command_reports_archive_coverage_without_manual_signoff(
@@ -2701,7 +2703,8 @@ def test_list_unlocks_command_renders_unlock_catalog(
 
     assert result.exit_code == 0
     assert "Unlock Catalog" in result.output
-    assert "Reward Id" in result.output
+    assert "Reward Id" not in result.output
+    assert "board_command_cloud" not in result.output
     assert "Next Unlock" in result.output
 
 

@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from nexus_tech.domain.money import format_money, quantize_money
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
+from nexus_tech.simulation.action_catalog import get_action_label
 from nexus_tech.simulation.campaign_mastery import (
     CampaignRouteMasterySummary,
     build_campaign_route_mastery,
@@ -26,7 +27,8 @@ class AchievementDefinition:
 
     @property
     def reward_label(self) -> str:
-        return f"Unlock {self.reward_type}: {self.reward_name} [{self.reward_id}]"
+        reward_type = self.reward_type.replace("_", " ").title()
+        return f"Unlock {reward_type}: {self.reward_name}"
 
 
 @dataclass(frozen=True)
@@ -432,21 +434,26 @@ def summarize_meta_progression(
         _format_ladder_step("institution_builder", campaign_stage == "institution_builder", 6),
     )
 
+    next_definition = next(
+        (
+            definition
+            for definition in achievement_definitions
+            if not unlock_status.get(definition.achievement_id, False)
+        ),
+        None,
+    )
     if victories == 0:
         next_goal = "Push one run to a victory state to unlock the next campaign tier."
-    elif unlocks_remaining:
-        next_goal = f"Next unlock target: {unlocks_remaining[0]}."
+    elif next_definition is not None:
+        next_goal = f"Next unlock target: {next_definition.title}."
     elif "ipo_ready" not in unique_outcomes:
         next_goal = "Reach an IPO-ready ending to complete the public-market ladder."
     else:
         next_goal = "The archive already covers the core campaign ladder."
-    next_reward = next(
-        (
-            definition.reward_label
-            for definition in achievement_definitions
-            if not unlock_status.get(definition.achievement_id, False)
-        ),
-        "All archive-driven rewards are unlocked.",
+    next_reward = (
+        next_definition.reward_label
+        if next_definition is not None
+        else "All archive-driven rewards are unlocked."
     )
 
     return MetaProgressionSummary(
@@ -673,7 +680,8 @@ def _common_next_focus(archives: list[RunArchiveSummary]) -> str:
     }
     if not focuses:
         return "-"
-    return max(focuses.items(), key=lambda item: item[1])[0]
+    command = max(focuses.items(), key=lambda item: item[1])[0]
+    return get_action_label(command)
 
 
 def _compute_unlock_status(archives: list[RunArchiveSummary]) -> dict[str, bool]:

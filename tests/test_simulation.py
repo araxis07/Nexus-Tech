@@ -24644,6 +24644,7 @@ def test_meta_progression_summary_derives_unlocks_from_archives() -> None:
             final_cash=Decimal("14000.00"),
             final_reputation=68,
             archived_at="2026-04-29T00:00:00+00:00",
+            review_next_focus="review_finance",
         )
     ]
 
@@ -24702,6 +24703,8 @@ def test_unlock_catalog_surfaces_exact_reward_metadata() -> None:
         entry.reward_id == "board_command_cloud" for entry in catalog.entries if entry.unlocked
     )
     assert catalog.next_unlock_label
+    assert all(entry.reward_id not in entry.reward_label for entry in catalog.entries)
+    assert "[" not in catalog.next_unlock_label
 
 
 def test_reward_unlocks_gate_progression_content_ids() -> None:
@@ -24859,6 +24862,7 @@ def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
             final_cash=Decimal("14000.00"),
             final_reputation=68,
             archived_at="2026-04-29T00:00:00+00:00",
+            review_next_focus="review_finance",
         ),
         RunArchiveSummary(
             archive_key="run-2",
@@ -24879,6 +24883,7 @@ def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
             final_cash=Decimal("18800.00"),
             final_reputation=72,
             archived_at="2026-04-30T00:00:00+00:00",
+            review_next_focus="review_finance",
         ),
     ]
 
@@ -24895,6 +24900,7 @@ def test_archive_comparison_summary_surfaces_archive_leaders() -> None:
     assert comparison.best_restructure_label == "-"
     assert comparison.path_balance_note
     assert comparison.next_gap
+    assert comparison.common_next_focus == "Review Finance"
 
 
 def test_run_enterprise_reference_secretariat_rebuilds_terminal_flagship_trust() -> None:

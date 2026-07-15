@@ -222,7 +222,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Classify successful runs into exit paths such as profitable independence, strategic acquisition, IPO-ready, or restructure
 - Summarize completed-run history into archive-driven meta progression with campaign tiers and unlock-style achievement tracking
 - Surface a visible campaign ladder, archive benchmarks, and next-goal hints so repeat runs feel like structured progression instead of isolated saves
-- Expose an explicit unlock catalog with reward ids for archive-driven scenarios, templates, rivals, tools, and late-game insight lenses
+- Expose an explicit unlock catalog with player-facing reward names for archive-driven scenarios, templates, rivals, tools, and late-game insight lenses
 - Apply archive-driven unlocks to real gameplay entry points so locked reward starts cannot be launched until the local archive progression earns them
 - Compare archived runs directly through score, cash, offer, grade, and outcome coverage so late-game experimentation becomes easier to review
 - Surface path-specific archive leaders, badge coverage, reward mix, and next-gap guidance so the meta layer can point toward what the player has not yet mastered
@@ -941,11 +941,11 @@ The core loop is simple:
 
 The HUD also tracks the full First Archive Mission: Guided Opening, Commitment, Consequence, Enter Endgame, Finish the Run, and Save & Archive. This journey indicator is guidance only and is derived from existing state, so older saves remain compatible.
 
-If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to get a compact opening checklist.
+If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or use the in-session Guided Opening panel to follow Coach Move, Spend AP, and End Turn without exposing internal command ids. Coach executes the current recommended move instead of opening a read-only hint.
 
 For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`; add `--motion-mode reduced` or `--motion-mode off` if you want quieter highlight, entity, actor, action-feedback, and transition animation. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, open the progression board, or press `7` for Settings before entering play. Inside a run you can click the Recommended Move and End Turn Check cards directly, plus product cards, modal options, deep-dive panel buttons, and the action bar, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `I`, `Q`, `F`, `M`, `D`, `H`, `A`, `O`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, `P`, `Esc`, and `F1`. `P` opens Pause with Resume, Save, Menu, Settings, and Quit controls; `T` opens Settings while paused; and `Esc` returns from Settings to Pause before resuming the run. The shared responsive frame reserves navigation, header, content, and footer regions across title, run, review, and turn-summary scenes. The live run retains its shape-based entity motion, deterministic shape-sprite actors, command feedback, scene transitions, compact action copy, adaptive feed pacing, staged turn summaries, endgame cockpit, and remembered inspector controls. If a button is disabled, the 2D shell still tells you exactly which prerequisite is missing before you waste the click.
 
-For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; CLI flags override that profile for the current launch. Arbitrary key remapping is not included in 0.289.0; the documented keyboard bindings remain fixed for this release.
+For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; CLI flags override that profile for the current launch. Arbitrary key remapping is not included in 0.290.0; the documented keyboard bindings remain fixed for this release.
 
 Difficulty guidance:
 

@@ -1117,8 +1117,8 @@ def test_endgame_cockpit_actions_expose_all_path_fix_buttons() -> None:
 
     labels = {action.label for action in actions}
     assert {"IPO Fix", "M&A Fix", "Independence Fix", "Reset Fix"} <= labels
-    assert any(action.label == "Gate Command" for action in actions)
-    assert any(action.label == "Hotspot Review" for action in actions)
+    assert any(action.label == "Recommended Fix" for action in actions)
+    assert any(action.label == "Review Main Risk" for action in actions)
 
 
 def test_run_scene_opening_endgame_panel_pushes_cockpit_brief_event() -> None:
@@ -1161,9 +1161,16 @@ def test_run_scene_first_turn_guide_draws_clickable_coach_path() -> None:
         scene.draw(surface)
 
         steps = scene._first_turn_guide_steps()
-        assert len(steps) == 4
-        assert steps[0].label == "1 Coach"
-        assert steps[2].detail.endswith("AP left")
+        assert len(steps) == 3
+        assert [step.label for step in steps] == [
+            "1 Coach Move",
+            "2 Spend AP",
+            "3 End Turn",
+        ]
+        assert "runs" in steps[0].detail
+        assert steps[1].detail.endswith("AP left")
+        assert steps[2].detail == "Space after spending AP"
+        assert [step.done for step in steps] == [False, False, False]
         assert scene.first_turn_guide_active()
         assert any(target.kind == "coach" for target in scene._click_targets)
 
@@ -1229,7 +1236,7 @@ def test_run_scene_endgame_cockpit_command_pushes_handoff_event() -> None:
         panel = scene.deep_panel
         assert panel is not None
         hotspot_action = next(
-            action for action in panel.actions if action.label == "Hotspot Review"
+            action for action in panel.actions if action.label == "Review Main Risk"
         )
 
         scene._run_endgame_cockpit_command(hotspot_action.command)
@@ -1591,8 +1598,8 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         scene._set_deep_panel("endgame")
         workspace_line, hint_line = scene._footer_status_lines()
         assert "Endgame: Endgame / Exit Board" in workspace_line
-        assert "Gate:" in workspace_line
-        assert "Hotspot:" in workspace_line
+        assert "Next:" in workspace_line
+        assert "Risk:" in workspace_line
         assert hint_line.startswith("Watch:")
 
         picker = ContextPicker(
@@ -1640,7 +1647,7 @@ def test_run_scene_endgame_footer_status_compacts_commands_on_small_windows() ->
 
         assert "Endgame: Endgame / Exit Board" in workspace_line
         assert "set_board_reset_cont..." not in workspace_line
-        assert "Gate:" in workspace_line
+        assert "Next:" in workspace_line
     finally:
         pygame.quit()
 
@@ -1691,7 +1698,7 @@ def test_run_scene_endgame_panel_action_tooltip_mentions_handoff_destination() -
         scene._set_deep_panel("endgame")
         panel = scene.deep_panel
         assert panel is not None
-        action = next(entry for entry in panel.actions if entry.label == "Hotspot Review")
+        action = next(entry for entry in panel.actions if entry.label == "Review Main Risk")
         hint = scene._describe_click_target(
             ClickTarget("panel_action", action.command, _surface.get_rect())
         )
@@ -2984,6 +2991,7 @@ def test_title_scene_sidebar_surfaces_meta_progression(tmp_path: Path) -> None:
         assert any(line.startswith("Campaign tier:") for line in menu_lines)
         assert any(line.startswith("First archive:") for line in menu_lines)
         assert any(line.startswith("Next reward:") for line in menu_lines)
+        assert not any("compare_archives" in line for line in menu_lines)
 
         scene._mode = "archives"
         archive_lines = scene._title_sidebar_lines()
@@ -3490,7 +3498,8 @@ def test_build_run_review_view_model_exposes_findings() -> None:
 
     assert review.title in {"Failure Postmortem", "After-Action Review"}
     assert review.findings
-    assert review.next_focus
+    assert review.next_focus == review.findings[0].command
+    assert "_" not in review.next_focus
 
 
 def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> None:

@@ -2,7 +2,7 @@
 
 ## Current Level
 
-NEXUS TECH 0.289.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission now connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. Schema 26 remains unchanged and retains isolated structured human-session evidence while migrating older saves additively.
+NEXUS TECH 0.290.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission now connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. Player-facing review, reward, onboarding, and Endgame guidance now suppresses internal identifiers and prioritizes one readable next move. Schema 26 remains unchanged and retains isolated structured human-session evidence while migrating older saves additively.
 
 The project is approximately 83% of the way to a defensible beta. Core simulation, persistence, navigation, responsive 2D presentation, campaign progression, deterministic testing, first-run journey guidance, archive replay guidance, and release automation exist. The remaining gap is observed usability with representative players, not another content expansion.
 
@@ -82,7 +82,7 @@ No test or generated report should mark these observations complete without a hu
 
 The repository baseline is currently `0/6` current-version human sessions. Run `beta-playtest-status` before and after each real session. Only use `record-beta-playtest-session --confirm-human-session ...` after observing the session; the local SQLite row is evidence input, not automatic release approval.
 
-Arbitrary key remapping is not part of 0.289.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
+Arbitrary key remapping is not part of 0.290.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
 
 ## Next Steps
 

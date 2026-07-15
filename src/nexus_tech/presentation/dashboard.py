@@ -631,7 +631,7 @@ def render_run_archive_catalog(
                 if archive.review_primary_area
                 else archive.review_title or "-"
             ),
-            archive.review_next_focus or "-",
+            get_action_label(archive.review_next_focus) if archive.review_next_focus else "-",
             archive.archived_at,
         )
 
@@ -658,7 +658,14 @@ def render_run_archive_catalog(
             else latest_archive.review_title or "-"
         ),
     )
-    summary_table.add_row("Next Focus", latest_archive.review_next_focus or "-")
+    summary_table.add_row(
+        "Next Focus",
+        (
+            get_action_label(latest_archive.review_next_focus)
+            if latest_archive.review_next_focus
+            else "-"
+        ),
+    )
     console.print(
         Columns(
             [
@@ -1542,14 +1549,12 @@ def render_unlock_catalog(console: Console, summary: UnlockCatalogSummary) -> No
     table.add_column("Status", style="bold")
     table.add_column("Type")
     table.add_column("Reward")
-    table.add_column("Reward Id")
     table.add_column("Achievement")
     for entry in summary.entries:
         table.add_row(
             "unlocked" if entry.unlocked else "locked",
             entry.reward_type,
             entry.reward_name,
-            entry.reward_id,
             entry.title,
         )
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.290.0 - 2026-07-16
+
+- Replaced raw action and reward identifiers in live reviews, archive reviews, progression guidance, and terminal archive tables with player-facing labels
+- Simplified the first-turn overlay into Coach Move, Spend AP, and End Turn steps while correcting Pause and Save key guidance
+- Reframed the Endgame cockpit around a Recommended Fix and Review Main Risk before its advanced path controls without changing simulation balance or save schema 26
+- Kept the feature-freeze catalogs unchanged and the release classified as a late-alpha beta candidate; current-version human usability evidence remains `0/6`
+
 ## 0.289.0 - 2026-07-15
 
 - Added a save-compatible six-step First Archive Mission spanning Guided Opening, Commitment, Consequence, Endgame, run completion, and Save & Archive without changing schema 26

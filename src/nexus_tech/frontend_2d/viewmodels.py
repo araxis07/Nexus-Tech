@@ -1316,8 +1316,8 @@ def _build_endgame_panel(
         key="endgame",
         title="Endgame / Exit Board",
         summary=(
-            "Track exit readiness, blocked path gates, and the next late-game repair command "
-            "without leaving the 2D run loop."
+            "Start with Recommended Fix, review the main risk, then compare advanced exit "
+            "paths without leaving the 2D run loop."
         ),
         metrics=(
             DeepDiveMetricViewModel(
@@ -1355,20 +1355,24 @@ def _build_endgame_panel(
                 f"Blocked paths: {blocked_paths}/4 | hotspot {hotspot_label.lower()} | "
                 f"next {get_action_label(pressure.path_gate_command_alert)}"
             ),
-            f"Gate alert: {pressure.path_gate_alert}",
-            f"Recommendation: {pressure.recommendation}",
+            f"Next move: {get_action_label(pressure.path_gate_command_alert)} | "
+            f"{humanize_action_text(pressure.path_gate_alert)}",
+            f"Recommendation: {humanize_action_text(pressure.recommendation)}",
         ),
         actions=tuple(
             [
                 DeepDiveActionViewModel(
                     pressure.path_gate_command_alert,
-                    "Gate Command",
-                    pressure.path_gate_alert,
+                    "Recommended Fix",
+                    (
+                        f"{get_action_label(pressure.path_gate_command_alert)}: "
+                        f"{humanize_action_text(pressure.path_gate_alert)}"
+                    ),
                     gate_command_tone,
                 ),
                 DeepDiveActionViewModel(
                     hotspot_command,
-                    "Hotspot Review",
+                    "Review Main Risk",
                     hotspot_detail,
                     hotspot_tone,
                 ),
@@ -1499,7 +1503,7 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
         title=postmortem.title,
         headline=postmortem.headline,
         summary_line=summary_line,
-        next_focus=postmortem.next_run_focus,
+        next_focus=get_action_label(postmortem.next_run_focus),
         campaign_legacy_title=legacy.route_label if legacy is not None else "",
         campaign_legacy_detail=(
             f"{legacy.pressure_line} {legacy.mandate}" if legacy is not None else ""
@@ -1513,6 +1517,7 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
     """Build a compact review scene from one archived run summary."""
 
     findings: list[ReviewFindingViewModel] = []
+    next_focus = get_action_label(summary.review_next_focus or TurnAction.VIEW_REPORT.value)
     legacy = build_campaign_path_legacy_from_labels(summary.scenario_id, summary.campaign_path)
     if summary.review_primary_area:
         findings.append(
@@ -1521,8 +1526,8 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
                 area=summary.review_primary_area,
                 severity="watch",
                 summary=summary.review_primary_summary or "Primary archive lesson captured.",
-                command=summary.review_next_focus or "view_report",
-                lesson=summary.review_next_focus or "Review the archived run details.",
+                command=next_focus,
+                lesson=f"Start the next run with {next_focus} before taking on more risk.",
             )
         )
     findings.append(
@@ -1534,7 +1539,7 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
                 f"Exit {summary.exit_outcome} at turn {summary.completed_turn} with "
                 f"score tier {summary.score_tier}."
             ),
-            command=summary.review_next_focus or "view_report",
+            command=next_focus,
             lesson=summary.strategic_outlook.replace("_", " "),
         )
     )
@@ -1545,7 +1550,7 @@ def build_archive_review_view_model(summary: RunArchiveSummary) -> RunReviewView
             f"Turn {summary.completed_turn} | score {summary.total_score} ({summary.score_tier}) | "
             f"grade {summary.campaign_grade} | cash {format_money(summary.final_cash)}"
         ),
-        next_focus=summary.review_next_focus or "view_report",
+        next_focus=next_focus,
         campaign_legacy_title=legacy.route_label if legacy is not None else "",
         campaign_legacy_detail=(
             f"{legacy.pressure_line} {legacy.mandate}" if legacy is not None else ""

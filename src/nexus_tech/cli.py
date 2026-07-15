@@ -8798,7 +8798,7 @@ def show_progression_command(
 def list_unlocks_command(
     db_path: Path = DB_PATH_OPTION,
 ) -> None:
-    """Render the archive-driven unlock catalog with exact reward ids."""
+    """Render the archive-driven unlock catalog with player-facing reward names."""
 
     coordinator = SaveLoadCoordinator(db_path)
     try:
