@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 26
+CURRENT_SCHEMA_VERSION = 27
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 26,
+        schema_version INTEGER NOT NULL DEFAULT 27,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -295,6 +295,21 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS decision_history (
+        slot_name TEXT NOT NULL
+            REFERENCES save_slots(slot_name) ON DELETE CASCADE,
+        entry_index INTEGER NOT NULL,
+        turn INTEGER NOT NULL,
+        command TEXT NOT NULL,
+        label TEXT NOT NULL,
+        family TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        impact_summary TEXT NOT NULL,
+        timing TEXT NOT NULL,
+        PRIMARY KEY (slot_name, entry_index)
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS quarter_plan (
         slot_name TEXT PRIMARY KEY
             REFERENCES save_slots(slot_name) ON DELETE CASCADE,
@@ -525,6 +540,7 @@ SCHEMA_STATEMENTS = (
         ui_scale TEXT NOT NULL DEFAULT 'standard',
         contrast_mode TEXT NOT NULL DEFAULT 'standard',
         motion_mode TEXT NOT NULL DEFAULT 'full',
+        action_loadout TEXT NOT NULL DEFAULT 'contextual',
         updated_at TEXT NOT NULL
     )
     """,
@@ -1395,6 +1411,12 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="event_history",
         column_name="chain_stage",
         column_definition="INTEGER NOT NULL DEFAULT 0",
+    )
+    _ensure_column(
+        connection,
+        table_name="frontend_preferences",
+        column_name="action_loadout",
+        column_definition="TEXT NOT NULL DEFAULT 'contextual'",
     )
     if current_version < 6:
         _apply_version_6_migration(connection)

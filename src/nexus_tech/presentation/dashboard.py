@@ -1438,6 +1438,7 @@ def render_report(console: Console, state: GameState) -> None:
     console.print(
         Columns(
             [
+                _build_decision_ledger_panel(state),
                 _build_funding_history_panel(state),
                 _build_recent_events_panel(state),
                 _build_milestone_history_panel(state),
@@ -4836,6 +4837,30 @@ def _build_funding_history_panel(state: GameState) -> Panel:
         border_style="green",
         expand=True,
     )
+
+
+def _build_decision_ledger_panel(state: GameState) -> Panel:
+    if not state.decision_history:
+        return Panel(
+            "No state-changing decisions recorded yet.",
+            title="Decision Ledger",
+            border_style="cyan",
+            expand=True,
+        )
+
+    table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    table.add_column("Turn", justify="right", style="bold cyan")
+    table.add_column("Decision", style="bold")
+    table.add_column("Immediate Impact")
+    table.add_column("Follow-on")
+    for entry in reversed(state.decision_history[-8:]):
+        table.add_row(
+            str(entry.turn),
+            f"{entry.label}\n[dim]{entry.family}[/dim]",
+            entry.impact_summary,
+            entry.timing,
+        )
+    return Panel(table, title="Decision Ledger", border_style="cyan", expand=True)
 
 
 def _build_recent_events_panel(state: GameState) -> Panel:

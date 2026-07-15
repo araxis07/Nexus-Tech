@@ -2,7 +2,7 @@
 
 ## Current Level
 
-NEXUS TECH 0.290.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission now connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. Player-facing review, reward, onboarding, and Endgame guidance now suppresses internal identifiers and prioritizes one readable next move. Schema 26 remains unchanged and retains isolated structured human-session evidence while migrating older saves additively.
+NEXUS TECH 0.291.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. A bounded Decision Ledger now explains immediate and end-turn effects, while persistent action loadouts prioritize existing enabled choices without changing balance. Schema 27 stores decision history additively, keeps display/loadout preferences outside gameplay save slots, and retains isolated structured human-session evidence.
 
 The project is approximately 83% of the way to a defensible beta. Core simulation, persistence, navigation, responsive 2D presentation, campaign progression, deterministic testing, first-run journey guidance, archive replay guidance, and release automation exist. The remaining gap is observed usability with representative players, not another content expansion.
 
@@ -30,7 +30,8 @@ The project is approximately 83% of the way to a defensible beta. Core simulatio
 - Root CLI help now stays player-facing; `developer-tools` indexes hidden balance, audit, CI, and manual-QA commands while preserving direct invocation.
 - All 2D launch paths support `--ui-scale compact|standard|large` and `--contrast-mode standard|high` in addition to motion controls.
 - Title shortcuts now follow their visible order: `1` Continue, `2` New Game, `3` Guide, `4` Saves, `5` Archives, `6` Progress, `7` Settings, and `8` Quit.
-- Title and Pause Settings apply text scale, contrast, and motion live, persist locally, and follow scene transitions without altering gameplay save slots.
+- Title and Pause Settings apply text scale, contrast, motion, and Contextual/Product/Growth/Resilience action loadouts live, persist locally, and follow scene transitions without altering gameplay save slots.
+- State-changing actions append a bounded Decision Ledger entry with a player-facing label, immediate delta summary, and follow-on timing; terminal and 2D reports expose the same persisted history.
 - Title, Run, Review, and Turn Summary use shared responsive frame profiles that reserve navigation, header, content, and footer regions.
 - Repeated saves now preserve parent product rows while dependent account, employee, pipeline, partnership, and event rows are replaced safely.
 
@@ -65,7 +66,7 @@ uv run nexus-tech balance-audit --scenario founder_journey --scenario bootstrap_
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 282 --viewport 820x620 --viewport 1280x720 --viewport 1440x900
 ```
 
-Automated coverage verifies campaign boundaries and delayed effects, event priority, all 72 campaign-route/difficulty cells, early-victory prevention, path retention, route-mastery derivation, Campaign Legacy synthesis, all six First Archive Mission states, archive confirmation and duplicate-save prevention, additive migration through schema 26, archive evidence, structured-session validation, preference persistence/fallback, the 6-by-3 balance matrix, the long-session Debt Crunch envelope, catalog ceilings, Focus View layout, Settings typography, Pause recovery, accessibility-profile launch, and responsive containment.
+Automated coverage verifies campaign boundaries and delayed effects, event priority, all 72 campaign-route/difficulty cells, early-victory prevention, path retention, route-mastery derivation, Campaign Legacy synthesis, all six First Archive Mission states, archive confirmation and duplicate-save prevention, additive migration through schema 27, Decision Ledger round trips, action-loadout persistence and prioritization, archive evidence, structured-session validation, preference persistence/fallback, the 6-by-3 balance matrix, the long-session Debt Crunch envelope, catalog ceilings, Focus View layout, Settings typography, Pause recovery, accessibility-profile launch, and responsive containment.
 
 ## Human Evidence Still Required
 
@@ -82,7 +83,7 @@ No test or generated report should mark these observations complete without a hu
 
 The repository baseline is currently `0/6` current-version human sessions. Run `beta-playtest-status` before and after each real session. Only use `record-beta-playtest-session --confirm-human-session ...` after observing the session; the local SQLite row is evidence input, not automatic release approval.
 
-Arbitrary key remapping is not part of 0.290.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
+Arbitrary key remapping is not part of 0.291.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
 
 ## Next Steps
 

@@ -1240,7 +1240,7 @@ def build_deep_dive_panel_view_models(
                 format_money(run_score.estimated_valuation),
                 "info",
             ),
-            DeepDiveMetricViewModel("History", str(len(state.turn_history)), "info"),
+            DeepDiveMetricViewModel("Decisions", str(len(state.decision_history)), "info"),
         ),
         detail_lines=(
             f"Scenario objective: {state.scenario_objective or 'None set.'}",
@@ -1252,6 +1252,12 @@ def build_deep_dive_panel_view_models(
                 else "No turn ledger exists yet."
             ),
             f"Milestones unlocked: {len(state.milestone_history)}",
+            (
+                f"Latest decision: {state.decision_history[-1].label} | "
+                f"{state.decision_history[-1].impact_summary}"
+                if state.decision_history
+                else "No state-changing decisions recorded yet."
+            ),
         ),
         actions=(
             DeepDiveActionViewModel(
@@ -2357,6 +2363,29 @@ def _build_pipeline_inspectors(
 
 
 def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    decision_items = tuple(
+        DeepDiveInspectorItemViewModel(
+            title=f"Turn {entry.turn} | {entry.label}",
+            detail_lines=(entry.impact_summary, entry.summary, entry.timing),
+            tone=(
+                "warning" if entry.family in {"Finance", "Board / Exit", "Operations"} else "info"
+            ),
+            actions=(
+                DeepDiveActionViewModel(
+                    "view_report",
+                    "Report",
+                    "Refresh the decision ledger and full run reporting.",
+                    "info",
+                ),
+            ),
+        )
+        for entry in reversed(state.decision_history)
+    ) or (
+        _placeholder_item(
+            "No Decisions Yet",
+            "Take a state-changing action to record its impact and follow-on timing.",
+        ),
+    )
     latest_turn_items = tuple(
         DeepDiveInspectorItemViewModel(
             title=f"Turn {entry.turn}",
@@ -2457,6 +2486,12 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
         ),
     )
     return (
+        DeepDiveInspectorSectionViewModel(
+            key="decisions",
+            title="Decision Ledger",
+            tone="info",
+            items=decision_items,
+        ),
         DeepDiveInspectorSectionViewModel(
             key="turns",
             title="Latest Turns",

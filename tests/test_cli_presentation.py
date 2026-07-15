@@ -2602,6 +2602,7 @@ def test_report_rendering_contains_score_and_turn_history() -> None:
     assert "End-Turn Preview" in output
     assert "Warning Level" in output
     assert "Turn History" in output
+    assert "Decision Ledger" in output
     assert "Quarter Plan" in output
     assert "Finance" in output
     assert "Competitor Watch" in output

@@ -93,7 +93,7 @@ from nexus_tech.simulation.meta_progression import (
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
-from nexus_tech.user_preferences import FrontendPreferences
+from nexus_tech.user_preferences import ActionLoadout, FrontendPreferences
 
 
 @dataclass(frozen=True)
@@ -476,6 +476,22 @@ _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
         TurnAction.END_TURN.value,
     ),
 )
+
+_ACTION_LOADOUT_COMMANDS: dict[ActionLoadout, tuple[str, ...]] = {
+    ActionLoadout.CONTEXTUAL: (),
+    ActionLoadout.PRODUCT: (
+        TurnAction.IMPROVE_QUALITY.value,
+        TurnAction.ADD_FEATURE.value,
+    ),
+    ActionLoadout.GROWTH: (
+        TurnAction.MARKET_PRODUCT.value,
+        TurnAction.CREATE_PARTNERSHIP.value,
+    ),
+    ActionLoadout.RESILIENCE: (
+        TurnAction.REDUCE_TECHNICAL_DEBT.value,
+        TurnAction.SET_SUPPORT_LANE_FOCUS.value,
+    ),
+}
 
 _INSPECTOR_SORT_MODES: tuple[str, ...] = ("default", "risk", "value", "stalled")
 _INSPECTOR_FILTER_MODES: tuple[str, ...] = ("all", "actionable", "attention")
@@ -988,7 +1004,7 @@ class BaseScene:
         draw_text_line(
             surface,
             self.fonts.heading,
-            "Display & Motion",
+            "Display & Decisions",
             TEXT,
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
@@ -1003,35 +1019,42 @@ class BaseScene:
         )
         controls = (
             (
-                f"Text Scale: {preferences.ui_scale.value.title()}",
+                f"1 Text: {preferences.ui_scale.value.title()}",
                 "Cycle compact, standard, and large type.",
                 f"{target_prefix}_cycle",
                 "ui_scale",
                 INFO,
             ),
             (
-                f"Contrast: {preferences.contrast_mode.value.title()}",
+                f"2 Contrast: {preferences.contrast_mode.value.title()}",
                 "Switch between standard and high contrast.",
                 f"{target_prefix}_cycle",
                 "contrast_mode",
                 WARN,
             ),
             (
-                f"Motion: {preferences.motion_mode.value.title()}",
+                f"3 Motion: {preferences.motion_mode.value.title()}",
                 "Choose full, reduced, or motion off.",
                 f"{target_prefix}_cycle",
                 "motion_mode",
                 GOOD,
             ),
             (
-                "Reset Defaults",
-                "Restore standard text, contrast, and full motion.",
+                f"4 Loadout: {preferences.action_loadout.value.title()}",
+                "Prioritize contextual, product, growth, or resilience actions.",
+                f"{target_prefix}_cycle",
+                "action_loadout",
+                SELECTION,
+            ),
+            (
+                "R / 8 Reset",
+                "Restore standard display, motion, and contextual actions.",
                 f"{target_prefix}_reset",
                 "",
                 DANGER,
             ),
             (
-                "Back",
+                "B / 9 Back",
                 "Return without losing the applied settings.",
                 back_kind,
                 back_payload,
@@ -1608,6 +1631,13 @@ class TitleScene(BaseScene):
             self.should_exit = True
             self.exit_reason = "quit"
             return
+        if self._mode == "settings":
+            if event.key == self.pygame.K_r:
+                self._reset_frontend_preferences()
+                return
+            if event.key == self.pygame.K_b:
+                self._set_mode("menu")
+                return
         if self._mode == "wizard" and event.key in (
             self.pygame.K_RETURN,
             self.pygame.K_KP_ENTER,
@@ -1871,6 +1901,20 @@ class TitleScene(BaseScene):
                 self._set_mode("menu")
             elif digit == 9:
                 self._launch_wizard_run()
+            return
+        if self._mode == "settings":
+            field = {
+                1: "ui_scale",
+                2: "contrast_mode",
+                3: "motion_mode",
+                4: "action_loadout",
+            }.get(digit)
+            if field is not None:
+                self._cycle_frontend_preference(field)
+            elif digit == 8:
+                self._reset_frontend_preferences()
+            elif digit == 9:
+                self._set_mode("menu")
 
     def _handle_menu_action(self, action: str) -> None:
         if action == "menu":
@@ -3403,7 +3447,7 @@ class TitleScene(BaseScene):
         elif self._mode == "wizard":
             message = "Wizard: click rows to cycle/edit. Enter launches. Esc returns to menu."
         elif self._mode == "settings":
-            message = "Settings apply immediately, persist locally, and follow every 2D scene."
+            message = "Settings: 1-4 cycle, 8 resets, 9 or Esc returns. Changes persist locally."
         else:
             message = "Archives: click a card to inspect it. Press 9 or Esc to return."
         draw_text_line(
@@ -3456,6 +3500,7 @@ class TitleScene(BaseScene):
                 f"Text scale: {preferences.ui_scale.value}",
                 f"Contrast: {preferences.contrast_mode.value}",
                 f"Motion: {preferences.motion_mode.value}",
+                f"Action loadout: {preferences.action_loadout.value}",
                 "Stored only in the local SQLite profile.",
             )
         if self._mode == "meta":
@@ -4901,6 +4946,8 @@ class RunScene(BaseScene):
                     self._cycle_frontend_preference("contrast_mode")
                 elif event.key == self.pygame.K_3:
                     self._cycle_frontend_preference("motion_mode")
+                elif event.key == self.pygame.K_4:
+                    self._cycle_frontend_preference("action_loadout")
                 elif event.key == self.pygame.K_r:
                     self._reset_frontend_preferences()
                 elif event.key == self.pygame.K_b:
@@ -8841,17 +8888,15 @@ class RunScene(BaseScene):
         if self._focus_mode:
             return self._focus_footer_action_buttons()
 
-        core_titles = {
-            "Coach",
-            "Team",
-            "Finance",
-            "Customers",
-            "Report",
-            "Improve",
-            "Market",
-        }
+        core_titles = {"Coach", "Team", "Finance", "Customers", "Report"}
         final_titles = {"Save", "End Turn"}
         buttons = [button for button in _ACTION_BUTTONS if button.title in core_titles]
+        loadout_buttons = list(self._loadout_action_buttons())
+        if not loadout_buttons:
+            loadout_buttons = [
+                button for button in _ACTION_BUTTONS if button.title in {"Improve", "Market"}
+            ]
+        buttons.extend(button for button in loadout_buttons if button not in buttons)
 
         contextual_panel_titles: list[str] = []
         if self.state.company.current_turn >= 10 or self.state.victory_achieved:
@@ -8871,22 +8916,22 @@ class RunScene(BaseScene):
             if button.title == title and button not in buttons
         ]
 
-        recommended_commands = {line.command for line in self._view_model.coach_lines[:3]}
-        contextual_commands = set(recommended_commands)
+        contextual_commands = [line.command for line in self._view_model.coach_lines[:3]]
         if not self.state.employees:
-            contextual_commands.add(TurnAction.HIRE_EMPLOYEE.value)
+            contextual_commands.append(TurnAction.HIRE_EMPLOYEE.value)
         elif any(employee.assigned_product_id is None for employee in self.state.employees):
-            contextual_commands.add(TurnAction.ASSIGN_EMPLOYEE.value)
+            contextual_commands.append(TurnAction.ASSIGN_EMPLOYEE.value)
         if (
             self.state.campaign_goal_id.value == "portfolio_empire"
             and self.state.company.current_turn >= 4
         ):
-            contextual_commands.add(TurnAction.CREATE_PRODUCT.value)
+            contextual_commands.append(TurnAction.CREATE_PRODUCT.value)
 
         contextual_buttons = [
             button
+            for command in dict.fromkeys(contextual_commands)
             for button in _ACTION_BUTTONS
-            if button.payload in contextual_commands and button not in buttons
+            if button.payload == command and button not in buttons
         ]
         contextual_budget = max(0, 10 - len(buttons) - len(final_titles))
         buttons.extend((contextual_panels + contextual_buttons)[:contextual_budget])
@@ -8901,7 +8946,7 @@ class RunScene(BaseScene):
         final_buttons = tuple(
             button for button in _ACTION_BUTTONS if button.title in {"Save", "End Turn"}
         )
-        recommended: list[ActionButtonSpec] = []
+        recommended: list[ActionButtonSpec] = list(self._loadout_action_buttons())
         for line in self._view_model.coach_lines[:3]:
             candidate = next(
                 (
@@ -8931,6 +8976,18 @@ class RunScene(BaseScene):
                 button for button in _ACTION_BUTTONS if button.title in {"Improve", "Market"}
             )
         return (coach_button, *recommended[:2], report_button, *final_buttons)
+
+    def _loadout_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
+        """Return enabled action buttons emphasized by the local player profile."""
+
+        loadout = self._current_frontend_preferences().action_loadout
+        commands = _ACTION_LOADOUT_COMMANDS[loadout]
+        return tuple(
+            button
+            for command in commands
+            for button in _ACTION_BUTTONS
+            if button.payload == command and self._button_is_enabled(button)
+        )
 
     def _footer_button_columns(self, available_width: int) -> int:
         if available_width < 620:
@@ -10594,7 +10651,14 @@ class RunScene(BaseScene):
                 WARN,
                 menu_available,
             ),
-            ("T Settings", "Text, contrast, and motion.", "pause_settings", "", SELECTION, True),
+            (
+                "T Settings",
+                "Text, contrast, motion, and action loadout.",
+                "pause_settings",
+                "",
+                SELECTION,
+                True,
+            ),
             ("Q Quit", "Close the 2D shell.", "pause_quit", "", DANGER, True),
         )
         for index, (title, button_detail, kind, payload, accent, enabled) in enumerate(buttons):

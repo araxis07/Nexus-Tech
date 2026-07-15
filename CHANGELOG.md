@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.291.0 - 2026-07-16
+
+- Added a bounded Decision Ledger for every state-changing player action, including readable immediate impact and follow-on timing in terminal and 2D reports
+- Added persistent Contextual, Product, Growth, and Resilience action loadouts to Title and Pause Settings, with enabled-action prioritization in Focus and full action bars
+- Upgraded SQLite to schema 27 with additive decision-history storage and a save-independent action-loadout preference migration for existing local profiles
+- Kept gameplay catalogs and balance frozen while adding simulation, persistence, presentation, compact-layout, and migration regressions; current-version human usability evidence remains `0/6`
+
 ## 0.290.0 - 2026-07-16
 
 - Replaced raw action and reward identifiers in live reviews, archive reviews, progression guidance, and terminal archive tables with player-facing labels

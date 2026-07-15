@@ -152,7 +152,7 @@ from nexus_tech.frontend_2d.visual_audit import (
     run_2d_visual_audit,
     write_2d_layout_matrix_report,
 )
-from nexus_tech.user_preferences import FrontendPreferences
+from nexus_tech.user_preferences import ActionLoadout, FrontendPreferences
 
 __all__ = [
     "DEFAULT_ANIMATION_AUDIT_SIZES",
@@ -208,6 +208,7 @@ __all__ = [
     "AnimationPlaytestUITriageItem",
     "AnimationPlaytestUITriagePlan",
     "AnimationPlaytestUITriageValidation",
+    "ActionLoadout",
     "ContrastMode",
     "FlowAuditFinding",
     "FlowAuditReport",

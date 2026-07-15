@@ -169,7 +169,7 @@ from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.simulation.risk_forecast import build_risk_forecast
 from nexus_tech.simulation.turn_coach import build_turn_coach
-from nexus_tech.user_preferences import FrontendPreferences
+from nexus_tech.user_preferences import ActionLoadout, FrontendPreferences
 
 runner = CliRunner()
 
@@ -249,6 +249,7 @@ def test_frontend_preferences_cycle_in_deterministic_ui_order() -> None:
     assert preferences.cycle("ui_scale").ui_scale is UiScale.LARGE
     assert preferences.cycle("contrast_mode").contrast_mode is ContrastMode.HIGH
     assert preferences.cycle("motion_mode").motion_mode is MotionMode.REDUCED
+    assert preferences.cycle("action_loadout").action_loadout is ActionLoadout.PRODUCT
 
     with pytest.raises(ValueError, match="Unknown frontend preference field"):
         preferences.cycle("sound")
@@ -342,6 +343,9 @@ def test_title_settings_apply_persist_and_render_at_compact_size(tmp_path: Path)
         scene._dispatch_click_target(
             ClickTarget("title_settings_cycle", "motion_mode", surface.get_rect())
         )
+        scene._dispatch_click_target(
+            ClickTarget("title_settings_cycle", "action_loadout", surface.get_rect())
+        )
         start_typography_audit()
         scene.draw(surface)
         typography_events = finish_typography_audit()
@@ -350,6 +354,7 @@ def test_title_settings_apply_persist_and_render_at_compact_size(tmp_path: Path)
             ui_scale=UiScale.LARGE,
             contrast_mode=ContrastMode.HIGH,
             motion_mode=MotionMode.REDUCED,
+            action_loadout=ActionLoadout.PRODUCT,
         )
         assert coordinator.load_frontend_preferences() == preference_provider()
         assert scene.layout_safety_violations() == ()
@@ -1000,11 +1005,17 @@ def test_deep_dive_panels_expose_live_inspector_sections() -> None:
         "alerts",
     }
     assert {section.key for section in report_panel.inspectors} == {
+        "decisions",
         "turns",
         "funding",
         "milestones",
         "events",
     }
+    decision_section = next(
+        section for section in report_panel.inspectors if section.key == "decisions"
+    )
+    assert decision_section.title == "Decision Ledger"
+    assert decision_section.items[0].title != "No Decisions Yet"
     assert {section.key for section in endgame_panel.inspectors} == {
         "paths",
         "watchlist",
@@ -1861,6 +1872,32 @@ def test_run_scene_footer_columns_prioritize_readable_buttons() -> None:
         assert scene._footer_button_columns(600) == 4
         assert scene._footer_button_columns(748) == 5
         assert scene._footer_button_columns(860) == 7
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_product_loadout_prioritizes_product_actions() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        preferences = FrontendPreferences(action_loadout=ActionLoadout.PRODUCT)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=49),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            preferences=preferences,
+        )
+
+        focus_titles = tuple(button.title for button in scene._footer_action_buttons())
+        assert focus_titles[1:3] == ("Improve", "Feature")
+
+        scene._focus_mode = False
+        full_titles = {button.title for button in scene._footer_action_buttons()}
+        assert {"Improve", "Feature", "Save", "End Turn"} <= full_titles
+        assert len(scene._footer_action_buttons()) <= 10
     finally:
         pygame.quit()
 

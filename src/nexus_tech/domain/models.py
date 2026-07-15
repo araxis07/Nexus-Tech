@@ -1055,6 +1055,20 @@ class TurnLedgerEntry(BaseModel):
         return quantize_money(value)
 
 
+class DecisionLedgerEntry(BaseModel):
+    """One player decision with readable immediate impact and follow-on timing."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    turn: int = Field(ge=1)
+    command: str = Field(min_length=1, max_length=100)
+    label: str = Field(min_length=1, max_length=100)
+    family: str = Field(min_length=1, max_length=40)
+    summary: str = Field(min_length=1, max_length=320)
+    impact_summary: str = Field(min_length=1, max_length=320)
+    timing: str = Field(min_length=1, max_length=180)
+
+
 class ProductReleasePlan(BaseModel):
     """A planned product release that can be worked over multiple actions."""
 
@@ -1202,6 +1216,7 @@ class GameState(BaseModel):
     functional_budget: FunctionalBudget = Field(default_factory=FunctionalBudget)
     capital_plan: CapitalPlan = Field(default_factory=CapitalPlan)
     turn_history: list[TurnLedgerEntry] = Field(default_factory=list)
+    decision_history: list[DecisionLedgerEntry] = Field(default_factory=list)
     victory_achieved: bool = False
     victory_reason: Optional[str] = Field(default=None, max_length=240)  # noqa: UP045
     exit_outcome: Optional[ExitOutcome] = None  # noqa: UP045

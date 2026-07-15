@@ -18,6 +18,7 @@ from nexus_tech.domain.models import (
     CompetitorIntelEntry,
     CompetitorMove,
     ContractBillingModel,
+    DecisionLedgerEntry,
     DifficultyMode,
     EventCategory,
     EventHistoryEntry,
@@ -189,7 +190,7 @@ class SaveLoadCoordinator:
             with self.database.connect() as connection:
                 row = connection.execute(
                     """
-                    SELECT ui_scale, contrast_mode, motion_mode
+                    SELECT ui_scale, contrast_mode, motion_mode, action_loadout
                     FROM frontend_preferences
                     WHERE profile_key = 'default'
                     """
@@ -204,6 +205,7 @@ class SaveLoadCoordinator:
                 ui_scale=row["ui_scale"],
                 contrast_mode=row["contrast_mode"],
                 motion_mode=row["motion_mode"],
+                action_loadout=row["action_loadout"],
             )
         except (AttributeError, ValueError):
             return FrontendPreferences()
@@ -221,19 +223,22 @@ class SaveLoadCoordinator:
                         ui_scale,
                         contrast_mode,
                         motion_mode,
+                        action_loadout,
                         updated_at
                     )
-                    VALUES ('default', ?, ?, ?, ?)
+                    VALUES ('default', ?, ?, ?, ?, ?)
                     ON CONFLICT(profile_key) DO UPDATE SET
                         ui_scale = excluded.ui_scale,
                         contrast_mode = excluded.contrast_mode,
                         motion_mode = excluded.motion_mode,
+                        action_loadout = excluded.action_loadout,
                         updated_at = excluded.updated_at
                     """,
                     (
                         preferences.ui_scale.value,
                         preferences.contrast_mode.value,
                         preferences.motion_mode.value,
+                        preferences.action_loadout.value,
                         utc_now(),
                     ),
                 )
@@ -299,6 +304,7 @@ class SaveLoadCoordinator:
                 self._save_event_history(connection, slot_name, state.event_history)
                 self._save_milestone_history(connection, slot_name, state.milestone_history)
                 self._save_turn_history(connection, slot_name, state.turn_history)
+                self._save_decision_history(connection, slot_name, state.decision_history)
                 self.product_repository.delete_missing(connection, slot_name, state.products)
                 self._archive_completed_run(connection, slot_name, state, timestamp)
         except sqlite3.DatabaseError as error:
@@ -390,6 +396,7 @@ class SaveLoadCoordinator:
                     event_history = self._load_event_history(connection, slot_name)
                     milestone_history = self._load_milestone_history(connection, slot_name)
                     turn_history = self._load_turn_history(connection, slot_name)
+                    decision_history = self._load_decision_history(connection, slot_name)
                     rng = RandomSource.from_state(
                         seed=slot_row["rng_seed"],
                         exported_state=slot_row["rng_state"],
@@ -425,6 +432,7 @@ class SaveLoadCoordinator:
                         market_cycle=MarketCycle(slot_row["market_cycle"]),
                         market_cycle_turns_remaining=slot_row["market_cycle_turns_remaining"],
                         turn_history=turn_history,
+                        decision_history=decision_history,
                         victory_achieved=bool(slot_row["victory_achieved"]),
                         victory_reason=slot_row["victory_reason"],
                         exit_outcome=(
@@ -2064,6 +2072,71 @@ class SaveLoadCoordinator:
                 total_users=row["total_users"],
                 headcount=row["headcount"],
                 roadmap_focus=RoadmapFocus(row["roadmap_focus"]),
+            )
+            for row in rows
+        ]
+
+    def _save_decision_history(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+        decision_history: list[DecisionLedgerEntry],
+    ) -> None:
+        connection.execute("DELETE FROM decision_history WHERE slot_name = ?", (slot_name,))
+        connection.executemany(
+            """
+            INSERT INTO decision_history (
+                slot_name,
+                entry_index,
+                turn,
+                command,
+                label,
+                family,
+                summary,
+                impact_summary,
+                timing
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    slot_name,
+                    index,
+                    entry.turn,
+                    entry.command,
+                    entry.label,
+                    entry.family,
+                    entry.summary,
+                    entry.impact_summary,
+                    entry.timing,
+                )
+                for index, entry in enumerate(decision_history)
+            ],
+        )
+
+    def _load_decision_history(
+        self,
+        connection: sqlite3.Connection,
+        slot_name: str,
+    ) -> list[DecisionLedgerEntry]:
+        rows = connection.execute(
+            """
+            SELECT turn, command, label, family, summary, impact_summary, timing
+            FROM decision_history
+            WHERE slot_name = ?
+            ORDER BY entry_index ASC
+            """,
+            (slot_name,),
+        ).fetchall()
+        return [
+            DecisionLedgerEntry(
+                turn=row["turn"],
+                command=row["command"],
+                label=row["label"],
+                family=row["family"],
+                summary=row["summary"],
+                impact_summary=row["impact_summary"],
+                timing=row["timing"],
             )
             for row in rows
         ]

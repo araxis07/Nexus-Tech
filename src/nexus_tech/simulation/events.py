@@ -9,7 +9,9 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.campaign_decisions import (
     build_due_campaign_decision_event,
     campaign_adjusted_event_weight,
+    is_campaign_decision_event,
 )
+from nexus_tech.simulation.decision_ledger import record_named_decision
 from nexus_tech.simulation.event_effects import (
     EventApplicationOutcome,
     apply_pending_event_choice,
@@ -136,4 +138,20 @@ def resolve_turn_event(state: GameState, rng: RandomLike) -> EventTurnOutcome:
 def resolve_pending_event(state: GameState, option_id: str) -> EventApplicationOutcome:
     """Resolve the current pending event with a selected option."""
 
-    return apply_pending_event_choice(state, option_id)
+    outcome = apply_pending_event_choice(state, option_id)
+    entry = outcome.history_entry
+    campaign_choice = is_campaign_decision_event(entry.event_id)
+    record_named_decision(
+        state,
+        outcome.state,
+        command=f"event:{entry.event_id}",
+        label=entry.selected_option_label,
+        family="Campaign Decision" if campaign_choice else "Event Choice",
+        summary=entry.result_text,
+        timing=(
+            "Choice applied now; campaign pressure and route consequences continue on later turns."
+            if campaign_choice
+            else "Choice applied now; downstream effects continue through the normal turn loop."
+        ),
+    )
+    return outcome

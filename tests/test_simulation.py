@@ -572,6 +572,31 @@ def test_technical_debt_penalty_reduces_quality_improvement_efficiency() -> None
     assert low_gain > high_gain
 
 
+def test_state_changing_actions_append_readable_decision_ledger_entries() -> None:
+    state = make_state(make_product("Ledger Core", quality=60, technical_debt=12))
+
+    outcome = apply_action(
+        state,
+        TurnAction.IMPROVE_QUALITY,
+        context=ActionContext(target_product_id=state.products[0].id),
+    )
+
+    assert state.decision_history == []
+    assert len(outcome.state.decision_history) == 1
+    entry = outcome.state.decision_history[0]
+    assert entry.command == TurnAction.IMPROVE_QUALITY.value
+    assert entry.label == "Improve Quality"
+    assert entry.family == "Product"
+    assert "Product quality +" in entry.impact_summary
+    assert "_" not in entry.label
+    assert "end of turn" in entry.timing.lower()
+
+    review = apply_action(outcome.state, TurnAction.REVIEW_FINANCE)
+
+    assert review.state is outcome.state
+    assert len(review.state.decision_history) == 1
+
+
 def test_company_strategy_changes_operating_cost_profile() -> None:
     product = make_product("Core")
     growth_state = make_state(product.model_copy(deep=True), strategy=CompanyStrategy.GROWTH)
@@ -1775,6 +1800,9 @@ def test_event_effect_application_updates_product_company_and_team() -> None:
     assert outcome.state.products[0].bug_level < state.products[0].bug_level
     assert outcome.state.employees[0].energy < state.employees[0].energy
     assert outcome.history_entry.event_id == "severe_bug_incident"
+    assert outcome.state.decision_history[-1].label == "Fund an emergency hotfix"
+    assert outcome.state.decision_history[-1].family == "Event Choice"
+    assert "Cash -" in outcome.state.decision_history[-1].impact_summary
 
 
 def test_event_selection_is_deterministic_under_fixed_seed() -> None:

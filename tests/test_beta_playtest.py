@@ -48,7 +48,7 @@ def make_session(
     )
 
 
-def test_beta_playtest_repository_round_trip_and_schema_26(tmp_path: Path) -> None:
+def test_beta_playtest_repository_round_trip_and_schema_27(tmp_path: Path) -> None:
     db_path = tmp_path / "beta.db"
     repository = BetaPlaytestRepository(db_path)
     session = make_session(1, "founder_journey")
@@ -57,7 +57,7 @@ def test_beta_playtest_repository_round_trip_and_schema_26(tmp_path: Path) -> No
 
     assert repository.list_sessions() == [session]
     with sqlite3.connect(db_path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 26
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 27
 
 
 def test_beta_playtest_repository_requires_explicit_replace(tmp_path: Path) -> None:

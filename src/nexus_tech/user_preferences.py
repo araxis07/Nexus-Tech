@@ -52,6 +52,15 @@ class MotionMode(StrEnum):
         return 0.0
 
 
+class ActionLoadout(StrEnum):
+    """Player-selectable action-bar emphasis without changing action rules."""
+
+    CONTEXTUAL = "contextual"
+    PRODUCT = "product"
+    GROWTH = "growth"
+    RESILIENCE = "resilience"
+
+
 def normalize_ui_scale(value: UiScale | str) -> UiScale:
     """Normalize a CLI, persisted, or API UI-scale value."""
 
@@ -90,13 +99,28 @@ def normalize_motion_mode(value: MotionMode | str | None) -> MotionMode:
         raise ValueError(f"motion mode must be one of: {valid_values}") from error
 
 
+def normalize_action_loadout(value: ActionLoadout | str | None) -> ActionLoadout:
+    """Normalize API or persisted values into a supported action loadout."""
+
+    if value is None:
+        return ActionLoadout.CONTEXTUAL
+    if isinstance(value, ActionLoadout):
+        return value
+    try:
+        return ActionLoadout(str(value).strip().lower())
+    except ValueError as error:
+        valid_values = ", ".join(loadout.value for loadout in ActionLoadout)
+        raise ValueError(f"action loadout must be one of: {valid_values}") from error
+
+
 @dataclass(frozen=True)
 class FrontendPreferences:
-    """One persistent local profile for 2D readability and motion."""
+    """One persistent local profile for 2D readability, motion, and action focus."""
 
     ui_scale: UiScale = UiScale.STANDARD
     contrast_mode: ContrastMode = ContrastMode.STANDARD
     motion_mode: MotionMode = MotionMode.FULL
+    action_loadout: ActionLoadout = ActionLoadout.CONTEXTUAL
 
     @classmethod
     def from_values(
@@ -105,6 +129,7 @@ class FrontendPreferences:
         ui_scale: UiScale | str = UiScale.STANDARD,
         contrast_mode: ContrastMode | str = ContrastMode.STANDARD,
         motion_mode: MotionMode | str | None = MotionMode.FULL,
+        action_loadout: ActionLoadout | str | None = ActionLoadout.CONTEXTUAL,
     ) -> FrontendPreferences:
         """Build a normalized preference profile from external values."""
 
@@ -112,6 +137,7 @@ class FrontendPreferences:
             ui_scale=normalize_ui_scale(ui_scale),
             contrast_mode=normalize_contrast_mode(contrast_mode),
             motion_mode=normalize_motion_mode(motion_mode),
+            action_loadout=normalize_action_loadout(action_loadout),
         )
 
     def with_overrides(
@@ -120,6 +146,7 @@ class FrontendPreferences:
         ui_scale: UiScale | str | None = None,
         contrast_mode: ContrastMode | str | None = None,
         motion_mode: MotionMode | str | None = None,
+        action_loadout: ActionLoadout | str | None = None,
     ) -> FrontendPreferences:
         """Return a copy with non-null launch overrides applied."""
 
@@ -132,6 +159,11 @@ class FrontendPreferences:
             ),
             motion_mode=(
                 self.motion_mode if motion_mode is None else normalize_motion_mode(motion_mode)
+            ),
+            action_loadout=(
+                self.action_loadout
+                if action_loadout is None
+                else normalize_action_loadout(action_loadout)
             ),
         )
 
@@ -147,6 +179,11 @@ class FrontendPreferences:
             )
         if field == "motion_mode":
             return replace(self, motion_mode=_next_enum_value(MotionMode, self.motion_mode))
+        if field == "action_loadout":
+            return replace(
+                self,
+                action_loadout=_next_enum_value(ActionLoadout, self.action_loadout),
+            )
         raise ValueError(f"Unknown frontend preference field: {field}")
 
 

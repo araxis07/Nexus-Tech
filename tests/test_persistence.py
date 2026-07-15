@@ -24,6 +24,7 @@ from nexus_tech.domain.models import (
     ContractCadence,
     CustomerAccount,
     CustomerAccountStatus,
+    DecisionLedgerEntry,
     DifficultyMode,
     Employee,
     EmployeeRole,
@@ -77,6 +78,7 @@ from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.events import resolve_pending_event
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.user_preferences import (
+    ActionLoadout,
     ContrastMode,
     FrontendPreferences,
     MotionMode,
@@ -451,6 +453,17 @@ def make_state() -> GameState:
         market_cycle=MarketCycle.EXPANDING,
         market_cycle_turns_remaining=2,
         turn_history=turn_history,
+        decision_history=[
+            DecisionLedgerEntry(
+                turn=4,
+                command="improve_quality",
+                label="Improve Quality",
+                family="Product",
+                summary="Improved Nexus One quality before the enterprise renewal.",
+                impact_summary="Action points -1 | Product quality +4",
+                timing="Applied now; revenue and retention follow-on resolves at end of turn.",
+            )
+        ],
         victory_achieved=True,
         victory_reason="You built a durable software company.",
         exit_outcome=ExitOutcome.STRATEGIC_ACQUISITION,
@@ -491,6 +504,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "event_history",
         "milestone_history",
         "turn_history",
+        "decision_history",
         "customer_accounts",
         "product_releases",
         "sales_deals",
@@ -533,6 +547,10 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         }
         archive_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(run_archives)").fetchall()
+        }
+        preference_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(frontend_preferences)").fetchall()
         }
         user_version = connection.execute("PRAGMA user_version").fetchone()[0]
 
@@ -581,6 +599,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "campaign_consequence_choice",
         "terminal_reason",
     }.issubset(archive_columns)
+    assert "action_loadout" in preference_columns
     assert {
         "target_segment",
         "packaging_strategy",
@@ -732,7 +751,7 @@ def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path)
     assert row["campaign_commitment_choice"] == ""
     assert row["campaign_consequence_choice"] == ""
     assert row["terminal_reason"] == ""
-    assert user_version == 26
+    assert user_version == 27
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -1466,6 +1485,7 @@ def test_frontend_preferences_round_trip_independently_of_save_slots(tmp_path: P
         ui_scale=UiScale.LARGE,
         contrast_mode=ContrastMode.HIGH,
         motion_mode=MotionMode.REDUCED,
+        action_loadout=ActionLoadout.GROWTH,
     )
 
     assert coordinator.load_frontend_preferences() == FrontendPreferences()
@@ -1492,3 +1512,46 @@ def test_frontend_preferences_fall_back_when_local_profile_is_malformed(
         )
 
     assert coordinator.load_frontend_preferences() == FrontendPreferences()
+
+
+def test_frontend_preferences_migrate_existing_profile_to_action_loadout(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-frontend-preferences.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE frontend_preferences (
+                profile_key TEXT PRIMARY KEY,
+                ui_scale TEXT NOT NULL,
+                contrast_mode TEXT NOT NULL,
+                motion_mode TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO frontend_preferences (
+                profile_key, ui_scale, contrast_mode, motion_mode, updated_at
+            )
+            VALUES ('default', 'large', 'high', 'reduced', '2026-07-14T00:00:00+00:00')
+            """
+        )
+        connection.execute("PRAGMA user_version = 26")
+
+    preferences = SaveLoadCoordinator(db_path).load_frontend_preferences()
+
+    assert preferences == FrontendPreferences(
+        ui_scale=UiScale.LARGE,
+        contrast_mode=ContrastMode.HIGH,
+        motion_mode=MotionMode.REDUCED,
+        action_loadout=ActionLoadout.CONTEXTUAL,
+    )
+    with sqlite3.connect(db_path) as connection:
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(frontend_preferences)").fetchall()
+        }
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 27
+    assert "action_loadout" in columns

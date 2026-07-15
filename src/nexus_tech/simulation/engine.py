@@ -92,6 +92,7 @@ from nexus_tech.simulation.customer_success import (
     run_win_back_play,
 )
 from nexus_tech.simulation.customers import CustomerTurnSummary, apply_end_of_turn_customers
+from nexus_tech.simulation.decision_ledger import record_action_decision
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.economy import (
     calculate_product_operating_cost,
@@ -463,7 +464,7 @@ def create_new_game(
     return state
 
 
-def apply_action(
+def _apply_action_without_ledger(
     state: GameState,
     action: TurnAction,
     context: ActionContext | None = None,
@@ -2733,6 +2734,19 @@ def apply_action(
         )
 
     raise ValueError(f"Unsupported action: {action.value}")
+
+
+def apply_action(
+    state: GameState,
+    action: TurnAction,
+    context: ActionContext | None = None,
+) -> ActionOutcome:
+    """Apply one action and record every resulting state-changing decision."""
+
+    outcome = _apply_action_without_ledger(state, action, context)
+    if outcome.state is not state:
+        record_action_decision(state, outcome.state, action, outcome.message)
+    return outcome
 
 
 def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
