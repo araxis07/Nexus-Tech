@@ -106,6 +106,10 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_ui_triage_plan,
     write_2d_layout_matrix_report,
 )
+from nexus_tech.frontend_2d.action_bar import (
+    ACTION_LOADOUT_COMMANDS,
+    RUN_ACTION_BUTTONS,
+)
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
     list_scenario_choices,
@@ -256,6 +260,52 @@ def test_frontend_preferences_cycle_in_deterministic_ui_order() -> None:
 
     with pytest.raises(ValueError, match="Unknown frontend preference field"):
         preferences.cycle("sound")
+
+
+def test_action_bar_catalog_preserves_controls_and_loadout_contract() -> None:
+    key_hints = tuple(button.key_hint for button in RUN_ACTION_BUTTONS)
+    titles = tuple(button.title for button in RUN_ACTION_BUTTONS)
+    command_payloads = {
+        button.payload
+        for button in RUN_ACTION_BUTTONS
+        if button.kind in {"command", "text_command"}
+    }
+
+    assert key_hints == (
+        "C",
+        "N",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "Q",
+        "F",
+        "M",
+        "D",
+        "H",
+        "A",
+        "Y",
+        "R",
+        "B",
+        "U",
+        "O",
+        "L",
+        "G",
+        "S",
+        "Space",
+    )
+    assert len(titles) == len(set(titles))
+    assert command_payloads <= {action.value for action in TurnAction}
+    assert set(ACTION_LOADOUT_COMMANDS) == set(ActionLoadout)
+    assert ACTION_LOADOUT_COMMANDS[ActionLoadout.CONTEXTUAL] == ()
+    assert all(set(commands) <= command_payloads for commands in ACTION_LOADOUT_COMMANDS.values())
+    assert any(
+        button.key_hint == "O" and button.title == "Partner" for button in RUN_ACTION_BUTTONS
+    )
 
 
 @pytest.mark.parametrize("size", [(820, 620), (960, 640), (1280, 720), (1440, 900)])
@@ -1952,12 +2002,12 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         )
 
         compact_detail = scene._footer_button_detail(
-            scenes_module._ACTION_BUTTONS[0],
+            RUN_ACTION_BUTTONS[0],
             enabled=True,
             button_cols=4,
         )
         narrow_detail = scene._footer_button_detail(
-            scenes_module._ACTION_BUTTONS[0],
+            RUN_ACTION_BUTTONS[0],
             enabled=True,
             button_cols=5,
         )
@@ -1983,7 +2033,7 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(narrow_detail) <= 28
         assert button_cols == 5
         assert footer_band_height == 48
-        assert len(visible_buttons) < len(scenes_module._ACTION_BUTTONS)
+        assert len(visible_buttons) < len(RUN_ACTION_BUTTONS)
         assert len(visible_buttons) <= 6
         assert {"Coach", "Report", "Save", "End Turn"} <= visible_titles
         assert all(label in vital_line for label in ("Cash", "Runway", "Users", "AP"))
@@ -2369,8 +2419,7 @@ def test_run_scene_partner_binding_moves_to_o_so_p_can_pause() -> None:
         assert scene._intent_for_key(pygame.K_o) is FrontendIntent.CREATE_PARTNERSHIP
         assert scene._intent_for_key(pygame.K_p) is None
         assert any(
-            button.key_hint == "O" and button.title == "Partner"
-            for button in scenes_module._ACTION_BUTTONS
+            button.key_hint == "O" and button.title == "Partner" for button in RUN_ACTION_BUTTONS
         )
     finally:
         pygame.quit()

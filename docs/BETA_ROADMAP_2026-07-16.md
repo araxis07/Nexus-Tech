@@ -2,16 +2,18 @@
 
 ## Product Position
 
-NEXUS TECH 0.297.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.298.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
-The current convergence slice consolidates completed-run and control presentation policy after the deterministic 820x620 owner audit while retaining the executable next-session packet:
+The current convergence slice consolidates action-bar, completed-run, and control presentation policy after the deterministic 820x620 owner audit while retaining the executable next-session packet:
 
+- the 25-button run action catalog and four local loadout policies now live in a pure module instead of the pygame scene renderer;
+- a direct catalog contract protects key order, unique titles, valid command payloads, and complete loadout routing;
 - completed-run title, cause, progression, and metric policy now live in a pure module instead of the pygame scene renderer;
 - shutdown, victory, and archived-ending branches have direct regression coverage while Cash, Score, and Last Turn remain visible;
 - compact Help content now lives in a pure module and retains complete labels without ellipsis at the large text scale;
-- `scenes.py` remains responsible for layout, input routing, and rendering rather than owning those presentation decisions;
+- `scenes.py` remains responsible for availability, contextual selection, layout, input routing, and rendering rather than owning those catalog decisions;
 - `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
 - the packet includes one visible launch command, an eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;

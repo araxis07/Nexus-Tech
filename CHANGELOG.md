@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.298.0 - 2026-07-17
+
+- Extracted the 25-button run action catalog and four action-loadout policies from the large pygame scene renderer into a pure frontend module
+- Added a public catalog contract covering deterministic key order, unique titles, valid turn-action payloads, and complete loadout routing
+- Kept `scenes.py` responsible for availability, contextual selection, layout, input routing, and rendering without changing visible controls
+- Preserved schema 27, gameplay balance, frozen content catalogs, and the truthful `0/6` current-version human-session boundary
+
 ## 0.297.0 - 2026-07-17
 
 - Extracted compact Help content and completed-run copy/metric policy from the large pygame scene renderer into pure frontend modules

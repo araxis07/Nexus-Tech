@@ -9,6 +9,11 @@ from typing import Callable
 
 from nexus_tech.domain.models import GameState, TurnAction
 from nexus_tech.domain.money import format_money
+from nexus_tech.frontend_2d.action_bar import (
+    ACTION_LOADOUT_COMMANDS,
+    RUN_ACTION_BUTTONS,
+    ActionButtonSpec,
+)
 from nexus_tech.frontend_2d.catalog import (
     CampaignGoalChoice,
     CampaignStartChoice,
@@ -96,7 +101,7 @@ from nexus_tech.simulation.meta_progression import (
 )
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
-from nexus_tech.user_preferences import ActionLoadout, FrontendPreferences
+from nexus_tech.user_preferences import FrontendPreferences
 
 
 @dataclass(frozen=True)
@@ -106,18 +111,6 @@ class ClickTarget:
     kind: str
     payload: str
     rect: object
-
-
-@dataclass(frozen=True)
-class ActionButtonSpec:
-    """One visible action button in the 2D action bar."""
-
-    key_hint: str
-    title: str
-    detail: str
-    accent: tuple[int, int, int]
-    kind: str
-    payload: str
 
 
 @dataclass(frozen=True)
@@ -311,190 +304,6 @@ def _fit_nav_safe_modal_rect(
         safe_height,
     )
 
-
-_ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
-    ActionButtonSpec("C", "Coach", "Run the top mission-board command.", INFO, "coach", ""),
-    ActionButtonSpec(
-        "N",
-        "New Product",
-        "Name and create one product.",
-        INFO,
-        "text_command",
-        TurnAction.CREATE_PRODUCT.value,
-    ),
-    ActionButtonSpec("1", "Team", "Open team staffing panel.", GOOD, "panel", "team"),
-    ActionButtonSpec("2", "Finance", "Open finance and capital panel.", WARN, "panel", "finance"),
-    ActionButtonSpec(
-        "3",
-        "Customers",
-        "Open pricing, segment, and support panel.",
-        INFO,
-        "panel",
-        "customers",
-    ),
-    ActionButtonSpec(
-        "4",
-        "Partners",
-        "Open channel and partner panel.",
-        INFO,
-        "panel",
-        "partnerships",
-    ),
-    ActionButtonSpec("5", "Board", "Open board and governance panel.", WARN, "panel", "board"),
-    ActionButtonSpec(
-        "6",
-        "Pipeline",
-        "Open delivery, deals, and hiring panel.",
-        INFO,
-        "panel",
-        "pipeline",
-    ),
-    ActionButtonSpec(
-        "7",
-        "Report",
-        "Open run-summary and reporting panel.",
-        INFO,
-        "panel",
-        "report",
-    ),
-    ActionButtonSpec(
-        "8",
-        "Endgame",
-        "Open exit readiness and late-game gate board.",
-        WARN,
-        "panel",
-        "endgame",
-    ),
-    ActionButtonSpec(
-        "Q",
-        "Improve",
-        "Invest in product quality.",
-        GOOD,
-        "command",
-        TurnAction.IMPROVE_QUALITY.value,
-    ),
-    ActionButtonSpec(
-        "F",
-        "Feature",
-        "Add one feature to the selected product.",
-        INFO,
-        "command",
-        TurnAction.ADD_FEATURE.value,
-    ),
-    ActionButtonSpec(
-        "M",
-        "Market",
-        "Push demand for the selected product.",
-        INFO,
-        "command",
-        TurnAction.MARKET_PRODUCT.value,
-    ),
-    ActionButtonSpec(
-        "D",
-        "Debt Down",
-        "Reduce technical debt on the selected product.",
-        WARN,
-        "command",
-        TurnAction.REDUCE_TECHNICAL_DEBT.value,
-    ),
-    ActionButtonSpec(
-        "H",
-        "Hire",
-        "Pick the next role to add.",
-        INFO,
-        "command",
-        TurnAction.HIRE_EMPLOYEE.value,
-    ),
-    ActionButtonSpec(
-        "A",
-        "Assign",
-        "Pick an idle teammate for the selected product.",
-        GOOD,
-        "command",
-        TurnAction.ASSIGN_EMPLOYEE.value,
-    ),
-    ActionButtonSpec(
-        "Y",
-        "Strategy",
-        "Choose the company posture.",
-        INFO,
-        "command",
-        TurnAction.SET_COMPANY_STRATEGY.value,
-    ),
-    ActionButtonSpec(
-        "R",
-        "Roadmap",
-        "Choose the multi-turn focus.",
-        INFO,
-        "command",
-        TurnAction.SET_ROADMAP.value,
-    ),
-    ActionButtonSpec(
-        "B",
-        "Budget",
-        "Choose quarter spending posture.",
-        WARN,
-        "command",
-        TurnAction.SET_BUDGET_STANCE.value,
-    ),
-    ActionButtonSpec(
-        "U",
-        "Support",
-        "Choose the service lane focus.",
-        WARN,
-        "command",
-        TurnAction.SET_SUPPORT_LANE_FOCUS.value,
-    ),
-    ActionButtonSpec(
-        "O",
-        "Partner",
-        "Open a partner channel for the selected product.",
-        INFO,
-        "command",
-        TurnAction.CREATE_PARTNERSHIP.value,
-    ),
-    ActionButtonSpec(
-        "L",
-        "Loan",
-        "Take debt if runway is tightening.",
-        WARN,
-        "command",
-        TurnAction.TAKE_LOAN.value,
-    ),
-    ActionButtonSpec(
-        "G",
-        "Angel",
-        "Raise an angel round if traction supports it.",
-        INFO,
-        "command",
-        TurnAction.RAISE_ANGEL.value,
-    ),
-    ActionButtonSpec("S", "Save", "Persist the active run.", INFO, "save", ""),
-    ActionButtonSpec(
-        "Space",
-        "End Turn",
-        "Resolve the turn with preview and warning gate.",
-        DANGER,
-        "command",
-        TurnAction.END_TURN.value,
-    ),
-)
-
-_ACTION_LOADOUT_COMMANDS: dict[ActionLoadout, tuple[str, ...]] = {
-    ActionLoadout.CONTEXTUAL: (),
-    ActionLoadout.PRODUCT: (
-        TurnAction.IMPROVE_QUALITY.value,
-        TurnAction.ADD_FEATURE.value,
-    ),
-    ActionLoadout.GROWTH: (
-        TurnAction.MARKET_PRODUCT.value,
-        TurnAction.CREATE_PARTNERSHIP.value,
-    ),
-    ActionLoadout.RESILIENCE: (
-        TurnAction.REDUCE_TECHNICAL_DEBT.value,
-        TurnAction.SET_SUPPORT_LANE_FOCUS.value,
-    ),
-}
 
 _INSPECTOR_SORT_MODES: tuple[str, ...] = ("default", "risk", "value", "stalled")
 _INSPECTOR_FILTER_MODES: tuple[str, ...] = ("all", "actionable", "attention")
@@ -8911,11 +8720,11 @@ class RunScene(BaseScene):
 
         core_titles = {"Coach", "Team", "Finance", "Customers", "Report"}
         final_titles = {"Save", "End Turn"}
-        buttons = [button for button in _ACTION_BUTTONS if button.title in core_titles]
+        buttons = [button for button in RUN_ACTION_BUTTONS if button.title in core_titles]
         loadout_buttons = list(self._loadout_action_buttons())
         if not loadout_buttons:
             loadout_buttons = [
-                button for button in _ACTION_BUTTONS if button.title in {"Improve", "Market"}
+                button for button in RUN_ACTION_BUTTONS if button.title in {"Improve", "Market"}
             ]
         buttons.extend(button for button in loadout_buttons if button not in buttons)
 
@@ -8933,7 +8742,7 @@ class RunScene(BaseScene):
         contextual_panels = [
             button
             for title in contextual_panel_titles
-            for button in _ACTION_BUTTONS
+            for button in RUN_ACTION_BUTTONS
             if button.title == title and button not in buttons
         ]
 
@@ -8951,28 +8760,28 @@ class RunScene(BaseScene):
         contextual_buttons = [
             button
             for command in dict.fromkeys(contextual_commands)
-            for button in _ACTION_BUTTONS
+            for button in RUN_ACTION_BUTTONS
             if button.payload == command and button not in buttons
         ]
         contextual_budget = max(0, 10 - len(buttons) - len(final_titles))
         buttons.extend((contextual_panels + contextual_buttons)[:contextual_budget])
-        buttons.extend(button for button in _ACTION_BUTTONS if button.title in final_titles)
+        buttons.extend(button for button in RUN_ACTION_BUTTONS if button.title in final_titles)
         return tuple(buttons)
 
     def _focus_footer_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
         """Expose one guided route, two alternatives, review, save, and resolution."""
 
-        coach_button = next(button for button in _ACTION_BUTTONS if button.title == "Coach")
-        report_button = next(button for button in _ACTION_BUTTONS if button.title == "Report")
+        coach_button = next(button for button in RUN_ACTION_BUTTONS if button.title == "Coach")
+        report_button = next(button for button in RUN_ACTION_BUTTONS if button.title == "Report")
         final_buttons = tuple(
-            button for button in _ACTION_BUTTONS if button.title in {"Save", "End Turn"}
+            button for button in RUN_ACTION_BUTTONS if button.title in {"Save", "End Turn"}
         )
         recommended: list[ActionButtonSpec] = list(self._loadout_action_buttons())
         for line in self._view_model.coach_lines[:3]:
             candidate = next(
                 (
                     button
-                    for button in _ACTION_BUTTONS
+                    for button in RUN_ACTION_BUTTONS
                     if button.payload == line.command and button.title not in {"Save", "End Turn"}
                 ),
                 None,
@@ -8982,7 +8791,7 @@ class RunScene(BaseScene):
                 candidate = next(
                     (
                         button
-                        for button in _ACTION_BUTTONS
+                        for button in RUN_ACTION_BUTTONS
                         if button.kind == "panel" and button.payload == panel_key
                     ),
                     None,
@@ -8994,7 +8803,7 @@ class RunScene(BaseScene):
 
         if not recommended:
             recommended.extend(
-                button for button in _ACTION_BUTTONS if button.title in {"Improve", "Market"}
+                button for button in RUN_ACTION_BUTTONS if button.title in {"Improve", "Market"}
             )
         return (coach_button, *recommended[:2], report_button, *final_buttons)
 
@@ -9002,11 +8811,11 @@ class RunScene(BaseScene):
         """Return enabled action buttons emphasized by the local player profile."""
 
         loadout = self._current_frontend_preferences().action_loadout
-        commands = _ACTION_LOADOUT_COMMANDS[loadout]
+        commands = ACTION_LOADOUT_COMMANDS[loadout]
         return tuple(
             button
             for command in commands
-            for button in _ACTION_BUTTONS
+            for button in RUN_ACTION_BUTTONS
             if button.payload == command and self._button_is_enabled(button)
         )
 
