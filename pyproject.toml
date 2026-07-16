@@ -1,6 +1,6 @@
 [project]
 name = "nexus-tech"
-version = "0.299.0"
+version = "0.300.0"
 description = "NEXUS TECH terminal-first management simulation game."
 readme = "README.md"
 requires-python = ">=3.13"

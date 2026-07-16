@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from nexus_tech.domain.models import TurnAction
 from nexus_tech.frontend_2d.widgets import DANGER, GOOD, INFO, WARN
 from nexus_tech.user_preferences import ActionLoadout
 
-__all__ = ["ACTION_LOADOUT_COMMANDS", "RUN_ACTION_BUTTONS", "ActionButtonSpec"]
+__all__ = [
+    "ACTION_LOADOUT_COMMANDS",
+    "RUN_ACTION_BUTTONS",
+    "ActionButtonSpec",
+    "build_focus_action_buttons",
+]
 
 
 @dataclass(frozen=True)
@@ -207,3 +213,50 @@ ACTION_LOADOUT_COMMANDS: dict[ActionLoadout, tuple[str, ...]] = {
         TurnAction.SET_SUPPORT_LANE_FOCUS.value,
     ),
 }
+
+
+def build_focus_action_buttons(
+    *,
+    primary_command: str,
+    primary_label: str,
+    primary_panel_key: str | None,
+    preferred_buttons: Sequence[ActionButtonSpec],
+    recommendation_buttons: Sequence[ActionButtonSpec],
+    fallback_buttons: Sequence[ActionButtonSpec],
+) -> tuple[ActionButtonSpec, ...]:
+    """Build one recommended route and two distinct focus alternatives."""
+
+    coach = next(button for button in RUN_ACTION_BUTTONS if button.kind == "coach")
+    report = next(button for button in RUN_ACTION_BUTTONS if button.title == "Report")
+    final_buttons = tuple(
+        button for button in RUN_ACTION_BUTTONS if button.title in {"Save", "End Turn"}
+    )
+    recommended = ActionButtonSpec(
+        key_hint=coach.key_hint,
+        title="Recommended",
+        detail=f"Do: {primary_label.rstrip('.')}.",
+        accent=GOOD,
+        kind=coach.kind,
+        payload=coach.payload,
+    )
+
+    primary_targets = {
+        ("command", primary_command),
+        ("text_command", primary_command),
+    }
+    if primary_panel_key is not None:
+        primary_targets.add(("panel", primary_panel_key))
+
+    alternatives: list[ActionButtonSpec] = []
+    seen_targets = set(primary_targets)
+    reserved_titles = {"Coach", "Report", "Save", "End Turn"}
+    for button in (*preferred_buttons, *recommendation_buttons, *fallback_buttons):
+        target = (button.kind, button.payload)
+        if button.title in reserved_titles or target in seen_targets:
+            continue
+        alternatives.append(button)
+        seen_targets.add(target)
+        if len(alternatives) == 2:
+            break
+
+    return (recommended, *alternatives, report, *final_buttons)

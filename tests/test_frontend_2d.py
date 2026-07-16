@@ -109,6 +109,7 @@ from nexus_tech.frontend_2d import (
 from nexus_tech.frontend_2d.action_bar import (
     ACTION_LOADOUT_COMMANDS,
     RUN_ACTION_BUTTONS,
+    build_focus_action_buttons,
 )
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
@@ -306,6 +307,33 @@ def test_action_bar_catalog_preserves_controls_and_loadout_contract() -> None:
     assert any(
         button.key_hint == "O" and button.title == "Partner" for button in RUN_ACTION_BUTTONS
     )
+
+
+def test_focus_action_policy_separates_recommended_move_from_alternatives() -> None:
+    hire = next(button for button in RUN_ACTION_BUTTONS if button.title == "Hire")
+    customers = next(button for button in RUN_ACTION_BUTTONS if button.title == "Customers")
+    finance = next(button for button in RUN_ACTION_BUTTONS if button.title == "Finance")
+
+    buttons = build_focus_action_buttons(
+        primary_command=TurnAction.HIRE_EMPLOYEE.value,
+        primary_label="Hire Teammate",
+        primary_panel_key="team",
+        preferred_buttons=(),
+        recommendation_buttons=(hire, customers, hire),
+        fallback_buttons=(finance,),
+    )
+
+    assert tuple(button.title for button in buttons) == (
+        "Recommended",
+        "Customers",
+        "Finance",
+        "Report",
+        "Save",
+        "End Turn",
+    )
+    assert buttons[0].kind == "coach"
+    assert buttons[0].detail == "Do: Hire Teammate."
+    assert all(button.payload != TurnAction.HIRE_EMPLOYEE.value for button in buttons[1:3])
 
 
 @pytest.mark.parametrize("size", [(820, 620), (960, 640), (1280, 720), (1440, 900)])
@@ -2035,7 +2063,9 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert footer_band_height == 48
         assert len(visible_buttons) < len(RUN_ACTION_BUTTONS)
         assert len(visible_buttons) <= 6
-        assert {"Coach", "Report", "Save", "End Turn"} <= visible_titles
+        assert {"Recommended", "Report", "Save", "End Turn"} <= visible_titles
+        primary_command = scene._view_model.decision_brief.command
+        assert all(button.payload != primary_command for button in visible_buttons[1:3])
         assert all(label in vital_line for label in ("Cash", "Runway", "Users", "AP"))
         assert scene._use_compact_run_focus(820, 220)
         assert scene._use_compact_run_focus(1280, 220)
@@ -2055,7 +2085,7 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert "Why:" not in compact_hint
         assert "End Turn:" in compact_hint
         assert "Later:" in compact_hint
-        assert "Hover C Coach for why" in compact_hint
+        assert "Hover C for why" in compact_hint
         assert full_hint.startswith("Why:")
         assert "0 More" in full_hint
 

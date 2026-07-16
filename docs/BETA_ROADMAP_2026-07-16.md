@@ -2,12 +2,15 @@
 
 ## Product Position
 
-NEXUS TECH 0.299.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.300.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
-The current convergence slice closes a concrete compact Endgame header collision after the deterministic 820x620 owner audit while retaining the executable next-session packet:
+The current convergence slice removes a concrete duplicate route from the six-slot Focus View after the deterministic 820x620 owner audit while retaining the executable next-session packet:
 
+- `Choose This Turn` now presents one green `Recommended` route, two distinct alternatives, Report, Save, and End Turn;
+- the primary command and its workspace are excluded from alternatives while preference, Coach, and stable fallback order remain deterministic;
+- Coach execution, direct keyboard commands, AP costs, simulation state, balance, persistence, and schema 27 are unchanged;
 - Endgame actor cards now use one measured header lane that reserves title and summary width at compact viewports;
 - the redundant Endgame entity strip is suppressed while actor cards are active, and Quick Start identifies its actor as `Guide`;
 - compact layout regressions protect actor-to-copy separation at 820x620;

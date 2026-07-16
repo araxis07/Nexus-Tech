@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.300.0 - 2026-07-17
+
+- Reframed the Focus View footer as `Choose This Turn`, with one green `Recommended` route followed by two distinct alternatives
+- Removed the duplicate primary command from the six-slot decision bar while preserving Coach execution and every direct keyboard route
+- Added pure action-bar policy for primary-command, workspace, preference, recommendation, and fallback de-duplication
+- Simplified first-turn copy around `C Recommended` without changing gameplay, AP costs, controls, balance, persistence, schema 27, or the truthful `0/6` human-session boundary
+
 ## 0.299.0 - 2026-07-17
 
 - Reserved a deterministic compact-header lane for Endgame actor cards so they cannot cover the title or summary at 820x620

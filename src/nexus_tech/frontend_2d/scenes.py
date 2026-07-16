@@ -13,6 +13,7 @@ from nexus_tech.frontend_2d.action_bar import (
     ACTION_LOADOUT_COMMANDS,
     RUN_ACTION_BUTTONS,
     ActionButtonSpec,
+    build_focus_action_buttons,
 )
 from nexus_tech.frontend_2d.catalog import (
     CampaignGoalChoice,
@@ -7909,7 +7910,7 @@ class RunScene(BaseScene):
         self._click_targets.append(ClickTarget("coach", "", rect))
         line = (
             f"Opening {self._view_model.run_journey.step_label} | "
-            f"C Coach: {get_action_label(opening.current_command)} | "
+            f"C Recommended: {get_action_label(opening.current_command)} | "
             f"AP {max(0, self.state.action_points_remaining)} | "
             "P Pause | S Save | Space End"
         )
@@ -8539,7 +8540,7 @@ class RunScene(BaseScene):
             f"Guided Opening | Journey {self._view_model.run_journey.step_label} | "
             "Follow the 3-step checklist"
         )
-        detail = "Coach executes the recommendation. P pause | S save | Space end turn."
+        detail = "C runs the recommendation. P pause | S save | Space end turn."
         draw_text_line(
             surface,
             self.fonts.small,
@@ -8630,7 +8631,7 @@ class RunScene(BaseScene):
         draw_text_line(
             surface,
             self.fonts.heading,
-            "Decision Bar" if self._focus_mode else "Action Bar",
+            "Choose This Turn" if self._focus_mode else "All Actions",
             TEXT,
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
@@ -8795,12 +8796,7 @@ class RunScene(BaseScene):
     def _focus_footer_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
         """Expose one guided route, two alternatives, review, save, and resolution."""
 
-        coach_button = next(button for button in RUN_ACTION_BUTTONS if button.title == "Coach")
-        report_button = next(button for button in RUN_ACTION_BUTTONS if button.title == "Report")
-        final_buttons = tuple(
-            button for button in RUN_ACTION_BUTTONS if button.title in {"Save", "End Turn"}
-        )
-        recommended: list[ActionButtonSpec] = list(self._loadout_action_buttons())
+        recommendation_buttons: list[ActionButtonSpec] = []
         for line in self._view_model.coach_lines[:3]:
             candidate = next(
                 (
@@ -8820,16 +8816,24 @@ class RunScene(BaseScene):
                     ),
                     None,
                 )
-            if candidate is not None and candidate not in recommended:
-                recommended.append(candidate)
-            if len(recommended) == 2:
-                break
+            if candidate is not None and candidate not in recommendation_buttons:
+                recommendation_buttons.append(candidate)
 
-        if not recommended:
-            recommended.extend(
-                button for button in RUN_ACTION_BUTTONS if button.title in {"Improve", "Market"}
-            )
-        return (coach_button, *recommended[:2], report_button, *final_buttons)
+        fallback_titles = {"Team", "Finance", "Customers", "Improve", "Market"}
+        fallback_buttons = tuple(
+            button
+            for button in RUN_ACTION_BUTTONS
+            if button.title in fallback_titles and self._button_is_enabled(button)
+        )
+        brief = self._view_model.decision_brief
+        return build_focus_action_buttons(
+            primary_command=brief.command,
+            primary_label=brief.command_label,
+            primary_panel_key=self._workspace_panel_key_for_command(brief.command),
+            preferred_buttons=self._loadout_action_buttons(),
+            recommendation_buttons=recommendation_buttons,
+            fallback_buttons=fallback_buttons,
+        )
 
     def _loadout_action_buttons(self) -> tuple[ActionButtonSpec, ...]:
         """Return enabled action buttons emphasized by the local player profile."""
@@ -8959,7 +8963,7 @@ class RunScene(BaseScene):
                 )
                 hint = (
                     f"End Turn: {brief.end_turn_label} | Later: {brief.later_label} | "
-                    "Hover C Coach for why"
+                    "Hover C for why"
                 )
             primary = self._compact_footer_status_line(primary)
             hint = self._compact_footer_hint_line(hint)
