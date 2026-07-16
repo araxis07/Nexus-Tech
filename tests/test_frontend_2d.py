@@ -127,6 +127,7 @@ from nexus_tech.frontend_2d.event_queue import (
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
+from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
     ReviewScene,
@@ -1132,6 +1133,57 @@ def test_endgame_cockpit_actions_expose_all_path_fix_buttons() -> None:
     assert any(action.label == "Review Main Risk" for action in actions)
 
 
+def test_endgame_panel_disclosure_starts_guided_and_preserves_all_actions() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    panel = next(
+        panel
+        for panel in build_deep_dive_panel_view_models(
+            state,
+            selected_product_id=state.products[0].id.hex,
+        )
+        if panel.key == "endgame"
+    )
+
+    guided = build_panel_disclosure(panel)
+    expanded = build_panel_disclosure(panel, expanded=True)
+
+    assert guided.action_heading == "Start Here"
+    assert [action.label for action in guided.actions] == [
+        "Recommended Fix",
+        "Review Main Risk",
+    ]
+    assert guided.hidden_action_count == len(panel.actions) - 2
+    assert guided.toggle_label == f"V More ({len(panel.actions) - 2})"
+    assert tuple(line.split(":", 1)[0] for line in guided.detail_lines) == (
+        "Projected path",
+        "Blocked paths",
+        "Next move",
+    )
+    assert expanded.action_heading == "All Endgame Actions"
+    assert expanded.actions == panel.actions
+    assert expanded.detail_lines == panel.detail_lines
+    assert expanded.toggle_label == "V Guided"
+
+
+def test_endgame_panel_disclosure_does_not_change_other_panels() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    panel = next(
+        panel
+        for panel in build_deep_dive_panel_view_models(
+            state,
+            selected_product_id=state.products[0].id.hex,
+        )
+        if panel.key == "finance"
+    )
+
+    disclosure = build_panel_disclosure(panel)
+
+    assert disclosure.action_heading == "Panel Actions"
+    assert disclosure.actions == panel.actions
+    assert disclosure.detail_lines == panel.detail_lines
+    assert disclosure.toggle_label == ""
+
+
 def test_run_scene_opening_endgame_panel_pushes_cockpit_brief_event() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -1611,7 +1663,7 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         assert "Endgame: Endgame / Exit Board" in workspace_line
         assert "Next:" in workspace_line
         assert "Risk:" in workspace_line
-        assert hint_line.startswith("Watch:")
+        assert hint_line == "V Show 8 More | I Inspector | Esc Close"
 
         picker = ContextPicker(
             title="Capital Plan",
@@ -1632,8 +1684,10 @@ def test_run_scene_footer_status_lines_reflect_workspace_and_picker() -> None:
         )
         scene._set_context_picker(picker)
         picker_line, _ = scene._footer_status_lines()
+        compact_picker_line, _ = scene._footer_status_lines(max_width=720)
 
         assert picker_line.startswith("Picker: Capital Plan")
+        assert compact_picker_line.startswith("Picker: Capital Plan")
     finally:
         pygame.quit()
 
@@ -1716,6 +1770,53 @@ def test_run_scene_endgame_panel_action_tooltip_mentions_handoff_destination() -
 
         assert "from the cockpit" in hint
         assert "hand off into" in hint
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_endgame_panel_reveals_advanced_actions_by_mouse_and_keyboard() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=33),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+        scene._set_deep_panel("endgame")
+        panel = scene.deep_panel
+        assert panel is not None
+
+        scene.draw(surface)
+
+        guided_targets = [
+            target for target in scene._click_targets if target.kind == "panel_action"
+        ]
+        toggle_target = next(
+            target for target in scene._click_targets if target.kind == "endgame_actions_toggle"
+        )
+        assert len(guided_targets) == 2
+        assert scene.layout_safety_violations() == ()
+
+        scene._dispatch_click_target(toggle_target)
+        scene.draw(surface)
+
+        expanded_targets = [
+            target for target in scene._click_targets if target.kind == "panel_action"
+        ]
+        assert scene._endgame_actions_expanded
+        assert len(expanded_targets) == len(panel.actions)
+        assert scene.layout_safety_violations() == ()
+
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_v, unicode="v"))
+
+        assert not scene._endgame_actions_expanded
     finally:
         pygame.quit()
 
@@ -1846,6 +1947,10 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(compact_hint) <= 96
         assert "Actions Left" in full_status
         assert "AP:" in compact_status
+        assert "Why:" not in compact_hint
+        assert "End Turn:" in compact_hint
+        assert "Later:" in compact_hint
+        assert "Hover C Coach for why" in compact_hint
         assert full_hint.startswith("Why:")
         assert "0 More" in full_hint
 

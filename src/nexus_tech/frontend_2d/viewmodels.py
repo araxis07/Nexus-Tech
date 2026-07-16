@@ -1327,8 +1327,7 @@ def _build_endgame_panel(
         key="endgame",
         title="Endgame / Exit Board",
         summary=(
-            "Start with Recommended Fix, review the main risk, then compare advanced exit "
-            "paths without leaving the 2D run loop."
+            "Start with Recommended Fix, then Review Main Risk. Press V to compare every exit path."
         ),
         metrics=(
             DeepDiveMetricViewModel(

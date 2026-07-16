@@ -35,6 +35,7 @@ from nexus_tech.frontend_2d.event_queue import (
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
+from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
@@ -4388,6 +4389,7 @@ class RunScene(BaseScene):
         self._pause_overlay_visible = False
         self._pause_settings_visible = False
         self._focus_mode = True
+        self._endgame_actions_expanded = False
         self._return_scene_factory = return_scene_factory
         self._terminal_archive_saved = False
         self._first_turn_guide_visible = False
@@ -4617,6 +4619,8 @@ class RunScene(BaseScene):
             return
         previous_key = self._deep_panel_key
         self._deep_panel_key = panel_key
+        if panel_key == "endgame":
+            self._endgame_actions_expanded = False
         if panel_key is not None:
             self._trigger_overlay_motion("panel", intensity=0.75)
             self._motion_pulses.trigger(f"panel:{panel_key}", intensity=0.7, decay=2.0)
@@ -4624,6 +4628,13 @@ class RunScene(BaseScene):
                 self._announce_endgame_cockpit()
         elif previous_key is not None:
             self._trigger_overlay_exit("panel")
+
+    def _toggle_endgame_actions(self) -> None:
+        if self._deep_panel_key != "endgame" or self.deep_panel is None:
+            return
+        self._endgame_actions_expanded = not self._endgame_actions_expanded
+        self._trigger_overlay_motion("panel", intensity=0.56)
+        self._motion_pulses.trigger("panel:endgame", intensity=0.62, decay=1.8)
 
     def _announce_endgame_cockpit(self) -> None:
         panel = self.deep_panel
@@ -5035,6 +5046,10 @@ class RunScene(BaseScene):
 
         if self.state.pending_event is not None:
             self._handle_pending_event_key(event)
+            return
+
+        if self._deep_panel_key == "endgame" and event.key == self.pygame.K_v:
+            self._toggle_endgame_actions()
             return
 
         if event.key == self.pygame.K_s:
@@ -7060,6 +7075,9 @@ class RunScene(BaseScene):
                 return
             self._run_command(target.payload)
             return
+        if target.kind == "endgame_actions_toggle":
+            self._toggle_endgame_actions()
+            return
         if target.kind == "close_panel":
             self._set_deep_panel(None)
             return
@@ -9060,6 +9078,17 @@ class RunScene(BaseScene):
             )
         elif self._deep_panel_key == "endgame":
             primary = self._endgame_cockpit_status_line()
+            panel = self.deep_panel
+            if panel is not None:
+                disclosure = build_panel_disclosure(
+                    panel,
+                    expanded=self._endgame_actions_expanded,
+                )
+                hint = (
+                    "V Guided View | I Inspector | Esc Close"
+                    if self._endgame_actions_expanded
+                    else (f"V Show {disclosure.hidden_action_count} More | I Inspector | Esc Close")
+                )
         elif self._focus_mode:
             brief = self._view_model.decision_brief
             primary = (
@@ -9079,6 +9108,24 @@ class RunScene(BaseScene):
         if hover_hint:
             hint = hover_hint
         if max_width is not None and max_width < 760:
+            if (
+                self._focus_mode
+                and self._deep_panel_key is None
+                and self._inspector_panel_key is None
+                and self._context_picker is None
+                and self._text_input is None
+                and self.state.pending_event is None
+                and not hover_hint
+            ):
+                brief = self._view_model.decision_brief
+                primary = (
+                    f"Next: {brief.command_label} | {brief.urgency_label} | "
+                    f"AP: {self.state.action_points_remaining}"
+                )
+                hint = (
+                    f"End Turn: {brief.end_turn_label} | Later: {brief.later_label} | "
+                    "Hover C Coach for why"
+                )
             primary = self._compact_footer_status_line(primary)
             hint = self._compact_footer_hint_line(hint)
         return primary, hint
@@ -9272,6 +9319,12 @@ class RunScene(BaseScene):
                         f"{self._panel_display_name(destination)}."
                     )
             return f"Hover: run {command_label} now."
+        if target.kind == "endgame_actions_toggle":
+            return (
+                "Hover: return to the recommended fix and main risk."
+                if self._endgame_actions_expanded
+                else "Hover: reveal exit-path fixes and specialist reviews."
+            )
         if target.kind == "panel":
             return f"Hover: open the {target.payload} deep-dive panel."
         if target.kind == "open_panel_inspector":
@@ -9849,6 +9902,11 @@ class RunScene(BaseScene):
         panel = self.deep_panel
         if panel is None:
             return
+        disclosure = build_panel_disclosure(
+            panel,
+            expanded=self._endgame_actions_expanded,
+        )
+        guided_endgame = panel.key == "endgame" and not self._endgame_actions_expanded
         overlay_motion = self._overlay_motion_level("panel")
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("panel"))
@@ -9857,7 +9915,7 @@ class RunScene(BaseScene):
             pygame,
             surface,
             width=940,
-            height=560,
+            height=500 if guided_endgame else 560,
             margin=24,
         )
         modal_rect = self._animated_overlay_rect(modal_rect, "panel", shift=38)
@@ -9964,7 +10022,7 @@ class RunScene(BaseScene):
         detail_title = self.fonts.heading.render("Live Notes", True, TEXT)
         surface.blit(detail_title, detail_title_rect.topleft)
         top = detail_rect.top
-        for line in panel.detail_lines:
+        for line in disclosure.detail_lines:
             consumed = draw_wrapped_text(
                 surface,
                 self.fonts.small,
@@ -9982,7 +10040,7 @@ class RunScene(BaseScene):
             action_rect.width,
             heading_height,
         )
-        action_title = self.fonts.heading.render("Panel Actions", True, TEXT)
+        action_title = self.fonts.heading.render(disclosure.action_heading, True, TEXT)
         surface.blit(action_title, action_title_rect.topleft)
         if metric_card_rects:
             self._record_layout_separation(
@@ -9990,12 +10048,12 @@ class RunScene(BaseScene):
                 metric_card_rects[0].unionall(metric_card_rects[1:]),
                 detail_title_rect.union(action_title_rect),
             )
-        cols = 2
+        cols = 1 if guided_endgame else 2
         button_gap = 10
         button_width = int((action_rect.width - button_gap * (cols - 1)) / cols)
-        action_rows = max(1, (len(panel.actions) + cols - 1) // cols)
+        action_rows = max(1, (len(disclosure.actions) + cols - 1) // cols)
         button_height = min(
-            54,
+            68 if guided_endgame else 54,
             max(
                 34,
                 int((action_rect.height - button_gap * (action_rows - 1)) / action_rows),
@@ -10004,12 +10062,12 @@ class RunScene(BaseScene):
         top = action_rect.top
         left = action_rect.left
         action_button_rects = []
-        for index, action in enumerate(panel.actions):
+        for index, action in enumerate(disclosure.actions):
             if index and index % cols == 0:
                 top += button_height + button_gap
                 left = action_rect.left
             button_left = left
-            if index == len(panel.actions) - 1 and len(panel.actions) % cols:
+            if index == len(disclosure.actions) - 1 and len(disclosure.actions) % cols:
                 button_left = action_rect.centerx - button_width // 2
             button_rect = pygame.Rect(button_left, top, button_width, button_height)
             action_button_rects.append(button_rect)
@@ -10028,48 +10086,54 @@ class RunScene(BaseScene):
             self._click_targets.append(ClickTarget("panel_action", action.command, button_rect))
             left += button_width + button_gap
 
-        footer_gap = 10
-        footer_button_rects = []
+        footer_gap = 8
+        footer_controls: list[tuple[str, str, str, str, tuple[int, int, int]]] = []
+        if disclosure.toggle_label:
+            footer_controls.append(
+                (
+                    "endgame_actions_toggle",
+                    "",
+                    disclosure.toggle_label,
+                    disclosure.toggle_detail,
+                    WARN if not self._endgame_actions_expanded else INFO,
+                )
+            )
         if panel.inspectors:
-            footer_button_width = int((action_rect.width - footer_gap) / 2)
-            inspect_rect = pygame.Rect(
-                action_rect.left,
-                footer_top,
-                footer_button_width,
-                34,
+            footer_controls.append(
+                (
+                    "open_panel_inspector",
+                    panel.key,
+                    "I Inspector",
+                    "Inspect this panel in detail.",
+                    SELECTION,
+                )
             )
-            close_rect = pygame.Rect(
-                inspect_rect.right + footer_gap,
-                footer_top,
-                action_rect.right - inspect_rect.right - footer_gap,
-                34,
+        footer_controls.append(("close_panel", "", "Esc Close", "Return to the run.", BORDER))
+        footer_button_rects = []
+        footer_button_width = int(
+            (action_rect.width - footer_gap * (len(footer_controls) - 1)) / len(footer_controls)
+        )
+        footer_left = action_rect.left
+        for index, (kind, payload, title, detail, accent) in enumerate(footer_controls):
+            width = (
+                action_rect.right - footer_left
+                if index == len(footer_controls) - 1
+                else footer_button_width
             )
-            footer_button_rects.append(inspect_rect)
+            footer_rect = pygame.Rect(footer_left, footer_top, width, 34)
+            footer_button_rects.append(footer_rect)
             draw_button(
                 surface,
                 pygame,
-                rect=inspect_rect,
-                title="I Open Inspector",
-                detail="Inspect this panel in detail.",
-                accent=SELECTION,
+                rect=footer_rect,
+                title=title,
+                detail=detail,
+                accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
             )
-            self._click_targets.append(ClickTarget("open_panel_inspector", panel.key, inspect_rect))
-        else:
-            close_rect = pygame.Rect(action_rect.left, footer_top, action_rect.width, 34)
-        footer_button_rects.append(close_rect)
-        draw_button(
-            surface,
-            pygame,
-            rect=close_rect,
-            title="Esc Close",
-            detail="Return to the run.",
-            accent=BORDER,
-            title_font=self.fonts.small,
-            detail_font=self.fonts.small,
-        )
-        self._click_targets.append(ClickTarget("close_panel", "", close_rect))
+            self._click_targets.append(ClickTarget(kind, payload, footer_rect))
+            footer_left = footer_rect.right + footer_gap
         if action_button_rects:
             self._record_layout_separation(
                 "panel-actions-vs-footer",
@@ -10768,6 +10832,7 @@ class RunScene(BaseScene):
             ("Tab", "Next product / next inspector section"),
             ("1-8", "Open deep panels"),
             ("0", "Toggle Focus View / More Actions workspace"),
+            ("V", "Toggle guided / full Endgame actions"),
             ("I", "Inspect the current deep panel"),
             ("C", "Run primary coach command"),
             ("Q/F/M/D", "Product actions"),

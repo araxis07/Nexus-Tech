@@ -235,6 +235,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 ## 2D Audit Notes
 
 - Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
+- Verify the Endgame Board starts with only Recommended Fix and Review Main Risk, `V` and the More control reveal every existing panel action, and returning to Guided View does not alter gameplay state.
 - Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, staged-summary motion, or 2D request-path coverage changes.
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.

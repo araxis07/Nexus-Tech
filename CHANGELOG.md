@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.293.0 - 2026-07-16
+
+- Added progressive disclosure to the 2D Endgame Board: Recommended Fix and Review Main Risk remain visible first, while `V` or the local More control reveals every existing path fix and specialist review
+- Rebalanced the guided Endgame overlay around full-width primary actions, shorter instruction copy, and a three-control footer without removing command, inspector, mouse, or keyboard routes
+- Replaced truncated compact Focus footer rationale with a complete Next, End Turn, Later, and Coach-hover handoff while preserving full rationale on wider windows and hover guidance
+- Extracted the panel-disclosure policy from the large scene renderer into a small tested frontend module without changing simulation balance, content catalogs, persistence, or schema 27
+- Added an owner-run decision-density checklist while retaining the explicit `0/6` current-version human-playtest boundary
+
 ## 0.292.0 - 2026-07-16
 
 - Added a save-compatible Strategic Rhythm that joins the current campaign objective, Quarter Plan progress, recommended move, end-turn check, and delayed follow-on into one readable loop across terminal and 2D play
