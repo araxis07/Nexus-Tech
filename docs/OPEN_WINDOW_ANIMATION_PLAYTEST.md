@@ -14,7 +14,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --viewport
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off --viewport 820x620 --viewport 960x640 --viewport 1440x900 --output-dir /tmp/nexus-tech-visual-audit/off
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
-uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+uv run nexus-tech prepare-2d-animation-playtest --matrix-input /tmp/nexus-tech-animation-matrix.md --output /tmp/nexus-tech-animation-playtest-prep.md
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md

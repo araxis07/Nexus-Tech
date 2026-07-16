@@ -10,6 +10,8 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `persistence`: SQLite schema, repositories, and save/load orchestration.
 - `presentation`: Rich panels and tables. This layer should render state, not mutate it.
 - `frontend_2d`: pygame scenes, responsive layout, input routing, animation, and view-model adapters. This layer should route commands rather than own simulation rules.
+- `frontend_2d.control_guide`: pure control-help content shared with layout regressions; it must not own input bindings or render surfaces.
+- `frontend_2d.outcome_presentation`: pure completed-run copy and metric policy; it must not mutate the run, save an archive, or render pygame surfaces.
 - `frontend_2d.panel_disclosure`: pure presentation policy for guided versus expanded deep-panel content; it must never remove commands from the underlying view model.
 - `simulation.decision_patterns`: pure operating-choice analysis derived from Decision Ledger entries; it must not write state, classify forced event responses as operating choices, or tune balance automatically.
 - `simulation.beta_playtest_preparation`: pure next-session targeting and command preparation; it must not persist evidence, retain free-form observation notes, or convert automation into human signoff.
@@ -37,4 +39,4 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 
 ## Current Scale
 
-The project is now a late-alpha beta candidate with multiple products, employees, events, finance, competitors, campaigns, persistence, balance tooling, key accounts, archive progression, and endgame classification across terminal and 2D play. Decision-density policy has started moving out of the large scene renderer without changing behavior ownership. The next meaningful scale step remains observed usability, consolidation, and safe module extraction rather than more catalog breadth, a web stack, or online infrastructure.
+The project is now a late-alpha beta candidate with multiple products, employees, events, finance, competitors, campaigns, persistence, balance tooling, key accounts, archive progression, and endgame classification across terminal and 2D play. Decision-density, control-guide, and completed-run presentation policy have started moving out of the large scene renderer without changing behavior ownership. The next meaningful scale step remains observed usability, consolidation, and safe module extraction rather than more catalog breadth, a web stack, or online infrastructure.

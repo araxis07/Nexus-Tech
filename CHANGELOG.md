@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.297.0 - 2026-07-17
+
+- Extracted compact Help content and completed-run copy/metric policy from the large pygame scene renderer into pure frontend modules
+- Added direct shutdown, victory, and archived-ending regressions while retaining the large-text Help and outcome layout contracts
+- Aligned local animation playtest preparation with CI by reusing the validated broad-matrix artifact instead of rerunning all 21 cells
+- Kept rendering and input routing in `scenes.py` without changing gameplay, controls, persistence, balance, or archive behavior
+- Preserved schema 27, frozen gameplay catalogs, and the truthful `0/6` current-version human-session boundary
+
 ## 0.296.0 - 2026-07-16
 
 - Rebuilt the completed-run overlay around an explicit ending cause, Cash/Score/Last Turn snapshot, and a readable Review, Save & Archive, then Exit handoff

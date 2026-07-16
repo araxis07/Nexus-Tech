@@ -28,6 +28,7 @@ from nexus_tech.frontend_2d.context import (
     explain_command_unavailable,
     explain_inspector_action_unavailable,
 )
+from nexus_tech.frontend_2d.control_guide import RUN_HELP_KEYCAPS
 from nexus_tech.frontend_2d.event_queue import (
     FrontendEvent,
     build_action_events,
@@ -35,12 +36,12 @@ from nexus_tech.frontend_2d.event_queue import (
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
+from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
     DeepDivePanelViewModel,
-    GameViewModel,
     RunReviewViewModel,
     SaveSlotCardViewModel,
     TurnSummaryViewModel,
@@ -202,26 +203,6 @@ class LateGameChoreographyCue:
 
 
 @dataclass(frozen=True)
-class OutcomeMetricViewModel:
-    """One compact run fact shown before the player archives an ending."""
-
-    label: str
-    value: str
-    tone: str
-
-
-@dataclass(frozen=True)
-class OutcomeOverlayViewModel:
-    """Readable completion context for the terminal outcome overlay."""
-
-    title: str
-    eyebrow: str
-    detail: str
-    progression: str
-    metrics: tuple[OutcomeMetricViewModel, ...]
-
-
-@dataclass(frozen=True)
 class ActorSpriteClip:
     """One deterministic shape-sprite actor beat rendered by the 2D frontend."""
 
@@ -329,92 +310,6 @@ def _fit_nav_safe_modal_rect(
         safe_width,
         safe_height,
     )
-
-
-def _build_outcome_overlay_view_model(
-    state: GameState,
-    game_view_model: GameViewModel,
-    *,
-    archive_saved: bool,
-) -> OutcomeOverlayViewModel:
-    """Build concise ending context without changing the completed run."""
-
-    if archive_saved:
-        title = "Archive Recorded"
-        eyebrow = "ARCHIVED ENDING"
-        detail = (
-            "This ending now counts toward progression and Route Atlas. "
-            "Return to the title menu when the review is complete."
-        )
-        progression = "Archive recorded. Open Progress from the title menu for the next route."
-    elif state.victory_achieved:
-        title = "Victory Achieved"
-        eyebrow = "VICTORY OUTCOME"
-        detail = (
-            state.victory_reason or state.exit_summary or "The company reached a winning end state."
-        )
-        progression = (
-            f"Journey {game_view_model.run_journey.step_label}: Review why, then "
-            "Save & Archive to keep progression."
-        )
-    else:
-        title = "Company Shutdown"
-        eyebrow = "SHUTDOWN CAUSE"
-        detail = (
-            f"Cash closed at {format_money(state.company.cash_on_hand)}. "
-            "Runway exhausted before the next control move could land."
-            if state.company.cash_on_hand < 0
-            else "The company can no longer continue. Open Review for the ranked causes."
-        )
-        progression = (
-            f"Journey {game_view_model.run_journey.step_label}: Review why, then "
-            "Save & Archive to keep progression."
-        )
-
-    return OutcomeOverlayViewModel(
-        title=title,
-        eyebrow=eyebrow,
-        detail=detail,
-        progression=progression,
-        metrics=(
-            OutcomeMetricViewModel(
-                label="CASH",
-                value=format_money(state.company.cash_on_hand),
-                tone="danger" if state.company.cash_on_hand < 0 else "success",
-            ),
-            OutcomeMetricViewModel(
-                label="SCORE",
-                value=game_view_model.score_label,
-                tone="info",
-            ),
-            OutcomeMetricViewModel(
-                label="LAST TURN",
-                value=game_view_model.turn_label,
-                tone="warning" if state.company.game_over else "info",
-            ),
-        ),
-    )
-
-
-_RUN_HELP_KEYCAPS = (
-    ("Tab", "Next product / next inspector section"),
-    ("1-8", "Open deep panels"),
-    ("0", "Toggle Focus View / More Actions"),
-    ("V", "Guided / full Endgame actions"),
-    ("I", "Inspect the current deep panel"),
-    ("C", "Run primary coach command"),
-    ("Q/F/M/D", "Product actions"),
-    ("H/A/O", "Hire / assign / partner"),
-    ("Y/R/B/U", "Strategy, roadmap, budget, support"),
-    ("Space", "End turn"),
-    ("P", "Pause menu: all run and exit options"),
-    ("Esc", "Back out of overlay, then pause"),
-    ("Z/X", "Inspector sort / filter"),
-    ("A/H", "Inspector actionable / hotspot focus"),
-    ("PgUp/PgDn", "Inspector page"),
-    ("Enter", "Run selected inspector action"),
-    ("F1/?", "Toggle this help"),
-)
 
 
 _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
@@ -10942,10 +10837,10 @@ class RunScene(BaseScene):
         two_columns = inner.width >= 620
         if two_columns:
             col_gap = 14
-            rows = (len(_RUN_HELP_KEYCAPS) + 1) // 2
+            rows = (len(RUN_HELP_KEYCAPS) + 1) // 2
             row_gap = max(5, min(8, (keycap_bottom - keycap_top - keycap_height * rows) // rows))
             col_width = int((inner.width - col_gap) / 2)
-            for index, (key_text, label) in enumerate(_RUN_HELP_KEYCAPS):
+            for index, (key_text, label) in enumerate(RUN_HELP_KEYCAPS):
                 col = index // rows
                 row = index % rows
                 keycap_rect = pygame.Rect(
@@ -10967,11 +10862,11 @@ class RunScene(BaseScene):
                 2,
                 min(
                     6,
-                    (keycap_bottom - keycap_top - keycap_height * len(_RUN_HELP_KEYCAPS))
-                    // max(1, len(_RUN_HELP_KEYCAPS) - 1),
+                    (keycap_bottom - keycap_top - keycap_height * len(RUN_HELP_KEYCAPS))
+                    // max(1, len(RUN_HELP_KEYCAPS) - 1),
                 ),
             )
-            for index, (key_text, label) in enumerate(_RUN_HELP_KEYCAPS):
+            for index, (key_text, label) in enumerate(RUN_HELP_KEYCAPS):
                 keycap_rect = pygame.Rect(
                     inner.left,
                     keycap_top + index * (keycap_height + row_gap),
@@ -11017,7 +10912,7 @@ class RunScene(BaseScene):
             emphasis=max(0.32, overlay_motion),
             lift=int(overlay_motion * 4),
         )
-        outcome = _build_outcome_overlay_view_model(
+        outcome = build_outcome_overlay_view_model(
             self.state,
             self._view_model,
             archive_saved=self._terminal_archive_saved,

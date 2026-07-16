@@ -35,7 +35,7 @@ uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --viewport
 uv run nexus-tech audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off --viewport 820x620 --viewport 960x640 --viewport 1440x900
 uv run nexus-tech audit-2d-animation --scenario founder_journey --seed 7 --frames 1
 uv run nexus-tech audit-2d-animation-matrix --frames 1 --output /tmp/nexus-tech-animation-matrix.md
-uv run nexus-tech prepare-2d-animation-playtest --frames 1 --output /tmp/nexus-tech-animation-playtest-prep.md
+uv run nexus-tech prepare-2d-animation-playtest --matrix-input /tmp/nexus-tech-animation-matrix.md --output /tmp/nexus-tech-animation-playtest-prep.md
 uv run nexus-tech draft-animation-playtest-report --prefill-automated-gates --output /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-status /tmp/nexus-tech-animation-playtest-report.md
 uv run nexus-tech animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md
@@ -241,7 +241,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 - Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, staged-summary motion, or 2D request-path coverage changes.
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.
 - Run `audit-2d-animation-matrix --output /tmp/nexus-tech-animation-matrix.md` before presentation builds so actor/state, readability, pacing, and motion gates are checked beyond the single founder seed.
-- Run `prepare-2d-animation-playtest --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist starts from the same matrix baselines as CI.
+- Run `prepare-2d-animation-playtest --matrix-input /tmp/nexus-tech-animation-matrix.md --output /tmp/nexus-tech-animation-playtest-prep.md` before the human pass so the window/motion/control checklist reuses the validated matrix baseline exactly like CI instead of rerunning it.
 - Use visible `menu-2d` and `play-2d` with `--window-size 820x620`, `--window-size 960x640`, and `--window-size 1440x900` during the human pass instead of hand-resizing windows.
 - Run `animation-playtest-commands --output /tmp/nexus-tech-animation-playtest-commands.md` when handing the remaining manual QA to a tester so no required window or motion mode is skipped.
 - Run `validate-animation-playtest-commands /tmp/nexus-tech-animation-playtest-commands.md` before handoff so the exported queue has every required menu/play command.

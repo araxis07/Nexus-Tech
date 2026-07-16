@@ -8761,7 +8761,8 @@ def write_2d_animation_playtest_prep_report(
             "--output /tmp/nexus-tech-animation-matrix.md"
         ),
         (
-            "uv run nexus-tech prepare-2d-animation-playtest --frames 1 "
+            "uv run nexus-tech prepare-2d-animation-playtest "
+            "--matrix-input /tmp/nexus-tech-animation-matrix.md "
             "--output /tmp/nexus-tech-animation-playtest-prep.md"
         ),
         "```",

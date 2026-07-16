@@ -119,6 +119,7 @@ from nexus_tech.frontend_2d.context import (
     explain_command_unavailable,
     explain_inspector_action_unavailable,
 )
+from nexus_tech.frontend_2d.control_guide import RUN_HELP_KEYCAPS
 from nexus_tech.frontend_2d.event_queue import (
     FrontendEvent,
     build_action_events,
@@ -127,6 +128,7 @@ from nexus_tech.frontend_2d.event_queue import (
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
+from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
@@ -3409,7 +3411,7 @@ def test_compact_help_labels_fit_large_text_without_ellipsis() -> None:
 
         oversized = [
             (key, label)
-            for key, label in scenes_module._RUN_HELP_KEYCAPS
+            for key, label in RUN_HELP_KEYCAPS
             if large_fonts.small.size(label)[0] > label_width
         ]
 
@@ -3424,7 +3426,7 @@ def test_outcome_overlay_copy_explains_shutdown_and_archive_handoff() -> None:
     state.company.game_over = True
     view_model = build_game_view_model(state)
 
-    shutdown = scenes_module._build_outcome_overlay_view_model(
+    shutdown = build_outcome_overlay_view_model(
         state,
         view_model,
         archive_saved=False,
@@ -3442,7 +3444,7 @@ def test_outcome_overlay_copy_explains_shutdown_and_archive_handoff() -> None:
         ("LAST TURN", view_model.turn_label),
     ]
 
-    archived = scenes_module._build_outcome_overlay_view_model(
+    archived = build_outcome_overlay_view_model(
         state,
         view_model,
         archive_saved=True,
@@ -3451,6 +3453,28 @@ def test_outcome_overlay_copy_explains_shutdown_and_archive_handoff() -> None:
     assert archived.title == "Archive Recorded"
     assert "counts toward progression" in archived.detail
     assert "Open Progress" in archived.progression
+
+
+def test_outcome_overlay_copy_preserves_victory_reason_before_archive() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    state.company.game_over = True
+    state.victory_achieved = True
+    state.victory_reason = "Category leadership secured."
+    view_model = build_game_view_model(state)
+
+    victory = build_outcome_overlay_view_model(
+        state,
+        view_model,
+        archive_saved=False,
+    )
+
+    assert victory.title == "Victory Achieved"
+    assert victory.eyebrow == "VICTORY OUTCOME"
+    assert victory.detail == "Category leadership secured."
+    assert "Review why" in victory.progression
+    assert "Save & Archive" in victory.progression
+    assert victory.metrics[0].tone == "success"
+    assert victory.metrics[2].tone == "warning"
 
 
 def test_compact_outcome_overlay_supports_large_text_without_severe_clamping() -> None:
@@ -5119,6 +5143,9 @@ def test_write_2d_animation_playtest_prep_report_keeps_manual_scope(tmp_path: Pa
     assert (
         "audit-2d-visual --scenario founder_journey --seed 7 --motion-mode off "
         "--viewport 820x620 --viewport 960x640 --viewport 1440x900"
+    ) in report_text
+    assert (
+        "prepare-2d-animation-playtest --matrix-input /tmp/nexus-tech-animation-matrix.md"
     ) in report_text
     assert "## Control Clarity Checklist" in report_text
     assert "Pause / Resume" in report_text
