@@ -1281,6 +1281,7 @@ class TitleScene(BaseScene):
     def _title_actor_sprite_clips(self) -> tuple[ActorSpriteClip, ...]:
         mode_label = {
             "menu": "Menu",
+            "guide": "Guide",
             "meta": "Meta",
             "slots": "Saves",
             "slot_detail": "Slot",
@@ -1290,6 +1291,7 @@ class TitleScene(BaseScene):
         }.get(self._mode, "Archive")
         mode_state = {
             "menu": "handoff",
+            "guide": "handoff",
             "meta": "success",
             "slots": "build",
             "slot_detail": "build",
@@ -5704,18 +5706,11 @@ class RunScene(BaseScene):
         if strength <= 0 or not clips:
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
-        visible_count = min(max_count, 2 if width < 940 else 3, len(clips))
-        visible_clips = clips[:visible_count]
-        gap = 8
-        clip_height = 42
-        clip_width = 124 if width >= 1040 else 108
-        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
-        left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 10)
-        # Leave a clear vertical lane between overlay actors and header summaries.
-        top = max(anchor_rect.top - 44, 18)
-        for index, clip in enumerate(visible_clips):
-            clip_rect = pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height)
+        for clip, clip_rect in self._overlay_actor_sprite_layout(
+            anchor_rect,
+            clips=clips,
+            max_count=max_count,
+        ):
             self._record_actor_sprite_bounds(clip, clip_rect)
             _draw_actor_sprite_clip(
                 pygame=pygame,
@@ -5726,6 +5721,35 @@ class RunScene(BaseScene):
                 elapsed=self._motion_elapsed,
                 intensity=strength,
             )
+
+    def _overlay_actor_sprite_layout(
+        self,
+        anchor_rect,
+        *,
+        clips: tuple[ActorSpriteClip, ...],
+        max_count: int = 3,
+    ) -> tuple[tuple[ActorSpriteClip, object], ...]:
+        """Place overlay actors in one deterministic header lane."""
+
+        if not clips:
+            return ()
+        pygame = self.pygame
+        width = self._window_width()
+        visible_count = min(max_count, 2 if width < 940 else 3, len(clips))
+        visible_clips = clips[:visible_count]
+        gap = 8
+        clip_height = 42
+        clip_width = 124 if width >= 1040 else 108
+        total_width = clip_width * len(visible_clips) + gap * (len(visible_clips) - 1)
+        left = max(anchor_rect.left + 12, anchor_rect.right - total_width - 10)
+        top = max(anchor_rect.top - 44, 18)
+        return tuple(
+            (
+                clip,
+                pygame.Rect(left + index * (clip_width + gap), top, clip_width, clip_height),
+            )
+            for index, clip in enumerate(visible_clips)
+        )
 
     def _impact_cue_duration(self) -> float:
         if self.motion_mode is MotionMode.OFF:
@@ -9740,41 +9764,68 @@ class RunScene(BaseScene):
             emphasis=max(panel_motion, overlay_motion),
             lift=int(max(panel_motion, overlay_motion) * 5),
         )
+        endgame_actor_clips = self._endgame_actor_sprite_clips()
+        endgame_actor_layout = (
+            self._overlay_actor_sprite_layout(inner, clips=endgame_actor_clips)
+            if panel.key == "endgame" and self.endgame_actor_active()
+            else ()
+        )
+        header_text_width = inner.width
+        if endgame_actor_layout:
+            actor_left = min(actor_rect.left for _clip, actor_rect in endgame_actor_layout)
+            header_text_width = max(220, actor_left - inner.left - 12)
         title_rect = pygame.Rect(
             inner.left,
             inner.top - 28,
-            inner.width,
+            header_text_width,
             self.fonts.title.get_height(),
         )
-        title_surface = self.fonts.title.render(panel.title, True, TEXT)
+        title_surface = self.fonts.title.render(
+            fit_text_line(self.fonts.title, panel.title, header_text_width),
+            True,
+            TEXT,
+        )
         surface.blit(title_surface, title_rect.topleft)
         self._record_layout_separation(
             "deep-panel-title-vs-nav",
             title_rect,
             pygame.Rect(0, 0, surface.get_width(), 54),
         )
-        self._draw_panel_entity_strip(
-            surface,
-            pygame.Rect(inner.right - 190, inner.top - 30, 190, 28),
-            panel_key=panel.key,
-            strength=self._entity_motion_strength(f"panel:{panel.key}", "overlay:panel"),
-        )
+        if not endgame_actor_layout:
+            self._draw_panel_entity_strip(
+                surface,
+                pygame.Rect(inner.right - 190, inner.top - 30, 190, 28),
+                panel_key=panel.key,
+                strength=self._entity_motion_strength(f"panel:{panel.key}", "overlay:panel"),
+            )
         if panel.key == "endgame":
             self._draw_overlay_actor_sprite_layer(
                 surface,
                 inner,
-                clips=self._endgame_actor_sprite_clips(),
+                clips=endgame_actor_clips,
                 strength=self._actor_sprite_strength("panel:endgame", "overlay:panel"),
             )
+        summary_rect = pygame.Rect(inner.left, inner.top, header_text_width, 40)
         draw_wrapped_text(
             surface,
             self.fonts.body,
             panel.summary,
             MUTED,
-            pygame.Rect(inner.left, inner.top, inner.width, 40),
+            summary_rect,
             line_height=18,
             max_lines=2,
         )
+        for index, (_clip, actor_rect) in enumerate(endgame_actor_layout):
+            self._record_layout_separation(
+                f"endgame-title-vs-actor-{index}",
+                title_rect,
+                actor_rect,
+            )
+            self._record_layout_separation(
+                f"endgame-summary-vs-actor-{index}",
+                summary_rect,
+                actor_rect,
+            )
         metric_top = inner.top + 54
         metric_width = int((inner.width - 24) / 2)
         metric_card_rects = []

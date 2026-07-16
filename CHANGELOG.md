@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.299.0 - 2026-07-17
+
+- Reserved a deterministic compact-header lane for Endgame actor cards so they cannot cover the title or summary at 820x620
+- Removed the redundant Endgame entity strip while actor cards are active, eliminating competing decoration in the same header region
+- Labeled the Quick Start title actor as `Guide` instead of falling back to the generic Archive role
+- Added compact-layout and actor-role regressions without changing gameplay, controls, balance, persistence, schema 27, or the truthful `0/6` human-session boundary
+
 ## 0.298.0 - 2026-07-17
 
 - Extracted the 25-button run action catalog and four action-loadout policies from the large pygame scene renderer into a pure frontend module

@@ -2,12 +2,15 @@
 
 ## Product Position
 
-NEXUS TECH 0.298.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.299.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
-The current convergence slice consolidates action-bar, completed-run, and control presentation policy after the deterministic 820x620 owner audit while retaining the executable next-session packet:
+The current convergence slice closes a concrete compact Endgame header collision after the deterministic 820x620 owner audit while retaining the executable next-session packet:
 
+- Endgame actor cards now use one measured header lane that reserves title and summary width at compact viewports;
+- the redundant Endgame entity strip is suppressed while actor cards are active, and Quick Start identifies its actor as `Guide`;
+- compact layout regressions protect actor-to-copy separation at 820x620;
 - the 25-button run action catalog and four local loadout policies now live in a pure module instead of the pygame scene renderer;
 - a direct catalog contract protects key order, unique titles, valid command payloads, and complete loadout routing;
 - completed-run title, cause, progression, and metric policy now live in a pure module instead of the pygame scene renderer;

@@ -3092,9 +3092,11 @@ def test_run_overlay_actor_sprite_layers_cover_inspector_and_endgame() -> None:
         scene._close_inspector()
         scene._set_deep_panel("endgame")
         scene.update(1 / 60)
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
         scene.draw(surface)
         assert scene.endgame_actor_active()
         _assert_actor_readability_clear(scene)
+        assert scene.layout_safety_violations() == ()
 
         off_scene._set_deep_panel("pipeline")
         off_scene._open_inspector("pipeline")
@@ -3276,6 +3278,7 @@ def test_title_scene_quick_start_guides_first_run_controls(tmp_path: Path) -> No
         guide_targets = {(target.kind, target.payload) for target in scene._click_targets}
 
         assert scene._mode == "guide"
+        assert scene._title_actor_sprite_clips()[0].role == "Guide"
         assert any("Goal:" in line for line in guide_lines)
         assert any("Controls:" in line for line in guide_lines)
         assert ("menu", "new_wizard") in guide_targets
