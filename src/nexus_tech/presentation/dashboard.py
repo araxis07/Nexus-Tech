@@ -56,6 +56,7 @@ from nexus_tech.simulation.campaign_starts import CampaignStartDefinition
 from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
+from nexus_tech.simulation.decision_patterns import build_decision_pattern
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
@@ -4873,9 +4874,17 @@ def _build_funding_history_panel(state: GameState) -> Panel:
 
 
 def _build_decision_ledger_panel(state: GameState) -> Panel:
+    pattern = build_decision_pattern(state.decision_history)
+    pattern_table = Table(box=None, expand=True, show_header=False, pad_edge=False)
+    pattern_table.add_column("Metric", style="bold cyan", no_wrap=True)
+    pattern_table.add_column("Value")
+    pattern_table.add_row("Decision Pattern", pattern.style_label)
+    pattern_table.add_row("Coverage", pattern.diversity_line)
+    pattern_table.add_row("Family Mix", pattern.family_mix_line.removeprefix("Mix: "))
+    pattern_table.add_row("Repeat Signal", pattern.repetition_line)
     if not state.decision_history:
         return Panel(
-            "No state-changing decisions recorded yet.",
+            Group(pattern_table, "No state-changing decisions recorded yet."),
             title="Decision Ledger",
             border_style="cyan",
             expand=True,
@@ -4893,7 +4902,12 @@ def _build_decision_ledger_panel(state: GameState) -> Panel:
             entry.impact_summary,
             entry.timing,
         )
-    return Panel(table, title="Decision Ledger", border_style="cyan", expand=True)
+    return Panel(
+        Group(pattern_table, table),
+        title="Decision Ledger",
+        border_style="cyan",
+        expand=True,
+    )
 
 
 def _build_recent_events_panel(state: GameState) -> Panel:

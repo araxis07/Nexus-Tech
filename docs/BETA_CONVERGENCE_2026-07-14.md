@@ -2,12 +2,15 @@
 
 ## Current Level
 
-NEXUS TECH 0.293.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. Strategic Rhythm joins campaign objective, Quarter Plan progress, current move, end-turn check, and delayed follow-on without adding state. The 2D Endgame Board now reveals its recommended fix and main risk before advanced paths, and compact Focus footer copy preserves complete decision cues instead of truncating rationale. A bounded Decision Ledger explains immediate and end-turn effects, while persistent action loadouts prioritize existing enabled choices without changing balance. Schema 27 stores decision history additively, keeps display/loadout preferences outside gameplay save slots, and retains isolated structured human-session evidence.
+NEXUS TECH 0.294.0 is a late-alpha beta candidate with a complete vertical slice. The six featured campaigns have real three-act progression, and every combination of their Commitment and Consequence decisions now has deterministic native-goal evidence across all three difficulties. Archived endings derive discovery and mastery across all 24 authored routes, while live and archived reviews synthesize both choices into a Campaign Legacy. A save-compatible six-step First Archive Mission connects Guided Opening, both campaign decisions, Endgame, the final outcome, and Save & Archive across terminal and 2D play. Terminal and 2D progression show the complete six-campaign Route Atlas. Strategic Rhythm joins campaign objective, Quarter Plan progress, current move, end-turn check, and delayed follow-on without adding state. Decision Pattern now derives voluntary operating-family mix, unique-choice coverage, and repetition signals from the existing Decision Ledger while excluding forced event responses. The 2D Endgame Board reveals its recommended fix and main risk before advanced paths, and compact Focus footer copy preserves complete decision cues instead of truncating rationale. Schema 27 stores decision history additively, keeps display/loadout preferences outside gameplay save slots, and retains isolated structured human-session evidence.
 
 The project is approximately 83% of the way to a defensible beta. Core simulation, persistence, navigation, responsive 2D presentation, campaign progression, deterministic testing, first-run journey guidance, archive replay guidance, and release automation exist. The remaining gap is observed usability with representative players, not another content expansion.
 
 ## Release Changes
 
+- Decision Pattern summarizes voluntary operating choices from the existing ledger without changing score, simulation state, balance, or persistence.
+- Mandatory campaign and systemic event responses remain visible in the ledger but are excluded from operating-family concentration and repetition signals.
+- Terminal Run Report, 2D Report Inspector, and completed-run review expose the same compact run identity without adding live-run controls.
 - Endgame progressive disclosure keeps Recommended Fix and Review Main Risk visible first; `V` or the local More control reveals all existing path fixes and reviews without removing command routes.
 - Compact Focus footer copy now shows a complete Next, End Turn, Later, and Coach-hover handoff instead of truncating the rationale lane.
 - The pure `frontend_2d.panel_disclosure` module owns guided versus expanded panel policy while the scene renderer remains responsible for geometry and input routing.
@@ -90,7 +93,7 @@ No test or generated report should mark these observations complete without a hu
 
 The repository baseline is currently `0/6` current-version human sessions. Run `beta-playtest-status` before and after each real session. Only use `record-beta-playtest-session --confirm-human-session ...` after observing the session; the local SQLite row is evidence input, not automatic release approval.
 
-Arbitrary key remapping is not part of 0.293.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
+Arbitrary key remapping is not part of 0.294.0. Keyboard-only control remains available through the documented bindings, but remapping and assistive-technology compatibility require separate design and real-device validation.
 
 ## Next Steps
 

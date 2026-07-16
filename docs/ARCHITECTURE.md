@@ -11,6 +11,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `presentation`: Rich panels and tables. This layer should render state, not mutate it.
 - `frontend_2d`: pygame scenes, responsive layout, input routing, animation, and view-model adapters. This layer should route commands rather than own simulation rules.
 - `frontend_2d.panel_disclosure`: pure presentation policy for guided versus expanded deep-panel content; it must never remove commands from the underlying view model.
+- `simulation.decision_patterns`: pure operating-choice analysis derived from Decision Ledger entries; it must not write state, classify forced event responses as operating choices, or tune balance automatically.
 - `cli.py`: Typer commands, interactive prompts, and command wiring.
 
 ## Turn Flow
@@ -27,6 +28,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - Keep SQL inside repositories and schema modules.
 - Keep rendering free of business logic.
 - Keep cross-system guidance derived and save-compatible; `simulation.strategic_rhythm` reads campaign, planning, coach, forecast, preview, and ledger state without creating a second source of truth.
+- Keep gameplay-usage evidence derived from the existing bounded ledger; Decision Pattern is review context, not telemetry, a score modifier, or proof of human comprehension.
 - Use `Decimal` for money and quantize through domain money helpers.
 - Use seeded randomness through `RandomSource` for deterministic tests and demos.
 - Prefer additive SQLite migrations so existing local save files can be upgraded.

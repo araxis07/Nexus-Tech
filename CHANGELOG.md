@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.294.0 - 2026-07-16
+
+- Added a save-compatible Decision Pattern summary that derives operating-family mix, unique-choice coverage, and repeat signals from the existing bounded Decision Ledger
+- Excluded mandatory campaign and systemic event responses from the operating pattern so authored choices do not distort voluntary action-use evidence
+- Added Decision Pattern context to the terminal Run Report, the 2D Report Inspector, and the live completed-run review without adding controls, content, balance changes, or save fields
+- Added a beta roadmap that keeps the six real-player sessions as the release blocker and postpones audio, localization, controller, and catalog expansion until after evidence-driven convergence
+- Preserved schema 27, frozen catalog ceilings, and the explicit `0/6` current-version human-playtest boundary
+
 ## 0.293.0 - 2026-07-16
 
 - Added progressive disclosure to the 2D Endgame Board: Recommended Fix and Review Main Risk remain visible first, while `V` or the local More control reveals every existing path fix and specialist review

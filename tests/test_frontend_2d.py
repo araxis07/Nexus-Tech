@@ -1006,6 +1006,7 @@ def test_deep_dive_panels_expose_live_inspector_sections() -> None:
         "alerts",
     }
     assert {section.key for section in report_panel.inspectors} == {
+        "patterns",
         "decisions",
         "turns",
         "funding",
@@ -1015,6 +1016,11 @@ def test_deep_dive_panels_expose_live_inspector_sections() -> None:
     decision_section = next(
         section for section in report_panel.inspectors if section.key == "decisions"
     )
+    pattern_section = next(
+        section for section in report_panel.inspectors if section.key == "patterns"
+    )
+    assert pattern_section.title == "Decision Pattern"
+    assert pattern_section.items[0].detail_lines[0].endswith("unique choices")
     assert decision_section.title == "Decision Ledger"
     assert decision_section.items[0].title != "No Decisions Yet"
     assert {section.key for section in endgame_panel.inspectors} == {
@@ -1844,6 +1850,36 @@ def test_run_scene_inspector_primary_action_summary_reflects_ready_state() -> No
         assert summary.startswith("Next: 1 ")
         assert badge is not None
         assert badge[0] in {"READY", "BLOCKED"}
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_decision_pattern_inspector_fits_compact_viewport() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        state = _build_enriched_2d_state()
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=42),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._open_inspector("report")
+        scene._select_inspector_section("patterns")
+        scene.draw(surface)
+
+        section = scene._selected_inspector_section()
+        assert section is not None
+        assert section.key == "patterns"
+        assert section.items[0].title != "No Operating Pattern"
+        assert scene.layout_safety_violations() == ()
+        assert any(target.kind == "close_inspector" for target in scene._click_targets)
     finally:
         pygame.quit()
 
@@ -3647,6 +3683,7 @@ def test_build_run_review_view_model_exposes_findings() -> None:
     assert review.findings
     assert review.next_focus == review.findings[0].command
     assert "_" not in review.next_focus
+    assert review.badges[0] == "No Operating Pattern"
 
 
 def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> None:

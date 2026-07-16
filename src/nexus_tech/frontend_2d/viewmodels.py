@@ -21,6 +21,7 @@ from nexus_tech.simulation.campaign_decisions import (
     get_campaign_path_outlook,
 )
 from nexus_tech.simulation.campaign_journey import get_campaign_journey_progress
+from nexus_tech.simulation.decision_patterns import build_decision_pattern
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
@@ -764,6 +765,7 @@ def build_deep_dive_panel_view_models(
     )
     latest_turn = state.turn_history[-1] if state.turn_history else None
     run_score = calculate_run_score(state)
+    decision_pattern = build_decision_pattern(state.decision_history)
     endgame_readiness = calculate_endgame_readiness(state, run_score)
     endgame_pressure = calculate_endgame_pressure(state, endgame_readiness)
     endgame_evaluation = evaluate_exit_outcome(state, run_score)
@@ -1258,6 +1260,13 @@ def build_deep_dive_panel_view_models(
             ),
             f"Milestones unlocked: {len(state.milestone_history)}",
             (
+                f"Decision pattern: {decision_pattern.style_label} | "
+                f"{decision_pattern.dominant_family_count}/"
+                f"{decision_pattern.operating_decisions} in the largest family share"
+                if decision_pattern.operating_decisions
+                else "Decision pattern: waiting for the first operating choice."
+            ),
+            (
                 f"Latest decision: {state.decision_history[-1].label} | "
                 f"{state.decision_history[-1].impact_summary}"
                 if state.decision_history
@@ -1488,12 +1497,13 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
     score = calculate_run_score(state)
     postmortem = build_run_postmortem(state)
     legacy = build_campaign_path_legacy(state)
+    decision_pattern = build_decision_pattern(state.decision_history)
     summary_line = (
         f"Turn {state.company.current_turn} | score {score.total_score} ({score.score_tier}) | "
         f"cash {format_money(state.company.cash_on_hand)} | grade {score.campaign_grade}"
     )
     badges = (
-        score.score_tier,
+        decision_pattern.style_label,
         state.exit_outcome.value if state.exit_outcome is not None else "in_progress",
         state.difficulty_mode.value,
         *get_campaign_path_labels(state),
@@ -2367,6 +2377,26 @@ def _build_pipeline_inspectors(
 
 
 def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSectionViewModel, ...]:
+    decision_pattern = build_decision_pattern(state.decision_history)
+    pattern_items = (
+        DeepDiveInspectorItemViewModel(
+            title=decision_pattern.style_label,
+            detail_lines=(
+                decision_pattern.diversity_line,
+                decision_pattern.family_mix_line,
+                decision_pattern.repetition_line,
+            ),
+            tone="warning" if decision_pattern.repetition_watch else "info",
+            actions=(
+                DeepDiveActionViewModel(
+                    "view_report",
+                    "Report",
+                    "Refresh the decision pattern and full run reporting.",
+                    "info",
+                ),
+            ),
+        ),
+    )
     decision_items = tuple(
         DeepDiveInspectorItemViewModel(
             title=f"Turn {entry.turn} | {entry.label}",
@@ -2490,6 +2520,12 @@ def _build_report_inspectors(state: GameState) -> tuple[DeepDiveInspectorSection
         ),
     )
     return (
+        DeepDiveInspectorSectionViewModel(
+            key="patterns",
+            title="Decision Pattern",
+            tone="warning" if decision_pattern.repetition_watch else "info",
+            items=pattern_items,
+        ),
         DeepDiveInspectorSectionViewModel(
             key="decisions",
             title="Decision Ledger",
