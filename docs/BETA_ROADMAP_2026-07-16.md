@@ -2,19 +2,19 @@
 
 ## Product Position
 
-NEXUS TECH 0.295.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.296.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
-The current convergence slice turns the existing evidence gaps into one executable next-session packet while retaining Decision Pattern as read-only gameplay context:
+The current convergence slice closes concrete ending and control-copy defects found in the deterministic 820x620 owner audit while retaining the executable next-session packet:
 
+- the completed-run overlay states the shutdown cause instead of showing a generic save instruction;
+- Cash, Score, and Last Turn remain visible beside the Review, Save & Archive, and Exit choices;
+- the compact Help guide uses complete labels without ellipsis at the large text scale;
+- shutdown feedback now matches the actual below-zero cash terminal condition;
 - `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
 - the packet includes one visible launch command, an eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
-- voluntary operating decisions are grouped by player-facing family;
-- unique command coverage and repeated choices are summarized without changing score;
-- mandatory campaign and systemic event responses stay in the ledger but do not distort operating mix;
-- terminal and 2D reports share the same derived result;
 - no save migration, new catalog entry, control, or balance adjustment is introduced.
 
 ## Path To Beta

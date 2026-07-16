@@ -233,7 +233,7 @@ def _build_delta_events(previous_state: GameState, current_state: GameState) -> 
         events.append(
             FrontendEvent(
                 title="Company Shutdown",
-                detail="Cash or governance pressure broke the run.",
+                detail="Cash fell below zero before the next operating turn.",
                 severity="danger",
                 ttl=7.0,
                 motion="flash",

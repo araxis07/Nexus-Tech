@@ -40,6 +40,7 @@ from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, norma
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
     DeepDivePanelViewModel,
+    GameViewModel,
     RunReviewViewModel,
     SaveSlotCardViewModel,
     TurnSummaryViewModel,
@@ -201,6 +202,26 @@ class LateGameChoreographyCue:
 
 
 @dataclass(frozen=True)
+class OutcomeMetricViewModel:
+    """One compact run fact shown before the player archives an ending."""
+
+    label: str
+    value: str
+    tone: str
+
+
+@dataclass(frozen=True)
+class OutcomeOverlayViewModel:
+    """Readable completion context for the terminal outcome overlay."""
+
+    title: str
+    eyebrow: str
+    detail: str
+    progression: str
+    metrics: tuple[OutcomeMetricViewModel, ...]
+
+
+@dataclass(frozen=True)
 class ActorSpriteClip:
     """One deterministic shape-sprite actor beat rendered by the 2D frontend."""
 
@@ -308,6 +329,92 @@ def _fit_nav_safe_modal_rect(
         safe_width,
         safe_height,
     )
+
+
+def _build_outcome_overlay_view_model(
+    state: GameState,
+    game_view_model: GameViewModel,
+    *,
+    archive_saved: bool,
+) -> OutcomeOverlayViewModel:
+    """Build concise ending context without changing the completed run."""
+
+    if archive_saved:
+        title = "Archive Recorded"
+        eyebrow = "ARCHIVED ENDING"
+        detail = (
+            "This ending now counts toward progression and Route Atlas. "
+            "Return to the title menu when the review is complete."
+        )
+        progression = "Archive recorded. Open Progress from the title menu for the next route."
+    elif state.victory_achieved:
+        title = "Victory Achieved"
+        eyebrow = "VICTORY OUTCOME"
+        detail = (
+            state.victory_reason or state.exit_summary or "The company reached a winning end state."
+        )
+        progression = (
+            f"Journey {game_view_model.run_journey.step_label}: Review why, then "
+            "Save & Archive to keep progression."
+        )
+    else:
+        title = "Company Shutdown"
+        eyebrow = "SHUTDOWN CAUSE"
+        detail = (
+            f"Cash closed at {format_money(state.company.cash_on_hand)}. "
+            "Runway exhausted before the next control move could land."
+            if state.company.cash_on_hand < 0
+            else "The company can no longer continue. Open Review for the ranked causes."
+        )
+        progression = (
+            f"Journey {game_view_model.run_journey.step_label}: Review why, then "
+            "Save & Archive to keep progression."
+        )
+
+    return OutcomeOverlayViewModel(
+        title=title,
+        eyebrow=eyebrow,
+        detail=detail,
+        progression=progression,
+        metrics=(
+            OutcomeMetricViewModel(
+                label="CASH",
+                value=format_money(state.company.cash_on_hand),
+                tone="danger" if state.company.cash_on_hand < 0 else "success",
+            ),
+            OutcomeMetricViewModel(
+                label="SCORE",
+                value=game_view_model.score_label,
+                tone="info",
+            ),
+            OutcomeMetricViewModel(
+                label="LAST TURN",
+                value=game_view_model.turn_label,
+                tone="warning" if state.company.game_over else "info",
+            ),
+        ),
+    )
+
+
+_RUN_HELP_KEYCAPS = (
+    ("Tab", "Next product / next inspector section"),
+    ("1-8", "Open deep panels"),
+    ("0", "Toggle Focus View / More Actions"),
+    ("V", "Guided / full Endgame actions"),
+    ("I", "Inspect the current deep panel"),
+    ("C", "Run primary coach command"),
+    ("Q/F/M/D", "Product actions"),
+    ("H/A/O", "Hire / assign / partner"),
+    ("Y/R/B/U", "Strategy, roadmap, budget, support"),
+    ("Space", "End turn"),
+    ("P", "Pause menu: all run and exit options"),
+    ("Esc", "Back out of overlay, then pause"),
+    ("Z/X", "Inspector sort / filter"),
+    ("A/H", "Inspector actionable / hotspot focus"),
+    ("PgUp/PgDn", "Inspector page"),
+    ("Enter", "Run selected inspector action"),
+    ("F1/?", "Toggle this help"),
+)
 
 
 _ACTION_BUTTONS: tuple[ActionButtonSpec, ...] = (
@@ -10828,25 +10935,6 @@ class RunScene(BaseScene):
             line_height=18,
             max_lines=3,
         )
-        keycaps = (
-            ("Tab", "Next product / next inspector section"),
-            ("1-8", "Open deep panels"),
-            ("0", "Toggle Focus View / More Actions workspace"),
-            ("V", "Toggle guided / full Endgame actions"),
-            ("I", "Inspect the current deep panel"),
-            ("C", "Run primary coach command"),
-            ("Q/F/M/D", "Product actions"),
-            ("H/A/O", "Hire / assign / partner"),
-            ("Y/R/B/U", "Strategy / roadmap / budget / support"),
-            ("Space", "End turn"),
-            ("P", "Pause with resume, save, settings, menu, and quit"),
-            ("Esc", "Back out of overlay, then pause"),
-            ("Z/X", "Inspector sort / filter"),
-            ("A/H", "Inspector actionable / hotspot focus"),
-            ("PgUp/PgDn", "Inspector page"),
-            ("Enter", "Run selected inspector action"),
-            ("F1/?", "Toggle this help"),
-        )
         close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 36)
         keycap_top = inner.top + 76
         keycap_bottom = close_rect.top - 14
@@ -10854,10 +10942,10 @@ class RunScene(BaseScene):
         two_columns = inner.width >= 620
         if two_columns:
             col_gap = 14
-            rows = (len(keycaps) + 1) // 2
+            rows = (len(_RUN_HELP_KEYCAPS) + 1) // 2
             row_gap = max(5, min(8, (keycap_bottom - keycap_top - keycap_height * rows) // rows))
             col_width = int((inner.width - col_gap) / 2)
-            for index, (key_text, label) in enumerate(keycaps):
+            for index, (key_text, label) in enumerate(_RUN_HELP_KEYCAPS):
                 col = index // rows
                 row = index % rows
                 keycap_rect = pygame.Rect(
@@ -10879,11 +10967,11 @@ class RunScene(BaseScene):
                 2,
                 min(
                     6,
-                    (keycap_bottom - keycap_top - keycap_height * len(keycaps))
-                    // max(1, len(keycaps) - 1),
+                    (keycap_bottom - keycap_top - keycap_height * len(_RUN_HELP_KEYCAPS))
+                    // max(1, len(_RUN_HELP_KEYCAPS) - 1),
                 ),
             )
-            for index, (key_text, label) in enumerate(keycaps):
+            for index, (key_text, label) in enumerate(_RUN_HELP_KEYCAPS):
                 keycap_rect = pygame.Rect(
                     inner.left,
                     keycap_top + index * (keycap_height + row_gap),
@@ -10916,7 +11004,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("outcome"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=520, height=264, margin=24)
+        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=300, margin=24)
         modal_rect = self._animated_overlay_rect(modal_rect, "outcome", shift=26)
         accent = GOOD if self.state.victory_achieved else DANGER
         self._draw_outcome_cinematic_backdrop(surface, modal_rect, accent)
@@ -10929,45 +11017,68 @@ class RunScene(BaseScene):
             emphasis=max(0.32, overlay_motion),
             lift=int(overlay_motion * 4),
         )
-        title = (
-            "Archive Recorded"
-            if self._terminal_archive_saved
-            else "Victory Achieved"
-            if self.state.victory_achieved
-            else "Company Shutdown"
+        outcome = _build_outcome_overlay_view_model(
+            self.state,
+            self._view_model,
+            archive_saved=self._terminal_archive_saved,
         )
-        title_surface = self.fonts.title.render(title, True, TEXT)
+        title_surface = self.fonts.title.render(outcome.title, True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 26))
-        detail = (
-            "This ending now counts toward progression and Route Atlas. "
-            "Open Review, then return to the menu to choose the next route."
-            if self._terminal_archive_saved
-            else (
-                self.state.victory_reason
-                or self.state.exit_summary
-                or "Press S to save or Esc to close the frontend."
-            )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            outcome.eyebrow,
+            accent,
+            pygame.Rect(inner.left, inner.top + 4, inner.width, 16),
+            valign="top",
         )
         draw_wrapped_text(
             surface,
             self.fonts.body,
-            detail,
+            outcome.detail,
             MUTED,
-            pygame.Rect(inner.left, inner.top + 8, inner.width, 90),
+            pygame.Rect(inner.left, inner.top + 24, inner.width, 54),
             line_height=18,
-            max_lines=4,
+            max_lines=3,
         )
+        metric_gap = 8
+        metric_width = (inner.width - metric_gap * 2) // 3
+        metric_top = inner.top + 104
+        for index, metric in enumerate(outcome.metrics):
+            metric_rect = pygame.Rect(
+                inner.left + index * (metric_width + metric_gap),
+                metric_top,
+                metric_width,
+                42,
+            )
+            metric_accent = tone_color(metric.tone)
+            pygame.draw.rect(surface, PANEL, metric_rect, border_radius=12)
+            pygame.draw.rect(surface, metric_accent, metric_rect, width=1, border_radius=12)
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                metric.label,
+                MUTED,
+                pygame.Rect(metric_rect.left + 10, metric_rect.top + 4, metric_rect.width - 20, 14),
+                valign="top",
+            )
+            draw_text_line(
+                surface,
+                self.fonts.body,
+                metric.value,
+                TEXT,
+                pygame.Rect(
+                    metric_rect.left + 10,
+                    metric_rect.top + 20,
+                    metric_rect.width - 20,
+                    18,
+                ),
+                valign="top",
+            )
         draw_text_line(
             surface,
             self.fonts.small,
-            (
-                "First archive complete. Open Progress from the title menu."
-                if self._terminal_archive_saved
-                else (
-                    f"Journey {self._view_model.run_journey.step_label}: "
-                    "Save & Archive is the final progression step."
-                )
-            ),
+            outcome.progression,
             GOOD,
             pygame.Rect(inner.left, inner.bottom - 72, inner.width, 18),
             valign="top",

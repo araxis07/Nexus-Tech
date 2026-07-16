@@ -766,6 +766,23 @@ def test_build_action_events_surfaces_cash_and_product_deltas() -> None:
     assert f"{current_state.products[0].name} Bugs" in titles
 
 
+def test_build_action_events_explains_cash_shutdown_condition() -> None:
+    previous_state = create_new_game("NEXUS TECH", "Nexus One")
+    current_state = previous_state.model_copy(deep=True)
+    current_state.company.cash_on_hand = Decimal("-1.00")
+    current_state.company.game_over = True
+
+    events = build_action_events(
+        previous_state,
+        current_state,
+        action_label=TurnAction.WAIT.value,
+        message="Operating costs landed.",
+    )
+
+    shutdown = next(event for event in events if event.title == "Company Shutdown")
+    assert shutdown.detail == "Cash fell below zero before the next operating turn."
+
+
 def test_build_action_events_emit_motion_targets() -> None:
     previous_state = create_new_game("NEXUS TECH", "Nexus One")
     current_state = previous_state.model_copy(deep=True)
@@ -3371,6 +3388,100 @@ def test_compact_help_overlay_keeps_title_below_navigation() -> None:
         assert any(target.kind == "close_help" for target in scene._click_targets)
         assert scene.layout_safety_violations() == ()
     finally:
+        pygame.quit()
+
+
+def test_compact_help_labels_fit_large_text_without_ellipsis() -> None:
+    pygame, _fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        modal_rect = scenes_module._fit_nav_safe_modal_rect(
+            pygame,
+            surface,
+            width=860,
+            height=580,
+            margin=28,
+        )
+        inner_width = modal_rect.width - 32
+        column_width = (inner_width - 14) // 2
+        label_width = column_width - 72 - 28
+        large_fonts = create_fonts(pygame, UiScale.LARGE)
+
+        oversized = [
+            (key, label)
+            for key, label in scenes_module._RUN_HELP_KEYCAPS
+            if large_fonts.small.size(label)[0] > label_width
+        ]
+
+        assert oversized == []
+    finally:
+        pygame.quit()
+
+
+def test_outcome_overlay_copy_explains_shutdown_and_archive_handoff() -> None:
+    state = create_new_game("NEXUS TECH", "Nexus One")
+    state.company.cash_on_hand = Decimal("-125.00")
+    state.company.game_over = True
+    view_model = build_game_view_model(state)
+
+    shutdown = scenes_module._build_outcome_overlay_view_model(
+        state,
+        view_model,
+        archive_saved=False,
+    )
+
+    assert shutdown.title == "Company Shutdown"
+    assert shutdown.eyebrow == "SHUTDOWN CAUSE"
+    assert "Cash closed at $-125.00" in shutdown.detail
+    assert "Runway exhausted" in shutdown.detail
+    assert "Review why" in shutdown.progression
+    assert "Save & Archive" in shutdown.progression
+    assert [(metric.label, metric.value) for metric in shutdown.metrics] == [
+        ("CASH", "$-125.00"),
+        ("SCORE", view_model.score_label),
+        ("LAST TURN", view_model.turn_label),
+    ]
+
+    archived = scenes_module._build_outcome_overlay_view_model(
+        state,
+        view_model,
+        archive_saved=True,
+    )
+
+    assert archived.title == "Archive Recorded"
+    assert "counts toward progression" in archived.detail
+    assert "Open Progress" in archived.progression
+
+
+def test_compact_outcome_overlay_supports_large_text_without_severe_clamping() -> None:
+    pygame, _fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.company.cash_on_hand = Decimal("-125.00")
+        state.company.game_over = True
+        scene = RunScene(
+            pygame=pygame,
+            fonts=create_fonts(pygame, UiScale.LARGE),
+            state=state,
+            rng=RandomSource(seed=296),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        start_typography_audit()
+        scene.draw(surface)
+        typography_events = finish_typography_audit()
+
+        assert not [event for event in typography_events if event.severe]
+        assert {"open_review", "save", "close_outcome"}.issubset(
+            target.kind for target in scene._click_targets
+        )
+        assert scene.layout_safety_violations() == ()
+    finally:
+        finish_typography_audit()
         pygame.quit()
 
 

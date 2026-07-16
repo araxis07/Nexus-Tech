@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.296.0 - 2026-07-16
+
+- Rebuilt the completed-run overlay around an explicit ending cause, Cash/Score/Last Turn snapshot, and a readable Review, Save & Archive, then Exit handoff
+- Replaced generic shutdown guidance with the actual below-zero cash condition while preserving the existing postmortem and archive flow
+- Shortened compact Help labels so every control remains complete at 820x620 with the large text profile instead of ending in ellipses
+- Added shutdown/archive copy, large-text outcome, and Help-width regressions plus deterministic before/after visual verification
+- Preserved schema 27, frozen gameplay catalogs and balance, and the truthful `0/6` current-version human-session boundary
+
 ## 0.295.0 - 2026-07-16
 
 - Added `prepare-beta-playtest-session` to turn current human-evidence gaps into one explicit next campaign, launch command, observation checklist, safe recorder template, and local Markdown handoff
