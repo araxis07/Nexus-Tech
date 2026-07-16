@@ -625,6 +625,15 @@ uv run nexus-tech beta-evidence
 
 The evidence view also reports authored-route discovery and mastery plus the next route to replay. These archive metrics remain advisory and never complete the human beta gate.
 
+Prepare the next observed session from the current coverage gap:
+
+```bash
+uv run nexus-tech prepare-beta-playtest-session \
+  --command-prefix ".venv313/bin/nexus-tech"
+```
+
+The preparation command selects the next uncovered featured campaign, allocates unused anonymous session/tester codes, prints the visible launch and observation checklist, and writes `/tmp/nexus-tech-beta-playtest-next.md`. It never copies stored free-form notes, records a session, or treats an owner rehearsal, headless run, test, or screenshot as human evidence. Replace every ALL_CAPS field in its recorder template only after observing a real session.
+
 Review structured evidence from observed real-human beta sessions:
 
 ```bash
@@ -949,7 +958,7 @@ If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or us
 
 For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`; add `--motion-mode reduced` or `--motion-mode off` if you want quieter highlight, entity, actor, action-feedback, and transition animation. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, open the progression board, or press `7` for Settings before entering play. Inside a run you can click the Recommended Move and End Turn Check cards directly, plus product cards, modal options, deep-dive panel buttons, and the action bar, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `V`, `I`, `Q`, `F`, `M`, `D`, `H`, `A`, `O`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, `P`, `Esc`, and `F1`. `V` toggles guided and full Endgame actions while that board is open. `P` opens Pause with Resume, Save, Menu, Settings, and Quit controls; `T` opens Settings while paused; and `Esc` returns from Settings to Pause before resuming the run. The shared responsive frame reserves navigation, header, content, and footer regions across title, run, review, and turn-summary scenes. The live run retains its shape-based entity motion, deterministic shape-sprite actors, command feedback, scene transitions, compact action copy, adaptive feed pacing, staged turn summaries, endgame cockpit, and remembered inspector controls. If a button is disabled, the 2D shell still tells you exactly which prerequisite is missing before you waste the click.
 
-For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; keys `1` through `4` cycle text, contrast, motion, and action loadout. CLI flags override display settings for the current launch. The Report inspector and terminal report include a Decision Ledger with immediate impact, end-turn follow-on timing, and a derived Decision Pattern. Arbitrary key remapping is not included in 0.294.0; the documented keyboard bindings remain fixed for this release.
+For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; keys `1` through `4` cycle text, contrast, motion, and action loadout. CLI flags override display settings for the current launch. The Report inspector and terminal report include a Decision Ledger with immediate impact, end-turn follow-on timing, and a derived Decision Pattern. Arbitrary key remapping is not included in 0.295.0; the documented keyboard bindings remain fixed for this release.
 
 Difficulty guidance:
 

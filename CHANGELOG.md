@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.295.0 - 2026-07-16
+
+- Added `prepare-beta-playtest-session` to turn current human-evidence gaps into one explicit next campaign, launch command, observation checklist, safe recorder template, and local Markdown handoff
+- Made next-session selection advance through uncovered featured campaigns, allocate non-conflicting anonymous session/tester codes, and route unresolved human gates back to the affected campaign
+- Kept preparation privacy-safe by excluding stored free-form observation notes, rejecting executable placeholder evidence, and writing the generated packet to `/tmp` by default
+- Added folded terminal command rendering so long launch, record, and evidence-refresh commands remain readable at compact console widths
+- Preserved schema 27, frozen gameplay catalogs, and the truthful `0/6` human-session boundary; preparation never records evidence or grants release approval
+
 ## 0.294.0 - 2026-07-16
 
 - Added a save-compatible Decision Pattern summary that derives operating-family mix, unique-choice coverage, and repeat signals from the existing bounded Decision Ledger

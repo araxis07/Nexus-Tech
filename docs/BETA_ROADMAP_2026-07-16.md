@@ -2,12 +2,15 @@
 
 ## Product Position
 
-NEXUS TECH 0.294.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.295.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
-Decision Pattern turns the existing bounded Decision Ledger into read-only gameplay-convergence evidence:
+The current convergence slice turns the existing evidence gaps into one executable next-session packet while retaining Decision Pattern as read-only gameplay context:
 
+- `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
+- the packet includes one visible launch command, an eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
+- stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
 - voluntary operating decisions are grouped by player-facing family;
 - unique command coverage and repeated choices are summarized without changing score;
 - mandatory campaign and systemic event responses stay in the ledger but do not distort operating mix;
@@ -16,7 +19,7 @@ Decision Pattern turns the existing bounded Decision Ledger into read-only gamep
 
 ## Path To Beta
 
-1. Complete one owner run from New Game through `Save & Archive` at 820x620 and record only defects actually observed.
+1. Run `prepare-beta-playtest-session`, then complete one owner rehearsal from New Game through `Save & Archive` at 820x620 and record only defects actually observed; do not count the owner rehearsal as first-time human evidence.
 2. Observe six first-time sessions across all six featured campaigns using anonymous tester codes and the structured local evidence command.
 3. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
 4. Use Decision Pattern only to identify candidate repetition or low action diversity; do not remove or retune a command without matching player notes.
@@ -30,4 +33,4 @@ The preferred expansion order is audio feedback, key remapping/controller suppor
 
 ## Evidence Boundary
 
-Automation may verify deterministic behavior, containment, navigation routes, and report consistency. It cannot claim that a first-time player understood a choice, enjoyed the pacing, or completed a visible session. Human evidence remains `0/6` until real observed sessions are recorded with explicit attestation.
+Automation may verify deterministic behavior, containment, navigation routes, report consistency, and packet safety. It cannot claim that a first-time player understood a choice, enjoyed the pacing, or completed a visible session. Human evidence remains `0/6` until real observed sessions are recorded with explicit attestation; generating a preparation packet does not change that count.

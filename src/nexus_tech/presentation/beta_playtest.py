@@ -3,11 +3,157 @@
 from __future__ import annotations
 
 from rich import box
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from nexus_tech.simulation.beta_playtest import BetaPlaytestStatus
+from nexus_tech.simulation.beta_playtest_preparation import BetaPlaytestPreparation
+
+
+def render_beta_playtest_preparation(
+    console: Console,
+    preparation: BetaPlaytestPreparation,
+) -> None:
+    """Render the next human-only session packet without observation notes."""
+
+    overview = Table.grid(padding=(0, 2))
+    overview.add_column(style="bold")
+    overview.add_column()
+    overview.add_row("Game Version", preparation.game_version)
+    overview.add_row("Evidence Status", preparation.evidence_status)
+    overview.add_row("Session Progress", preparation.session_progress)
+    overview.add_row("Target", preparation.target_track_label)
+    overview.add_row("Scenario", preparation.target_scenario_id or "manual release review")
+    overview.add_row("Reason", preparation.target_reason)
+    console.print(
+        Panel(
+            overview,
+            title="Next Human Beta Session",
+            subtitle="Preparation only; this command never records evidence",
+            border_style="cyan" if preparation.requires_session else "green",
+            expand=True,
+        )
+    )
+
+    if not preparation.requires_session:
+        console.print(
+            Panel(
+                _folded_command(preparation.status_command),
+                title="Manual Review Command",
+                border_style="green",
+                expand=True,
+            )
+        )
+        return
+
+    console.print(
+        Panel(
+            Group(
+                _folded_command(preparation.launch_command),
+                Text(""),
+                Text(preparation.selection_instruction),
+            ),
+            title="1. Launch And Select",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+    checklist = Table(box=box.SIMPLE, expand=True)
+    checklist.add_column("Step", justify="right", style="bold cyan")
+    checklist.add_column("Observe")
+    for index, item in enumerate(preparation.checklist, start=1):
+        checklist.add_row(str(index), item)
+    console.print(Panel(checklist, title="2. Human Observation Checklist", expand=True))
+    console.print(
+        Panel(
+            Group(
+                Text("Template only. Replace every ALL_CAPS value after the observed session."),
+                Text(""),
+                _folded_command(preparation.record_command),
+            ),
+            title="3. Record After Session",
+            border_style="yellow",
+            expand=True,
+        )
+    )
+    console.print(
+        Panel(
+            Group(
+                _folded_command(preparation.status_command),
+                _folded_command(preparation.archive_command),
+            ),
+            title="4. Refresh Evidence",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+
+
+def format_beta_playtest_preparation_markdown(
+    preparation: BetaPlaytestPreparation,
+) -> str:
+    """Format a local handoff packet that contains no recorded free-form notes."""
+
+    lines = [
+        "# NEXUS TECH Human Beta Session Packet",
+        "",
+        f"- Game version: `{preparation.game_version}`",
+        f"- Evidence status: `{preparation.evidence_status}`",
+        f"- Session progress: `{preparation.session_progress}`",
+        f"- Target track: `{preparation.target_track_label}`",
+        (
+            f"- Target scenario: `{preparation.target_scenario_id}`"
+            if preparation.target_scenario_id is not None
+            else "- Target scenario: `manual release review`"
+        ),
+        f"- Reason: {preparation.target_reason}",
+        "",
+        "## Human-Only Boundary",
+        "",
+        "This packet prepares a session but never records or approves evidence. Only an "
+        "observed real-person session may be entered with `--confirm-human-session`. Owner "
+        "rehearsals, headless runs, tests, and generated screenshots do not count.",
+        "",
+    ]
+    if preparation.requires_session:
+        lines.extend(
+            (
+                "## Launch",
+                "",
+                "```bash",
+                preparation.launch_command,
+                "```",
+                "",
+                preparation.selection_instruction,
+                "",
+                "## Observation Checklist",
+                "",
+                *(f"{index}. {item}" for index, item in enumerate(preparation.checklist, 1)),
+                "",
+                "## Record After The Session",
+                "",
+                "Replace every ALL_CAPS value. The unchanged template must fail validation.",
+                "",
+                "```bash",
+                preparation.record_command,
+                "```",
+                "",
+            )
+        )
+    lines.extend(
+        (
+            "## Refresh Evidence",
+            "",
+            "```bash",
+            preparation.status_command,
+            preparation.archive_command,
+            "```",
+            "",
+        )
+    )
+    return "\n".join(lines)
 
 
 def render_beta_playtest_status(console: Console, status: BetaPlaytestStatus) -> None:
@@ -115,3 +261,7 @@ def render_beta_playtest_status(console: Console, status: BetaPlaytestStatus) ->
 
 def _mark(passed: bool) -> str:
     return "Y" if passed else "N"
+
+
+def _folded_command(command: str) -> Text:
+    return Text(command, overflow="fold", no_wrap=False)

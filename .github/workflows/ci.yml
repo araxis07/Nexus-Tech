@@ -52,6 +52,13 @@ jobs:
       - name: Check structured human beta evidence guardrail
         run: uv run nexus-tech beta-playtest-status --db-path /tmp/nexus-tech-human-beta.db
 
+      - name: Prepare structured human beta next-session packet
+        run: >
+          uv run nexus-tech prepare-beta-playtest-session
+          --command-prefix "uv run nexus-tech"
+          --db-path /tmp/nexus-tech-human-beta.db
+          --output /tmp/nexus-tech-beta-playtest-next.md
+
       - name: Check featured campaign branch readiness
         run: >
           uv run nexus-tech campaign-readiness
@@ -490,6 +497,15 @@ jobs:
         with:
           name: nexus-tech-campaign-readiness
           path: /tmp/nexus-tech-campaign-readiness.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload structured human beta next-session packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-beta-playtest-next
+          path: /tmp/nexus-tech-beta-playtest-next.md
           if-no-files-found: warn
           retention-days: 7
 

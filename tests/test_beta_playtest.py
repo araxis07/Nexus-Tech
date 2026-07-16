@@ -12,10 +12,15 @@ from nexus_tech.persistence.beta_playtest_repository import (
     BetaPlaytestInterface,
     BetaPlaytestRepository,
     BetaPlaytestSession,
+    is_substantive_beta_playtest_note,
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.simulation.beta_playtest import build_beta_playtest_status
+from nexus_tech.simulation.beta_playtest_preparation import (
+    build_beta_playtest_preparation,
+)
 from nexus_tech.simulation.campaign_journey import list_featured_campaign_journeys
+from nexus_tech.user_preferences import MotionMode
 
 runner = CliRunner()
 
@@ -214,6 +219,161 @@ def test_beta_playtest_status_excludes_stale_version_evidence() -> None:
     assert status.session_count == 0
     assert status.stale_sessions == 1
     assert status.status == "human-sessions-needed"
+
+
+def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> None:
+    preparation = build_beta_playtest_preparation(
+        [],
+        game_version=__version__,
+        interface_mode=BetaPlaytestInterface.TWO_D,
+        viewport="820x620",
+        motion_mode=MotionMode.FULL,
+        command_prefix=".venv313/bin/nexus-tech",
+        database_path="nexus-tech.db",
+    )
+
+    assert preparation.requires_session
+    assert preparation.target_scenario_id == "founder_journey"
+    assert preparation.target_track_label == "Learn"
+    assert preparation.session_key == "beta-001"
+    assert preparation.tester_code == "T01"
+    assert "menu-2d" in preparation.launch_command
+    assert "--window-size 820x620" in preparation.launch_command
+    assert "--scenario founder_journey" in preparation.record_command
+    placeholder = "REPLACE with a concrete observation from the real session"
+    assert placeholder in preparation.record_command
+    assert not is_substantive_beta_playtest_note(placeholder)
+
+
+def test_beta_playtest_preparation_advances_without_reusing_identifiers() -> None:
+    existing = make_session(1, "founder_journey")
+
+    preparation = build_beta_playtest_preparation(
+        [existing],
+        game_version=__version__,
+        interface_mode=BetaPlaytestInterface.TERMINAL,
+        viewport="120x40",
+        motion_mode=MotionMode.OFF,
+        command_prefix="uv run nexus-tech",
+        database_path="nexus-tech.db",
+    )
+
+    assert preparation.target_scenario_id == "bootstrap_studio"
+    assert preparation.session_key == "beta-002"
+    assert preparation.tester_code == "T02"
+    assert "new-game --scenario bootstrap_studio" in preparation.launch_command
+    assert "--motion-mode" not in preparation.launch_command
+
+
+def test_beta_playtest_preparation_retests_an_unresolved_human_gate() -> None:
+    sessions = [
+        make_session(
+            index,
+            journey.scenario_id,
+            blocker_found=index == 1,
+        )
+        for index, journey in enumerate(list_featured_campaign_journeys(), start=1)
+    ]
+
+    preparation = build_beta_playtest_preparation(
+        sessions,
+        game_version=__version__,
+        interface_mode=BetaPlaytestInterface.TWO_D,
+        viewport="1280x720",
+        motion_mode=MotionMode.REDUCED,
+        command_prefix="nexus-tech",
+        database_path="nexus-tech.db",
+    )
+
+    assert preparation.target_scenario_id == "founder_journey"
+    assert preparation.session_key == "beta-007"
+    assert preparation.tester_code == "T07"
+    assert "unresolved human gate" in preparation.target_reason
+
+
+def test_beta_playtest_preparation_stops_when_manual_review_is_ready() -> None:
+    sessions = [
+        make_session(index, journey.scenario_id)
+        for index, journey in enumerate(list_featured_campaign_journeys(), start=1)
+    ]
+
+    preparation = build_beta_playtest_preparation(
+        sessions,
+        game_version=__version__,
+        interface_mode=BetaPlaytestInterface.TWO_D,
+        viewport="820x620",
+        motion_mode=MotionMode.FULL,
+        command_prefix="nexus-tech",
+        database_path="nexus-tech.db",
+    )
+
+    assert not preparation.requires_session
+    assert preparation.target_scenario_id is None
+    assert preparation.launch_command == ""
+    assert preparation.record_command == ""
+    assert "manual release review" in preparation.target_reason
+
+
+@pytest.mark.parametrize(
+    ("viewport", "command_prefix", "database_path", "message"),
+    (
+        ("wide", "nexus-tech", "nexus-tech.db", "Viewport must use"),
+        ("820x620", "nexus-tech; echo unsafe", "nexus-tech.db", "shell control"),
+        ("820x620", "'nexus-tech", "nexus-tech.db", "valid shell quoting"),
+        ("820x620", "nexus-tech", "bad\npath.db", "single line"),
+    ),
+)
+def test_beta_playtest_preparation_rejects_unsafe_packet_inputs(
+    viewport: str,
+    command_prefix: str,
+    database_path: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        build_beta_playtest_preparation(
+            [],
+            game_version=__version__,
+            interface_mode=BetaPlaytestInterface.TWO_D,
+            viewport=viewport,
+            motion_mode=MotionMode.FULL,
+            command_prefix=command_prefix,
+            database_path=database_path,
+        )
+
+
+def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Path) -> None:
+    db_path = tmp_path / "beta.db"
+    output = tmp_path / "next-session.md"
+    existing = make_session(1, "founder_journey")
+    BetaPlaytestRepository(db_path).save_session(existing)
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--viewport",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Next Human Beta Session" in result.output
+    assert "bootstrap_studio" in result.output
+    assert "Preparation only" in result.output
+    assert "--confirm-human-session" in result.output
+    markdown = output.read_text(encoding="utf-8")
+    assert "Human-Only Boundary" in markdown
+    assert "bootstrap_studio" in markdown
+    assert existing.notes not in markdown
+    assert BetaPlaytestRepository(db_path).list_sessions() == [existing]
 
 
 def test_beta_playtest_cli_records_and_reviews_local_evidence(tmp_path: Path) -> None:
