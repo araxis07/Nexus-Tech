@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.301.0 - 2026-07-18
+
+- Extracted transient 2D scene records into `frontend_2d.scene_state` while preserving the existing scene imports used by runtime audits
+- Centralized Team, Finance, Pipeline, Board, Customer, Partner, and Report command ownership in one pure `frontend_2d.workspace_routing` policy shared by navigation and animation feedback
+- Added direct workspace contracts plus a persisted completed-campaign-to-First-Archive owner-flow regression
+- Kept gameplay, AP costs, controls, balance, frozen catalogs, persistence schema 27, and the truthful `0/6` human-session boundary unchanged
+
 ## 0.300.0 - 2026-07-17
 
 - Reframed the Focus View footer as `Choose This Turn`, with one green `Recommended` route followed by two distinct alternatives

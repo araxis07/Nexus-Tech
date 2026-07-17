@@ -2,12 +2,16 @@
 
 ## Product Position
 
-NEXUS TECH 0.300.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.301.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
-The current convergence slice removes a concrete duplicate route from the six-slot Focus View after the deterministic 820x620 owner audit while retaining the executable next-session packet:
+The current convergence slice reduces 2D scene coupling and protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- transient scene records now live in `frontend_2d.scene_state` without changing scene construction or audit imports;
+- `frontend_2d.workspace_routing` is the single command-owner policy for navigation, feedback, and choreography;
+- a temporary-database contract persists one completed featured campaign, verifies its archive fields, and closes First Archive Mission 6/6 without writing to the player's database;
+- automated owner-flow coverage does not count as visible-window rehearsal or human beta evidence;
 - `Choose This Turn` now presents one green `Recommended` route, two distinct alternatives, Report, Save, and End Turn;
 - the primary command and its workspace are excluded from alternatives while preference, Coach, and stable fallback order remain deterministic;
 - Coach execution, direct keyboard commands, AP costs, simulation state, balance, persistence, and schema 27 are unchanged;

@@ -166,6 +166,7 @@ from nexus_tech.frontend_2d.widgets import (
     fit_text_line,
     start_typography_audit,
 )
+from nexus_tech.frontend_2d.workspace_routing import workspace_panel_key_for_command
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
@@ -334,6 +335,28 @@ def test_focus_action_policy_separates_recommended_move_from_alternatives() -> N
     assert buttons[0].kind == "coach"
     assert buttons[0].detail == "Do: Hire Teammate."
     assert all(button.payload != TurnAction.HIRE_EMPLOYEE.value for button in buttons[1:3])
+
+
+@pytest.mark.parametrize(
+    ("command", "panel_key"),
+    [
+        (TurnAction.HIRE_EMPLOYEE.value, "team"),
+        (TurnAction.SET_CAPITAL_PLAN.value, "finance"),
+        (TurnAction.WORK_RELEASE.value, "pipeline"),
+        (TurnAction.EXECUTE_BOARD_RESPONSE.value, "board"),
+        (TurnAction.RUN_RETENTION_PLAY.value, "customers"),
+        (TurnAction.CREATE_PARTNERSHIP.value, "partnerships"),
+        (TurnAction.VIEW_REPORT.value, "report"),
+        ("run_enterprise_recovery", "customers"),
+        ("run_channel_recovery", "partnerships"),
+        (TurnAction.IMPROVE_QUALITY.value, None),
+    ],
+)
+def test_workspace_routing_keeps_one_command_ownership_policy(
+    command: str,
+    panel_key: str | None,
+) -> None:
+    assert workspace_panel_key_for_command(command) == panel_key
 
 
 @pytest.mark.parametrize("size", [(820, 620), (960, 640), (1280, 720), (1440, 900)])

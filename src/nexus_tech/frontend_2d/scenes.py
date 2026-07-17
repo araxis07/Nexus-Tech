@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from math import sin
 from typing import Callable
 
@@ -44,6 +43,21 @@ from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
+from nexus_tech.frontend_2d.scene_state import (
+    ActionFeedbackCue,
+    ActorSpriteBounds,
+    ActorSpriteClip,
+    ClickTarget,
+    FirstTurnGuideStep,
+    ImpactCue,
+    InspectorMemoryState,
+    LateGameChoreographyCue,
+    NewGameWizardState,
+    OverlayExitCue,
+    PendingChoiceCue,
+    TextInputModalState,
+    TimedFrontendEvent,
+)
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
@@ -81,6 +95,9 @@ from nexus_tech.frontend_2d.widgets import (
     fit_text_line,
     tone_color,
 )
+from nexus_tech.frontend_2d.workspace_routing import (
+    workspace_panel_key_for_command as _workspace_panel_key_for_command,
+)
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
     RunArchiveSummary,
@@ -103,169 +120,6 @@ from nexus_tech.simulation.meta_progression import (
 from nexus_tech.simulation.opening_guide import build_guided_opening
 from nexus_tech.simulation.randomness import RandomSource
 from nexus_tech.user_preferences import FrontendPreferences
-
-
-@dataclass(frozen=True)
-class ClickTarget:
-    """One clickable hitbox registered during the last draw pass."""
-
-    kind: str
-    payload: str
-    rect: object
-
-
-@dataclass(frozen=True)
-class FirstTurnGuideStep:
-    """One compact onboarding checkpoint rendered inside the live run dashboard."""
-
-    label: str
-    detail: str
-    done: bool
-    accent: tuple[int, int, int]
-
-
-@dataclass
-class TimedFrontendEvent:
-    """Mutable event card with time remaining."""
-
-    payload: FrontendEvent
-    time_left: float
-
-
-@dataclass(frozen=True)
-class ActionFeedbackCue:
-    """Short-lived command-specific animation feedback."""
-
-    command: str
-    label: str
-    family: str
-    accent: tuple[int, int, int]
-    targets: tuple[str, ...]
-    time_left: float
-    duration: float
-    outcome: str = "success"
-    detail: str = ""
-
-
-@dataclass(frozen=True)
-class ImpactCue:
-    """Short-lived visible delta feedback after state-changing actions."""
-
-    label: str
-    value_text: str
-    tone: str
-    accent: tuple[int, int, int]
-    targets: tuple[str, ...]
-    time_left: float
-    duration: float
-
-
-@dataclass(frozen=True)
-class OverlayExitCue:
-    """Short exit shimmer after a modal overlay closes."""
-
-    key: str
-    label: str
-    accent: tuple[int, int, int]
-    time_left: float
-    duration: float
-
-
-@dataclass(frozen=True)
-class PendingChoiceCue:
-    """Short consequence flash after resolving a pending event choice."""
-
-    label: str
-    detail: str
-    accent: tuple[int, int, int]
-    time_left: float
-    duration: float
-
-
-@dataclass(frozen=True)
-class LateGameChoreographyCue:
-    """Short late-game command cue tied to cockpit, capital, and board lanes."""
-
-    command: str
-    label: str
-    detail: str
-    family: str
-    accent: tuple[int, int, int]
-    targets: tuple[str, ...]
-    time_left: float
-    duration: float
-
-
-@dataclass(frozen=True)
-class ActorSpriteClip:
-    """One deterministic shape-sprite actor beat rendered by the 2D frontend."""
-
-    key: str
-    label: str
-    role: str
-    state: str
-    accent: tuple[int, int, int]
-    lane: str
-    delay: float = 0.0
-    phase_offset: float = 0.0
-    pose: str | None = None
-
-    @property
-    def pose_key(self) -> str:
-        """Return the readable pose cue used by the lightweight sprite renderer."""
-
-        return _actor_pose_key(self.state, self.pose)
-
-
-@dataclass(frozen=True)
-class ActorSpriteBounds:
-    """One actor sprite footprint from the last draw pass."""
-
-    key: str
-    lane: str
-    left: int
-    top: int
-    width: int
-    height: int
-
-
-@dataclass
-class TextInputModalState:
-    """One live text-input modal used by the 2D frontend."""
-
-    title: str
-    description: str
-    severity: str
-    submit_title: str
-    submit_detail: str
-    text: str
-    placeholder: str
-    on_submit: Callable[[str], None]
-
-
-@dataclass
-class NewGameWizardState:
-    """Mutable configuration used by the 2D new-game wizard."""
-
-    scenario_index: int
-    difficulty_index: int
-    campaign_start_index: int
-    goal_index: int
-    company_name: str
-    product_name: str
-    slot_name: str
-    seed_text: str = ""
-
-
-@dataclass(frozen=True)
-class InspectorMemoryState:
-    """Remember one panel's last inspector focus so reopening is less noisy."""
-
-    section_key: str
-    page: int
-    item_index: int
-    sort_mode_index: int
-    filter_mode_index: int
 
 
 def _fit_modal_rect(pygame, surface, *, width: int, height: int, margin: int = 24):
@@ -322,148 +176,6 @@ _SCENE_TRANSITION_LABELS = {
     "summary_to_run": ("Return Focus", GOOD),
     "summary_to_review": ("Final Review", DANGER),
 }
-_FINANCE_PANEL_COMMANDS = {
-    TurnAction.REVIEW_FINANCE.value,
-    TurnAction.TAKE_LOAN.value,
-    TurnAction.RAISE_ANGEL.value,
-    TurnAction.RAISE_VC.value,
-    TurnAction.REPAY_DEBT.value,
-    TurnAction.REFINANCE_DEBT.value,
-    TurnAction.DEBT_ROLLOVER.value,
-    TurnAction.REBALANCE_CAPITAL.value,
-    TurnAction.RAISE_RESERVE_TARGET.value,
-    TurnAction.SET_CAPITAL_PLAN.value,
-    TurnAction.SET_REFINANCING_POSTURE.value,
-    TurnAction.SET_COVENANT_FIREWALL.value,
-    TurnAction.SET_DEBT_STRATEGY.value,
-    TurnAction.SET_GROWTH_FIREBREAK.value,
-    TurnAction.SET_PATH_CAPITAL_POSTURE.value,
-    TurnAction.SET_ENDGAME_CAPITAL_MAP.value,
-    TurnAction.SET_EXIT_READINESS_BUFFER.value,
-    TurnAction.SET_TERMINAL_LIQUIDITY_CONTROLS.value,
-    TurnAction.SET_CAPITAL_REALLOCATION_GRID.value,
-    TurnAction.SET_PATH_CONTROL_MATRIX.value,
-    TurnAction.SET_PATH_RESILIENCE_GRID.value,
-    TurnAction.SET_BALANCE_SHEET_RECOVERY_MESH.value,
-    TurnAction.SET_TERMINAL_RECOVERY_LATTICE.value,
-    TurnAction.SET_TERMINAL_CONTINUITY_MATRIX.value,
-    TurnAction.SET_TERMINAL_RESILIENCE_COVENANT.value,
-    TurnAction.SET_TERMINAL_SOLVENCY_STATUTE.value,
-    TurnAction.SET_TERMINAL_SOLVENCY_MANDATE.value,
-    TurnAction.SET_TERMINAL_SOLVENCY_COMMISSION.value,
-    TurnAction.SET_TERMINAL_SOLVENCY_OVERSIGHT.value,
-    TurnAction.SET_TERMINAL_SOLVENCY_COUNCIL.value,
-    TurnAction.SET_PATH_CASH_WATERFALL.value,
-    TurnAction.SET_BOARD_RESET_CONTINGENCY_BUFFER.value,
-    TurnAction.STEP_UP_RESERVE_DISCIPLINE.value,
-    TurnAction.HARDEN_FINANCING_POSTURE.value,
-    TurnAction.LOCK_CAPITAL_BUFFER.value,
-}
-_TEAM_PANEL_COMMANDS = {
-    TurnAction.REVIEW_TEAM.value,
-    TurnAction.HIRE_EMPLOYEE.value,
-    TurnAction.FIRE_EMPLOYEE.value,
-    TurnAction.ASSIGN_EMPLOYEE.value,
-    TurnAction.UNASSIGN_EMPLOYEE.value,
-    TurnAction.REST_TEAM.value,
-    TurnAction.TRAIN_EMPLOYEE.value,
-    TurnAction.PROMOTE_EMPLOYEE.value,
-    TurnAction.RUN_COMP_REVIEW.value,
-    TurnAction.RUN_SUCCESSION_REVIEW.value,
-    TurnAction.APPOINT_TEAM_LEAD.value,
-    TurnAction.ASSIGN_MANAGER.value,
-    TurnAction.CLEAR_MANAGER.value,
-    TurnAction.REORG_TEAM.value,
-}
-_PIPELINE_PANEL_COMMANDS = {
-    TurnAction.REVIEW_PIPELINE.value,
-    TurnAction.PLAN_RELEASE.value,
-    TurnAction.WORK_RELEASE.value,
-    TurnAction.CREATE_SALES_DEAL.value,
-    TurnAction.ADVANCE_SALES_DEAL.value,
-    TurnAction.START_ROADMAP_PROJECT.value,
-    TurnAction.WORK_ROADMAP_PROJECT.value,
-    TurnAction.SOURCE_CANDIDATES.value,
-    TurnAction.SCREEN_CANDIDATE.value,
-    TurnAction.INTERVIEW_CANDIDATE.value,
-    TurnAction.MAKE_HIRING_OFFER.value,
-}
-_BOARD_PANEL_COMMANDS = {
-    TurnAction.REVIEW_BOARD.value,
-    TurnAction.EXECUTE_BOARD_RESPONSE.value,
-    TurnAction.START_BOARD_RECOVERY_PLAN.value,
-    TurnAction.EXECUTE_RESTRUCTURE_PLAN.value,
-}
-_CUSTOMER_PANEL_COMMANDS = {
-    TurnAction.REVIEW_CUSTOMERS.value,
-    TurnAction.ADJUST_PRICING.value,
-    TurnAction.SET_PACKAGING_STRATEGY.value,
-    TurnAction.SET_TARGET_SEGMENT.value,
-    TurnAction.INVEST_IN_CUSTOMER_SUCCESS.value,
-    TurnAction.RUN_RETENTION_PLAY.value,
-    TurnAction.MAKE_RENEWAL_OFFER.value,
-    TurnAction.RUN_WIN_BACK_PLAY.value,
-    TurnAction.ROUTE_SUPPORT_ESCALATION.value,
-    TurnAction.RUN_ACCOUNT_RESCUE.value,
-    TurnAction.RUN_LANE_RECOVERY.value,
-    TurnAction.RUN_RENEWAL_SWEEP.value,
-    TurnAction.RUN_ENTERPRISE_ASSURANCE.value,
-    TurnAction.RUN_BILLING_STABILIZATION.value,
-    TurnAction.RUN_ONBOARDING_RECOVERY.value,
-    TurnAction.RUN_ONBOARDING_FAST_TRACK.value,
-    TurnAction.TRIAGE_SUPPORT_BACKLOG.value,
-    TurnAction.INVEST_IN_SUPPORT_STAFFING.value,
-    TurnAction.SET_SUPPORT_LANE_FOCUS.value,
-    TurnAction.UPGRADE_SUPPORT_PROGRAM.value,
-}
-_PARTNERSHIP_PANEL_COMMANDS = {
-    TurnAction.CREATE_PARTNERSHIP.value,
-    TurnAction.INVEST_IN_PARTNER_ENABLEMENT.value,
-    TurnAction.RUN_CHANNEL_QBR.value,
-    TurnAction.REBALANCE_CHANNEL_MIX.value,
-    TurnAction.RENEGOTIATE_PARTNERSHIP.value,
-    TurnAction.REACTIVATE_PARTNERSHIP.value,
-    TurnAction.PAUSE_PARTNERSHIP.value,
-    TurnAction.REVIEW_PARTNERSHIPS.value,
-}
-
-
-def _workspace_panel_key_for_command(command: str) -> str | None:
-    if command in _TEAM_PANEL_COMMANDS:
-        return "team"
-    if command in _FINANCE_PANEL_COMMANDS:
-        return "finance"
-    if command in _PIPELINE_PANEL_COMMANDS:
-        return "pipeline"
-    if command in _BOARD_PANEL_COMMANDS:
-        return "board"
-    if command in _CUSTOMER_PANEL_COMMANDS:
-        return "customers"
-    if command in _PARTNERSHIP_PANEL_COMMANDS:
-        return "partnerships"
-    if command == TurnAction.VIEW_REPORT.value:
-        return "report"
-    if command.startswith(
-        (
-            "run_enterprise_",
-            "run_billing_",
-            "run_onboarding_",
-            "run_white_glove_",
-            "run_reference_",
-        )
-    ):
-        return "customers"
-    if command.startswith(
-        (
-            "run_channel_",
-            "run_partner_",
-            "run_reseller_",
-            "run_integration_",
-            "run_marketplace_",
-        )
-    ):
-        return "partnerships"
-    return None
 
 
 def _short_actor_text(value: str, max_length: int) -> str:
@@ -498,21 +210,6 @@ def _actor_state_badge(state: str) -> str:
     }.get(state, ".")
 
 
-_ACTOR_STATE_POSES: dict[str, str] = {
-    "idle": "steady",
-    "build": "build",
-    "handoff": "handoff",
-    "shipping": "handoff",
-    "success": "win",
-    "celebrating": "win",
-    "coaching": "coach",
-    "negotiating": "deal",
-    "risk": "warn",
-    "alert": "warn",
-    "blocked": "block",
-    "firefighting": "fire",
-}
-
 _ACTOR_POSE_BADGES: dict[str, str] = {
     "steady": "I",
     "build": "B",
@@ -524,10 +221,6 @@ _ACTOR_POSE_BADGES: dict[str, str] = {
     "block": "X",
     "fire": "!",
 }
-
-
-def _actor_pose_key(state: str, pose: str | None = None) -> str:
-    return pose or _ACTOR_STATE_POSES.get(state, "steady")
 
 
 def _actor_pose_badge(pose: str) -> str:
@@ -6112,32 +5805,32 @@ class RunScene(BaseScene):
                 INFO,
                 ("panel:customers", "stat:users"),
             )
-        if command in _FINANCE_PANEL_COMMANDS or panel_key == "finance":
+        if panel_key == "finance":
             return (
                 "Capital Move",
                 "finance",
                 WARN,
                 ("panel:finance", "stat:cash", "stat:runway"),
             )
-        if command in _TEAM_PANEL_COMMANDS or panel_key == "team":
+        if panel_key == "team":
             return ("Team Move", "team", GOOD, ("panel:team",))
-        if command in _PIPELINE_PANEL_COMMANDS or panel_key == "pipeline":
+        if panel_key == "pipeline":
             return (
                 "Pipeline Move",
                 "pipeline",
                 SELECTION,
                 ("panel:pipeline", "panel:products"),
             )
-        if command in _BOARD_PANEL_COMMANDS or panel_key == "board":
+        if panel_key == "board":
             return (
                 "Board Impact",
                 "board",
                 DANGER,
                 ("panel:board", "panel:endgame", "stat:board_pressure"),
             )
-        if command in _CUSTOMER_PANEL_COMMANDS or panel_key == "customers":
+        if panel_key == "customers":
             return ("Market Signal", "customers", INFO, ("panel:customers", "stat:users"))
-        if command in _PARTNERSHIP_PANEL_COMMANDS or panel_key == "partnerships":
+        if panel_key == "partnerships":
             return (
                 "Partner Signal",
                 "partners",
@@ -6218,6 +5911,7 @@ class RunScene(BaseScene):
         command: str,
     ) -> tuple[str, str, str, tuple[int, int, int], tuple[str, ...]] | None:
         normalized = command.lower()
+        panel_key = self._workspace_panel_key_for_command(command)
         path_specific_profiles = {
             TurnAction.SET_PATH_CONTROL_MATRIX.value: (
                 "IPO Controls",
@@ -6280,7 +5974,7 @@ class RunScene(BaseScene):
                 ("panel:endgame", "panel:finance", "stat:board_pressure"),
             )
         if (
-            command in _BOARD_PANEL_COMMANDS
+            panel_key == "board"
             or "board_reset" in normalized
             or normalized.startswith("start_board_")
             or normalized.startswith("execute_board_")
@@ -6292,7 +5986,7 @@ class RunScene(BaseScene):
                 DANGER,
                 ("panel:board", "panel:endgame", "stat:board_pressure"),
             )
-        if command in _FINANCE_PANEL_COMMANDS or any(
+        if panel_key == "finance" or any(
             token in normalized
             for token in (
                 "capital",
@@ -6311,7 +6005,7 @@ class RunScene(BaseScene):
                 WARN,
                 ("panel:finance", "stat:cash", "stat:runway"),
             )
-        if command in _PIPELINE_PANEL_COMMANDS or any(
+        if panel_key == "pipeline" or any(
             token in normalized for token in ("roadmap", "release", "pipeline")
         ):
             return (

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from nexus_tech.domain.models import EventCategory, EventHistoryEntry, GameState
+from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import create_new_game
 from nexus_tech.simulation.first_archive_mission import (
     FirstArchiveStepId,
     build_first_archive_mission,
 )
+from nexus_tech.simulation.randomness import RandomSource
 
 
 def _founder_state() -> GameState:
@@ -106,6 +110,27 @@ def test_existing_archive_completes_first_archive_mission_for_any_current_state(
     assert mission.completed_steps == 6
     assert mission.progress == 1.0
     assert "next unexplored route" in mission.next_action
+
+
+def test_persisted_completed_run_closes_first_archive_owner_flow(tmp_path: Path) -> None:
+    coordinator = SaveLoadCoordinator(tmp_path / "owner-rehearsal.db")
+    state = _founder_state()
+    state.company.current_turn = 12
+    _record_founder_commitment(state)
+    _record_founder_consequence(state)
+    state.victory_achieved = True
+    state.victory_reason = "The owner rehearsal completed the campaign path."
+
+    coordinator.save_game("owner-rehearsal", state, RandomSource(seed=301))
+    archives = coordinator.list_run_archives()
+    mission = build_first_archive_mission(state, archive_count=len(archives))
+
+    assert len(archives) == 1
+    assert archives[0].scenario_id == "founder_journey"
+    assert archives[0].campaign_path == ("Sharpen the Flagship", "Defend Control")
+    assert mission.complete
+    assert mission.completed_steps == 6
+    assert mission.current_step.step_id is FirstArchiveStepId.ARCHIVE_RUN
 
 
 def test_non_featured_scenario_uses_turn_chapters_instead_of_campaign_events() -> None:
