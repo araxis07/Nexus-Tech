@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.302.0 - 2026-07-18
+
+- Added a direct `6 Open Progress` action after `Save & Archive` while preserving the existing Back/Menu route
+- Extracted post-run button ownership into a pure `frontend_2d.review_navigation` policy shared by the review footer and navigation rail
+- Propagated optional Progress routing through title, run, turn-summary, and completed-review scenes without changing direct `play-2d` behavior
+- Added campaign-identity contracts for unique authored chapter language, distinct choice mechanics, and broad state-dimension coverage across all six featured campaigns
+- Kept gameplay balance, action/event catalogs, controls, persistence schema 27, and the truthful `0/6` human-session boundary unchanged
+
 ## 0.301.0 - 2026-07-18
 
 - Extracted transient 2D scene records into `frontend_2d.scene_state` while preserving the existing scene imports used by runtime audits

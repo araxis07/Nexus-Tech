@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from decimal import Decimal
 
 from nexus_tech.domain.models import (
@@ -47,6 +47,16 @@ class CampaignChoiceEffect:
     acquisition_rate_delta: Decimal = Decimal("0.0000")
     churn_rate_delta: Decimal = Decimal("0.0000")
     all_active_products: bool = False
+
+    @property
+    def mechanical_dimensions(self) -> tuple[str, ...]:
+        """Return the state dimensions changed by this authored choice."""
+
+        return tuple(
+            field.name
+            for field in fields(self)
+            if field.name != "result_text" and bool(getattr(self, field.name))
+        )
 
 
 @dataclass(frozen=True)

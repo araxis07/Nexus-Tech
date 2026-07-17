@@ -16,7 +16,7 @@ Version 0.293.0 reduces presentation density without changing simulation balance
 3. Confirm the compact footer explains Next, End Turn, and Later without clipped copy; hover Coach for the full rationale and skipped-action consequence.
 4. Confirm `P`, `Esc`, Settings back, and return-to-menu recovery work without losing the run.
 5. Open Endgame, use both the More control and `V`, compare the guided and expanded views, and confirm no command disappears from the expanded view.
-6. Finish the run and choose `Save & Archive`; record only layout, navigation, wording, pacing, or gameplay defects that were actually observed.
+6. Finish the run, choose `Save & Archive`, then use `6 Open Progress` and confirm Route Atlas shows the archived route without removing Back/Menu; record only layout, navigation, wording, pacing, or gameplay defects that were actually observed.
 
 ## Evidence Boundary
 

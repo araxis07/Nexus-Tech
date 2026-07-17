@@ -43,6 +43,11 @@ from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
+from nexus_tech.frontend_2d.review_navigation import (
+    ReviewNavigationAction,
+    ReviewNavigationPolicy,
+    build_review_navigation_policy,
+)
 from nexus_tech.frontend_2d.scene_state import (
     ActionFeedbackCue,
     ActorSpriteBounds,
@@ -1500,6 +1505,7 @@ class TitleScene(BaseScene):
                 "menu",
                 entry_transition="run_to_title",
             ),
+            progress_scene_factory=lambda: self._spawn_scene("meta"),
         )
 
     def _open_archive_review(self, archive_key: str) -> None:
@@ -3317,6 +3323,8 @@ class ReviewScene(BaseScene):
         return_scene_factory: Callable[[], BaseScene] | None,
         allow_save: bool,
         dirty: bool,
+        progress_scene_factory: Callable[[], BaseScene] | None = None,
+        archive_saved: bool = False,
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "run_to_review",
         preferences: FrontendPreferences | None = None,
@@ -3342,7 +3350,9 @@ class ReviewScene(BaseScene):
         self._primary_title = primary_title
         self._primary_detail = primary_detail
         self._return_scene_factory = return_scene_factory
-        self._allow_save = allow_save
+        self._progress_scene_factory = progress_scene_factory
+        self._archive_saved = archive_saved
+        self._allow_save = allow_save and not archive_saved
         self._click_targets: list[ClickTarget] = []
         self._motion_elapsed = 0.0
         self._motion_pulses = PulseBank(
@@ -3476,6 +3486,9 @@ class ReviewScene(BaseScene):
         if event.key == self.pygame.K_s and self._allow_save:
             self._save_review_archive()
             return
+        if event.key == self.pygame.K_6 and self._archive_saved:
+            self._open_progress()
+            return
         if event.key in (
             self.pygame.K_ESCAPE,
             self.pygame.K_SPACE,
@@ -3517,27 +3530,21 @@ class ReviewScene(BaseScene):
         self._draw_review_actor_sprite_layer(surface, header_rect)
         self._draw_review_findings(surface, left_rect)
         self._draw_review_sidebar(surface, right_rect)
-        self._draw_review_footer(surface, footer_rect)
-        items = [
-            (
-                "Back",
-                "Return to the previous screen.",
-                "review_primary",
-                "",
-                self._accent,
-            )
-        ]
-        if self._allow_save:
-            items.append(
+        navigation = self._review_navigation_policy()
+        self._draw_review_footer(surface, footer_rect, navigation)
+        self._draw_nav_rail(
+            surface,
+            tuple(
                 (
-                    "S Save & Archive",
-                    "Record this ending for progression.",
-                    "review_save",
+                    action.title,
+                    action.detail,
+                    action.kind,
                     "",
-                    GOOD,
+                    self._review_action_accent(action),
                 )
-            )
-        self._draw_nav_rail(surface, tuple(items))
+                for action in navigation.actions
+            ),
+        )
         self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
 
@@ -3547,12 +3554,39 @@ class ReviewScene(BaseScene):
             return
         if target.kind == "review_save" and self._allow_save:
             self._save_review_archive()
+            return
+        if target.kind == "review_progress":
+            self._open_progress()
 
     def _save_review_archive(self) -> None:
         self._persist_current_run()
         self._allow_save = False
-        self._primary_detail = "Archive recorded. Return to the menu and open Progress."
+        self._archive_saved = True
         self._trigger_review_motion("footer", intensity=0.72)
+
+    def _open_progress(self) -> None:
+        if not self._archive_saved or self._progress_scene_factory is None:
+            return
+        self._next_scene = self._progress_scene_factory()
+
+    def _review_navigation_policy(self) -> ReviewNavigationPolicy:
+        return build_review_navigation_policy(
+            primary_title=self._primary_title,
+            primary_detail=self._primary_detail,
+            allow_save=self._allow_save,
+            archive_saved=self._archive_saved,
+            progress_available=self._progress_scene_factory is not None,
+        )
+
+    def _review_action_accent(
+        self,
+        action: ReviewNavigationAction,
+    ) -> tuple[int, int, int]:
+        if action.tone == "success":
+            return GOOD
+        if action.tone == "info":
+            return INFO
+        return self._accent
 
     def _primary_action(self) -> None:
         if self._return_scene_factory is not None:
@@ -3789,7 +3823,12 @@ class ReviewScene(BaseScene):
             )
             top += 36
 
-    def _draw_review_footer(self, surface, rect) -> None:
+    def _draw_review_footer(
+        self,
+        surface,
+        rect,
+        navigation: ReviewNavigationPolicy,
+    ) -> None:
         pygame = self.pygame
         footer_motion = self._motion_level("review:footer")
         inner = draw_panel(
@@ -3801,16 +3840,7 @@ class ReviewScene(BaseScene):
             emphasis=footer_motion,
             lift=int(footer_motion * 2),
         )
-        actions = [(self._primary_title, self._primary_detail, self._accent, "review_primary")]
-        if self._allow_save:
-            actions.append(
-                (
-                    "S Save & Archive",
-                    "Record this ending for progression.",
-                    GOOD,
-                    "review_save",
-                )
-            )
+        actions = navigation.actions
         gap = 12
         button_count = len(actions)
         max_button_width = 300 if button_count == 1 else 260
@@ -3821,19 +3851,19 @@ class ReviewScene(BaseScene):
         total_width = button_width * button_count + gap * max(0, button_count - 1)
         left = inner.left + max(0, (inner.width - total_width) // 2)
         top = inner.top + max(8, (inner.height - 40) // 2)
-        for index, (title, detail, accent, kind) in enumerate(actions):
+        for index, action in enumerate(actions):
             button_rect = pygame.Rect(left + index * (button_width + gap), top, button_width, 40)
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
-                title=title,
-                detail=detail,
-                accent=accent,
+                title=action.title,
+                detail=action.detail,
+                accent=self._review_action_accent(action),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
             )
-            self._click_targets.append(ClickTarget(kind, "", button_rect))
+            self._click_targets.append(ClickTarget(action.kind, "", button_rect))
 
 
 class RunScene(BaseScene):
@@ -3856,6 +3886,7 @@ class RunScene(BaseScene):
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "boot_run",
         return_scene_factory: Callable[[], BaseScene] | None = None,
+        progress_scene_factory: Callable[[], BaseScene] | None = None,
         preferences: FrontendPreferences | None = None,
         preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
         preference_provider: Callable[[], FrontendPreferences] | None = None,
@@ -3898,6 +3929,7 @@ class RunScene(BaseScene):
         self._focus_mode = True
         self._endgame_actions_expanded = False
         self._return_scene_factory = return_scene_factory
+        self._progress_scene_factory = progress_scene_factory
         self._terminal_archive_saved = False
         self._first_turn_guide_visible = False
         self._product_index = 0
@@ -7133,6 +7165,7 @@ class RunScene(BaseScene):
             preference_provider=self._preference_provider,
             entry_transition="run_to_summary",
             return_scene_factory=self._return_scene_factory,
+            progress_scene_factory=self._progress_scene_factory,
         )
 
     def _save_current_run(self) -> None:
@@ -7173,6 +7206,8 @@ class RunScene(BaseScene):
             return_scene_factory=self._return_scene_factory,
             allow_save=not self._terminal_archive_saved,
             dirty=self._dirty,
+            progress_scene_factory=self._progress_scene_factory,
+            archive_saved=self._terminal_archive_saved,
             motion_mode=self.motion_mode,
             preferences=self._current_frontend_preferences(),
             preference_callback=self._preference_callback,
@@ -10771,6 +10806,7 @@ class TurnSummaryScene(BaseScene):
         motion_mode: MotionMode | str = MotionMode.FULL,
         entry_transition: str = "run_to_summary",
         return_scene_factory: Callable[[], BaseScene] | None = None,
+        progress_scene_factory: Callable[[], BaseScene] | None = None,
         preferences: FrontendPreferences | None = None,
         preference_callback: Callable[[FrontendPreferences], FontPack] | None = None,
         preference_provider: Callable[[], FrontendPreferences] | None = None,
@@ -10793,6 +10829,7 @@ class TurnSummaryScene(BaseScene):
         self._resolution = resolution
         self._selected_product_id = selected_product_id
         self._return_scene_factory = return_scene_factory
+        self._progress_scene_factory = progress_scene_factory
         self._click_targets: list[ClickTarget] = []
         self._events = build_turn_resolution_events(previous_state, resolution)
         self._visible_event_count = 1
@@ -11162,6 +11199,7 @@ class TurnSummaryScene(BaseScene):
                 return_scene_factory=self._return_scene_factory,
                 allow_save=True,
                 dirty=self._dirty,
+                progress_scene_factory=self._progress_scene_factory,
                 motion_mode=self.motion_mode,
                 preferences=self._current_frontend_preferences(),
                 preference_callback=self._preference_callback,
@@ -11192,6 +11230,7 @@ class TurnSummaryScene(BaseScene):
             preference_provider=self._preference_provider,
             entry_transition="summary_to_run",
             return_scene_factory=self._return_scene_factory,
+            progress_scene_factory=self._progress_scene_factory,
         )
 
     def _trigger_summary_event_motion(self, event: FrontendEvent) -> None:

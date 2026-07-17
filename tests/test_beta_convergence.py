@@ -330,6 +330,35 @@ def test_featured_campaigns_have_two_unique_mechanical_decisions() -> None:
     )
 
 
+def test_featured_campaigns_preserve_distinct_authored_and_mechanical_identity() -> None:
+    journeys = list_featured_campaign_journeys()
+    chapters = tuple(chapter for journey in journeys for chapter in journey.chapters)
+    decisions = list_campaign_decisions()
+
+    assert len({journey.track_label for journey in journeys}) == len(journeys)
+    assert len({journey.theme for journey in journeys}) == len(journeys)
+    assert len({chapter.objective for chapter in chapters}) == len(chapters)
+    assert len({chapter.decision_lens for chapter in chapters}) == len(chapters)
+    assert len({chapter.primary_risk for chapter in chapters}) == len(chapters)
+
+    for decision in decisions:
+        option_dimensions = tuple(
+            option.effect.mechanical_dimensions for option in decision.options
+        )
+        assert all(option_dimensions)
+        assert option_dimensions[0] != option_dimensions[1]
+
+    for journey in journeys:
+        campaign_dimensions = {
+            dimension
+            for decision in decisions
+            if decision.scenario_id == journey.scenario_id
+            for option in decision.options
+            for dimension in option.effect.mechanical_dimensions
+        }
+        assert len(campaign_dimensions) >= 10
+
+
 def test_every_campaign_option_declares_a_bounded_long_run_event_bias() -> None:
     option_ids = {
         option.option_id for decision in list_campaign_decisions() for option in decision.options

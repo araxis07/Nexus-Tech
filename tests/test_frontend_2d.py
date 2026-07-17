@@ -135,6 +135,7 @@ from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
+from nexus_tech.frontend_2d.review_navigation import build_review_navigation_policy
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
     ReviewScene,
@@ -335,6 +336,42 @@ def test_focus_action_policy_separates_recommended_move_from_alternatives() -> N
     assert buttons[0].kind == "coach"
     assert buttons[0].detail == "Do: Hire Teammate."
     assert all(button.payload != TurnAction.HIRE_EMPLOYEE.value for button in buttons[1:3])
+
+
+def test_review_navigation_policy_unlocks_progress_without_replacing_back() -> None:
+    before_archive = build_review_navigation_policy(
+        primary_title="Back to Menu",
+        primary_detail="Return to the title menu.",
+        allow_save=True,
+        archive_saved=False,
+        progress_available=True,
+    )
+    after_archive = build_review_navigation_policy(
+        primary_title="Back to Menu",
+        primary_detail="Return to the title menu.",
+        allow_save=False,
+        archive_saved=True,
+        progress_available=True,
+    )
+    direct_launcher = build_review_navigation_policy(
+        primary_title="Esc Close",
+        primary_detail="Leave the 2D shell.",
+        allow_save=False,
+        archive_saved=True,
+        progress_available=False,
+    )
+
+    assert tuple(action.kind for action in before_archive.actions) == (
+        "review_primary",
+        "review_save",
+    )
+    assert tuple(action.kind for action in after_archive.actions) == (
+        "review_primary",
+        "review_progress",
+    )
+    assert after_archive.actions[0].title == "Back to Menu"
+    assert after_archive.actions[1].title == "6 Open Progress"
+    assert tuple(action.kind for action in direct_launcher.actions) == ("review_primary",)
 
 
 @pytest.mark.parametrize(
@@ -752,12 +789,24 @@ def test_terminal_run_save_confirms_archive_and_blocks_duplicate_save() -> None:
         pygame.quit()
 
 
-def test_review_save_changes_to_archive_recorded_handoff() -> None:
-    pygame, fonts, _surface = _build_pygame_bundle()
+def test_review_save_exposes_progress_handoff_without_replacing_return(tmp_path: Path) -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
     saved: list[tuple[object, ...]] = []
     try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
         state = create_new_game("NEXUS TECH", "Nexus One")
         state.victory_achieved = True
+        coordinator = SaveLoadCoordinator(tmp_path / "review-progress.db")
+        progress_scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=291),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="meta",
+        )
         scene = ReviewScene(
             pygame=pygame,
             fonts=fonts,
@@ -772,14 +821,41 @@ def test_review_save_changes_to_archive_recorded_handoff() -> None:
             return_scene_factory=None,
             allow_save=True,
             dirty=True,
+            progress_scene_factory=lambda: progress_scene,
             motion_mode=MotionMode.OFF,
         )
 
         scene._save_review_archive()
+        navigation = scene._review_navigation_policy()
+        scene.draw(surface)
 
         assert len(saved) == 1
         assert not scene._allow_save
-        assert "Archive recorded" in scene._primary_detail
+        assert scene._archive_saved
+        assert scene._primary_detail == "Return to the title menu."
+        assert tuple(action.kind for action in navigation.actions) == (
+            "review_primary",
+            "review_progress",
+        )
+        assert {target.kind for target in scene._click_targets} >= {
+            "review_primary",
+            "review_progress",
+        }
+        action_targets = [
+            target
+            for target in scene._click_targets
+            if target.kind in {"review_primary", "review_progress"}
+        ]
+        assert all(surface.get_rect().contains(target.rect) for target in action_targets)
+        assert all(
+            not left.rect.colliderect(right.rect)
+            for index, left in enumerate(action_targets)
+            for right in action_targets[index + 1 :]
+        )
+
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_6, unicode="6"))
+
+        assert scene.pop_next_scene() is progress_scene
     finally:
         pygame.quit()
 
@@ -3722,6 +3798,11 @@ def test_title_scene_preserves_motion_mode_when_loading_run(tmp_path: Path) -> N
         assert scene._next_scene.motion_mode is MotionMode.OFF
         assert scene._next_scene.scene_transition_key == "title_to_run"
         assert not scene._next_scene.scene_transition_active()
+        assert isinstance(scene._next_scene, RunScene)
+        assert scene._next_scene._progress_scene_factory is not None
+        progress_scene = scene._next_scene._progress_scene_factory()
+        assert isinstance(progress_scene, TitleScene)
+        assert progress_scene._mode == "meta"
     finally:
         pygame.quit()
 

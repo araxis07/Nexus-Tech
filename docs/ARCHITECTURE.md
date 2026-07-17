@@ -14,6 +14,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `frontend_2d.control_guide`: pure control-help content shared with layout regressions; it must not own input bindings or render surfaces.
 - `frontend_2d.outcome_presentation`: pure completed-run copy and metric policy; it must not mutate the run, save an archive, or render pygame surfaces.
 - `frontend_2d.panel_disclosure`: pure presentation policy for guided versus expanded deep-panel content; it must never remove commands from the underlying view model.
+- `frontend_2d.review_navigation`: pure completed-review action policy; it must preserve the existing return route and expose Progress only after an archive exists and a title-shell destination is available.
 - `frontend_2d.scene_state`: transient scene records shared by title, run, review, summary, and audits; these records must not evaluate gameplay or persistence.
 - `frontend_2d.workspace_routing`: pure command-to-workspace ownership used by navigation and feedback; it must remain the only frontend mapping from commands to deep-dive panels.
 - `simulation.decision_patterns`: pure operating-choice analysis derived from Decision Ledger entries; it must not write state, classify forced event responses as operating choices, or tune balance automatically.
@@ -38,6 +39,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - Keep human-session preparation separate from evidence persistence; generated packets may guide an observer but only explicit post-session attestation may create a beta evidence row.
 - Keep animated actor overlays in reserved presentation lanes; they must not cover copy, controls, or other non-interactive status decoration at any supported viewport.
 - Keep Focus View alternatives distinct from the primary Coach route; compact presentation may reduce visible choice density but must preserve the underlying direct controls.
+- Keep `Save & Archive`, Back/Menu, and the optional direct Progress handoff separate so replay guidance never removes a recovery route or fabricates an archive.
 - Keep workspace navigation, action feedback, and late-game choreography on the shared workspace-routing policy instead of duplicating command sets inside scene renderers.
 - Use `Decimal` for money and quantize through domain money helpers.
 - Use seeded randomness through `RandomSource` for deterministic tests and demos.

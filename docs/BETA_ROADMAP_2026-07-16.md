@@ -2,12 +2,16 @@
 
 ## Product Position
 
-NEXUS TECH 0.301.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.302.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
 The current convergence slice reduces 2D scene coupling and protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- completed reviews reached from the title shell preserve Back/Menu and add a direct `6 Open Progress` route after archiving;
+- one pure review-navigation policy owns post-run action order and availability across the footer and navigation rail;
+- optional Progress routing crosses title, run, summary, and review scenes without changing direct-launch behavior or persistence;
+- campaign identity contracts protect unique chapter language, mechanically distinct decision options, and broad state-dimension coverage;
 - transient scene records now live in `frontend_2d.scene_state` without changing scene construction or audit imports;
 - `frontend_2d.workspace_routing` is the single command-owner policy for navigation, feedback, and choreography;
 - a temporary-database contract persists one completed featured campaign, verifies its archive fields, and closes First Archive Mission 6/6 without writing to the player's database;
@@ -31,7 +35,7 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 
 ## Path To Beta
 
-1. Run `prepare-beta-playtest-session`, then complete one owner rehearsal from New Game through `Save & Archive` at 820x620 and record only defects actually observed; do not count the owner rehearsal as first-time human evidence.
+1. Run `prepare-beta-playtest-session`, then complete one owner rehearsal from New Game through `Save & Archive` and `6 Open Progress` at 820x620 and record only defects actually observed; do not count the owner rehearsal as first-time human evidence.
 2. Observe six first-time sessions across all six featured campaigns using anonymous tester codes and the structured local evidence command.
 3. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
 4. Use Decision Pattern only to identify candidate repetition or low action diversity; do not remove or retune a command without matching player notes.
