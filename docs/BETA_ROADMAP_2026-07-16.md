@@ -2,12 +2,15 @@
 
 ## Product Position
 
-NEXUS TECH 0.306.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.307.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
 The current convergence slice reduces 2D scene coupling and protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- Pause now distinguishes title-shell recovery from direct play, keeps unavailable Menu actions non-interactive, and prevents direct-play `M` from closing an unsaved run;
+- one pure pause-presentation policy owns status, guidance, action order, tone, and availability without saving, quitting, or mutating a run;
+- action and impact feedback now translate product targets into stable names and metrics instead of exposing random internal identifiers;
 - Title Menu and Quick Start now emphasize New Game when no save exists, render Continue as explicitly unavailable, and restore Continue as the primary route for returning players;
 - one pure title-presentation policy owns first-run action availability, tone, copy, and footer guidance without loading or mutating a run;
 - compact Focus View now uses two balanced rows of three actions instead of placing End Turn alone beneath five peer controls, while wider layouts retain one six-action row;

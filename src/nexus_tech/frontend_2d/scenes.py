@@ -39,6 +39,7 @@ from nexus_tech.frontend_2d.event_queue import (
     build_action_events,
     build_turn_resolution_events,
 )
+from nexus_tech.frontend_2d.feedback_presentation import build_feedback_target_text
 from nexus_tech.frontend_2d.focus_presentation import (
     build_guided_opening_focus_copy,
     resolve_focus_button_emphasis,
@@ -48,6 +49,10 @@ from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
+from nexus_tech.frontend_2d.pause_presentation import (
+    PauseMenuPresentation,
+    build_pause_menu_presentation,
+)
 from nexus_tech.frontend_2d.review_navigation import (
     ReviewNavigationAction,
     ReviewNavigationPolicy,
@@ -193,6 +198,17 @@ _SCENE_TRANSITION_LABELS = {
     "summary_to_run": ("Return Focus", GOOD),
     "summary_to_review": ("Final Review", DANGER),
 }
+
+
+def _action_presentation_accent(tone: str) -> tuple[int, int, int]:
+    return {
+        "success": GOOD,
+        "info": INFO,
+        "warning": WARN,
+        "selection": SELECTION,
+        "danger": DANGER,
+        "muted": BORDER,
+    }.get(tone, INFO)
 
 
 def _short_actor_text(value: str, max_length: int) -> str:
@@ -2085,7 +2101,7 @@ class TitleScene(BaseScene):
                 rect=button_rect,
                 title=action.title,
                 detail=action.detail,
-                accent=self._title_action_accent(action),
+                accent=_action_presentation_accent(action.tone),
                 title_font=self.fonts.body,
                 detail_font=self.fonts.small,
                 enabled=action.enabled,
@@ -2139,19 +2155,6 @@ class TitleScene(BaseScene):
             current_step_label=mission.step_label,
             progress_label=mission.progress_label,
         )
-
-    def _title_action_accent(
-        self,
-        action: TitleActionPresentation,
-    ) -> tuple[int, int, int]:
-        return {
-            "success": GOOD,
-            "info": INFO,
-            "warning": WARN,
-            "selection": SELECTION,
-            "danger": DANGER,
-            "muted": BORDER,
-        }.get(action.tone, INFO)
 
     def _draw_title_settings(self, surface, rect) -> None:
         self._draw_frontend_settings_panel(
@@ -2452,7 +2455,7 @@ class TitleScene(BaseScene):
                 rect=button_rect,
                 title=action.title,
                 detail=action.detail,
-                accent=self._title_action_accent(action),
+                accent=_action_presentation_accent(action.tone),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
                 enabled=action.enabled,
@@ -4534,7 +4537,7 @@ class RunScene(BaseScene):
             elif event.key == self.pygame.K_t:
                 self._set_pause_settings_visible(True)
             elif event.key == self.pygame.K_m:
-                self._return_to_menu_or_quit()
+                self._return_to_menu()
             elif event.key == self.pygame.K_q:
                 self.should_exit = True
                 self.exit_reason = "quit"
@@ -6258,13 +6261,7 @@ class RunScene(BaseScene):
                 count=2,
                 offset=index + len(cue.label),
             )
-            target_text = " / ".join(
-                target.removeprefix("panel:")
-                .removeprefix("stat:")
-                .removeprefix("product:")
-                .split(":")[-1]
-                for target in cue.targets[:2]
-            )
+            target_text = self._feedback_target_text(cue.targets[:2])
             value_width = min(96, max(54, rect.width // 3))
             draw_text_line(
                 surface,
@@ -6419,13 +6416,7 @@ class RunScene(BaseScene):
             if blocked and cue.detail:
                 target_text = cue.detail
             else:
-                target_text = " / ".join(
-                    target.removeprefix("panel:")
-                    .removeprefix("stat:")
-                    .removeprefix("summary:")
-                    .removeprefix("overlay:")
-                    for target in cue.targets[:2]
-                )
+                target_text = self._feedback_target_text(cue.targets[:2])
             family_width = min(86, max(62, rect.width // 4))
             draw_text_line(
                 surface,
@@ -6464,6 +6455,12 @@ class RunScene(BaseScene):
                     progress_rect.height,
                 ),
             )
+
+    def _feedback_target_text(self, targets: tuple[str, ...]) -> str:
+        return build_feedback_target_text(
+            targets,
+            product_names={product.id.hex: product.name for product in self.state.products},
+        )
 
     def _draw_late_game_choreography_cues(self, surface) -> None:
         if not self._late_game_choreography_cues or self.motion_mode is MotionMode.OFF:
@@ -6610,7 +6607,7 @@ class RunScene(BaseScene):
             self._set_pause_settings_visible(False)
             return
         if target.kind == "pause_menu":
-            self._return_to_menu_or_quit()
+            self._return_to_menu()
             return
         if target.kind == "pause_quit":
             self.should_exit = True
@@ -6740,10 +6737,8 @@ class RunScene(BaseScene):
             return
         self._set_pause_overlay_visible(True)
 
-    def _return_to_menu_or_quit(self) -> None:
+    def _return_to_menu(self) -> None:
         if self._return_scene_factory is None:
-            self.should_exit = True
-            self.exit_reason = "quit"
             return
         if self._dirty:
             self._persist_current_run()
@@ -10321,15 +10316,11 @@ class RunScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 30, inner.width, 30),
             valign="top",
         )
-        menu_available = self._return_scene_factory is not None
-        detail = (
-            f"Turn {self.state.company.current_turn} | Actions left "
-            f"{self.state.action_points_remaining} | Slot {self.slot_name}"
-        )
+        presentation = self._pause_menu_presentation()
         draw_wrapped_text(
             surface,
             self.fonts.body,
-            detail,
+            presentation.status_line,
             MUTED,
             pygame.Rect(inner.left, inner.top, inner.width, 24),
             line_height=18,
@@ -10338,10 +10329,7 @@ class RunScene(BaseScene):
         draw_wrapped_text(
             surface,
             self.fonts.small,
-            (
-                "Use P or Esc to resume. Save before leaving if you want to keep the current "
-                "run state. Menu is available when the run was launched from the 2D title shell."
-            ),
+            presentation.guidance,
             TEXT,
             pygame.Rect(inner.left, inner.top + 34, inner.width, 52),
             line_height=17,
@@ -10351,34 +10339,11 @@ class RunScene(BaseScene):
         button_gap = 12
         button_height = 46
         button_width = int((inner.width - button_gap) / 2)
-        buttons = (
-            ("Resume", "Return to the run.", "pause_resume", "", GOOD, True),
-            ("S Save", "Persist the run.", "pause_save", "", INFO, True),
-            (
-                "M Menu" if menu_available else "Menu Unavailable",
-                "Save and return to title."
-                if menu_available
-                else "Direct play has no title shell.",
-                "pause_menu",
-                "",
-                WARN,
-                menu_available,
-            ),
-            (
-                "T Settings",
-                "Text, contrast, motion, and action loadout.",
-                "pause_settings",
-                "",
-                SELECTION,
-                True,
-            ),
-            ("Q Quit", "Close the 2D shell.", "pause_quit", "", DANGER, True),
-        )
-        for index, (title, button_detail, kind, payload, accent, enabled) in enumerate(buttons):
+        for index, action in enumerate(presentation.actions):
             row = index // 2
             col = index % 2
             left = inner.left + col * (button_width + button_gap)
-            if index == len(buttons) - 1 and len(buttons) % 2:
+            if index == len(presentation.actions) - 1 and len(presentation.actions) % 2:
                 left = inner.centerx - button_width // 2
             rect = pygame.Rect(
                 left,
@@ -10390,15 +10355,23 @@ class RunScene(BaseScene):
                 surface,
                 pygame,
                 rect=rect,
-                title=title,
-                detail=button_detail,
-                accent=accent,
+                title=action.title,
+                detail=action.detail,
+                accent=_action_presentation_accent(action.tone),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
-                enabled=enabled,
+                enabled=action.enabled,
             )
-            if enabled:
-                self._click_targets.append(ClickTarget(kind, payload, rect))
+            if action.enabled:
+                self._click_targets.append(ClickTarget(action.target_kind, action.payload, rect))
+
+    def _pause_menu_presentation(self) -> PauseMenuPresentation:
+        return build_pause_menu_presentation(
+            current_turn=self.state.company.current_turn,
+            action_points_remaining=self.state.action_points_remaining,
+            slot_name=self.slot_name,
+            menu_available=self._return_scene_factory is not None,
+        )
 
     def _draw_pause_settings_overlay(self, surface) -> None:
         pygame = self.pygame

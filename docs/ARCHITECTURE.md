@@ -12,8 +12,10 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `frontend_2d`: pygame scenes, responsive layout, input routing, animation, and view-model adapters. This layer should route commands rather than own simulation rules.
 - `frontend_2d.action_bar`: pure run-button catalog, local loadout, and Focus View hierarchy policy; it may remove duplicate visible routes but must not evaluate availability, route input, or render controls.
 - `frontend_2d.control_guide`: pure control-help content shared with layout regressions; it must not own input bindings or render surfaces.
+- `frontend_2d.feedback_presentation`: pure player-facing labels for internal feedback targets; it must not expose product identifiers or alter motion routing.
 - `frontend_2d.outcome_presentation`: pure completed-run copy and metric policy; it must not mutate the run, save an archive, or render pygame surfaces.
 - `frontend_2d.panel_disclosure`: pure presentation policy for guided versus expanded deep-panel content; it must never remove commands from the underlying view model.
+- `frontend_2d.pause_presentation`: pure pause status, guidance, action order, and availability policy; it may expose title return only when a return scene exists and must not save, quit, or mutate the run.
 - `frontend_2d.focus_presentation`: pure opening-copy, Focus action-grid, and primary-emphasis policy; it must not alter action availability, command routing, AP, or simulation state.
 - `frontend_2d.review_navigation`: pure completed-review action policy; it must preserve the existing return route and expose Progress only after an archive exists and a title-shell destination is available.
 - `frontend_2d.review_presentation`: pure responsive finding-card budget; it may reduce visible compact cards and expose an overflow label but must not discard or rewrite the underlying findings.

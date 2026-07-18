@@ -131,6 +131,7 @@ from nexus_tech.frontend_2d.event_queue import (
     build_turn_resolution_events,
     describe_action_motion_profile,
 )
+from nexus_tech.frontend_2d.feedback_presentation import build_feedback_target_text
 from nexus_tech.frontend_2d.focus_presentation import (
     build_guided_opening_focus_copy,
     resolve_focus_button_emphasis,
@@ -140,6 +141,7 @@ from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
+from nexus_tech.frontend_2d.pause_presentation import build_pause_menu_presentation
 from nexus_tech.frontend_2d.review_navigation import build_review_navigation_policy
 from nexus_tech.frontend_2d.review_presentation import build_review_finding_card_layout
 from nexus_tech.frontend_2d.scenes import (
@@ -449,6 +451,65 @@ def test_title_presentation_prioritizes_the_action_that_can_advance_play() -> No
     assert returning_quick_actions[1].enabled
     assert returning_quick_actions[1].tone == "success"
     assert "1 continues" in returning_quick_footer
+
+
+def test_pause_presentation_preserves_recovery_actions_and_direct_play_boundary() -> None:
+    title_shell = build_pause_menu_presentation(
+        current_turn=7,
+        action_points_remaining=11,
+        slot_name="active",
+        menu_available=True,
+    )
+    direct_play = build_pause_menu_presentation(
+        current_turn=3,
+        action_points_remaining=4,
+        slot_name="challenge",
+        menu_available=False,
+    )
+
+    assert title_shell.status_line == "Turn 7 | Actions left 11 | Slot active"
+    assert [action.target_kind for action in title_shell.actions] == [
+        "pause_resume",
+        "pause_save",
+        "pause_menu",
+        "pause_settings",
+        "pause_quit",
+    ]
+    assert all(action.enabled for action in title_shell.actions)
+    assert title_shell.actions[2].title == "M Menu"
+    assert "returning to the title menu" in title_shell.guidance
+    assert direct_play.status_line == "Turn 3 | Actions left 4 | Slot challenge"
+    assert not direct_play.actions[2].enabled
+    assert direct_play.actions[2].title == "Menu Unavailable"
+    assert direct_play.actions[2].detail == "Direct play has no title shell."
+    assert "no title menu route" in direct_play.guidance
+    assert direct_play.actions[3].tone == "selection"
+
+
+def test_feedback_target_text_hides_internal_product_identifiers() -> None:
+    product_id = "fea6cc76-6274-4ee4-8501-5267aee6187f"
+    product_names = {product_id: "Nexus One"}
+
+    assert (
+        build_feedback_target_text(
+            ("panel:products", f"product:{product_id}"),
+            product_names=product_names,
+        )
+        == "Products / Nexus One"
+    )
+    assert (
+        build_feedback_target_text(
+            (f"product:{product_id}", f"product:{product_id}:quality"),
+            product_names=product_names,
+        )
+        == "Nexus One / Quality"
+    )
+    unknown = build_feedback_target_text(
+        ("product:0123456789abcdef:bugs",),
+        product_names=product_names,
+    )
+    assert unknown == "Selected Product / Bugs"
+    assert "0123456789abcdef" not in unknown
 
 
 def test_review_navigation_policy_unlocks_progress_without_replacing_back() -> None:
@@ -2583,6 +2644,12 @@ def test_run_scene_pause_and_back_hotkeys_are_distinct() -> None:
         scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_p, unicode="p"))
         assert scene._pause_overlay_visible
         scene.draw(_surface)
+        pause_targets = {target.kind for target in scene._click_targets}
+        assert {"pause_resume", "pause_save", "pause_settings", "pause_quit"} <= pause_targets
+        assert "pause_menu" not in pause_targets
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_m, unicode="m"))
+        assert scene._pause_overlay_visible
+        assert not scene.should_exit
         scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode=""))
         assert not scene._pause_overlay_visible
 
@@ -2629,7 +2696,9 @@ def test_run_scene_pause_menu_returns_to_title_shell(tmp_path: Path) -> None:
         )
 
         scene._set_pause_overlay_visible(True)
-        scene._dispatch_click_target(ClickTarget("pause_menu", "", _surface.get_rect()))
+        scene.draw(_surface)
+        menu_target = next(target for target in scene._click_targets if target.kind == "pause_menu")
+        scene._dispatch_click_target(menu_target)
         next_scene = scene.pop_next_scene()
 
         assert saved_slots == ["active"]

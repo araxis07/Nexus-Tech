@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.307.0 - 2026-07-19
+
+- Prevented `M` in a paused direct-play run from silently closing the 2D shell through the unavailable title-menu route; `Q` remains the explicit quit control
+- Made Pause guidance describe the actual recovery path for title-shell and direct-play launches instead of showing one conditional paragraph for both
+- Kept unavailable Menu actions disabled and without mouse targets while preserving Resume, Save, Settings, Quit, and title-shell save-and-return behavior
+- Replaced raw product UUIDs in action and impact feedback with stable product and metric labels, restoring deterministic visual baselines and readable cue copy
+- Extracted pure pause-menu status, guidance, action order, tone, and availability policy from the pygame scene renderer with direct and rendered-input regressions
+- Kept gameplay balance, controls, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6` unchanged
+
 ## 0.306.0 - 2026-07-19
 
 - Made New Game the single emphasized first-run route when no save exists, while returning players still see Continue as the primary route
