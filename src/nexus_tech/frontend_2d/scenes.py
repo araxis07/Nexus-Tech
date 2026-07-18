@@ -48,6 +48,7 @@ from nexus_tech.frontend_2d.review_navigation import (
     ReviewNavigationPolicy,
     build_review_navigation_policy,
 )
+from nexus_tech.frontend_2d.review_presentation import build_review_finding_card_layout
 from nexus_tech.frontend_2d.scene_state import (
     ActionFeedbackCue,
     ActorSpriteBounds,
@@ -3654,12 +3655,21 @@ class ReviewScene(BaseScene):
             surface.blit(idle_surface, (inner.left, inner.top))
             return
         top = inner.top
-        card_gap = 10
-        card_height = 92 if inner.height < 300 else 98
-        visible_limit = max(1, int((inner.height + card_gap) / (card_height + card_gap)))
-        visible_findings = self._view_model.findings[:visible_limit]
+        large_text = self.fonts.small.get_height() >= 13
+        finding_layout = build_review_finding_card_layout(
+            available_height=inner.height,
+            finding_count=len(self._view_model.findings),
+            minimum_card_height=114 if large_text else 100,
+            maximum_card_height=120 if large_text else 112,
+        )
+        visible_findings = self._view_model.findings[: finding_layout.visible_count]
         for finding in visible_findings:
-            card_rect = pygame.Rect(inner.left, top, inner.width, card_height)
+            card_rect = pygame.Rect(
+                inner.left,
+                top,
+                inner.width,
+                finding_layout.card_height,
+            )
             accent = tone_color(finding.severity)
             finding_motion = max(
                 findings_motion * 0.65, 0.18 if finding.rank_label == "#1" else 0.0
@@ -3703,9 +3713,9 @@ class ReviewScene(BaseScene):
                 MUTED,
                 pygame.Rect(
                     animated_rect.left + 12,
-                    animated_rect.top + 32,
+                    animated_rect.top + 29,
                     animated_rect.width - 24,
-                    28,
+                    30,
                 ),
                 line_height=15,
                 max_lines=2,
@@ -3719,20 +3729,26 @@ class ReviewScene(BaseScene):
                     animated_rect.left + 12,
                     animated_rect.top + 62,
                     animated_rect.width - 24,
-                    20,
+                    max(0, animated_rect.height - 68),
                 ),
                 line_height=15,
-                max_lines=1,
+                max_lines=3 if finding_layout.card_height >= 114 else 2,
             )
-            top += card_height + card_gap
+            top += finding_layout.card_height + finding_layout.card_gap
         remaining = len(self._view_model.findings) - len(visible_findings)
         if remaining > 0:
+            noun = "finding" if remaining == 1 else "findings"
             draw_text_line(
                 surface,
                 self.fonts.small,
-                f"{remaining} more finding(s) available in larger layouts.",
+                f"{remaining} more {noun} in larger layouts.",
                 MUTED,
-                pygame.Rect(inner.left, inner.bottom - 18, inner.width, 18),
+                pygame.Rect(
+                    inner.left,
+                    inner.bottom - finding_layout.remaining_label_height,
+                    inner.width,
+                    finding_layout.remaining_label_height,
+                ),
                 valign="top",
             )
 
@@ -8969,9 +8985,10 @@ class RunScene(BaseScene):
         default_detail: str,
         *,
         enabled: bool,
+        max_length: int = 32,
     ) -> str:
         detail = self._button_detail(command, default_detail, enabled=enabled)
-        return self._compact_button_detail(detail, max_length=32)
+        return self._compact_button_detail(detail, max_length=max_length)
 
     def _draw_product_card(self, surface, rect, product) -> None:
         pygame = self.pygame
@@ -9672,7 +9689,12 @@ class RunScene(BaseScene):
                 pygame,
                 rect=button_rect,
                 title=action.label,
-                detail=self._overlay_button_detail(action.command, action.detail, enabled=enabled),
+                detail=self._overlay_button_detail(
+                    action.command,
+                    action.detail,
+                    enabled=enabled,
+                    max_length=64 if guided_endgame else 32,
+                ),
                 accent=tone_color(action.tone),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,

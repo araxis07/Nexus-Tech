@@ -136,6 +136,7 @@ from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_pro
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.review_navigation import build_review_navigation_policy
+from nexus_tech.frontend_2d.review_presentation import build_review_finding_card_layout
 from nexus_tech.frontend_2d.scenes import (
     ClickTarget,
     ReviewScene,
@@ -1361,10 +1362,33 @@ def test_endgame_panel_disclosure_starts_guided_and_preserves_all_actions() -> N
         "Blocked paths",
         "Next move",
     )
+    assert guided.detail_lines[-1].endswith("Clear the nearest exit gate.")
+    assert "|" not in guided.detail_lines[-1]
+    assert all(action.detail.endswith(".") for action in guided.actions)
+    assert all("..." not in action.detail for action in guided.actions)
+    assert max(map(len, (action.detail for action in guided.actions))) <= 64
     assert expanded.action_heading == "All Endgame Actions"
     assert expanded.actions == panel.actions
     assert expanded.detail_lines == panel.detail_lines
     assert expanded.toggle_label == "V Guided"
+
+
+def test_review_finding_layout_preserves_two_line_copy_at_compact_height() -> None:
+    layout = build_review_finding_card_layout(available_height=230, finding_count=3)
+
+    assert layout.visible_count == 2
+    assert layout.card_height >= 100
+    assert layout.remaining_label_height == 18
+
+    large_text_layout = build_review_finding_card_layout(
+        available_height=230,
+        finding_count=2,
+        minimum_card_height=114,
+        maximum_card_height=120,
+    )
+    assert large_text_layout.visible_count == 1
+    assert large_text_layout.card_height == 120
+    assert large_text_layout.remaining_label_height == 18
 
 
 def test_endgame_panel_disclosure_does_not_change_other_panels() -> None:
@@ -4317,6 +4341,61 @@ def test_review_scene_initializes_motion_and_draws() -> None:
         assert scene._motion_pulses.get("review:findings") > 0
         assert scene._motion_pulses.get("review:sidebar") > 0
     finally:
+        pygame.quit()
+
+
+def test_compact_endgame_and_review_keep_large_text_unclamped() -> None:
+    pygame, _fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        fonts = create_fonts(pygame, UiScale.LARGE)
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        run_scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=297),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+        run_scene._set_deep_panel("endgame")
+
+        start_typography_audit()
+        run_scene.draw(surface)
+        endgame_events = finish_typography_audit()
+
+        review_state = state.model_copy(deep=True)
+        review_state.company.game_over = True
+        review_state.company.cash_on_hand = Decimal("-125.00")
+        review_scene = ReviewScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=review_state,
+            rng=RandomSource(seed=298),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            view_model=build_run_review_view_model(review_state),
+            accent=DANGER,
+            primary_title="Esc Close",
+            primary_detail="Leave the 2D shell.",
+            return_scene_factory=None,
+            allow_save=False,
+            dirty=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        start_typography_audit()
+        review_scene.draw(surface)
+        review_events = finish_typography_audit()
+
+        assert not [event for event in endgame_events if event.kind == "wrapped-clamp"]
+        assert not [event for event in review_events if event.kind == "wrapped-clamp"]
+        assert run_scene.layout_safety_violations() == ()
+        assert review_scene.layout_safety_violations() == ()
+    finally:
+        finish_typography_audit()
         pygame.quit()
 
 

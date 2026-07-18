@@ -1332,6 +1332,7 @@ def _build_endgame_panel(
     hotspot_command, hotspot_label, hotspot_detail, hotspot_tone = _endgame_hotspot_review_spec(
         pressure
     )
+    gate_action_label = get_action_label(pressure.path_gate_command_alert)
     return DeepDivePanelViewModel(
         key="endgame",
         title="Endgame / Exit Board",
@@ -1372,10 +1373,9 @@ def _build_endgame_panel(
             ),
             (
                 f"Blocked paths: {blocked_paths}/4 | hotspot {hotspot_label.lower()} | "
-                f"next {get_action_label(pressure.path_gate_command_alert)}"
+                f"next {gate_action_label}"
             ),
-            f"Next move: {get_action_label(pressure.path_gate_command_alert)} | "
-            f"{humanize_action_text(pressure.path_gate_alert)}",
+            f"Next move: {gate_action_label} | {humanize_action_text(pressure.path_gate_alert)}",
             f"Recommendation: {humanize_action_text(pressure.recommendation)}",
         ),
         actions=tuple(
@@ -1383,10 +1383,7 @@ def _build_endgame_panel(
                 DeepDiveActionViewModel(
                     pressure.path_gate_command_alert,
                     "Recommended Fix",
-                    (
-                        f"{get_action_label(pressure.path_gate_command_alert)}: "
-                        f"{humanize_action_text(pressure.path_gate_alert)}"
-                    ),
+                    f"{gate_action_label} clears the nearest exit gate.",
                     gate_command_tone,
                 ),
                 DeepDiveActionViewModel(
@@ -1466,27 +1463,27 @@ def _endgame_hotspot_review_spec(pressure) -> tuple[str, str, str, str]:
         return (
             TurnAction.REVIEW_CUSTOMERS.value,
             "Customer Hotspot",
-            "Open the enterprise and retention hotspot that is weakening the public-market story.",
+            "Inspect enterprise retention risk before an IPO.",
             "warning",
         )
     if pressure.dominant_pressure == "acquirer_diligence":
         return (
             TurnAction.REVIEW_PARTNERSHIPS.value,
             "Channel Hotspot",
-            "Open the partner and concentration hotspot that is adding diligence drag.",
+            "Inspect partner concentration risk before M&A.",
             "warning",
         )
     if pressure.dominant_pressure == "independence_discipline":
         return (
             TurnAction.REVIEW_FINANCE.value,
             "Capital Hotspot",
-            "Open the reserve, debt, and billing hotspot threatening independence.",
+            "Inspect reserve, debt, and billing risk.",
             "warning",
         )
     return (
         TurnAction.REVIEW_BOARD.value,
         "Reset Hotspot",
-        "Open the governance hotspot before reset pressure forces the board's hand.",
+        "Inspect governance risk before a forced reset.",
         "danger",
     )
 

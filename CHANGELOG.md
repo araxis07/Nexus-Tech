@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.304.0 - 2026-07-18
+
+- Replaced artificial 32-character truncation in the guided Endgame Board with complete, compact fix and risk instructions while preserving every expanded action and command route
+- Added a pure responsive Review finding-card policy that budgets two-line causes and lessons, reduces visible card count for the large-text compact profile, and keeps overflow guidance outside the cards
+- Added 820x620 large-text render regressions for Endgame and Review plus full/off visual verification across compact and desktop viewports
+- Kept gameplay balance, frozen catalogs, controls, persistence schema 27, and the truthful `0/6` human-session boundary unchanged
+
 ## 0.303.0 - 2026-07-18
 
 - Added a deterministic decision-quality audit across the six featured campaigns and all three difficulties, using the existing bounded Decision Ledger without adding telemetry or save state

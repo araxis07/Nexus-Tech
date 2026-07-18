@@ -2,12 +2,15 @@
 
 ## Product Position
 
-NEXUS TECH 0.303.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.304.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
 The current convergence slice reduces 2D scene coupling and protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- guided Endgame fix and risk cards now use complete compact instructions instead of artificial 32-character ellipses;
+- responsive Review finding cards preserve complete cause and lesson copy at 820x620, including the large-text profile, while moving additional findings behind an explicit larger-layout notice;
+- one pure review-presentation policy owns the card count and height budget without changing postmortem data;
 - completed reviews reached from the title shell preserve Back/Menu and add a direct `6 Open Progress` route after archiving;
 - one pure review-navigation policy owns post-run action order and availability across the footer and navigation rail;
 - optional Progress routing crosses title, run, summary, and review scenes without changing direct-launch behavior or persistence;

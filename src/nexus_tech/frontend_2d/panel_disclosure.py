@@ -61,7 +61,7 @@ def build_panel_disclosure(
         )
 
     guided_details = tuple(
-        line
+        _compact_guided_detail(line)
         for prefix in _ENDGAME_GUIDED_DETAIL_PREFIXES
         for line in panel.detail_lines
         if line.startswith(prefix)
@@ -74,3 +74,10 @@ def build_panel_disclosure(
         toggle_label=f"V More ({hidden_action_count})",
         toggle_detail="Reveal exit-path fixes and specialist reviews.",
     )
+
+
+def _compact_guided_detail(line: str) -> str:
+    if line.startswith("Next move:") and "|" in line:
+        action = line.split("|", 1)[0].rstrip()
+        return f"{action}. Clear the nearest exit gate."
+    return line
