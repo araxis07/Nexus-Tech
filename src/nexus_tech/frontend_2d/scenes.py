@@ -69,6 +69,12 @@ from nexus_tech.frontend_2d.scene_state import (
     TextInputModalState,
     TimedFrontendEvent,
 )
+from nexus_tech.frontend_2d.title_presentation import (
+    TitleActionPresentation,
+    TitleMenuPresentation,
+    build_quick_start_actions,
+    build_title_menu_presentation,
+)
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     ArchiveCardViewModel,
@@ -2049,29 +2055,10 @@ class TitleScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
-        continue_detail = (
-            f"Resume {self._first_archive_mission.current_step.title} "
-            f"({self._first_archive_mission.step_label})."
-            if self._save_cards
-            else "No save yet; start a guided campaign."
-        )
-        primary_buttons = (
-            ("1 Continue Last", continue_detail, "continue", GOOD),
-            ("2 New Game", "Start a guided campaign.", "new_wizard", INFO),
-        )
-        secondary_buttons = (
-            ("3 How to Play", "Goal, controls, and first turn.", "guide", GOOD),
-            ("4 Manage Saves", "Load, rename, copy, or delete.", "load_slots", INFO),
-            ("5 Run Archives", "Completed runs and lessons.", "archives", WARN),
-            (
-                "6 Progress",
-                f"First archive {self._first_archive_mission.progress_label}; routes and rewards.",
-                "meta",
-                SELECTION,
-            ),
-            ("7 Settings", "Text, contrast, and motion.", "settings", INFO),
-        )
-        quit_button = ("8 Quit", "Leave NEXUS TECH.", "quit", DANGER)
+        presentation = self._title_menu_presentation()
+        primary_buttons = presentation.primary_actions
+        secondary_buttons = presentation.secondary_actions
+        quit_button = presentation.quit_action
         gap = 8 if inner.height < 250 else 10
         primary_height = max(46, min(68, int(inner.height * 0.22)))
         quit_height = max(36, min(44, int(inner.height * 0.14)))
@@ -2091,19 +2078,20 @@ class TitleScene(BaseScene):
         )
         column_width = int((inner.width - gap) / 2)
 
-        def draw_menu_button(button, button_rect) -> None:
-            title, detail, payload, accent = button
+        def draw_menu_button(action: TitleActionPresentation, button_rect) -> None:
             draw_button(
                 surface,
                 pygame,
                 rect=button_rect,
-                title=title,
-                detail=detail,
-                accent=accent,
+                title=action.title,
+                detail=action.detail,
+                accent=self._title_action_accent(action),
                 title_font=self.fonts.body,
                 detail_font=self.fonts.small,
+                enabled=action.enabled,
             )
-            self._click_targets.append(ClickTarget("menu", payload, button_rect))
+            if action.enabled:
+                self._click_targets.append(ClickTarget("menu", action.payload, button_rect))
 
         for index, button in enumerate(primary_buttons):
             draw_menu_button(
@@ -2142,6 +2130,28 @@ class TitleScene(BaseScene):
                 quit_height,
             ),
         )
+
+    def _title_menu_presentation(self) -> TitleMenuPresentation:
+        mission = self._first_archive_mission
+        return build_title_menu_presentation(
+            has_saves=bool(self._save_cards),
+            current_step_title=mission.current_step.title,
+            current_step_label=mission.step_label,
+            progress_label=mission.progress_label,
+        )
+
+    def _title_action_accent(
+        self,
+        action: TitleActionPresentation,
+    ) -> tuple[int, int, int]:
+        return {
+            "success": GOOD,
+            "info": INFO,
+            "warning": WARN,
+            "selection": SELECTION,
+            "danger": DANGER,
+            "muted": BORDER,
+        }.get(action.tone, INFO)
 
     def _draw_title_settings(self, surface, rect) -> None:
         self._draw_frontend_settings_panel(
@@ -2428,14 +2438,10 @@ class TitleScene(BaseScene):
             )
 
         button_width = int((inner.width - gap * 2) / 3)
-        buttons = (
-            ("2 New Game", "Open wizard.", "new_wizard", INFO),
-            ("1 Continue", "Resume newest save.", "continue", GOOD),
-            ("9 Back", "Return to menu.", "menu", BORDER),
-        )
+        buttons, _footer_line = build_quick_start_actions(has_saves=bool(self._save_cards))
         left = inner.left
         button_rects = []
-        for title, detail, payload, accent in buttons:
+        for action in buttons:
             button_rect = pygame.Rect(
                 left, inner.bottom - action_height, button_width, action_height
             )
@@ -2444,13 +2450,15 @@ class TitleScene(BaseScene):
                 surface,
                 pygame,
                 rect=button_rect,
-                title=title,
-                detail=detail,
-                accent=accent,
+                title=action.title,
+                detail=action.detail,
+                accent=self._title_action_accent(action),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                enabled=action.enabled,
             )
-            self._click_targets.append(ClickTarget("menu", payload, button_rect))
+            if action.enabled:
+                self._click_targets.append(ClickTarget("menu", action.payload, button_rect))
             left += button_width + gap
         if card_rects and button_rects:
             self._record_layout_separation(
@@ -2952,12 +2960,9 @@ class TitleScene(BaseScene):
             lift=int(footer_motion * 2),
         )
         if self._mode == "menu":
-            message = (
-                "Menu: 1 continue, 2 new, 3 guide, 4 saves, 5 archives, 6 progress, "
-                "7 settings, 8 quit."
-            )
+            message = self._title_menu_presentation().footer_line
         elif self._mode == "guide":
-            message = "Quick Start: 2 opens wizard, 1 continues, 9 or Esc returns to menu."
+            _actions, message = build_quick_start_actions(has_saves=bool(self._save_cards))
         elif self._mode == "meta":
             message = "Meta board: 1 archives, 2 saves, 3 wizard, 9 back."
         elif self._mode == "slots":

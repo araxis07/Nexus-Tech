@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.306.0 - 2026-07-19
+
+- Made New Game the single emphasized first-run route when no save exists, while returning players still see Continue as the primary route
+- Rendered unavailable Continue actions with disabled styling and explicit reasons in both Title Menu and Quick Start instead of presenting a dead route as ready
+- Updated title guidance from actual save availability while preserving established numeric shortcuts, menu routes, and returning-player behavior
+- Extracted pure title-presentation policy from the pygame scene renderer with direct policy and compact render regressions
+- Kept gameplay balance, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6` unchanged
+
 ## 0.305.0 - 2026-07-19
 
 - Rebalanced the six-action Focus footer into a symmetric `3x2` compact grid and `6x1` wide grid so End Turn no longer sits alone beneath five peer actions

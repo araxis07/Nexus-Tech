@@ -149,6 +149,10 @@ from nexus_tech.frontend_2d.scenes import (
     TitleScene,
     TurnSummaryScene,
 )
+from nexus_tech.frontend_2d.title_presentation import (
+    build_quick_start_actions,
+    build_title_menu_presentation,
+)
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
     build_deep_dive_panel_view_models,
@@ -403,6 +407,48 @@ def test_focus_footer_policy_builds_symmetric_grids_and_primary_emphasis() -> No
         )
         == 0.3
     )
+
+
+def test_title_presentation_prioritizes_the_action_that_can_advance_play() -> None:
+    first_run = build_title_menu_presentation(
+        has_saves=False,
+        current_step_title="Guided Opening",
+        current_step_label="1/6",
+        progress_label="0/6 complete",
+    )
+    returning = build_title_menu_presentation(
+        has_saves=True,
+        current_step_title="Commitment",
+        current_step_label="2/6",
+        progress_label="1/6 complete",
+    )
+    first_quick_actions, first_quick_footer = build_quick_start_actions(has_saves=False)
+    returning_quick_actions, returning_quick_footer = build_quick_start_actions(has_saves=True)
+
+    first_continue, first_new = first_run.primary_actions
+    returning_continue, returning_new = returning.primary_actions
+    assert not first_continue.enabled
+    assert first_continue.tone == "muted"
+    assert "Unavailable" in first_continue.detail
+    assert first_new.enabled
+    assert first_new.tone == "success"
+    assert first_run.footer_line.startswith("Start: 2 new game")
+    assert returning_continue.enabled
+    assert returning_continue.tone == "success"
+    assert "Commitment (2/6)" in returning_continue.detail
+    assert returning_new.tone == "info"
+    assert returning.footer_line.startswith("Menu: 1 continue")
+    assert [action.payload for action in first_quick_actions] == [
+        "new_wizard",
+        "continue",
+        "menu",
+    ]
+    assert not first_quick_actions[1].enabled
+    assert first_quick_actions[0].tone == "success"
+    assert first_quick_footer.startswith("Quick Start: 2 opens")
+    assert returning_quick_actions[1].enabled
+    assert returning_quick_actions[1].tone == "success"
+    assert "1 continues" in returning_quick_footer
 
 
 def test_review_navigation_policy_unlocks_progress_without_replacing_back() -> None:
@@ -3535,7 +3581,8 @@ def test_compact_quick_start_keeps_cards_above_action_row(tmp_path: Path) -> Non
 
         assert scene.layout_safety_violations() == ()
         guide_targets = [target for target in scene._click_targets if target.kind == "menu"]
-        assert {target.payload for target in guide_targets} >= {"new_wizard", "continue", "menu"}
+        assert {target.payload for target in guide_targets} >= {"new_wizard", "menu"}
+        assert "continue" not in {target.payload for target in guide_targets}
         assert all(target.rect.bottom <= surface.get_height() for target in guide_targets)
     finally:
         pygame.quit()
@@ -3564,7 +3611,11 @@ def test_compact_title_menu_centers_unpaired_final_action(tmp_path: Path) -> Non
             for target in scene._click_targets
             if target.kind == "menu" and target.payload == "quit"
         )
+        menu_payloads = {target.payload for target in scene._click_targets if target.kind == "menu"}
         assert quit_target.rect.centerx == surface.get_rect().centerx
+        assert "new_wizard" in menu_payloads
+        assert "continue" not in menu_payloads
+        assert not scene._title_menu_presentation().primary_actions[0].enabled
         assert scene.layout_safety_violations() == ()
     finally:
         pygame.quit()
