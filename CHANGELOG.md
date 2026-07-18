@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.305.0 - 2026-07-19
+
+- Rebalanced the six-action Focus footer into a symmetric `3x2` compact grid and `6x1` wide grid so End Turn no longer sits alone beneath five peer actions
+- Gave the Recommended route persistent primary emphasis while retaining both alternatives, Report, Save, End Turn, mouse targets, and keyboard commands
+- Replaced repeated Guided Opening shortcut copy with a concise `NEXT` then `LATER` hierarchy while keeping Pause, Back, Help, Save, and End Turn visible in their established controls
+- Extracted pure Focus presentation policy for responsive grid, opening copy, and primary emphasis decisions, with compact render and policy regressions
+- Kept gameplay balance, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6` unchanged
+
 ## 0.304.0 - 2026-07-18
 
 - Replaced artificial 32-character truncation in the guided Endgame Board with complete, compact fix and risk instructions while preserving every expanded action and command route

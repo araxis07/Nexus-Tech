@@ -14,6 +14,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `frontend_2d.control_guide`: pure control-help content shared with layout regressions; it must not own input bindings or render surfaces.
 - `frontend_2d.outcome_presentation`: pure completed-run copy and metric policy; it must not mutate the run, save an archive, or render pygame surfaces.
 - `frontend_2d.panel_disclosure`: pure presentation policy for guided versus expanded deep-panel content; it must never remove commands from the underlying view model.
+- `frontend_2d.focus_presentation`: pure opening-copy, Focus action-grid, and primary-emphasis policy; it must not alter action availability, command routing, AP, or simulation state.
 - `frontend_2d.review_navigation`: pure completed-review action policy; it must preserve the existing return route and expose Progress only after an archive exists and a title-shell destination is available.
 - `frontend_2d.review_presentation`: pure responsive finding-card budget; it may reduce visible compact cards and expose an overflow label but must not discard or rewrite the underlying findings.
 - `frontend_2d.scene_state`: transient scene records shared by title, run, review, summary, and audits; these records must not evaluate gameplay or persistence.

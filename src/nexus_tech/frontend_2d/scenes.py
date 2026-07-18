@@ -39,6 +39,11 @@ from nexus_tech.frontend_2d.event_queue import (
     build_action_events,
     build_turn_resolution_events,
 )
+from nexus_tech.frontend_2d.focus_presentation import (
+    build_guided_opening_focus_copy,
+    resolve_focus_button_emphasis,
+    resolve_footer_grid_columns,
+)
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
@@ -7632,7 +7637,6 @@ class RunScene(BaseScene):
         if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 24:
             return False
         pygame = self.pygame
-        opening = build_guided_opening(self.state)
         shimmer = (
             0.0
             if self.motion_mode is MotionMode.OFF
@@ -7653,16 +7657,14 @@ class RunScene(BaseScene):
         )
         self._first_turn_guide_visible = True
         self._click_targets.append(ClickTarget("coach", "", rect))
-        line = (
-            f"Opening {self._view_model.run_journey.step_label} | "
-            f"C Recommended: {get_action_label(opening.current_command)} | "
-            f"AP {max(0, self.state.action_points_remaining)} | "
-            "P Pause | S Save | Space End"
+        copy = build_guided_opening_focus_copy(
+            journey_step_label=self._view_model.run_journey.step_label,
+            actions_remaining=self.state.action_points_remaining,
         )
         draw_text_line(
             surface,
             self.fonts.small,
-            line,
+            copy.header_line,
             TEXT,
             pygame.Rect(rect.left + 10, rect.top + 5, rect.width - 20, rect.height - 10),
         )
@@ -8281,15 +8283,14 @@ class RunScene(BaseScene):
             border_radius=14,
         )
         self._click_targets.append(ClickTarget("coach", "", card_rect))
-        title = (
-            f"Guided Opening | Journey {self._view_model.run_journey.step_label} | "
-            "Follow the 3-step checklist"
+        copy = build_guided_opening_focus_copy(
+            journey_step_label=self._view_model.run_journey.step_label,
+            actions_remaining=self.state.action_points_remaining,
         )
-        detail = "C runs the recommendation. P pause | S save | Space end turn."
         draw_text_line(
             surface,
             self.fonts.small,
-            title,
+            copy.card_title,
             TEXT,
             pygame.Rect(card_rect.left + 12, card_rect.top + 7, card_rect.width - 24, 18),
             valign="top",
@@ -8297,7 +8298,7 @@ class RunScene(BaseScene):
         draw_text_line(
             surface,
             self.fonts.small,
-            detail,
+            copy.card_detail,
             MUTED,
             pygame.Rect(card_rect.left + 12, card_rect.top + 24, card_rect.width - 24, 16),
             valign="top",
@@ -8320,8 +8321,8 @@ class RunScene(BaseScene):
                 pending_seen = True
             else:
                 status = "LATER"
-                fill_ratio = 0.07
-                border_ratio = 0.22
+                fill_ratio = 0.04
+                border_ratio = 0.12
             chip_rect = pygame.Rect(left, chip_top, chip_width, chip_height)
             pygame.draw.rect(
                 surface,
@@ -8333,7 +8334,7 @@ class RunScene(BaseScene):
                 surface,
                 blend_color(BORDER, step.accent, border_ratio),
                 chip_rect,
-                width=1,
+                width=2 if status == "NEXT" else 1,
                 border_radius=11,
             )
             draw_text_line(
@@ -8403,6 +8404,11 @@ class RunScene(BaseScene):
             button_motion = (
                 self._motion_level(f"panel:{button.payload}") if button.kind == "panel" else 0.0
             )
+            button_emphasis = resolve_focus_button_emphasis(
+                title=button.title,
+                enabled=enabled,
+                motion_emphasis=button_motion,
+            )
             draw_button(
                 surface,
                 pygame,
@@ -8418,7 +8424,7 @@ class RunScene(BaseScene):
                 detail_font=self.fonts.small,
                 enabled=enabled,
                 selected=selected,
-                emphasis=button_motion,
+                emphasis=button_emphasis,
                 lift=int(button_motion * 2),
             )
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
@@ -8446,8 +8452,13 @@ class RunScene(BaseScene):
 
     def _footer_outer_height(self, width: int, height: int) -> int:
         usable_width = width - 40 - 32
-        button_cols = self._footer_button_columns(usable_width)
-        rows = max(1, (len(self._footer_action_buttons()) + button_cols - 1) // button_cols)
+        buttons = self._footer_action_buttons()
+        button_cols = resolve_footer_grid_columns(
+            available_width=usable_width,
+            button_count=len(buttons),
+            focus_mode=self._focus_mode,
+        )
+        rows = max(1, (len(buttons) + button_cols - 1) // button_cols)
         button_gap = 10
         button_height = 34 if height < 700 else 40 if button_cols <= 5 else 44
         footer_band_height = 38 if height < 700 else 46
@@ -8463,9 +8474,13 @@ class RunScene(BaseScene):
         *,
         button_count: int | None = None,
     ) -> tuple[int, int, int]:
-        button_cols = self._footer_button_columns(inner_width)
         visible_count = (
             button_count if button_count is not None else len(self._footer_action_buttons())
+        )
+        button_cols = resolve_footer_grid_columns(
+            available_width=inner_width,
+            button_count=visible_count,
+            focus_mode=self._focus_mode,
         )
         rows = max(1, (visible_count + button_cols - 1) // button_cols)
         footer_band_height = 42 if inner_height < 300 else 48 if button_cols >= 5 else 52
@@ -8592,13 +8607,6 @@ class RunScene(BaseScene):
             if button.payload == command and self._button_is_enabled(button)
         )
 
-    def _footer_button_columns(self, available_width: int) -> int:
-        if available_width < 620:
-            return 4
-        if available_width < 860:
-            return 5
-        return 7
-
     def _footer_button_title(self, button: ActionButtonSpec, *, button_cols: int) -> str:
         if button_cols < 7:
             return f"{button.key_hint} {button.title}"
@@ -8701,15 +8709,23 @@ class RunScene(BaseScene):
                 and self.state.pending_event is None
                 and not hover_hint
             ):
-                brief = self._view_model.decision_brief
-                primary = (
-                    f"Next: {brief.command_label} | {brief.urgency_label} | "
-                    f"AP: {self.state.action_points_remaining}"
-                )
-                hint = (
-                    f"End Turn: {brief.end_turn_label} | Later: {brief.later_label} | "
-                    "Hover C for why"
-                )
+                if self._first_turn_guide_active():
+                    copy = build_guided_opening_focus_copy(
+                        journey_step_label=self._view_model.run_journey.step_label,
+                        actions_remaining=self.state.action_points_remaining,
+                    )
+                    primary = copy.footer_status
+                    hint = copy.footer_hint
+                else:
+                    brief = self._view_model.decision_brief
+                    primary = (
+                        f"Next: {brief.command_label} | {brief.urgency_label} | "
+                        f"AP: {self.state.action_points_remaining}"
+                    )
+                    hint = (
+                        f"End Turn: {brief.end_turn_label} | Later: {brief.later_label} | "
+                        "Hover C for why"
+                    )
             primary = self._compact_footer_status_line(primary)
             hint = self._compact_footer_hint_line(hint)
         return primary, hint

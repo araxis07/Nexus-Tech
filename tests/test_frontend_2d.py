@@ -131,6 +131,11 @@ from nexus_tech.frontend_2d.event_queue import (
     build_turn_resolution_events,
     describe_action_motion_profile,
 )
+from nexus_tech.frontend_2d.focus_presentation import (
+    build_guided_opening_focus_copy,
+    resolve_focus_button_emphasis,
+    resolve_footer_grid_columns,
+)
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
@@ -337,6 +342,67 @@ def test_focus_action_policy_separates_recommended_move_from_alternatives() -> N
     assert buttons[0].kind == "coach"
     assert buttons[0].detail == "Do: Hire Teammate."
     assert all(button.payload != TurnAction.HIRE_EMPLOYEE.value for button in buttons[1:3])
+
+
+def test_guided_opening_focus_copy_removes_redundant_shortcuts() -> None:
+    copy = build_guided_opening_focus_copy(
+        journey_step_label="1/6",
+        actions_remaining=18,
+    )
+
+    assert copy.header_line == "Opening 1/6 | Follow the highlighted NEXT step | AP 18"
+    assert copy.card_title == "Opening Guide"
+    assert "NEXT" in copy.card_detail
+    assert "LATER" in copy.card_detail
+    assert all(
+        shortcut not in f"{copy.header_line} {copy.card_title} {copy.card_detail}"
+        for shortcut in ("P Pause", "S Save", "Space End")
+    )
+    assert copy.footer_status.startswith("Recommended")
+    assert copy.footer_hint.endswith("after spending AP.")
+
+
+def test_focus_footer_policy_builds_symmetric_grids_and_primary_emphasis() -> None:
+    assert (
+        resolve_footer_grid_columns(
+            available_width=748,
+            button_count=6,
+            focus_mode=True,
+        )
+        == 3
+    )
+    assert (
+        resolve_footer_grid_columns(
+            available_width=1100,
+            button_count=6,
+            focus_mode=True,
+        )
+        == 6
+    )
+    assert (
+        resolve_footer_grid_columns(
+            available_width=748,
+            button_count=6,
+            focus_mode=False,
+        )
+        == 5
+    )
+    assert (
+        resolve_focus_button_emphasis(
+            title="Recommended",
+            enabled=True,
+            motion_emphasis=0.0,
+        )
+        == 0.52
+    )
+    assert (
+        resolve_focus_button_emphasis(
+            title="Finance",
+            enabled=True,
+            motion_emphasis=0.3,
+        )
+        == 0.3
+    )
 
 
 def test_review_navigation_policy_unlocks_progress_without_replacing_back() -> None:
@@ -2182,8 +2248,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
 
         assert len(compact_detail) <= 24
         assert len(narrow_detail) <= 28
-        assert button_cols == 5
-        assert footer_band_height == 48
+        assert button_cols == 3
+        assert footer_band_height == 52
         assert len(visible_buttons) < len(RUN_ACTION_BUTTONS)
         assert len(visible_buttons) <= 6
         assert {"Recommended", "Report", "Save", "End Turn"} <= visible_titles
@@ -2204,11 +2270,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(compact_status) <= 92
         assert len(compact_hint) <= 96
         assert "Actions Left" in full_status
-        assert "AP:" in compact_status
-        assert "Why:" not in compact_hint
-        assert "End Turn:" in compact_hint
-        assert "Later:" in compact_hint
-        assert "Hover C for why" in compact_hint
+        assert compact_status == "Recommended follows the highlighted NEXT step."
+        assert compact_hint == "Hover an action for details; Space resolves after spending AP."
         assert full_hint.startswith("Why:")
         assert "0 More" in full_hint
 
@@ -2219,7 +2282,7 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         pygame.quit()
 
 
-def test_run_scene_footer_columns_prioritize_readable_buttons() -> None:
+def test_run_scene_focus_footer_renders_two_balanced_rows() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
         scene = RunScene(
@@ -2231,10 +2294,19 @@ def test_run_scene_footer_columns_prioritize_readable_buttons() -> None:
             save_callback=lambda *_args: None,
             show_ready_event=False,
         )
+        surface = pygame.Surface((820, 620))
+        scene._click_targets = []
 
-        assert scene._footer_button_columns(600) == 4
-        assert scene._footer_button_columns(748) == 5
-        assert scene._footer_button_columns(860) == 7
+        scene._draw_footer(surface, pygame.Rect(20, 420, 780, 180))
+
+        targets = scene._click_targets
+        row_counts = sorted(
+            sum(target.rect.top == top for target in targets)
+            for top in {target.rect.top for target in targets}
+        )
+        assert len(targets) == 6
+        assert row_counts == [3, 3]
+        assert len({target.rect.width for target in targets}) == 1
     finally:
         pygame.quit()
 
