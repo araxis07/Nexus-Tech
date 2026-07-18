@@ -67,6 +67,14 @@ jobs:
           --seed-base 28500
           --output /tmp/nexus-tech-campaign-readiness.md
 
+      - name: Check deterministic decision variety
+        run: >
+          uv run nexus-tech decision-quality-audit
+          --runs 3
+          --turns 12
+          --seed-base 28600
+          --output /tmp/nexus-tech-decision-quality.md
+
       - name: Smoke-test accessible 2D launch profile
         run: >
           uv run nexus-tech play-2d
@@ -497,6 +505,15 @@ jobs:
         with:
           name: nexus-tech-campaign-readiness
           path: /tmp/nexus-tech-campaign-readiness.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload decision quality artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-decision-quality
+          path: /tmp/nexus-tech-decision-quality.md
           if-no-files-found: warn
           retention-days: 7
 

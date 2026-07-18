@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.303.0 - 2026-07-18
+
+- Added a deterministic decision-quality audit across the six featured campaigns and all three difficulties, using the existing bounded Decision Ledger without adding telemetry or save state
+- Separated hard operating-ledger coverage failures from advisory repetition and low-variety watches so autoplay cannot authorize gameplay tuning
+- Added a hidden developer command, Markdown export, terminal summary, regression coverage, CI gate, and retained CI artifact for the 18-cell, 54-run default matrix
+- Kept gameplay balance, frozen catalogs, controls, persistence schema 27, and the truthful `0/6` human-session boundary unchanged
+
 ## 0.302.0 - 2026-07-18
 
 - Added a direct `6 Open Progress` action after `Save & Archive` while preserving the existing Back/Menu route

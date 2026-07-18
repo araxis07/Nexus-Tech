@@ -21,3 +21,14 @@ Version 0.293.0 reduces presentation density without changing simulation balance
 ## Evidence Boundary
 
 Automated tests and captures verify action preservation, toggle routing, text containment, and responsive geometry. They do not prove that a first-time player understands the choices. Human beta evidence remains `0/6` until real observed sessions are recorded with explicit attestation.
+
+## Automated Variety Baseline
+
+Version 0.303.0 adds a read-only cross-campaign baseline over the existing Decision Pattern:
+
+```bash
+uv run nexus-tech decision-quality-audit --runs 3 --turns 12 \
+  --seed-base 28600 --output /tmp/nexus-tech-decision-quality.md
+```
+
+The 18-cell default matrix fails only when an autoplay run records no operating decisions. Repetition and low-variety watches are investigation candidates, not proof of player confusion; command consolidation or tuning still requires matching notes from observed sessions.

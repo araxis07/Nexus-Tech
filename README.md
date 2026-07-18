@@ -260,6 +260,7 @@ Each turn represents a business interval. You review the company, choose actions
 - The default 2D Focus View prioritizes Act Objective, Recommended Next, and End-Turn Risk with at most six controls; press `0` on standard windows to switch to the full ten-control dashboard
 - Strategic Rhythm connects that objective to live Quarter Plan progress, the recommended move, the end-turn check, and one delayed follow-on; terminal play uses the same compact loop while the Run Report retains full Coach, Risk Forecast, and Preview diagnostics
 - Decision Pattern derives the current operating-family mix, unique-choice coverage, and neutral repetition signals from the existing Decision Ledger; forced campaign and systemic event responses do not distort the pattern
+- A deterministic decision-quality audit compares that pattern across six campaigns and three difficulties; coverage failures block CI, while repetition and low-variety results remain advisory until real-player notes agree
 - The 2D Endgame Board starts with Recommended Fix and Review Main Risk; press `V` or click More to reveal every existing exit-path fix and specialist review without losing keyboard or inspector access
 - Contextual 2D action footer keeps Coach, two recommended alternatives, Report, Save, and End Turn visible in Focus View while the full dashboard preserves phase-aware endgame, board, and partner routes
 - Persistent Contextual, Product, Growth, and Resilience loadouts prioritize enabled action-bar choices without bypassing gameplay prerequisites or changing simulation balance
@@ -625,6 +626,15 @@ uv run nexus-tech beta-evidence
 
 The evidence view also reports authored-route discovery and mastery plus the next route to replay. These archive metrics remain advisory and never complete the human beta gate.
 
+Audit deterministic operating-choice variety without treating autoplay as player evidence:
+
+```bash
+uv run nexus-tech decision-quality-audit --runs 3 --turns 12 \
+  --seed-base 28600 --output /tmp/nexus-tech-decision-quality.md
+```
+
+The default matrix covers the six featured campaigns across Builder, Standard, and Founder. Missing operating-ledger coverage fails the command; repetition and low-variety watches require matching observations from real sessions before any command is consolidated or retuned.
+
 Prepare the next observed session from the current coverage gap:
 
 ```bash
@@ -958,7 +968,7 @@ If you are new to the game, run `nexus-tech guide`, `nexus-tech tutorial`, or us
 
 For the animated frontend shell, run `nexus-tech play-2d --scenario founder_journey --seed 7` or open the full menu flow with `nexus-tech menu-2d`; add `--motion-mode reduced` or `--motion-mode off` if you want quieter highlight, entity, actor, action-feedback, and transition animation. From the title scene you can start a fresh run with the wizard, manage save slots, inspect archives, open the progression board, or press `7` for Settings before entering play. Inside a run, `Choose This Turn` keeps one green `C Recommended` route ahead of two non-duplicated alternatives, Report, Save, and End Turn. You can click the Recommended Move and End Turn Check cards directly, plus product cards, modal options, deep-dive panel buttons, and the action bar, or use keys like `Tab`, `C`, `N`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `V`, `I`, `Q`, `F`, `M`, `D`, `H`, `A`, `O`, `Y`, `R`, `B`, `U`, `L`, `G`, `Space`, `S`, `P`, `Esc`, and `F1`. `V` toggles guided and full Endgame actions while that board is open. `P` opens Pause with Resume, Save, Menu, Settings, and Quit controls; `T` opens Settings while paused; and `Esc` returns from Settings to Pause before resuming the run. After a title-shell run uses `Save & Archive`, the completed review keeps Back/Menu available and adds `6 Open Progress` for a direct Route Atlas and next-route handoff. The shared responsive frame reserves navigation, header, content, and footer regions across title, run, review, and turn-summary scenes. The live run retains its shape-based entity motion, deterministic shape-sprite actors, command feedback, scene transitions, compact action copy, adaptive feed pacing, staged turn summaries, endgame cockpit, and remembered inspector controls. If a button is disabled, the 2D shell still tells you exactly which prerequisite is missing before you waste the click.
 
-For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; keys `1` through `4` cycle text, contrast, motion, and action loadout. CLI flags override display settings for the current launch. The Report inspector and terminal report include a Decision Ledger with immediate impact, end-turn follow-on timing, and a derived Decision Pattern. Arbitrary key remapping is not included in 0.302.0; the documented keyboard bindings remain fixed for this release.
+For a larger, high-contrast 2D profile, use Settings or append `--ui-scale large --contrast-mode high` to a 2D launch command. Settings changes persist in the local SQLite profile; keys `1` through `4` cycle text, contrast, motion, and action loadout. CLI flags override display settings for the current launch. The Report inspector and terminal report include a Decision Ledger with immediate impact, end-turn follow-on timing, and a derived Decision Pattern. Arbitrary key remapping is not included in 0.303.0; the documented keyboard bindings remain fixed for this release.
 
 Difficulty guidance:
 
@@ -1000,6 +1010,7 @@ uv run ruff format --check src tests
 uv run pytest -q
 uv run nexus-tech validate-content
 uv run nexus-tech campaign-readiness --runs 3 --turns 20 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
+uv run nexus-tech decision-quality-audit --runs 3 --turns 12 --seed-base 28600 --output /tmp/nexus-tech-decision-quality.md
 uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md
 uv run nexus-tech onboarding-visible-playtest-packet --output /tmp/nexus-tech-onboarding-visible-playtest.md
 uv run nexus-tech validate-onboarding-visible-playtest-packet --input /tmp/nexus-tech-onboarding-visible-playtest.md

@@ -169,6 +169,7 @@ from nexus_tech.presentation.dashboard import (
     render_content_health,
     render_customer_view,
     render_dashboard,
+    render_decision_quality_audit,
     render_employee_picker,
     render_event_catalog,
     render_event_result,
@@ -219,6 +220,10 @@ from nexus_tech.simulation.campaign_starts import (
 )
 from nexus_tech.simulation.capital_planning import get_capital_plan_profile
 from nexus_tech.simulation.catalog_validation import validate_content_catalogs
+from nexus_tech.simulation.decision_quality import (
+    format_decision_quality_markdown,
+    run_decision_quality_audit,
+)
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.engine import (
     ActionContext,
@@ -376,6 +381,11 @@ CAMPAIGN_READINESS_SCENARIOS_OPTION = typer.Option(
     "--scenario",
     help="Featured campaign id to audit. Repeat to limit the default six-campaign matrix.",
 )
+DECISION_QUALITY_SCENARIOS_OPTION = typer.Option(
+    None,
+    "--scenario",
+    help="Scenario id to audit. Repeat to limit the default six featured campaigns.",
+)
 ANIMATION_MATRIX_SCENARIOS_OPTION = typer.Option(
     None,
     "--scenario",
@@ -420,6 +430,11 @@ CAMPAIGN_READINESS_OUTPUT_OPTION = typer.Option(
     None,
     "--output",
     help="Optional Markdown path for detailed automated branch evidence.",
+)
+DECISION_QUALITY_OUTPUT_OPTION = typer.Option(
+    None,
+    "--output",
+    help="Optional Markdown path for deterministic decision-variety evidence.",
 )
 ONBOARDING_FLOW_AUDIT_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-onboarding-flow-audit.md"),
@@ -6077,6 +6092,59 @@ def campaign_readiness_command(
         raise typer.Exit(code=1) from None
 
 
+@app.command("decision-quality-audit")
+def decision_quality_audit_command(
+    scenario: Optional[list[str]] = DECISION_QUALITY_SCENARIOS_OPTION,
+    runs: int = typer.Option(3, "--runs", min=1, help="Heuristic runs per matrix cell."),
+    turns: int = typer.Option(
+        12,
+        "--turns",
+        min=1,
+        help="Maximum turns per deterministic heuristic run.",
+    ),
+    seed_base: int = typer.Option(
+        28600,
+        "--seed-base",
+        help="Base seed shared across difficulties for each scenario.",
+    ),
+    output: Optional[Path] = DECISION_QUALITY_OUTPUT_OPTION,
+) -> None:
+    """Flag autoplay repetition candidates without claiming player behavior."""
+
+    if scenario:
+        for scenario_id in scenario:
+            validate_scenario_id(scenario_id)
+    try:
+        matrix = run_decision_quality_audit(
+            scenario_ids=scenario,
+            runs_per_cell=runs,
+            turns=turns,
+            seed_base=seed_base,
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Decision Quality Audit Error",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from error
+
+    render_decision_quality_audit(console, matrix)
+    if output is not None:
+        output.write_text(format_decision_quality_markdown(matrix), encoding="utf-8")
+        console.print(
+            Panel.fit(
+                f"Wrote decision quality report to {output}",
+                title="Decision Quality Export",
+                border_style="green",
+            )
+        )
+    if not matrix.automated_gate_passed:
+        raise typer.Exit(code=1) from None
+
+
 @app.command("export-balance-csv")
 def export_balance_csv_command(
     output: Path = CSV_OUTPUT_OPTION,
@@ -11516,7 +11584,10 @@ def _developer_command_area(command_name: str) -> str:
         return "Onboarding QA"
     if command_name.startswith(("audit-2d", "validate-2d", "prepare-2d")):
         return "2D Automated QA"
-    if "balance" in command_name or command_name == "campaign-readiness":
+    if "balance" in command_name or command_name in {
+        "campaign-readiness",
+        "decision-quality-audit",
+    }:
         return "Balance & Campaigns"
     if command_name.startswith(("validate-", "audit-", "beta-")):
         return "Release Validation"

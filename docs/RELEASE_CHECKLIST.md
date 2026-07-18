@@ -24,6 +24,7 @@ uv run nexus-tech beta-evidence
 uv run nexus-tech beta-playtest-status
 uv run nexus-tech prepare-beta-playtest-session --output /tmp/nexus-tech-beta-playtest-next.md
 uv run nexus-tech campaign-readiness --runs 3 --turns 20 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
+uv run nexus-tech decision-quality-audit --runs 3 --turns 12 --seed-base 28600 --output /tmp/nexus-tech-decision-quality.md
 uv run nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced
 uv run nexus-tech play-2d --scenario founder_journey --seed 283 --headless --max-frames 2 --window-size 820x620 --motion-mode reduced --ui-scale large --contrast-mode high
 uv run nexus-tech menu-2d --headless --max-frames 2 --motion-mode reduced
@@ -237,6 +238,7 @@ If no save database exists yet, `doctor` should still run cleanly and explain th
 
 - Capture the latest internal playtest and balance findings in a repo doc before release so cockpit, friction, and tuning decisions stay attached to the build.
 - Verify Decision Pattern excludes Campaign Decision and Event Choice entries from operating mix, remains read-only, and fits the terminal report plus paged 2D Report Inspector without crowding the live run.
+- Verify `decision-quality-audit` fails empty operating ledgers but treats repetition and low-variety watches as advisory; never retune gameplay from autoplay evidence alone.
 - Verify the Endgame Board starts with only Recommended Fix and Review Main Risk, `V` and the More control reveal every existing panel action, and returning to Guided View does not alter gameplay state.
 - Run `audit-2d-motion` whenever animation pacing, pulse-bank cooldown, staged-summary motion, or 2D request-path coverage changes.
 - Run `audit-2d-animation` whenever a scene, overlay, pending-event, outcome, actor/sprite, or late-game choreography layer changes so required animation coverage and advisory gaps stay explicit.

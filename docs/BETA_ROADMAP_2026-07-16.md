@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.302.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.303.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
@@ -31,6 +31,7 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
 - the packet includes one visible launch command, an eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
+- `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, failing only missing ledger coverage while exporting repetition and low-variety candidates for human review;
 - no save migration, new catalog entry, control binding, or balance adjustment is introduced.
 
 ## Path To Beta
@@ -38,7 +39,7 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 1. Run `prepare-beta-playtest-session`, then complete one owner rehearsal from New Game through `Save & Archive` and `6 Open Progress` at 820x620 and record only defects actually observed; do not count the owner rehearsal as first-time human evidence.
 2. Observe six first-time sessions across all six featured campaigns using anonymous tester codes and the structured local evidence command.
 3. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
-4. Use Decision Pattern only to identify candidate repetition or low action diversity; do not remove or retune a command without matching player notes.
+4. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.
 5. Fix P0/P1 navigation, readability, wording, or pacing defects before any feature expansion.
 6. Re-run gameplay, balance, campaign, save, visual, layout, motion, animation, package, and security gates after every observed blocker fix.
 7. Promote to beta only after the human gates pass and a reviewer makes the release decision.

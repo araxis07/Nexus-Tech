@@ -57,6 +57,10 @@ from nexus_tech.simulation.capital_planning import evaluate_capital_plan
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
 from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.decision_patterns import build_decision_pattern
+from nexus_tech.simulation.decision_quality import (
+    DecisionQualityMatrix,
+    evaluate_decision_quality_cell,
+)
 from nexus_tech.simulation.difficulty import get_difficulty_profile
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
@@ -1231,6 +1235,65 @@ def render_campaign_readiness(console: Console, matrix: CampaignReadinessMatrix)
                 ),
             ),
             title="Four Routes x Three Difficulties",
+            border_style="green" if matrix.automated_gate_passed else "red",
+            expand=True,
+        )
+    )
+
+
+def render_decision_quality_audit(console: Console, matrix: DecisionQualityMatrix) -> None:
+    """Render autoplay variety candidates without implying player evidence."""
+
+    evaluations = [evaluate_decision_quality_cell(cell) for cell in matrix.cells]
+    overview = Table.grid(padding=(0, 1))
+    overview.add_row("Scenarios", str(matrix.scenario_count))
+    overview.add_row("Difficulty Cells", str(len(matrix.cells)))
+    overview.add_row("Runs / Cell", str(matrix.runs_per_cell))
+    overview.add_row("Heuristic Runs", str(matrix.run_count))
+    overview.add_row("Turns", str(matrix.turns))
+    overview.add_row("Seed Base", str(matrix.seed_base))
+    overview.add_row("Advisory Watches", str(matrix.watch_count))
+    overview.add_row(
+        "Automated Ledger Gate",
+        "pass" if matrix.automated_gate_passed else "fail",
+    )
+    overview.add_row("Human Confirmation", "required")
+
+    table = Table(
+        box=box.SIMPLE_HEAVY,
+        expand=True,
+        padding=(0, 1),
+        collapse_padding=True,
+    )
+    table.add_column("Scenario", style="bold", width=18, overflow="fold")
+    table.add_column("Mode", width=8, no_wrap=True)
+    table.add_column("Status", width=6, no_wrap=True)
+    table.add_column("Avg U/F", justify="right", width=7, no_wrap=True)
+    table.add_column("Repeat", justify="right", width=6, no_wrap=True)
+    table.add_column("Candidate", width=11, overflow="fold")
+    for cell, evaluation in zip(matrix.cells, evaluations, strict=True):
+        table.add_row(
+            cell.scenario_id.replace("_", " "),
+            cell.difficulty_mode.value,
+            evaluation.status,
+            f"{cell.average_unique_commands:.1f}/{cell.average_family_count:.1f}",
+            f"{cell.repetition_watch_runs}/{cell.run_count}",
+            cell.leading_repeat_label,
+        )
+
+    console.print(Panel(overview, title="Decision Quality Audit", border_style="cyan", expand=True))
+    console.print(
+        Panel(
+            Group(
+                table,
+                "",
+                (
+                    "[yellow]Autoplayer variety evidence only.[/yellow]\n"
+                    "[dim]Watch cells need matching real-player notes.\n"
+                    "Do not consolidate or retune commands from autoplay alone.[/dim]"
+                ),
+            ),
+            title="Operating Variety x Difficulty",
             border_style="green" if matrix.automated_gate_passed else "red",
             expand=True,
         )

@@ -74,6 +74,11 @@ from nexus_tech.simulation.campaign_readiness import (
     CampaignRouteOutcome,
 )
 from nexus_tech.simulation.catalog_validation import CatalogValidationReport
+from nexus_tech.simulation.decision_quality import (
+    DecisionQualityCell,
+    DecisionQualityMatrix,
+    DecisionQualityRun,
+)
 from nexus_tech.simulation.end_turn_preview import EndTurnPreviewSummary
 from nexus_tech.simulation.engine import create_new_game, resolve_turn
 from nexus_tech.simulation.onboarding_flow import (
@@ -843,6 +848,61 @@ def test_campaign_readiness_command_renders_and_exports_automated_boundary(
     assert "Human Signoff" in result.output
     assert output.exists()
     assert "Human playtest signoff: `required`" in output.read_text(encoding="utf-8")
+
+
+def test_decision_quality_audit_renders_and_exports_advisory_boundary(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    matrix = DecisionQualityMatrix(
+        runs_per_cell=1,
+        turns=12,
+        seed_base=28600,
+        cells=(
+            DecisionQualityCell(
+                scenario_id="founder_journey",
+                difficulty_mode=DifficultyMode.STANDARD,
+                campaign_goal_id=CampaignGoalId.PROFIT_MACHINE,
+                runs=(
+                    DecisionQualityRun(
+                        seed=28600,
+                        turns_played=12,
+                        game_over=False,
+                        operating_decisions=20,
+                        unique_commands=8,
+                        family_count=5,
+                        repeated_label="Grow Demand",
+                        repeated_count=9,
+                        repeat_share=0.45,
+                        repetition_watch=True,
+                    ),
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(cli_module, "run_decision_quality_audit", lambda **_: matrix)
+    output = tmp_path / "decision-quality.md"
+
+    result = runner.invoke(
+        app,
+        [
+            "decision-quality-audit",
+            "--scenario",
+            "founder_journey",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Decision Quality Audit" in result.output
+    assert "Autoplayer variety evidence only" in result.output
+    assert "Human Confirmation" in result.output
+    assert "founder journey" in result.output
+    assert "Grow Demand" in result.output
+    assert "8.0/5.0" in result.output
+    assert output.exists()
+    assert "Human tuning confirmation: `required`" in output.read_text(encoding="utf-8")
 
 
 def test_export_balance_csv_command_writes_matrix_file(
