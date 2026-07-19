@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.308.0 - 2026-07-20
+
+- Made generated human-beta, onboarding visible-window, and animation manual-QA commands mirror the `nexus-tech` executable that created the packet
+- Kept `--command-prefix` as an explicit cross-environment override while removing the default dependency on `uv` being available in the operator shell
+- Normalized project-local absolute launchers into shell-safe relative paths without leaking the repository path into local handoff artifacts
+- Added direct command-prefix policy, beta-packet, and onboarding-packet regressions plus a validated 820x620 onboarding handoff generated through `.venv313/bin/nexus-tech`
+- Kept gameplay, balance, controls, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6` unchanged
+
 ## 0.307.0 - 2026-07-19
 
 - Prevented `M` in a paused direct-play run from silently closing the 2D shell through the unavailable title-menu route; `Q` remains the explicit quit control

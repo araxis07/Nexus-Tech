@@ -10,6 +10,7 @@ from typer.main import get_command
 from typer.testing import CliRunner
 
 import nexus_tech.cli as cli_module
+import nexus_tech.cli_command_prefix as command_prefix_module
 from nexus_tech import __version__
 from nexus_tech.cli import app
 from nexus_tech.content.models import ScenarioDefinition, ScenarioProductSeed
@@ -1087,6 +1088,36 @@ def test_onboarding_visible_playtest_packet_command_writes_packet(
     assert "--difficulty builder" in text
     assert "- Status: `manual-required`" in text
     assert "- Manual result: `not completed by automation`" in text
+
+
+def test_onboarding_visible_packet_defaults_to_current_executable(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    output_path = tmp_path / "onboarding-visible.md"
+    monkeypatch.setattr(
+        command_prefix_module.sys,
+        "argv",
+        [".venv313/bin/nexus-tech"],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "onboarding-visible-playtest-packet",
+            "--window-size",
+            "820x620",
+            "--motion-mode",
+            "reduced",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    text = output_path.read_text(encoding="utf-8")
+    assert ".venv313/bin/nexus-tech menu-2d" in text
+    assert "uv run nexus-tech" not in text
 
 
 def test_validate_onboarding_visible_playtest_packet_command_passes_current_packet(

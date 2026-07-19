@@ -638,11 +638,10 @@ The default matrix covers the six featured campaigns across Builder, Standard, a
 Prepare the next observed session from the current coverage gap:
 
 ```bash
-uv run nexus-tech prepare-beta-playtest-session \
-  --command-prefix ".venv313/bin/nexus-tech"
+.venv313/bin/nexus-tech prepare-beta-playtest-session
 ```
 
-The preparation command selects the next uncovered featured campaign, allocates unused anonymous session/tester codes, prints the visible launch and observation checklist, and writes `/tmp/nexus-tech-beta-playtest-next.md`. It never copies stored free-form notes, records a session, or treats an owner rehearsal, headless run, test, or screenshot as human evidence. Replace every ALL_CAPS field in its recorder template only after observing a real session.
+The preparation command selects the next uncovered featured campaign, allocates unused anonymous session/tester codes, prints the visible launch and observation checklist, and writes `/tmp/nexus-tech-beta-playtest-next.md`. Generated beta, onboarding, and animation handoffs automatically reuse the `nexus-tech` executable that created them, so a `.venv313/bin/nexus-tech` launch no longer produces unusable `uv run` follow-up commands. Use `--command-prefix` only when the packet will run in another environment. Preparation never copies stored free-form notes, records a session, or treats an owner rehearsal, headless run, test, or screenshot as human evidence. Replace every ALL_CAPS field in its recorder template only after observing a real session.
 
 Review structured evidence from observed real-human beta sessions:
 

@@ -70,22 +70,12 @@ uv run nexus-tech simulate-balance --scenario founder_journey --difficulty found
 uv run nexus-tech validate-animation-playtest-report /tmp/nexus-tech-animation-playtest-report.md
 ```
 
-If `uv` is not available in the release shell, keep the same manual animation
-workflow but add `--command-prefix .venv313/bin/nexus-tech` to
-`animation-playtest-commands`, `validate-animation-playtest-commands`,
-`animation-playtest-plan`, `animation-playtest-recorder-queue`,
-`validate-animation-playtest-recorder-queue`, `animation-playtest-recorder-next`,
-`animation-playtest-route-batches`, `validate-animation-playtest-route-batches`,
-`animation-playtest-ui-triage`, `validate-animation-playtest-ui-triage`,
-`animation-playtest-release-gate`, `validate-animation-playtest-release-gate`,
-`animation-playtest-progress`, `validate-animation-playtest-progress`,
-`animation-playtest-execution-guide`, `validate-animation-playtest-execution-guide`,
-`animation-playtest-issue-backlog`, `validate-animation-playtest-issue-backlog`,
-`animation-playtest-sprint`, `validate-animation-playtest-sprint`,
-`validate-animation-playtest-plan`, `prepare-animation-playtest-session`,
-`validate-animation-playtest-session`, and `animation-playtest-handoff`.
-The command queue, grouped plan, recorder queue, recorder hints, and validators
-must all use the same launcher prefix.
+If `uv` is not available in the release shell, invoke the first command through
+`.venv313/bin/nexus-tech`. Human-beta, onboarding visible-window, and animation
+manual-QA artifacts then reuse that executable automatically across their command
+queues, plans, recorder hints, and validators. Pass `--command-prefix` only when
+the generated handoff will run through a different launcher or environment; all
+linked artifacts must still use the same explicit override.
 
 Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command

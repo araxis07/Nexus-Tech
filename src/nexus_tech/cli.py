@@ -22,6 +22,7 @@ from rich.traceback import install as install_rich_traceback
 
 from nexus_tech import __version__
 from nexus_tech.cli_beta_playtest import register_beta_playtest_commands
+from nexus_tech.cli_command_prefix import resolve_cli_command_prefix
 from nexus_tech.config import (
     DEFAULT_DATABASE_PATH,
     DEFAULT_SCENARIO_ID,
@@ -1054,11 +1055,12 @@ ANIMATION_PLAYTEST_PLAN_OUTPUT_OPTION = typer.Option(
     help="Optional Markdown path for the grouped animation playtest plan.",
 )
 ANIMATION_PLAYTEST_COMMAND_PREFIX_OPTION = typer.Option(
-    "uv run nexus-tech",
+    None,
     "--command-prefix",
+    callback=resolve_cli_command_prefix,
     help=(
-        "Command prefix used in generated manual animation commands. "
-        "Use .venv313/bin/nexus-tech when uv is not installed."
+        "Command prefix used in generated manual QA commands. Defaults to the current "
+        "nexus-tech executable; override it for a different environment."
     ),
 )
 ANIMATION_PLAYTEST_PLAN_PATH_ARGUMENT = typer.Argument(

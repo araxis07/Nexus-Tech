@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import nexus_tech.cli_command_prefix as command_prefix_module
 from nexus_tech import __version__
 from nexus_tech.cli import app
 from nexus_tech.persistence.beta_playtest_repository import (
@@ -374,6 +375,34 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
     assert "bootstrap_studio" in markdown
     assert existing.notes not in markdown
     assert BetaPlaytestRepository(db_path).list_sessions() == [existing]
+
+
+def test_prepare_beta_playtest_cli_defaults_to_current_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "next-session.md"
+    monkeypatch.setattr(
+        command_prefix_module.sys,
+        "argv",
+        [".venv313/bin/nexus-tech"],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(tmp_path / "beta.db"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    markdown = output.read_text(encoding="utf-8")
+    assert ".venv313/bin/nexus-tech menu-2d" in markdown
+    assert "uv run nexus-tech" not in markdown
 
 
 def test_beta_playtest_cli_records_and_reviews_local_evidence(tmp_path: Path) -> None:

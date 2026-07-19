@@ -12,6 +12,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from nexus_tech import __version__
+from nexus_tech.cli_command_prefix import resolve_cli_command_prefix
 from nexus_tech.config import DEFAULT_DATABASE_PATH
 from nexus_tech.persistence.beta_playtest_repository import (
     BetaPlaytestInterface,
@@ -91,11 +92,12 @@ BETA_PREPARATION_MOTION_OPTION = typer.Option(
     help="2D motion mode embedded in the launch command.",
 )
 BETA_COMMAND_PREFIX_OPTION = typer.Option(
-    "uv run nexus-tech",
+    None,
     "--command-prefix",
+    callback=resolve_cli_command_prefix,
     help=(
-        "Command prefix embedded in the packet. Use .venv313/bin/nexus-tech when uv "
-        "is not installed."
+        "Command prefix embedded in the packet. Defaults to the current nexus-tech "
+        "executable; override it when the packet will run in another environment."
     ),
 )
 
