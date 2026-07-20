@@ -12,7 +12,6 @@ __all__ = [
     "ActorSpriteBounds",
     "ActorSpriteClip",
     "ClickTarget",
-    "FirstTurnGuideStep",
     "ImpactCue",
     "InspectorMemoryState",
     "LateGameChoreographyCue",
@@ -31,16 +30,6 @@ class ClickTarget:
     kind: str
     payload: str
     rect: object
-
-
-@dataclass(frozen=True)
-class FirstTurnGuideStep:
-    """One compact onboarding checkpoint rendered inside the live run dashboard."""
-
-    label: str
-    detail: str
-    done: bool
-    accent: tuple[int, int, int]
 
 
 @dataclass

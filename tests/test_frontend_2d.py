@@ -133,6 +133,7 @@ from nexus_tech.frontend_2d.event_queue import (
 )
 from nexus_tech.frontend_2d.feedback_presentation import build_feedback_target_text
 from nexus_tech.frontend_2d.focus_presentation import (
+    build_first_turn_guide_presentation,
     build_guided_opening_focus_copy,
     resolve_focus_button_emphasis,
     resolve_footer_grid_columns,
@@ -366,6 +367,94 @@ def test_guided_opening_focus_copy_removes_redundant_shortcuts() -> None:
     )
     assert copy.footer_status.startswith("Recommended")
     assert copy.footer_hint.endswith("after spending AP.")
+
+    compact = build_guided_opening_focus_copy(
+        journey_step_label=" 1/6 ",
+        actions_remaining=-2,
+        compact=True,
+    )
+    assert compact.header_line == "Opening 1/6 | NEXT first | AP 0"
+    assert compact.card_detail == "NEXT first; LATER unlocks in order."
+    assert compact.footer_status == "Recommended follows NEXT."
+
+
+def test_first_turn_guide_presentation_tracks_progress_and_visibility() -> None:
+    initial = build_first_turn_guide_presentation(
+        opening_active=True,
+        current_command_label="Hire Employee",
+        first_opening_step_done=False,
+        actions_remaining=18,
+        current_turn=1,
+        resolved_turn_count=0,
+        journey_step_label="1/6",
+        run_finished=False,
+        overlay_active=False,
+    )
+
+    assert initial.active
+    assert [step.label for step in initial.steps] == [
+        "1 Coach Move",
+        "2 Spend AP",
+        "3 End Turn",
+    ]
+    assert [step.done for step in initial.steps] == [False, False, False]
+    assert [step.tone for step in initial.steps] == ["info", "success", "selection"]
+    assert initial.steps[0].detail == "C / click runs Hire Employee"
+
+    spent = build_first_turn_guide_presentation(
+        opening_active=True,
+        current_command_label="Assign Employee",
+        first_opening_step_done=True,
+        actions_remaining=0,
+        current_turn=1,
+        resolved_turn_count=0,
+        journey_step_label="1/6",
+        run_finished=False,
+        overlay_active=False,
+    )
+    assert [step.done for step in spent.steps] == [True, True, False]
+
+    resolved = build_first_turn_guide_presentation(
+        opening_active=True,
+        current_command_label="Improve Quality",
+        first_opening_step_done=True,
+        actions_remaining=18,
+        current_turn=2,
+        resolved_turn_count=1,
+        journey_step_label="2/6",
+        run_finished=False,
+        overlay_active=False,
+        compact=True,
+    )
+    assert [step.done for step in resolved.steps] == [True, True, True]
+    assert [step.label for step in resolved.steps] == ["1 Coach", "2 AP", "3 End"]
+    assert [step.detail for step in resolved.steps] == [
+        "Press C",
+        "AP 18 left",
+        "Press Space",
+    ]
+    assert not build_first_turn_guide_presentation(
+        opening_active=True,
+        current_command_label="Hire Employee",
+        first_opening_step_done=False,
+        actions_remaining=18,
+        current_turn=1,
+        resolved_turn_count=0,
+        journey_step_label="1/6",
+        run_finished=False,
+        overlay_active=True,
+    ).active
+    assert not build_first_turn_guide_presentation(
+        opening_active=True,
+        current_command_label="Hire Employee",
+        first_opening_step_done=False,
+        actions_remaining=18,
+        current_turn=1,
+        resolved_turn_count=0,
+        journey_step_label="1/6",
+        run_finished=True,
+        overlay_active=False,
+    ).active
 
 
 def test_focus_footer_policy_builds_symmetric_grids_and_primary_emphasis() -> None:
@@ -1636,6 +1725,15 @@ def test_run_scene_first_turn_guide_draws_clickable_coach_path() -> None:
         assert scene.first_turn_guide_active()
         assert any(target.kind == "coach" for target in scene._click_targets)
 
+        compact_surface = pygame.Surface((340, 108))
+        compact_rect = pygame.Rect(10, 10, 320, 88)
+        start_typography_audit()
+        assert scene._draw_first_turn_guide_card(compact_surface, compact_rect)
+        compact_events = finish_typography_audit()
+        assert not compact_events
+        compact_steps = scene._first_turn_guide_steps(compact=True)
+        assert [step.label for step in compact_steps] == ["1 Coach", "2 AP", "3 End"]
+
         scene.draw(pygame.Surface((1280, 720)))
 
         assert scene.first_turn_guide_active()
@@ -2377,8 +2475,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(compact_status) <= 92
         assert len(compact_hint) <= 96
         assert "Actions Left" in full_status
-        assert compact_status == "Recommended follows the highlighted NEXT step."
-        assert compact_hint == "Hover an action for details; Space resolves after spending AP."
+        assert compact_status == "Recommended follows NEXT."
+        assert compact_hint == "Hover for details; Space resolves after AP is spent."
         assert full_hint.startswith("Why:")
         assert "0 More" in full_hint
 

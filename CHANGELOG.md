@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.309.0 - 2026-07-21
+
+- Extracted first-turn guide visibility, copy, progress, and semantic tone policy from the pygame scene renderer into the pure Focus presentation module
+- Added width-aware first-turn header, checkpoint, and footer copy so narrow layouts retain complete instructions instead of relying on ellipsis fitting
+- Added direct progress and visibility contracts plus a 320px rendered typography regression with zero fitted or hidden guide lines
+- Preserved Coach routing, AP and turn behavior, gameplay balance, controls, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.308.0 - 2026-07-20
 
 - Made generated human-beta, onboarding visible-window, and animation manual-QA commands mirror the `nexus-tech` executable that created the packet

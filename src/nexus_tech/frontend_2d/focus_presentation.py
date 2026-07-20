@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 __all__ = [
+    "FirstTurnGuidePresentation",
+    "FirstTurnGuideStepPresentation",
     "GuidedOpeningFocusCopy",
+    "build_first_turn_guide_presentation",
     "build_guided_opening_focus_copy",
     "resolve_focus_button_emphasis",
     "resolve_footer_grid_columns",
@@ -23,15 +26,43 @@ class GuidedOpeningFocusCopy:
     footer_hint: str
 
 
+@dataclass(frozen=True)
+class FirstTurnGuideStepPresentation:
+    """One compact checkpoint without pygame-specific color values."""
+
+    label: str
+    detail: str
+    done: bool
+    tone: str
+
+
+@dataclass(frozen=True)
+class FirstTurnGuidePresentation:
+    """Visibility, copy, and progress for the live first-turn guide."""
+
+    active: bool
+    copy: GuidedOpeningFocusCopy
+    steps: tuple[FirstTurnGuideStepPresentation, ...]
+
+
 def build_guided_opening_focus_copy(
     *,
     journey_step_label: str,
     actions_remaining: int,
+    compact: bool = False,
 ) -> GuidedOpeningFocusCopy:
     """Keep opening copy instructional without repeating every shortcut."""
 
     step_label = " ".join(journey_step_label.split()) or "1/6"
     safe_actions = max(0, actions_remaining)
+    if compact:
+        return GuidedOpeningFocusCopy(
+            header_line=f"Opening {step_label} | NEXT first | AP {safe_actions}",
+            card_title="Opening Guide",
+            card_detail="NEXT first; LATER unlocks in order.",
+            footer_status="Recommended follows NEXT.",
+            footer_hint="Hover for details; Space resolves after AP is spent.",
+        )
     return GuidedOpeningFocusCopy(
         header_line=(
             f"Opening {step_label} | Follow the highlighted NEXT step | AP {safe_actions}"
@@ -40,6 +71,67 @@ def build_guided_opening_focus_copy(
         card_detail="Do NEXT first. LATER steps become NEXT in order.",
         footer_status="Recommended follows the highlighted NEXT step.",
         footer_hint="Hover an action for details; Space resolves after spending AP.",
+    )
+
+
+def build_first_turn_guide_presentation(
+    *,
+    opening_active: bool,
+    current_command_label: str,
+    first_opening_step_done: bool,
+    actions_remaining: int,
+    current_turn: int,
+    resolved_turn_count: int,
+    journey_step_label: str,
+    run_finished: bool,
+    overlay_active: bool,
+    compact: bool = False,
+) -> FirstTurnGuidePresentation:
+    """Build first-turn progress without coupling policy to pygame or scene state."""
+
+    resolved_once = resolved_turn_count > 0 or current_turn > 1
+    spent_actions = first_opening_step_done and (actions_remaining <= 0 or resolved_once)
+    finished_turn = spent_actions and resolved_once
+    safe_actions = max(0, actions_remaining)
+    command_label = " ".join(current_command_label.split()) or "Recommended"
+    copy = build_guided_opening_focus_copy(
+        journey_step_label=journey_step_label,
+        actions_remaining=safe_actions,
+        compact=compact,
+    )
+    if compact:
+        steps = (
+            FirstTurnGuideStepPresentation("1 Coach", "Press C", first_opening_step_done, "info"),
+            FirstTurnGuideStepPresentation(
+                "2 AP", f"AP {safe_actions} left", spent_actions, "success"
+            ),
+            FirstTurnGuideStepPresentation("3 End", "Press Space", finished_turn, "selection"),
+        )
+    else:
+        steps = (
+            FirstTurnGuideStepPresentation(
+                "1 Coach Move",
+                f"C / click runs {command_label}",
+                first_opening_step_done,
+                "info",
+            ),
+            FirstTurnGuideStepPresentation(
+                "2 Spend AP",
+                f"{safe_actions} AP left",
+                spent_actions,
+                "success",
+            ),
+            FirstTurnGuideStepPresentation(
+                "3 End Turn",
+                "Space after spending AP",
+                finished_turn,
+                "selection",
+            ),
+        )
+    return FirstTurnGuidePresentation(
+        active=opening_active and not run_finished and not overlay_active,
+        copy=copy,
+        steps=steps,
     )
 
 

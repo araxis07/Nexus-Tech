@@ -41,6 +41,9 @@ from nexus_tech.frontend_2d.event_queue import (
 )
 from nexus_tech.frontend_2d.feedback_presentation import build_feedback_target_text
 from nexus_tech.frontend_2d.focus_presentation import (
+    FirstTurnGuidePresentation,
+    FirstTurnGuideStepPresentation,
+    build_first_turn_guide_presentation,
     build_guided_opening_focus_copy,
     resolve_focus_button_emphasis,
     resolve_footer_grid_columns,
@@ -64,7 +67,6 @@ from nexus_tech.frontend_2d.scene_state import (
     ActorSpriteBounds,
     ActorSpriteClip,
     ClickTarget,
-    FirstTurnGuideStep,
     ImpactCue,
     InspectorMemoryState,
     LateGameChoreographyCue,
@@ -4857,45 +4859,34 @@ class RunScene(BaseScene):
         return self._first_turn_guide_visible
 
     def _first_turn_guide_active(self) -> bool:
-        if self.state.company.game_over or self.state.victory_achieved:
-            return False
-        if self._overlay_or_pending_active():
-            return False
-        return build_guided_opening(self.state).active
+        return self._first_turn_guide_presentation().active
 
-    def _first_turn_guide_steps(self) -> tuple[FirstTurnGuideStep, ...]:
+    def _first_turn_guide_presentation(
+        self,
+        *,
+        compact: bool = False,
+    ) -> FirstTurnGuidePresentation:
         opening = build_guided_opening(self.state)
         first_step_done = bool(opening.steps and opening.steps[0].status == "done")
-        resolved_once = bool(self.state.turn_history) or self.state.company.current_turn > 1
-        spent_actions = first_step_done and (
-            self.state.action_points_remaining <= 0 or resolved_once
+        return build_first_turn_guide_presentation(
+            opening_active=opening.active,
+            current_command_label=get_action_label(opening.current_command),
+            first_opening_step_done=first_step_done,
+            actions_remaining=self.state.action_points_remaining,
+            current_turn=self.state.company.current_turn,
+            resolved_turn_count=len(self.state.turn_history),
+            journey_step_label=self._view_model.run_journey.step_label,
+            run_finished=self.state.company.game_over or self.state.victory_achieved,
+            overlay_active=self._overlay_or_pending_active(),
+            compact=compact,
         )
-        finished_turn = spent_actions and resolved_once
-        ap_label = f"{max(0, self.state.action_points_remaining)} AP left"
-        command_label = self._compact_button_detail(
-            get_action_label(opening.current_command),
-            max_length=24,
-        )
-        return (
-            FirstTurnGuideStep(
-                "1 Coach Move",
-                f"C / click runs {command_label}",
-                first_step_done,
-                INFO,
-            ),
-            FirstTurnGuideStep(
-                "2 Spend AP",
-                ap_label,
-                spent_actions,
-                GOOD,
-            ),
-            FirstTurnGuideStep(
-                "3 End Turn",
-                "Space after spending AP",
-                finished_turn,
-                SELECTION,
-            ),
-        )
+
+    def _first_turn_guide_steps(
+        self,
+        *,
+        compact: bool = False,
+    ) -> tuple[FirstTurnGuideStepPresentation, ...]:
+        return self._first_turn_guide_presentation(compact=compact).steps
 
     def _motion_pressure_ratio(self) -> float:
         live_count = self._motion_pulses.live_count()
@@ -7634,7 +7625,9 @@ class RunScene(BaseScene):
             left += chip_width + 12
 
     def _draw_first_turn_header_strip(self, surface, rect) -> bool:
-        if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 24:
+        compact = rect.width < 520
+        presentation = self._first_turn_guide_presentation(compact=compact)
+        if not presentation.active or rect.width < 320 or rect.height < 24:
             return False
         pygame = self.pygame
         shimmer = (
@@ -7657,14 +7650,10 @@ class RunScene(BaseScene):
         )
         self._first_turn_guide_visible = True
         self._click_targets.append(ClickTarget("coach", "", rect))
-        copy = build_guided_opening_focus_copy(
-            journey_step_label=self._view_model.run_journey.step_label,
-            actions_remaining=self.state.action_points_remaining,
-        )
         draw_text_line(
             surface,
             self.fonts.small,
-            copy.header_line,
+            presentation.copy.header_line,
             TEXT,
             pygame.Rect(rect.left + 10, rect.top + 5, rect.width - 20, rect.height - 10),
         )
@@ -8258,10 +8247,12 @@ class RunScene(BaseScene):
         )
 
     def _draw_first_turn_guide_card(self, surface, rect) -> bool:
-        if not self._first_turn_guide_active() or rect.width < 320 or rect.height < 58:
+        compact = rect.width < 520
+        presentation = self._first_turn_guide_presentation(compact=compact)
+        if not presentation.active or rect.width < 320 or rect.height < 58:
             return False
         pygame = self.pygame
-        steps = self._first_turn_guide_steps()
+        steps = presentation.steps
         shimmer = (
             0.0
             if self.motion_mode is MotionMode.OFF
@@ -8283,14 +8274,10 @@ class RunScene(BaseScene):
             border_radius=14,
         )
         self._click_targets.append(ClickTarget("coach", "", card_rect))
-        copy = build_guided_opening_focus_copy(
-            journey_step_label=self._view_model.run_journey.step_label,
-            actions_remaining=self.state.action_points_remaining,
-        )
         draw_text_line(
             surface,
             self.fonts.small,
-            copy.card_title,
+            presentation.copy.card_title,
             TEXT,
             pygame.Rect(card_rect.left + 12, card_rect.top + 7, card_rect.width - 24, 18),
             valign="top",
@@ -8298,7 +8285,7 @@ class RunScene(BaseScene):
         draw_text_line(
             surface,
             self.fonts.small,
-            copy.card_detail,
+            presentation.copy.card_detail,
             MUTED,
             pygame.Rect(card_rect.left + 12, card_rect.top + 24, card_rect.width - 24, 16),
             valign="top",
@@ -8310,6 +8297,7 @@ class RunScene(BaseScene):
         left = card_rect.left
         pending_seen = False
         for step in steps:
+            accent = SELECTION if step.tone == "selection" else tone_color(step.tone)
             if step.done:
                 status = "DONE"
                 fill_ratio = 0.22
@@ -8326,13 +8314,13 @@ class RunScene(BaseScene):
             chip_rect = pygame.Rect(left, chip_top, chip_width, chip_height)
             pygame.draw.rect(
                 surface,
-                blend_color((24, 36, 52), step.accent, fill_ratio),
+                blend_color((24, 36, 52), accent, fill_ratio),
                 chip_rect,
                 border_radius=11,
             )
             pygame.draw.rect(
                 surface,
-                blend_color(BORDER, step.accent, border_ratio),
+                blend_color(BORDER, accent, border_ratio),
                 chip_rect,
                 width=2 if status == "NEXT" else 1,
                 border_radius=11,
@@ -8713,6 +8701,7 @@ class RunScene(BaseScene):
                     copy = build_guided_opening_focus_copy(
                         journey_step_label=self._view_model.run_journey.step_label,
                         actions_remaining=self.state.action_points_remaining,
+                        compact=True,
                     )
                     primary = copy.footer_status
                     hint = copy.footer_hint
