@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import gettempdir
+from uuid import uuid4
 
 import typer
 from rich.console import Console
@@ -91,6 +93,22 @@ BETA_PREPARATION_MOTION_OPTION = typer.Option(
     "--motion-mode",
     help="2D motion mode embedded in the launch command.",
 )
+BETA_SESSION_DB_PATH_OPTION = typer.Option(
+    None,
+    "--session-db-path",
+    help=(
+        "Fresh disposable SQLite gameplay profile for the observed tester. Defaults "
+        "to a unique path in the system temporary directory."
+    ),
+)
+BETA_REHEARSAL_DB_PATH_OPTION = typer.Option(
+    None,
+    "--rehearsal-db-path",
+    help=(
+        "Fresh disposable SQLite gameplay profile for owner rehearsal. Defaults to "
+        "a different unique path in the system temporary directory."
+    ),
+)
 BETA_COMMAND_PREFIX_OPTION = typer.Option(
     None,
     "--command-prefix",
@@ -100,6 +118,20 @@ BETA_COMMAND_PREFIX_OPTION = typer.Option(
         "executable; override it when the packet will run in another environment."
     ),
 )
+
+
+def _require_fresh_gameplay_profile(path: Path, *, label: str) -> None:
+    parent = path.parent
+    if not parent.is_dir():
+        raise ValueError(f"{label} parent directory must already exist: {parent}.")
+    profile_artifacts = (path, Path(f"{path}-journal"), Path(f"{path}-wal"), Path(f"{path}-shm"))
+    existing_artifact = next(
+        (artifact for artifact in profile_artifacts if artifact.exists()), None
+    )
+    if existing_artifact is not None:
+        raise ValueError(
+            f"{label} must not already exist: {existing_artifact}. Choose a fresh profile path."
+        )
 
 
 def register_beta_playtest_commands(
@@ -116,6 +148,8 @@ def register_beta_playtest_commands(
         command_prefix: str = BETA_COMMAND_PREFIX_OPTION,
         output: Path = BETA_PREPARATION_OUTPUT_OPTION,
         db_path: Path = BETA_DB_PATH_OPTION,
+        session_db_path: Path | None = BETA_SESSION_DB_PATH_OPTION,
+        rehearsal_db_path: Path | None = BETA_REHEARSAL_DB_PATH_OPTION,
     ) -> None:
         """Prepare the next human session without recording evidence."""
 
@@ -123,6 +157,14 @@ def register_beta_playtest_commands(
         repository = BetaPlaytestRepository(db_path)
         try:
             sessions = repository.list_sessions()
+            profile_token = uuid4().hex[:12]
+            temporary_directory = Path(gettempdir())
+            resolved_session_db_path = session_db_path or (
+                temporary_directory / f"nexus-tech-beta-session-{profile_token}.db"
+            )
+            resolved_rehearsal_db_path = rehearsal_db_path or (
+                temporary_directory / f"nexus-tech-beta-rehearsal-{profile_token}.db"
+            )
             preparation = build_beta_playtest_preparation(
                 sessions,
                 game_version=__version__,
@@ -130,8 +172,20 @@ def register_beta_playtest_commands(
                 viewport=viewport,
                 motion_mode=motion_mode,
                 command_prefix=command_prefix,
-                database_path=str(db_path),
+                evidence_database_path=str(db_path),
+                session_database_path=str(resolved_session_db_path),
+                owner_rehearsal_database_path=str(resolved_rehearsal_db_path),
             )
+            if preparation.requires_session:
+                _require_fresh_gameplay_profile(
+                    resolved_session_db_path,
+                    label="Tester gameplay profile",
+                )
+                if preparation.owner_rehearsal_required:
+                    _require_fresh_gameplay_profile(
+                        resolved_rehearsal_db_path,
+                        label="Owner rehearsal profile",
+                    )
             output.write_text(
                 format_beta_playtest_preparation_markdown(preparation),
                 encoding="utf-8",

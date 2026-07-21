@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shlex
 from dataclasses import dataclass
+from pathlib import Path
 
 from nexus_tech.persistence.beta_playtest_repository import (
     BetaPlaytestInterface,
@@ -19,7 +20,8 @@ from nexus_tech.simulation.beta_playtest import (
 from nexus_tech.user_preferences import MotionMode
 
 _SESSION_CHECKLIST = (
-    "Start timing when the title menu appears; do not point to controls.",
+    "Confirm the isolated tester profile opens with Continue unavailable and no prior "
+    "archive progress, then start timing; do not point to controls.",
     "Confirm the tester chooses New Game and the target campaign without help.",
     "Record whether Turn 1 is completed without operator guidance.",
     "Ask the tester to use Pause, Back, and return to Menu without hints.",
@@ -30,8 +32,8 @@ _SESSION_CHECKLIST = (
 )
 
 _OWNER_REHEARSAL_CHECKLIST = (
-    "Run the visible route yourself before inviting a first-time tester; do not count "
-    "this rehearsal as human evidence.",
+    "Confirm the dedicated rehearsal profile has no prior save or archive, then run the "
+    "visible route yourself; do not count this rehearsal as human evidence.",
     "Choose New Game and complete Guided Opening without using developer tools or "
     "source-code knowledge.",
     "Use Pause, Back, Menu, and Continue so every recovery route is visible and the run "
@@ -61,7 +63,9 @@ class BetaPlaytestPreparation:
     viewport: str
     motion_mode: MotionMode
     command_prefix: str
-    database_path: str
+    evidence_database_path: str
+    session_database_path: str
+    owner_rehearsal_database_path: str
     owner_rehearsal_required: bool
     checklist: tuple[str, ...] = _SESSION_CHECKLIST
     owner_rehearsal_checklist: tuple[str, ...] = _OWNER_REHEARSAL_CHECKLIST
@@ -80,6 +84,17 @@ class BetaPlaytestPreparation:
 
     @property
     def launch_command(self) -> str:
+        """Launch one tester against an isolated, disposable gameplay profile."""
+
+        return self._launch_command(self.session_database_path)
+
+    @property
+    def owner_rehearsal_launch_command(self) -> str:
+        """Launch owner rehearsal without contaminating the tester or evidence database."""
+
+        return self._launch_command(self.owner_rehearsal_database_path)
+
+    def _launch_command(self, database_path: str) -> str:
         if not self.requires_session:
             return ""
         if self.interface_mode is BetaPlaytestInterface.TWO_D:
@@ -87,7 +102,7 @@ class BetaPlaytestPreparation:
                 self.command_prefix,
                 "menu-2d",
                 "--db-path",
-                self.database_path,
+                database_path,
                 "--window-size",
                 self.viewport,
                 "--motion-mode",
@@ -99,7 +114,7 @@ class BetaPlaytestPreparation:
             "--scenario",
             self.target_scenario_id,
             "--db-path",
-            self.database_path,
+            database_path,
         )
 
     @property
@@ -135,7 +150,7 @@ class BetaPlaytestPreparation:
             "REPLACE with a concrete observation from the real session",
             "--confirm-human-session",
             "--db-path",
-            self.database_path,
+            self.evidence_database_path,
         )
 
     @property
@@ -144,7 +159,7 @@ class BetaPlaytestPreparation:
             self.command_prefix,
             "beta-playtest-status",
             "--db-path",
-            self.database_path,
+            self.evidence_database_path,
         )
 
     @property
@@ -153,7 +168,7 @@ class BetaPlaytestPreparation:
             self.command_prefix,
             "beta-evidence",
             "--db-path",
-            self.database_path,
+            self.evidence_database_path,
         )
 
 
@@ -165,7 +180,9 @@ def build_beta_playtest_preparation(
     viewport: str,
     motion_mode: MotionMode,
     command_prefix: str,
-    database_path: str,
+    evidence_database_path: str,
+    session_database_path: str,
+    owner_rehearsal_database_path: str,
 ) -> BetaPlaytestPreparation:
     """Select the next honest session target without copying observation notes."""
 
@@ -176,7 +193,9 @@ def build_beta_playtest_preparation(
     _validate_packet_input(
         viewport=viewport,
         command_prefix=command_prefix,
-        database_path=database_path,
+        evidence_database_path=evidence_database_path,
+        session_database_path=session_database_path,
+        owner_rehearsal_database_path=owner_rehearsal_database_path,
     )
     status = build_beta_playtest_status(sessions, game_version=game_version)
     target_lane, target_reason = _select_target(status)
@@ -201,7 +220,9 @@ def build_beta_playtest_preparation(
         viewport=viewport,
         motion_mode=motion_mode,
         command_prefix=command_prefix.strip(),
-        database_path=database_path.strip(),
+        evidence_database_path=evidence_database_path.strip(),
+        session_database_path=session_database_path.strip(),
+        owner_rehearsal_database_path=owner_rehearsal_database_path.strip(),
         owner_rehearsal_required=status.session_count == 0 and target_lane is not None,
     )
 
@@ -258,13 +279,17 @@ def _validate_packet_input(
     *,
     viewport: str,
     command_prefix: str,
-    database_path: str,
+    evidence_database_path: str,
+    session_database_path: str,
+    owner_rehearsal_database_path: str,
 ) -> None:
     if re.fullmatch(r"[0-9]{2,4}x[0-9]{2,4}", viewport) is None:
         raise ValueError("Viewport must use WIDTHxHEIGHT, for example 820x620 or 120x40.")
     for label, value in (
         ("Command prefix", command_prefix),
-        ("Database path", database_path),
+        ("Evidence database path", evidence_database_path),
+        ("Session database path", session_database_path),
+        ("Owner rehearsal database path", owner_rehearsal_database_path),
     ):
         if not value.strip() or "\n" in value or "\r" in value:
             raise ValueError(f"{label} must be a non-empty single line.")
@@ -275,6 +300,17 @@ def _validate_packet_input(
         shlex.split(command_prefix)
     except ValueError as error:
         raise ValueError("Command prefix must contain valid shell quoting.") from error
+    normalized_paths = {
+        _normalized_database_path(evidence_database_path),
+        _normalized_database_path(session_database_path),
+        _normalized_database_path(owner_rehearsal_database_path),
+    }
+    if len(normalized_paths) != 3:
+        raise ValueError("Evidence, session, and owner rehearsal database paths must be distinct.")
+
+
+def _normalized_database_path(database_path: str) -> Path:
+    return Path(database_path.strip()).expanduser().resolve(strict=False)
 
 
 def _command(prefix: str, *arguments: object) -> str:

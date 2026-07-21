@@ -48,6 +48,31 @@ def render_beta_playtest_preparation(
         )
         return
 
+    profile_boundary = Table.grid(padding=(0, 2))
+    profile_boundary.add_column(style="bold")
+    profile_boundary.add_column(overflow="fold")
+    if preparation.owner_rehearsal_required:
+        profile_boundary.add_row("Rehearsal Profile", preparation.owner_rehearsal_database_path)
+    profile_boundary.add_row("Tester Profile", preparation.session_database_path)
+    profile_boundary.add_row("Evidence Store", preparation.evidence_database_path)
+    console.print(
+        Panel(
+            Group(
+                Text(
+                    "Gameplay profiles are fresh and isolated. Never replace their "
+                    "--db-path with the evidence store or reuse one for another tester.",
+                    overflow="fold",
+                    no_wrap=False,
+                ),
+                Text(""),
+                profile_boundary,
+            ),
+            title="Profile Isolation",
+            border_style="cyan",
+            expand=True,
+        )
+    )
+
     if preparation.owner_rehearsal_required:
         rehearsal = Table(box=box.SIMPLE, expand=True)
         rehearsal.add_column("Step", justify="right", style="bold yellow")
@@ -64,7 +89,7 @@ def render_beta_playtest_preparation(
                         no_wrap=False,
                     ),
                     Text(""),
-                    _folded_command(preparation.launch_command),
+                    _folded_command(preparation.owner_rehearsal_launch_command),
                     Text(""),
                     rehearsal,
                 ),
@@ -145,6 +170,29 @@ def format_beta_playtest_preparation_markdown(
         "",
     ]
     if preparation.requires_session:
+        lines.extend(
+            (
+                "## Isolated Profile Boundary",
+                "",
+                (
+                    "Owner rehearsal and tester gameplay use separate fresh SQLite profiles. "
+                    if preparation.owner_rehearsal_required
+                    else "Tester gameplay uses a fresh SQLite profile. "
+                )
+                + "The recorder and status commands use the persistent evidence store. Never "
+                "replace a launch `--db-path` with the evidence store or reuse a gameplay "
+                "profile for another tester.",
+                "",
+                *(
+                    (f"- Owner rehearsal profile: `{preparation.owner_rehearsal_database_path}`",)
+                    if preparation.owner_rehearsal_required
+                    else ()
+                ),
+                f"- Tester gameplay profile: `{preparation.session_database_path}`",
+                f"- Structured evidence store: `{preparation.evidence_database_path}`",
+                "",
+            )
+        )
         if preparation.owner_rehearsal_required:
             lines.extend(
                 (
@@ -155,7 +203,7 @@ def format_beta_playtest_preparation_markdown(
                     "`record-beta-playtest-session`.",
                     "",
                     "```bash",
-                    preparation.launch_command,
+                    preparation.owner_rehearsal_launch_command,
                     "```",
                     "",
                     *(

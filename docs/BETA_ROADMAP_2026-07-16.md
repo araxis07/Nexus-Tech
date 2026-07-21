@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.311.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.312.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
@@ -46,14 +46,16 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - `scenes.py` remains responsible for availability, contextual selection, layout, input routing, and rendering rather than owning those catalog decisions;
 - `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
 - while current-version evidence is `0/6`, that packet opens with a separate owner-only rehearsal gate covering recovery, campaign, Endgame, archive, and Progress routes without placing the human recorder inside the rehearsal gate;
-- the packet includes one visible launch command, an eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
+- owner rehearsal, tester gameplay, and structured evidence now use three distinct database paths so prior saves, Continue state, and archives cannot contaminate a first-time observation;
+- preparation allocates unique temporary gameplay profiles by default, rejects explicit profiles that already exist, and leaves the persistent evidence store only in recorder/status commands;
+- the first packet includes isolated rehearsal and tester launches; later packets retain one fresh tester launch, the eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
 - `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, failing only missing ledger coverage while exporting repetition and low-variety candidates for human review;
 - no save migration, new catalog entry, control binding, or balance adjustment is introduced.
 
 ## Path To Beta
 
-1. Run `prepare-beta-playtest-session`, follow its Owner Rehearsal Gate from New Game through `Save & Archive` and `6 Open Progress` at 820x620, and record only defects actually observed; never run the human-session recorder for the rehearsal.
+1. Run `prepare-beta-playtest-session`, keep its isolated rehearsal/tester/evidence database paths unchanged, follow the Owner Rehearsal Gate from New Game through `Save & Archive` and `6 Open Progress` at 820x620, and record only defects actually observed; never run the human-session recorder for the rehearsal.
 2. Observe six first-time sessions across all six featured campaigns using anonymous tester codes and the structured local evidence command.
 3. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
 4. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.

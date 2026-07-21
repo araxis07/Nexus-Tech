@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.312.0 - 2026-07-22
+
+- Isolated Owner Rehearsal and each observed tester in separate fresh disposable gameplay databases instead of sharing the structured evidence store
+- Added unique temporary gameplay-profile allocation, explicit `--session-db-path` and `--rehearsal-db-path` overrides, and refusal to reuse an existing profile
+- Made the session packet show the three-database boundary and verify that first-time testers see no prior Continue, save, or archive state
+- Added preparation-policy, CLI, rendered-output, path-safety, and profile-reuse regressions without creating human evidence
+- Preserved gameplay balance, controls, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.311.0 - 2026-07-22
 
 - Added an explicit Owner Rehearsal Gate to the first human-beta packet while current-version evidence remains `0/6`

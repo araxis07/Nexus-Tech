@@ -25,7 +25,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `cli_command_prefix`: shell-safe runtime launcher detection for generated local QA handoffs; it must preserve explicit overrides and avoid embedding project-local absolute paths when a relative launcher is sufficient.
 - `simulation.decision_patterns`: pure operating-choice analysis derived from Decision Ledger entries; it must not write state, classify forced event responses as operating choices, or tune balance automatically.
 - `simulation.decision_quality`: deterministic cross-run analysis of existing Decision Patterns; it may fail missing-ledger coverage but must keep repetition and low-variety findings advisory until observed player notes confirm them.
-- `simulation.beta_playtest_preparation`: pure next-session targeting, first-session owner-rehearsal policy, and command preparation; it must keep rehearsal separate from the human recorder and must not persist evidence, retain free-form observation notes, or convert automation into human signoff.
+- `simulation.beta_playtest_preparation`: pure next-session targeting, first-session owner-rehearsal policy, and command preparation; it must keep rehearsal, tester gameplay, and structured evidence on distinct database paths, keep rehearsal separate from the human recorder, and never persist evidence, retain free-form observation notes, or convert automation into human signoff.
 - `cli.py`: Typer commands, interactive prompts, and command wiring.
 
 ## Turn Flow
@@ -44,7 +44,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - Keep cross-system guidance derived and save-compatible; `simulation.strategic_rhythm` reads campaign, planning, coach, forecast, preview, and ledger state without creating a second source of truth.
 - Keep gameplay-usage evidence derived from the existing bounded ledger; Decision Pattern is review context, not telemetry, a score modifier, or proof of human comprehension.
 - Keep decision-quality watches separate from release failures; autoplay may identify investigation candidates but cannot justify command removal, consolidation, or balance changes.
-- Keep human-session preparation separate from evidence persistence; generated packets may guide an observer but only explicit post-session attestation may create a beta evidence row.
+- Keep human-session preparation separate from evidence persistence; generated packets must isolate each fresh gameplay profile from the persistent evidence store, and only explicit post-session attestation may create a beta evidence row.
 - Keep animated actor overlays in reserved presentation lanes; they must not cover copy, controls, or other non-interactive status decoration at any supported viewport.
 - Keep Focus View alternatives distinct from the primary Coach route; compact presentation may reduce visible choice density but must preserve the underlying direct controls.
 - Keep `Save & Archive`, Back/Menu, and the optional direct Progress handoff separate so replay guidance never removes a recovery route or fabricates an archive.

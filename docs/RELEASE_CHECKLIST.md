@@ -77,6 +77,11 @@ queues, plans, recorder hints, and validators. Pass `--command-prefix` only when
 the generated handoff will run through a different launcher or environment; all
 linked artifacts must still use the same explicit override.
 
+After preparing the human-beta packet, confirm its tester launch and
+recorder/status commands use distinct database paths. When the Owner Rehearsal
+Gate is present, its launch must use a third path. Every gameplay profile must be
+fresh and disposable; only the evidence database may persist between sessions.
+
 Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command
 is being used as a release gate.

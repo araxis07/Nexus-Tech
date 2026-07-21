@@ -230,7 +230,9 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
         viewport="820x620",
         motion_mode=MotionMode.FULL,
         command_prefix=".venv313/bin/nexus-tech",
-        database_path="nexus-tech.db",
+        evidence_database_path="nexus-tech.db",
+        session_database_path="/tmp/nexus-tech-beta-001-session.db",
+        owner_rehearsal_database_path="/tmp/nexus-tech-beta-001-rehearsal.db",
     )
 
     assert preparation.requires_session
@@ -244,8 +246,13 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert "Route Atlas" in rehearsal
     assert "never run the human-session recorder" in rehearsal
     assert "menu-2d" in preparation.launch_command
+    assert "nexus-tech-beta-001-session.db" in preparation.launch_command
+    assert "nexus-tech-beta-001-rehearsal.db" not in preparation.launch_command
+    assert "nexus-tech-beta-001-rehearsal.db" in preparation.owner_rehearsal_launch_command
+    assert "nexus-tech-beta-001-session.db" not in preparation.owner_rehearsal_launch_command
     assert "--window-size 820x620" in preparation.launch_command
     assert "--scenario founder_journey" in preparation.record_command
+    assert "--db-path nexus-tech.db" in preparation.record_command
     placeholder = "REPLACE with a concrete observation from the real session"
     assert placeholder in preparation.record_command
     assert not is_substantive_beta_playtest_note(placeholder)
@@ -261,7 +268,9 @@ def test_beta_playtest_preparation_advances_without_reusing_identifiers() -> Non
         viewport="120x40",
         motion_mode=MotionMode.OFF,
         command_prefix="uv run nexus-tech",
-        database_path="nexus-tech.db",
+        evidence_database_path="nexus-tech.db",
+        session_database_path="/tmp/nexus-tech-beta-002-session.db",
+        owner_rehearsal_database_path="/tmp/nexus-tech-beta-owner-rehearsal.db",
     )
 
     assert preparation.target_scenario_id == "bootstrap_studio"
@@ -289,7 +298,9 @@ def test_beta_playtest_preparation_retests_an_unresolved_human_gate() -> None:
         viewport="1280x720",
         motion_mode=MotionMode.REDUCED,
         command_prefix="nexus-tech",
-        database_path="nexus-tech.db",
+        evidence_database_path="nexus-tech.db",
+        session_database_path="/tmp/nexus-tech-beta-007-session.db",
+        owner_rehearsal_database_path="/tmp/nexus-tech-beta-owner-rehearsal.db",
     )
 
     assert preparation.target_scenario_id == "founder_journey"
@@ -311,7 +322,9 @@ def test_beta_playtest_preparation_stops_when_manual_review_is_ready() -> None:
         viewport="820x620",
         motion_mode=MotionMode.FULL,
         command_prefix="nexus-tech",
-        database_path="nexus-tech.db",
+        evidence_database_path="nexus-tech.db",
+        session_database_path="/tmp/nexus-tech-beta-review-session.db",
+        owner_rehearsal_database_path="/tmp/nexus-tech-beta-review-rehearsal.db",
     )
 
     assert not preparation.requires_session
@@ -345,13 +358,32 @@ def test_beta_playtest_preparation_rejects_unsafe_packet_inputs(
             viewport=viewport,
             motion_mode=MotionMode.FULL,
             command_prefix=command_prefix,
-            database_path=database_path,
+            evidence_database_path=database_path,
+            session_database_path="/tmp/nexus-tech-beta-session.db",
+            owner_rehearsal_database_path="/tmp/nexus-tech-beta-rehearsal.db",
+        )
+
+
+def test_beta_playtest_preparation_requires_three_distinct_databases() -> None:
+    with pytest.raises(ValueError, match="must be distinct"):
+        build_beta_playtest_preparation(
+            [],
+            game_version=__version__,
+            interface_mode=BetaPlaytestInterface.TWO_D,
+            viewport="820x620",
+            motion_mode=MotionMode.FULL,
+            command_prefix="nexus-tech",
+            evidence_database_path="nexus-tech.db",
+            session_database_path="nexus-tech.db",
+            owner_rehearsal_database_path="/tmp/nexus-tech-beta-rehearsal.db",
         )
 
 
 def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Path) -> None:
     db_path = tmp_path / "beta.db"
     output = tmp_path / "next-session.md"
+    session_db_path = tmp_path / "tester-profile.db"
+    rehearsal_db_path = tmp_path / "rehearsal-profile.db"
     existing = make_session(1, "founder_journey")
     BetaPlaytestRepository(db_path).save_session(existing)
 
@@ -369,6 +401,10 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
             str(output),
             "--db-path",
             str(db_path),
+            "--session-db-path",
+            str(session_db_path),
+            "--rehearsal-db-path",
+            str(rehearsal_db_path),
         ],
     )
 
@@ -382,6 +418,12 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
     assert "Human-Only Boundary" in markdown
     assert "Owner Rehearsal Gate" not in markdown
     assert "bootstrap_studio" in markdown
+    assert "Isolated Profile Boundary" in markdown
+    assert str(session_db_path) in markdown
+    assert str(rehearsal_db_path) not in markdown
+    assert f"--db-path {db_path}" in markdown
+    assert not session_db_path.exists()
+    assert not rehearsal_db_path.exists()
     assert existing.notes not in markdown
     assert BetaPlaytestRepository(db_path).list_sessions() == [existing]
 
@@ -391,6 +433,8 @@ def test_prepare_beta_playtest_cli_defaults_to_current_executable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = tmp_path / "next-session.md"
+    session_db_path = tmp_path / "tester-profile.db"
+    rehearsal_db_path = tmp_path / "rehearsal-profile.db"
     monkeypatch.setattr(
         command_prefix_module.sys,
         "argv",
@@ -405,6 +449,10 @@ def test_prepare_beta_playtest_cli_defaults_to_current_executable(
             str(output),
             "--db-path",
             str(tmp_path / "beta.db"),
+            "--session-db-path",
+            str(session_db_path),
+            "--rehearsal-db-path",
+            str(rehearsal_db_path),
         ],
     )
 
@@ -419,7 +467,89 @@ def test_prepare_beta_playtest_cli_defaults_to_current_executable(
     assert "Save & Archive" in markdown
     assert "Route Atlas" in markdown
     assert ".venv313/bin/nexus-tech menu-2d" in markdown
+    assert f"--db-path {rehearsal_db_path}" in markdown
+    assert f"--db-path {session_db_path}" in markdown
     assert "uv run nexus-tech" not in markdown
+
+
+def test_prepare_beta_playtest_cli_allocates_fresh_default_gameplay_profiles(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "next-session.md"
+    evidence_db_path = tmp_path / "evidence.db"
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(evidence_db_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = output.read_text(encoding="utf-8").splitlines()
+    rehearsal_line = next(line for line in lines if line.startswith("- Owner rehearsal profile:"))
+    session_line = next(line for line in lines if line.startswith("- Tester gameplay profile:"))
+    rehearsal_path = Path(rehearsal_line.split("`")[1])
+    session_path = Path(session_line.split("`")[1])
+    assert rehearsal_path != session_path
+    assert rehearsal_path != evidence_db_path
+    assert session_path != evidence_db_path
+    assert rehearsal_path.name.startswith("nexus-tech-beta-rehearsal-")
+    assert session_path.name.startswith("nexus-tech-beta-session-")
+    assert not rehearsal_path.exists()
+    assert not session_path.exists()
+
+
+@pytest.mark.parametrize("artifact_suffix", ("", "-journal", "-wal", "-shm"))
+def test_prepare_beta_playtest_cli_rejects_reused_gameplay_profile(
+    tmp_path: Path,
+    artifact_suffix: str,
+) -> None:
+    session_profile = tmp_path / "used-profile.db"
+    existing_artifact = Path(f"{session_profile}{artifact_suffix}")
+    existing_artifact.write_text("already used", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(tmp_path / "next-session.md"),
+            "--db-path",
+            str(tmp_path / "evidence.db"),
+            "--session-db-path",
+            str(session_profile),
+            "--rehearsal-db-path",
+            str(tmp_path / "fresh-rehearsal.db"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Tester gameplay profile must not already exist" in result.output
+
+
+def test_prepare_beta_playtest_cli_rejects_missing_profile_parent(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(tmp_path / "next-session.md"),
+            "--db-path",
+            str(tmp_path / "evidence.db"),
+            "--session-db-path",
+            str(tmp_path / "missing" / "tester.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "fresh-rehearsal.db"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Tester gameplay profile parent directory must already exist" in result.output
 
 
 def test_beta_playtest_cli_records_and_reviews_local_evidence(tmp_path: Path) -> None:
