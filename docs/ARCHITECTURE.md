@@ -20,7 +20,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `frontend_2d.review_navigation`: pure completed-review action policy; it must preserve the existing return route and expose Progress only after an archive exists and a title-shell destination is available.
 - `frontend_2d.review_presentation`: pure responsive finding-card budget; it may reduce visible compact cards and expose an overflow label but must not discard or rewrite the underlying findings.
 - `frontend_2d.scene_state`: transient scene records shared by title, run, review, summary, and audits; these records must not evaluate gameplay or persistence.
-- `frontend_2d.title_presentation`: pure first-run title and Quick Start action hierarchy; it may mark Continue unavailable from local save presence but must not load, create, or mutate a run.
+- `frontend_2d.title_presentation`: pure first-run title hierarchy and responsive header-lane policy; it may mark Continue unavailable from local save presence and position copy within measured panel height, but must not load, create, mutate, or render a run.
 - `frontend_2d.workspace_routing`: pure command-to-workspace ownership used by navigation and feedback; it must remain the only frontend mapping from commands to deep-dive panels.
 - `cli_command_prefix`: shell-safe runtime launcher detection for generated local QA handoffs; it must preserve explicit overrides and avoid embedding project-local absolute paths when a relative launcher is sufficient.
 - `simulation.decision_patterns`: pure operating-choice analysis derived from Decision Ledger entries; it must not write state, classify forced event responses as operating choices, or tune balance automatically.

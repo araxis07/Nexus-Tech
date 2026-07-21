@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.310.0 - 2026-07-21
+
+- Moved compact Title Menu and Quick Start archive-progress copy into a measured lane above the panel border instead of drawing it across the lower frame
+- Added pure compact/standard title-header layout policy with direct geometry regression and refreshed 820x620 visual verification
+- Re-ran owner-flow contracts, the five-area onboarding audit, and all 18 onboarding window/motion preflight routes without creating human evidence
+- Confirmed Debt Crunch's native 20-turn profit goal across all difficulties; retained non-native Builder autoplay failures as investigation targets rather than tuning from bot evidence alone
+- Preserved gameplay balance, controls, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.309.0 - 2026-07-21
 
 - Extracted first-turn guide visibility, copy, progress, and semantic tone policy from the pygame scene renderer into the pure Focus presentation module

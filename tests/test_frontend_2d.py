@@ -155,6 +155,7 @@ from nexus_tech.frontend_2d.scenes import (
 from nexus_tech.frontend_2d.title_presentation import (
     build_quick_start_actions,
     build_title_menu_presentation,
+    resolve_title_header_layout,
 )
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
@@ -540,6 +541,18 @@ def test_title_presentation_prioritizes_the_action_that_can_advance_play() -> No
     assert returning_quick_actions[1].enabled
     assert returning_quick_actions[1].tone == "success"
     assert "1 continues" in returning_quick_footer
+
+
+def test_title_header_layout_keeps_archive_progress_above_panel_border() -> None:
+    compact = resolve_title_header_layout(panel_height=92)
+    standard = resolve_title_header_layout(panel_height=104)
+
+    assert compact.subtitle_max_lines == 1
+    assert compact.mission_offset >= compact.subtitle_height + 4
+    assert 44 + compact.mission_offset + compact.mission_height <= 92 - 10
+    assert standard.subtitle_max_lines == 2
+    assert standard.mission_offset >= standard.subtitle_height + 2
+    assert 44 + standard.mission_offset + standard.mission_height <= 104 - 6
 
 
 def test_pause_presentation_preserves_recovery_actions_and_direct_play_boundary() -> None:

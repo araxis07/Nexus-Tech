@@ -81,6 +81,7 @@ from nexus_tech.frontend_2d.title_presentation import (
     TitleMenuPresentation,
     build_quick_start_actions,
     build_title_menu_presentation,
+    resolve_title_header_layout,
 )
 from nexus_tech.frontend_2d.tween import MotionMode, PulseBank, TweenBank, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import (
@@ -2024,14 +2025,20 @@ class TitleScene(BaseScene):
             valign="top",
         )
         subtitle = "Build, survive, choose an exit, then archive the run to unlock new routes."
+        header_layout = resolve_title_header_layout(panel_height=rect.height)
         draw_wrapped_text(
             surface,
             self.fonts.body,
             subtitle,
             MUTED,
-            pygame.Rect(inner.left, inner.top, copy_width, 36),
+            pygame.Rect(
+                inner.left,
+                inner.top + header_layout.subtitle_offset,
+                copy_width,
+                header_layout.subtitle_height,
+            ),
             line_height=18,
-            max_lines=2,
+            max_lines=header_layout.subtitle_max_lines,
         )
         archive_mission_label = (
             "First archive complete"
@@ -2049,7 +2056,12 @@ class TitleScene(BaseScene):
                 f"{archive_mission_label}"
             ),
             TEXT,
-            pygame.Rect(inner.left, inner.top + 38, copy_width, 18),
+            pygame.Rect(
+                inner.left,
+                inner.top + header_layout.mission_offset,
+                copy_width,
+                header_layout.mission_height,
+            ),
             valign="top",
         )
 

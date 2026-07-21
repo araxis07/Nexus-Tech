@@ -6,9 +6,11 @@ from dataclasses import dataclass
 
 __all__ = [
     "TitleActionPresentation",
+    "TitleHeaderLayout",
     "TitleMenuPresentation",
     "build_quick_start_actions",
     "build_title_menu_presentation",
+    "resolve_title_header_layout",
 ]
 
 
@@ -24,6 +26,17 @@ class TitleActionPresentation:
 
 
 @dataclass(frozen=True)
+class TitleHeaderLayout:
+    """Vertical lanes for title-shell subtitle and archive progress copy."""
+
+    subtitle_offset: int
+    subtitle_height: int
+    subtitle_max_lines: int
+    mission_offset: int
+    mission_height: int
+
+
+@dataclass(frozen=True)
 class TitleMenuPresentation:
     """Ordered title actions and guidance derived from local progress."""
 
@@ -31,6 +44,26 @@ class TitleMenuPresentation:
     secondary_actions: tuple[TitleActionPresentation, ...]
     quit_action: TitleActionPresentation
     footer_line: str
+
+
+def resolve_title_header_layout(*, panel_height: int) -> TitleHeaderLayout:
+    """Keep compact archive progress above the title panel's bottom border."""
+
+    if panel_height <= 96:
+        return TitleHeaderLayout(
+            subtitle_offset=0,
+            subtitle_height=18,
+            subtitle_max_lines=1,
+            mission_offset=22,
+            mission_height=16,
+        )
+    return TitleHeaderLayout(
+        subtitle_offset=0,
+        subtitle_height=36,
+        subtitle_max_lines=2,
+        mission_offset=38,
+        mission_height=16,
+    )
 
 
 def build_title_menu_presentation(
