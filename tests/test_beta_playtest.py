@@ -238,6 +238,11 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert preparation.target_track_label == "Learn"
     assert preparation.session_key == "beta-001"
     assert preparation.tester_code == "T01"
+    assert preparation.owner_rehearsal_required
+    rehearsal = " ".join(preparation.owner_rehearsal_checklist)
+    assert "Save & Archive" in rehearsal
+    assert "Route Atlas" in rehearsal
+    assert "never run the human-session recorder" in rehearsal
     assert "menu-2d" in preparation.launch_command
     assert "--window-size 820x620" in preparation.launch_command
     assert "--scenario founder_journey" in preparation.record_command
@@ -262,6 +267,7 @@ def test_beta_playtest_preparation_advances_without_reusing_identifiers() -> Non
     assert preparation.target_scenario_id == "bootstrap_studio"
     assert preparation.session_key == "beta-002"
     assert preparation.tester_code == "T02"
+    assert not preparation.owner_rehearsal_required
     assert "new-game --scenario bootstrap_studio" in preparation.launch_command
     assert "--motion-mode" not in preparation.launch_command
 
@@ -309,6 +315,7 @@ def test_beta_playtest_preparation_stops_when_manual_review_is_ready() -> None:
     )
 
     assert not preparation.requires_session
+    assert not preparation.owner_rehearsal_required
     assert preparation.target_scenario_id is None
     assert preparation.launch_command == ""
     assert preparation.record_command == ""
@@ -369,9 +376,11 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
     assert "Next Human Beta Session" in result.output
     assert "bootstrap_studio" in result.output
     assert "Preparation only" in result.output
+    assert "Owner Rehearsal Gate" not in result.output
     assert "--confirm-human-session" in result.output
     markdown = output.read_text(encoding="utf-8")
     assert "Human-Only Boundary" in markdown
+    assert "Owner Rehearsal Gate" not in markdown
     assert "bootstrap_studio" in markdown
     assert existing.notes not in markdown
     assert BetaPlaytestRepository(db_path).list_sessions() == [existing]
@@ -401,6 +410,14 @@ def test_prepare_beta_playtest_cli_defaults_to_current_executable(
 
     assert result.exit_code == 0
     markdown = output.read_text(encoding="utf-8")
+    assert "Owner Rehearsal Gate" in result.output
+    assert "Visible preparation only" in result.output
+    assert "It must never be entered" in result.output
+    assert "with record-beta-playtest-session." in result.output
+    assert "Owner Rehearsal Gate" in markdown
+    assert "must never be entered" in markdown
+    assert "Save & Archive" in markdown
+    assert "Route Atlas" in markdown
     assert ".venv313/bin/nexus-tech menu-2d" in markdown
     assert "uv run nexus-tech" not in markdown
 

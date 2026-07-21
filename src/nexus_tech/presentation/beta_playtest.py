@@ -48,6 +48,33 @@ def render_beta_playtest_preparation(
         )
         return
 
+    if preparation.owner_rehearsal_required:
+        rehearsal = Table(box=box.SIMPLE, expand=True)
+        rehearsal.add_column("Step", justify="right", style="bold yellow")
+        rehearsal.add_column("Verify")
+        for index, item in enumerate(preparation.owner_rehearsal_checklist, start=1):
+            rehearsal.add_row(str(index), item)
+        console.print(
+            Panel(
+                Group(
+                    Text(
+                        "Run this once before the first observed session. It must never "
+                        "be entered with record-beta-playtest-session.",
+                        overflow="fold",
+                        no_wrap=False,
+                    ),
+                    Text(""),
+                    _folded_command(preparation.launch_command),
+                    Text(""),
+                    rehearsal,
+                ),
+                title="0. Owner Rehearsal Gate",
+                subtitle="Visible preparation only; human evidence remains unchanged",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+
     console.print(
         Panel(
             Group(
@@ -118,6 +145,29 @@ def format_beta_playtest_preparation_markdown(
         "",
     ]
     if preparation.requires_session:
+        if preparation.owner_rehearsal_required:
+            lines.extend(
+                (
+                    "## Owner Rehearsal Gate",
+                    "",
+                    "Run this visible route once before inviting the first tester. The "
+                    "rehearsal must never be entered with "
+                    "`record-beta-playtest-session`.",
+                    "",
+                    "```bash",
+                    preparation.launch_command,
+                    "```",
+                    "",
+                    *(
+                        f"{index}. {item}"
+                        for index, item in enumerate(
+                            preparation.owner_rehearsal_checklist,
+                            1,
+                        )
+                    ),
+                    "",
+                )
+            )
         lines.extend(
             (
                 "## Launch",

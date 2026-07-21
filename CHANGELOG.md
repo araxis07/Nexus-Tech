@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.311.0 - 2026-07-22
+
+- Added an explicit Owner Rehearsal Gate to the first human-beta packet while current-version evidence remains `0/6`
+- Separated the owner-only New Game, recovery, campaign, Endgame, archive, and Progress checklist from the real-human recorder workflow
+- Folded the rehearsal evidence warning at compact terminal widths so its no-recording boundary remains complete and readable
+- Added preparation-policy, rendered-output, and post-first-session regressions without writing evidence or copying observation notes
+- Preserved gameplay balance, controls, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.310.0 - 2026-07-21
 
 - Moved compact Title Menu and Quick Start archive-progress copy into a measured lane above the panel border instead of drawing it across the lower frame

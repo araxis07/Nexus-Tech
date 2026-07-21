@@ -29,6 +29,21 @@ _SESSION_CHECKLIST = (
     "Record one anonymous concrete observation only after the real session ends.",
 )
 
+_OWNER_REHEARSAL_CHECKLIST = (
+    "Run the visible route yourself before inviting a first-time tester; do not count "
+    "this rehearsal as human evidence.",
+    "Choose New Game and complete Guided Opening without using developer tools or "
+    "source-code knowledge.",
+    "Use Pause, Back, Menu, and Continue so every recovery route is visible and the run "
+    "returns without accidental loss.",
+    "Complete Commitment and Consequence, then switch between guided and full Endgame "
+    "while checking the recommended fix and main risk.",
+    "Finish the run, use Save & Archive, open Progress, and confirm the archived route "
+    "appears in the Route Atlas.",
+    "Record only defects actually observed; never run the human-session recorder for "
+    "this owner rehearsal.",
+)
+
 
 @dataclass(frozen=True)
 class BetaPlaytestPreparation:
@@ -47,7 +62,9 @@ class BetaPlaytestPreparation:
     motion_mode: MotionMode
     command_prefix: str
     database_path: str
+    owner_rehearsal_required: bool
     checklist: tuple[str, ...] = _SESSION_CHECKLIST
+    owner_rehearsal_checklist: tuple[str, ...] = _OWNER_REHEARSAL_CHECKLIST
 
     @property
     def requires_session(self) -> bool:
@@ -185,6 +202,7 @@ def build_beta_playtest_preparation(
         motion_mode=motion_mode,
         command_prefix=command_prefix.strip(),
         database_path=database_path.strip(),
+        owner_rehearsal_required=status.session_count == 0 and target_lane is not None,
     )
 
 

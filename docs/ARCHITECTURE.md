@@ -25,7 +25,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - `cli_command_prefix`: shell-safe runtime launcher detection for generated local QA handoffs; it must preserve explicit overrides and avoid embedding project-local absolute paths when a relative launcher is sufficient.
 - `simulation.decision_patterns`: pure operating-choice analysis derived from Decision Ledger entries; it must not write state, classify forced event responses as operating choices, or tune balance automatically.
 - `simulation.decision_quality`: deterministic cross-run analysis of existing Decision Patterns; it may fail missing-ledger coverage but must keep repetition and low-variety findings advisory until observed player notes confirm them.
-- `simulation.beta_playtest_preparation`: pure next-session targeting and command preparation; it must not persist evidence, retain free-form observation notes, or convert automation into human signoff.
+- `simulation.beta_playtest_preparation`: pure next-session targeting, first-session owner-rehearsal policy, and command preparation; it must keep rehearsal separate from the human recorder and must not persist evidence, retain free-form observation notes, or convert automation into human signoff.
 - `cli.py`: Typer commands, interactive prompts, and command wiring.
 
 ## Turn Flow
