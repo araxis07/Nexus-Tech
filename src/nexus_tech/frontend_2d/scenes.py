@@ -1200,7 +1200,11 @@ class TitleScene(BaseScene):
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         profile = resolve_layout_profile(width, height)
-        nav_visible = self._text_input is None and self._confirm_delete_slot_name is None
+        nav_visible = (
+            self._mode != "menu"
+            and self._text_input is None
+            and self._confirm_delete_slot_name is None
+        )
         frame = build_frame_layout(
             width,
             height,
@@ -1264,7 +1268,7 @@ class TitleScene(BaseScene):
         if right_rect.width > 0 and right_rect.height > 0:
             self._draw_title_sidebar(surface, right_rect)
         self._draw_title_footer(surface, footer_rect)
-        if self._text_input is None and self._confirm_delete_slot_name is None:
+        if nav_visible:
             self._draw_nav_rail(
                 surface,
                 (
@@ -3538,7 +3542,7 @@ class ReviewScene(BaseScene):
             height,
             header_height=104,
             footer_height=footer_height,
-            nav_visible=True,
+            nav_visible=False,
             profile=profile,
         )
         gap = profile.gap
@@ -3560,19 +3564,6 @@ class ReviewScene(BaseScene):
         self._draw_review_sidebar(surface, right_rect)
         navigation = self._review_navigation_policy()
         self._draw_review_footer(surface, footer_rect, navigation)
-        self._draw_nav_rail(
-            surface,
-            tuple(
-                (
-                    action.title,
-                    action.detail,
-                    action.kind,
-                    "",
-                    self._review_action_accent(action),
-                )
-                for action in navigation.actions
-            ),
-        )
         self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
 
@@ -11133,7 +11124,7 @@ class TurnSummaryScene(BaseScene):
             height,
             header_height=self._summary_header_height(height),
             footer_height=footer_height,
-            nav_visible=True,
+            nav_visible=False,
             profile=profile,
         )
         margin = profile.margin
@@ -11167,14 +11158,6 @@ class TurnSummaryScene(BaseScene):
         self._draw_summary_main(surface, left_rect)
         self._draw_summary_timeline(surface, right_rect)
         self._draw_summary_footer(surface, footer_rect)
-        self._draw_nav_rail(
-            surface,
-            (
-                ("Space Continue", "Return to the live run.", "continue", "", GOOD),
-                ("S Save", "Persist the run.", "save", "", INFO),
-                ("Esc Close", "Leave the 2D shell.", "close_summary", "", DANGER),
-            ),
-        )
         self._draw_summary_outcome_lanes(surface)
         self._draw_summary_cinematic_overlay(surface)
         self._sync_mouse_cursor()

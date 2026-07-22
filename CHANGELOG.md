@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.313.0 - 2026-07-23
+
+- Removed duplicate visible Quit, Continue, Save, Close, Back, and Progress targets from the Title Menu, Turn Summary, and Review scene shells
+- Kept each scene's contextual actions in one footer or menu region while preserving every keyboard shortcut and the live-run Pause/Back/Help navigation rail
+- Reclaimed the reserved navigation band for clearer title, summary, and review layouts across compact, standard, and presentation viewports
+- Added click-target ownership regressions and revalidated all 45 full-motion visual captures without changing gameplay balance, save schema 27, or human evidence
+
 ## 0.312.0 - 2026-07-22
 
 - Isolated Owner Rehearsal and each observed tester in separate fresh disposable gameplay databases instead of sharing the structured evidence store

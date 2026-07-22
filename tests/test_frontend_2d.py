@@ -1122,6 +1122,8 @@ def test_review_save_exposes_progress_handoff_without_replacing_return(tmp_path:
             for target in scene._click_targets
             if target.kind in {"review_primary", "review_progress"}
         ]
+        assert [target.kind for target in action_targets].count("review_primary") == 1
+        assert [target.kind for target in action_targets].count("review_progress") == 1
         assert all(surface.get_rect().contains(target.rect) for target in action_targets)
         assert all(
             not left.rect.colliderect(right.rect)
@@ -3786,11 +3788,13 @@ def test_compact_title_menu_centers_unpaired_final_action(tmp_path: Path) -> Non
 
         scene.draw(surface)
 
-        quit_target = next(
+        quit_targets = [
             target
             for target in scene._click_targets
             if target.kind == "menu" and target.payload == "quit"
-        )
+        ]
+        assert len(quit_targets) == 1
+        quit_target = quit_targets[0]
         menu_payloads = {target.payload for target in scene._click_targets if target.kind == "menu"}
         assert quit_target.rect.centerx == surface.get_rect().centerx
         assert "new_wizard" in menu_payloads
@@ -4386,6 +4390,10 @@ def test_turn_summary_scene_reveals_all_phases_and_draws_small_window() -> None:
         assert scene._visible_metric_count() == len(scene._view_model.metrics)
         assert scene._visible_product_count() == len(scene._view_model.product_lines)
         assert not scene.summary_metric_sequence_active()
+        target_kinds = [target.kind for target in scene._click_targets]
+        assert target_kinds.count("continue") == 1
+        assert target_kinds.count("save") == 1
+        assert target_kinds.count("close_summary") == 1
     finally:
         pygame.quit()
 

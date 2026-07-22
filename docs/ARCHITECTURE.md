@@ -46,6 +46,7 @@ NEXUS TECH is a local Python management simulation with terminal and lightweight
 - Keep decision-quality watches separate from release failures; autoplay may identify investigation candidates but cannot justify command removal, consolidation, or balance changes.
 - Keep human-session preparation separate from evidence persistence; generated packets must isolate each fresh gameplay profile from the persistent evidence store, and only explicit post-session attestation may create a beta evidence row.
 - Keep animated actor overlays in reserved presentation lanes; they must not cover copy, controls, or other non-interactive status decoration at any supported viewport.
+- Keep each contextual scene action in one visible owner region; keyboard shortcuts may share the same route, but a footer-owned or menu-owned action must not be duplicated in the navigation rail.
 - Keep Focus View alternatives distinct from the primary Coach route; compact presentation may reduce visible choice density but must preserve the underlying direct controls.
 - Keep `Save & Archive`, Back/Menu, and the optional direct Progress handoff separate so replay guidance never removes a recovery route or fabricates an archive.
 - Keep workspace navigation, action feedback, and late-game choreography on the shared workspace-routing policy instead of duplicating command sets inside scene renderers.

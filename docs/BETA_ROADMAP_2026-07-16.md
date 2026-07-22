@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.312.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.313.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 ## Current Engineering Slice
 
@@ -15,6 +15,7 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - action and impact feedback now translate product targets into stable names and metrics instead of exposing random internal identifiers;
 - Title Menu and Quick Start now emphasize New Game when no save exists, render Continue as explicitly unavailable, and restore Continue as the primary route for returning players;
 - compact title headers now reserve separate subtitle and archive-progress lanes so local progression never crosses the lower panel frame;
+- Title Menu, Turn Summary, and Review now expose each contextual action in one visible owner region instead of duplicating the same click route in both navigation and content, while the live-run recovery rail remains unchanged;
 - one pure title-presentation policy owns first-run action availability, tone, copy, and footer guidance without loading or mutating a run;
 - compact Focus View now uses two balanced rows of three actions instead of placing End Turn alone beneath five peer controls, while wider layouts retain one six-action row;
 - Recommended remains visibly primary with motion disabled, and Guided Opening teaches `NEXT` then `LATER` without duplicating shortcuts already visible in navigation and actions;
