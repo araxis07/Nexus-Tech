@@ -4104,6 +4104,41 @@ def test_title_scene_mode_and_overlay_motion_are_triggered(tmp_path: Path) -> No
         pygame.quit()
 
 
+def test_title_blocking_overlays_exclusively_own_click_targets(tmp_path: Path) -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        coordinator = SaveLoadCoordinator(tmp_path / "title-overlay-owner.db")
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=18),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="wizard",
+        )
+
+        scene._open_wizard_text_modal("company")
+        scene.draw(surface)
+
+        assert {target.kind for target in scene._click_targets} == {
+            "submit_text",
+            "cancel_text",
+        }
+
+        scene._set_text_input(None)
+        scene._set_confirm_delete_slot_name("active")
+        scene.draw(surface)
+
+        assert {target.kind for target in scene._click_targets} == {
+            "confirm_delete",
+            "cancel_delete",
+        }
+    finally:
+        pygame.quit()
+
+
 def test_title_scene_preserves_motion_mode_when_loading_run(tmp_path: Path) -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:

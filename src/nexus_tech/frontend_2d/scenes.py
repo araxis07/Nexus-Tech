@@ -62,6 +62,12 @@ from nexus_tech.frontend_2d.review_navigation import (
     build_review_navigation_policy,
 )
 from nexus_tech.frontend_2d.review_presentation import build_review_finding_card_layout
+from nexus_tech.frontend_2d.scene_chrome import (
+    resolve_review_scene_chrome,
+    resolve_run_scene_chrome,
+    resolve_title_scene_chrome,
+    resolve_turn_summary_scene_chrome,
+)
 from nexus_tech.frontend_2d.scene_state import (
     ActionFeedbackCue,
     ActorSpriteBounds,
@@ -1200,17 +1206,18 @@ class TitleScene(BaseScene):
         draw_grid(surface, pygame)
         width, height = surface.get_size()
         profile = resolve_layout_profile(width, height)
-        nav_visible = (
-            self._mode != "menu"
-            and self._text_input is None
-            and self._confirm_delete_slot_name is None
+        chrome = resolve_title_scene_chrome(
+            mode=self._mode,
+            blocking_overlay_visible=(
+                self._text_input is not None or self._confirm_delete_slot_name is not None
+            ),
         )
         frame = build_frame_layout(
             width,
             height,
             header_height=profile.title_header_height,
             footer_height=profile.title_footer_height,
-            nav_visible=nav_visible,
+            nav_visible=chrome.navigation_visible,
             profile=profile,
         )
         margin = profile.margin
@@ -1268,7 +1275,7 @@ class TitleScene(BaseScene):
         if right_rect.width > 0 and right_rect.height > 0:
             self._draw_title_sidebar(surface, right_rect)
         self._draw_title_footer(surface, footer_rect)
-        if nav_visible:
+        if chrome.navigation_visible:
             self._draw_nav_rail(
                 surface,
                 (
@@ -1281,9 +1288,11 @@ class TitleScene(BaseScene):
                     ),
                 ),
             )
+        if self._confirm_delete_slot_name is not None or self._text_input is not None:
+            self._click_targets = []
         if self._confirm_delete_slot_name is not None:
             self._draw_delete_confirmation_overlay(surface)
-        if self._text_input is not None:
+        elif self._text_input is not None:
             self._draw_text_input_overlay(surface)
         self._sync_mouse_cursor()
         self._draw_scene_transition_overlay(surface)
@@ -3537,12 +3546,13 @@ class ReviewScene(BaseScene):
         width, height = surface.get_size()
         profile = resolve_layout_profile(width, height)
         footer_height = 116 if height < 700 else 104
+        chrome = resolve_review_scene_chrome()
         frame = build_frame_layout(
             width,
             height,
             header_height=104,
             footer_height=footer_height,
-            nav_visible=False,
+            nav_visible=chrome.navigation_visible,
             profile=profile,
         )
         gap = profile.gap
@@ -4691,12 +4701,15 @@ class RunScene(BaseScene):
         width, height = surface.get_size()
         profile = resolve_layout_profile(width, height)
         footer_height = self._footer_outer_height(width, height)
+        chrome = resolve_run_scene_chrome(
+            pause_overlay_visible=self._pause_overlay_visible,
+        )
         frame = build_frame_layout(
             width,
             height,
             header_height=profile.run_header_height,
             footer_height=footer_height,
-            nav_visible=not self._pause_overlay_visible,
+            nav_visible=chrome.navigation_visible,
             profile=profile,
         )
         margin = profile.margin
@@ -4795,7 +4808,7 @@ class RunScene(BaseScene):
         self._draw_late_game_choreography_cues(surface)
         self._draw_impact_cues(surface)
         self._draw_action_feedback_cues(surface)
-        if not self._pause_overlay_visible:
+        if chrome.navigation_visible:
             nav_items = [
                 ("P Pause", "Open pause, save, and menu controls.", "pause_toggle", "", WARN),
                 ("Esc Back", "Close overlay or open pause.", "run_back", "", INFO),
@@ -11119,12 +11132,13 @@ class TurnSummaryScene(BaseScene):
         width, height = surface.get_size()
         profile = resolve_layout_profile(width, height)
         footer_height = 118 if height < 700 else 94
+        chrome = resolve_turn_summary_scene_chrome()
         frame = build_frame_layout(
             width,
             height,
             header_height=self._summary_header_height(height),
             footer_height=footer_height,
-            nav_visible=False,
+            nav_visible=chrome.navigation_visible,
             profile=profile,
         )
         margin = profile.margin

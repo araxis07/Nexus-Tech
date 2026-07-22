@@ -13,7 +13,7 @@ __all__ = [
 
 @dataclass(frozen=True)
 class ReviewNavigationAction:
-    """One footer and navigation-rail action exposed by a review scene."""
+    """One footer-owned action exposed by a review scene."""
 
     title: str
     detail: str

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.314.0 - 2026-07-23
+
+- Centralized Title, Run, Review, and Turn Summary action ownership in one pure scene-chrome policy instead of scattering navigation-reservation booleans across renderers
+- Kept menu, footer, navigation, and Pause overlay controls mutually exclusive while preserving every existing click route and keyboard shortcut
+- Prevented Title text-input and delete-confirmation overlays from leaving background content click targets active behind the modal
+- Added direct action-owner regressions for title submodes, blocking overlays, live-run Pause transitions, completed reviews, and turn summaries
+- Preserved gameplay balance, frozen catalogs, persistence schema 27, and truthful human-session evidence `0/6`
+
 ## 0.313.0 - 2026-07-23
 
 - Removed duplicate visible Quit, Continue, Save, Close, Back, and Progress targets from the Title Menu, Turn Summary, and Review scene shells
