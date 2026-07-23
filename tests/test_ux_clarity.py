@@ -82,6 +82,8 @@ def test_live_hud_exposes_current_act_and_readable_next_move() -> None:
     assert view_model.decision_brief.command == view_model.coach_lines[0].command
     assert view_model.decision_brief.command == TurnAction.HIRE_EMPLOYEE.value
     assert view_model.decision_brief.command_label == view_model.coach_lines[0].label
+    assert view_model.decision_brief.command_effect == "Build the first execution loop"
+    assert view_model.decision_brief.command_source == "opening"
     assert view_model.decision_brief.command_consequence
     assert view_model.decision_brief.urgency_label
     assert view_model.decision_brief.end_turn_label in {

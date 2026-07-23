@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.314.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.315.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
 [Beta Execution Audit - 2026-07-23](BETA_EXECUTION_AUDIT_2026-07-23.md).
@@ -37,6 +37,9 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - a temporary-database contract persists one completed featured campaign, verifies its archive fields, and closes First Archive Mission 6/6 without writing to the player's database;
 - automated owner-flow coverage does not count as visible-window rehearsal or human beta evidence;
 - `Choose This Turn` now presents one green `Recommended` route, two distinct alternatives, Report, Save, and End Turn;
+- the default Focus footer now separates `NEXT / COST / WHEN`, expected outcome, and skip risk into three measured lines instead of merging recommendation context into generic prose;
+- compact risk cues remain complete at 820x620, while hover adds consequence context and the Recommended button shows AP cost plus urgency;
+- the engine and 2D availability checks now share the existing zero-AP review/end-turn and one-AP operating-action policy, so Recommended disables when the current move cannot be afforded;
 - the primary command and its workspace are excluded from alternatives while preference, Coach, and stable fallback order remain deterministic;
 - Coach execution, direct keyboard commands, AP costs, simulation state, balance, persistence, and schema 27 are unchanged;
 - Endgame actor cards now use one measured header lane that reserves title and summary width at compact viewports;

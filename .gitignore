@@ -6,6 +6,14 @@
 *.pem
 *.p12
 *.pfx
+*.crt
+*.cer
+*.jks
+*.keystore
+.npmrc
+.pypirc
+credentials*.json
+service-account*.json
 .secrets/
 .venv/
 .venv*/

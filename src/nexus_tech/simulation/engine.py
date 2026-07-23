@@ -43,6 +43,7 @@ from nexus_tech.domain.models import (
     TurnAction,
 )
 from nexus_tech.domain.money import format_money, quantize_money
+from nexus_tech.simulation.action_points import get_action_point_cost
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.campaign import (
     CampaignGoalProgress,
@@ -495,17 +496,8 @@ def _apply_action_without_ledger(
             message="Resolve the pending event before taking new actions.",
         )
 
-    if action in (
-        TurnAction.VIEW_STATUS,
-        TurnAction.REVIEW_TEAM,
-        TurnAction.REVIEW_FINANCE,
-        TurnAction.REVIEW_CUSTOMERS,
-        TurnAction.REVIEW_PIPELINE,
-        TurnAction.REVIEW_BOARD,
-        TurnAction.REVIEW_PARTNERSHIPS,
-        TurnAction.VIEW_REPORT,
-        TurnAction.END_TURN,
-    ):
+    action_point_cost = get_action_point_cost(action)
+    if action_point_cost == 0:
         if action is TurnAction.VIEW_STATUS:
             return ActionOutcome(state=state, message="Status refreshed.")
         if action is TurnAction.REVIEW_TEAM:
@@ -524,14 +516,14 @@ def _apply_action_without_ledger(
             return ActionOutcome(state=state, message="Run report refreshed.")
         return ActionOutcome(state=state, message="Ending turn.", turn_should_end=True)
 
-    if state.action_points_remaining <= 0:
+    if state.action_points_remaining < action_point_cost:
         return ActionOutcome(
             state=state,
             message="No action points remaining. Review status or end the turn.",
         )
 
     next_state = state.model_copy(deep=True)
-    next_state.action_points_remaining -= 1
+    next_state.action_points_remaining -= action_point_cost
 
     if action is TurnAction.EXECUTE_BOARD_RESPONSE:
         summary = execute_board_response(next_state)

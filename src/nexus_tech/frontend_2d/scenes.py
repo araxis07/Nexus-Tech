@@ -34,6 +34,10 @@ from nexus_tech.frontend_2d.context import (
     explain_inspector_action_unavailable,
 )
 from nexus_tech.frontend_2d.control_guide import RUN_HELP_KEYCAPS
+from nexus_tech.frontend_2d.decision_preview import (
+    DecisionPreviewPresentation,
+    build_decision_preview_presentation,
+)
 from nexus_tech.frontend_2d.event_queue import (
     FrontendEvent,
     build_action_events,
@@ -8434,6 +8438,40 @@ class RunScene(BaseScene):
             self._click_targets.append(ClickTarget(button.kind, button.payload, button_rect))
             left += button_width + button_gap
         footer_top = inner.bottom - footer_band_height + 6
+        decision_preview = self._footer_decision_preview(max_width=inner.width)
+        if decision_preview is not None:
+            line_height = self.fonts.small.get_height() + 2
+            preview_height = line_height * 3
+            preview_top = (
+                inner.bottom
+                - footer_band_height
+                + max(
+                    0,
+                    (footer_band_height - preview_height) // 2,
+                )
+            )
+            for index, (line, color) in enumerate(
+                (
+                    (decision_preview.primary_line, TEXT),
+                    (decision_preview.effect_line, GOOD),
+                    (decision_preview.risk_line, WARN),
+                )
+            ):
+                draw_text_line(
+                    surface,
+                    self.fonts.small,
+                    line,
+                    color,
+                    pygame.Rect(
+                        inner.left,
+                        preview_top + index * line_height,
+                        inner.width,
+                        line_height,
+                    ),
+                    valign="top",
+                )
+            return
+
         status_line, hint_line = self._footer_status_lines(max_width=inner.width)
         draw_wrapped_text(
             surface,
@@ -8466,6 +8504,11 @@ class RunScene(BaseScene):
         button_gap = 10
         button_height = 34 if height < 700 else 40 if button_cols <= 5 else 44
         footer_band_height = 38 if height < 700 else 46
+        if self._focus_mode:
+            footer_band_height = max(
+                footer_band_height,
+                self.fonts.small.get_height() * 3 + 8,
+            )
         panel_chrome = 60
         return (
             panel_chrome + rows * button_height + button_gap * max(0, rows - 1) + footer_band_height
@@ -8488,6 +8531,11 @@ class RunScene(BaseScene):
         )
         rows = max(1, (visible_count + button_cols - 1) // button_cols)
         footer_band_height = 42 if inner_height < 300 else 48 if button_cols >= 5 else 52
+        if self._focus_mode:
+            footer_band_height = max(
+                footer_band_height,
+                self.fonts.small.get_height() * 3 + 8,
+            )
         button_gap = 10
         button_area_height = max(
             36,
@@ -8636,6 +8684,12 @@ class RunScene(BaseScene):
         enabled: bool,
         button_cols: int,
     ) -> str:
+        if button.kind == "coach":
+            preview = self._build_focus_decision_preview(compact=button_cols <= 3)
+            timing = preview.timing_label.split("/", maxsplit=1)[0].strip()
+            detail = f"{preview.cost_label} | {timing}"
+            max_length = 24 if button_cols <= 4 else 28 if button_cols == 5 else 36
+            return self._compact_button_detail(detail, max_length=max_length)
         detail = self._button_detail(
             button.payload if button.kind in {"command", "text_command"} else None,
             button.detail,
@@ -8645,6 +8699,13 @@ class RunScene(BaseScene):
         return self._compact_button_detail(detail, max_length=max_length)
 
     def _footer_status_lines(self, *, max_width: int | None = None) -> tuple[str, str]:
+        decision_preview = self._footer_decision_preview(max_width=max_width)
+        if decision_preview is not None:
+            return (
+                decision_preview.primary_line,
+                f"{decision_preview.effect_line} | {decision_preview.risk_line}",
+            )
+
         workspace_key = self._active_panel_key()
         workspace_title = (
             self._panel_display_name(workspace_key) if workspace_key is not None else "Core HUD"
@@ -8764,6 +8825,44 @@ class RunScene(BaseScene):
             compact = compact.replace(source, target)
         return self._compact_button_detail(compact, max_length=96)
 
+    def _footer_decision_preview(
+        self,
+        *,
+        max_width: int | None,
+    ) -> DecisionPreviewPresentation | None:
+        if (
+            not self._focus_mode
+            or self._deep_panel_key is not None
+            or self._inspector_panel_key is not None
+            or self._context_picker is not None
+            or self._text_input is not None
+            or self.state.pending_event is not None
+            or self.state.company.game_over
+            or self.state.victory_achieved
+            or self._hover_hint_line()
+        ):
+            return None
+        return self._build_focus_decision_preview(
+            compact=max_width is not None and max_width < 760,
+        )
+
+    def _build_focus_decision_preview(
+        self,
+        *,
+        compact: bool,
+    ) -> DecisionPreviewPresentation:
+        brief = self._view_model.decision_brief
+        return build_decision_preview_presentation(
+            command=brief.command,
+            command_label=brief.command_label,
+            expected_effect=brief.command_effect,
+            skipped_consequence=brief.command_consequence,
+            source=brief.command_source,
+            urgency_label=brief.urgency_label,
+            action_points_remaining=self.state.action_points_remaining,
+            compact=compact,
+        )
+
     def _event_queue_visible_count(self, event_height: int) -> int:
         visible = 2 if event_height < 180 else 3 if event_height < 280 else 4
         if self._overlay_or_pending_active():
@@ -8829,6 +8928,8 @@ class RunScene(BaseScene):
     def _button_is_enabled(self, button: ActionButtonSpec) -> bool:
         if button.kind in {"save", "panel"}:
             return True
+        if button.kind == "coach":
+            return self._command_disabled_reason(self._view_model.decision_brief.command) is None
         if button.kind in {"command", "panel_action", "text_command"}:
             return self._command_disabled_reason(button.payload) is None
         return not self.state.company.game_over
@@ -8936,14 +9037,11 @@ class RunScene(BaseScene):
             return f"Hover: inspect the `{target.payload}` panel in full detail."
         if target.kind == "coach":
             brief = self._view_model.decision_brief
-            consequence = self._compact_button_detail(
-                brief.command_consequence,
-                max_length=120,
-            )
-            return (
-                f"Hover: run {brief.command_label} ({brief.urgency_label}). "
-                f"If skipped: {consequence}"
-            )
+            reason = self._command_disabled_reason(brief.command)
+            if reason is not None:
+                return f"Hover: {brief.command_label} is blocked because {reason}"
+            preview = self._build_focus_decision_preview(compact=True)
+            return f"Hover: {preview.tooltip}"
         if target.kind == "inspector_section":
             return f"Hover: focus the `{target.payload}` inspector section."
         if target.kind == "inspector_item_action":

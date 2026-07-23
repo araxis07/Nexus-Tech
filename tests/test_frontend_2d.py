@@ -2489,12 +2489,22 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert max(len(title) for title in compact_titles) <= 15
         assert len(compact_status) <= 92
         assert len(compact_hint) <= 96
-        assert "Actions Left" in full_status
-        assert compact_status == "Recommended follows NEXT."
-        assert compact_hint == "Hover for details; Space resolves after AP is spent."
-        assert full_hint.startswith("Why:")
-        assert "0 More" in full_hint
+        assert compact_status == ("NEXT Hire Teammate | COST 1 AP -> 1 | WHEN Now / 1 turn")
+        assert compact_hint == (
+            "EXPECTED Build the first execution loop | IF SKIPPED Opening progress stays blocked."
+        )
+        assert "COST 1 AP -> 1 left" in full_status
+        assert "WHEN Act now / 1 turn" in full_status
+        assert full_hint.startswith("EXPECTED ")
+        assert "IF SKIPPED" in full_hint
+        scene._focus_mode = True
+        preview = scene._footer_decision_preview(max_width=720)
+        assert preview is not None
+        assert scene.fonts.small.size(preview.primary_line)[0] <= 720
+        assert scene.fonts.small.size(preview.effect_line)[0] <= 720
+        assert scene.fonts.small.size(preview.risk_line)[0] <= 720
 
+        scene._focus_mode = False
         scene.state.company.current_turn = 10
         scene._refresh_view_model()
         assert "Endgame" in {button.title for button in scene._footer_action_buttons()}
@@ -2527,6 +2537,33 @@ def test_run_scene_focus_footer_renders_two_balanced_rows() -> None:
         assert len(targets) == 6
         assert row_counts == [3, 3]
         assert len({target.rect.width for target in targets}) == 1
+    finally:
+        pygame.quit()
+
+
+def test_run_scene_recommended_action_disables_when_action_points_are_spent() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        state.action_points_remaining = 0
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=state,
+            rng=RandomSource(seed=49),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        recommended = scene._footer_action_buttons()[0]
+        preview = scene._build_focus_decision_preview(compact=True)
+        hint = scene._describe_click_target(ClickTarget("coach", "", surface.get_rect()))
+
+        assert recommended.title == "Recommended"
+        assert not scene._button_is_enabled(recommended)
+        assert preview.blocked
+        assert preview.cost_label == "1 AP / blocked at 0"
+        assert "No action points remaining" in hint
     finally:
         pygame.quit()
 
@@ -4341,11 +4378,24 @@ def test_explain_command_unavailable_surfaces_specific_reason() -> None:
         command=TurnAction.WORK_RELEASE.value,
         selected_product_id=state.products[0].id.hex,
     )
+    state.action_points_remaining = 0
+    no_ap_reason = explain_command_unavailable(
+        state,
+        command=TurnAction.IMPROVE_QUALITY.value,
+        selected_product_id=state.products[0].id.hex,
+    )
+    free_review_reason = explain_command_unavailable(
+        state,
+        command=TurnAction.REVIEW_FINANCE.value,
+        selected_product_id=state.products[0].id.hex,
+    )
 
     assert assign_reason is not None
     assert "Hire" in assign_reason or "employee" in assign_reason
     assert release_reason is not None
     assert "release" in release_reason.lower()
+    assert no_ap_reason == "No action points remaining. Review status or end the turn."
+    assert free_review_reason is None
 
 
 def test_catalog_choices_mix_unlocked_and_locked_content(tmp_path: Path) -> None:

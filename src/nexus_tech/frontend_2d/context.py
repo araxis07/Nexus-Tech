@@ -24,6 +24,7 @@ from nexus_tech.domain.models import (
     SupportLaneFocus,
     TurnAction,
 )
+from nexus_tech.simulation.action_points import get_action_point_cost
 from nexus_tech.simulation.engine import ActionContext
 
 
@@ -668,6 +669,8 @@ def explain_command_unavailable(
     product = _pick_selected_product(state, selected_product_id)
     if state.pending_event is not None and action not in _DIRECT_ACTIONS:
         return "Resolve the pending event before taking new operating actions."
+    if get_action_point_cost(action) > state.action_points_remaining:
+        return "No action points remaining. Review status or end the turn."
     if action in _PRODUCT_ACTIONS and product is None:
         return "Select an active product first."
     if (

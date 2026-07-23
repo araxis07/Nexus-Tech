@@ -34,6 +34,8 @@ class StrategicRhythm:
     plan_tone: str
     command: str
     command_label: str
+    command_effect: str
+    command_source: str
     command_detail: str
     command_consequence: str
     urgency_label: str
@@ -73,6 +75,12 @@ def build_strategic_rhythm(
     primary = coach.recommendations[0] if coach.recommendations else None
     command = primary.command if primary is not None else coach.primary_command
     command_label = get_action_label(command)
+    command_effect = (
+        humanize_action_text(primary.title)
+        if primary is not None
+        else "Refresh the current operating context."
+    )
+    command_source = primary.source if primary is not None else "review"
     command_detail = (
         humanize_action_text(primary.rationale)
         if primary is not None
@@ -112,6 +120,8 @@ def build_strategic_rhythm(
         plan_tone=_plan_tone(state, plan_progress.completed_target_count),
         command=command,
         command_label=command_label,
+        command_effect=command_effect,
+        command_source=command_source,
         command_detail=command_detail,
         command_consequence=command_consequence,
         urgency_label=urgency_label,

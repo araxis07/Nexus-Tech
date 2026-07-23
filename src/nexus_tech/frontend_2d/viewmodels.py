@@ -102,6 +102,8 @@ class DecisionBriefViewModel:
     plan_tone: str
     command: str
     command_label: str
+    command_effect: str
+    command_source: str
     command_detail: str
     command_consequence: str
     urgency_label: str
@@ -2916,6 +2918,8 @@ def _build_decision_brief(rhythm: StrategicRhythm) -> DecisionBriefViewModel:
         plan_tone=rhythm.plan_tone,
         command=rhythm.command,
         command_label=rhythm.command_label,
+        command_effect=rhythm.command_effect,
+        command_source=rhythm.command_source,
         command_detail=rhythm.command_detail,
         command_consequence=rhythm.command_consequence,
         urgency_label=rhythm.urgency_label,

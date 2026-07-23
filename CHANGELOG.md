@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.315.0 - 2026-07-24
+
+- Replaced the Focus footer's generic recommendation prose with a three-line decision preview that exposes the next move, AP cost and remaining budget, timing, expected outcome, and skip risk
+- Added bounded compact risk cues and consequence-aware hover detail so the 820x620 footer preserves meaning without text fitting or ellipsis
+- Centralized the existing free-review and one-AP operating-action policy, then disabled Recommended when no AP remains instead of presenting an action the engine would reject
+- Added pure decision-preview, AP-policy, runtime, compact-layout, tooltip, and no-AP regressions
+- Preserved gameplay outcomes, balance, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.314.0 - 2026-07-23
 
 - Centralized Title, Run, Review, and Turn Summary action ownership in one pure scene-chrome policy instead of scattering navigation-reservation booleans across renderers
