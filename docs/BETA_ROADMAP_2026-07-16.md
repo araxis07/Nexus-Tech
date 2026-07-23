@@ -5,7 +5,7 @@
 NEXUS TECH 0.315.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
-[Beta Execution Audit - 2026-07-23](BETA_EXECUTION_AUDIT_2026-07-23.md).
+[Beta Execution Audit - 2026-07-24](BETA_EXECUTION_AUDIT_2026-07-24.md).
 
 ## Current Engineering Slice
 
