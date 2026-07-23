@@ -40,8 +40,17 @@ def render_beta_playtest_preparation(
     if not preparation.requires_session:
         console.print(
             Panel(
-                _folded_command(preparation.status_command),
-                title="Manual Review Command",
+                Group(
+                    _folded_command(preparation.review_gate_command),
+                    Text(""),
+                    Text(
+                        "A zero exit confirms evidence is ready for review, not that "
+                        "release has been approved.",
+                        overflow="fold",
+                        no_wrap=False,
+                    ),
+                ),
+                title="Manual Review Gate",
                 border_style="green",
                 expand=True,
             )
@@ -138,6 +147,23 @@ def render_beta_playtest_preparation(
             ),
             title="4. Refresh Evidence",
             border_style="cyan",
+            expand=True,
+        )
+    )
+    console.print(
+        Panel(
+            Group(
+                _folded_command(preparation.review_gate_command),
+                Text(""),
+                Text(
+                    "This command exits non-zero until all current-version human "
+                    "criteria are ready. Reviewer approval remains manual.",
+                    overflow="fold",
+                    no_wrap=False,
+                ),
+            ),
+            title="5. Review Readiness Guard",
+            border_style="yellow",
             expand=True,
         )
     )
@@ -248,6 +274,15 @@ def format_beta_playtest_preparation_markdown(
             preparation.status_command,
             preparation.archive_command,
             "```",
+            "",
+            "## Review Readiness Guard",
+            "",
+            "```bash",
+            preparation.review_gate_command,
+            "```",
+            "",
+            "This command exits non-zero until every current-version human criterion "
+            "is ready. A zero exit still requires an explicit reviewer release decision.",
             "",
         )
     )

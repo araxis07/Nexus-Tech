@@ -253,6 +253,7 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert "--window-size 820x620" in preparation.launch_command
     assert "--scenario founder_journey" in preparation.record_command
     assert "--db-path nexus-tech.db" in preparation.record_command
+    assert "--require-review-ready" in preparation.review_gate_command
     placeholder = "REPLACE with a concrete observation from the real session"
     assert placeholder in preparation.record_command
     assert not is_substantive_beta_playtest_note(placeholder)
@@ -466,6 +467,8 @@ def test_prepare_beta_playtest_cli_defaults_to_current_executable(
     assert "must never be entered" in markdown
     assert "Save & Archive" in markdown
     assert "Route Atlas" in markdown
+    assert "Review Readiness Guard" in markdown
+    assert "--require-review-ready" in markdown
     assert ".venv313/bin/nexus-tech menu-2d" in markdown
     assert f"--db-path {rehearsal_db_path}" in markdown
     assert f"--db-path {session_db_path}" in markdown
@@ -502,6 +505,35 @@ def test_prepare_beta_playtest_cli_allocates_fresh_default_gameplay_profiles(
     assert session_path.name.startswith("nexus-tech-beta-session-")
     assert not rehearsal_path.exists()
     assert not session_path.exists()
+
+
+def test_prepare_beta_playtest_cli_hands_review_ready_evidence_to_fail_closed_gate(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "manual-review.md"
+    repository = BetaPlaytestRepository(db_path)
+    for index, journey in enumerate(list_featured_campaign_journeys(), start=1):
+        repository.save_session(make_session(index, journey.scenario_id))
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Manual Review Gate" in result.output
+    assert "--require-review-ready" in result.output
+    assert "Launch And Select" not in result.output
+    markdown = output.read_text(encoding="utf-8")
+    assert "Review Readiness Guard" in markdown
+    assert "--require-review-ready" in markdown
 
 
 @pytest.mark.parametrize("artifact_suffix", ("", "-journal", "-wal", "-shm"))
@@ -601,6 +633,49 @@ def test_beta_playtest_cli_records_and_reviews_local_evidence(tmp_path: Path) ->
     assert status_result.exit_code == 0
     assert "Six-Campaign Session Coverage" in status_result.output
     assert "human-sessions-needed" in status_result.output
+
+
+def test_beta_playtest_status_review_guard_fails_closed_without_human_evidence(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "beta.db"
+
+    result = runner.invoke(
+        app,
+        [
+            "beta-playtest-status",
+            "--db-path",
+            str(db_path),
+            "--require-review-ready",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "human-sessions-needed" in result.output
+    assert "Record 6 more current-version session(s)." in result.output
+
+
+def test_beta_playtest_status_review_guard_passes_only_review_ready_evidence(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "beta.db"
+    repository = BetaPlaytestRepository(db_path)
+    for index, journey in enumerate(list_featured_campaign_journeys(), start=1):
+        repository.save_session(make_session(index, journey.scenario_id))
+
+    result = runner.invoke(
+        app,
+        [
+            "beta-playtest-status",
+            "--db-path",
+            str(db_path),
+            "--require-review-ready",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "human-evidence-ready-for-review" in result.output
+    assert "a human reviewer must still approve release" in result.output
 
 
 def test_beta_playtest_cli_requires_explicit_human_attestation(tmp_path: Path) -> None:

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.316.0 - 2026-07-24
+
+- Added a fail-closed `--require-review-ready` human-beta status guard so release scripts cannot treat missing or failed current-version evidence as a successful gate
+- Embedded the guard in generated tester packets and the manual-review handoff while preserving the explicit reviewer decision after automated criteria pass
+- Added CLI and packet regressions for blocked `0/6` evidence and review-ready six-campaign evidence
+- Preserved gameplay outcomes, balance, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.315.0 - 2026-07-24
 
 - Replaced the Focus footer's generic recommendation prose with a three-line decision preview that exposes the next move, AP cost and remaining budget, timing, expected outcome, and skip risk

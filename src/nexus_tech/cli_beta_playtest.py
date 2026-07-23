@@ -73,6 +73,14 @@ BETA_DB_PATH_OPTION = typer.Option(
     "--db-path",
     help="Local ignored SQLite database used for structured beta evidence.",
 )
+BETA_REQUIRE_REVIEW_READY_OPTION = typer.Option(
+    False,
+    "--require-review-ready",
+    help=(
+        "Exit non-zero until current-version human evidence meets every automated "
+        "review-readiness criterion. A zero exit still requires reviewer approval."
+    ),
+)
 BETA_PREPARATION_INTERFACE_OPTION = typer.Option(
     BetaPlaytestInterface.TWO_D,
     "--interface",
@@ -306,6 +314,7 @@ def register_beta_playtest_commands(
     @app.command("beta-playtest-status")
     def beta_playtest_status_command(
         db_path: Path = BETA_DB_PATH_OPTION,
+        require_review_ready: bool = BETA_REQUIRE_REVIEW_READY_OPTION,
     ) -> None:
         """Review current-version human beta coverage and unresolved gates."""
 
@@ -315,10 +324,10 @@ def register_beta_playtest_commands(
             sessions = repository.list_sessions()
         except PersistenceError as error:
             _exit_with_error(console, "Beta Evidence Read Failed", str(error))
-        render_beta_playtest_status(
-            console,
-            build_beta_playtest_status(sessions, game_version=__version__),
-        )
+        status = build_beta_playtest_status(sessions, game_version=__version__)
+        render_beta_playtest_status(console, status)
+        if require_review_ready and not status.review_ready:
+            raise typer.Exit(code=1)
 
 
 def _exit_with_error(console: Console, title: str, message: str) -> None:

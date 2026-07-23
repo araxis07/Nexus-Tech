@@ -163,6 +163,16 @@ class BetaPlaytestPreparation:
         )
 
     @property
+    def review_gate_command(self) -> str:
+        return _command(
+            self.command_prefix,
+            "beta-playtest-status",
+            "--db-path",
+            self.evidence_database_path,
+            "--require-review-ready",
+        )
+
+    @property
     def archive_command(self) -> str:
         return _command(
             self.command_prefix,

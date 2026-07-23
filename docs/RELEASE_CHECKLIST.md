@@ -220,6 +220,18 @@ uv run nexus-tech simulate-balance --scenario founder_journey --difficulty found
 uv run nexus-tech balance-report --output /tmp/nexus-balance-report.md --scenario founder_journey --runs 1 --turns 3 --seed-base 7
 ```
 
+## Human Beta Release Gate
+
+Run this fail-closed command only after the six observed first-time sessions are recorded:
+
+```bash
+uv run nexus-tech beta-playtest-status --require-review-ready
+```
+
+A zero exit means the structured current-version evidence meets the automated
+criteria. It does not replace the explicit reviewer release decision. A non-zero
+exit blocks tagging even when every deterministic CI gate passes.
+
 ## Save Verification
 
 ```bash
