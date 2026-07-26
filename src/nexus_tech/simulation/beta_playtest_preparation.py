@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
+import json
 import re
 import shlex
 from dataclasses import dataclass
@@ -18,6 +22,15 @@ from nexus_tech.simulation.beta_playtest import (
     build_beta_playtest_status,
 )
 from nexus_tech.user_preferences import MotionMode
+
+_PACKET_MANIFEST_PREFIX = "<!-- nexus-tech-beta-packet-v1 "
+_PACKET_MANIFEST_SUFFIX = " -->"
+_PACKET_MANIFEST_PATTERN = re.compile(
+    rf"^{re.escape(_PACKET_MANIFEST_PREFIX)}([A-Za-z0-9_-]+)"
+    rf"{re.escape(_PACKET_MANIFEST_SUFFIX)}$",
+    re.MULTILINE,
+)
+_PACKET_MANIFEST_SCHEMA_VERSION = 1
 
 _SESSION_CHECKLIST = (
     "Confirm the isolated tester profile opens with Continue unavailable and no prior "
@@ -54,6 +67,7 @@ class BetaPlaytestPreparation:
     game_version: str
     evidence_status: str
     session_progress: str
+    evidence_fingerprint: str
     target_scenario_id: str | None
     target_track_label: str
     target_reason: str
@@ -181,6 +195,192 @@ class BetaPlaytestPreparation:
             self.evidence_database_path,
         )
 
+    def validation_command(self, packet_path: str) -> str:
+        return _command(
+            self.command_prefix,
+            "validate-beta-playtest-session-packet",
+            "--input",
+            packet_path,
+            "--db-path",
+            self.evidence_database_path,
+        )
+
+
+@dataclass(frozen=True)
+class BetaPlaytestPacketManifest:
+    """Deterministic reconstruction inputs and evidence snapshot embedded in a packet."""
+
+    schema_version: int
+    game_version: str
+    evidence_status: str
+    session_progress: str
+    evidence_fingerprint: str
+    target_scenario_id: str | None
+    target_track_label: str
+    target_reason: str
+    session_key: str
+    tester_code: str
+    interface_mode: BetaPlaytestInterface
+    viewport: str
+    motion_mode: MotionMode
+    command_prefix: str
+    evidence_database_path: str
+    session_database_path: str
+    owner_rehearsal_database_path: str
+    owner_rehearsal_required: bool
+
+    @classmethod
+    def from_preparation(
+        cls,
+        preparation: BetaPlaytestPreparation,
+    ) -> BetaPlaytestPacketManifest:
+        return cls(
+            schema_version=_PACKET_MANIFEST_SCHEMA_VERSION,
+            game_version=preparation.game_version,
+            evidence_status=preparation.evidence_status,
+            session_progress=preparation.session_progress,
+            evidence_fingerprint=preparation.evidence_fingerprint,
+            target_scenario_id=preparation.target_scenario_id,
+            target_track_label=preparation.target_track_label,
+            target_reason=preparation.target_reason,
+            session_key=preparation.session_key,
+            tester_code=preparation.tester_code,
+            interface_mode=preparation.interface_mode,
+            viewport=preparation.viewport,
+            motion_mode=preparation.motion_mode,
+            command_prefix=preparation.command_prefix,
+            evidence_database_path=preparation.evidence_database_path,
+            session_database_path=preparation.session_database_path,
+            owner_rehearsal_database_path=preparation.owner_rehearsal_database_path,
+            owner_rehearsal_required=preparation.owner_rehearsal_required,
+        )
+
+    def encode(self) -> str:
+        payload = {
+            "command_prefix": self.command_prefix,
+            "evidence_database_path": self.evidence_database_path,
+            "evidence_fingerprint": self.evidence_fingerprint,
+            "evidence_status": self.evidence_status,
+            "game_version": self.game_version,
+            "interface_mode": self.interface_mode.value,
+            "motion_mode": self.motion_mode.value,
+            "owner_rehearsal_database_path": self.owner_rehearsal_database_path,
+            "owner_rehearsal_required": self.owner_rehearsal_required,
+            "schema_version": self.schema_version,
+            "session_database_path": self.session_database_path,
+            "session_key": self.session_key,
+            "session_progress": self.session_progress,
+            "target_reason": self.target_reason,
+            "target_scenario_id": self.target_scenario_id,
+            "target_track_label": self.target_track_label,
+            "tester_code": self.tester_code,
+            "viewport": self.viewport,
+        }
+        encoded = base64.urlsafe_b64encode(
+            json.dumps(
+                payload,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        ).decode("ascii")
+        return f"{_PACKET_MANIFEST_PREFIX}{encoded.rstrip('=')}{_PACKET_MANIFEST_SUFFIX}"
+
+
+def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketManifest:
+    """Decode exactly one manifest while rejecting malformed or ambiguous packets."""
+
+    matches = _PACKET_MANIFEST_PATTERN.findall(markdown)
+    if len(matches) != 1:
+        raise ValueError("Packet must contain exactly one valid NEXUS TECH beta packet manifest.")
+    encoded = matches[0]
+    padded = encoded + ("=" * (-len(encoded) % 4))
+    try:
+        decoded = base64.b64decode(padded, altchars=b"-_", validate=True)
+        raw_manifest = json.loads(decoded.decode("utf-8"))
+    except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("Packet manifest is malformed; regenerate the packet.") from error
+    if not isinstance(raw_manifest, dict):
+        raise ValueError("Packet manifest must decode to an object.")
+
+    expected_keys = {
+        "command_prefix",
+        "evidence_database_path",
+        "evidence_fingerprint",
+        "evidence_status",
+        "game_version",
+        "interface_mode",
+        "motion_mode",
+        "owner_rehearsal_database_path",
+        "owner_rehearsal_required",
+        "schema_version",
+        "session_database_path",
+        "session_key",
+        "session_progress",
+        "target_reason",
+        "target_scenario_id",
+        "target_track_label",
+        "tester_code",
+        "viewport",
+    }
+    if set(raw_manifest) != expected_keys:
+        raise ValueError("Packet manifest fields are invalid; regenerate the packet.")
+    if (
+        type(raw_manifest["schema_version"]) is not int
+        or raw_manifest["schema_version"] != _PACKET_MANIFEST_SCHEMA_VERSION
+    ):
+        raise ValueError("Packet manifest schema is unsupported; regenerate the packet.")
+
+    string_fields = expected_keys - {
+        "owner_rehearsal_required",
+        "schema_version",
+        "target_scenario_id",
+    }
+    if any(
+        not isinstance(raw_manifest[field], str) or not raw_manifest[field]
+        for field in string_fields
+    ):
+        raise ValueError("Packet manifest contains an invalid text field.")
+    if re.fullmatch(r"[0-9a-f]{64}", raw_manifest["evidence_fingerprint"]) is None:
+        raise ValueError("Packet manifest contains an invalid evidence fingerprint.")
+    target_scenario_id = raw_manifest["target_scenario_id"]
+    if target_scenario_id is not None and (
+        not isinstance(target_scenario_id, str) or not target_scenario_id
+    ):
+        raise ValueError("Packet manifest contains an invalid target scenario.")
+    if not isinstance(raw_manifest["owner_rehearsal_required"], bool):
+        raise ValueError("Packet manifest contains an invalid rehearsal flag.")
+
+    try:
+        interface_mode = BetaPlaytestInterface(raw_manifest["interface_mode"])
+    except ValueError as error:
+        raise ValueError("Packet manifest contains an unsupported interface mode.") from error
+    try:
+        motion_mode = MotionMode(raw_manifest["motion_mode"])
+    except ValueError as error:
+        raise ValueError("Packet manifest contains an unsupported motion mode.") from error
+
+    return BetaPlaytestPacketManifest(
+        schema_version=raw_manifest["schema_version"],
+        game_version=raw_manifest["game_version"],
+        evidence_status=raw_manifest["evidence_status"],
+        session_progress=raw_manifest["session_progress"],
+        evidence_fingerprint=raw_manifest["evidence_fingerprint"],
+        target_scenario_id=target_scenario_id,
+        target_track_label=raw_manifest["target_track_label"],
+        target_reason=raw_manifest["target_reason"],
+        session_key=raw_manifest["session_key"],
+        tester_code=raw_manifest["tester_code"],
+        interface_mode=interface_mode,
+        viewport=raw_manifest["viewport"],
+        motion_mode=motion_mode,
+        command_prefix=raw_manifest["command_prefix"],
+        evidence_database_path=raw_manifest["evidence_database_path"],
+        session_database_path=raw_manifest["session_database_path"],
+        owner_rehearsal_database_path=raw_manifest["owner_rehearsal_database_path"],
+        owner_rehearsal_required=raw_manifest["owner_rehearsal_required"],
+    )
+
 
 def build_beta_playtest_preparation(
     sessions: list[BetaPlaytestSession],
@@ -213,6 +413,7 @@ def build_beta_playtest_preparation(
         game_version=game_version,
         evidence_status=status.status,
         session_progress=status.session_progress,
+        evidence_fingerprint=_beta_evidence_fingerprint(sessions),
         target_scenario_id=(target_lane.scenario_id if target_lane is not None else None),
         target_track_label=(target_lane.track_label if target_lane is not None else "Review"),
         target_reason=target_reason,
@@ -235,6 +436,30 @@ def build_beta_playtest_preparation(
         owner_rehearsal_database_path=owner_rehearsal_database_path.strip(),
         owner_rehearsal_required=status.session_count == 0 and target_lane is not None,
     )
+
+
+def _beta_evidence_fingerprint(sessions: list[BetaPlaytestSession]) -> str:
+    rows = []
+    for session in sessions:
+        row = {
+            "act_three": session.reached_act_three,
+            "blocker": session.blocker_found,
+            "first_turn_seconds": session.first_turn_seconds,
+            "game_version": session.game_version,
+            "interface": session.interface_mode.value,
+            "notes": session.notes,
+            "pause_back": session.pause_back_success,
+            "recorded_at": session.recorded_at,
+            "scenario_id": session.scenario_id,
+            "session_key": session.session_key,
+            "tester_code": session.tester_code,
+            "tradeoff": session.tradeoff_explained,
+            "turn_one": session.turn_one_unaided,
+            "viewport": session.viewport,
+        }
+        rows.append(json.dumps(row, ensure_ascii=True, separators=(",", ":"), sort_keys=True))
+    canonical = f"[{','.join(sorted(rows))}]".encode()
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def _select_target(

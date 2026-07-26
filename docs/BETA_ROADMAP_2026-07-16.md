@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.316.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.317.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
 [Beta Execution Audit - 2026-07-24](BETA_EXECUTION_AUDIT_2026-07-24.md).
@@ -57,19 +57,21 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - preparation allocates unique temporary gameplay profiles by default, rejects explicit profiles that already exist, and leaves the persistent evidence store only in recorder/status commands;
 - the first packet includes isolated rehearsal and tester launches; later packets retain one fresh tester launch, the eight-step observation checklist, a deliberately invalid recorder template, and evidence-refresh commands;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
+- every generated packet now carries a deterministic manifest, and `validate-beta-playtest-session-packet` rejects changed content, stale build/evidence state, a mismatched evidence store, or an already-used gameplay profile before handoff;
 - `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, failing only missing ledger coverage while exporting repetition and low-variety candidates for human review;
 - `beta-playtest-status --require-review-ready` now exits non-zero until all current-version human criteria pass, preventing release scripts from confusing an informative status report with a successful gate while retaining the final manual reviewer decision;
 - no save migration, new catalog entry, control binding, or balance adjustment is introduced.
 
 ## Path To Beta
 
-1. Run `prepare-beta-playtest-session`, keep its isolated rehearsal/tester/evidence database paths unchanged, follow the Owner Rehearsal Gate from New Game through `Save & Archive` and `6 Open Progress` at 820x620, and record only defects actually observed; never run the human-session recorder for the rehearsal.
-2. Observe six first-time sessions across all six featured campaigns using anonymous tester codes and the structured local evidence command.
-3. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
-4. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.
-5. Fix P0/P1 navigation, readability, wording, or pacing defects before any feature expansion.
-6. Re-run gameplay, balance, campaign, save, visual, layout, motion, animation, package, and security gates after every observed blocker fix.
-7. Run `beta-playtest-status --require-review-ready`, then promote to beta only after its fail-closed gate passes and a reviewer makes the release decision.
+1. Run `prepare-beta-playtest-session` and keep its isolated rehearsal/tester/evidence database paths unchanged.
+2. Run `validate-beta-playtest-session-packet` immediately before handoff, then follow the Owner Rehearsal Gate from New Game through `Save & Archive` and `6 Open Progress` at 820x620; record only defects actually observed and never run the human-session recorder for the rehearsal.
+3. Observe six first-time sessions across all six featured campaigns using anonymous tester codes and the structured local evidence command.
+4. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
+5. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.
+6. Fix P0/P1 navigation, readability, wording, or pacing defects before any feature expansion.
+7. Re-run gameplay, balance, campaign, save, visual, layout, motion, animation, package, and security gates after every observed blocker fix.
+8. Run `beta-playtest-status --require-review-ready`, then promote to beta only after its fail-closed gate passes and a reviewer makes the release decision.
 
 ## Post-Beta Order
 

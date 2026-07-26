@@ -9,7 +9,10 @@ from rich.table import Table
 from rich.text import Text
 
 from nexus_tech.simulation.beta_playtest import BetaPlaytestStatus
-from nexus_tech.simulation.beta_playtest_preparation import BetaPlaytestPreparation
+from nexus_tech.simulation.beta_playtest_preparation import (
+    BetaPlaytestPacketManifest,
+    BetaPlaytestPreparation,
+)
 
 
 def render_beta_playtest_preparation(
@@ -176,6 +179,8 @@ def format_beta_playtest_preparation_markdown(
 
     lines = [
         "# NEXUS TECH Human Beta Session Packet",
+        "",
+        BetaPlaytestPacketManifest.from_preparation(preparation).encode(),
         "",
         f"- Game version: `{preparation.game_version}`",
         f"- Evidence status: `{preparation.evidence_status}`",

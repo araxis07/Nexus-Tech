@@ -507,6 +507,258 @@ def test_prepare_beta_playtest_cli_allocates_fresh_default_gameplay_profiles(
     assert not session_path.exists()
 
 
+def test_validate_beta_playtest_packet_accepts_current_isolated_packet(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    session_db_path = tmp_path / "tester-profile.db"
+    rehearsal_db_path = tmp_path / "rehearsal-profile.db"
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(session_db_path),
+            "--rehearsal-db-path",
+            str(rehearsal_db_path),
+        ],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert prepare_result.exit_code == 0
+    assert result.exit_code == 0
+    assert "Beta Packet Validated" in result.output
+    assert "human-sessions-needed" in result.output
+    assert "founder_journey" in result.output
+
+
+@pytest.mark.parametrize("mutation", ("edited", "manifest-removed"))
+def test_validate_beta_playtest_packet_rejects_modified_artifact(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(tmp_path / "tester-profile.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "rehearsal-profile.db"),
+        ],
+    )
+    assert prepare_result.exit_code == 0
+    markdown = output.read_text(encoding="utf-8")
+    if mutation == "edited":
+        markdown = markdown.replace(
+            "Choose New Game, then Learn / founder_journey.",
+            "Choose any campaign.",
+        )
+    else:
+        markdown = "\n".join(
+            line
+            for line in markdown.splitlines()
+            if not line.startswith("<!-- nexus-tech-beta-packet-v1 ")
+        )
+    output.write_text(markdown, encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Beta Packet Validation Failed" in result.output
+    if mutation == "edited":
+        assert "modified after generation" in result.output
+    else:
+        assert "exactly one valid" in result.output
+
+
+def test_validate_beta_playtest_packet_rejects_stale_evidence_snapshot(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(tmp_path / "tester-profile.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "rehearsal-profile.db"),
+        ],
+    )
+    assert prepare_result.exit_code == 0
+    BetaPlaytestRepository(db_path).save_session(make_session(1, "founder_journey"))
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "evidence snapshot is stale" in result.output
+
+
+def test_validate_beta_playtest_packet_rejects_mismatched_evidence_store(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(tmp_path / "tester-profile.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "rehearsal-profile.db"),
+        ],
+    )
+    assert prepare_result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(tmp_path / "wrong-evidence.db"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "does not match --db-path" in result.output
+
+
+def test_validate_beta_playtest_packet_detects_same_status_evidence_correction(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    repository = BetaPlaytestRepository(db_path)
+    session = make_session(1, "founder_journey")
+    repository.save_session(session)
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(tmp_path / "tester-profile.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "rehearsal-profile.db"),
+        ],
+    )
+    assert prepare_result.exit_code == 0
+    corrected = BetaPlaytestSession(
+        **{
+            **session.__dict__,
+            "notes": "Corrected observation retains every aggregate beta gate result.",
+        }
+    )
+    repository.save_session(corrected, replace=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "evidence snapshot is stale" in result.output
+
+
+def test_validate_beta_playtest_packet_rejects_consumed_gameplay_profile(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    session_db_path = tmp_path / "tester-profile.db"
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(session_db_path),
+            "--rehearsal-db-path",
+            str(tmp_path / "rehearsal-profile.db"),
+        ],
+    )
+    assert prepare_result.exit_code == 0
+    session_db_path.write_text("used profile", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Tester gameplay profile must not already exist" in result.output
+
+
 def test_prepare_beta_playtest_cli_hands_review_ready_evidence_to_fail_closed_gate(
     tmp_path: Path,
 ) -> None:
@@ -534,6 +786,18 @@ def test_prepare_beta_playtest_cli_hands_review_ready_evidence_to_fail_closed_ga
     markdown = output.read_text(encoding="utf-8")
     assert "Review Readiness Guard" in markdown
     assert "--require-review-ready" in markdown
+    validation_result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+    assert validation_result.exit_code == 0
+    assert "manual release review" in validation_result.output
 
 
 @pytest.mark.parametrize("artifact_suffix", ("", "-journal", "-wal", "-shm"))

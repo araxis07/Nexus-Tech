@@ -34,6 +34,19 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check src tests
 
+      - name: Build package artifacts
+        run: uv build --out-dir /tmp/nexus-tech-dist
+
+      - name: Verify source distribution package
+        run: >
+          python -c 'import glob, tarfile;
+          archive = glob.glob("/tmp/nexus-tech-dist/nexus_tech-*.tar.gz")[0];
+          names = set(tarfile.open(archive).getnames());
+          required = ("src/nexus_tech/__init__.py", "src/nexus_tech/cli.py",
+          "src/nexus_tech/beta_playtest_packet.py");
+          missing = [item for item in required if not any(name.endswith(item) for name in names)];
+          assert not missing, f"sdist missing required files: {missing}"'
+
       - name: Validate content catalog
         run: uv run nexus-tech validate-content
 
@@ -58,6 +71,12 @@ jobs:
           --command-prefix "uv run nexus-tech"
           --db-path /tmp/nexus-tech-human-beta.db
           --output /tmp/nexus-tech-beta-playtest-next.md
+
+      - name: Validate structured human beta next-session packet
+        run: >
+          uv run nexus-tech validate-beta-playtest-session-packet
+          --input /tmp/nexus-tech-beta-playtest-next.md
+          --db-path /tmp/nexus-tech-human-beta.db
 
       - name: Check featured campaign branch readiness
         run: >

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.317.0 - 2026-07-27
+
+- Embedded a deterministic manifest in every generated human-beta packet so the current build can reconstruct and verify the intended handoff
+- Added `validate-beta-playtest-session-packet` to reject stale evidence snapshots, changed packet content, mismatched evidence stores, and reused rehearsal or tester profiles before handoff
+- Added the packet validator to CI and covered valid, edited, manifest-free, stale-evidence, and consumed-profile workflows with CLI regressions
+- Restored Python source files to the Hatch source distribution and added a CI artifact-content guard so the published tarball remains installable
+- Preserved gameplay outcomes, balance, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.316.0 - 2026-07-24
 
 - Added a fail-closed `--require-review-ready` human-beta status guard so release scripts cannot treat missing or failed current-version evidence as a successful gate

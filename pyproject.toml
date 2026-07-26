@@ -1,6 +1,6 @@
 [project]
 name = "nexus-tech"
-version = "0.316.0"
+version = "0.317.0"
 description = "NEXUS TECH terminal-first management simulation game."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -42,6 +42,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 include = [
+  "src/nexus_tech/**/*.py",
   "src/nexus_tech/content/*.json",
   "README.md",
   "CHANGELOG.md",

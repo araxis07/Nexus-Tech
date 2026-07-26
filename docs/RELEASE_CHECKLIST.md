@@ -17,12 +17,14 @@ uv run ruff check src tests
 uv run ruff format --check src tests
 uv run pytest -q
 uv run pytest -q tests/test_beta_convergence.py
+uv build --out-dir /tmp/nexus-tech-dist
 uv run nexus-tech --version
 uv run nexus-tech doctor
 uv run nexus-tech validate-content
 uv run nexus-tech beta-evidence
 uv run nexus-tech beta-playtest-status
 uv run nexus-tech prepare-beta-playtest-session --output /tmp/nexus-tech-beta-playtest-next.md
+uv run nexus-tech validate-beta-playtest-session-packet --input /tmp/nexus-tech-beta-playtest-next.md
 uv run nexus-tech campaign-readiness --runs 3 --turns 20 --seed-base 28500 --output /tmp/nexus-tech-campaign-readiness.md
 uv run nexus-tech decision-quality-audit --runs 3 --turns 12 --seed-base 28600 --output /tmp/nexus-tech-decision-quality.md
 uv run nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced

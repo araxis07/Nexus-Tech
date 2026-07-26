@@ -9,11 +9,14 @@ from tempfile import gettempdir
 from uuid import uuid4
 
 import typer
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 
 from nexus_tech import __version__
+from nexus_tech.beta_playtest_packet import (
+    validate_beta_playtest_session_packet,
+)
 from nexus_tech.cli_command_prefix import resolve_cli_command_prefix
 from nexus_tech.config import DEFAULT_DATABASE_PATH
 from nexus_tech.persistence.beta_playtest_repository import (
@@ -90,6 +93,11 @@ BETA_PREPARATION_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-beta-playtest-next.md"),
     "--output",
     help="Local Markdown path for the next-session packet.",
+)
+BETA_PACKET_INPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-beta-playtest-next.md"),
+    "--input",
+    help="Generated local Markdown session packet to validate before handoff.",
 )
 BETA_PREPARATION_VIEWPORT_OPTION = typer.Option(
     "820x620",
@@ -194,23 +202,84 @@ def register_beta_playtest_commands(
                         resolved_rehearsal_db_path,
                         label="Owner rehearsal profile",
                     )
-            output.write_text(
-                format_beta_playtest_preparation_markdown(preparation),
-                encoding="utf-8",
+            packet_markdown = format_beta_playtest_preparation_markdown(preparation)
+            validate_beta_playtest_session_packet(
+                packet_markdown,
+                sessions,
+                game_version=__version__,
+                evidence_database_path=str(db_path),
             )
+            output.write_text(packet_markdown, encoding="utf-8")
         except (OSError, PersistenceError, ValueError) as error:
             _exit_with_error(console, "Beta Session Preparation Failed", str(error))
         render_beta_playtest_preparation(console, preparation)
         console.print(
             Panel(
-                Text(
-                    f"Human beta session packet written to {output}",
-                    overflow="fold",
-                    no_wrap=False,
+                Group(
+                    Text(
+                        f"Human beta session packet written to {output}",
+                        overflow="fold",
+                        no_wrap=False,
+                    ),
+                    Text(
+                        "Validate immediately before handoff:",
+                        style="bold",
+                    ),
+                    Text(
+                        preparation.validation_command(str(output)),
+                        style="cyan",
+                        overflow="fold",
+                        no_wrap=False,
+                    ),
                 ),
                 title="Local Session Artifact",
                 border_style="cyan",
                 expand=True,
+            )
+        )
+
+    @app.command("validate-beta-playtest-session-packet")
+    def validate_beta_playtest_session_packet_command(
+        input_path: Path = BETA_PACKET_INPUT_OPTION,
+        db_path: Path = BETA_DB_PATH_OPTION,
+    ) -> None:
+        """Reject stale, edited, or profile-contaminated beta session packets."""
+
+        console = get_console()
+        repository = BetaPlaytestRepository(db_path)
+        try:
+            markdown = input_path.read_text(encoding="utf-8")
+            sessions = repository.list_sessions()
+            preparation = validate_beta_playtest_session_packet(
+                markdown,
+                sessions,
+                game_version=__version__,
+                evidence_database_path=str(db_path),
+            )
+            if preparation.requires_session:
+                _require_fresh_gameplay_profile(
+                    Path(preparation.session_database_path),
+                    label="Tester gameplay profile",
+                )
+                if preparation.owner_rehearsal_required:
+                    _require_fresh_gameplay_profile(
+                        Path(preparation.owner_rehearsal_database_path),
+                        label="Owner rehearsal profile",
+                    )
+        except (OSError, PersistenceError, ValueError) as error:
+            _exit_with_error(console, "Beta Packet Validation Failed", str(error))
+
+        target = preparation.target_scenario_id or "manual release review"
+        console.print(
+            Panel.fit(
+                (
+                    "Packet matches the current build and evidence snapshot.\n"
+                    f"Status: {preparation.evidence_status}\n"
+                    f"Target: {target}\n"
+                    "Any required gameplay profile paths are fresh and isolated."
+                ),
+                title="Beta Packet Validated",
+                border_style="green",
             )
         )
 
@@ -331,5 +400,12 @@ def register_beta_playtest_commands(
 
 
 def _exit_with_error(console: Console, title: str, message: str) -> None:
-    console.print(Panel.fit(message, title=title, border_style="red"))
+    console.print(
+        Panel(
+            Text(message, overflow="fold", no_wrap=False),
+            title=title,
+            border_style="red",
+            expand=True,
+        )
+    )
     raise typer.Exit(code=1)
