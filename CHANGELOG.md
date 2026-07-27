@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.318.0 - 2026-07-27
+
+- Added a deterministic `P0`/`P1`/`P2` defect-triage policy and explicit stop conditions to every active human-beta session packet
+- Kept crashes, data loss, hard locks, recovery failures, unaided usability failures, and non-blocking polish observations distinct so operators classify evidence consistently
+- Rendered the complete policy in both the Rich console handoff and validated Markdown artifact, with regressions protecting severity order, response guidance, and privacy boundaries
+- Replaced new RNG save-state pickles with bounded JSON tokens while preserving old saves through a restricted primitive-only legacy reader that rejects global object loading
+- Preserved gameplay outcomes, balance, frozen catalogs, persistence schema 27, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.317.0 - 2026-07-27
 
 - Embedded a deterministic manifest in every generated human-beta packet so the current build can reconstruct and verify the intended handoff

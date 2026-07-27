@@ -130,6 +130,27 @@ def render_beta_playtest_preparation(
     for index, item in enumerate(preparation.checklist, start=1):
         checklist.add_row(str(index), item)
     console.print(Panel(checklist, title="2. Human Observation Checklist", expand=True))
+
+    triage = Table(box=box.SIMPLE, expand=True)
+    triage.add_column("Priority", justify="center", style="bold")
+    triage.add_column("Classify", overflow="fold")
+    triage.add_column("Operator Response", overflow="fold")
+    priority_styles = {"P0": "bold red", "P1": "bold yellow", "P2": "bold cyan"}
+    for rule in preparation.triage_rules:
+        triage.add_row(
+            Text(rule.priority, style=priority_styles[rule.priority]),
+            f"{rule.label}: {rule.trigger}",
+            rule.response,
+        )
+    console.print(
+        Panel(
+            triage,
+            title="3. Defect Triage / Stop Conditions",
+            subtitle="Classify only what was actually observed",
+            border_style="yellow",
+            expand=True,
+        )
+    )
     console.print(
         Panel(
             Group(
@@ -137,7 +158,7 @@ def render_beta_playtest_preparation(
                 Text(""),
                 _folded_command(preparation.record_command),
             ),
-            title="3. Record After Session",
+            title="4. Record After Session",
             border_style="yellow",
             expand=True,
         )
@@ -148,7 +169,7 @@ def render_beta_playtest_preparation(
                 _folded_command(preparation.status_command),
                 _folded_command(preparation.archive_command),
             ),
-            title="4. Refresh Evidence",
+            title="5. Refresh Evidence",
             border_style="cyan",
             expand=True,
         )
@@ -165,7 +186,7 @@ def render_beta_playtest_preparation(
                     no_wrap=False,
                 ),
             ),
-            title="5. Review Readiness Guard",
+            title="6. Review Readiness Guard",
             border_style="yellow",
             expand=True,
         )
@@ -261,6 +282,21 @@ def format_beta_playtest_preparation_markdown(
                 "",
                 *(f"{index}. {item}" for index, item in enumerate(preparation.checklist, 1)),
                 "",
+                "## Defect Triage And Stop Conditions",
+                "",
+                "Classify only what was actually observed before completing the recorder.",
+                "",
+                *(
+                    line
+                    for rule in preparation.triage_rules
+                    for line in (
+                        f"### {rule.priority} - {rule.label}",
+                        "",
+                        f"- Trigger: {rule.trigger}",
+                        f"- Response: {rule.response}",
+                        "",
+                    )
+                ),
                 "## Record After The Session",
                 "",
                 "Replace every ALL_CAPS value. The unchanged template must fail validation.",

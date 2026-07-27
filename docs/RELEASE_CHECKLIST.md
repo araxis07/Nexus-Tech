@@ -234,6 +234,11 @@ A zero exit means the structured current-version evidence meets the automated
 criteria. It does not replace the explicit reviewer release decision. A non-zero
 exit blocks tagging even when every deterministic CI gate passes.
 
+Before each observed session, validate the generated packet and follow its
+`P0`/`P1`/`P2` defect-triage and stop conditions. Never coach around a `P0`,
+never record an owner rehearsal as human evidence, and do not mark a non-blocking
+`P2` observation as a blocker.
+
 ## Save Verification
 
 ```bash

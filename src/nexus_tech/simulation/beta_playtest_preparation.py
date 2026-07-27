@@ -59,6 +59,49 @@ _OWNER_REHEARSAL_CHECKLIST = (
     "this owner rehearsal.",
 )
 
+_SESSION_TRIAGE_RULES = (
+    (
+        "P0",
+        "Release blocker",
+        "The game crashes, loses or corrupts save/archive data, hard-locks, or leaves "
+        "no visible recovery or return route.",
+        "Stop immediately and do not coach around the failure. Capture the exact scene "
+        "and control. For a real observed tester, record blocker FOUND; never record an "
+        "owner rehearsal as human evidence.",
+    ),
+    (
+        "P1",
+        "Usability blocker",
+        "The tester cannot identify a required primary action, use Pause/Back/Menu "
+        "recovery, read a required choice, or explain the choice without a hint.",
+        "Observe without coaching first and mark the matching check FAIL. Stop only if "
+        "the tester cannot continue; record blocker FOUND only when progress is blocked.",
+    ),
+    (
+        "P2",
+        "Polish defect",
+        "A cosmetic alignment, motion, feedback, or wording defect is visible while "
+        "comprehension and progress remain possible.",
+        "Continue the session and record one concrete anonymous observation afterward. "
+        "Keep blocker NONE unless the issue escalates or prevents progress.",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class BetaPlaytestTriageRule:
+    """One deterministic severity and operator-response rule."""
+
+    priority: str
+    label: str
+    trigger: str
+    response: str
+
+
+_DEFAULT_SESSION_TRIAGE_RULES = tuple(
+    BetaPlaytestTriageRule(*rule) for rule in _SESSION_TRIAGE_RULES
+)
+
 
 @dataclass(frozen=True)
 class BetaPlaytestPreparation:
@@ -83,6 +126,7 @@ class BetaPlaytestPreparation:
     owner_rehearsal_required: bool
     checklist: tuple[str, ...] = _SESSION_CHECKLIST
     owner_rehearsal_checklist: tuple[str, ...] = _OWNER_REHEARSAL_CHECKLIST
+    triage_rules: tuple[BetaPlaytestTriageRule, ...] = _DEFAULT_SESSION_TRIAGE_RULES
 
     @property
     def requires_session(self) -> bool:

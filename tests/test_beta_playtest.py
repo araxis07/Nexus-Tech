@@ -245,6 +245,14 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert "Save & Archive" in rehearsal
     assert "Route Atlas" in rehearsal
     assert "never run the human-session recorder" in rehearsal
+    assert [rule.priority for rule in preparation.triage_rules] == ["P0", "P1", "P2"]
+    p0, p1, p2 = preparation.triage_rules
+    assert "loses or corrupts save/archive data" in p0.trigger
+    assert "record blocker FOUND" in p0.response
+    assert "Observe without coaching first" in p1.response
+    assert "only when progress is blocked" in p1.response
+    assert "comprehension and progress remain possible" in p2.trigger
+    assert "Keep blocker NONE" in p2.response
     assert "menu-2d" in preparation.launch_command
     assert "nexus-tech-beta-001-session.db" in preparation.launch_command
     assert "nexus-tech-beta-001-rehearsal.db" not in preparation.launch_command
@@ -414,12 +422,19 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
     assert "bootstrap_studio" in result.output
     assert "Preparation only" in result.output
     assert "Owner Rehearsal Gate" not in result.output
+    assert "Defect Triage / Stop Conditions" in result.output
+    assert all(priority in result.output for priority in ("P0", "P1", "P2"))
     assert "--confirm-human-session" in result.output
     markdown = output.read_text(encoding="utf-8")
     assert "Human-Only Boundary" in markdown
     assert "Owner Rehearsal Gate" not in markdown
     assert "bootstrap_studio" in markdown
     assert "Isolated Profile Boundary" in markdown
+    assert "Defect Triage And Stop Conditions" in markdown
+    assert "### P0 - Release blocker" in markdown
+    assert "### P1 - Usability blocker" in markdown
+    assert "### P2 - Polish defect" in markdown
+    assert "Record After The Session" in markdown
     assert str(session_db_path) in markdown
     assert str(rehearsal_db_path) not in markdown
     assert f"--db-path {db_path}" in markdown
