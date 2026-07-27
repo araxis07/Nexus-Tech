@@ -9,6 +9,7 @@ from rich.table import Table
 from rich.text import Text
 
 from nexus_tech.simulation.beta_playtest import BetaPlaytestStatus
+from nexus_tech.simulation.beta_playtest_execution import BetaPlaytestExecutionPlan
 from nexus_tech.simulation.beta_playtest_preparation import (
     BetaPlaytestPacketManifest,
     BetaPlaytestPreparation,
@@ -30,6 +31,8 @@ def render_beta_playtest_preparation(
     overview.add_row("Target", preparation.target_track_label)
     overview.add_row("Scenario", preparation.target_scenario_id or "manual release review")
     overview.add_row("Reason", preparation.target_reason)
+    if preparation.retest_of_session_key is not None:
+        overview.add_row("Retest Of", preparation.retest_of_session_key)
     console.print(
         Panel(
             overview,
@@ -213,6 +216,11 @@ def format_beta_playtest_preparation_markdown(
             else "- Target scenario: `manual release review`"
         ),
         f"- Reason: {preparation.target_reason}",
+        *(
+            (f"- Retest of: `{preparation.retest_of_session_key}`",)
+            if preparation.retest_of_session_key is not None
+            else ()
+        ),
         "",
         "## Human-Only Boundary",
         "",
@@ -330,6 +338,163 @@ def format_beta_playtest_preparation_markdown(
     return "\n".join(lines)
 
 
+def render_beta_playtest_execution_plan(
+    console: Console,
+    plan: BetaPlaytestExecutionPlan,
+) -> None:
+    """Render the six campaign lanes and exactly one safe next action."""
+
+    overview = Table.grid(padding=(0, 2))
+    overview.add_column(style="bold")
+    overview.add_column()
+    overview.add_row("Game Version", plan.status.game_version)
+    overview.add_row("Evidence Status", plan.status.status)
+    overview.add_row("Active Sessions", plan.status.session_progress)
+    overview.add_row(
+        "Campaign Coverage",
+        f"{plan.status.covered_campaigns}/{plan.status.required_campaigns}",
+    )
+    overview.add_row("Superseded Retest Rows", str(plan.status.superseded_sessions))
+    overview.add_row(
+        "Owner Rehearsal",
+        (
+            "required once before the first tester; never record it"
+            if plan.owner_rehearsal_required
+            else "not part of the next evidence action"
+        ),
+    )
+    console.print(
+        Panel(
+            overview,
+            title="Human Beta Execution Plan",
+            subtitle="One fresh packet and one real session at a time",
+            border_style="green" if plan.status.review_ready else "cyan",
+            expand=True,
+        )
+    )
+
+    lane_table = Table(box=box.SIMPLE_HEAVY, expand=True)
+    lane_table.add_column("#", justify="right")
+    lane_table.add_column("Track", style="bold cyan")
+    lane_table.add_column("Scenario")
+    lane_table.add_column("Sessions", justify="right")
+    lane_table.add_column("Testers", justify="right")
+    lane_table.add_column("State", style="bold")
+    for lane in plan.lanes:
+        lane_table.add_row(
+            str(lane.order),
+            lane.track_label,
+            lane.scenario_id,
+            str(lane.active_sessions),
+            str(lane.unique_testers),
+            lane.state,
+        )
+    console.print(Panel(lane_table, title="Six-Campaign Queue", expand=True))
+
+    if plan.target.kind == "review":
+        next_command = plan.review_gate_command
+        next_copy = plan.target.reason
+    else:
+        next_command = plan.prepare_command
+        next_copy = (
+            f"{plan.target.reason} Generate and validate only this packet. "
+            "Regenerate the plan after the real session is recorded."
+        )
+    console.print(
+        Panel(
+            Group(
+                Text(next_copy, overflow="fold", no_wrap=False),
+                Text(""),
+                _folded_command(next_command),
+                Text(""),
+                Text(
+                    "Do not pre-allocate later tester codes or copy free-form observations "
+                    "into this plan.",
+                    overflow="fold",
+                    no_wrap=False,
+                ),
+            ),
+            title="Next Operator Action",
+            border_style="yellow" if not plan.status.review_ready else "green",
+            expand=True,
+        )
+    )
+
+
+def format_beta_playtest_execution_plan_markdown(
+    plan: BetaPlaytestExecutionPlan,
+) -> str:
+    """Format a note-free six-lane plan that is safe for local handoff."""
+
+    rehearsal = (
+        "required once before the first tester; never record it as human evidence"
+        if plan.owner_rehearsal_required
+        else "not part of the next evidence action"
+    )
+    lines = [
+        "# NEXUS TECH Human Beta Execution Plan",
+        "",
+        f"- Game version: `{plan.status.game_version}`",
+        f"- Evidence status: `{plan.status.status}`",
+        f"- Active sessions: `{plan.status.session_progress}`",
+        (
+            f"- Campaign coverage: "
+            f"`{plan.status.covered_campaigns}/{plan.status.required_campaigns}`"
+        ),
+        f"- Unique active testers: `{plan.status.unique_testers}`",
+        f"- Superseded retest rows retained as history: `{plan.status.superseded_sessions}`",
+        f"- Owner rehearsal: {rehearsal}",
+        "",
+        "## Evidence Boundary",
+        "",
+        "This plan allocates no tester code, records no observation, stores no free-form "
+        "note, and cannot approve release. Generate only the next packet, observe one real "
+        "first-time tester, record that session with explicit attestation, then regenerate "
+        "this plan from the updated local evidence store.",
+        "",
+        "## Six-Campaign Queue",
+        "",
+        "| # | Track | Scenario | Active sessions | Testers | State | Follow-up |",
+        "|---:|---|---|---:|---:|---|---|",
+        *(
+            (
+                f"| {lane.order} | {lane.track_label} | `{lane.scenario_id}` | "
+                f"{lane.active_sessions} | {lane.unique_testers} | `{lane.state}` | "
+                f"{lane.follow_up} |"
+            )
+            for lane in plan.lanes
+        ),
+        "",
+        "## Next Operator Action",
+        "",
+        plan.target.reason,
+        "",
+        "```bash",
+        (plan.review_gate_command if plan.target.kind == "review" else plan.prepare_command),
+        "```",
+        "",
+        "For a session packet, run its embedded validator immediately before handoff. "
+        "Never prepare all six tester profiles in advance.",
+        "",
+        "## Refresh After Each Real Session",
+        "",
+        "```bash",
+        plan.status_command,
+        plan.refresh_plan_command,
+        "```",
+        "",
+        "## Final Fail-Closed Gate",
+        "",
+        "```bash",
+        plan.review_gate_command,
+        "```",
+        "",
+        "A zero exit means ready for manual review, not automatically approved.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def render_beta_playtest_status(console: Console, status: BetaPlaytestStatus) -> None:
     """Render human-session coverage without exposing free-form observation notes."""
 
@@ -355,6 +520,7 @@ def render_beta_playtest_status(console: Console, status: BetaPlaytestStatus) ->
     overview.add_row("Blocker Sessions", str(status.blocker_sessions))
     overview.add_row("Stale-Version Rows", str(status.stale_sessions))
     overview.add_row("Ignored Campaign Rows", str(status.ignored_sessions))
+    overview.add_row("Superseded Retest Rows", str(status.superseded_sessions))
 
     border_style = "green" if status.review_ready else "yellow"
     if status.session_count >= status.required_sessions and status.gate_failures:
@@ -389,6 +555,7 @@ def render_beta_playtest_status(console: Console, status: BetaPlaytestStatus) ->
         session_table = Table(box=box.SIMPLE, expand=True)
         session_table.add_column("Session")
         session_table.add_column("Tester Code")
+        session_table.add_column("Retest Of")
         session_table.add_column("Campaign")
         session_table.add_column("Mode / Viewport")
         session_table.add_column("Turn 1", justify="right")
@@ -406,6 +573,7 @@ def render_beta_playtest_status(console: Console, status: BetaPlaytestStatus) ->
             session_table.add_row(
                 session.session_key,
                 session.tester_code,
+                session.retest_of or "-",
                 session.scenario_id,
                 f"{session.interface_mode.value} / {session.viewport}",
                 f"{session.first_turn_seconds}s",

@@ -751,7 +751,7 @@ def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path)
     assert row["campaign_commitment_choice"] == ""
     assert row["campaign_consequence_choice"] == ""
     assert row["terminal_reason"] == ""
-    assert user_version == 27
+    assert user_version == 28
 
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
@@ -1553,5 +1553,5 @@ def test_frontend_preferences_migrate_existing_profile_to_action_loadout(
             row[1]
             for row in connection.execute("PRAGMA table_info(frontend_preferences)").fetchall()
         }
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 27
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 28
     assert "action_loadout" in columns

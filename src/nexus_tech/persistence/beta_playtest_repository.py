@@ -37,6 +37,7 @@ class BetaPlaytestSession:
     notes: str
     game_version: str
     recorded_at: str
+    retest_of: str | None = None
 
 
 class BetaPlaytestRepository:
@@ -58,7 +59,11 @@ class BetaPlaytestRepository:
             self.database.initialize()
             with self.database.connect() as connection:
                 existing = connection.execute(
-                    "SELECT 1 FROM beta_playtest_sessions WHERE session_key = ?",
+                    """
+                    SELECT session_key, retest_of
+                    FROM beta_playtest_sessions
+                    WHERE session_key = ?
+                    """,
                     (session.session_key,),
                 ).fetchone()
                 if existing is not None and not replace:
@@ -66,6 +71,12 @@ class BetaPlaytestRepository:
                         f"Beta playtest session '{session.session_key}' already exists. "
                         "Use explicit replacement only when correcting that observation."
                     )
+                if existing is not None and existing["retest_of"] != session.retest_of:
+                    raise PersistenceError(
+                        "Explicit correction cannot change a session's retest relationship."
+                    )
+                _validate_unique_current_tester(connection, session)
+                _validate_retest_relationship(connection, session)
                 connection.execute(
                     """
                     INSERT INTO beta_playtest_sessions (
@@ -82,9 +93,10 @@ class BetaPlaytestRepository:
                         blocker_found,
                         notes,
                         game_version,
-                        recorded_at
+                        recorded_at,
+                        retest_of
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(session_key) DO UPDATE SET
                         tester_code = excluded.tester_code,
                         scenario_id = excluded.scenario_id,
@@ -98,7 +110,8 @@ class BetaPlaytestRepository:
                         blocker_found = excluded.blocker_found,
                         notes = excluded.notes,
                         game_version = excluded.game_version,
-                        recorded_at = excluded.recorded_at
+                        recorded_at = excluded.recorded_at,
+                        retest_of = excluded.retest_of
                     """,
                     (
                         session.session_key,
@@ -115,6 +128,7 @@ class BetaPlaytestRepository:
                         session.notes.strip(),
                         session.game_version,
                         session.recorded_at,
+                        session.retest_of,
                     ),
                 )
         except PersistenceError:
@@ -144,7 +158,8 @@ class BetaPlaytestRepository:
                         blocker_found,
                         notes,
                         game_version,
-                        recorded_at
+                        recorded_at,
+                        retest_of
                     FROM beta_playtest_sessions
                     ORDER BY recorded_at, session_key
                     """
@@ -169,6 +184,7 @@ class BetaPlaytestRepository:
                     notes=row["notes"],
                     game_version=row["game_version"],
                     recorded_at=row["recorded_at"],
+                    retest_of=row["retest_of"],
                 )
                 for row in rows
             ]
@@ -206,6 +222,92 @@ def validate_beta_playtest_session(session: BetaPlaytestSession) -> None:
         )
     if not session.game_version.strip() or not session.recorded_at.strip():
         raise ValueError("Game version and recorded timestamp are required.")
+    if session.retest_of is not None:
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{1,39}", session.retest_of) is None:
+            raise ValueError("Retest session key must use the same anonymous key format.")
+        if session.retest_of == session.session_key:
+            raise ValueError("A beta playtest session cannot retest itself.")
+
+
+def _validate_retest_relationship(
+    connection: sqlite3.Connection,
+    session: BetaPlaytestSession,
+) -> None:
+    """Protect an append-only, single-child retest chain."""
+
+    if session.retest_of is None:
+        return
+    parent = connection.execute(
+        """
+        SELECT
+            session_key,
+            tester_code,
+            scenario_id,
+            game_version,
+            turn_one_unaided,
+            pause_back_success,
+            tradeoff_explained,
+            reached_act_three,
+            blocker_found,
+            notes
+        FROM beta_playtest_sessions
+        WHERE session_key = ?
+        """,
+        (session.retest_of,),
+    ).fetchone()
+    if parent is None:
+        raise PersistenceError(
+            f"Retest parent '{session.retest_of}' does not exist in this evidence store."
+        )
+    if parent["scenario_id"] != session.scenario_id:
+        raise PersistenceError("Retest must use the same featured campaign as its parent.")
+    if parent["game_version"] != session.game_version:
+        raise PersistenceError("Retest must use the same game version as its parent.")
+    if parent["tester_code"] == session.tester_code:
+        raise PersistenceError("Retest must use a new anonymous first-time tester code.")
+    if all(
+        (
+            parent["turn_one_unaided"],
+            parent["pause_back_success"],
+            parent["tradeoff_explained"],
+            parent["reached_act_three"],
+            not parent["blocker_found"],
+            is_substantive_beta_playtest_note(parent["notes"]),
+        )
+    ):
+        raise PersistenceError("A passing beta session does not require a retest.")
+    existing_child = connection.execute(
+        """
+        SELECT session_key
+        FROM beta_playtest_sessions
+        WHERE retest_of = ? AND session_key != ?
+        """,
+        (session.retest_of, session.session_key),
+    ).fetchone()
+    if existing_child is not None:
+        raise PersistenceError(
+            f"Retest parent '{session.retest_of}' is already superseded by "
+            f"'{existing_child['session_key']}'. Retest the active child instead."
+        )
+
+
+def _validate_unique_current_tester(
+    connection: sqlite3.Connection,
+    session: BetaPlaytestSession,
+) -> None:
+    existing = connection.execute(
+        """
+        SELECT session_key
+        FROM beta_playtest_sessions
+        WHERE tester_code = ? AND game_version = ? AND session_key != ?
+        """,
+        (session.tester_code, session.game_version, session.session_key),
+    ).fetchone()
+    if existing is not None:
+        raise PersistenceError(
+            f"Tester code '{session.tester_code}' is already used by current-version "
+            f"session '{existing['session_key']}'. Use a new anonymous first-time tester."
+        )
 
 
 def is_substantive_beta_playtest_note(notes: str) -> bool:

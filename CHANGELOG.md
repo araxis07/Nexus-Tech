@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.319.0 - 2026-07-27
+
+- Added append-only human-beta retest lineage so a repaired P0/P1 failure can be re-observed by a new first-time tester without deleting the original evidence row
+- Changed review-readiness metrics to evaluate active retest-chain leaves while reporting superseded rows separately, closing the previous permanent-blocker gate dead end
+- Upgraded generated session packets to manifest schema 2 and added guarded `--retest-of` recorder commands for the exact unresolved active session
+- Added `beta-playtest-plan`, a note-free six-campaign execution queue that prepares only one fresh packet at a time and regenerates after each real session
+- Kept motion-mode differentiation focused on animation density and off-state behavior so a transient reduced-mode timing watch cannot fail the broad animation matrix; genuine reduced-mode stability failures still block
+- Upgraded persistence to additive schema 28, added retest and execution-plan CI/package regressions, and preserved gameplay outcomes, balance, frozen catalogs, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.318.0 - 2026-07-27
 
 - Added a deterministic `P0`/`P1`/`P2` defect-triage policy and explicit stop conditions to every active human-beta session packet

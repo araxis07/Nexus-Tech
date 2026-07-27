@@ -46,6 +46,16 @@ class BetaPlaytestCampaignLane:
 
 
 @dataclass(frozen=True)
+class BetaPlaytestTarget:
+    """One next human-only action selected from the active evidence snapshot."""
+
+    kind: str
+    lane: BetaPlaytestCampaignLane | None
+    reason: str
+    retest_of: BetaPlaytestSession | None = None
+
+
+@dataclass(frozen=True)
 class BetaPlaytestStatus:
     """Release-facing summary that keeps automation separate from human evidence."""
 
@@ -54,6 +64,7 @@ class BetaPlaytestStatus:
     lanes: tuple[BetaPlaytestCampaignLane, ...]
     stale_sessions: int
     ignored_sessions: int
+    superseded_sessions: int
     required_sessions: int
     required_campaigns: int
     unique_testers: int
@@ -119,17 +130,20 @@ class BetaPlaytestStatus:
 
     @property
     def next_action(self) -> str:
-        missing_lane = next((lane for lane in self.lanes if not lane.covered), None)
-        if missing_lane is not None:
+        target = select_beta_playtest_target(self)
+        if target.kind == "review":
+            return "Review the recorded evidence and make the manual beta release decision."
+        if target.kind == "coverage" and target.lane is not None:
             return (
-                f"Run a first-time session for {missing_lane.track_label} / "
-                f"{missing_lane.scenario_id}."
+                f"Run a first-time session for {target.lane.track_label} / "
+                f"{target.lane.scenario_id}."
             )
-        if self.session_count < self.required_sessions:
-            return "Record another first-time current-version session."
-        if self.gate_failures:
-            return self.gate_failures[0]
-        return "Review the recorded evidence and make the manual beta release decision."
+        if target.kind == "retest" and target.lane is not None and target.retest_of is not None:
+            return (
+                f"Fix and re-test {target.lane.track_label} / {target.lane.scenario_id}, "
+                f"superseding {target.retest_of.session_key} with a new first-time tester."
+            )
+        return "Record another independent first-time current-version session."
 
     @property
     def session_progress(self) -> str:
@@ -151,10 +165,16 @@ def build_beta_playtest_status(
 
     featured_journeys = list_featured_campaign_journeys()
     featured_ids = {journey.scenario_id for journey in featured_journeys}
-    current_sessions = tuple(
+    current_evidence = tuple(
         session
         for session in sessions
         if session.game_version == game_version and session.scenario_id in featured_ids
+    )
+    superseded_keys = {
+        session.retest_of for session in current_evidence if session.retest_of is not None
+    }
+    current_sessions = tuple(
+        session for session in current_evidence if session.session_key not in superseded_keys
     )
     lanes = tuple(
         BetaPlaytestCampaignLane(
@@ -180,6 +200,7 @@ def build_beta_playtest_status(
         lanes=lanes,
         stale_sessions=sum(session.game_version != game_version for session in sessions),
         ignored_sessions=sum(session.scenario_id not in featured_ids for session in sessions),
+        superseded_sessions=len(current_evidence) - len(current_sessions),
         required_sessions=6,
         required_campaigns=len(featured_journeys),
         unique_testers=len({session.tester_code for session in current_sessions}),
@@ -196,4 +217,57 @@ def build_beta_playtest_status(
             if session_count
             else 0
         ),
+    )
+
+
+def beta_playtest_session_needs_retest(session: BetaPlaytestSession) -> bool:
+    """Return whether an active human observation still blocks its campaign lane."""
+
+    return not all(
+        (
+            session.turn_one_unaided,
+            session.pause_back_success,
+            session.tradeoff_explained,
+            session.reached_act_three,
+            not session.blocker_found,
+            is_substantive_beta_playtest_note(session.notes),
+        )
+    )
+
+
+def select_beta_playtest_target(status: BetaPlaytestStatus) -> BetaPlaytestTarget:
+    """Select one next lane without allocating evidence or tester identities."""
+
+    if status.review_ready:
+        return BetaPlaytestTarget(
+            kind="review",
+            lane=None,
+            reason="Automated human-evidence criteria are ready for manual release review.",
+        )
+
+    missing_lane = next((lane for lane in status.lanes if not lane.covered), None)
+    if missing_lane is not None:
+        return BetaPlaytestTarget(
+            kind="coverage",
+            lane=missing_lane,
+            reason="Cover the next featured campaign missing current-version evidence.",
+        )
+
+    failed_session = next(
+        (session for session in status.sessions if beta_playtest_session_needs_retest(session)),
+        None,
+    )
+    if failed_session is not None:
+        lane = next(lane for lane in status.lanes if lane.scenario_id == failed_session.scenario_id)
+        return BetaPlaytestTarget(
+            kind="retest",
+            lane=lane,
+            reason="Re-test the first campaign with an unresolved human gate.",
+            retest_of=failed_session,
+        )
+
+    return BetaPlaytestTarget(
+        kind="additional",
+        lane=min(status.lanes, key=lambda lane: (lane.sessions, lane.scenario_id)),
+        reason="Add an independent tester to close the remaining aggregate human gate.",
     )

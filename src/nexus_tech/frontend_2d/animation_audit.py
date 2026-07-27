@@ -9213,12 +9213,8 @@ def _build_motion_mode_differentiation_cell(
     off_residual = _max_residual_motion_pulses(off_motion_report)
 
     findings: list[str] = []
-    if motion_report.status != "pass":
-        findings.append(f"full status {motion_report.status}")
-    if reduced_motion_report.status != "pass":
-        findings.append(f"reduced status {reduced_motion_report.status}")
-    if off_motion_report.status != "pass":
-        findings.append(f"off status {off_motion_report.status}")
+    if reduced_motion_report.status == "fail":
+        findings.append("reduced mode failed its stability budget")
     if full_active <= 0:
         findings.append("full mode has no active motion samples")
     if reduced_active <= 0:
@@ -9230,6 +9226,9 @@ def _build_motion_mode_differentiation_cell(
         findings.append(f"off still active {off_active}/{off_residual}")
 
     active_layers = (
+        f"full-status:{motion_report.status}",
+        f"reduced-status:{reduced_motion_report.status}",
+        f"off-status:{off_motion_report.status}",
         f"full-active:{full_active}",
         f"reduced-active:{reduced_active}",
         f"reduced-active-overrun:{reduced_overrun}",

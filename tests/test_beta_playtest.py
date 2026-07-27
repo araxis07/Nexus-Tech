@@ -17,6 +17,9 @@ from nexus_tech.persistence.beta_playtest_repository import (
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.simulation.beta_playtest import build_beta_playtest_status
+from nexus_tech.simulation.beta_playtest_execution import (
+    build_beta_playtest_execution_plan,
+)
 from nexus_tech.simulation.beta_playtest_preparation import (
     build_beta_playtest_preparation,
 )
@@ -33,6 +36,7 @@ def make_session(
     game_version: str = __version__,
     blocker_found: bool = False,
     notes: str = "Tester found the controls and explained both campaign trade-offs clearly.",
+    retest_of: str | None = None,
 ) -> BetaPlaytestSession:
     return BetaPlaytestSession(
         session_key=f"beta-{index:03d}",
@@ -51,10 +55,11 @@ def make_session(
         notes=notes,
         game_version=game_version,
         recorded_at=f"2026-07-15T00:0{index}:00+00:00",
+        retest_of=retest_of,
     )
 
 
-def test_beta_playtest_repository_round_trip_and_schema_27(tmp_path: Path) -> None:
+def test_beta_playtest_repository_round_trip_and_schema_28(tmp_path: Path) -> None:
     db_path = tmp_path / "beta.db"
     repository = BetaPlaytestRepository(db_path)
     session = make_session(1, "founder_journey")
@@ -63,7 +68,67 @@ def test_beta_playtest_repository_round_trip_and_schema_27(tmp_path: Path) -> No
 
     assert repository.list_sessions() == [session]
     with sqlite3.connect(db_path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 27
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 28
+
+
+def test_beta_playtest_repository_migrates_schema_27_without_losing_evidence(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "schema-27-beta.db"
+    session = make_session(1, "founder_journey")
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE beta_playtest_sessions (
+                session_key TEXT PRIMARY KEY,
+                tester_code TEXT NOT NULL,
+                scenario_id TEXT NOT NULL,
+                interface_mode TEXT NOT NULL,
+                viewport TEXT NOT NULL,
+                first_turn_seconds INTEGER NOT NULL,
+                turn_one_unaided INTEGER NOT NULL,
+                pause_back_success INTEGER NOT NULL,
+                tradeoff_explained INTEGER NOT NULL,
+                reached_act_three INTEGER NOT NULL,
+                blocker_found INTEGER NOT NULL,
+                notes TEXT NOT NULL,
+                game_version TEXT NOT NULL,
+                recorded_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO beta_playtest_sessions
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session.session_key,
+                session.tester_code,
+                session.scenario_id,
+                session.interface_mode.value,
+                session.viewport,
+                session.first_turn_seconds,
+                int(session.turn_one_unaided),
+                int(session.pause_back_success),
+                int(session.tradeoff_explained),
+                int(session.reached_act_three),
+                int(session.blocker_found),
+                session.notes,
+                session.game_version,
+                session.recorded_at,
+            ),
+        )
+        connection.execute("PRAGMA user_version = 27")
+
+    assert BetaPlaytestRepository(db_path).list_sessions() == [session]
+    with sqlite3.connect(db_path) as connection:
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(beta_playtest_sessions)").fetchall()
+        }
+        assert "retest_of" in columns
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 28
 
 
 def test_beta_playtest_repository_requires_explicit_replace(tmp_path: Path) -> None:
@@ -84,6 +149,22 @@ def test_beta_playtest_repository_requires_explicit_replace(tmp_path: Path) -> N
     repository.save_session(replacement, replace=True)
 
     assert repository.list_sessions() == [replacement]
+
+
+def test_beta_playtest_repository_requires_new_current_version_tester(
+    tmp_path: Path,
+) -> None:
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    repository.save_session(make_session(1, "founder_journey"))
+    duplicate_tester = BetaPlaytestSession(
+        **{
+            **make_session(2, "bootstrap_studio").__dict__,
+            "tester_code": "T01",
+        }
+    )
+
+    with pytest.raises(PersistenceError, match="new anonymous first-time tester"):
+        repository.save_session(duplicate_tester)
 
 
 def test_beta_playtest_repository_reports_invalid_stored_interface(tmp_path: Path) -> None:
@@ -178,6 +259,53 @@ def test_beta_playtest_status_requires_six_current_human_sessions() -> None:
     assert status.covered_campaigns == 0
 
 
+def test_beta_playtest_execution_plan_queues_six_lanes_one_session_at_a_time() -> None:
+    plan = build_beta_playtest_execution_plan(
+        [],
+        game_version=__version__,
+        command_prefix=".venv313/bin/nexus-tech",
+        evidence_database_path="nexus-tech.db",
+        packet_output_path="/tmp/nexus-tech-beta-playtest-next.md",
+        plan_output_path="/tmp/nexus-tech-beta-playtest-plan.md",
+    )
+
+    assert plan.owner_rehearsal_required
+    assert len(plan.lanes) == 6
+    assert plan.lanes[0].scenario_id == "founder_journey"
+    assert plan.lanes[0].state == "NEXT SESSION"
+    assert all(lane.state == "QUEUED" for lane in plan.lanes[1:])
+    assert "prepare-beta-playtest-session" in plan.prepare_command
+    assert "--command-prefix .venv313/bin/nexus-tech" in plan.prepare_command
+    assert "--require-review-ready" in plan.review_gate_command
+
+
+def test_beta_playtest_execution_plan_targets_active_retest_without_copying_notes() -> None:
+    sessions = [
+        make_session(
+            index,
+            journey.scenario_id,
+            blocker_found=index == 1,
+        )
+        for index, journey in enumerate(list_featured_campaign_journeys(), start=1)
+    ]
+
+    plan = build_beta_playtest_execution_plan(
+        sessions,
+        game_version=__version__,
+        command_prefix="nexus-tech",
+        evidence_database_path="nexus-tech.db",
+        packet_output_path="/tmp/next.md",
+        plan_output_path="/tmp/plan.md",
+    )
+
+    assert plan.target.kind == "retest"
+    assert plan.target.retest_of is not None
+    assert plan.target.retest_of.session_key == "beta-001"
+    assert plan.lanes[0].state == "NEXT RETEST"
+    assert plan.lanes[0].follow_up.endswith("with a new first-time tester.")
+    assert all(session.notes not in plan.lanes[0].follow_up for session in sessions)
+
+
 def test_beta_playtest_status_reaches_manual_review_with_six_campaigns() -> None:
     sessions = [
         make_session(index, journey.scenario_id)
@@ -212,6 +340,149 @@ def test_beta_playtest_status_fails_when_a_blocker_is_recorded() -> None:
     assert any("blocker-level" in failure for failure in status.gate_failures)
 
 
+def test_beta_playtest_retest_preserves_history_and_closes_resolved_blocker(
+    tmp_path: Path,
+) -> None:
+    journeys = list_featured_campaign_journeys()
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    blocked = make_session(1, journeys[0].scenario_id, blocker_found=True)
+    repository.save_session(blocked)
+    for index, journey in enumerate(journeys[1:], start=2):
+        repository.save_session(make_session(index, journey.scenario_id))
+    retest = make_session(
+        7,
+        journeys[0].scenario_id,
+        notes="A new tester completed the repaired recovery route without operator help.",
+        retest_of=blocked.session_key,
+    )
+    repository.save_session(retest)
+
+    stored = repository.list_sessions()
+    status = build_beta_playtest_status(stored, game_version=__version__)
+
+    assert len(stored) == 7
+    assert stored[0] == blocked
+    assert stored[-1] == retest
+    assert status.superseded_sessions == 1
+    assert status.session_count == 6
+    assert status.blocker_sessions == 0
+    assert status.review_ready
+    assert blocked not in status.sessions
+    assert retest in status.sessions
+
+
+@pytest.mark.parametrize(
+    ("scenario_id", "tester_code", "retest_of", "message"),
+    (
+        ("bootstrap_studio", "T02", "beta-001", "same featured campaign"),
+        ("founder_journey", "T01", "beta-001", "new anonymous first-time tester"),
+        ("founder_journey", "T02", "beta-999", "does not exist"),
+    ),
+)
+def test_beta_playtest_repository_rejects_invalid_retest_relationship(
+    tmp_path: Path,
+    scenario_id: str,
+    tester_code: str,
+    retest_of: str,
+    message: str,
+) -> None:
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    repository.save_session(make_session(1, "founder_journey", blocker_found=True))
+    candidate = make_session(
+        2,
+        scenario_id,
+        retest_of=retest_of,
+    )
+    candidate = BetaPlaytestSession(**{**candidate.__dict__, "tester_code": tester_code})
+
+    with pytest.raises(PersistenceError, match=message):
+        repository.save_session(candidate)
+
+
+def test_beta_playtest_repository_rejects_retesting_a_passing_session(
+    tmp_path: Path,
+) -> None:
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    repository.save_session(make_session(1, "founder_journey"))
+
+    with pytest.raises(PersistenceError, match="does not require a retest"):
+        repository.save_session(make_session(2, "founder_journey", retest_of="beta-001"))
+
+
+def test_beta_playtest_repository_rejects_second_direct_retest_child(
+    tmp_path: Path,
+) -> None:
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    repository.save_session(make_session(1, "founder_journey", blocker_found=True))
+    repository.save_session(make_session(2, "founder_journey", retest_of="beta-001"))
+
+    with pytest.raises(PersistenceError, match="already superseded by 'beta-002'"):
+        repository.save_session(make_session(3, "founder_journey", retest_of="beta-001"))
+
+
+def test_beta_playtest_status_evaluates_only_leaf_of_multi_stage_retest_chain(
+    tmp_path: Path,
+) -> None:
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    original = make_session(1, "founder_journey", blocker_found=True)
+    failed_retest = make_session(
+        2,
+        "founder_journey",
+        blocker_found=True,
+        retest_of=original.session_key,
+    )
+    passing_retest = make_session(
+        3,
+        "founder_journey",
+        retest_of=failed_retest.session_key,
+    )
+    repository.save_session(original)
+    repository.save_session(failed_retest)
+    repository.save_session(passing_retest)
+
+    status = build_beta_playtest_status(repository.list_sessions(), game_version=__version__)
+
+    assert status.sessions == (passing_retest,)
+    assert status.superseded_sessions == 2
+    assert status.blocker_sessions == 0
+
+
+def test_beta_playtest_repository_correction_cannot_change_retest_lineage(
+    tmp_path: Path,
+) -> None:
+    repository = BetaPlaytestRepository(tmp_path / "beta.db")
+    repository.save_session(make_session(1, "founder_journey", blocker_found=True))
+    retest = make_session(2, "founder_journey", retest_of="beta-001")
+    repository.save_session(retest)
+    changed_lineage = BetaPlaytestSession(**{**retest.__dict__, "retest_of": None})
+
+    with pytest.raises(PersistenceError, match="cannot change.*retest relationship"):
+        repository.save_session(changed_lineage, replace=True)
+
+
+def test_beta_playtest_repository_allows_retest_of_legacy_placeholder_note(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "beta.db"
+    repository = BetaPlaytestRepository(db_path)
+    repository.save_session(make_session(1, "founder_journey"))
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            "UPDATE beta_playtest_sessions SET notes = 'placeholder' WHERE session_key = ?",
+            ("beta-001",),
+        )
+
+    retest = make_session(
+        2,
+        "founder_journey",
+        notes="A new tester supplied a concrete observation for the repaired evidence lane.",
+        retest_of="beta-001",
+    )
+    repository.save_session(retest)
+
+    assert repository.list_sessions()[-1] == retest
+
+
 def test_beta_playtest_status_excludes_stale_version_evidence() -> None:
     stale = make_session(1, "founder_journey", game_version="0.287.0")
 
@@ -241,6 +512,7 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert preparation.session_key == "beta-001"
     assert preparation.tester_code == "T01"
     assert preparation.owner_rehearsal_required
+    assert preparation.retest_of_session_key is None
     rehearsal = " ".join(preparation.owner_rehearsal_checklist)
     assert "Save & Archive" in rehearsal
     assert "Route Atlas" in rehearsal
@@ -315,6 +587,8 @@ def test_beta_playtest_preparation_retests_an_unresolved_human_gate() -> None:
     assert preparation.target_scenario_id == "founder_journey"
     assert preparation.session_key == "beta-007"
     assert preparation.tester_code == "T07"
+    assert preparation.retest_of_session_key == "beta-001"
+    assert "--retest-of beta-001" in preparation.record_command
     assert "unresolved human gate" in preparation.target_reason
 
 
@@ -442,6 +716,47 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
     assert not rehearsal_db_path.exists()
     assert existing.notes not in markdown
     assert BetaPlaytestRepository(db_path).list_sessions() == [existing]
+
+
+def test_beta_playtest_plan_cli_writes_note_free_six_lane_artifact(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "execution-plan.md"
+    packet_output = tmp_path / "next-session.md"
+    existing = make_session(1, "founder_journey")
+    BetaPlaytestRepository(db_path).save_session(existing)
+
+    result = runner.invoke(
+        app,
+        [
+            "beta-playtest-plan",
+            "--command-prefix",
+            ".venv313/bin/nexus-tech",
+            "--output",
+            str(output),
+            "--packet-output",
+            str(packet_output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Human Beta Execution Plan" in result.output
+    assert "Six-Campaign Queue" in result.output
+    assert "Next Operator Action" in result.output
+    markdown = output.read_text(encoding="utf-8")
+    assert "Six-Campaign Queue" in markdown
+    assert "`NEXT SESSION`" in markdown
+    assert all(
+        f"`{journey.scenario_id}`" in markdown for journey in list_featured_campaign_journeys()
+    )
+    assert "Never prepare all six tester profiles in advance." in markdown
+    assert "prepare-beta-playtest-session" in markdown
+    assert "beta-playtest-plan" in markdown
+    assert existing.notes not in markdown
+    assert not packet_output.exists()
 
 
 def test_prepare_beta_playtest_cli_defaults_to_current_executable(
@@ -594,7 +909,7 @@ def test_validate_beta_playtest_packet_rejects_modified_artifact(
         markdown = "\n".join(
             line
             for line in markdown.splitlines()
-            if not line.startswith("<!-- nexus-tech-beta-packet-v1 ")
+            if not line.startswith("<!-- nexus-tech-beta-packet-v2 ")
         )
     output.write_text(markdown, encoding="utf-8")
 
@@ -734,6 +1049,55 @@ def test_validate_beta_playtest_packet_detects_same_status_evidence_correction(
 
     assert result.exit_code == 1
     assert "evidence snapshot is stale" in result.output
+
+
+def test_prepare_and_validate_beta_playtest_retest_packet(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "retest-session.md"
+    repository = BetaPlaytestRepository(db_path)
+    for index, journey in enumerate(list_featured_campaign_journeys(), start=1):
+        repository.save_session(
+            make_session(
+                index,
+                journey.scenario_id,
+                blocker_found=index == 1,
+            )
+        )
+
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(tmp_path / "retest-profile.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "unused-rehearsal.db"),
+        ],
+    )
+    validation_result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert prepare_result.exit_code == 0
+    assert validation_result.exit_code == 0
+    assert "Retest Of" in prepare_result.output
+    markdown = output.read_text(encoding="utf-8")
+    assert "- Retest of: `beta-001`" in markdown
+    assert "--retest-of beta-001" in markdown
+    assert "Target: founder_journey" in validation_result.output
 
 
 def test_validate_beta_playtest_packet_rejects_consumed_gameplay_profile(

@@ -564,4 +564,4 @@ def test_completed_campaign_archive_preserves_beta_evidence_fields(tmp_path) -> 
     assert archive.difficulty_mode == "founder"
     assert archive.campaign_path == ("Sharpen the Flagship", "Defend Control")
     assert archive.terminal_reason == "The company proved a durable path."
-    assert coordinator.check_save_health().schema_version == 27
+    assert coordinator.check_save_health().schema_version == 28

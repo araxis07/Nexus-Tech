@@ -2,10 +2,10 @@
 
 ## Product Position
 
-NEXUS TECH 0.318.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.319.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
-[Beta Execution Audit - 2026-07-24](BETA_EXECUTION_AUDIT_2026-07-24.md).
+[Beta Execution Audit - 2026-07-27](BETA_EXECUTION_AUDIT_2026-07-27.md).
 
 ## Current Engineering Slice
 
@@ -41,7 +41,7 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - compact risk cues remain complete at 820x620, while hover adds consequence context and the Recommended button shows AP cost plus urgency;
 - the engine and 2D availability checks now share the existing zero-AP review/end-turn and one-AP operating-action policy, so Recommended disables when the current move cannot be afforded;
 - the primary command and its workspace are excluded from alternatives while preference, Coach, and stable fallback order remain deterministic;
-- Coach execution, direct keyboard commands, AP costs, simulation state, balance, persistence, and schema 27 are unchanged;
+- Coach execution, direct keyboard commands, AP costs, simulation state, and balance are unchanged; schema 28 adds only human-beta retest lineage;
 - Endgame actor cards now use one measured header lane that reserves title and summary width at compact viewports;
 - the redundant Endgame entity strip is suppressed while actor cards are active, and Quick Start identifies its actor as `Guide`;
 - compact layout regressions protect actor-to-copy separation at 820x620;
@@ -52,6 +52,8 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - compact Help content now lives in a pure module and retains complete labels without ellipsis at the large text scale;
 - `scenes.py` remains responsible for availability, contextual selection, layout, input routing, and rendering rather than owning those catalog decisions;
 - `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
+- `beta-playtest-plan` exposes all six campaign lanes while allowing only one fresh packet to be generated before the plan is refreshed;
+- unresolved P0/P1 rows remain stored as history, while a guarded `--retest-of` session from a new first-time tester becomes the active gate row instead of leaving release readiness permanently blocked;
 - while current-version evidence is `0/6`, that packet opens with a separate owner-only rehearsal gate covering recovery, campaign, Endgame, archive, and Progress routes without placing the human recorder inside the rehearsal gate;
 - owner rehearsal, tester gameplay, and structured evidence now use three distinct database paths so prior saves, Continue state, and archives cannot contaminate a first-time observation;
 - preparation allocates unique temporary gameplay profiles by default, rejects explicit profiles that already exist, and leaves the persistent evidence store only in recorder/status commands;
@@ -59,6 +61,7 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 - every active session packet defines deterministic `P0` release-blocker, `P1` usability-blocker, and `P2` polish classifications with explicit stop and recording responses;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
 - every generated packet now carries a deterministic manifest, and `validate-beta-playtest-session-packet` rejects changed content, stale build/evidence state, a mismatched evidence store, or an already-used gameplay profile before handoff;
+- motion-mode differentiation now evaluates animation density and disabled-state behavior independently from transient reduced-mode timing watches, while genuine reduced-mode stability failures remain blocking;
 - `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, failing only missing ledger coverage while exporting repetition and low-variety candidates for human review;
 - `beta-playtest-status --require-review-ready` now exits non-zero until all current-version human criteria pass, preventing release scripts from confusing an informative status report with a successful gate while retaining the final manual reviewer decision;
 - no save migration, new catalog entry, control binding, or balance adjustment is introduced.
@@ -67,10 +70,10 @@ The current convergence slice reduces 2D scene coupling and protects the complet
 
 1. Run `prepare-beta-playtest-session` and keep its isolated rehearsal/tester/evidence database paths unchanged.
 2. Run `validate-beta-playtest-session-packet` immediately before handoff, then follow the Owner Rehearsal Gate from New Game through `Save & Archive` and `6 Open Progress` at 820x620; record only defects actually observed and never run the human-session recorder for the rehearsal.
-3. Observe six first-time sessions across all six featured campaigns using anonymous tester codes, classify each issue with the packet's `P0`/`P1`/`P2` policy, and use the structured local evidence command only after each real session.
+3. Observe six first-time sessions across all six featured campaigns using anonymous tester codes, classify each issue with the packet's `P0`/`P1`/`P2` policy, and use the structured local evidence command only after each real session. Regenerate `beta-playtest-plan` after every row rather than pre-allocating later testers.
 4. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
 5. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.
-6. Fix P0/P1 navigation, readability, wording, or pacing defects before any feature expansion.
+6. Fix P0/P1 navigation, readability, wording, or pacing defects before any feature expansion, then use the generated `--retest-of` relationship with a new first-time tester so the original failure remains auditable.
 7. Re-run gameplay, balance, campaign, save, visual, layout, motion, animation, package, and security gates after every observed blocker fix.
 8. Run `beta-playtest-status --require-review-ready`, then promote to beta only after its fail-closed gate passes and a reviewer makes the release decision.
 

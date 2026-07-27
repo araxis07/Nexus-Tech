@@ -43,7 +43,8 @@ jobs:
           archive = glob.glob("/tmp/nexus-tech-dist/nexus_tech-*.tar.gz")[0];
           names = set(tarfile.open(archive).getnames());
           required = ("src/nexus_tech/__init__.py", "src/nexus_tech/cli.py",
-          "src/nexus_tech/beta_playtest_packet.py");
+          "src/nexus_tech/beta_playtest_packet.py",
+          "src/nexus_tech/simulation/beta_playtest_execution.py");
           missing = [item for item in required if not any(name.endswith(item) for name in names)];
           assert not missing, f"sdist missing required files: {missing}"'
 
@@ -64,6 +65,14 @@ jobs:
 
       - name: Check structured human beta evidence guardrail
         run: uv run nexus-tech beta-playtest-status --db-path /tmp/nexus-tech-human-beta.db
+
+      - name: Export structured human beta execution plan
+        run: >
+          uv run nexus-tech beta-playtest-plan
+          --command-prefix "uv run nexus-tech"
+          --db-path /tmp/nexus-tech-human-beta.db
+          --packet-output /tmp/nexus-tech-beta-playtest-next.md
+          --output /tmp/nexus-tech-beta-playtest-plan.md
 
       - name: Prepare structured human beta next-session packet
         run: >
@@ -542,6 +551,15 @@ jobs:
         with:
           name: nexus-tech-beta-playtest-next
           path: /tmp/nexus-tech-beta-playtest-next.md
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload structured human beta execution plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-tech-beta-playtest-plan
+          path: /tmp/nexus-tech-beta-playtest-plan.md
           if-no-files-found: warn
           retention-days: 7
 

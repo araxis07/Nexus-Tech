@@ -5623,6 +5623,14 @@ def test_motion_mode_differentiation_records_reduced_residual_without_failing() 
     reduced_with_more_residual = _report(residual=13, active=3, mode=MotionMode.REDUCED)
     reduced_with_active_jitter = _report(residual=12, active=5, mode=MotionMode.REDUCED)
     reduced_with_active_regression = _report(residual=12, active=6, mode=MotionMode.REDUCED)
+    reduced_with_timing_watch = replace(
+        reduced_with_jitter,
+        cells=(replace(reduced_with_jitter.cells[0], p99_frame_ms=60.0),),
+    )
+    reduced_with_timing_failure = replace(
+        reduced_with_jitter,
+        cells=(replace(reduced_with_jitter.cells[0], p99_frame_ms=80.0),),
+    )
     off_report = _report(residual=0, active=0, mode=MotionMode.OFF)
     off_report_with_residual = _report(residual=1, active=0, mode=MotionMode.OFF)
 
@@ -5646,6 +5654,16 @@ def test_motion_mode_differentiation_records_reduced_residual_without_failing() 
         reduced_with_active_regression,
         off_report,
     )
+    timing_watch = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_with_timing_watch,
+        off_report,
+    )
+    timing_failure = animation_audit_module._build_motion_mode_differentiation_cell(
+        full_report,
+        reduced_with_timing_failure,
+        off_report,
+    )
     off_regression = animation_audit_module._build_motion_mode_differentiation_cell(
         full_report,
         reduced_with_jitter,
@@ -5660,6 +5678,12 @@ def test_motion_mode_differentiation_records_reduced_residual_without_failing() 
     assert "reduced-active-overrun:3" in active_jitter.active_layers
     assert active_regression.status == "fail"
     assert "reduced active 18>12" in active_regression.notes
+    assert reduced_with_timing_watch.status == "watch"
+    assert timing_watch.status == "pass"
+    assert "reduced-status:watch" in timing_watch.active_layers
+    assert reduced_with_timing_failure.status == "fail"
+    assert timing_failure.status == "fail"
+    assert "reduced mode failed its stability budget" in timing_failure.notes
     assert off_regression.status == "fail"
     assert "off still active 0/1" in off_regression.notes
 

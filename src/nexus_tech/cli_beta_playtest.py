@@ -26,7 +26,9 @@ from nexus_tech.persistence.beta_playtest_repository import (
 )
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.presentation.beta_playtest import (
+    format_beta_playtest_execution_plan_markdown,
     format_beta_playtest_preparation_markdown,
+    render_beta_playtest_execution_plan,
     render_beta_playtest_preparation,
     render_beta_playtest_status,
 )
@@ -34,6 +36,9 @@ from nexus_tech.simulation.beta_playtest import (
     BetaBlockerResult,
     BetaObservationResult,
     build_beta_playtest_status,
+)
+from nexus_tech.simulation.beta_playtest_execution import (
+    build_beta_playtest_execution_plan,
 )
 from nexus_tech.simulation.beta_playtest_preparation import (
     build_beta_playtest_preparation,
@@ -93,6 +98,16 @@ BETA_PREPARATION_OUTPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-beta-playtest-next.md"),
     "--output",
     help="Local Markdown path for the next-session packet.",
+)
+BETA_EXECUTION_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-beta-playtest-plan.md"),
+    "--output",
+    help="Local Markdown path for the six-campaign execution plan.",
+)
+BETA_EXECUTION_PACKET_OUTPUT_OPTION = typer.Option(
+    Path("/tmp/nexus-tech-beta-playtest-next.md"),
+    "--packet-output",
+    help="Local Markdown path used by the plan's next-session preparation command.",
 )
 BETA_PACKET_INPUT_OPTION = typer.Option(
     Path("/tmp/nexus-tech-beta-playtest-next.md"),
@@ -155,6 +170,47 @@ def register_beta_playtest_commands(
     get_console: Callable[[], Console],
 ) -> None:
     """Register release-only beta evidence commands on the main application."""
+
+    @app.command("beta-playtest-plan")
+    def beta_playtest_plan_command(
+        command_prefix: str = BETA_COMMAND_PREFIX_OPTION,
+        output: Path = BETA_EXECUTION_OUTPUT_OPTION,
+        packet_output: Path = BETA_EXECUTION_PACKET_OUTPUT_OPTION,
+        db_path: Path = BETA_DB_PATH_OPTION,
+    ) -> None:
+        """Export all six campaign lanes while selecting only one next session."""
+
+        console = get_console()
+        repository = BetaPlaytestRepository(db_path)
+        try:
+            sessions = repository.list_sessions()
+            plan = build_beta_playtest_execution_plan(
+                sessions,
+                game_version=__version__,
+                command_prefix=command_prefix,
+                evidence_database_path=str(db_path),
+                packet_output_path=str(packet_output),
+                plan_output_path=str(output),
+            )
+            output.write_text(
+                format_beta_playtest_execution_plan_markdown(plan),
+                encoding="utf-8",
+            )
+        except (OSError, PersistenceError, ValueError) as error:
+            _exit_with_error(console, "Beta Execution Plan Failed", str(error))
+        render_beta_playtest_execution_plan(console, plan)
+        console.print(
+            Panel(
+                Text(
+                    f"Human beta execution plan written to {output}",
+                    overflow="fold",
+                    no_wrap=False,
+                ),
+                title="Local Plan Artifact",
+                border_style="cyan",
+                expand=True,
+            )
+        )
 
     @app.command("prepare-beta-playtest-session")
     def prepare_beta_playtest_session_command(
@@ -334,6 +390,14 @@ def register_beta_playtest_commands(
             "--replace",
             help="Explicitly replace an existing session key when correcting evidence.",
         ),
+        retest_of: str | None = typer.Option(
+            None,
+            "--retest-of",
+            help=(
+                "Unresolved prior session superseded by this observed retest. The prior "
+                "row remains stored as history."
+            ),
+        ),
     ) -> None:
         """Record one observed real-human beta session in the local database."""
 
@@ -369,6 +433,7 @@ def register_beta_playtest_commands(
             notes=notes,
             game_version=__version__,
             recorded_at=datetime.now(UTC).isoformat(),
+            retest_of=retest_of,
         )
         try:
             repository.save_session(session, replace=replace)

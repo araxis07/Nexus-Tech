@@ -14,23 +14,21 @@ from pathlib import Path
 from nexus_tech.persistence.beta_playtest_repository import (
     BetaPlaytestInterface,
     BetaPlaytestSession,
-    is_substantive_beta_playtest_note,
 )
 from nexus_tech.simulation.beta_playtest import (
-    BetaPlaytestCampaignLane,
-    BetaPlaytestStatus,
     build_beta_playtest_status,
+    select_beta_playtest_target,
 )
 from nexus_tech.user_preferences import MotionMode
 
-_PACKET_MANIFEST_PREFIX = "<!-- nexus-tech-beta-packet-v1 "
+_PACKET_MANIFEST_PREFIX = "<!-- nexus-tech-beta-packet-v2 "
 _PACKET_MANIFEST_SUFFIX = " -->"
 _PACKET_MANIFEST_PATTERN = re.compile(
     rf"^{re.escape(_PACKET_MANIFEST_PREFIX)}([A-Za-z0-9_-]+)"
     rf"{re.escape(_PACKET_MANIFEST_SUFFIX)}$",
     re.MULTILINE,
 )
-_PACKET_MANIFEST_SCHEMA_VERSION = 1
+_PACKET_MANIFEST_SCHEMA_VERSION = 2
 
 _SESSION_CHECKLIST = (
     "Confirm the isolated tester profile opens with Continue unavailable and no prior "
@@ -114,6 +112,7 @@ class BetaPlaytestPreparation:
     target_scenario_id: str | None
     target_track_label: str
     target_reason: str
+    retest_of_session_key: str | None
     session_key: str
     tester_code: str
     interface_mode: BetaPlaytestInterface
@@ -179,8 +178,7 @@ class BetaPlaytestPreparation:
     def record_command(self) -> str:
         if not self.requires_session:
             return ""
-        return _command(
-            self.command_prefix,
+        arguments: list[object] = [
             "record-beta-playtest-session",
             "--session-key",
             self.session_key,
@@ -209,7 +207,10 @@ class BetaPlaytestPreparation:
             "--confirm-human-session",
             "--db-path",
             self.evidence_database_path,
-        )
+        ]
+        if self.retest_of_session_key is not None:
+            arguments.extend(("--retest-of", self.retest_of_session_key))
+        return _command(self.command_prefix, *arguments)
 
     @property
     def status_command(self) -> str:
@@ -262,6 +263,7 @@ class BetaPlaytestPacketManifest:
     target_scenario_id: str | None
     target_track_label: str
     target_reason: str
+    retest_of_session_key: str | None
     session_key: str
     tester_code: str
     interface_mode: BetaPlaytestInterface
@@ -287,6 +289,7 @@ class BetaPlaytestPacketManifest:
             target_scenario_id=preparation.target_scenario_id,
             target_track_label=preparation.target_track_label,
             target_reason=preparation.target_reason,
+            retest_of_session_key=preparation.retest_of_session_key,
             session_key=preparation.session_key,
             tester_code=preparation.tester_code,
             interface_mode=preparation.interface_mode,
@@ -310,6 +313,7 @@ class BetaPlaytestPacketManifest:
             "motion_mode": self.motion_mode.value,
             "owner_rehearsal_database_path": self.owner_rehearsal_database_path,
             "owner_rehearsal_required": self.owner_rehearsal_required,
+            "retest_of_session_key": self.retest_of_session_key,
             "schema_version": self.schema_version,
             "session_database_path": self.session_database_path,
             "session_key": self.session_key,
@@ -357,6 +361,7 @@ def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketMan
         "motion_mode",
         "owner_rehearsal_database_path",
         "owner_rehearsal_required",
+        "retest_of_session_key",
         "schema_version",
         "session_database_path",
         "session_key",
@@ -377,6 +382,7 @@ def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketMan
 
     string_fields = expected_keys - {
         "owner_rehearsal_required",
+        "retest_of_session_key",
         "schema_version",
         "target_scenario_id",
     }
@@ -392,6 +398,11 @@ def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketMan
         not isinstance(target_scenario_id, str) or not target_scenario_id
     ):
         raise ValueError("Packet manifest contains an invalid target scenario.")
+    retest_of_session_key = raw_manifest["retest_of_session_key"]
+    if retest_of_session_key is not None and (
+        not isinstance(retest_of_session_key, str) or not retest_of_session_key
+    ):
+        raise ValueError("Packet manifest contains an invalid retest session key.")
     if not isinstance(raw_manifest["owner_rehearsal_required"], bool):
         raise ValueError("Packet manifest contains an invalid rehearsal flag.")
 
@@ -413,6 +424,7 @@ def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketMan
         target_scenario_id=target_scenario_id,
         target_track_label=raw_manifest["target_track_label"],
         target_reason=raw_manifest["target_reason"],
+        retest_of_session_key=retest_of_session_key,
         session_key=raw_manifest["session_key"],
         tester_code=raw_manifest["tester_code"],
         interface_mode=interface_mode,
@@ -452,15 +464,18 @@ def build_beta_playtest_preparation(
         owner_rehearsal_database_path=owner_rehearsal_database_path,
     )
     status = build_beta_playtest_status(sessions, game_version=game_version)
-    target_lane, target_reason = _select_target(status)
+    target = select_beta_playtest_target(status)
     return BetaPlaytestPreparation(
         game_version=game_version,
         evidence_status=status.status,
         session_progress=status.session_progress,
         evidence_fingerprint=_beta_evidence_fingerprint(sessions),
-        target_scenario_id=(target_lane.scenario_id if target_lane is not None else None),
-        target_track_label=(target_lane.track_label if target_lane is not None else "Review"),
-        target_reason=target_reason,
+        target_scenario_id=(target.lane.scenario_id if target.lane is not None else None),
+        target_track_label=(target.lane.track_label if target.lane is not None else "Review"),
+        target_reason=target.reason,
+        retest_of_session_key=(
+            target.retest_of.session_key if target.retest_of is not None else None
+        ),
         session_key=_next_identifier(
             {session.session_key for session in sessions},
             prefix="beta-",
@@ -478,7 +493,7 @@ def build_beta_playtest_preparation(
         evidence_database_path=evidence_database_path.strip(),
         session_database_path=session_database_path.strip(),
         owner_rehearsal_database_path=owner_rehearsal_database_path.strip(),
-        owner_rehearsal_required=status.session_count == 0 and target_lane is not None,
+        owner_rehearsal_required=status.session_count == 0 and target.lane is not None,
     )
 
 
@@ -494,6 +509,7 @@ def _beta_evidence_fingerprint(sessions: list[BetaPlaytestSession]) -> str:
             "notes": session.notes,
             "pause_back": session.pause_back_success,
             "recorded_at": session.recorded_at,
+            "retest_of": session.retest_of,
             "scenario_id": session.scenario_id,
             "session_key": session.session_key,
             "tester_code": session.tester_code,
@@ -504,41 +520,6 @@ def _beta_evidence_fingerprint(sessions: list[BetaPlaytestSession]) -> str:
         rows.append(json.dumps(row, ensure_ascii=True, separators=(",", ":"), sort_keys=True))
     canonical = f"[{','.join(sorted(rows))}]".encode()
     return hashlib.sha256(canonical).hexdigest()
-
-
-def _select_target(
-    status: BetaPlaytestStatus,
-) -> tuple[BetaPlaytestCampaignLane | None, str]:
-    if status.review_ready:
-        return None, "Automated human-evidence criteria are ready for manual release review."
-
-    missing_lane = next((lane for lane in status.lanes if not lane.covered), None)
-    if missing_lane is not None:
-        return missing_lane, "Cover the next featured campaign missing current-version evidence."
-
-    failed_session = next(
-        (session for session in status.sessions if _session_needs_retest(session)),
-        None,
-    )
-    if failed_session is not None:
-        lane = next(lane for lane in status.lanes if lane.scenario_id == failed_session.scenario_id)
-        return lane, "Re-test the first campaign with an unresolved human gate."
-
-    least_observed = min(status.lanes, key=lambda lane: (lane.sessions, lane.scenario_id))
-    return least_observed, "Add an independent tester to close the remaining human gate."
-
-
-def _session_needs_retest(session: BetaPlaytestSession) -> bool:
-    return not all(
-        (
-            session.turn_one_unaided,
-            session.pause_back_success,
-            session.tradeoff_explained,
-            session.reached_act_three,
-            not session.blocker_found,
-            is_substantive_beta_playtest_note(session.notes),
-        )
-    )
 
 
 def _next_identifier(

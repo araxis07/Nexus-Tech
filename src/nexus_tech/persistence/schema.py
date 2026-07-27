@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-CURRENT_SCHEMA_VERSION = 27
+CURRENT_SCHEMA_VERSION = 28
 
 SCHEMA_STATEMENTS = (
     """
@@ -49,7 +49,7 @@ SCHEMA_STATEMENTS = (
         exit_outcome TEXT,
         exit_summary TEXT,
         saved_with_version TEXT NOT NULL DEFAULT 'unknown',
-        schema_version INTEGER NOT NULL DEFAULT 27,
+        schema_version INTEGER NOT NULL DEFAULT 28,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -559,7 +559,9 @@ SCHEMA_STATEMENTS = (
         blocker_found INTEGER NOT NULL CHECK(blocker_found IN (0, 1)),
         notes TEXT NOT NULL,
         game_version TEXT NOT NULL,
-        recorded_at TEXT NOT NULL
+        recorded_at TEXT NOT NULL,
+        retest_of TEXT
+            REFERENCES beta_playtest_sessions(session_key)
     )
     """,
 )
@@ -1417,6 +1419,19 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
         table_name="frontend_preferences",
         column_name="action_loadout",
         column_definition="TEXT NOT NULL DEFAULT 'contextual'",
+    )
+    _ensure_column(
+        connection,
+        table_name="beta_playtest_sessions",
+        column_name="retest_of",
+        column_definition="TEXT REFERENCES beta_playtest_sessions(session_key)",
+    )
+    connection.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_playtest_single_retest
+        ON beta_playtest_sessions(retest_of)
+        WHERE retest_of IS NOT NULL
+        """
     )
     if current_version < 6:
         _apply_version_6_migration(connection)
