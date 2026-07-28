@@ -2,15 +2,18 @@
 
 ## Product Position
 
-NEXUS TECH 0.320.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.321.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
-[Beta Execution Audit - 2026-07-28](BETA_EXECUTION_AUDIT_2026-07-28.md).
+[Beta Execution Audit - 2026-07-29](BETA_EXECUTION_AUDIT_2026-07-29.md).
 
 ## Current Engineering Slice
 
-The current convergence slice reduces 2D scene coupling and protects the complete owner-flow contract while retaining the executable next-session packet:
+The current beta candidate protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- every generated session packet now embeds its own required preflight command and binds manifest schema 3 to the intended packet path;
+- preparation rejects packet output that aliases an evidence, tester, or rehearsal database or any SQLite journal, WAL, or shared-memory sidecar;
+- validation rejects moved packets in addition to stale evidence, changed content, mismatched stores, and consumed profiles, keeping the handoff fail-closed before either visible launch;
 - the live run header now prioritizes campaign goal, next-move timing, and End Turn state while leaving score and market diagnostics in Report;
 - Focus action names now lead each button while fixed shortcuts use separate badges, and wide rows avoid duplicating the decision preview inside every button;
 - Endgame readiness exposes a consistent `/100` scale and states that lower Reset Risk is safer without changing exit calculations;

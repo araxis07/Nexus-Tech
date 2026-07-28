@@ -21,14 +21,14 @@ from nexus_tech.simulation.beta_playtest import (
 )
 from nexus_tech.user_preferences import MotionMode
 
-_PACKET_MANIFEST_PREFIX = "<!-- nexus-tech-beta-packet-v2 "
+_PACKET_MANIFEST_PREFIX = "<!-- nexus-tech-beta-packet-v3 "
 _PACKET_MANIFEST_SUFFIX = " -->"
 _PACKET_MANIFEST_PATTERN = re.compile(
     rf"^{re.escape(_PACKET_MANIFEST_PREFIX)}([A-Za-z0-9_-]+)"
     rf"{re.escape(_PACKET_MANIFEST_SUFFIX)}$",
     re.MULTILINE,
 )
-_PACKET_MANIFEST_SCHEMA_VERSION = 2
+_PACKET_MANIFEST_SCHEMA_VERSION = 3
 
 _SESSION_CHECKLIST = (
     "Confirm the isolated tester profile opens with Continue unavailable and no prior "
@@ -119,6 +119,7 @@ class BetaPlaytestPreparation:
     viewport: str
     motion_mode: MotionMode
     command_prefix: str
+    packet_output_path: str
     evidence_database_path: str
     session_database_path: str
     owner_rehearsal_database_path: str
@@ -240,12 +241,13 @@ class BetaPlaytestPreparation:
             self.evidence_database_path,
         )
 
-    def validation_command(self, packet_path: str) -> str:
+    @property
+    def validation_command(self) -> str:
         return _command(
             self.command_prefix,
             "validate-beta-playtest-session-packet",
             "--input",
-            packet_path,
+            self.packet_output_path,
             "--db-path",
             self.evidence_database_path,
         )
@@ -270,6 +272,7 @@ class BetaPlaytestPacketManifest:
     viewport: str
     motion_mode: MotionMode
     command_prefix: str
+    packet_output_path: str
     evidence_database_path: str
     session_database_path: str
     owner_rehearsal_database_path: str
@@ -296,6 +299,7 @@ class BetaPlaytestPacketManifest:
             viewport=preparation.viewport,
             motion_mode=preparation.motion_mode,
             command_prefix=preparation.command_prefix,
+            packet_output_path=preparation.packet_output_path,
             evidence_database_path=preparation.evidence_database_path,
             session_database_path=preparation.session_database_path,
             owner_rehearsal_database_path=preparation.owner_rehearsal_database_path,
@@ -313,6 +317,7 @@ class BetaPlaytestPacketManifest:
             "motion_mode": self.motion_mode.value,
             "owner_rehearsal_database_path": self.owner_rehearsal_database_path,
             "owner_rehearsal_required": self.owner_rehearsal_required,
+            "packet_output_path": self.packet_output_path,
             "retest_of_session_key": self.retest_of_session_key,
             "schema_version": self.schema_version,
             "session_database_path": self.session_database_path,
@@ -361,6 +366,7 @@ def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketMan
         "motion_mode",
         "owner_rehearsal_database_path",
         "owner_rehearsal_required",
+        "packet_output_path",
         "retest_of_session_key",
         "schema_version",
         "session_database_path",
@@ -431,6 +437,7 @@ def decode_beta_playtest_packet_manifest(markdown: str) -> BetaPlaytestPacketMan
         viewport=raw_manifest["viewport"],
         motion_mode=motion_mode,
         command_prefix=raw_manifest["command_prefix"],
+        packet_output_path=raw_manifest["packet_output_path"],
         evidence_database_path=raw_manifest["evidence_database_path"],
         session_database_path=raw_manifest["session_database_path"],
         owner_rehearsal_database_path=raw_manifest["owner_rehearsal_database_path"],
@@ -446,6 +453,7 @@ def build_beta_playtest_preparation(
     viewport: str,
     motion_mode: MotionMode,
     command_prefix: str,
+    packet_output_path: str,
     evidence_database_path: str,
     session_database_path: str,
     owner_rehearsal_database_path: str,
@@ -459,6 +467,7 @@ def build_beta_playtest_preparation(
     _validate_packet_input(
         viewport=viewport,
         command_prefix=command_prefix,
+        packet_output_path=packet_output_path,
         evidence_database_path=evidence_database_path,
         session_database_path=session_database_path,
         owner_rehearsal_database_path=owner_rehearsal_database_path,
@@ -490,6 +499,7 @@ def build_beta_playtest_preparation(
         viewport=viewport,
         motion_mode=motion_mode,
         command_prefix=command_prefix.strip(),
+        packet_output_path=packet_output_path.strip(),
         evidence_database_path=evidence_database_path.strip(),
         session_database_path=session_database_path.strip(),
         owner_rehearsal_database_path=owner_rehearsal_database_path.strip(),
@@ -539,6 +549,7 @@ def _validate_packet_input(
     *,
     viewport: str,
     command_prefix: str,
+    packet_output_path: str,
     evidence_database_path: str,
     session_database_path: str,
     owner_rehearsal_database_path: str,
@@ -547,6 +558,7 @@ def _validate_packet_input(
         raise ValueError("Viewport must use WIDTHxHEIGHT, for example 820x620 or 120x40.")
     for label, value in (
         ("Command prefix", command_prefix),
+        ("Packet output path", packet_output_path),
         ("Evidence database path", evidence_database_path),
         ("Session database path", session_database_path),
         ("Owner rehearsal database path", owner_rehearsal_database_path),
@@ -560,17 +572,28 @@ def _validate_packet_input(
         shlex.split(command_prefix)
     except ValueError as error:
         raise ValueError("Command prefix must contain valid shell quoting.") from error
-    normalized_paths = {
-        _normalized_database_path(evidence_database_path),
-        _normalized_database_path(session_database_path),
-        _normalized_database_path(owner_rehearsal_database_path),
+    normalized_database_paths = {
+        _normalized_path(evidence_database_path),
+        _normalized_path(session_database_path),
+        _normalized_path(owner_rehearsal_database_path),
     }
-    if len(normalized_paths) != 3:
+    if len(normalized_database_paths) != 3:
         raise ValueError("Evidence, session, and owner rehearsal database paths must be distinct.")
+    protected_database_artifacts = {
+        _normalized_path(f"{database_path}{suffix}")
+        for database_path in (
+            evidence_database_path,
+            session_database_path,
+            owner_rehearsal_database_path,
+        )
+        for suffix in ("", "-journal", "-wal", "-shm")
+    }
+    if _normalized_path(packet_output_path) in protected_database_artifacts:
+        raise ValueError("Packet output and gameplay/evidence database paths must be distinct.")
 
 
-def _normalized_database_path(database_path: str) -> Path:
-    return Path(database_path.strip()).expanduser().resolve(strict=False)
+def _normalized_path(value: str) -> Path:
+    return Path(value.strip()).expanduser().resolve(strict=False)
 
 
 def _command(prefix: str, *arguments: object) -> str:

@@ -244,6 +244,7 @@ def register_beta_playtest_commands(
                 viewport=viewport,
                 motion_mode=motion_mode,
                 command_prefix=command_prefix,
+                packet_output_path=str(output),
                 evidence_database_path=str(db_path),
                 session_database_path=str(resolved_session_db_path),
                 owner_rehearsal_database_path=str(resolved_rehearsal_db_path),
@@ -263,6 +264,7 @@ def register_beta_playtest_commands(
                 packet_markdown,
                 sessions,
                 game_version=__version__,
+                packet_path=str(output),
                 evidence_database_path=str(db_path),
             )
             output.write_text(packet_markdown, encoding="utf-8")
@@ -282,7 +284,7 @@ def register_beta_playtest_commands(
                         style="bold",
                     ),
                     Text(
-                        preparation.validation_command(str(output)),
+                        preparation.validation_command,
                         style="cyan",
                         overflow="fold",
                         no_wrap=False,
@@ -310,6 +312,7 @@ def register_beta_playtest_commands(
                 markdown,
                 sessions,
                 game_version=__version__,
+                packet_path=str(input_path),
                 evidence_database_path=str(db_path),
             )
             if preparation.requires_session:

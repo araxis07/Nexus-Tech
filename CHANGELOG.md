@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.321.0 - 2026-07-29
+
+- Made every human-beta session packet self-contained with a required preflight command that verifies the current build, evidence snapshot, packet content, and unused gameplay profiles before either owner rehearsal or tester launch
+- Upgraded the packet manifest to schema 3 and bound it to its intended output path so copied, moved, stale, or edited handoffs fail closed instead of silently using an obsolete validation command
+- Prevented packet output from overwriting the evidence, tester, or rehearsal SQLite database and their `-journal`, `-wal`, or `-shm` sidecars
+- Added direct preparation and CLI regressions for database-path collisions, sidecar collisions, embedded validation, and moved-packet rejection
+- Preserved gameplay outcomes, balance, controls, frozen catalogs, persistence schema 28, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.320.0 - 2026-07-28
 
 - Simplified the live run header around campaign goal, next move, timing, and end-turn state while moving score and market diagnostics back to the existing Report surfaces

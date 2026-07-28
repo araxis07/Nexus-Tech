@@ -43,6 +43,24 @@ def render_beta_playtest_preparation(
         )
     )
 
+    console.print(
+        Panel(
+            Group(
+                _folded_command(preparation.validation_command),
+                Text(""),
+                Text(
+                    "Run immediately before opening either gameplay profile. Stop if "
+                    "validation fails; regenerate the packet instead of editing or moving it.",
+                    overflow="fold",
+                    no_wrap=False,
+                ),
+            ),
+            title="Required Packet Preflight",
+            border_style="yellow",
+            expand=True,
+        )
+    )
+
     if not preparation.requires_session:
         console.print(
             Panel(
@@ -227,6 +245,15 @@ def format_beta_playtest_preparation_markdown(
         "This packet prepares a session but never records or approves evidence. Only an "
         "observed real-person session may be entered with `--confirm-human-session`. Owner "
         "rehearsals, headless runs, tests, and generated screenshots do not count.",
+        "",
+        "## Required Packet Preflight",
+        "",
+        "Run this immediately before opening either gameplay profile. Stop if it fails; "
+        "regenerate the packet instead of editing or moving it.",
+        "",
+        "```bash",
+        preparation.validation_command,
+        "```",
         "",
     ]
     if preparation.requires_session:

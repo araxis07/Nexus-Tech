@@ -501,6 +501,7 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
         viewport="820x620",
         motion_mode=MotionMode.FULL,
         command_prefix=".venv313/bin/nexus-tech",
+        packet_output_path="/tmp/nexus-tech-beta-001.md",
         evidence_database_path="nexus-tech.db",
         session_database_path="/tmp/nexus-tech-beta-001-session.db",
         owner_rehearsal_database_path="/tmp/nexus-tech-beta-001-rehearsal.db",
@@ -534,6 +535,8 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert "--scenario founder_journey" in preparation.record_command
     assert "--db-path nexus-tech.db" in preparation.record_command
     assert "--require-review-ready" in preparation.review_gate_command
+    assert "validate-beta-playtest-session-packet" in preparation.validation_command
+    assert "--input /tmp/nexus-tech-beta-001.md" in preparation.validation_command
     placeholder = "REPLACE with a concrete observation from the real session"
     assert placeholder in preparation.record_command
     assert not is_substantive_beta_playtest_note(placeholder)
@@ -549,6 +552,7 @@ def test_beta_playtest_preparation_advances_without_reusing_identifiers() -> Non
         viewport="120x40",
         motion_mode=MotionMode.OFF,
         command_prefix="uv run nexus-tech",
+        packet_output_path="/tmp/nexus-tech-beta-002.md",
         evidence_database_path="nexus-tech.db",
         session_database_path="/tmp/nexus-tech-beta-002-session.db",
         owner_rehearsal_database_path="/tmp/nexus-tech-beta-owner-rehearsal.db",
@@ -579,6 +583,7 @@ def test_beta_playtest_preparation_retests_an_unresolved_human_gate() -> None:
         viewport="1280x720",
         motion_mode=MotionMode.REDUCED,
         command_prefix="nexus-tech",
+        packet_output_path="/tmp/nexus-tech-beta-007.md",
         evidence_database_path="nexus-tech.db",
         session_database_path="/tmp/nexus-tech-beta-007-session.db",
         owner_rehearsal_database_path="/tmp/nexus-tech-beta-owner-rehearsal.db",
@@ -605,6 +610,7 @@ def test_beta_playtest_preparation_stops_when_manual_review_is_ready() -> None:
         viewport="820x620",
         motion_mode=MotionMode.FULL,
         command_prefix="nexus-tech",
+        packet_output_path="/tmp/nexus-tech-beta-review.md",
         evidence_database_path="nexus-tech.db",
         session_database_path="/tmp/nexus-tech-beta-review-session.db",
         owner_rehearsal_database_path="/tmp/nexus-tech-beta-review-rehearsal.db",
@@ -641,6 +647,7 @@ def test_beta_playtest_preparation_rejects_unsafe_packet_inputs(
             viewport=viewport,
             motion_mode=MotionMode.FULL,
             command_prefix=command_prefix,
+            packet_output_path="/tmp/nexus-tech-beta-session.md",
             evidence_database_path=database_path,
             session_database_path="/tmp/nexus-tech-beta-session.db",
             owner_rehearsal_database_path="/tmp/nexus-tech-beta-rehearsal.db",
@@ -656,8 +663,38 @@ def test_beta_playtest_preparation_requires_three_distinct_databases() -> None:
             viewport="820x620",
             motion_mode=MotionMode.FULL,
             command_prefix="nexus-tech",
+            packet_output_path="/tmp/nexus-tech-beta-session.md",
             evidence_database_path="nexus-tech.db",
             session_database_path="nexus-tech.db",
+            owner_rehearsal_database_path="/tmp/nexus-tech-beta-rehearsal.db",
+        )
+
+
+@pytest.mark.parametrize(
+    "database_path",
+    (
+        "/tmp/nexus-tech-beta-evidence.db",
+        "/tmp/nexus-tech-beta-evidence.db-wal",
+        "/tmp/nexus-tech-beta-session.db",
+        "/tmp/nexus-tech-beta-session.db-shm",
+        "/tmp/nexus-tech-beta-rehearsal.db",
+        "/tmp/nexus-tech-beta-rehearsal.db-journal",
+    ),
+)
+def test_beta_playtest_preparation_keeps_packet_outside_database_paths(
+    database_path: str,
+) -> None:
+    with pytest.raises(ValueError, match="Packet output.*database paths must be distinct"):
+        build_beta_playtest_preparation(
+            [],
+            game_version=__version__,
+            interface_mode=BetaPlaytestInterface.TWO_D,
+            viewport="820x620",
+            motion_mode=MotionMode.FULL,
+            command_prefix="nexus-tech",
+            packet_output_path=database_path,
+            evidence_database_path="/tmp/nexus-tech-beta-evidence.db",
+            session_database_path="/tmp/nexus-tech-beta-session.db",
             owner_rehearsal_database_path="/tmp/nexus-tech-beta-rehearsal.db",
         )
 
@@ -709,6 +746,9 @@ def test_prepare_beta_playtest_cli_writes_private_local_packet_only(tmp_path: Pa
     assert "### P1 - Usability blocker" in markdown
     assert "### P2 - Polish defect" in markdown
     assert "Record After The Session" in markdown
+    assert "Required Packet Preflight" in markdown
+    assert "validate-beta-playtest-session-packet" in markdown
+    assert f"--input {output}" in markdown
     assert str(session_db_path) in markdown
     assert str(rehearsal_db_path) not in markdown
     assert f"--db-path {db_path}" in markdown
@@ -909,7 +949,7 @@ def test_validate_beta_playtest_packet_rejects_modified_artifact(
         markdown = "\n".join(
             line
             for line in markdown.splitlines()
-            if not line.startswith("<!-- nexus-tech-beta-packet-v2 ")
+            if not line.startswith("<!-- nexus-tech-beta-packet-v3 ")
         )
     output.write_text(markdown, encoding="utf-8")
 
@@ -1003,6 +1043,42 @@ def test_validate_beta_playtest_packet_rejects_mismatched_evidence_store(
 
     assert result.exit_code == 1
     assert "does not match --db-path" in result.output
+
+
+def test_validate_beta_playtest_packet_rejects_moved_packet(tmp_path: Path) -> None:
+    db_path = tmp_path / "evidence.db"
+    output = tmp_path / "next-session.md"
+    moved_output = tmp_path / "moved-session.md"
+    prepare_result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(output),
+            "--db-path",
+            str(db_path),
+            "--session-db-path",
+            str(tmp_path / "tester-profile.db"),
+            "--rehearsal-db-path",
+            str(tmp_path / "rehearsal-profile.db"),
+        ],
+    )
+    assert prepare_result.exit_code == 0
+    moved_output.write_text(output.read_text(encoding="utf-8"), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "validate-beta-playtest-session-packet",
+            "--input",
+            str(moved_output),
+            "--db-path",
+            str(db_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Packet path does not match --input" in result.output
 
 
 def test_validate_beta_playtest_packet_detects_same_status_evidence_correction(
@@ -1225,6 +1301,39 @@ def test_prepare_beta_playtest_cli_rejects_missing_profile_parent(tmp_path: Path
 
     assert result.exit_code == 1
     assert "Tester gameplay profile parent directory must already exist" in result.output
+
+
+@pytest.mark.parametrize("output_target", ("evidence", "session", "rehearsal-wal"))
+def test_prepare_beta_playtest_cli_rejects_packet_database_collision(
+    tmp_path: Path,
+    output_target: str,
+) -> None:
+    evidence_path = tmp_path / "evidence.db"
+    session_path = tmp_path / "session.db"
+    rehearsal_path = tmp_path / "rehearsal.db"
+    outputs = {
+        "evidence": evidence_path,
+        "session": session_path,
+        "rehearsal-wal": Path(f"{rehearsal_path}-wal"),
+    }
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-beta-playtest-session",
+            "--output",
+            str(outputs[output_target]),
+            "--db-path",
+            str(evidence_path),
+            "--session-db-path",
+            str(session_path),
+            "--rehearsal-db-path",
+            str(rehearsal_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Packet output and gameplay/evidence database paths must be distinct" in result.output
 
 
 def test_beta_playtest_cli_records_and_reviews_local_evidence(tmp_path: Path) -> None:

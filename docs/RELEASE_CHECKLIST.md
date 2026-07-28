@@ -84,6 +84,10 @@ After preparing the human-beta packet, confirm its tester launch and
 recorder/status commands use distinct database paths. When the Owner Rehearsal
 Gate is present, its launch must use a third path. Every gameplay profile must be
 fresh and disposable; only the evidence database may persist between sessions.
+Run the packet's embedded Required Packet Preflight before opening either
+profile. Packet output must not alias any database, `-journal`, `-wal`, or
+`-shm` path; copied, moved, edited, stale, or profile-contaminated packets must
+be regenerated rather than repaired in place.
 
 Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command

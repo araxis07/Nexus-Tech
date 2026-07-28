@@ -21,6 +21,7 @@ def validate_beta_playtest_session_packet(
     sessions: list[BetaPlaytestSession],
     *,
     game_version: str,
+    packet_path: str,
     evidence_database_path: str,
 ) -> BetaPlaytestPreparation:
     """Return the current packet plan or reject stale and modified artifacts."""
@@ -28,7 +29,11 @@ def validate_beta_playtest_session_packet(
     manifest = decode_beta_playtest_packet_manifest(markdown)
     if manifest.game_version != game_version:
         raise ValueError("Packet game version does not match this build; regenerate the packet.")
-    if _normalized_database_path(manifest.evidence_database_path) != _normalized_database_path(
+    if _normalized_path(manifest.packet_output_path) != _normalized_path(packet_path):
+        raise ValueError(
+            "Packet path does not match --input; regenerate the packet at its intended path."
+        )
+    if _normalized_path(manifest.evidence_database_path) != _normalized_path(
         evidence_database_path
     ):
         raise ValueError(
@@ -43,6 +48,7 @@ def validate_beta_playtest_session_packet(
         viewport=manifest.viewport,
         motion_mode=manifest.motion_mode,
         command_prefix=manifest.command_prefix,
+        packet_output_path=manifest.packet_output_path,
         evidence_database_path=manifest.evidence_database_path,
         session_database_path=manifest.session_database_path,
         owner_rehearsal_database_path=manifest.owner_rehearsal_database_path,
@@ -61,5 +67,5 @@ def validate_beta_playtest_session_packet(
     return current_preparation
 
 
-def _normalized_database_path(database_path: str) -> Path:
-    return Path(database_path.strip()).expanduser().resolve(strict=False)
+def _normalized_path(value: str) -> Path:
+    return Path(value.strip()).expanduser().resolve(strict=False)
