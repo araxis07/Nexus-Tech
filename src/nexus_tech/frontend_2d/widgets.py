@@ -430,6 +430,7 @@ def draw_button(
     accent: tuple[int, int, int],
     title_font,
     detail_font,
+    key_hint: str = "",
     enabled: bool = True,
     selected: bool = False,
     emphasis: float = 0.0,
@@ -467,10 +468,17 @@ def draw_button(
             border_radius=3,
         )
     show_detail = bool(detail) and visual_rect.height >= 46
+    clean_key_hint = " ".join(key_hint.split())
+    key_badge_width = 0
+    if clean_key_hint:
+        key_badge_width = min(
+            64,
+            max(26, detail_font.size(clean_key_hint.upper())[0] + 14),
+        )
     title_rect = pygame.Rect(
         visual_rect.left + 12,
         visual_rect.top + (8 if show_detail else 6),
-        visual_rect.width - 24,
+        visual_rect.width - 24 - key_badge_width - (8 if key_badge_width else 0),
         22 if show_detail else visual_rect.height - 12,
     )
     fitted_title = fit_text_line(title_font, title, title_rect.width)
@@ -483,6 +491,31 @@ def draw_button(
         severe_threshold=0.58,
     )
     draw_text_line(surface, title_font, title, title_color, title_rect)
+    if clean_key_hint:
+        key_badge_height = 20
+        key_badge_rect = pygame.Rect(
+            visual_rect.right - key_badge_width - 10,
+            visual_rect.top + (7 if show_detail else (visual_rect.height - key_badge_height) // 2),
+            key_badge_width,
+            key_badge_height,
+        )
+        key_fill = blend_color(PANEL_ALT, accent, 0.16 if enabled else 0.04)
+        key_border = blend_color(BORDER, accent, 0.38 if enabled else 0.08)
+        pygame.draw.rect(surface, key_fill, key_badge_rect, border_radius=8)
+        pygame.draw.rect(surface, key_border, key_badge_rect, width=1, border_radius=8)
+        draw_text_line(
+            surface,
+            detail_font,
+            clean_key_hint.upper(),
+            accent if enabled else detail_color,
+            pygame.Rect(
+                key_badge_rect.left + 5,
+                key_badge_rect.top + 2,
+                key_badge_rect.width - 10,
+                key_badge_rect.height - 4,
+            ),
+            align="center",
+        )
     if show_detail:
         detail_top = visual_rect.top + 28
         detail_rect = pygame.Rect(

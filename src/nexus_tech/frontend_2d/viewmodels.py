@@ -477,9 +477,9 @@ def build_game_view_model(
         else base_campaign_lens
     )
     decision_brief = _build_decision_brief(rhythm)
+    decision_timing = decision_brief.urgency_label.split("/", maxsplit=1)[0].strip()
     header_note = (
-        f"Plan {decision_brief.plan_progress_label.split(' | ', maxsplit=1)[0]} | "
-        f"Next: {decision_brief.command_label} ({decision_brief.urgency_label}) | "
+        f"Next: {decision_brief.command_label} | Due: {decision_timing} | "
         f"End Turn: {decision_brief.end_turn_label}"
     )
     return GameViewModel(
@@ -1339,27 +1339,27 @@ def _build_endgame_panel(
         key="endgame",
         title="Endgame / Exit Board",
         summary=(
-            "Start with Recommended Fix, then Review Main Risk. Press V to compare every exit path."
+            "Readiness is scored /100; lower Reset Risk is safer. Start with Recommended Fix."
         ),
         metrics=(
             DeepDiveMetricViewModel(
-                "IPO",
-                str(readiness.ipo_readiness_score),
+                "IPO Ready",
+                f"{readiness.ipo_readiness_score}/100",
                 _attribute_tone(readiness.ipo_readiness_score),
             ),
             DeepDiveMetricViewModel(
-                "M&A",
-                str(readiness.acquisition_interest_score),
+                "M&A Ready",
+                f"{readiness.acquisition_interest_score}/100",
                 _attribute_tone(readiness.acquisition_interest_score),
             ),
             DeepDiveMetricViewModel(
                 "Independence",
-                str(readiness.independence_score),
+                f"{readiness.independence_score}/100",
                 _attribute_tone(readiness.independence_score),
             ),
             DeepDiveMetricViewModel(
-                "Reset Risk",
-                str(pressure.board_reset_risk),
+                "Reset Risk (low)",
+                f"{pressure.board_reset_risk}/100",
                 _attribute_tone(100 - pressure.board_reset_risk),
             ),
         ),
@@ -1497,14 +1497,17 @@ def build_run_review_view_model(state: GameState) -> RunReviewViewModel:
     postmortem = build_run_postmortem(state)
     legacy = build_campaign_path_legacy(state)
     decision_pattern = build_decision_pattern(state.decision_history)
+    outcome_label = (
+        state.exit_outcome.value if state.exit_outcome is not None else "in_progress"
+    ).replace("_", " ")
     summary_line = (
         f"Turn {state.company.current_turn} | score {score.total_score} ({score.score_tier}) | "
         f"cash {format_money(state.company.cash_on_hand)} | grade {score.campaign_grade}"
     )
     badges = (
-        decision_pattern.style_label,
-        state.exit_outcome.value if state.exit_outcome is not None else "in_progress",
-        state.difficulty_mode.value,
+        f"Style: {decision_pattern.style_label}",
+        f"Outcome: {outcome_label.title()}",
+        f"Difficulty: {state.difficulty_mode.value.replace('_', ' ').title()}",
         *get_campaign_path_labels(state),
     )
     findings = tuple(

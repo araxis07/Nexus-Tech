@@ -3691,8 +3691,8 @@ class ReviewScene(BaseScene):
         finding_layout = build_review_finding_card_layout(
             available_height=inner.height,
             finding_count=len(self._view_model.findings),
-            minimum_card_height=114 if large_text else 100,
-            maximum_card_height=120 if large_text else 112,
+            minimum_card_height=124 if large_text else 120,
+            maximum_card_height=136 if large_text else 132,
         )
         visible_findings = self._view_model.findings[: finding_layout.visible_count]
         for finding in visible_findings:
@@ -3741,7 +3741,7 @@ class ReviewScene(BaseScene):
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
-                finding.summary,
+                f"Cause: {finding.summary}",
                 MUTED,
                 pygame.Rect(
                     animated_rect.left + 12,
@@ -3755,7 +3755,7 @@ class ReviewScene(BaseScene):
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
-                finding.lesson,
+                f"Lesson: {finding.lesson}",
                 tone_color(finding.severity),
                 pygame.Rect(
                     animated_rect.left + 12,
@@ -3764,7 +3764,7 @@ class ReviewScene(BaseScene):
                     max(0, animated_rect.height - 68),
                 ),
                 line_height=15,
-                max_lines=3 if finding_layout.card_height >= 114 else 2,
+                max_lines=4 if finding_layout.card_height >= 120 else 3,
             )
             top += finding_layout.card_height + finding_layout.card_gap
         remaining = len(self._view_model.findings) - len(visible_findings)
@@ -3796,18 +3796,26 @@ class ReviewScene(BaseScene):
             emphasis=sidebar_motion,
             lift=int(sidebar_motion * 2),
         )
-        title_surface = self.fonts.heading.render("Next Focus", True, TEXT)
+        title_surface = self.fonts.heading.render("Next Run", True, TEXT)
         surface.blit(title_surface, (inner.left, inner.top - 24))
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            "FIRST MOVE",
+            MUTED,
+            pygame.Rect(inner.left, inner.top, inner.width, 16),
+            valign="top",
+        )
         draw_text_line(
             surface,
             self.fonts.body,
             self._view_model.next_focus,
             INFO,
-            pygame.Rect(inner.left, inner.top, inner.width, 22),
+            pygame.Rect(inner.left, inner.top + 18, inner.width, 22),
             valign="top",
         )
-        badge_label_top = inner.top + 30
-        badge_top = inner.top + 52
+        badge_label_top = inner.top + 50
+        badge_top = inner.top + 72
         badge_limit = 6
         if self._view_model.campaign_legacy_title:
             draw_text_line(
@@ -3815,7 +3823,7 @@ class ReviewScene(BaseScene):
                 self.fonts.small,
                 "Campaign Legacy",
                 MUTED,
-                pygame.Rect(inner.left, inner.top + 30, inner.width, 18),
+                pygame.Rect(inner.left, inner.top + 50, inner.width, 18),
                 valign="top",
             )
             draw_text_line(
@@ -3823,7 +3831,7 @@ class ReviewScene(BaseScene):
                 self.fonts.small,
                 self._view_model.campaign_legacy_title,
                 TEXT,
-                pygame.Rect(inner.left, inner.top + 50, inner.width, 18),
+                pygame.Rect(inner.left, inner.top + 70, inner.width, 18),
                 valign="top",
             )
             draw_wrapped_text(
@@ -3831,24 +3839,32 @@ class ReviewScene(BaseScene):
                 self.fonts.small,
                 self._view_model.campaign_legacy_detail,
                 INFO,
-                pygame.Rect(inner.left, inner.top + 70, inner.width, 36),
+                pygame.Rect(inner.left, inner.top + 90, inner.width, 36),
                 line_height=15,
                 max_lines=2,
             )
-            badge_label_top = inner.top + 112
-            badge_top = inner.top + 134
+            badge_label_top = inner.top + 132
+            badge_top = inner.top + 154
             badge_limit = 4
         draw_text_line(
             surface,
             self.fonts.small,
-            "Badges",
+            "RUN TRAITS",
             MUTED,
             pygame.Rect(inner.left, badge_label_top, inner.width, 18),
             valign="top",
         )
         top = badge_top
+        left = inner.left
         for badge in self._view_model.badges[:badge_limit]:
-            chip_rect = pygame.Rect(inner.left, top, inner.width, 28)
+            badge_text = badge.replace("_", " ")
+            chip_width = min(inner.width, self.fonts.small.size(badge_text)[0] + 24)
+            if left > inner.left and left + chip_width > inner.right:
+                left = inner.left
+                top += 34
+            if top + 26 > inner.bottom:
+                break
+            chip_rect = pygame.Rect(left, top, chip_width, 26)
             pygame.draw.rect(
                 surface,
                 blend_color((24, 35, 50), INFO, sidebar_motion * 0.08),
@@ -3865,11 +3881,11 @@ class ReviewScene(BaseScene):
             draw_text_line(
                 surface,
                 self.fonts.small,
-                badge.replace("_", " "),
+                badge_text,
                 TEXT,
                 pygame.Rect(chip_rect.left + 10, chip_rect.top + 5, chip_rect.width - 20, 18),
             )
-            top += 36
+            left = chip_rect.right + 8
 
     def _draw_review_footer(
         self,
@@ -7585,7 +7601,7 @@ class RunScene(BaseScene):
         )
         meta_text = (
             f"{self._view_model.campaign_chapter_label} | {self._view_model.scenario_title} | "
-            f"score {self._view_model.score_label} | market {self._view_model.market_label}"
+            f"Goal: {self._view_model.campaign_objective}"
         )
         draw_wrapped_text(
             surface,
@@ -8142,7 +8158,7 @@ class RunScene(BaseScene):
             next_rect,
             eyebrow="2 / RECOMMENDED MOVE",
             headline=brief.command_label,
-            detail=f"{brief.urgency_label}. {brief.command_detail}",
+            detail=f"{brief.urgency_label}. {brief.command_effect.rstrip('.')}.",
             accent=GOOD,
             click_kind="coach",
         )
@@ -8262,8 +8278,7 @@ class RunScene(BaseScene):
         stats = {stat.key: stat.value_text for stat in self._view_model.stats}
         return (
             f"Cash {stats.get('cash', '-')} | Runway {stats.get('runway', '-')} | "
-            f"Users {stats.get('users', '-')} | AP {stats.get('actions', '-')} | "
-            f"Journey {self._view_model.run_journey.step_label}"
+            f"AP {stats.get('actions', '-')} | Journey {self._view_model.run_journey.step_label}"
         )
 
     def _draw_first_turn_guide_card(self, surface, rect) -> bool:
@@ -8427,6 +8442,7 @@ class RunScene(BaseScene):
                     enabled=enabled,
                     button_cols=button_cols,
                 ),
+                key_hint=self._footer_button_key_hint(button),
                 accent=button.accent,
                 title_font=self.fonts.body if button_cols <= 5 else self.fonts.small,
                 detail_font=self.fonts.small,
@@ -8661,7 +8677,7 @@ class RunScene(BaseScene):
 
     def _footer_button_title(self, button: ActionButtonSpec, *, button_cols: int) -> str:
         if button_cols < 7:
-            return f"{button.key_hint} {button.title}"
+            return button.title
         compact_titles = {
             "New Product": "Product",
             "Customers": "Cust",
@@ -8673,9 +8689,11 @@ class RunScene(BaseScene):
             "Roadmap": "Map",
             "End Turn": "End",
         }
-        key_hint = "Sp" if button.key_hint == "Space" else button.key_hint
-        title = compact_titles.get(button.title, button.title)
-        return f"{key_hint} {title}"
+        return compact_titles.get(button.title, button.title)
+
+    @staticmethod
+    def _footer_button_key_hint(button: ActionButtonSpec) -> str:
+        return "SPC" if button.key_hint == "Space" else button.key_hint
 
     def _footer_button_detail(
         self,
@@ -8684,6 +8702,8 @@ class RunScene(BaseScene):
         enabled: bool,
         button_cols: int,
     ) -> str:
+        if button_cols >= 6:
+            return ""
         if button.kind == "coach":
             preview = self._build_focus_decision_preview(compact=button_cols <= 3)
             timing = preview.timing_label.split("/", maxsplit=1)[0].strip()

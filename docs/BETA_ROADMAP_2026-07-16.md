@@ -2,15 +2,19 @@
 
 ## Product Position
 
-NEXUS TECH 0.319.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.320.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
-[Beta Execution Audit - 2026-07-27](BETA_EXECUTION_AUDIT_2026-07-27.md).
+[Beta Execution Audit - 2026-07-28](BETA_EXECUTION_AUDIT_2026-07-28.md).
 
 ## Current Engineering Slice
 
 The current convergence slice reduces 2D scene coupling and protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- the live run header now prioritizes campaign goal, next-move timing, and End Turn state while leaving score and market diagnostics in Report;
+- Focus action names now lead each button while fixed shortcuts use separate badges, and wide rows avoid duplicating the decision preview inside every button;
+- Endgame readiness exposes a consistent `/100` scale and states that lower Reset Risk is safer without changing exit calculations;
+- completed Review findings separate Cause from Lesson, identify the next run's first move, and wrap semantic run traits without hiding compact learning copy;
 - generated human-beta, onboarding visible-window, and animation manual-QA artifacts now reuse the executable that created them instead of assuming `uv` exists in the operator shell;
 - project-local absolute executables collapse to shell-safe relative launchers, while `--command-prefix` remains available for a deliberate cross-environment handoff;
 - Pause now distinguishes title-shell recovery from direct play, keeps unavailable Menu actions non-interactive, and prevents direct-play `M` from closing an unsaved run;

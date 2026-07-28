@@ -971,8 +971,9 @@ def test_2d_widget_wrapping_and_buttons_stay_inside_compact_rects() -> None:
             surface,
             pygame,
             rect=pygame.Rect(20, 44, 128, 44),
-            title="Space End Turn With Preview",
+            title="End Turn",
             detail="Resolve this turn with warning gates and consequence previews.",
+            key_hint="SPC",
             accent=DANGER,
             title_font=fonts.small,
             detail_font=fonts.small,
@@ -1644,6 +1645,14 @@ def test_endgame_panel_disclosure_starts_guided_and_preserves_all_actions() -> N
     assert all(action.detail.endswith(".") for action in guided.actions)
     assert all("..." not in action.detail for action in guided.actions)
     assert max(map(len, (action.detail for action in guided.actions))) <= 64
+    assert panel.summary.startswith("Readiness is scored /100")
+    assert all(metric.value_text.endswith("/100") for metric in panel.metrics)
+    assert [metric.label for metric in panel.metrics] == [
+        "IPO Ready",
+        "M&A Ready",
+        "Independence",
+        "Reset Risk (low)",
+    ]
     assert expanded.action_heading == "All Endgame Actions"
     assert expanded.actions == panel.actions
     assert expanded.detail_lines == panel.detail_lines
@@ -2448,6 +2457,11 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
             enabled=True,
             button_cols=5,
         )
+        wide_detail = scene._footer_button_detail(
+            RUN_ACTION_BUTTONS[0],
+            enabled=True,
+            button_cols=6,
+        )
         visible_buttons = scene._footer_action_buttons()
         button_cols, button_height, footer_band_height = scene._footer_layout_metrics(
             820,
@@ -2461,13 +2475,17 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
             for button in visible_buttons
         )
         visible_titles = {button.title for button in visible_buttons}
+        visible_key_hints = tuple(
+            scene._footer_button_key_hint(button) for button in visible_buttons
+        )
         vital_line = scene._compact_vital_line()
-        end_turn_title = next(title for title in compact_titles if title.startswith("Space "))
+        end_turn_title = next(title for title in compact_titles if title == "End Turn")
         compact_status, compact_hint = scene._footer_status_lines(max_width=720)
         full_status, full_hint = scene._footer_status_lines(max_width=900)
 
         assert len(compact_detail) <= 24
         assert len(narrow_detail) <= 28
+        assert wide_detail == ""
         assert button_cols == 3
         assert footer_band_height == 52
         assert len(visible_buttons) < len(RUN_ACTION_BUTTONS)
@@ -2475,7 +2493,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert {"Recommended", "Report", "Save", "End Turn"} <= visible_titles
         primary_command = scene._view_model.decision_brief.command
         assert all(button.payload != primary_command for button in visible_buttons[1:3])
-        assert all(label in vital_line for label in ("Cash", "Runway", "Users", "AP"))
+        assert all(label in vital_line for label in ("Cash", "Runway", "AP", "Journey"))
+        assert "Users" not in vital_line
         assert scene._use_compact_run_focus(820, 220)
         assert scene._use_compact_run_focus(1280, 220)
         scene._focus_mode = False
@@ -2485,7 +2504,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert "Endgame" not in visible_titles
         assert rows * button_height + max(0, rows - 1) * 10 <= 320 - footer_band_height
         assert compact_outer_height <= 320
-        assert end_turn_title == "Space End Turn"
+        assert end_turn_title == "End Turn"
+        assert "SPC" in visible_key_hints
         assert max(len(title) for title in compact_titles) <= 15
         assert len(compact_status) <= 92
         assert len(compact_hint) <= 96
@@ -4420,7 +4440,9 @@ def test_build_run_review_view_model_exposes_findings() -> None:
     assert review.findings
     assert review.next_focus == review.findings[0].command
     assert "_" not in review.next_focus
-    assert review.badges[0] == "No Operating Pattern"
+    assert review.badges[0] == "Style: No Operating Pattern"
+    assert review.badges[1] == "Outcome: In Progress"
+    assert review.badges[2] == "Difficulty: Standard"
 
 
 def test_launch_2d_frontend_headless_exits_after_frame_cap(tmp_path: Path) -> None:

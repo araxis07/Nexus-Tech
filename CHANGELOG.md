@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.320.0 - 2026-07-28
+
+- Simplified the live run header around campaign goal, next move, timing, and end-turn state while moving score and market diagnostics back to the existing Report surfaces
+- Made action names the primary Focus-button label and moved fixed keyboard shortcuts into separate compact badges, removing duplicate wide-button detail that competed with the decision preview
+- Added explicit `/100` Endgame readiness units, safer Reset Risk guidance, and clearer IPO and acquisition labels without changing exit calculations
+- Reframed completed-run findings as Cause and Lesson, labeled run traits, and enlarged responsive review cards so compact layouts preserve the complete learning copy
+- Revalidated compact and desktop visual hierarchy across 30 captures while preserving gameplay balance, controls, frozen catalogs, schema 28, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.319.0 - 2026-07-27
 
 - Added append-only human-beta retest lineage so a repaired P0/P1 failure can be re-observed by a new first-time tester without deleting the original evidence row

@@ -72,6 +72,9 @@ def test_live_hud_exposes_current_act_and_readable_next_move() -> None:
     assert view_model.campaign_chapter_label == "Act 1/3: Foundation Loop"
     assert view_model.campaign_objective == "Staff and stabilize the flagship."
     assert "Next:" in view_model.header_note
+    assert "Due:" in view_model.header_note
+    assert "End Turn:" in view_model.header_note
+    assert "Plan " not in view_model.header_note
     assert not _contains_raw_command(view_model.header_note)
     assert all(not _contains_raw_command(line.label) for line in view_model.coach_lines)
     assert view_model.decision_brief.objective_label == "Act 1/3: Foundation Loop"
