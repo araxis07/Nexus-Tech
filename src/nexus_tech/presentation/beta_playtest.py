@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from nexus_tech.simulation.beta_owner_rehearsal import BetaOwnerRehearsalStatus
 from nexus_tech.simulation.beta_playtest import BetaPlaytestStatus
 from nexus_tech.simulation.beta_playtest_execution import BetaPlaytestExecutionPlan
 from nexus_tech.simulation.beta_playtest_preparation import (
@@ -128,6 +129,24 @@ def render_beta_playtest_preparation(
                 ),
                 title="0. Owner Rehearsal Gate",
                 subtitle="Visible preparation only; human evidence remains unchanged",
+                border_style="yellow",
+                expand=True,
+            )
+        )
+        console.print(
+            Panel(
+                Group(
+                    _folded_command(preparation.owner_rehearsal_validation_command),
+                    Text(""),
+                    Text(
+                        "Run after Save & Archive. This machine gate verifies the exact "
+                        "scenario and both campaign choices; the visible recovery and "
+                        "Route Atlas checks remain the owner's manual responsibility.",
+                        overflow="fold",
+                        no_wrap=False,
+                    ),
+                ),
+                title="0B. Required Post-Rehearsal Gate",
                 border_style="yellow",
                 expand=True,
             )
@@ -301,6 +320,17 @@ def format_beta_playtest_preparation_markdown(
                         )
                     ),
                     "",
+                    "### Required Post-Rehearsal Gate",
+                    "",
+                    "Run this after `Save & Archive` and before opening the tester profile. "
+                    "It verifies an archived route for the exact target scenario with both "
+                    "campaign choices. Pause, Back, Menu, Continue, Endgame switching, and "
+                    "Route Atlas visibility remain manual checklist observations.",
+                    "",
+                    "```bash",
+                    preparation.owner_rehearsal_validation_command,
+                    "```",
+                    "",
                 )
             )
         lines.extend(
@@ -363,6 +393,37 @@ def format_beta_playtest_preparation_markdown(
         )
     )
     return "\n".join(lines)
+
+
+def render_beta_owner_rehearsal_status(
+    console: Console,
+    status: BetaOwnerRehearsalStatus,
+) -> None:
+    """Render the archive-backed portion of the owner-rehearsal gate."""
+
+    summary = Table.grid(padding=(0, 2))
+    summary.add_column(style="bold")
+    summary.add_column(overflow="fold")
+    summary.add_row("Rehearsal Profile", status.database_path)
+    summary.add_row("Target Scenario", status.target_scenario_id)
+    summary.add_row("All Archives", str(status.archive_count))
+    summary.add_row("Target Archives", str(status.target_archive_count))
+    summary.add_row("Complete Target Paths", str(status.full_path_archive_count))
+    summary.add_row(
+        "Recorded Routes",
+        "; ".join(status.target_routes) if status.target_routes else "none",
+    )
+    console.print(
+        Panel(
+            Group(summary, Text(""), Text(status.message, overflow="fold", no_wrap=False)),
+            title=(
+                "Owner Rehearsal Validated" if status.completed else "Owner Rehearsal Incomplete"
+            ),
+            subtitle="This command never records human-session evidence",
+            border_style="green" if status.completed else "red",
+            expand=True,
+        )
+    )
 
 
 def render_beta_playtest_execution_plan(

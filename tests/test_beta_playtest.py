@@ -598,6 +598,8 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert "nexus-tech-beta-001-rehearsal.db" not in preparation.launch_command
     assert "nexus-tech-beta-001-rehearsal.db" in preparation.owner_rehearsal_launch_command
     assert "nexus-tech-beta-001-session.db" not in preparation.owner_rehearsal_launch_command
+    assert "validate-beta-owner-rehearsal" in preparation.owner_rehearsal_validation_command
+    assert "--input /tmp/nexus-tech-beta-001.md" in preparation.owner_rehearsal_validation_command
     assert "--window-size 820x620" in preparation.launch_command
     assert "--scenario founder_journey" in preparation.record_command
     assert "--db-path nexus-tech.db" in preparation.record_command
@@ -937,6 +939,9 @@ def test_prepare_beta_playtest_cli_defaults_to_current_executable(
     assert "It must never be entered" in result.output
     assert "with record-beta-playtest-session." in result.output
     assert "Owner Rehearsal Gate" in markdown
+    assert "Required Post-Rehearsal Gate" in result.output
+    assert "Required Post-Rehearsal Gate" in markdown
+    assert "validate-beta-owner-rehearsal" in markdown
     assert "must never be entered" in markdown
     assert "Save & Archive" in markdown
     assert "Route Atlas" in markdown
@@ -1339,6 +1344,8 @@ def test_prepare_beta_playtest_cli_hands_review_ready_evidence_to_fail_closed_ga
 
     assert result.exit_code == 0
     assert "Manual Review Gate" in result.output
+    assert "Post-Rehearsal Gate" not in result.output
+    assert "validate-beta-owner-rehearsal" not in result.output
     assert "--require-review-ready" in result.output
     assert "Launch And Select" not in result.output
     markdown = output.read_text(encoding="utf-8")

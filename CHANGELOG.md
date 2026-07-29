@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.322.1 - 2026-07-29
+
+- Added `validate-beta-owner-rehearsal`, a fail-closed post-rehearsal gate that requires one archived two-choice route for the packet's exact target scenario before first-tester handoff
+- Kept packet/build/evidence validation and fresh tester-profile enforcement active after the rehearsal profile has legitimately been used
+- Embedded the required post-rehearsal command in both Rich and Markdown handoffs with an explicit boundary between archive checks and manual Pause, Back, Menu, Continue, Endgame, and Route Atlas observations
+- Added pure and real-SQLite CLI regressions for missing profiles, incomplete or wrong-scenario routes, completed target routes, evidence preservation, and consumed tester profiles
+- Preserved gameplay outcomes, balance, controls, frozen catalogs, persistence schema 28, packet manifest schema 3, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.322.0 - 2026-07-29
 
 - Added one shared local-path safety policy for generated beta artifacts, SQLite databases, and their lexical or symlink-resolved `-journal`, `-wal`, and `-shm` sidecars

@@ -25,12 +25,17 @@ from nexus_tech.persistence.beta_playtest_repository import (
     BetaPlaytestSession,
 )
 from nexus_tech.persistence.errors import PersistenceError
+from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.presentation.beta_playtest import (
     format_beta_playtest_execution_plan_markdown,
     format_beta_playtest_preparation_markdown,
+    render_beta_owner_rehearsal_status,
     render_beta_playtest_execution_plan,
     render_beta_playtest_preparation,
     render_beta_playtest_status,
+)
+from nexus_tech.simulation.beta_owner_rehearsal import (
+    build_beta_owner_rehearsal_status,
 )
 from nexus_tech.simulation.beta_playtest import (
     BetaBlockerResult,
@@ -341,6 +346,52 @@ def register_beta_playtest_commands(
                 border_style="green",
             )
         )
+
+    @app.command("validate-beta-owner-rehearsal")
+    def validate_beta_owner_rehearsal_command(
+        input_path: Path = BETA_PACKET_INPUT_OPTION,
+        db_path: Path = BETA_DB_PATH_OPTION,
+    ) -> None:
+        """Require an archived target route before the first tester handoff."""
+
+        console = get_console()
+        repository = BetaPlaytestRepository(db_path)
+        try:
+            markdown = input_path.read_text(encoding="utf-8")
+            sessions = repository.list_sessions()
+            preparation = validate_beta_playtest_session_packet(
+                markdown,
+                sessions,
+                game_version=__version__,
+                packet_path=str(input_path),
+                evidence_database_path=str(db_path),
+            )
+            if not preparation.owner_rehearsal_required:
+                raise ValueError(
+                    "This packet does not require an owner rehearsal; use its normal "
+                    "packet preflight before tester handoff."
+                )
+            _require_fresh_gameplay_profile(
+                Path(preparation.session_database_path),
+                label="Tester gameplay profile",
+            )
+            rehearsal_path = Path(preparation.owner_rehearsal_database_path)
+            if rehearsal_path.exists() and not rehearsal_path.is_file():
+                raise ValueError(
+                    f"Owner rehearsal profile must be a SQLite file: {rehearsal_path}."
+                )
+            status = build_beta_owner_rehearsal_status(
+                SaveLoadCoordinator(rehearsal_path).list_run_archives(),
+                database_path=str(rehearsal_path),
+                database_exists=rehearsal_path.is_file(),
+                target_scenario_id=preparation.target_scenario_id or "",
+            )
+        except (OSError, PersistenceError, ValueError) as error:
+            _exit_with_error(console, "Owner Rehearsal Validation Failed", str(error))
+
+        render_beta_owner_rehearsal_status(console, status)
+        if not status.completed:
+            raise typer.Exit(code=1)
 
     @app.command("record-beta-playtest-session")
     def record_beta_playtest_session_command(

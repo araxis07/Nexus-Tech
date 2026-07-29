@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.322.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.322.1 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
 [Beta Execution Audit - 2026-07-29](BETA_EXECUTION_AUDIT_2026-07-29.md).
@@ -70,6 +70,8 @@ The current beta candidate protects the complete owner-flow contract while retai
 - every active session packet defines deterministic `P0` release-blocker, `P1` usability-blocker, and `P2` polish classifications with explicit stop and recording responses;
 - stored observation notes never enter the packet, generated artifacts default to `/tmp`, and preparation never writes a session row;
 - every generated packet now carries a deterministic manifest, and `validate-beta-playtest-session-packet` rejects changed content, stale build/evidence state, a mismatched evidence store, or an already-used gameplay profile before handoff;
+- the first packet now embeds `validate-beta-owner-rehearsal`, which revalidates the packet and evidence snapshot after visible play, keeps the tester profile fresh, and fails until the rehearsal database contains the exact target scenario with both campaign choices archived;
+- the post-rehearsal gate explicitly leaves Pause, Back, Menu, Continue, Endgame switching, Progress, and Route Atlas confirmation as manual owner checks and never writes human-session evidence;
 - motion-mode differentiation now evaluates animation density and disabled-state behavior independently from transient reduced-mode timing watches, while genuine reduced-mode stability failures remain blocking;
 - `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, failing only missing ledger coverage while exporting repetition and low-variety candidates for human review;
 - `beta-playtest-status --require-review-ready` now exits non-zero until all current-version human criteria pass, preventing release scripts from confusing an informative status report with a successful gate while retaining the final manual reviewer decision;
@@ -78,7 +80,7 @@ The current beta candidate protects the complete owner-flow contract while retai
 ## Path To Beta
 
 1. Run `prepare-beta-playtest-session` and keep its isolated rehearsal/tester/evidence database paths unchanged.
-2. Run `validate-beta-playtest-session-packet` immediately before handoff, then follow the Owner Rehearsal Gate from New Game through `Save & Archive` and `6 Open Progress` at 820x620; record only defects actually observed and never run the human-session recorder for the rehearsal.
+2. Run `validate-beta-playtest-session-packet` immediately before the rehearsal, follow the visible route from New Game through `Save & Archive` and `6 Open Progress` at 820x620, then run the packet's `validate-beta-owner-rehearsal` gate before opening the tester profile; record only defects actually observed and never run the human-session recorder for the rehearsal.
 3. Observe six first-time sessions across all six featured campaigns using anonymous tester codes, classify each issue with the packet's `P0`/`P1`/`P2` policy, and use the structured local evidence command only after each real session. Regenerate `beta-playtest-plan` after every row rather than pre-allocating later testers.
 4. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
 5. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.
