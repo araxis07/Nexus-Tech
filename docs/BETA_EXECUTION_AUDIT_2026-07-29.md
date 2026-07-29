@@ -2,9 +2,9 @@
 
 ## Scope
 
-This audit covers NEXUS TECH 0.321.0. It validates the fail-closed human-beta
-packet handoff without changing gameplay balance, controls, frozen catalogs,
-save schema 28, archive progression, or the human-evidence boundary.
+This audit covers NEXUS TECH 0.322.0. It validates fail-closed human-beta packet
+and execution-plan handoffs without changing gameplay balance, controls, frozen
+catalogs, save schema 28, archive progression, or the human-evidence boundary.
 
 ## Decision
 
@@ -29,6 +29,12 @@ or rehearsal SQLite database. The same boundary covers each database's
 `-journal`, `-wal`, and `-shm` sidecars so packet generation cannot overwrite
 live evidence or gameplay state.
 
+Execution-plan generation now applies the same normalization policy before
+writing. Relative aliases between the plan and packet are rejected, and neither
+artifact may target the lexical or symlink-resolved evidence database and
+SQLite sidecars. Rejected commands leave existing structured evidence
+unchanged.
+
 These guards do not record owner rehearsal, automated runs, screenshots, or
 generated artifacts as human evidence. The first real target remains Learn /
 `founder_journey`.
@@ -37,11 +43,11 @@ generated artifacts as human evidence. The first real target remains Learn /
 
 | Area | Result | Evidence |
 | --- | --- | --- |
-| Full test suite | pass | 1220 tests |
-| Formatting and lint | pass | 149 files formatted; Ruff reported no issues |
-| Focused beta contracts | pass | 86 beta-playtest and beta-convergence tests |
+| Full test suite | pass | 1229 tests |
+| Formatting and lint | pass | 150 files formatted; Ruff reported no issues |
+| Focused beta contracts | pass | 95 beta-playtest and beta-convergence tests |
 | Content catalog | pass | 49 scenarios, 49 templates, 32 rivals, 202 events, 0 issues |
-| Human-beta packet | pass | Manifest schema 3, embedded preflight, path binding, profile isolation, and collision guards |
+| Human-beta handoff | pass | Manifest schema 3, embedded preflight, shared path normalization, profile isolation, and packet/plan collision guards |
 | Human-beta gate | expected blocked | Fail-closed review command returned non-zero at truthful evidence `0/6` |
 | Campaign readiness | pass | 18/18 campaign and difficulty cells; 72/72 authored route executions; no shutdowns |
 | Decision quality | pass with advisory watches | 54 heuristic runs recorded operating decisions; 13 cells still require comparison with human notes |
@@ -58,9 +64,10 @@ generated artifacts as human evidence. The first real target remains Learn /
 - Current tracked content and existing Git history contain no recognized
   private-key, GitHub, OpenAI-style, Slack, AWS, Google, Stripe, personal
   workspace path, or personal email signature.
-- Local databases, virtual environments, caches, Headroom files, Node
-  dependencies, and package-manager files remain ignored and unstaged.
-- The 0.321.0 wheel contains 141 expected package files and no risky local
+- Local `.db`, `.sqlite`, `.sqlite3`, SQLite sidecar, virtual-environment,
+  cache, Headroom, Node dependency, and package-manager files remain ignored
+  and unstaged.
+- The 0.322.0 wheel contains 142 expected package files and no risky local
   artifact.
 
 ## Required Human Work

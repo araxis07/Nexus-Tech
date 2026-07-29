@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from nexus_tech.artifact_path_safety import normalize_local_path
 from nexus_tech.persistence.beta_playtest_repository import BetaPlaytestSession
 from nexus_tech.presentation.beta_playtest import (
     format_beta_playtest_preparation_markdown,
@@ -29,11 +28,11 @@ def validate_beta_playtest_session_packet(
     manifest = decode_beta_playtest_packet_manifest(markdown)
     if manifest.game_version != game_version:
         raise ValueError("Packet game version does not match this build; regenerate the packet.")
-    if _normalized_path(manifest.packet_output_path) != _normalized_path(packet_path):
+    if normalize_local_path(manifest.packet_output_path) != normalize_local_path(packet_path):
         raise ValueError(
             "Packet path does not match --input; regenerate the packet at its intended path."
         )
-    if _normalized_path(manifest.evidence_database_path) != _normalized_path(
+    if normalize_local_path(manifest.evidence_database_path) != normalize_local_path(
         evidence_database_path
     ):
         raise ValueError(
@@ -65,7 +64,3 @@ def validate_beta_playtest_session_packet(
             "Packet content was modified after generation; regenerate it instead of editing it."
         )
     return current_preparation
-
-
-def _normalized_path(value: str) -> Path:
-    return Path(value.strip()).expanduser().resolve(strict=False)

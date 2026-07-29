@@ -5,6 +5,10 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass
 
+from nexus_tech.artifact_path_safety import (
+    normalize_local_path,
+    protected_sqlite_artifact_paths,
+)
 from nexus_tech.persistence.beta_playtest_repository import BetaPlaytestSession
 from nexus_tech.simulation.beta_playtest import (
     BetaPlaytestStatus,
@@ -207,8 +211,16 @@ def _validate_execution_input(
         shlex.split(command_prefix)
     except ValueError as error:
         raise ValueError("Command prefix must contain valid shell quoting.") from error
-    if packet_output_path.strip() == plan_output_path.strip():
+    normalized_packet_output = normalize_local_path(packet_output_path)
+    normalized_plan_output = normalize_local_path(plan_output_path)
+    if normalized_packet_output == normalized_plan_output:
         raise ValueError("Packet and execution-plan output paths must be distinct.")
+    protected_evidence_artifacts = protected_sqlite_artifact_paths(evidence_database_path)
+    if {normalized_packet_output, normalized_plan_output} & protected_evidence_artifacts:
+        raise ValueError(
+            "Packet and execution-plan outputs must not overwrite the evidence database "
+            "or its SQLite sidecars."
+        )
 
 
 def _command(prefix: str, *arguments: object) -> str:

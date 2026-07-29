@@ -9,8 +9,11 @@ import json
 import re
 import shlex
 from dataclasses import dataclass
-from pathlib import Path
 
+from nexus_tech.artifact_path_safety import (
+    normalize_local_path,
+    protected_sqlite_artifact_paths,
+)
 from nexus_tech.persistence.beta_playtest_repository import (
     BetaPlaytestInterface,
     BetaPlaytestSession,
@@ -573,27 +576,19 @@ def _validate_packet_input(
     except ValueError as error:
         raise ValueError("Command prefix must contain valid shell quoting.") from error
     normalized_database_paths = {
-        _normalized_path(evidence_database_path),
-        _normalized_path(session_database_path),
-        _normalized_path(owner_rehearsal_database_path),
+        normalize_local_path(evidence_database_path),
+        normalize_local_path(session_database_path),
+        normalize_local_path(owner_rehearsal_database_path),
     }
     if len(normalized_database_paths) != 3:
         raise ValueError("Evidence, session, and owner rehearsal database paths must be distinct.")
-    protected_database_artifacts = {
-        _normalized_path(f"{database_path}{suffix}")
-        for database_path in (
-            evidence_database_path,
-            session_database_path,
-            owner_rehearsal_database_path,
-        )
-        for suffix in ("", "-journal", "-wal", "-shm")
-    }
-    if _normalized_path(packet_output_path) in protected_database_artifacts:
+    protected_database_artifacts = protected_sqlite_artifact_paths(
+        evidence_database_path,
+        session_database_path,
+        owner_rehearsal_database_path,
+    )
+    if normalize_local_path(packet_output_path) in protected_database_artifacts:
         raise ValueError("Packet output and gameplay/evidence database paths must be distinct.")
-
-
-def _normalized_path(value: str) -> Path:
-    return Path(value.strip()).expanduser().resolve(strict=False)
 
 
 def _command(prefix: str, *arguments: object) -> str:

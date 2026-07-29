@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.322.0 - 2026-07-29
+
+- Added one shared local-path safety policy for generated beta artifacts, SQLite databases, and their lexical or symlink-resolved `-journal`, `-wal`, and `-shm` sidecars
+- Made `beta-playtest-plan` normalize packet and execution-plan output paths before accepting them so relative aliases cannot target the same file
+- Prevented either execution-plan artifact path from overwriting the structured human-evidence database or any SQLite sidecar before the plan is written
+- Extended repository ignores to cover `.sqlite3` files and SQLite journal, WAL, and shared-memory sidecars so local playtest state is not staged accidentally
+- Added pure and CLI regressions for normalized and symlink aliases, database and sidecar collisions, and preservation of existing evidence after a rejected command
+- Preserved gameplay outcomes, balance, controls, frozen catalogs, persistence schema 28, packet manifest schema 3, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.321.0 - 2026-07-29
 
 - Made every human-beta session packet self-contained with a required preflight command that verifies the current build, evidence snapshot, packet content, and unused gameplay profiles before either owner rehearsal or tester launch

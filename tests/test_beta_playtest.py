@@ -279,6 +279,73 @@ def test_beta_playtest_execution_plan_queues_six_lanes_one_session_at_a_time() -
     assert "--require-review-ready" in plan.review_gate_command
 
 
+@pytest.mark.parametrize(
+    ("packet_name", "plan_name", "message"),
+    (
+        (
+            "artifacts/../execution-plan.md",
+            "execution-plan.md",
+            "Packet and execution-plan output paths must be distinct",
+        ),
+        (
+            "next-session.md",
+            "evidence.db",
+            "must not overwrite the evidence database",
+        ),
+        (
+            "next-session.md",
+            "evidence.db-wal",
+            "must not overwrite the evidence database",
+        ),
+        (
+            "evidence.db-shm",
+            "execution-plan.md",
+            "must not overwrite the evidence database",
+        ),
+    ),
+)
+def test_beta_playtest_execution_plan_rejects_normalized_artifact_collisions(
+    tmp_path: Path,
+    packet_name: str,
+    plan_name: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        build_beta_playtest_execution_plan(
+            [],
+            game_version=__version__,
+            command_prefix="nexus-tech",
+            evidence_database_path=str(tmp_path / "evidence.db"),
+            packet_output_path=str(tmp_path / packet_name),
+            plan_output_path=str(tmp_path / plan_name),
+        )
+
+
+@pytest.mark.parametrize("sidecar_base", ("alias", "target"))
+def test_beta_playtest_execution_plan_rejects_symlinked_evidence_sidecars(
+    tmp_path: Path,
+    sidecar_base: str,
+) -> None:
+    evidence_target = tmp_path / "evidence-target.db"
+    evidence_target.touch()
+    evidence_alias = tmp_path / "evidence-alias.db"
+    evidence_alias.symlink_to(evidence_target)
+    bases = {
+        "alias": evidence_alias,
+        "target": evidence_target,
+    }
+
+    with pytest.raises(ValueError, match="must not overwrite the evidence database"):
+        build_beta_playtest_execution_plan(
+            [],
+            game_version=__version__,
+            command_prefix="nexus-tech",
+            evidence_database_path=str(evidence_alias),
+            packet_output_path=f"{bases[sidecar_base]}-wal",
+            plan_output_path=str(tmp_path / "execution-plan.md"),
+        )
+
+
 def test_beta_playtest_execution_plan_targets_active_retest_without_copying_notes() -> None:
     sessions = [
         make_session(
@@ -797,6 +864,42 @@ def test_beta_playtest_plan_cli_writes_note_free_six_lane_artifact(
     assert "beta-playtest-plan" in markdown
     assert existing.notes not in markdown
     assert not packet_output.exists()
+
+
+@pytest.mark.parametrize(
+    ("option", "database_suffix"),
+    (
+        ("--output", ""),
+        ("--output", "-journal"),
+        ("--packet-output", "-shm"),
+    ),
+)
+def test_beta_playtest_plan_cli_preserves_evidence_on_artifact_collision(
+    tmp_path: Path,
+    option: str,
+    database_suffix: str,
+) -> None:
+    db_path = tmp_path / "evidence.db"
+    existing = make_session(1, "founder_journey")
+    repository = BetaPlaytestRepository(db_path)
+    repository.save_session(existing)
+    arguments = [
+        "beta-playtest-plan",
+        "--output",
+        str(tmp_path / "execution-plan.md"),
+        "--packet-output",
+        str(tmp_path / "next-session.md"),
+        "--db-path",
+        str(db_path),
+    ]
+    arguments[arguments.index(option) + 1] = f"{db_path}{database_suffix}"
+
+    result = runner.invoke(app, arguments)
+
+    assert result.exit_code == 1
+    assert "must not overwrite the evidence database" in result.output
+    assert "SQLite sidecars" in result.output
+    assert repository.list_sessions() == [existing]
 
 
 def test_prepare_beta_playtest_cli_defaults_to_current_executable(
