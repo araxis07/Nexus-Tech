@@ -156,6 +156,21 @@ class BetaPlaytestPreparation:
         return self._launch_command(self.owner_rehearsal_database_path)
 
     @property
+    def owner_rehearsal_run_command(self) -> str:
+        """Run the visible rehearsal and its archive gate as one guarded workflow."""
+
+        if not self.owner_rehearsal_required:
+            return ""
+        return _command(
+            self.command_prefix,
+            "run-beta-owner-rehearsal",
+            "--input",
+            self.packet_output_path,
+            "--db-path",
+            self.evidence_database_path,
+        )
+
+    @property
     def owner_rehearsal_validation_command(self) -> str:
         """Validate the archived route after the visible owner rehearsal."""
 

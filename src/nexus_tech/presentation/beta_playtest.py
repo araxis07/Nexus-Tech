@@ -117,13 +117,15 @@ def render_beta_playtest_preparation(
             Panel(
                 Group(
                     Text(
-                        "Run this once before the first observed session. It must never "
-                        "be entered with record-beta-playtest-session.",
+                        "Use the guarded command below before the first observed session. "
+                        "It performs packet preflight, opens the exact visible profile, "
+                        "and checks the archive after the window closes.",
                         overflow="fold",
                         no_wrap=False,
                     ),
+                    Text("It must never be entered with record-beta-playtest-session."),
                     Text(""),
-                    _folded_command(preparation.owner_rehearsal_launch_command),
+                    _folded_command(preparation.owner_rehearsal_run_command),
                     Text(""),
                     rehearsal,
                 ),
@@ -136,12 +138,15 @@ def render_beta_playtest_preparation(
         console.print(
             Panel(
                 Group(
+                    Text("Manual equivalent:", style="bold"),
+                    _folded_command(preparation.owner_rehearsal_launch_command),
+                    Text(""),
                     _folded_command(preparation.owner_rehearsal_validation_command),
                     Text(""),
                     Text(
-                        "Run after Save & Archive. This machine gate verifies the exact "
-                        "scenario and both campaign choices; the visible recovery and "
-                        "Route Atlas checks remain the owner's manual responsibility.",
+                        "The post-gate verifies the exact scenario and both campaign "
+                        "choices. The visible recovery and Route Atlas checks remain the "
+                        "owner's manual responsibility in both workflows.",
                         overflow="fold",
                         no_wrap=False,
                     ),
@@ -304,12 +309,14 @@ def format_beta_playtest_preparation_markdown(
                 (
                     "## Owner Rehearsal Gate",
                     "",
-                    "Run this visible route once before inviting the first tester. The "
+                    "Run this guarded visible workflow once before inviting the first "
+                    "tester. It performs packet preflight, opens the exact rehearsal "
+                    "profile, and checks the archive after the window closes. The "
                     "rehearsal must never be entered with "
                     "`record-beta-playtest-session`.",
                     "",
                     "```bash",
-                    preparation.owner_rehearsal_launch_command,
+                    preparation.owner_rehearsal_run_command,
                     "```",
                     "",
                     *(
@@ -322,14 +329,19 @@ def format_beta_playtest_preparation_markdown(
                     "",
                     "### Required Post-Rehearsal Gate",
                     "",
-                    "Run this after `Save & Archive` and before opening the tester profile. "
-                    "It verifies an archived route for the exact target scenario with both "
-                    "campaign choices. Pause, Back, Menu, Continue, Endgame switching, and "
-                    "Route Atlas visibility remain manual checklist observations.",
+                    "The guarded command above runs these commands in order and supports "
+                    "resuming its existing rehearsal profile after an incomplete window "
+                    "close. Use this manual equivalent only when diagnosing launch behavior:",
                     "",
                     "```bash",
+                    preparation.owner_rehearsal_launch_command,
                     preparation.owner_rehearsal_validation_command,
                     "```",
+                    "",
+                    "The post-gate verifies an archived route for the exact target "
+                    "scenario with both campaign choices. Pause, Back, Menu, Continue, "
+                    "Endgame switching, and Route Atlas visibility remain manual "
+                    "checklist observations.",
                     "",
                 )
             )
@@ -421,6 +433,77 @@ def render_beta_owner_rehearsal_status(
             ),
             subtitle="This command never records human-session evidence",
             border_style="green" if status.completed else "red",
+            expand=True,
+        )
+    )
+
+
+def render_beta_owner_rehearsal_briefing(
+    console: Console,
+    preparation: BetaPlaytestPreparation,
+    *,
+    profile_exists: bool,
+    has_save: bool,
+) -> None:
+    """Render the exact visible route before the guarded rehearsal launch."""
+
+    if has_save:
+        launch_mode = "Continue existing save"
+        selection_instruction = (
+            f"Choose Continue, then finish "
+            f"{preparation.target_track_label} / {preparation.target_scenario_id}."
+        )
+        first_check = (
+            "Confirm this is the dedicated rehearsal profile, choose Continue, and "
+            "resume the visible route without counting it as human evidence."
+        )
+    elif profile_exists:
+        launch_mode = "Retry existing profile"
+        selection_instruction = preparation.selection_instruction
+        first_check = (
+            "The prior window close created no save or archive. Confirm this is the "
+            "dedicated rehearsal profile, then choose New Game; do not count it as "
+            "human evidence."
+        )
+    else:
+        launch_mode = "Fresh rehearsal"
+        selection_instruction = preparation.selection_instruction
+        first_check = preparation.owner_rehearsal_checklist[0]
+
+    summary = Table.grid(padding=(0, 2))
+    summary.add_column(style="bold")
+    summary.add_column(overflow="fold")
+    summary.add_row(
+        "Target", f"{preparation.target_track_label} / {preparation.target_scenario_id}"
+    )
+    summary.add_row("Window", preparation.viewport)
+    summary.add_row("Motion", preparation.motion_mode.value)
+    summary.add_row("Profile", preparation.owner_rehearsal_database_path)
+    summary.add_row("Launch Mode", launch_mode)
+
+    checklist = Table(box=box.SIMPLE, expand=True)
+    checklist.add_column("Step", justify="right", style="bold yellow")
+    checklist.add_column("Verify")
+    for index, item in enumerate(preparation.owner_rehearsal_checklist, start=1):
+        checklist.add_row(str(index), first_check if index == 1 else item)
+
+    console.print(
+        Panel(
+            Group(
+                summary,
+                Text(""),
+                Text(
+                    selection_instruction,
+                    style="bold",
+                    overflow="fold",
+                    no_wrap=False,
+                ),
+                Text(""),
+                checklist,
+            ),
+            title="Owner Rehearsal Ready",
+            subtitle="Closing the window triggers the archive gate; no human evidence is written",
+            border_style="yellow",
             expand=True,
         )
     )

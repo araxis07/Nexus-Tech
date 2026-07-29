@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.323.0 - 2026-07-30
+
+- Added `run-beta-owner-rehearsal`, one guarded command that validates the current packet and evidence snapshot, opens the packet-bound 2D profile, and runs the archive gate when the visible window closes
+- Allowed the guarded workflow to resume its existing incomplete rehearsal profile while keeping the first-tester profile fresh and isolated
+- Made completed rehearsal archives skip unnecessary window relaunches and kept incomplete closes fail-closed with the exact retry command
+- Kept the manual launch plus `validate-beta-owner-rehearsal` path available for diagnostics and preserved the visible Pause, Back, Menu, Continue, Endgame, Progress, and Route Atlas responsibilities
+- Added CLI regressions for fresh, incomplete, completed, resumed, and already-complete rehearsal flows without recording human-session evidence
+- Preserved gameplay outcomes, balance, controls, frozen catalogs, persistence schema 28, packet manifest schema 3, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.322.1 - 2026-07-29
 
 - Added `validate-beta-owner-rehearsal`, a fail-closed post-rehearsal gate that requires one archived two-choice route for the packet's exact target scenario before first-tester handoff

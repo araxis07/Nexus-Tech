@@ -598,6 +598,10 @@ def test_beta_playtest_preparation_targets_first_missing_campaign_safely() -> No
     assert "nexus-tech-beta-001-rehearsal.db" not in preparation.launch_command
     assert "nexus-tech-beta-001-rehearsal.db" in preparation.owner_rehearsal_launch_command
     assert "nexus-tech-beta-001-session.db" not in preparation.owner_rehearsal_launch_command
+    assert "run-beta-owner-rehearsal" in preparation.owner_rehearsal_run_command
+    assert "--input /tmp/nexus-tech-beta-001.md" in preparation.owner_rehearsal_run_command
+    assert "--db-path nexus-tech.db" in preparation.owner_rehearsal_run_command
+    assert "nexus-tech-beta-001-session.db" not in preparation.owner_rehearsal_run_command
     assert "validate-beta-owner-rehearsal" in preparation.owner_rehearsal_validation_command
     assert "--input /tmp/nexus-tech-beta-001.md" in preparation.owner_rehearsal_validation_command
     assert "--window-size 820x620" in preparation.launch_command

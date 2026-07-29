@@ -88,12 +88,15 @@ Run the packet's embedded Required Packet Preflight before opening either
 profile. Packet output must not alias any database, `-journal`, `-wal`, or
 `-shm` path; copied, moved, edited, stale, or profile-contaminated packets must
 be regenerated rather than repaired in place.
-After completing the visible rehearsal and using Save & Archive, run the
-packet's embedded `validate-beta-owner-rehearsal` command before opening the
-tester profile. It must find a two-choice archive for the exact target scenario
-while the tester profile remains fresh. Pause, Back, Menu, Continue, Endgame,
-and Route Atlas checks remain manual and the command must not create human
-evidence.
+For the first human-beta packet, prefer its `run-beta-owner-rehearsal` command.
+It validates the packet, opens the exact visible 2D rehearsal profile, and runs
+the archive gate after close while leaving the tester profile and human evidence
+untouched. Re-run it after an incomplete close; it directs the owner to New Game
+or Continue from the actual saved state. Use the packet's separate launch and
+`validate-beta-owner-rehearsal` commands only for diagnostics. The gate must find
+a two-choice archive for the exact target scenario while the tester profile
+remains fresh. Pause, Back, Menu, Continue, Endgame, and Route Atlas checks remain
+manual and neither workflow may create human evidence.
 
 Run `animation-playtest-status` while the manual pass is in progress to see the
 remaining grouped rows. Add `--fail-on-incomplete` only when the status command

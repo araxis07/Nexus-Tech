@@ -11543,7 +11543,31 @@ def _build_locked_campaign_start_ids(*, db_path: Path) -> set[str]:
     }
 
 
-register_beta_playtest_commands(app, lambda: console)
+def _launch_beta_owner_rehearsal(
+    db_path: Path,
+    viewport: str,
+    motion_mode: MotionMode,
+) -> str:
+    """Keep packet-bound frontend launch details in the main CLI module."""
+
+    try:
+        result = launch_2d_menu(
+            db_path=db_path,
+            headless=False,
+            window_size=parse_2d_window_size(viewport),
+            max_frames=None,
+            motion_mode=motion_mode,
+        )
+    except Frontend2DUnavailableError as error:
+        raise ValueError(str(error)) from error
+    return result.exit_reason
+
+
+register_beta_playtest_commands(
+    app,
+    lambda: console,
+    launch_owner_rehearsal=_launch_beta_owner_rehearsal,
+)
 
 
 _PLAYER_FACING_COMMANDS = frozenset(
@@ -11578,7 +11602,7 @@ _PLAYER_FACING_COMMANDS = frozenset(
 
 
 def _developer_command_area(command_name: str) -> str:
-    if "beta-playtest" in command_name:
+    if "beta-playtest" in command_name or "owner-rehearsal" in command_name:
         return "Release Validation"
     if "animation-playtest" in command_name:
         return "Animation QA"

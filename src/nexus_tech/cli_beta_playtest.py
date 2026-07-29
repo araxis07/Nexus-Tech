@@ -29,12 +29,14 @@ from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.presentation.beta_playtest import (
     format_beta_playtest_execution_plan_markdown,
     format_beta_playtest_preparation_markdown,
+    render_beta_owner_rehearsal_briefing,
     render_beta_owner_rehearsal_status,
     render_beta_playtest_execution_plan,
     render_beta_playtest_preparation,
     render_beta_playtest_status,
 )
 from nexus_tech.simulation.beta_owner_rehearsal import (
+    BetaOwnerRehearsalStatus,
     build_beta_owner_rehearsal_status,
 )
 from nexus_tech.simulation.beta_playtest import (
@@ -46,6 +48,7 @@ from nexus_tech.simulation.beta_playtest_execution import (
     build_beta_playtest_execution_plan,
 )
 from nexus_tech.simulation.beta_playtest_preparation import (
+    BetaPlaytestPreparation,
     build_beta_playtest_preparation,
 )
 from nexus_tech.simulation.campaign_journey import list_featured_campaign_journeys
@@ -155,6 +158,8 @@ BETA_COMMAND_PREFIX_OPTION = typer.Option(
     ),
 )
 
+BetaOwnerRehearsalLauncher = Callable[[Path, str, MotionMode], str]
+
 
 def _require_fresh_gameplay_profile(path: Path, *, label: str) -> None:
     parent = path.parent
@@ -170,9 +175,49 @@ def _require_fresh_gameplay_profile(path: Path, *, label: str) -> None:
         )
 
 
+def _load_current_beta_preparation(
+    input_path: Path,
+    db_path: Path,
+) -> BetaPlaytestPreparation:
+    markdown = input_path.read_text(encoding="utf-8")
+    sessions = BetaPlaytestRepository(db_path).list_sessions()
+    return validate_beta_playtest_session_packet(
+        markdown,
+        sessions,
+        game_version=__version__,
+        packet_path=str(input_path),
+        evidence_database_path=str(db_path),
+    )
+
+
+def _require_owner_rehearsal(preparation: BetaPlaytestPreparation) -> None:
+    if not preparation.owner_rehearsal_required:
+        raise ValueError(
+            "This packet does not require an owner rehearsal; use its normal "
+            "packet preflight before tester handoff."
+        )
+
+
+def _build_current_owner_rehearsal_status(
+    preparation: BetaPlaytestPreparation,
+) -> BetaOwnerRehearsalStatus:
+    rehearsal_path = Path(preparation.owner_rehearsal_database_path)
+    if rehearsal_path.exists() and not rehearsal_path.is_file():
+        raise ValueError(f"Owner rehearsal profile must be a SQLite file: {rehearsal_path}.")
+    database_exists = rehearsal_path.is_file()
+    archives = SaveLoadCoordinator(rehearsal_path).list_run_archives() if database_exists else []
+    return build_beta_owner_rehearsal_status(
+        archives,
+        database_path=str(rehearsal_path),
+        database_exists=database_exists,
+        target_scenario_id=preparation.target_scenario_id or "",
+    )
+
+
 def register_beta_playtest_commands(
     app: typer.Typer,
     get_console: Callable[[], Console],
+    launch_owner_rehearsal: BetaOwnerRehearsalLauncher | None = None,
 ) -> None:
     """Register release-only beta evidence commands on the main application."""
 
@@ -355,42 +400,129 @@ def register_beta_playtest_commands(
         """Require an archived target route before the first tester handoff."""
 
         console = get_console()
-        repository = BetaPlaytestRepository(db_path)
         try:
-            markdown = input_path.read_text(encoding="utf-8")
-            sessions = repository.list_sessions()
-            preparation = validate_beta_playtest_session_packet(
-                markdown,
-                sessions,
-                game_version=__version__,
-                packet_path=str(input_path),
-                evidence_database_path=str(db_path),
+            preparation = _load_current_beta_preparation(input_path, db_path)
+            _require_owner_rehearsal(preparation)
+            _require_fresh_gameplay_profile(
+                Path(preparation.session_database_path),
+                label="Tester gameplay profile",
             )
-            if not preparation.owner_rehearsal_required:
+            status = _build_current_owner_rehearsal_status(preparation)
+        except (OSError, PersistenceError, ValueError) as error:
+            _exit_with_error(console, "Owner Rehearsal Validation Failed", str(error))
+
+        render_beta_owner_rehearsal_status(console, status)
+        if not status.completed:
+            raise typer.Exit(code=1)
+
+    @app.command("run-beta-owner-rehearsal")
+    def run_beta_owner_rehearsal_command(
+        input_path: Path = BETA_PACKET_INPUT_OPTION,
+        db_path: Path = BETA_DB_PATH_OPTION,
+    ) -> None:
+        """Preflight, launch, and validate the visible owner rehearsal."""
+
+        console = get_console()
+        try:
+            preparation = _load_current_beta_preparation(input_path, db_path)
+            _require_owner_rehearsal(preparation)
+            if preparation.interface_mode is not BetaPlaytestInterface.TWO_D:
                 raise ValueError(
-                    "This packet does not require an owner rehearsal; use its normal "
-                    "packet preflight before tester handoff."
+                    "The guarded owner-rehearsal runner requires a 2d packet. "
+                    "Use the packet's manual commands for a terminal session."
                 )
             _require_fresh_gameplay_profile(
                 Path(preparation.session_database_path),
                 label="Tester gameplay profile",
             )
             rehearsal_path = Path(preparation.owner_rehearsal_database_path)
-            if rehearsal_path.exists() and not rehearsal_path.is_file():
-                raise ValueError(
-                    f"Owner rehearsal profile must be a SQLite file: {rehearsal_path}."
+            status = _build_current_owner_rehearsal_status(preparation)
+            if status.completed:
+                render_beta_owner_rehearsal_status(console, status)
+                console.print(
+                    Panel.fit(
+                        "The target route is already archived; "
+                        "the visible window was not reopened.",
+                        title="Owner Rehearsal Already Complete",
+                        border_style="green",
+                    )
                 )
-            status = build_beta_owner_rehearsal_status(
-                SaveLoadCoordinator(rehearsal_path).list_run_archives(),
-                database_path=str(rehearsal_path),
-                database_exists=rehearsal_path.is_file(),
-                target_scenario_id=preparation.target_scenario_id or "",
+                return
+            profile_exists = rehearsal_path.is_file()
+            if not profile_exists:
+                _require_fresh_gameplay_profile(
+                    rehearsal_path,
+                    label="Owner rehearsal profile",
+                )
+            has_save = (
+                bool(SaveLoadCoordinator(rehearsal_path).list_save_slots())
+                if profile_exists
+                else False
+            )
+            if launch_owner_rehearsal is None:
+                raise ValueError("The visible 2D owner-rehearsal launcher is unavailable.")
+
+            render_beta_owner_rehearsal_briefing(
+                console,
+                preparation,
+                profile_exists=profile_exists,
+                has_save=has_save,
+            )
+            exit_reason = launch_owner_rehearsal(
+                rehearsal_path,
+                preparation.viewport,
+                preparation.motion_mode,
+            )
+            status = _build_current_owner_rehearsal_status(preparation)
+            has_save_after_launch = (
+                bool(SaveLoadCoordinator(rehearsal_path).list_save_slots())
+                if rehearsal_path.is_file()
+                else False
             )
         except (OSError, PersistenceError, ValueError) as error:
-            _exit_with_error(console, "Owner Rehearsal Validation Failed", str(error))
+            _exit_with_error(console, "Owner Rehearsal Run Failed", str(error))
 
+        console.print(
+            Panel.fit(
+                f"The visible window closed with reason '{exit_reason}'. Running archive gate now.",
+                title="Owner Rehearsal Window Closed",
+                border_style="cyan",
+            )
+        )
         render_beta_owner_rehearsal_status(console, status)
         if not status.completed:
+            next_launch = "Continue existing save" if has_save_after_launch else "New Game"
+            retry_instruction = (
+                "Re-run the guarded command to Continue this rehearsal profile, "
+                "then finish the route and choose Save & Archive before closing the window."
+                if has_save_after_launch
+                else "Re-run the guarded command, choose New Game, then finish the route "
+                "and choose Save & Archive before closing the window."
+            )
+            console.print(
+                Panel(
+                    Group(
+                        Text(f"Next launch: {next_launch}", style="bold"),
+                        Text(""),
+                        Text(
+                            f"No complete target archive was found. {retry_instruction}",
+                            overflow="fold",
+                            no_wrap=False,
+                        ),
+                        Text(""),
+                        Text(
+                            preparation.owner_rehearsal_run_command,
+                            style="cyan",
+                            overflow="fold",
+                            no_wrap=False,
+                        ),
+                    ),
+                    title="Owner Rehearsal Next Action",
+                    subtitle="Tester profile and human evidence remain untouched",
+                    border_style="yellow",
+                    expand=True,
+                )
+            )
             raise typer.Exit(code=1)
 
     @app.command("record-beta-playtest-session")

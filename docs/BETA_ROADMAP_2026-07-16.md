@@ -2,15 +2,18 @@
 
 ## Product Position
 
-NEXUS TECH 0.322.1 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.323.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest automated execution record is
-[Beta Execution Audit - 2026-07-29](BETA_EXECUTION_AUDIT_2026-07-29.md).
+[Beta Execution Audit - 2026-07-30](BETA_EXECUTION_AUDIT_2026-07-30.md).
 
 ## Current Engineering Slice
 
 The current beta candidate protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- `run-beta-owner-rehearsal` now performs packet preflight, opens the exact packet-bound visible 2D profile, and runs the archive gate after the window closes;
+- an incomplete rehearsal close remains blocked but can resume the same owner-only profile, while the isolated first-tester profile and structured human evidence remain untouched;
+- a completed target archive skips unnecessary relaunch, and the manual launch plus post-gate commands remain available for diagnostics;
 - every generated session packet now embeds its own required preflight command and binds manifest schema 3 to the intended packet path;
 - preparation rejects packet output that aliases an evidence, tester, or rehearsal database or any SQLite journal, WAL, or shared-memory sidecar;
 - execution-plan generation normalizes its packet and plan outputs, rejects aliases between them, and refuses to overwrite the evidence database or any SQLite sidecar;
@@ -80,7 +83,7 @@ The current beta candidate protects the complete owner-flow contract while retai
 ## Path To Beta
 
 1. Run `prepare-beta-playtest-session` and keep its isolated rehearsal/tester/evidence database paths unchanged.
-2. Run `validate-beta-playtest-session-packet` immediately before the rehearsal, follow the visible route from New Game through `Save & Archive` and `6 Open Progress` at 820x620, then run the packet's `validate-beta-owner-rehearsal` gate before opening the tester profile; record only defects actually observed and never run the human-session recorder for the rehearsal.
+2. Run the packet's `run-beta-owner-rehearsal` command, follow the visible route from New Game through `Save & Archive` and `6 Open Progress` at 820x620, and require its automatic post-window archive gate to pass before opening the tester profile; use the separate preflight, launch, and `validate-beta-owner-rehearsal` commands only for diagnostics, record only defects actually observed, and never run the human-session recorder for the rehearsal.
 3. Observe six first-time sessions across all six featured campaigns using anonymous tester codes, classify each issue with the packet's `P0`/`P1`/`P2` policy, and use the structured local evidence command only after each real session. Regenerate `beta-playtest-plan` after every row rather than pre-allocating later testers.
 4. Require at least 80% unaided turn-one completion, 100% Pause/Back/Menu recovery, at least 80% trade-off recall, at least 80% Act 3 reach, and zero blocker sessions.
 5. Run the decision-quality matrix and compare its advisory candidates with actual session notes; do not remove or retune a command unless both sources identify the same problem.
