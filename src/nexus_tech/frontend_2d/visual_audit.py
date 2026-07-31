@@ -74,13 +74,22 @@ _CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
             }
         ),
     ),
-    ("help-control", frozenset({"open_help", "close_help"})),
+    ("help-control", frozenset({"open_help", "close_help", "pause_help"})),
     ("save-control", frozenset({"save", "pause_save", "review_save"})),
     ("flow-control", frozenset({"continue", "open_review", "close_outcome", "close_summary"})),
 )
 _CRITICAL_TARGET_OVERLAP_GROUPS = (
     frozenset({"pause_toggle", "run_back", "open_help"}),
-    frozenset({"pause_resume", "pause_save", "pause_menu", "pause_quit"}),
+    frozenset(
+        {
+            "pause_resume",
+            "pause_save",
+            "pause_menu",
+            "pause_settings",
+            "pause_help",
+            "pause_quit",
+        }
+    ),
     frozenset({"open_review", "save", "close_outcome"}),
     frozenset({"continue", "save", "close_summary"}),
     frozenset({"review_primary", "review_save"}),
@@ -875,6 +884,37 @@ def run_2d_visual_audit(
                     )
                 )
 
+                pause_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 15),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                pause_scene._set_pause_overlay_visible(True)
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        pause_scene,
+                        scene_key="run_pause",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "pause",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
                 endgame_scene = RunScene(
                     pygame=pygame,
                     fonts=fonts,
@@ -1400,6 +1440,10 @@ def _active_layers(scene) -> tuple[str, ...]:
         layers.append("inspector")
     if getattr(scene, "_help_overlay_visible", False):
         layers.append("help")
+    if getattr(scene, "_pause_overlay_visible", False):
+        layers.append("pause")
+    if getattr(scene, "_pause_settings_visible", False):
+        layers.append("pause-settings")
     if getattr(scene, "_action_feedback_cues", ()):
         layers.append("action-feedback")
         if any(cue.targets for cue in scene._action_feedback_cues):

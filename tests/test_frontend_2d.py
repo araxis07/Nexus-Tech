@@ -111,6 +111,13 @@ from nexus_tech.frontend_2d.action_bar import (
     RUN_ACTION_BUTTONS,
     build_focus_action_buttons,
 )
+from nexus_tech.frontend_2d.beginner_guide import (
+    ADVANCED_RUN_CONTROLS,
+    BEGINNER_GUIDE_PAGES,
+    ESSENTIAL_RUN_CONTROLS,
+    clamp_guide_page_index,
+    resolve_guide_page,
+)
 from nexus_tech.frontend_2d.catalog import (
     list_campaign_start_choices,
     list_scenario_choices,
@@ -172,6 +179,7 @@ from nexus_tech.frontend_2d.visual_audit import (
     VISUAL_AUDIT_SUMMARY_NAME,
 )
 from nexus_tech.frontend_2d.visual_hierarchy import (
+    resolve_button_chrome,
     resolve_focus_card_text_policy,
     resolve_overlay_backdrop_alpha,
     resolve_panel_chrome,
@@ -581,6 +589,7 @@ def test_pause_presentation_preserves_recovery_actions_and_direct_play_boundary(
         "pause_save",
         "pause_menu",
         "pause_settings",
+        "pause_help",
         "pause_quit",
     ]
     assert all(action.enabled for action in title_shell.actions)
@@ -592,6 +601,50 @@ def test_pause_presentation_preserves_recovery_actions_and_direct_play_boundary(
     assert direct_play.actions[2].detail == "Direct play has no title shell."
     assert "no title menu route" in direct_play.guidance
     assert direct_play.actions[3].tone == "selection"
+    assert direct_play.actions[4].title == "F1 Player Guide"
+
+
+def test_beginner_guide_is_ordered_and_keeps_advanced_keys_optional() -> None:
+    assert [page.key for page in BEGINNER_GUIDE_PAGES] == [
+        "goal",
+        "turn",
+        "screen",
+        "recovery",
+        "controls",
+        "advanced",
+    ]
+    assert all(len(page.steps) == 3 for page in BEGINNER_GUIDE_PAGES)
+    assert len(ESSENTIAL_RUN_CONTROLS) == 6
+    assert len(ADVANCED_RUN_CONTROLS) == 6
+    assert resolve_guide_page(-10).key == "goal"
+    assert resolve_guide_page(99).key == "advanced"
+    assert clamp_guide_page_index(3) == 3
+
+
+def test_button_chrome_separates_primary_quiet_and_disabled_actions() -> None:
+    primary = resolve_button_chrome(
+        "primary",
+        enabled=True,
+        selected=False,
+        emphasis=0.4,
+    )
+    quiet = resolve_button_chrome(
+        "quiet",
+        enabled=True,
+        selected=False,
+        emphasis=0.0,
+    )
+    disabled = resolve_button_chrome(
+        "primary",
+        enabled=False,
+        selected=False,
+        emphasis=1.0,
+    )
+
+    assert primary.fill_accent_mix > quiet.fill_accent_mix
+    assert primary.border_width > quiet.border_width
+    assert primary.accent_height > quiet.accent_height
+    assert disabled.fill_accent_mix == 0.0
 
 
 def test_feedback_target_text_hides_internal_product_identifiers() -> None:
@@ -3861,9 +3914,14 @@ def test_compact_quick_start_keeps_cards_above_action_row(tmp_path: Path) -> Non
             motion_mode=MotionMode.OFF,
         )
 
-        scene.draw(surface)
+        for page_index in range(len(BEGINNER_GUIDE_PAGES)):
+            scene._set_guide_page(page_index)
+            scene.draw(surface)
+            assert scene.layout_safety_violations() == ()
+            assert all(
+                target.rect.bottom <= surface.get_height() for target in scene._click_targets
+            )
 
-        assert scene.layout_safety_violations() == ()
         guide_targets = [target for target in scene._click_targets if target.kind == "menu"]
         assert {target.payload for target in guide_targets} >= {"new_wizard", "menu"}
         assert "continue" not in {target.payload for target in guide_targets}
@@ -3872,7 +3930,7 @@ def test_compact_quick_start_keeps_cards_above_action_row(tmp_path: Path) -> Non
         pygame.quit()
 
 
-def test_compact_title_menu_centers_unpaired_final_action(tmp_path: Path) -> None:
+def test_compact_title_menu_keeps_quit_quiet_and_separate(tmp_path: Path) -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
         surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
@@ -3898,7 +3956,8 @@ def test_compact_title_menu_centers_unpaired_final_action(tmp_path: Path) -> Non
         assert len(quit_targets) == 1
         quit_target = quit_targets[0]
         menu_payloads = {target.payload for target in scene._click_targets if target.kind == "menu"}
-        assert quit_target.rect.centerx == surface.get_rect().centerx
+        assert quit_target.rect.centerx > surface.get_rect().centerx
+        assert quit_target.rect.right <= surface.get_width() - 20
         assert "new_wizard" in menu_payloads
         assert "continue" not in menu_payloads
         assert not scene._title_menu_presentation().primary_actions[0].enabled
@@ -4002,7 +4061,48 @@ def test_compact_help_overlay_keeps_title_below_navigation() -> None:
         scene.draw(surface)
 
         assert any(target.kind == "close_help" for target in scene._click_targets)
+        assert len([target for target in scene._click_targets if target.kind == "help_page"]) >= 5
         assert scene.layout_safety_violations() == ()
+    finally:
+        pygame.quit()
+
+
+def test_help_pages_support_keyboard_mouse_and_block_gameplay_click_through() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=146),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+        scene._set_help_overlay_visible(True)
+        scene.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT, unicode=""))
+        assert scene._help_page_index == 1
+
+        scene.draw(surface)
+        final_tab = next(
+            target
+            for target in scene._click_targets
+            if target.kind == "help_page" and target.payload == str(len(BEGINNER_GUIDE_PAGES) - 1)
+        )
+        scene._handle_mouse_click(final_tab.rect.center)
+        assert scene._help_page_index == len(BEGINNER_GUIDE_PAGES) - 1
+
+        help_toggle = next(target for target in scene._click_targets if target.kind == "open_help")
+        scene._handle_mouse_click(help_toggle.rect.center)
+        assert not scene._help_overlay_visible
+        scene._set_help_overlay_visible(True)
+
+        blocked_rect = pygame.Rect(10, 100, 120, 40)
+        scene._click_targets = [ClickTarget("pause_toggle", "", blocked_rect)]
+        scene._handle_mouse_click(blocked_rect.center)
+        assert scene._help_overlay_visible
+        assert not scene._pause_overlay_visible
     finally:
         pygame.quit()
 
@@ -5254,6 +5354,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "run_picker_feedback",
         "run_inspector",
         "run_help",
+        "run_pause",
         "run_endgame_board",
         "run_outcome_overlay",
         "turn_summary",
@@ -5293,6 +5394,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     picker = next(cell for cell in report.cells if cell.scene_key == "run_picker_feedback")
     inspector = next(cell for cell in report.cells if cell.scene_key == "run_inspector")
     help_overlay = next(cell for cell in report.cells if cell.scene_key == "run_help")
+    pause_overlay = next(cell for cell in report.cells if cell.scene_key == "run_pause")
     endgame = next(cell for cell in report.cells if cell.scene_key == "run_endgame_board")
     outcome = next(cell for cell in report.cells if cell.scene_key == "run_outcome_overlay")
     summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
@@ -5353,6 +5455,11 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "help" in help_overlay.active_layers
     assert "overlay-transition" in help_overlay.active_layers
     assert "help-control" in help_overlay.active_layers
+    assert "pause" in pause_overlay.active_layers
+    assert "overlay-transition" in pause_overlay.active_layers
+    assert "pause-control" in pause_overlay.active_layers
+    assert "save-control" in pause_overlay.active_layers
+    assert "help-control" in pause_overlay.active_layers
     assert "endgame-actor" in endgame.active_layers
     assert "deep-panel" in endgame.active_layers
     assert "actor-timeline" in endgame.active_layers
@@ -5548,7 +5655,7 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     )
 
     assert report.status == "pass"
-    assert report.visual_report.baseline_signature.startswith("15:")
+    assert report.visual_report.baseline_signature.startswith("16:")
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers

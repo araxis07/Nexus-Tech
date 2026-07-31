@@ -90,10 +90,17 @@ def build_pause_menu_presentation(
             menu_action,
             PauseActionPresentation(
                 "T Settings",
-                "Text, contrast, motion, and action loadout.",
+                "Display, motion, and controls.",
                 "pause_settings",
                 "",
                 "selection",
+            ),
+            PauseActionPresentation(
+                "F1 Player Guide",
+                "Lessons plus shortcut reference.",
+                "pause_help",
+                "",
+                "info",
             ),
             PauseActionPresentation(
                 "Q Quit",

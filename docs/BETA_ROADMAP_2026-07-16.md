@@ -2,10 +2,10 @@
 
 ## Product Position
 
-NEXUS TECH 0.324.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.325.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest presentation record is
-[UX Hierarchy Audit - 2026-07-30](UX_HIERARCHY_AUDIT_2026-07-30.md). The
+[Beginner UX Redesign Audit - 2026-07-31](BEGINNER_UX_REDESIGN_2026-07-31.md). The
 guarded owner-flow record remains
 [Beta Execution Audit - 2026-07-30](BETA_EXECUTION_AUDIT_2026-07-30.md).
 
@@ -13,6 +13,12 @@ guarded owner-flow record remains
 
 The current beta candidate protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- the title shell now exposes one primary Start or Continue route and one promoted Learn to Play route while moving utilities and Quit out of the first-time decision path;
+- one shared guide model provides five progressive beginner lessons plus an optional grouped shortcut reference in both the title shell and live-run Help;
+- Help supports tabs, Previous/Next, number keys, Home/End, a primary Close & Play route, and click-through blocking behind the overlay;
+- Pause now includes Player Guide in a balanced 2x3 recovery grid and keeps Resume, Save, Menu, Settings, Guide, and Quit visually distinct;
+- semantic primary, secondary, quiet, and danger button policies now apply across title, wizard, run, modal, inspector, outcome, summary, and review actions;
+- permanent Pause coverage raises the full visual matrix to 64 captures across four viewports, while the focused full/reduced/off layout matrix passes 96 captures;
 - viewport-aware typography now spends spare room at standard and spacious sizes while keeping the compact 820x620 scale stable;
 - spacious Focus cards promote decision headlines and details into stronger font roles instead of stretching compact copy across large empty cards;
 - default panel chrome is quieter than emphasized state chrome, and blocking overlays use stable dim floors so background copy cannot compete with modal content;
@@ -34,7 +40,7 @@ The current beta candidate protects the complete owner-flow contract while retai
 - Pause now distinguishes title-shell recovery from direct play, keeps unavailable Menu actions non-interactive, and prevents direct-play `M` from closing an unsaved run;
 - one pure pause-presentation policy owns status, guidance, action order, tone, and availability without saving, quitting, or mutating a run;
 - action and impact feedback now translate product targets into stable names and metrics instead of exposing random internal identifiers;
-- Title Menu and Quick Start now emphasize New Game when no save exists, render Continue as explicitly unavailable, and restore Continue as the primary route for returning players;
+- Title Menu and Quick Start now emphasize Start Guided Game when no save exists, omit the unavailable Continue route, and restore Continue as the primary route for returning players;
 - compact title headers now reserve separate subtitle and archive-progress lanes so local progression never crosses the lower panel frame;
 - one pure scene-chrome policy keeps Title, Run, Turn Summary, and Review action ownership mutually exclusive across content, footer, navigation, and blocking overlays while preserving the live-run recovery rail;
 - one pure title-presentation policy owns first-run action availability, tone, copy, and footer guidance without loading or mutating a run;
@@ -67,7 +73,7 @@ The current beta candidate protects the complete owner-flow contract while retai
 - a direct catalog contract protects key order, unique titles, valid command payloads, and complete loadout routing;
 - completed-run title, cause, progression, and metric policy now live in a pure module instead of the pygame scene renderer;
 - shutdown, victory, and archived-ending branches have direct regression coverage while Cash, Score, and Last Turn remain visible;
-- compact Help content now lives in a pure module and retains complete labels without ellipsis at the large text scale;
+- beginner Help content now lives in a pure shared module and retains complete lesson and control labels without ellipsis at the large text scale;
 - `scenes.py` remains responsible for availability, contextual selection, layout, input routing, and rendering rather than owning those catalog decisions;
 - `prepare-beta-playtest-session` selects the next uncovered campaign or unresolved human gate;
 - `beta-playtest-plan` exposes all six campaign lanes while allowing only one fresh packet to be generated before the plan is refreshed;

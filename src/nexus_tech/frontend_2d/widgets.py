@@ -12,6 +12,7 @@ from nexus_tech.frontend_2d.accessibility import (
     normalize_ui_scale,
 )
 from nexus_tech.frontend_2d.visual_hierarchy import (
+    resolve_button_chrome,
     resolve_panel_chrome,
     resolve_viewport_typography_scale,
 )
@@ -184,10 +185,28 @@ def blend_color(
 
 
 def draw_grid(surface, pygame) -> None:
-    """Paint a subtle background grid."""
+    """Paint a layered command-room backdrop behind every scene."""
 
     width, height = surface.get_size()
     surface.fill(BACKGROUND)
+    if _ACTIVE_CONTRAST_MODE is ContrastMode.STANDARD:
+        band_height = 32
+        for y_pos in range(0, height, band_height):
+            depth = 1.0 - min(1.0, y_pos / max(1, height))
+            band_color = blend_color(BACKGROUND, PANEL_ALT, 0.08 * depth)
+            pygame.draw.rect(
+                surface,
+                band_color,
+                (0, y_pos, width, min(band_height, height - y_pos)),
+            )
+        horizon = min(height - 1, max(88, int(height * 0.18)))
+        pygame.draw.line(
+            surface,
+            blend_color(GRID, INFO, 0.12),
+            (0, horizon),
+            (width, horizon),
+            1,
+        )
     for x_pos in range(0, width, 64):
         pygame.draw.line(surface, GRID, (x_pos, 0), (x_pos, height), 1)
     for y_pos in range(0, height, 64):
@@ -230,6 +249,13 @@ def draw_panel(
         header_rect,
         border_top_left_radius=18,
         border_top_right_radius=18,
+    )
+    pygame.draw.line(
+        surface,
+        blend_color(muted_border, accent, 0.18 + safe_emphasis * 0.18),
+        (header_rect.left + 12, header_rect.bottom - 1),
+        (header_rect.right - 12, header_rect.bottom - 1),
+        1,
     )
     pygame.draw.rect(
         surface,
@@ -456,22 +482,43 @@ def draw_button(
     key_hint: str = "",
     enabled: bool = True,
     selected: bool = False,
+    priority: str = "secondary",
     emphasis: float = 0.0,
     lift: int = 0,
 ) -> None:
     """Draw one clickable action or modal button."""
 
     safe_emphasis = max(0.0, min(1.0, emphasis))
+    normalized_priority = priority.strip().lower()
+    chrome = resolve_button_chrome(
+        normalized_priority,
+        enabled=enabled,
+        selected=selected,
+        emphasis=safe_emphasis,
+    )
     visual_rect = pygame.Rect(rect.left, rect.top - lift, rect.width, rect.height)
-    base_fill = (28, 40, 58) if selected and enabled else PANEL_ALT if enabled else (18, 22, 28)
-    fill = blend_color(base_fill, accent, safe_emphasis * 0.18)
-    border_seed = SELECTION if selected and enabled else accent if enabled else BORDER
-    border = blend_color(border_seed, TEXT, safe_emphasis * 0.14)
-    title_color = TEXT if enabled else MUTED
+    if not enabled:
+        base_fill = (18, 22, 28)
+    elif normalized_priority == "quiet":
+        base_fill = blend_color(PANEL_ALT, BACKGROUND, 0.52)
+    elif selected:
+        base_fill = (28, 40, 58)
+    else:
+        base_fill = PANEL_ALT
+    fill = blend_color(base_fill, accent, chrome.fill_accent_mix)
+    border_seed = SELECTION if selected and enabled else BORDER
+    border = blend_color(border_seed, accent, chrome.border_accent_mix)
+    border = blend_color(border, TEXT, safe_emphasis * 0.12)
+    title_color = blend_color(TEXT, accent, chrome.label_accent_mix) if enabled else MUTED
     detail_color = MUTED if enabled else (100, 112, 128)
-    border_width = 2 if safe_emphasis >= 0.4 else 1
     pygame.draw.rect(surface, fill, visual_rect, border_radius=14)
-    pygame.draw.rect(surface, border, visual_rect, width=border_width, border_radius=14)
+    pygame.draw.rect(
+        surface,
+        border,
+        visual_rect,
+        width=chrome.border_width,
+        border_radius=14,
+    )
     pygame.draw.rect(
         surface,
         border,
@@ -479,7 +526,7 @@ def draw_button(
             visual_rect.left + 1,
             visual_rect.top + 1,
             visual_rect.width - 2,
-            4 + int(safe_emphasis * 2),
+            chrome.accent_height,
         ),
         border_radius=4,
     )

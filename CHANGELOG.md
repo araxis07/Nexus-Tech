@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.325.0 - 2026-07-31
+
+- Rebuilt the title shell around one clear Start or Continue route, a promoted Learn to Play route, quieter library/settings controls, and a deliberately subordinate Quit action
+- Replaced the dense in-run key list with five shared beginner lessons plus an optional grouped shortcut reference covering the goal, one-turn loop, screen hierarchy, recovery, and essential controls
+- Added clickable guide page tabs, Previous/Next navigation, keyboard paging, a primary Close & Play route, and click-through blocking behind the Help overlay
+- Added Player Guide directly to the Pause menu and balanced recovery into a responsive 2x3 grid with distinct Resume, Save, Menu, Settings, Guide, and Quit priorities
+- Added semantic primary, secondary, quiet, and danger button chrome across title, wizard, run, overlays, inspector, outcome, summary, and review scenes
+- Strengthened shared panel separation and the layered command-room background without changing gameplay outcomes, balance, keyboard routes, persistence schema 28, or save compatibility
+- Expanded visual QA with a permanent Pause capture and passed all 64 captures at 820x620, 960x640, 1280x720, and 1440x900 with no target-spacing, typography, or layout violations
+- Preserved frozen catalogs, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.324.0 - 2026-07-30
 
 - Added viewport-aware typography that uses spare room at standard and spacious window sizes while preserving the established compact 820x620 scale

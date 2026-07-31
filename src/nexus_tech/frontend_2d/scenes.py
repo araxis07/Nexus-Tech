@@ -14,6 +14,13 @@ from nexus_tech.frontend_2d.action_bar import (
     ActionButtonSpec,
     build_focus_action_buttons,
 )
+from nexus_tech.frontend_2d.beginner_guide import (
+    ADVANCED_RUN_CONTROLS,
+    BEGINNER_GUIDE_PAGES,
+    ESSENTIAL_RUN_CONTROLS,
+    clamp_guide_page_index,
+    resolve_guide_page,
+)
 from nexus_tech.frontend_2d.catalog import (
     CampaignGoalChoice,
     CampaignStartChoice,
@@ -33,7 +40,6 @@ from nexus_tech.frontend_2d.context import (
     explain_command_unavailable,
     explain_inspector_action_unavailable,
 )
-from nexus_tech.frontend_2d.control_guide import RUN_HELP_KEYCAPS
 from nexus_tech.frontend_2d.decision_preview import (
     DecisionPreviewPresentation,
     build_decision_preview_presentation,
@@ -89,7 +95,6 @@ from nexus_tech.frontend_2d.scene_state import (
 from nexus_tech.frontend_2d.title_presentation import (
     TitleActionPresentation,
     TitleMenuPresentation,
-    build_quick_start_actions,
     build_title_menu_presentation,
     resolve_title_header_layout,
 )
@@ -120,6 +125,7 @@ from nexus_tech.frontend_2d.widgets import (
     MUTED,
     OVERLAY,
     PANEL,
+    PANEL_ALT,
     SELECTION,
     TEXT,
     WARN,
@@ -649,8 +655,241 @@ class BaseScene:
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                priority=(
+                    "danger"
+                    if kind.endswith("_reset")
+                    else "quiet"
+                    if kind == back_kind
+                    else "secondary"
+                ),
             )
             self._click_targets.append(ClickTarget(kind, payload, button_rect))
+
+    def _draw_beginner_guide_page(
+        self,
+        surface,
+        rect,
+        page_index: int,
+    ) -> tuple[object, ...]:
+        """Draw one responsive learning page and return its page-tab bounds."""
+
+        pygame = self.pygame
+        safe_index = clamp_guide_page_index(page_index)
+        page = resolve_guide_page(safe_index)
+        compact = rect.height < 270
+        header_height = 40 if compact else 48
+        summary_height = 54 if compact else 68
+        tip_height = 28 if compact else 34
+        gap = 8 if compact else 10
+
+        marker_size = 34
+        marker_gap = 8
+        marker_total = marker_size * len(BEGINNER_GUIDE_PAGES) + marker_gap * (
+            len(BEGINNER_GUIDE_PAGES) - 1
+        )
+        copy_width = max(180, rect.width - marker_total - 14)
+        eyebrow_rect = pygame.Rect(rect.left, rect.top, copy_width, 16)
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            f"{page.eyebrow}  |  {safe_index + 1}/{len(BEGINNER_GUIDE_PAGES)}",
+            INFO,
+            eyebrow_rect,
+            valign="top",
+        )
+        title_rect = pygame.Rect(
+            rect.left,
+            rect.top + 17,
+            copy_width,
+            header_height - 17,
+        )
+        draw_text_line(
+            surface,
+            self.fonts.heading if not compact else self.fonts.body,
+            page.title,
+            TEXT,
+            title_rect,
+            valign="top",
+        )
+
+        marker_left = rect.right - marker_total
+        page_tabs = []
+        for index in range(len(BEGINNER_GUIDE_PAGES)):
+            marker_rect = pygame.Rect(
+                marker_left + index * (marker_size + marker_gap),
+                rect.top,
+                marker_size,
+                marker_size,
+            )
+            active = index == safe_index
+            marker_accent = GOOD if active else BORDER
+            marker_fill = blend_color(PANEL_ALT, marker_accent, 0.26 if active else 0.04)
+            pygame.draw.rect(surface, marker_fill, marker_rect, border_radius=8)
+            pygame.draw.rect(
+                surface,
+                marker_accent,
+                marker_rect,
+                width=2 if active else 1,
+                border_radius=8,
+            )
+            draw_text_line(
+                surface,
+                self.fonts.small,
+                str(index + 1),
+                TEXT if active else MUTED,
+                marker_rect,
+                align="center",
+            )
+            page_tabs.append(marker_rect)
+
+        summary_rect = pygame.Rect(
+            rect.left,
+            rect.top + header_height,
+            rect.width,
+            summary_height,
+        )
+        pygame.draw.rect(
+            surface,
+            blend_color(PANEL_ALT, INFO, 0.1),
+            summary_rect,
+            border_radius=14,
+        )
+        pygame.draw.rect(surface, INFO, summary_rect, width=1, border_radius=14)
+        pygame.draw.rect(
+            surface,
+            INFO,
+            (summary_rect.left + 1, summary_rect.top + 1, 5, summary_rect.height - 2),
+            border_radius=4,
+        )
+        draw_wrapped_text(
+            surface,
+            self.fonts.body if not compact else self.fonts.small,
+            page.summary,
+            TEXT,
+            pygame.Rect(
+                summary_rect.left + 16,
+                summary_rect.top + 9,
+                summary_rect.width - 28,
+                summary_rect.height - 18,
+            ),
+            line_height=17 if not compact else 15,
+            max_lines=3,
+        )
+
+        tip_rect = pygame.Rect(rect.left, rect.bottom - tip_height, rect.width, tip_height)
+        step_top = summary_rect.bottom + gap
+        step_bottom = tip_rect.top - gap
+        step_area = pygame.Rect(rect.left, step_top, rect.width, max(0, step_bottom - step_top))
+        if page.key in {"controls", "advanced"}:
+            controls = ESSENTIAL_RUN_CONTROLS if page.key == "controls" else ADVANCED_RUN_CONTROLS
+            columns = 2 if step_area.width >= 520 else 1
+            rows = (len(controls) + columns - 1) // columns
+            control_gap = 6
+            control_width = int((step_area.width - control_gap * max(0, columns - 1)) / columns)
+            control_height = max(
+                20,
+                int((step_area.height - control_gap * max(0, rows - 1)) / rows),
+            )
+            for index, (key_text, label) in enumerate(controls):
+                row = index % rows
+                column = index // rows
+                control_rect = pygame.Rect(
+                    step_area.left + column * (control_width + control_gap),
+                    step_area.top + row * (control_height + control_gap),
+                    control_width,
+                    control_height,
+                )
+                draw_keycap(
+                    surface,
+                    pygame,
+                    self.fonts.small,
+                    rect=control_rect,
+                    key_text=key_text,
+                    label=label,
+                )
+        else:
+            step_gap = 8
+            step_width = int((step_area.width - step_gap * 2) / 3)
+            for index, step in enumerate(page.steps):
+                step_rect = pygame.Rect(
+                    step_area.left + index * (step_width + step_gap),
+                    step_area.top,
+                    step_width,
+                    step_area.height,
+                )
+                accent = _action_presentation_accent(step.tone)
+                pygame.draw.rect(
+                    surface,
+                    blend_color(PANEL_ALT, accent, 0.08),
+                    step_rect,
+                    border_radius=14,
+                )
+                pygame.draw.rect(surface, accent, step_rect, width=1, border_radius=14)
+                badge_width = min(50, max(28, self.fonts.small.size(step.marker)[0] + 14))
+                badge_rect = pygame.Rect(
+                    step_rect.left + 10,
+                    step_rect.top + 9,
+                    badge_width,
+                    22,
+                )
+                pygame.draw.rect(
+                    surface,
+                    blend_color(PANEL, accent, 0.28),
+                    badge_rect,
+                    border_radius=8,
+                )
+                draw_text_line(
+                    surface,
+                    self.fonts.small,
+                    step.marker,
+                    accent,
+                    badge_rect,
+                    align="center",
+                )
+                draw_text_line(
+                    surface,
+                    self.fonts.small,
+                    step.title,
+                    TEXT,
+                    pygame.Rect(
+                        badge_rect.right + 8,
+                        step_rect.top + 10,
+                        step_rect.right - badge_rect.right - 18,
+                        20,
+                    ),
+                    valign="top",
+                )
+                draw_wrapped_text(
+                    surface,
+                    self.fonts.small,
+                    step.detail,
+                    MUTED,
+                    pygame.Rect(
+                        step_rect.left + 10,
+                        step_rect.top + 38,
+                        step_rect.width - 20,
+                        max(18, step_rect.height - 46),
+                    ),
+                    line_height=14,
+                    max_lines=3,
+                )
+
+        pygame.draw.rect(
+            surface,
+            blend_color(PANEL_ALT, WARN, 0.06),
+            tip_rect,
+            border_radius=10,
+        )
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            f"TIP  {page.tip}",
+            blend_color(MUTED, WARN, 0.35),
+            pygame.Rect(
+                tip_rect.left + 10, tip_rect.top + 2, tip_rect.width - 20, tip_rect.height - 4
+            ),
+        )
+        return tuple(page_tabs)
 
     @property
     def scene_transition_key(self) -> str:
@@ -791,6 +1030,7 @@ class BaseScene:
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                priority="quiet",
             )
             click_targets = getattr(self, "_click_targets", None)
             if click_targets is not None:
@@ -922,6 +1162,7 @@ class TitleScene(BaseScene):
         )
         self.coordinator = coordinator
         self._mode = initial_mode
+        self._guide_page_index = 0
         self._click_targets: list[ClickTarget] = []
         self._events: list[TimedFrontendEvent] = []
         self._motion_elapsed = 0.0
@@ -1152,8 +1393,17 @@ class TitleScene(BaseScene):
     def _set_mode(self, mode: str) -> None:
         if mode == self._mode:
             return
+        if mode == "guide":
+            self._guide_page_index = 0
         self._mode = mode
         self._trigger_mode_motion(mode)
+
+    def _set_guide_page(self, index: int) -> None:
+        next_index = clamp_guide_page_index(index)
+        if next_index == self._guide_page_index:
+            return
+        self._guide_page_index = next_index
+        self._trigger_title_motion("guide_page", intensity=0.62)
 
     def _set_text_input(self, modal: TextInputModalState | None) -> None:
         self._text_input = modal
@@ -1200,6 +1450,22 @@ class TitleScene(BaseScene):
                 return
             if event.key == self.pygame.K_b:
                 self._set_mode("menu")
+                return
+        if self._mode == "guide":
+            if event.key in (self.pygame.K_LEFT, self.pygame.K_PAGEUP):
+                self._set_guide_page(self._guide_page_index - 1)
+                return
+            if event.key in (self.pygame.K_RIGHT, self.pygame.K_PAGEDOWN):
+                self._set_guide_page(self._guide_page_index + 1)
+                return
+            if event.key == self.pygame.K_HOME:
+                self._set_guide_page(0)
+                return
+            if event.key == self.pygame.K_END:
+                self._set_guide_page(len(BEGINNER_GUIDE_PAGES) - 1)
+                return
+            if event.key == self.pygame.K_n:
+                self._set_mode("wizard")
                 return
         if self._mode == "wizard" and event.key in (
             self.pygame.K_RETURN,
@@ -1362,6 +1628,9 @@ class TitleScene(BaseScene):
         if target.kind == "menu":
             self._handle_menu_action(target.payload)
             return
+        if target.kind == "guide_page":
+            self._set_guide_page(int(target.payload))
+            return
         if target.kind == "title_settings_cycle":
             self._cycle_frontend_preference(target.payload)
             return
@@ -1418,14 +1687,10 @@ class TitleScene(BaseScene):
             )
             return
         if self._mode == "guide":
-            guide_actions = {
-                1: "continue",
-                2: "new_wizard",
-                9: "menu",
-            }
-            action = guide_actions.get(digit)
-            if action:
-                self._handle_menu_action(action)
+            if 1 <= digit <= len(BEGINNER_GUIDE_PAGES):
+                self._set_guide_page(digit - 1)
+            elif digit == 9:
+                self._handle_menu_action("menu")
             return
         if self._mode == "meta":
             meta_actions = {
@@ -2106,35 +2371,42 @@ class TitleScene(BaseScene):
         draw_text_line(
             surface,
             self.fonts.heading,
-            "Title Menu",
+            "Choose Your Next Step",
             TEXT,
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
         presentation = self._title_menu_presentation()
-        primary_buttons = presentation.primary_actions
-        secondary_buttons = presentation.secondary_actions
+        continue_action, new_game_action = presentation.primary_actions
+        guide_action = next(
+            action for action in presentation.secondary_actions if action.payload == "guide"
+        )
+        utility_actions = tuple(
+            action for action in presentation.secondary_actions if action.payload != "guide"
+        )
+        if continue_action.enabled:
+            hero_actions = (
+                (continue_action, "primary"),
+                (new_game_action, "secondary"),
+            )
+            utility_actions = (guide_action, *utility_actions)
+        else:
+            hero_actions = (
+                (new_game_action, "primary"),
+                (guide_action, "secondary"),
+            )
         quit_button = presentation.quit_action
-        gap = 8 if inner.height < 250 else 10
-        primary_height = max(46, min(68, int(inner.height * 0.22)))
-        quit_height = max(36, min(44, int(inner.height * 0.14)))
-        secondary_columns = 3 if inner.height < 250 and inner.width >= 700 else 2
-        secondary_rows = (len(secondary_buttons) + secondary_columns - 1) // secondary_columns
-        fixed_gaps = gap * (secondary_rows + 1)
-        secondary_area = max(
-            secondary_rows * 36,
-            inner.height - primary_height - quit_height - fixed_gaps,
-        )
-        secondary_height = max(
-            36,
-            min(
-                54,
-                int((secondary_area - gap * max(0, secondary_rows - 1)) / secondary_rows),
-            ),
-        )
-        column_width = int((inner.width - gap) / 2)
+        gap = 8 if inner.height < 300 else 10
+        hero_height = max(58, min(86, int(inner.height * 0.25)))
+        utility_label_height = 18
+        quit_height = 34
 
-        def draw_menu_button(action: TitleActionPresentation, button_rect) -> None:
+        def draw_menu_button(
+            action: TitleActionPresentation,
+            button_rect,
+            *,
+            priority: str = "secondary",
+        ) -> None:
             draw_button(
                 surface,
                 pygame,
@@ -2145,47 +2417,95 @@ class TitleScene(BaseScene):
                 title_font=self.fonts.body,
                 detail_font=self.fonts.small,
                 enabled=action.enabled,
+                priority=priority,
+                emphasis=menu_motion if priority == "primary" else 0.0,
             )
             if action.enabled:
                 self._click_targets.append(ClickTarget("menu", action.payload, button_rect))
 
-        for index, button in enumerate(primary_buttons):
+        hero_widths = (
+            int((inner.width - gap) * 0.58),
+            inner.width - gap - int((inner.width - gap) * 0.58),
+        )
+        hero_left = inner.left
+        hero_rects = []
+        for index, (button, priority) in enumerate(hero_actions):
+            button_rect = pygame.Rect(
+                hero_left,
+                inner.top,
+                hero_widths[index],
+                hero_height,
+            )
+            hero_rects.append(button_rect)
             draw_menu_button(
                 button,
-                pygame.Rect(
-                    inner.left + index * (column_width + gap),
-                    inner.top,
-                    column_width,
-                    primary_height,
-                ),
+                button_rect,
+                priority=priority,
             )
-        secondary_top = inner.top + primary_height + gap
-        for index, button in enumerate(secondary_buttons):
-            secondary_width = int((inner.width - gap * (secondary_columns - 1)) / secondary_columns)
-            column = index % secondary_columns
-            row = index // secondary_columns
-            left = inner.left + column * (secondary_width + gap)
-            if index == len(secondary_buttons) - 1 and len(secondary_buttons) % secondary_columns:
-                left = inner.centerx - secondary_width // 2
-            draw_menu_button(
-                button,
-                pygame.Rect(
-                    left,
-                    secondary_top + row * (secondary_height + gap),
-                    secondary_width,
-                    secondary_height,
-                ),
-            )
-        quit_width = min(column_width, max(220, int(inner.width * 0.46)))
-        draw_menu_button(
-            quit_button,
-            pygame.Rect(
-                inner.centerx - quit_width // 2,
-                inner.bottom - quit_height,
-                quit_width,
-                quit_height,
+            hero_left += hero_widths[index] + gap
+
+        utility_label_top = inner.top + hero_height + gap
+        draw_text_line(
+            surface,
+            self.fonts.small,
+            "RUNS, LEARNING & SETTINGS",
+            MUTED,
+            pygame.Rect(inner.left, utility_label_top, inner.width, utility_label_height),
+            valign="top",
+        )
+        utility_top = utility_label_top + utility_label_height + 4
+        utility_bottom = inner.bottom - quit_height - gap
+        utility_columns = 2
+        utility_rows = (len(utility_actions) + utility_columns - 1) // utility_columns
+        utility_height = max(
+            38,
+            min(
+                54,
+                int((utility_bottom - utility_top - gap * max(0, utility_rows - 1)) / utility_rows),
             ),
         )
+        utility_width = int((inner.width - gap) / utility_columns)
+        utility_rects = []
+        for index, button in enumerate(utility_actions):
+            column = index % utility_columns
+            row = index // utility_columns
+            button_rect = pygame.Rect(
+                inner.left + column * (utility_width + gap),
+                utility_top + row * (utility_height + gap),
+                utility_width,
+                utility_height,
+            )
+            utility_rects.append(button_rect)
+            draw_menu_button(
+                button,
+                button_rect,
+                priority="secondary" if button.payload == "guide" else "quiet",
+            )
+
+        quit_width = min(154, max(120, int(inner.width * 0.2)))
+        quit_rect = pygame.Rect(
+            inner.right - quit_width,
+            inner.bottom - quit_height,
+            quit_width,
+            quit_height,
+        )
+        draw_menu_button(
+            quit_button,
+            quit_rect,
+            priority="danger",
+        )
+        if hero_rects and utility_rects:
+            self._record_layout_separation(
+                "title-hero-vs-utilities",
+                hero_rects[0].unionall(hero_rects[1:]),
+                utility_rects[0].unionall(utility_rects[1:]),
+            )
+        if utility_rects:
+            self._record_layout_separation(
+                "title-utilities-vs-quit",
+                utility_rects[0].unionall(utility_rects[1:]),
+                quit_rect,
+            )
 
     def _title_menu_presentation(self) -> TitleMenuPresentation:
         mission = self._first_archive_mission
@@ -2301,6 +2621,13 @@ class TitleScene(BaseScene):
                     accent=accent,
                     title_font=self.fonts.small,
                     detail_font=self.fonts.small,
+                    priority=(
+                        "primary"
+                        if payload == "archives"
+                        else "quiet"
+                        if payload == "menu"
+                        else "secondary"
+                    ),
                 )
                 self._click_targets.append(ClickTarget("menu", payload, button_rect))
             guide_top = max(top + 8, action_rect.top + button_height * 2 + button_gap + 14)
@@ -2323,6 +2650,13 @@ class TitleScene(BaseScene):
                     accent=accent,
                     title_font=self.fonts.small,
                     detail_font=self.fonts.small,
+                    priority=(
+                        "primary"
+                        if payload == "archives"
+                        else "quiet"
+                        if payload == "menu"
+                        else "secondary"
+                    ),
                 )
                 self._click_targets.append(ClickTarget("menu", payload, button_rect))
                 top += 70
@@ -2376,12 +2710,16 @@ class TitleScene(BaseScene):
 
     def _draw_quick_start_guide(self, surface, rect) -> None:
         pygame = self.pygame
-        guide_motion = self._motion_level("title:mode:guide", "title:content")
+        guide_motion = self._motion_level(
+            "title:mode:guide",
+            "title:content",
+            "title:guide_page",
+        )
         inner = draw_panel(
             surface,
             pygame,
             rect,
-            title="Quick Start",
+            title="Learn",
             accent=GOOD,
             emphasis=guide_motion,
             lift=int(guide_motion * 3),
@@ -2389,126 +2727,93 @@ class TitleScene(BaseScene):
         draw_text_line(
             surface,
             self.fonts.heading,
-            "Quick Start Guide",
+            "Learn to Play",
             TEXT,
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
-        cards = (
-            (
-                "1. Goal",
-                (
-                    "Build enough durable traction to reach IPO, acquisition, or "
-                    "independence before cash, board, or market pressure breaks the company."
-                ),
-                GOOD,
-            ),
-            (
-                "2. First Turn",
-                (
-                    "Start in New Game Wizard, open the live run, then use Coach and the "
-                    "highlighted panels before spending actions."
-                ),
-                INFO,
-            ),
-            (
-                "3. Read The HUD",
-                (
-                    "Watch cash, runway, reputation, board pressure, selected product, "
-                    "action points, and the footer hint before ending the turn."
-                ),
-                WARN,
-            ),
-            (
-                "4. Recovery",
-                (
-                    "Use P for Pause, Esc for Back, F1 for Help, S to Save, and Space to "
-                    "resolve only after warnings are clear."
-                ),
-                SELECTION,
-            ),
+        action_height = 44
+        gap = 8
+        action_top = inner.bottom - action_height
+        content_rect = pygame.Rect(
+            inner.left,
+            inner.top,
+            inner.width,
+            max(120, action_top - inner.top - gap),
         )
-        action_height = 46
-        gap = 10
-        grid_bottom = inner.bottom - action_height - 14
-        card_area_height = max(120, grid_bottom - inner.top)
-        single_column_height = int((card_area_height - gap * (len(cards) - 1)) / len(cards))
-        cols = 1 if inner.width < 620 and single_column_height >= 58 else 2
-        rows = max(1, (len(cards) + cols - 1) // cols)
-        card_width = int((inner.width - gap * max(0, cols - 1)) / cols)
-        card_height = max(58, int((card_area_height - gap * max(0, rows - 1)) / rows))
-        card_rects = []
-        card_fill = blend_color(PANEL, TEXT, 0.08)
-        for index, (title, detail, accent) in enumerate(cards):
-            row = index // cols
-            col = index % cols
-            card_rect = pygame.Rect(
-                inner.left + col * (card_width + gap),
-                inner.top + row * (card_height + gap),
-                card_width,
-                card_height,
-            )
-            card_rects.append(card_rect)
-            pygame.draw.rect(surface, card_fill, card_rect, border_radius=14)
-            pygame.draw.rect(surface, accent, card_rect, width=1, border_radius=14)
-            pygame.draw.rect(
-                surface,
-                accent,
-                (card_rect.left + 1, card_rect.top + 1, card_rect.width - 2, 4),
-                border_radius=4,
-            )
-            draw_text_line(
-                surface,
-                self.fonts.body if card_height >= 76 else self.fonts.small,
-                title,
-                TEXT,
-                pygame.Rect(card_rect.left + 12, card_rect.top + 10, card_rect.width - 24, 22),
-                valign="top",
-            )
-            draw_wrapped_text(
-                surface,
-                self.fonts.small,
-                detail,
-                MUTED,
-                pygame.Rect(
-                    card_rect.left + 12,
-                    card_rect.top + 34,
-                    card_rect.width - 24,
-                    max(20, card_rect.height - 42),
-                ),
-                line_height=15,
-                max_lines=3 if card_height >= 82 else 2,
-            )
+        page_tabs = self._draw_beginner_guide_page(
+            surface,
+            content_rect,
+            self._guide_page_index,
+        )
+        for index, tab_rect in enumerate(page_tabs):
+            self._click_targets.append(ClickTarget("guide_page", str(index), tab_rect))
 
-        button_width = int((inner.width - gap * 2) / 3)
-        buttons, _footer_line = build_quick_start_actions(has_saves=bool(self._save_cards))
-        left = inner.left
-        button_rects = []
-        for action in buttons:
-            button_rect = pygame.Rect(
-                left, inner.bottom - action_height, button_width, action_height
+        side_width = min(154, max(116, int(inner.width * 0.2)))
+        center_width = inner.width - side_width * 2 - gap * 2
+        previous_rect = pygame.Rect(inner.left, action_top, side_width, action_height)
+        start_rect = pygame.Rect(
+            previous_rect.right + gap,
+            action_top,
+            center_width,
+            action_height,
+        )
+        next_rect = pygame.Rect(start_rect.right + gap, action_top, side_width, action_height)
+        previous_enabled = self._guide_page_index > 0
+        on_last_page = self._guide_page_index == len(BEGINNER_GUIDE_PAGES) - 1
+
+        draw_button(
+            surface,
+            pygame,
+            rect=previous_rect,
+            title="Previous",
+            detail="Earlier lesson.",
+            accent=INFO,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+            enabled=previous_enabled,
+            priority="quiet",
+        )
+        if previous_enabled:
+            self._click_targets.append(
+                ClickTarget("guide_page", str(self._guide_page_index - 1), previous_rect)
             )
-            button_rects.append(button_rect)
-            draw_button(
-                surface,
-                pygame,
-                rect=button_rect,
-                title=action.title,
-                detail=action.detail,
-                accent=_action_presentation_accent(action.tone),
-                title_font=self.fonts.small,
-                detail_font=self.fonts.small,
-                enabled=action.enabled,
+        draw_button(
+            surface,
+            pygame,
+            rect=start_rect,
+            title="Start Guided Game",
+            detail="Open the setup wizard.",
+            accent=GOOD,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+            priority="primary",
+            emphasis=max(0.42, guide_motion),
+        )
+        self._click_targets.append(ClickTarget("menu", "new_wizard", start_rect))
+        draw_button(
+            surface,
+            pygame,
+            rect=next_rect,
+            title="Back to Menu" if on_last_page else "Next",
+            detail="Finish guide." if on_last_page else "Next lesson.",
+            accent=INFO,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+            priority="secondary",
+        )
+        self._click_targets.append(
+            ClickTarget(
+                "menu" if on_last_page else "guide_page",
+                "menu" if on_last_page else str(self._guide_page_index + 1),
+                next_rect,
             )
-            if action.enabled:
-                self._click_targets.append(ClickTarget("menu", action.payload, button_rect))
-            left += button_width + gap
-        if card_rects and button_rects:
-            self._record_layout_separation(
-                "quick-start-cards-vs-actions",
-                card_rects[0].unionall(card_rects[1:]),
-                button_rects[0].unionall(button_rects[1:]),
-            )
+        )
+        self._record_layout_separation(
+            "quick-start-content-vs-actions",
+            content_rect,
+            previous_rect.unionall((start_rect, next_rect)),
+        )
 
     def _draw_archive_comparison_strip(self, surface, rect, *, compact: bool) -> None:
         if rect.width < 220 or rect.height < 38:
@@ -2780,6 +3085,15 @@ class TitleScene(BaseScene):
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                priority=(
+                    "primary"
+                    if payload == "load"
+                    else "danger"
+                    if payload == "delete"
+                    else "quiet"
+                    if payload == "back"
+                    else "secondary"
+                ),
             )
             self._click_targets.append(ClickTarget("slot_action", payload, button_rect))
 
@@ -2916,6 +3230,8 @@ class TitleScene(BaseScene):
             accent=GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="primary",
+            emphasis=max(0.42, wizard_motion),
         )
         draw_button(
             surface,
@@ -2926,13 +3242,19 @@ class TitleScene(BaseScene):
             accent=BORDER,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet",
         )
         self._click_targets.append(ClickTarget("wizard_launch", "", launch_rect))
         self._click_targets.append(ClickTarget("wizard_back", "", back_rect))
 
     def _draw_title_sidebar(self, surface, rect) -> None:
         pygame = self.pygame
-        summary_share = 0.56 if self._mode == "meta" else 0.36
+        summary_share = {
+            "guide": 0.5,
+            "meta": 0.56,
+            "settings": 0.44,
+            "wizard": 0.48,
+        }.get(self._mode, 0.36)
         summary_rect = pygame.Rect(
             rect.left, rect.top, rect.width, int(rect.height * summary_share)
         )
@@ -3005,7 +3327,7 @@ class TitleScene(BaseScene):
         if self._mode == "menu":
             message = self._title_menu_presentation().footer_line
         elif self._mode == "guide":
-            _actions, message = build_quick_start_actions(has_saves=bool(self._save_cards))
+            message = "Guide: choose a lesson tab or use Left/Right. N starts a game; Esc returns."
         elif self._mode == "meta":
             message = "Meta board: 1 archives, 2 saves, 3 wizard, 9 back."
         elif self._mode == "slots":
@@ -3056,10 +3378,12 @@ class TitleScene(BaseScene):
                 ),
             )
         if self._mode == "guide":
+            page = resolve_guide_page(self._guide_page_index)
             return (
+                f"Lesson {self._guide_page_index + 1}/{len(BEGINNER_GUIDE_PAGES)}: {page.title}",
                 "Goal: survive pressure and reach IPO, acquisition, or independence.",
-                "First turn: use Coach, inspect panels, then spend action points.",
-                "Controls: P pause, Esc back, F1 help, S save, Space end turn.",
+                f"Now: {page.summary}",
+                "Controls: mouse to choose, Esc back, P pause, F1 help.",
                 f"Next reward: {meta.next_reward}",
             )
         if self._mode == "settings":
@@ -3296,6 +3620,7 @@ class TitleScene(BaseScene):
             accent=tone_color(modal.severity),
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="primary",
         )
         draw_button(
             surface,
@@ -3306,6 +3631,7 @@ class TitleScene(BaseScene):
             accent=BORDER,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet",
         )
         self._click_targets.append(ClickTarget("submit_text", "", submit_rect))
         self._click_targets.append(ClickTarget("cancel_text", "", cancel_rect))
@@ -3935,6 +4261,13 @@ class ReviewScene(BaseScene):
                 accent=self._review_action_accent(action),
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                priority=(
+                    "primary"
+                    if action.kind in {"review_save", "review_progress"} or len(actions) == 1
+                    else "quiet"
+                    if action.kind == "review_primary"
+                    else "secondary"
+                ),
             )
             self._click_targets.append(ClickTarget(action.kind, "", button_rect))
 
@@ -3997,6 +4330,7 @@ class RunScene(BaseScene):
         self._inspector_filter_mode_index = 0
         self._inspector_memory: dict[str, InspectorMemoryState] = {}
         self._help_overlay_visible = False
+        self._help_page_index = 0
         self._pause_overlay_visible = False
         self._pause_settings_visible = False
         self._focus_mode = True
@@ -4345,6 +4679,13 @@ class RunScene(BaseScene):
         elif previous_visible:
             self._trigger_overlay_exit("help")
 
+    def _set_help_page(self, index: int) -> None:
+        next_index = clamp_guide_page_index(index)
+        if next_index == self._help_page_index:
+            return
+        self._help_page_index = next_index
+        self._trigger_overlay_motion("help", intensity=0.48)
+
     def _set_pause_overlay_visible(self, visible: bool) -> None:
         previous_visible = self._pause_overlay_visible
         self._pause_overlay_visible = visible
@@ -4588,6 +4929,18 @@ class RunScene(BaseScene):
             return
 
         if self._help_overlay_visible:
+            if event.key in (self.pygame.K_LEFT, self.pygame.K_PAGEUP):
+                self._set_help_page(self._help_page_index - 1)
+            elif event.key in (self.pygame.K_RIGHT, self.pygame.K_PAGEDOWN):
+                self._set_help_page(self._help_page_index + 1)
+            elif event.key == self.pygame.K_HOME:
+                self._set_help_page(0)
+            elif event.key == self.pygame.K_END:
+                self._set_help_page(len(BEGINNER_GUIDE_PAGES) - 1)
+            elif event.unicode and event.unicode.isdigit():
+                page_number = int(event.unicode)
+                if 1 <= page_number <= len(BEGINNER_GUIDE_PAGES):
+                    self._set_help_page(page_number - 1)
             return
 
         if self._text_input is not None:
@@ -6608,6 +6961,13 @@ class RunScene(BaseScene):
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
         for target in reversed(self._click_targets):
             if target.rect.collidepoint(position):
+                if self._help_overlay_visible and target.kind not in {
+                    "close_help",
+                    "help_page",
+                    "open_help",
+                    "run_back",
+                }:
+                    return
                 if self._pause_overlay_visible and not target.kind.startswith("pause_"):
                     return
                 self._dispatch_click_target(target)
@@ -6621,7 +6981,10 @@ class RunScene(BaseScene):
             self._handle_back_navigation()
             return
         if target.kind == "open_help":
-            self._set_help_overlay_visible(True)
+            self._set_help_overlay_visible(not self._help_overlay_visible)
+            return
+        if target.kind == "help_page":
+            self._set_help_page(int(target.payload))
             return
         if target.kind == "focus_toggle":
             self._toggle_focus_mode()
@@ -6634,6 +6997,9 @@ class RunScene(BaseScene):
             return
         if target.kind == "pause_settings":
             self._set_pause_settings_visible(True)
+            return
+        if target.kind == "pause_help":
+            self._set_help_overlay_visible(True)
             return
         if target.kind == "pause_settings_cycle":
             self._cycle_frontend_preference(target.payload)
@@ -8476,6 +8842,15 @@ class RunScene(BaseScene):
                 detail_font=self.fonts.small,
                 enabled=enabled,
                 selected=selected,
+                priority=(
+                    "primary"
+                    if button.kind == "coach" or button.title == "Recommended"
+                    else "danger"
+                    if button.title == "End Turn"
+                    else "quiet"
+                    if button.title == "Save"
+                    else "secondary"
+                ),
                 emphasis=button_emphasis,
                 lift=int(button_motion * 2),
             )
@@ -9109,11 +9484,11 @@ class RunScene(BaseScene):
         if target.kind == "close_summary":
             return "Hover: close the 2D shell from the turn summary."
         if target.kind == "pause_toggle":
-            return "Hover: open Pause for resume, save, settings, menu, or quit controls."
+            return "Hover: open Pause for resume, save, guide, settings, menu, or quit."
         if target.kind == "run_back":
             return "Hover: close the current overlay first; with no overlay open, show Pause."
         if target.kind == "open_help":
-            return "Hover: open the control guide for keyboard, mouse, pause, and inspector hints."
+            return "Hover: open the player and control guide for the core loop and recovery."
         if target.kind == "focus_toggle":
             return "Hover: open every action or return to the guided decision view."
         if target.kind == "pause_resume":
@@ -9122,6 +9497,8 @@ class RunScene(BaseScene):
             return "Hover: save the current run to the active slot and stay paused."
         if target.kind == "pause_settings":
             return "Hover: adjust text scale, contrast, and motion while the run stays paused."
+        if target.kind == "pause_help":
+            return "Hover: open the beginner lessons and optional key reference."
         if target.kind == "pause_settings_cycle":
             return f"Hover: cycle the saved `{target.payload}` preference."
         if target.kind == "pause_settings_reset":
@@ -9134,6 +9511,8 @@ class RunScene(BaseScene):
             return "Hover: close the 2D shell after saving dirty run state on exit."
         if target.kind == "close_help":
             return "Hover: close Help and return to the current run screen."
+        if target.kind in {"help_page", "guide_page"}:
+            return "Hover: open this lesson in the beginner guide."
         if target.kind == "close_picker":
             return "Hover: close this picker without running an option."
         if target.kind in {"close_panel", "close_inspector"}:
@@ -9506,6 +9885,7 @@ class RunScene(BaseScene):
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
                 selected=index == 0,
+                priority="primary" if index == 0 else "secondary",
                 emphasis=option_motion,
             )
             self._draw_pending_option_preview(
@@ -9575,6 +9955,7 @@ class RunScene(BaseScene):
             accent=BORDER,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet",
         )
         self._click_targets.append(ClickTarget("close_picker", "", close_rect))
 
@@ -9635,6 +10016,7 @@ class RunScene(BaseScene):
             accent=tone_color(modal.severity),
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="primary",
         )
         draw_button(
             surface,
@@ -9645,6 +10027,7 @@ class RunScene(BaseScene):
             accent=BORDER,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet",
         )
         self._click_targets.append(ClickTarget("submit_text", "", submit_rect))
         self._click_targets.append(ClickTarget("cancel_text", "", cancel_rect))
@@ -9866,6 +10249,7 @@ class RunScene(BaseScene):
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
                 enabled=enabled,
+                priority="primary" if index == 0 else "secondary",
             )
             self._click_targets.append(ClickTarget("panel_action", action.command, button_rect))
             left += button_width + button_gap
@@ -9915,6 +10299,7 @@ class RunScene(BaseScene):
                 accent=accent,
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
+                priority="quiet" if kind == "close_panel" else "secondary",
             )
             self._click_targets.append(ClickTarget(kind, payload, footer_rect))
             footer_left = footer_rect.right + footer_gap
@@ -10044,6 +10429,7 @@ class RunScene(BaseScene):
             accent=BORDER,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet",
         )
         self._click_targets.append(ClickTarget("close_inspector", "", close_rect))
 
@@ -10371,6 +10757,7 @@ class RunScene(BaseScene):
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
                 enabled=enabled,
+                priority="primary" if index == 0 else "secondary",
             )
             self._click_targets.append(
                 ClickTarget("inspector_item_action", str(index), button_rect)
@@ -10448,7 +10835,7 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("pause"))
         surface.blit(overlay, (0, 0))
-        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=388, margin=26)
+        modal_rect = _fit_modal_rect(pygame, surface, width=560, height=338, margin=26)
         modal_rect = self._animated_overlay_rect(modal_rect, "pause", shift=24)
         inner = draw_panel(
             surface,
@@ -10512,6 +10899,15 @@ class RunScene(BaseScene):
                 title_font=self.fonts.small,
                 detail_font=self.fonts.small,
                 enabled=action.enabled,
+                priority=(
+                    "primary"
+                    if action.target_kind == "pause_resume"
+                    else "danger"
+                    if action.target_kind == "pause_quit"
+                    else "quiet"
+                    if action.target_kind in {"pause_settings", "pause_menu"}
+                    else "secondary"
+                ),
             )
             if action.enabled:
                 self._click_targets.append(ClickTarget(action.target_kind, action.payload, rect))
@@ -10570,88 +10966,98 @@ class RunScene(BaseScene):
             inner.width,
             self.fonts.title.get_height(),
         )
-        title_surface = self.fonts.title.render("2D Control Guide", True, TEXT)
+        title_surface = self.fonts.title.render("Player Guide", True, TEXT)
         surface.blit(title_surface, title_rect.topleft)
         self._record_layout_separation(
             "help-title-vs-nav",
             title_rect,
             pygame.Rect(0, 0, surface.get_width(), 54),
         )
-        draw_wrapped_text(
-            surface,
-            self.fonts.body,
-            (
-                "This frontend is now self-contained for the main run loop. "
-                "Use these controls to move between products, panels, inspectors, pause/menu, "
-                "the endgame board, and turn resolution without dropping back to the CLI."
-            ),
-            MUTED,
-            pygame.Rect(inner.left, inner.top, inner.width, 54),
-            line_height=18,
-            max_lines=3,
+        action_height = 44
+        gap = 8
+        action_top = inner.bottom - action_height
+        content_rect = pygame.Rect(
+            inner.left,
+            inner.top,
+            inner.width,
+            max(120, action_top - inner.top - gap),
         )
-        close_rect = pygame.Rect(inner.left, modal_rect.bottom - 56, 180, 36)
-        keycap_top = inner.top + 76
-        keycap_bottom = close_rect.top - 14
-        keycap_height = 25
-        two_columns = inner.width >= 620
-        if two_columns:
-            col_gap = 14
-            rows = (len(RUN_HELP_KEYCAPS) + 1) // 2
-            row_gap = max(5, min(8, (keycap_bottom - keycap_top - keycap_height * rows) // rows))
-            col_width = int((inner.width - col_gap) / 2)
-            for index, (key_text, label) in enumerate(RUN_HELP_KEYCAPS):
-                col = index // rows
-                row = index % rows
-                keycap_rect = pygame.Rect(
-                    inner.left + col * (col_width + col_gap),
-                    keycap_top + row * (keycap_height + row_gap),
-                    col_width,
-                    keycap_height,
-                )
-                draw_keycap(
-                    surface,
-                    pygame,
-                    self.fonts.small,
-                    rect=keycap_rect,
-                    key_text=key_text,
-                    label=label,
-                )
-        else:
-            row_gap = max(
-                2,
-                min(
-                    6,
-                    (keycap_bottom - keycap_top - keycap_height * len(RUN_HELP_KEYCAPS))
-                    // max(1, len(RUN_HELP_KEYCAPS) - 1),
-                ),
+        page_tabs = self._draw_beginner_guide_page(
+            surface,
+            content_rect,
+            self._help_page_index,
+        )
+        for index, tab_rect in enumerate(page_tabs):
+            self._click_targets.append(ClickTarget("help_page", str(index), tab_rect))
+
+        button_width = int((inner.width - gap * 2) / 3)
+        previous_rect = pygame.Rect(inner.left, action_top, button_width, action_height)
+        close_rect = pygame.Rect(
+            previous_rect.right + gap,
+            action_top,
+            button_width,
+            action_height,
+        )
+        next_rect = pygame.Rect(
+            close_rect.right + gap,
+            action_top,
+            inner.right - close_rect.right - gap,
+            action_height,
+        )
+        previous_enabled = self._help_page_index > 0
+        on_last_page = self._help_page_index == len(BEGINNER_GUIDE_PAGES) - 1
+        draw_button(
+            surface,
+            pygame,
+            rect=previous_rect,
+            title="Previous",
+            detail="Earlier lesson.",
+            accent=INFO,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+            enabled=previous_enabled,
+            priority="quiet",
+        )
+        if previous_enabled:
+            self._click_targets.append(
+                ClickTarget("help_page", str(self._help_page_index - 1), previous_rect)
             )
-            for index, (key_text, label) in enumerate(RUN_HELP_KEYCAPS):
-                keycap_rect = pygame.Rect(
-                    inner.left,
-                    keycap_top + index * (keycap_height + row_gap),
-                    inner.width,
-                    keycap_height,
-                )
-                draw_keycap(
-                    surface,
-                    pygame,
-                    self.fonts.small,
-                    rect=keycap_rect,
-                    key_text=key_text,
-                    label=label,
-                )
         draw_button(
             surface,
             pygame,
             rect=close_rect,
-            title="Esc Close Help",
-            detail="Return to the run dashboard.",
-            accent=BORDER,
+            title="Close & Play",
+            detail="Return to the dashboard.",
+            accent=GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="primary",
+            emphasis=max(0.42, overlay_motion),
         )
         self._click_targets.append(ClickTarget("close_help", "", close_rect))
+        draw_button(
+            surface,
+            pygame,
+            rect=next_rect,
+            title="Done" if on_last_page else "Next",
+            detail="Close guide." if on_last_page else "Next lesson.",
+            accent=INFO,
+            title_font=self.fonts.small,
+            detail_font=self.fonts.small,
+            priority="secondary",
+        )
+        self._click_targets.append(
+            ClickTarget(
+                "close_help" if on_last_page else "help_page",
+                "" if on_last_page else str(self._help_page_index + 1),
+                next_rect,
+            )
+        )
+        self._record_layout_separation(
+            "help-content-vs-actions",
+            content_rect,
+            previous_rect.unionall((close_rect, next_rect)),
+        )
 
     def _draw_outcome_overlay(self, surface) -> None:
         pygame = self.pygame
@@ -10750,6 +11156,7 @@ class RunScene(BaseScene):
             accent=INFO,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="primary" if self._terminal_archive_saved else "secondary",
         )
         draw_button(
             surface,
@@ -10764,6 +11171,7 @@ class RunScene(BaseScene):
             accent=BORDER if self._terminal_archive_saved else GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet" if self._terminal_archive_saved else "primary",
         )
         draw_button(
             surface,
@@ -10778,6 +11186,7 @@ class RunScene(BaseScene):
             accent=INFO if self._terminal_archive_saved else accent,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet" if self._terminal_archive_saved else "danger",
         )
         self._click_targets.append(ClickTarget("open_review", "", review_rect))
         if not self._terminal_archive_saved:
@@ -12003,6 +12412,7 @@ class TurnSummaryScene(BaseScene):
             accent=INFO,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="primary",
         )
         draw_button(
             surface,
@@ -12013,6 +12423,7 @@ class TurnSummaryScene(BaseScene):
             accent=GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="secondary",
         )
         draw_button(
             surface,
@@ -12023,6 +12434,7 @@ class TurnSummaryScene(BaseScene):
             accent=WARN,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
+            priority="quiet",
         )
         self._click_targets.append(ClickTarget("continue", "", continue_rect))
         self._click_targets.append(ClickTarget("save", "", save_rect))

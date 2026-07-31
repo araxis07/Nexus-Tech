@@ -29,6 +29,17 @@ class FocusCardTextPolicy:
     detail_max_lines: int
 
 
+@dataclass(frozen=True)
+class ButtonChromePolicy:
+    """Color and border weight for one semantic action priority."""
+
+    fill_accent_mix: float
+    border_accent_mix: float
+    border_width: int
+    accent_height: int
+    label_accent_mix: float
+
+
 _OVERLAY_ALPHA_FLOORS = {
     "delete": 216,
     "help": 226,
@@ -49,10 +60,10 @@ def resolve_panel_chrome(emphasis: float) -> PanelChromePolicy:
     safe_emphasis = max(0.0, min(1.0, emphasis))
     return PanelChromePolicy(
         fill_accent_mix=safe_emphasis * 0.16,
-        border_mute_mix=0.34 * (1.0 - safe_emphasis),
-        border_accent_mix=0.14 + safe_emphasis * 0.42,
-        header_accent_mix=0.04 + safe_emphasis * 0.10,
-        accent_line_mix=0.58 + safe_emphasis * 0.34,
+        border_mute_mix=0.24 * (1.0 - safe_emphasis),
+        border_accent_mix=0.22 + safe_emphasis * 0.42,
+        header_accent_mix=0.06 + safe_emphasis * 0.12,
+        accent_line_mix=0.68 + safe_emphasis * 0.26,
         border_width=2 if safe_emphasis >= 0.45 else 1,
         accent_height=3 + round(safe_emphasis * 3),
     )
@@ -108,4 +119,51 @@ def resolve_focus_card_text_policy(
         headline_role="small",
         detail_role="small",
         detail_max_lines=2,
+    )
+
+
+def resolve_button_chrome(
+    priority: str,
+    *,
+    enabled: bool,
+    selected: bool,
+    emphasis: float,
+) -> ButtonChromePolicy:
+    """Resolve action hierarchy without coupling it to a specific renderer."""
+
+    if not enabled:
+        return ButtonChromePolicy(0.0, 0.08, 1, 2, 0.0)
+
+    normalized = priority.strip().lower()
+    safe_emphasis = max(0.0, min(1.0, emphasis))
+    if normalized == "primary":
+        return ButtonChromePolicy(
+            fill_accent_mix=0.2 + safe_emphasis * 0.16,
+            border_accent_mix=0.78 + safe_emphasis * 0.16,
+            border_width=2,
+            accent_height=5 + round(safe_emphasis * 2),
+            label_accent_mix=0.08,
+        )
+    if normalized == "quiet":
+        return ButtonChromePolicy(
+            fill_accent_mix=safe_emphasis * 0.08,
+            border_accent_mix=0.2 + safe_emphasis * 0.2,
+            border_width=1,
+            accent_height=2,
+            label_accent_mix=0.0,
+        )
+    if normalized == "danger":
+        return ButtonChromePolicy(
+            fill_accent_mix=0.1 + safe_emphasis * 0.16,
+            border_accent_mix=0.66 + safe_emphasis * 0.2,
+            border_width=2 if safe_emphasis >= 0.3 else 1,
+            accent_height=4 + round(safe_emphasis * 2),
+            label_accent_mix=0.04,
+        )
+    return ButtonChromePolicy(
+        fill_accent_mix=(0.1 if selected else 0.03) + safe_emphasis * 0.14,
+        border_accent_mix=(0.68 if selected else 0.48) + safe_emphasis * 0.2,
+        border_width=2 if selected or safe_emphasis >= 0.4 else 1,
+        accent_height=3 + round(safe_emphasis * 2),
+        label_accent_mix=0.0,
     )
