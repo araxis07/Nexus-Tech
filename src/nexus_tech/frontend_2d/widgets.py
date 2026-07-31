@@ -11,6 +11,10 @@ from nexus_tech.frontend_2d.accessibility import (
     normalize_contrast_mode,
     normalize_ui_scale,
 )
+from nexus_tech.frontend_2d.visual_hierarchy import (
+    resolve_panel_chrome,
+    resolve_viewport_typography_scale,
+)
 
 _STANDARD_PALETTE = {
     "BACKGROUND": (8, 14, 23),
@@ -124,10 +128,17 @@ def active_contrast_mode() -> ContrastMode:
     return _ACTIVE_CONTRAST_MODE
 
 
-def create_fonts(pygame, ui_scale: UiScale | str = UiScale.STANDARD) -> FontPack:
+def create_fonts(
+    pygame,
+    ui_scale: UiScale | str = UiScale.STANDARD,
+    *,
+    viewport_size: tuple[int, int] | None = None,
+) -> FontPack:
     """Build a compact font set with deterministic metrics across OS runners."""
 
     scale = normalize_ui_scale(ui_scale).factor
+    if viewport_size is not None:
+        scale *= resolve_viewport_typography_scale(*viewport_size)
     return FontPack(
         title=_default_font(pygame, _scaled_font_size(34, scale), bold=True),
         heading=_default_font(pygame, _scaled_font_size(24, scale), bold=True),
@@ -196,15 +207,22 @@ def draw_panel(
     """Draw a framed panel and return its inner content rect."""
 
     safe_emphasis = max(0.0, min(1.0, emphasis))
+    chrome = resolve_panel_chrome(safe_emphasis)
     visual_rect = pygame.Rect(rect.left, rect.top - lift, rect.width, rect.height)
-    panel_fill = blend_color(PANEL, accent, safe_emphasis * 0.16)
-    panel_border = blend_color(BORDER, accent, safe_emphasis * 0.48)
-    header_fill = blend_color(PANEL_ALT, accent, safe_emphasis * 0.12)
-    border_width = 2 if safe_emphasis >= 0.45 else 1
-    accent_height = 4 + int(safe_emphasis * 2)
+    panel_fill = blend_color(PANEL, accent, chrome.fill_accent_mix)
+    muted_border = blend_color(BORDER, PANEL, chrome.border_mute_mix)
+    panel_border = blend_color(muted_border, accent, chrome.border_accent_mix)
+    header_fill = blend_color(PANEL_ALT, accent, chrome.header_accent_mix)
+    accent_line = blend_color(BORDER, accent, chrome.accent_line_mix)
 
     pygame.draw.rect(surface, panel_fill, visual_rect, border_radius=18)
-    pygame.draw.rect(surface, panel_border, visual_rect, width=border_width, border_radius=18)
+    pygame.draw.rect(
+        surface,
+        panel_border,
+        visual_rect,
+        width=chrome.border_width,
+        border_radius=18,
+    )
     header_rect = pygame.Rect(visual_rect.left, visual_rect.top, visual_rect.width, 34)
     pygame.draw.rect(
         surface,
@@ -215,8 +233,13 @@ def draw_panel(
     )
     pygame.draw.rect(
         surface,
-        blend_color(accent, TEXT, safe_emphasis * 0.15),
-        (visual_rect.left + 1, visual_rect.top + 1, visual_rect.width - 2, accent_height),
+        blend_color(accent_line, TEXT, safe_emphasis * 0.12),
+        (
+            visual_rect.left + 1,
+            visual_rect.top + 1,
+            visual_rect.width - 2,
+            chrome.accent_height,
+        ),
         border_radius=4,
     )
     return pygame.Rect(

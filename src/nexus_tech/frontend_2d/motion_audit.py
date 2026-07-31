@@ -249,7 +249,6 @@ def run_2d_motion_audit(
     pygame.init()
     pygame.font.init()
     try:
-        fonts = create_fonts(pygame)
         state = _build_motion_audit_state(
             scenario_id=scenario_id,
             difficulty_mode=difficulty_mode,
@@ -263,6 +262,10 @@ def run_2d_motion_audit(
             coordinator = SaveLoadCoordinator(Path(tmpdir) / "motion-audit.db")
             for width, height in sizes:
                 surface = pygame.display.set_mode((width, height), pygame.HIDDEN)
+                fonts = create_fonts(
+                    pygame,
+                    viewport_size=(width, height),
+                )
                 run_scene = RunScene(
                     pygame=pygame,
                     fonts=fonts,

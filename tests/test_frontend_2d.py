@@ -171,6 +171,12 @@ from nexus_tech.frontend_2d.visual_audit import (
     MIN_CLICK_TARGET_CLEARANCE,
     VISUAL_AUDIT_SUMMARY_NAME,
 )
+from nexus_tech.frontend_2d.visual_hierarchy import (
+    resolve_focus_card_text_policy,
+    resolve_overlay_backdrop_alpha,
+    resolve_panel_chrome,
+    resolve_viewport_typography_scale,
+)
 from nexus_tech.frontend_2d.widgets import (
     DANGER,
     configure_contrast_mode,
@@ -871,6 +877,45 @@ def test_2d_accessibility_profiles_scale_fonts_and_mirror_palette() -> None:
         pygame.quit()
 
     assert original_background == scenes_module.BACKGROUND
+
+
+def test_2d_viewport_typography_uses_spare_space_without_pressuring_compact_windows() -> None:
+    pygame, _fonts, _surface = _build_pygame_bundle()
+    try:
+        compact_fonts = create_fonts(pygame, viewport_size=(820, 620))
+        standard_fonts = create_fonts(pygame, viewport_size=(1280, 720))
+        spacious_fonts = create_fonts(pygame, viewport_size=(1440, 900))
+
+        assert resolve_viewport_typography_scale(820, 620) == 1.0
+        assert resolve_viewport_typography_scale(1280, 720) == 1.03
+        assert resolve_viewport_typography_scale(1440, 900) == 1.12
+        assert standard_fonts.body.get_height() >= compact_fonts.body.get_height()
+        assert spacious_fonts.body.get_height() > compact_fonts.body.get_height()
+        assert (
+            spacious_fonts.heading.size("Recommended Move")[0]
+            > standard_fonts.heading.size("Recommended Move")[0]
+        )
+    finally:
+        pygame.quit()
+
+
+def test_2d_visual_hierarchy_quiets_containers_and_isolates_blocking_overlays() -> None:
+    default_panel = resolve_panel_chrome(0.0)
+    primary_panel = resolve_panel_chrome(1.0)
+    compact_card = resolve_focus_card_text_policy(width=300, height=72, compact=True)
+    spacious_card = resolve_focus_card_text_policy(width=420, height=180, compact=False)
+
+    assert default_panel.accent_height < primary_panel.accent_height
+    assert default_panel.border_mute_mix > primary_panel.border_mute_mix
+    assert default_panel.accent_line_mix < primary_panel.accent_line_mix
+    assert compact_card.headline_role == "small"
+    assert spacious_card.headline_role == "heading"
+    assert spacious_card.detail_role == "body"
+    assert resolve_overlay_backdrop_alpha("inspector", base_alpha=180) >= 232
+    assert resolve_overlay_backdrop_alpha("panel", base_alpha=180) >= 228
+    assert resolve_overlay_backdrop_alpha("pending", base_alpha=180) < (
+        resolve_overlay_backdrop_alpha("inspector", base_alpha=180)
+    )
 
 
 def test_2d_accessible_profile_draws_compact_title_and_run_without_hidden_text(

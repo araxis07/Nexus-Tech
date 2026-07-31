@@ -2,15 +2,21 @@
 
 ## Product Position
 
-NEXUS TECH 0.323.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.324.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
-The latest automated execution record is
+The latest presentation record is
+[UX Hierarchy Audit - 2026-07-30](UX_HIERARCHY_AUDIT_2026-07-30.md). The
+guarded owner-flow record remains
 [Beta Execution Audit - 2026-07-30](BETA_EXECUTION_AUDIT_2026-07-30.md).
 
 ## Current Engineering Slice
 
 The current beta candidate protects the complete owner-flow contract while retaining the executable next-session packet:
 
+- viewport-aware typography now spends spare room at standard and spacious sizes while keeping the compact 820x620 scale stable;
+- spacious Focus cards promote decision headlines and details into stronger font roles instead of stretching compact copy across large empty cards;
+- default panel chrome is quieter than emphasized state chrome, and blocking overlays use stable dim floors so background copy cannot compete with modal content;
+- runtime resizing and headless visual/motion audits now share the same viewport typography policy;
 - `run-beta-owner-rehearsal` now performs packet preflight, opens the exact packet-bound visible 2D profile, and runs the archive gate after the window closes;
 - an incomplete rehearsal close remains blocked but can resume the same owner-only profile, while the isolated first-tester profile and structured human evidence remain untouched;
 - a completed target archive skips unnecessary relaunch, and the manual launch plus post-gate commands remain available for diagnostics;

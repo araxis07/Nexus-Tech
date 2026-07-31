@@ -72,7 +72,13 @@ def launch_2d_frontend(
         surface = pygame.display.set_mode(window_size, flags)
         pygame.display.set_caption(f"NEXUS TECH 2D | {state.company.name}")
         coordinator = SaveLoadCoordinator(db_path)
-        preferences, fonts, apply_preferences, preference_provider = _build_preference_runtime(
+        (
+            preferences,
+            fonts,
+            apply_preferences,
+            preference_provider,
+            resize_fonts,
+        ) = _build_preference_runtime(
             pygame=pygame,
             scenes=scenes,
             coordinator=coordinator,
@@ -81,6 +87,7 @@ def launch_2d_frontend(
             motion_mode=motion_mode,
             ui_scale=ui_scale,
             contrast_mode=contrast_mode,
+            viewport_size=window_size,
         )
         scene = scenes.RunScene(
             pygame=pygame,
@@ -110,6 +117,7 @@ def launch_2d_frontend(
             scene=scene,
             flags=flags,
             max_frames=max_frames,
+            resize_fonts=resize_fonts,
         )
     finally:
         configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
@@ -153,7 +161,13 @@ def launch_2d_menu(
         surface = pygame.display.set_mode(window_size, flags)
         pygame.display.set_caption("NEXUS TECH 2D | Menu")
         coordinator = SaveLoadCoordinator(db_path)
-        preferences, fonts, apply_preferences, preference_provider = _build_preference_runtime(
+        (
+            preferences,
+            fonts,
+            apply_preferences,
+            preference_provider,
+            resize_fonts,
+        ) = _build_preference_runtime(
             pygame=pygame,
             scenes=scenes,
             coordinator=coordinator,
@@ -162,6 +176,7 @@ def launch_2d_menu(
             motion_mode=motion_mode,
             ui_scale=ui_scale,
             contrast_mode=contrast_mode,
+            viewport_size=window_size,
         )
         scene = scenes.TitleScene(
             pygame=pygame,
@@ -193,6 +208,7 @@ def launch_2d_menu(
             scene=scene,
             flags=flags,
             max_frames=max_frames,
+            resize_fonts=resize_fonts,
         )
     finally:
         configure_contrast_mode(previous_contrast_mode, mirror_modules=(scenes,))
@@ -208,11 +224,13 @@ def _build_preference_runtime(
     motion_mode: MotionMode | str | None,
     ui_scale: UiScale | str | None,
     contrast_mode: ContrastMode | str | None,
+    viewport_size: tuple[int, int],
 ) -> tuple[
     FrontendPreferences,
     object,
     Callable[[FrontendPreferences], object],
     Callable[[], FrontendPreferences],
+    Callable[[tuple[int, int]], object],
 ]:
     """Build one mutable preference bridge shared by every scene transition."""
 
@@ -222,23 +240,43 @@ def _build_preference_runtime(
         contrast_mode=contrast_mode,
     )
     configure_contrast_mode(current.contrast_mode, mirror_modules=(scenes,))
-    fonts = create_fonts(pygame, current.ui_scale)
+    current_viewport = viewport_size
+    fonts = create_fonts(pygame, current.ui_scale, viewport_size=current_viewport)
 
     def apply_preferences(preferences: FrontendPreferences):
         nonlocal current
         coordinator.save_frontend_preferences(preferences)
         configure_contrast_mode(preferences.contrast_mode, mirror_modules=(scenes,))
         current = preferences
-        return create_fonts(pygame, preferences.ui_scale)
+        return create_fonts(
+            pygame,
+            preferences.ui_scale,
+            viewport_size=current_viewport,
+        )
 
     def preference_provider() -> FrontendPreferences:
         return current
 
-    return current, fonts, apply_preferences, preference_provider
+    def resize_fonts(size: tuple[int, int]):
+        nonlocal current_viewport
+        current_viewport = size
+        return create_fonts(
+            pygame,
+            current.ui_scale,
+            viewport_size=current_viewport,
+        )
+
+    return current, fonts, apply_preferences, preference_provider, resize_fonts
 
 
 def _run_frontend_loop(
-    *, pygame, surface, scene, flags: int, max_frames: int | None
+    *,
+    pygame,
+    surface,
+    scene,
+    flags: int,
+    max_frames: int | None,
+    resize_fonts: Callable[[tuple[int, int]], object] | None = None,
 ) -> FrontendRunResult:
     """Run the shared event loop for any 2D frontend scene."""
 
@@ -250,6 +288,8 @@ def _run_frontend_loop(
             for event in pygame.event.get():
                 if event.type == pygame.VIDEORESIZE:
                     surface = pygame.display.set_mode(event.size, flags)
+                    if resize_fonts is not None:
+                        scene.fonts = resize_fonts(event.size)
                     continue
                 scene.handle_event(event)
             scene.update(dt)

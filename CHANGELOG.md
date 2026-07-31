@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.324.0 - 2026-07-30
+
+- Added viewport-aware typography that uses spare room at standard and spacious window sizes while preserving the established compact 820x620 scale
+- Enlarged spacious Focus decision headlines and details so Act Objective, Recommended Move, and End Turn Check use the available canvas instead of retaining compact text
+- Quieted secondary panel borders and accent rails while preserving stronger emphasized-state chrome, improving primary-action hierarchy without changing controls
+- Strengthened blocking overlay backdrops for inspectors, deep panels, pause, help, outcomes, and pickers so underlying scene copy no longer competes with modal content
+- Rebuilt fonts after live window resizing and aligned visual/motion audits with the same viewport-aware font policy used by the runtime
+- Extracted the new visual hierarchy decisions into a pure policy module with direct regression coverage
+- Preserved gameplay outcomes, balance, controls, frozen catalogs, persistence schema 28, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.323.0 - 2026-07-30
 
 - Added `run-beta-owner-rehearsal`, one guarded command that validates the current packet and evidence snapshot, opens the packet-bound 2D profile, and runs the archive gate when the visible window closes

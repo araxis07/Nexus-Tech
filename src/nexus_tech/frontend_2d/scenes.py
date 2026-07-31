@@ -107,6 +107,10 @@ from nexus_tech.frontend_2d.viewmodels import (
     build_save_slot_card_view_models,
     build_turn_summary_view_model,
 )
+from nexus_tech.frontend_2d.visual_hierarchy import (
+    resolve_focus_card_text_policy,
+    resolve_overlay_backdrop_alpha,
+)
 from nexus_tech.frontend_2d.widgets import (
     BACKGROUND,
     BORDER,
@@ -114,6 +118,7 @@ from nexus_tech.frontend_2d.widgets import (
     GOOD,
     INFO,
     MUTED,
+    OVERLAY,
     PANEL,
     SELECTION,
     TEXT,
@@ -981,8 +986,12 @@ class TitleScene(BaseScene):
 
     def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
         pulse = self._overlay_motion_level(overlay_key)
-        alpha = min(224, 180 + int(pulse * 36))
-        return (8, 10, 14, alpha)
+        alpha = resolve_overlay_backdrop_alpha(
+            overlay_key,
+            base_alpha=OVERLAY[3],
+            pulse=pulse,
+        )
+        return (*OVERLAY[:3], alpha)
 
     def _title_actor_sprite_strength(self) -> float:
         if self.motion_mode is MotionMode.OFF:
@@ -6589,10 +6598,12 @@ class RunScene(BaseScene):
 
     def _overlay_fill(self, overlay_key: str) -> tuple[int, int, int, int]:
         pulse = self._overlay_motion_level(overlay_key)
-        enter = self._overlay_enter_progress(overlay_key)
-        alpha = min(224, 180 + int(pulse * 36))
-        alpha = int(alpha * (0.55 + enter * 0.45))
-        return (8, 10, 14, alpha)
+        alpha = resolve_overlay_backdrop_alpha(
+            overlay_key,
+            base_alpha=OVERLAY[3],
+            pulse=pulse,
+        )
+        return (*OVERLAY[:3], alpha)
 
     def _handle_mouse_click(self, position: tuple[int, int]) -> None:
         for target in reversed(self._click_targets):
@@ -8189,6 +8200,13 @@ class RunScene(BaseScene):
         compact: bool = False,
     ) -> None:
         pygame = self.pygame
+        text_policy = resolve_focus_card_text_policy(
+            width=rect.width,
+            height=rect.height,
+            compact=compact,
+        )
+        headline_font = getattr(self.fonts, text_policy.headline_role)
+        detail_font = getattr(self.fonts, text_policy.detail_role)
         pygame.draw.rect(
             surface,
             blend_color((18, 29, 44), accent, 0.12),
@@ -8210,20 +8228,27 @@ class RunScene(BaseScene):
             pygame.Rect(rect.left + 12, rect.top + 8, rect.width - 24, 14),
             valign="top",
         )
+        headline_top = rect.top + 8 + self.fonts.small.get_linesize() + 3
         draw_text_line(
             surface,
-            self.fonts.small if compact else self.fonts.body,
+            headline_font,
             headline,
             TEXT,
-            pygame.Rect(rect.left + 12, rect.top + 25, rect.width - 24, 20),
+            pygame.Rect(
+                rect.left + 12,
+                headline_top,
+                rect.width - 24,
+                headline_font.get_linesize(),
+            ),
             valign="top",
         )
-        detail_top = rect.top + (43 if compact else 45)
+        detail_top = headline_top + headline_font.get_linesize() + 4
         detail_height = rect.bottom - detail_top - 6
-        if detail_height >= 15:
+        detail_line_height = max(15, detail_font.get_linesize())
+        if detail_height >= detail_line_height:
             draw_wrapped_text(
                 surface,
-                self.fonts.small,
+                detail_font,
                 detail,
                 MUTED,
                 pygame.Rect(
@@ -8232,8 +8257,11 @@ class RunScene(BaseScene):
                     rect.width - 24,
                     detail_height,
                 ),
-                line_height=15,
-                max_lines=2,
+                line_height=detail_line_height,
+                max_lines=min(
+                    text_policy.detail_max_lines,
+                    max(1, detail_height // detail_line_height),
+                ),
             )
         if click_kind is not None:
             self._click_targets.append(ClickTarget(click_kind, click_payload, rect))
