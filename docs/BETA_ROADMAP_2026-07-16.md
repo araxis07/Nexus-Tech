@@ -6,7 +6,9 @@ NEXUS TECH 0.325.0 remains a late-alpha beta candidate at approximately 83% of a
 
 The latest presentation record is
 [Beginner UX Redesign Audit - 2026-07-31](BEGINNER_UX_REDESIGN_2026-07-31.md). The
-guarded owner-flow record remains
+current playtest-readiness record is
+[Beta Playtest Readiness - 2026-08-01](BETA_PLAYTEST_READINESS_2026-08-01.md).
+The guarded owner-flow implementation record remains
 [Beta Execution Audit - 2026-07-30](BETA_EXECUTION_AUDIT_2026-07-30.md).
 
 ## Current Engineering Slice
