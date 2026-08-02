@@ -2655,7 +2655,8 @@ def test_run_scene_footer_button_detail_compacts_on_narrow_layout() -> None:
         assert len(narrow_detail) <= 28
         assert wide_detail == ""
         assert button_cols == 3
-        assert footer_band_height == 52
+        expected_text_band = max(14, scene.fonts.small.get_linesize()) * 3 + 16
+        assert footer_band_height >= expected_text_band
         assert len(visible_buttons) < len(RUN_ACTION_BUTTONS)
         assert len(visible_buttons) <= 6
         assert {"Recommended", "Report", "Save", "End Turn"} <= visible_titles
@@ -4330,6 +4331,24 @@ def test_compact_outcome_overlay_supports_large_text_without_severe_clamping() -
     finally:
         finish_typography_audit()
         pygame.quit()
+
+
+@pytest.mark.parametrize("scenario_id", ("renewal_crunch", "late_scale_drag"))
+def test_outcome_overlay_preserves_terminal_focus_hint_without_clamping(
+    scenario_id: str,
+) -> None:
+    report = run_2d_visual_audit(
+        scenario_id=scenario_id,
+        difficulty_mode=None,
+        seed=7,
+        sizes=((960, 640),),
+    )
+
+    outcome = next(cell for cell in report.cells if cell.scene_key == "run_outcome_overlay")
+
+    assert outcome.status == "pass"
+    assert outcome.typography_violations == ()
+    assert outcome.wrapped_clamp_count == 0
 
 
 def test_picker_feedback_cues_do_not_cover_nav_or_modal_controls() -> None:

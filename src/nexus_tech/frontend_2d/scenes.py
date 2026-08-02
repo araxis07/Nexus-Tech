@@ -9032,23 +9032,31 @@ class RunScene(BaseScene):
             return
 
         status_line, hint_line = self._footer_status_lines(max_width=inner.width)
+        line_height = max(14, self.fonts.small.get_linesize())
         draw_wrapped_text(
             surface,
             self.fonts.small,
             status_line,
             TEXT,
-            pygame.Rect(inner.left, footer_top, inner.width, 16),
-            line_height=14,
+            pygame.Rect(inner.left, footer_top, inner.width, line_height),
+            line_height=line_height,
             max_lines=1,
         )
+        hint_top = footer_top + line_height + 4
+        hint_max_lines = 2 if self._focus_mode else 1
         draw_wrapped_text(
             surface,
             self.fonts.small,
             hint_line,
             MUTED,
-            pygame.Rect(inner.left, footer_top + 18, inner.width, 16),
-            line_height=14,
-            max_lines=1,
+            pygame.Rect(
+                inner.left,
+                hint_top,
+                inner.width,
+                max(0, inner.bottom - hint_top - 2),
+            ),
+            line_height=line_height,
+            max_lines=hint_max_lines,
         )
 
     def _footer_outer_height(self, width: int, height: int) -> int:
@@ -9064,9 +9072,10 @@ class RunScene(BaseScene):
         button_height = 34 if height < 700 else 40 if button_cols <= 5 else 44
         footer_band_height = 38 if height < 700 else 46
         if self._focus_mode:
+            line_height = max(14, self.fonts.small.get_linesize())
             footer_band_height = max(
                 footer_band_height,
-                self.fonts.small.get_height() * 3 + 8,
+                line_height * 3 + 16,
             )
         panel_chrome = 60
         return (
@@ -9091,9 +9100,10 @@ class RunScene(BaseScene):
         rows = max(1, (visible_count + button_cols - 1) // button_cols)
         footer_band_height = 42 if inner_height < 300 else 48 if button_cols >= 5 else 52
         if self._focus_mode:
+            line_height = max(14, self.fonts.small.get_linesize())
             footer_band_height = max(
                 footer_band_height,
-                self.fonts.small.get_height() * 3 + 8,
+                line_height * 3 + 16,
             )
         button_gap = 10
         button_area_height = max(
@@ -11436,9 +11446,17 @@ class RunScene(BaseScene):
             pygame.Rect(inner.left, inner.bottom - 72, inner.width, 18),
             valign="top",
         )
-        review_rect = pygame.Rect(inner.left, inner.bottom - 46, 160, 36)
-        save_rect = pygame.Rect(inner.left + 176, inner.bottom - 46, 160, 36)
-        close_rect = pygame.Rect(inner.left + 352, inner.bottom - 46, 140, 36)
+        action_gap = 12
+        action_width = (inner.width - action_gap * 2) // 3
+        action_top = inner.bottom - 46
+        review_rect = pygame.Rect(inner.left, action_top, action_width, 36)
+        save_rect = pygame.Rect(review_rect.right + action_gap, action_top, action_width, 36)
+        close_rect = pygame.Rect(
+            save_rect.right + action_gap,
+            action_top,
+            inner.right - save_rect.right - action_gap,
+            36,
+        )
         draw_button(
             surface,
             pygame,
@@ -11454,12 +11472,13 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect=save_rect,
-            title="Archived" if self._terminal_archive_saved else "S Save & Archive",
+            title="Archived" if self._terminal_archive_saved else "Save & Archive",
             detail=(
                 "Ending recorded for progression."
                 if self._terminal_archive_saved
                 else "Record this ending for progression."
             ),
+            key_hint="" if self._terminal_archive_saved else "S",
             accent=BORDER if self._terminal_archive_saved else GOOD,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,
@@ -11469,12 +11488,13 @@ class RunScene(BaseScene):
             surface,
             pygame,
             rect=close_rect,
-            title="Esc Exit" if self._terminal_archive_saved else "Esc Exit Unsaved",
+            title="Exit" if self._terminal_archive_saved else "Exit Unsaved",
             detail=(
                 "Leave after the archive is recorded."
                 if self._terminal_archive_saved
                 else "Leave without archive progress."
             ),
+            key_hint="Esc",
             accent=INFO if self._terminal_archive_saved else accent,
             title_font=self.fonts.small,
             detail_font=self.fonts.small,

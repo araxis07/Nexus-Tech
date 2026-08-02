@@ -8,6 +8,7 @@
 - Rebalanced Turn Summary phase chips and footer actions so labels remain complete, buttons stay inside their panel, and the large-text profile no longer shrinks key copy below a readable fit
 - Rebuilt compact menu, wizard, deep-panel, and inspector copy so cards use complete authored text or a clean title-only state instead of exposing clipped helper fragments
 - Reflowed every gameplay workspace and inspector at compact widths, separated actor/entity header lanes, and kept all six Report sections plus paging and item actions inside the modal
+- Let Focus View footer guidance use its reserved second line and gave outcome actions equal responsive widths with separate shortcut badges, removing terminal-run clipping in renewal and late-scale scenarios
 - Expanded deterministic visual coverage from 16 to 39 menu/gameplay surfaces, including every deep panel and inspector, across compact, standard, and large text scales
 - Passed 1,404 automated visual captures across four viewports, three motion modes, and three text scales with zero layout, typography, or wrapped-text violations
 - Preserved gameplay outcomes, balance, controls, persistence schema 28, save compatibility, archive evidence `0/24`, and truthful human-session evidence `0/6`
