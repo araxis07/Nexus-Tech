@@ -5,6 +5,24 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+MIN_FRONTEND_WIDTH = 820
+MIN_FRONTEND_HEIGHT = 620
+MIN_FRONTEND_VIEWPORT = (MIN_FRONTEND_WIDTH, MIN_FRONTEND_HEIGHT)
+
+
+def clamp_frontend_viewport_size(size: tuple[int, int]) -> tuple[int, int]:
+    """Keep live windows inside the layout contract supported by every scene."""
+
+    width, height = size
+    return max(MIN_FRONTEND_WIDTH, width), max(MIN_FRONTEND_HEIGHT, height)
+
+
+def frontend_viewport_is_supported(size: tuple[int, int]) -> bool:
+    """Return whether a viewport can render every scene without collapsing lanes."""
+
+    width, height = size
+    return width >= MIN_FRONTEND_WIDTH and height >= MIN_FRONTEND_HEIGHT
+
 
 class LayoutDensity(StrEnum):
     """Named viewport-density bands used by every scene shell."""

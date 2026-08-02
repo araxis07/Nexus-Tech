@@ -332,6 +332,8 @@ def draw_wrapped_text(
     words = text.split()
     if not words:
         return 0
+    if " ".join(words).endswith("..."):
+        _record_typography_event("pre-truncated-copy", 0.0, severe=True)
     lines: list[str] = []
     current_line = _fit_word(font, words[0], rect.width)
     for raw_word in words[1:]:
@@ -355,7 +357,7 @@ def draw_wrapped_text(
         _record_typography_event(
             "wrapped-clamp",
             line_limit / max(1, len(lines)),
-            severe=False,
+            severe=True,
         )
     previous_clip = surface.get_clip()
     surface.set_clip(rect.clip(previous_clip))
@@ -408,6 +410,8 @@ def draw_text_line(
     rect = surface.get_clip().clip(rect)
     if rect.width <= 0 or rect.height <= 0:
         return 0
+    if " ".join(text.split()).endswith("..."):
+        _record_typography_event("pre-truncated-copy", 0.0, severe=True)
     line = fit_text_line(font, text, rect.width)
     if not line:
         if text.strip():
@@ -476,6 +480,7 @@ def draw_button(
     rect,
     title: str,
     detail: str,
+    compact_detail: str | None = None,
     accent: tuple[int, int, int],
     title_font,
     detail_font,
@@ -486,7 +491,7 @@ def draw_button(
     emphasis: float = 0.0,
     lift: int = 0,
 ) -> None:
-    """Draw one clickable action or modal button."""
+    """Draw one clickable action without exposing clipped helper copy."""
 
     safe_emphasis = max(0.0, min(1.0, emphasis))
     normalized_priority = priority.strip().lower()
@@ -537,7 +542,26 @@ def draw_button(
             (visual_rect.left + 1, visual_rect.bottom - 5, visual_rect.width - 2, 3),
             border_radius=3,
         )
-    show_detail = bool(detail) and visual_rect.height >= 46
+    detail_line_height = 13 if visual_rect.height < 58 else 15
+    detail_top = visual_rect.top + 28
+    detail_rect = pygame.Rect(
+        visual_rect.left + 12,
+        detail_top,
+        visual_rect.width - 24,
+        max(0, visual_rect.bottom - detail_top - 5),
+    )
+    detail_line_limit = min(
+        2 if visual_rect.height >= 58 else 1,
+        detail_rect.height // max(1, detail_line_height),
+    )
+    detail_copy = _resolve_button_detail_copy(
+        detail_font,
+        detail,
+        compact_detail,
+        max_width=detail_rect.width,
+        max_lines=detail_line_limit,
+    )
+    show_detail = bool(detail_copy) and visual_rect.height >= 46
     clean_key_hint = " ".join(key_hint.split())
     key_badge_width = 0
     if clean_key_hint:
@@ -587,22 +611,68 @@ def draw_button(
             align="center",
         )
     if show_detail:
-        detail_top = visual_rect.top + 28
-        detail_rect = pygame.Rect(
-            visual_rect.left + 12,
-            detail_top,
-            visual_rect.width - 24,
-            max(0, visual_rect.bottom - detail_top - 5),
-        )
         draw_wrapped_text(
             surface,
             detail_font,
-            detail,
+            detail_copy,
             detail_color,
             detail_rect,
-            line_height=13 if visual_rect.height < 58 else 15,
-            max_lines=2 if visual_rect.height >= 58 else 1,
+            line_height=detail_line_height,
+            max_lines=detail_line_limit,
         )
+
+
+def _resolve_button_detail_copy(
+    font,
+    detail: str,
+    compact_detail: str | None,
+    *,
+    max_width: int,
+    max_lines: int,
+) -> str:
+    """Choose complete helper copy; never render a pre-truncated fragment."""
+
+    if max_width <= 0 or max_lines <= 0:
+        return ""
+    candidates = (detail, compact_detail or "")
+    seen: set[str] = set()
+    for candidate in candidates:
+        clean_candidate = " ".join(candidate.split())
+        if not clean_candidate or clean_candidate in seen:
+            continue
+        seen.add(clean_candidate)
+        if clean_candidate.endswith("..."):
+            continue
+        if _wrapped_text_fits(
+            font,
+            clean_candidate,
+            max_width=max_width,
+            max_lines=max_lines,
+        ):
+            return clean_candidate
+    return ""
+
+
+def _wrapped_text_fits(font, text: str, *, max_width: int, max_lines: int) -> bool:
+    """Return whether text can be wrapped without clipping or ellipsis."""
+
+    if max_width <= 0 or max_lines <= 0:
+        return False
+    words = text.split()
+    if not words or any(font.size(word)[0] > max_width for word in words):
+        return False
+    line_count = 1
+    current_line = words[0]
+    for word in words[1:]:
+        candidate = f"{current_line} {word}"
+        if font.size(candidate)[0] <= max_width:
+            current_line = candidate
+            continue
+        line_count += 1
+        if line_count > max_lines:
+            return False
+        current_line = word
+    return True
 
 
 def _record_text_fit_event(

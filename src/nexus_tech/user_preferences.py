@@ -21,7 +21,7 @@ class UiScale(StrEnum):
         """Return the font-size multiplier for this profile."""
 
         return {
-            UiScale.COMPACT: 0.90,
+            UiScale.COMPACT: 0.96,
             UiScale.STANDARD: 1.00,
             UiScale.LARGE: 1.12,
         }[self]

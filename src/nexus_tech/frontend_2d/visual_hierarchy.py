@@ -41,16 +41,16 @@ class ButtonChromePolicy:
 
 
 _OVERLAY_ALPHA_FLOORS = {
-    "delete": 216,
-    "help": 226,
-    "inspector": 232,
-    "outcome": 226,
-    "panel": 228,
-    "pause": 218,
-    "pause_settings": 224,
-    "pending": 212,
-    "picker": 216,
-    "text_input": 220,
+    "delete": 248,
+    "help": 250,
+    "inspector": 250,
+    "outcome": 250,
+    "panel": 248,
+    "pause": 250,
+    "pause_settings": 250,
+    "pending": 248,
+    "picker": 248,
+    "text_input": 250,
 }
 
 
@@ -81,7 +81,7 @@ def resolve_overlay_backdrop_alpha(
     floor = _OVERLAY_ALPHA_FLOORS.get(normalized_key, 212)
     safe_base = max(0, min(255, base_alpha))
     safe_pulse = max(0.0, min(1.0, pulse))
-    return min(242, max(safe_base, floor) + round(safe_pulse * 8))
+    return min(252, max(safe_base, floor) + round(safe_pulse * 4))
 
 
 def resolve_viewport_typography_scale(width: int, height: int) -> float:

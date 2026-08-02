@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.325.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.326.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest presentation record is
 [Beginner UX Redesign Audit - 2026-07-31](BEGINNER_UX_REDESIGN_2026-07-31.md). The
@@ -20,7 +20,11 @@ The current beta candidate protects the complete owner-flow contract while retai
 - Help supports tabs, Previous/Next, number keys, Home/End, a primary Close & Play route, and click-through blocking behind the overlay;
 - Pause now includes Player Guide in a balanced 2x3 recovery grid and keeps Resume, Save, Menu, Settings, Guide, and Quit visually distinct;
 - semantic primary, secondary, quiet, and danger button policies now apply across title, wizard, run, modal, inspector, outcome, summary, and review actions;
-- permanent Pause coverage raises the full visual matrix to 64 captures across four viewports, while the focused full/reduced/off layout matrix passes 96 captures;
+- deterministic visual coverage now spans 39 menu and gameplay surfaces, including every deep panel and inspector, while the full layout matrix passes 1,404 captures across four viewports, three motion modes, and three text scales;
+- launch and live-resize paths enforce the audited 820x620 minimum viewport so scene lanes cannot collapse below the supported layout contract;
+- blocking run states now expose one visible overlay owner, discard hidden workspace targets, and render transitions below dialogs so modal copy stays readable without click-through;
+- Pause Settings and Turn Summary now use responsive widths, complete detail copy, bounded action rows, and measured phase labels instead of fixed boxes that truncate large text;
+- compact menu, wizard, workspace, and inspector cards now show complete authored helper copy or a clean title-only state instead of clipped fragments, while hover retains the full action explanation;
 - viewport-aware typography now spends spare room at standard and spacious sizes while keeping the compact 820x620 scale stable;
 - spacious Focus cards promote decision headlines and details into stronger font roles instead of stretching compact copy across large empty cards;
 - default panel chrome is quieter than emphasized state chrome, and blocking overlays use stable dim floors so background copy cannot compete with modal content;

@@ -31,6 +31,7 @@ from nexus_tech.simulation.engine import (
     resolve_turn,
 )
 from nexus_tech.simulation.randomness import RandomSource
+from nexus_tech.user_preferences import FrontendPreferences, UiScale, normalize_ui_scale
 
 DEFAULT_VISUAL_AUDIT_SIZES: tuple[tuple[int, int], ...] = (
     (820, 620),
@@ -43,6 +44,7 @@ DEFAULT_LAYOUT_MATRIX_MOTION_MODES: tuple[MotionMode, ...] = (
     MotionMode.REDUCED,
     MotionMode.OFF,
 )
+DEFAULT_LAYOUT_MATRIX_UI_SCALES: tuple[UiScale, ...] = tuple(UiScale)
 MIN_UNIQUE_COLOR_SAMPLES = 18
 MIN_LUMINANCE_SPREAD = 28
 MIN_NON_DARK_RATIO = 0.05
@@ -53,6 +55,19 @@ VISUAL_AUDIT_CONTACT_SHEET_PREFIX = "visual-audit-contact-sheet"
 MIN_CLICK_TARGET_WIDTH = 28
 MIN_CLICK_TARGET_HEIGHT = 24
 MIN_CLICK_TARGET_CLEARANCE = 8
+_BLOCKING_OVERLAY_SCENES = frozenset(
+    {
+        "run_help",
+        "run_outcome_overlay",
+        "run_pause",
+        "run_pause_settings",
+        "run_pending_feedback",
+        "run_picker_feedback",
+        "run_text_input",
+        "title_delete_confirmation",
+        "title_text_input",
+    }
+)
 
 _CONTROL_TARGET_LAYER_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("pause-control", frozenset({"pause_toggle", "pause_resume"})),
@@ -203,6 +218,8 @@ class VisualAuditCell:
     def minimum_non_dark_ratio(self) -> float:
         """Use a lower fill threshold for large presentation windows with intentional margins."""
 
+        if self.scene_key in _BLOCKING_OVERLAY_SCENES:
+            return 0.02
         if self.width >= 1280 and self.height >= 800:
             return 0.02
         return MIN_NON_DARK_RATIO
@@ -217,6 +234,7 @@ class VisualAuditReport:
     seed: int
     motion_mode: str
     cells: tuple[VisualAuditCell, ...]
+    ui_scale: str = UiScale.STANDARD.value
     output_dir: str | None = None
 
     @property
@@ -229,7 +247,7 @@ class VisualAuditReport:
     def baseline_signature(self) -> str:
         """Return a stable compact signature for the captured visual baseline."""
 
-        digest = 1
+        digest = zlib.adler32(f"ui-scale:{self.ui_scale}".encode("utf-8"))
         for cell in sorted(self.cells, key=lambda item: (item.scene_key, item.width, item.height)):
             payload = (
                 f"{cell.scene_key}:{cell.width}x{cell.height}:"
@@ -259,6 +277,7 @@ class VisualLayoutMatrixCell:
     click_target_count: int
     min_click_target_size: tuple[int, int]
     min_click_target_clearance: int
+    ui_scale: str = UiScale.STANDARD.value
     layout_violations: tuple[str, ...] = ()
     typography_violations: tuple[str, ...] = ()
     text_fit_count: int = 0
@@ -283,6 +302,7 @@ class VisualLayoutMatrixReport:
     sizes: tuple[tuple[int, int], ...]
     cells: tuple[VisualLayoutMatrixCell, ...]
     source_baselines: tuple[str, ...]
+    ui_scales: tuple[str, ...] = (UiScale.STANDARD.value,)
 
     @property
     def status(self) -> str:
@@ -328,44 +348,51 @@ def run_2d_layout_matrix_audit(
     seed: int,
     sizes: tuple[tuple[int, int], ...] = DEFAULT_VISUAL_AUDIT_SIZES,
     motion_modes: tuple[MotionMode | str, ...] = DEFAULT_LAYOUT_MATRIX_MOTION_MODES,
+    ui_scales: tuple[UiScale | str, ...] = DEFAULT_LAYOUT_MATRIX_UI_SCALES,
 ) -> VisualLayoutMatrixReport:
-    """Run visual audits across viewports and motion modes for layout QA."""
+    """Run visual audits across viewports, motion modes, and text scales for layout QA."""
 
     normalized_modes = tuple(normalize_motion_mode(mode) for mode in motion_modes)
+    normalized_scales = tuple(normalize_ui_scale(scale) for scale in ui_scales)
     cells: list[VisualLayoutMatrixCell] = []
     baselines: list[str] = []
     difficulty = "scenario"
 
     for motion_mode in normalized_modes:
-        visual_report = run_2d_visual_audit(
-            scenario_id=scenario_id,
-            difficulty_mode=difficulty_mode,
-            seed=seed,
-            sizes=sizes,
-            motion_mode=motion_mode,
-            output_dir=None,
-        )
-        difficulty = visual_report.difficulty
-        baselines.append(f"{motion_mode.value}:{visual_report.baseline_signature}")
-        for cell in visual_report.cells:
-            cells.append(
-                VisualLayoutMatrixCell(
-                    motion_mode=motion_mode.value,
-                    scene_key=cell.scene_key,
-                    width=cell.width,
-                    height=cell.height,
-                    status=cell.status,
-                    notes=cell.notes,
-                    click_target_count=cell.click_target_count,
-                    min_click_target_size=cell.min_click_target_size,
-                    min_click_target_clearance=cell.min_click_target_clearance,
-                    layout_violations=cell.layout_violations,
-                    typography_violations=cell.typography_violations,
-                    text_fit_count=cell.text_fit_count,
-                    wrapped_clamp_count=cell.wrapped_clamp_count,
-                    min_text_fit_ratio=cell.min_text_fit_ratio,
-                )
+        for ui_scale in normalized_scales:
+            visual_report = run_2d_visual_audit(
+                scenario_id=scenario_id,
+                difficulty_mode=difficulty_mode,
+                seed=seed,
+                sizes=sizes,
+                motion_mode=motion_mode,
+                ui_scale=ui_scale,
+                output_dir=None,
             )
+            difficulty = visual_report.difficulty
+            baselines.append(
+                f"{motion_mode.value}:{ui_scale.value}:{visual_report.baseline_signature}"
+            )
+            for cell in visual_report.cells:
+                cells.append(
+                    VisualLayoutMatrixCell(
+                        motion_mode=motion_mode.value,
+                        ui_scale=ui_scale.value,
+                        scene_key=cell.scene_key,
+                        width=cell.width,
+                        height=cell.height,
+                        status=cell.status,
+                        notes=cell.notes,
+                        click_target_count=cell.click_target_count,
+                        min_click_target_size=cell.min_click_target_size,
+                        min_click_target_clearance=cell.min_click_target_clearance,
+                        layout_violations=cell.layout_violations,
+                        typography_violations=cell.typography_violations,
+                        text_fit_count=cell.text_fit_count,
+                        wrapped_clamp_count=cell.wrapped_clamp_count,
+                        min_text_fit_ratio=cell.min_text_fit_ratio,
+                    )
+                )
 
     return VisualLayoutMatrixReport(
         scenario_id=scenario_id,
@@ -375,6 +402,7 @@ def run_2d_layout_matrix_audit(
         sizes=sizes,
         cells=tuple(cells),
         source_baselines=tuple(baselines),
+        ui_scales=tuple(scale.value for scale in normalized_scales),
     )
 
 
@@ -391,6 +419,7 @@ def write_2d_layout_matrix_report(report: VisualLayoutMatrixReport, output_path:
         f"- Difficulty: `{report.difficulty}`",
         f"- Seed: `{report.seed}`",
         f"- Motion modes: `{', '.join(report.motion_modes)}`",
+        f"- UI scales: `{', '.join(report.ui_scales)}`",
         f"- Viewports: `{viewport_labels}`",
         f"- Status: `{report.status}`",
         f"- Captures: `{len(report.cells)}` total, `{passed}` pass, "
@@ -405,9 +434,9 @@ def write_2d_layout_matrix_report(report: VisualLayoutMatrixReport, output_path:
         "This automated matrix guards responsive containment, target spacing, and text fitting. "
         "It does not replace visible-window playtest evidence.",
         "",
-        "| Motion | Scene | Viewport | Status | Targets | Min Target | Clearance | "
+        "| Motion | Scale | Scene | Viewport | Status | Targets | Min Target | Clearance | "
         "Text Fit | Clamp | Notes |",
-        "| --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | --- |",
+        "| --- | --- | --- | --- | --- | ---: | --- | ---: | ---: | ---: | --- |",
     ]
     for cell in report.cells:
         min_target = (
@@ -423,6 +452,7 @@ def write_2d_layout_matrix_report(report: VisualLayoutMatrixReport, output_path:
         lines.append(
             "| "
             f"`{cell.motion_mode}` | "
+            f"`{cell.ui_scale}` | "
             f"`{cell.scene_key}` | "
             f"`{cell.viewport}` | "
             f"`{cell.status}` | "
@@ -461,11 +491,13 @@ def run_2d_visual_audit(
     seed: int,
     sizes: tuple[tuple[int, int], ...] = DEFAULT_VISUAL_AUDIT_SIZES,
     motion_mode: MotionMode | str = MotionMode.FULL,
+    ui_scale: UiScale | str = UiScale.STANDARD,
     output_dir: Path | None = None,
 ) -> VisualAuditReport:
     """Render deterministic 2D scene snapshots and verify expected motion layers."""
 
     motion_mode = normalize_motion_mode(motion_mode)
+    ui_scale = normalize_ui_scale(ui_scale)
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     try:
@@ -498,7 +530,12 @@ def run_2d_visual_audit(
                 surface = pygame.display.set_mode((width, height), pygame.HIDDEN)
                 fonts = create_fonts(
                     pygame,
+                    ui_scale,
                     viewport_size=(width, height),
+                )
+                preferences = FrontendPreferences(
+                    ui_scale=ui_scale,
+                    motion_mode=motion_mode,
                 )
                 title_menu = TitleScene(
                     pygame=pygame,
@@ -592,6 +629,121 @@ def run_2d_visual_audit(
                                 "title-actor",
                                 "archive-comparison",
                             ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                title_layers = (
+                    "transition",
+                    "motion-pulses",
+                    "actor-timeline",
+                    "sprite-clips",
+                    "title-actor",
+                )
+                for mode_index, mode in enumerate(("slots", "archives", "wizard", "settings")):
+                    title_scene = TitleScene(
+                        pygame=pygame,
+                        fonts=fonts,
+                        state=create_new_game("NEXUS TECH", "Nexus One"),
+                        rng=RandomSource(seed=seed + 20 + mode_index),
+                        slot_name="visual-audit",
+                        save_callback=lambda *_args: None,
+                        coordinator=coordinator,
+                        initial_mode=mode,
+                        motion_mode=motion_mode,
+                        preferences=preferences,
+                        entry_transition="boot_title",
+                    )
+                    cells.append(
+                        _capture_visual_cell(
+                            pygame,
+                            surface,
+                            title_scene,
+                            scene_key=f"title_{mode}",
+                            expected_layers=_expected_layers(
+                                (*title_layers, f"title-mode:{mode}"),
+                                motion_mode=motion_mode,
+                            ),
+                            output_dir=output_dir,
+                        )
+                    )
+
+                coordinator.save_game(
+                    "visual-audit-slot",
+                    state.model_copy(deep=True),
+                    RandomSource(seed=seed + 24),
+                )
+                title_slot_detail = TitleScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=create_new_game("NEXUS TECH", "Nexus One"),
+                    rng=RandomSource(seed=seed + 25),
+                    slot_name="visual-audit-slot",
+                    save_callback=lambda *_args: None,
+                    coordinator=coordinator,
+                    initial_mode="slots",
+                    motion_mode=motion_mode,
+                    entry_transition="boot_title",
+                )
+                title_slot_detail._selected_slot_name = "visual-audit-slot"
+                title_slot_detail._set_mode("slot_detail")
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        title_slot_detail,
+                        scene_key="title_slot_detail",
+                        expected_layers=_expected_layers(
+                            (*title_layers, "title-mode:slot_detail"),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                title_slot_detail._set_confirm_delete_slot_name("visual-audit-slot")
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        title_slot_detail,
+                        scene_key="title_delete_confirmation",
+                        expected_layers=_expected_layers(
+                            (
+                                *title_layers,
+                                "title-mode:slot_detail",
+                                "delete-confirmation",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                title_text_input = TitleScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=create_new_game("NEXUS TECH", "Nexus One"),
+                    rng=RandomSource(seed=seed + 26),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    coordinator=coordinator,
+                    initial_mode="wizard",
+                    motion_mode=motion_mode,
+                    preferences=preferences,
+                    entry_transition="boot_title",
+                )
+                title_text_input._open_wizard_text_modal("company")
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        title_text_input,
+                        scene_key="title_text_input",
+                        expected_layers=_expected_layers(
+                            (*title_layers, "title-mode:wizard", "text-input"),
                             motion_mode=motion_mode,
                         ),
                         output_dir=output_dir,
@@ -805,7 +957,6 @@ def run_2d_visual_audit(
                                 "transition",
                                 "motion-pulses",
                                 "overlay-transition",
-                                "deep-panel",
                                 "picker",
                                 "action-feedback",
                                 "late-game-choreography",
@@ -825,6 +976,7 @@ def run_2d_visual_audit(
                     save_callback=lambda *_args: None,
                     show_ready_event=False,
                     motion_mode=motion_mode,
+                    preferences=preferences,
                     entry_transition="boot_run",
                 )
                 inspector_scene._set_deep_panel("pipeline")
@@ -840,7 +992,6 @@ def run_2d_visual_audit(
                                 "transition",
                                 "motion-pulses",
                                 "overlay-transition",
-                                "deep-panel",
                                 "inspector",
                                 "action-feedback",
                                 "actor-timeline",
@@ -852,6 +1003,97 @@ def run_2d_visual_audit(
                         output_dir=output_dir,
                     )
                 )
+
+                for panel_index, panel_key in enumerate(
+                    (
+                        "team",
+                        "finance",
+                        "customers",
+                        "partnerships",
+                        "board",
+                        "pipeline",
+                        "report",
+                    )
+                ):
+                    panel_scene = RunScene(
+                        pygame=pygame,
+                        fonts=fonts,
+                        state=state.model_copy(deep=True),
+                        rng=RandomSource(seed=seed + 40 + panel_index),
+                        slot_name="visual-audit",
+                        save_callback=lambda *_args: None,
+                        show_ready_event=False,
+                        motion_mode=motion_mode,
+                        preferences=preferences,
+                        entry_transition="boot_run",
+                    )
+                    panel_scene._set_deep_panel(panel_key)
+                    cells.append(
+                        _capture_visual_cell(
+                            pygame,
+                            surface,
+                            panel_scene,
+                            scene_key=f"run_panel_{panel_key}",
+                            expected_layers=_expected_layers(
+                                (
+                                    "transition",
+                                    "motion-pulses",
+                                    "overlay-transition",
+                                    "deep-panel",
+                                ),
+                                motion_mode=motion_mode,
+                            ),
+                            output_dir=output_dir,
+                        )
+                    )
+
+                for inspector_index, panel_key in enumerate(
+                    (
+                        "team",
+                        "finance",
+                        "customers",
+                        "partnerships",
+                        "board",
+                        "report",
+                        "endgame",
+                    )
+                ):
+                    panel_inspector_scene = RunScene(
+                        pygame=pygame,
+                        fonts=fonts,
+                        state=state.model_copy(deep=True),
+                        rng=RandomSource(seed=seed + 50 + inspector_index),
+                        slot_name="visual-audit",
+                        save_callback=lambda *_args: None,
+                        show_ready_event=False,
+                        motion_mode=motion_mode,
+                        preferences=preferences,
+                        entry_transition="boot_run",
+                    )
+                    panel_inspector_scene._set_deep_panel(panel_key)
+                    panel_inspector_scene._open_inspector(panel_key)
+                    cells.append(
+                        _capture_visual_cell(
+                            pygame,
+                            surface,
+                            panel_inspector_scene,
+                            scene_key=f"run_inspector_{panel_key}",
+                            expected_layers=_expected_layers(
+                                (
+                                    "transition",
+                                    "motion-pulses",
+                                    "overlay-transition",
+                                    "inspector",
+                                    "action-feedback",
+                                    "actor-timeline",
+                                    "sprite-clips",
+                                    "inspector-actor",
+                                ),
+                                motion_mode=motion_mode,
+                            ),
+                            output_dir=output_dir,
+                        )
+                    )
 
                 help_scene = RunScene(
                     pygame=pygame,
@@ -908,6 +1150,70 @@ def run_2d_visual_audit(
                                 "motion-pulses",
                                 "overlay-transition",
                                 "pause",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                pause_settings_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 27),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    preferences=preferences,
+                    entry_transition="boot_run",
+                )
+                pause_settings_scene._set_pause_overlay_visible(True)
+                pause_settings_scene._set_pause_settings_visible(True)
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        pause_settings_scene,
+                        scene_key="run_pause_settings",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "pause-settings",
+                            ),
+                            motion_mode=motion_mode,
+                        ),
+                        output_dir=output_dir,
+                    )
+                )
+
+                text_input_scene = RunScene(
+                    pygame=pygame,
+                    fonts=fonts,
+                    state=state.model_copy(deep=True),
+                    rng=RandomSource(seed=seed + 28),
+                    slot_name="visual-audit",
+                    save_callback=lambda *_args: None,
+                    show_ready_event=False,
+                    motion_mode=motion_mode,
+                    entry_transition="boot_run",
+                )
+                text_input_scene._open_create_product_modal()
+                cells.append(
+                    _capture_visual_cell(
+                        pygame,
+                        surface,
+                        text_input_scene,
+                        scene_key="run_text_input",
+                        expected_layers=_expected_layers(
+                            (
+                                "transition",
+                                "motion-pulses",
+                                "overlay-transition",
+                                "text-input",
                             ),
                             motion_mode=motion_mode,
                         ),
@@ -1066,6 +1372,7 @@ def run_2d_visual_audit(
             seed=seed,
             motion_mode=motion_mode.value,
             cells=tuple(cells),
+            ui_scale=ui_scale.value,
             output_dir=output_dir_text,
         )
         if output_dir is not None:
@@ -1329,6 +1636,7 @@ def _write_visual_audit_summary(report: VisualAuditReport, output_dir: Path) -> 
         f"- Difficulty: `{report.difficulty}`",
         f"- Seed: `{report.seed}`",
         f"- Motion mode: `{report.motion_mode}`",
+        f"- UI scale: `{report.ui_scale}`",
         f"- Status: `{report.status}`",
         f"- Baseline: `{report.baseline_signature}`",
         f"- Captures: `{len(report.cells)}` total, `{passed}` pass, `{failed}` fail",
@@ -1385,7 +1693,7 @@ def _write_visual_audit_contact_sheets(pygame, report: VisualAuditReport, output
         title_font = pygame.font.Font(None, 26)
         label_font = pygame.font.Font(None, 18)
         title = title_font.render(
-            f"NEXUS TECH visual QA | {width}x{height} | {report.motion_mode}",
+            (f"NEXUS TECH visual QA | {width}x{height} | {report.motion_mode} | {report.ui_scale}"),
             True,
             (222, 231, 241),
         )
@@ -1427,23 +1735,20 @@ def _active_layers(scene) -> tuple[str, ...]:
     motion_bank = getattr(scene, "_motion_pulses", None)
     if motion_bank is not None and motion_bank.live_count() > 0:
         layers.append("motion-pulses")
-    if getattr(scene, "_deep_panel_key", None) is not None:
-        layers.append("deep-panel")
-    if getattr(scene, "_context_picker", None) is not None:
-        layers.append("picker")
-    if getattr(getattr(scene, "state", None), "pending_event", None) is not None:
-        layers.append("pending")
-    scene_state = getattr(scene, "state", None)
-    if scene_state is not None and (scene_state.company.game_over or scene_state.victory_achieved):
-        layers.append("outcome")
-    if getattr(scene, "_inspector_panel_key", None) is not None:
-        layers.append("inspector")
-    if getattr(scene, "_help_overlay_visible", False):
-        layers.append("help")
-    if getattr(scene, "_pause_overlay_visible", False):
-        layers.append("pause")
-    if getattr(scene, "_pause_settings_visible", False):
-        layers.append("pause-settings")
+    visible_overlay = getattr(scene, "visible_overlay_key", lambda: None)()
+    overlay_layer = {
+        "panel": "deep-panel",
+        "pause_settings": "pause-settings",
+        "text_input": "text-input",
+    }.get(visible_overlay, visible_overlay)
+    if overlay_layer is not None:
+        layers.append(overlay_layer)
+    if scene.__class__.__name__ == "TitleScene":
+        layers.append(f"title-mode:{getattr(scene, '_mode', 'unknown')}")
+        if getattr(scene, "_confirm_delete_slot_name", None) is not None:
+            layers.append("delete-confirmation")
+        elif getattr(scene, "_text_input", None) is not None:
+            layers.append("text-input")
     if getattr(scene, "_action_feedback_cues", ()):
         layers.append("action-feedback")
         if any(cue.targets for cue in scene._action_feedback_cues):

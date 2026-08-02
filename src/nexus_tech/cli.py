@@ -146,6 +146,11 @@ from nexus_tech.frontend_2d import (
     write_2d_animation_playtest_ui_triage_plan,
     write_2d_layout_matrix_report,
 )
+from nexus_tech.frontend_2d.layout import (
+    MIN_FRONTEND_HEIGHT,
+    MIN_FRONTEND_WIDTH,
+    frontend_viewport_is_supported,
+)
 from nexus_tech.persistence.errors import PersistenceError
 from nexus_tech.persistence.save_coordinator import (
     DEFAULT_SAVE_SLOT,
@@ -763,6 +768,14 @@ LAYOUT_MATRIX_MOTION_MODE_OPTION = typer.Option(
         "omit to run full, reduced, and off."
     ),
 )
+LAYOUT_MATRIX_UI_SCALE_OPTION = typer.Option(
+    None,
+    "--ui-scale",
+    help=(
+        "Optional 2D layout-matrix text scale. Repeat to audit a focused subset; "
+        "omit to run compact, standard, and large."
+    ),
+)
 ANIMATION_MATRIX_SEED_OPTION = typer.Option(
     None,
     "--seed",
@@ -1263,8 +1276,11 @@ def parse_2d_window_size(value: str) -> tuple[int, int]:
     if len(parts) != 2 or not all(part.isdigit() for part in parts):
         raise ValueError("Use WIDTHxHEIGHT, for example 820x620.")
     width, height = (int(parts[0]), int(parts[1]))
-    if width < 640 or height < 480:
-        raise ValueError("2D window size must be at least 640x480.")
+    if not frontend_viewport_is_supported((width, height)):
+        raise ValueError(
+            f"2D window size must be at least {MIN_FRONTEND_WIDTH}x{MIN_FRONTEND_HEIGHT} "
+            "to keep text and controls separated."
+        )
     return (width, height)
 
 
@@ -1833,6 +1849,7 @@ def audit_2d_visual_command(
         help="Seed for deterministic 2D visual audit setup.",
     ),
     motion_mode: MotionMode = MOTION_MODE_2D_OPTION,
+    ui_scale: UiScale = UI_SCALE_2D_OPTION,
     output_dir: Path | None = VISUAL_AUDIT_OUTPUT_DIR_OPTION,
     viewport: list[str] | None = VISUAL_AUDIT_VIEWPORT_OPTION,
 ) -> None:
@@ -1845,6 +1862,7 @@ def audit_2d_visual_command(
             difficulty_mode=difficulty,
             seed=seed,
             motion_mode=motion_mode,
+            ui_scale=ui_scale,
             output_dir=output_dir,
         )
         if sizes is not None:
@@ -1864,7 +1882,7 @@ def audit_2d_visual_command(
         title=(
             "2D Visual Audit | "
             f"{report.scenario_id} | {report.difficulty} | "
-            f"seed {report.seed} | motion {report.motion_mode}"
+            f"seed {report.seed} | motion {report.motion_mode} | scale {report.ui_scale}"
         )
     )
     table.add_column("Scene", style="cyan")
@@ -1927,11 +1945,13 @@ def audit_2d_layout_matrix_command(
     output: Path = LAYOUT_MATRIX_OUTPUT_OPTION,
     viewport: list[str] | None = VISUAL_AUDIT_VIEWPORT_OPTION,
     motion_mode: list[MotionMode] | None = LAYOUT_MATRIX_MOTION_MODE_OPTION,
+    ui_scale: list[UiScale] | None = LAYOUT_MATRIX_UI_SCALE_OPTION,
 ) -> None:
-    """Audit responsive 2D layout safety across viewports and motion modes."""
+    """Audit responsive 2D layout safety across viewports, motion, and text scales."""
 
     sizes = resolve_2d_visual_audit_viewports(viewport)
     motion_modes = tuple(motion_mode) if motion_mode else DEFAULT_LAYOUT_MATRIX_MOTION_MODES
+    ui_scales = tuple(ui_scale) if ui_scale else None
     try:
         audit_kwargs = dict(
             scenario_id=scenario,
@@ -1939,6 +1959,8 @@ def audit_2d_layout_matrix_command(
             seed=seed,
             motion_modes=motion_modes,
         )
+        if ui_scales is not None:
+            audit_kwargs["ui_scales"] = ui_scales
         if sizes is not None:
             audit_kwargs["sizes"] = sizes
         report = run_2d_layout_matrix_audit(**audit_kwargs)
@@ -1960,6 +1982,7 @@ def audit_2d_layout_matrix_command(
         )
     )
     table.add_column("Motion", style="cyan")
+    table.add_column("Scale", style="green")
     table.add_column("Scene")
     table.add_column("Viewport", justify="right")
     table.add_column("Targets", justify="right")
@@ -1976,6 +1999,7 @@ def audit_2d_layout_matrix_command(
         )
         table.add_row(
             cell.motion_mode,
+            cell.ui_scale,
             cell.scene_key,
             cell.viewport,
             str(cell.click_target_count),

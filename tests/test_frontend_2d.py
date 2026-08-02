@@ -146,7 +146,13 @@ from nexus_tech.frontend_2d.focus_presentation import (
     resolve_footer_grid_columns,
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
-from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
+from nexus_tech.frontend_2d.layout import (
+    MIN_FRONTEND_VIEWPORT,
+    build_frame_layout,
+    clamp_frontend_viewport_size,
+    frontend_viewport_is_supported,
+    resolve_layout_profile,
+)
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.pause_presentation import build_pause_menu_presentation
@@ -752,6 +758,15 @@ def test_shared_frame_layout_reserves_non_overlapping_regions(
     assert frame.footer.top + frame.footer.height <= height - profile.margin
 
 
+def test_frontend_viewport_contract_clamps_sizes_that_collapse_scene_lanes() -> None:
+    assert MIN_FRONTEND_VIEWPORT == (820, 620)
+    assert not frontend_viewport_is_supported((640, 480))
+    assert frontend_viewport_is_supported(MIN_FRONTEND_VIEWPORT)
+    assert clamp_frontend_viewport_size((640, 900)) == (820, 900)
+    assert clamp_frontend_viewport_size((1200, 480)) == (1200, 620)
+    assert clamp_frontend_viewport_size((1440, 900)) == (1440, 900)
+
+
 @pytest.mark.parametrize("size", [(1280, 720), (1440, 900)])
 def test_run_header_reserves_space_between_lens_and_snapshot_rows(
     size: tuple[int, int],
@@ -964,8 +979,9 @@ def test_2d_visual_hierarchy_quiets_containers_and_isolates_blocking_overlays() 
     assert compact_card.headline_role == "small"
     assert spacious_card.headline_role == "heading"
     assert spacious_card.detail_role == "body"
-    assert resolve_overlay_backdrop_alpha("inspector", base_alpha=180) >= 232
-    assert resolve_overlay_backdrop_alpha("panel", base_alpha=180) >= 228
+    assert resolve_overlay_backdrop_alpha("inspector", base_alpha=180) >= 250
+    assert resolve_overlay_backdrop_alpha("panel", base_alpha=180) >= 248
+    assert resolve_overlay_backdrop_alpha("pause", base_alpha=180) >= 250
     assert resolve_overlay_backdrop_alpha("pending", base_alpha=180) < (
         resolve_overlay_backdrop_alpha("inspector", base_alpha=180)
     )
@@ -1049,6 +1065,7 @@ def test_actor_caption_keeps_role_readable_before_lane_detail() -> None:
 
         assert caption == "Strategy"
         assert fonts.small.size(caption)[0] <= 82
+        assert scenes_module._fit_actor_caption(fonts.small, clip, 8) == ""
     finally:
         pygame.quit()
 
@@ -1078,6 +1095,30 @@ def test_2d_widget_wrapping_and_buttons_stay_inside_compact_rects() -> None:
         )
 
         assert consumed == 16
+    finally:
+        pygame.quit()
+
+
+def test_button_detail_policy_uses_complete_compact_copy_or_hides_detail() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        compact = widgets_module._resolve_button_detail_copy(
+            fonts.small,
+            "This helper sentence is intentionally too long for a compact action card.",
+            "Open details.",
+            max_width=92,
+            max_lines=1,
+        )
+        hidden = widgets_module._resolve_button_detail_copy(
+            fonts.small,
+            "This helper sentence is intentionally too long for a compact action card.",
+            "Partial helper...",
+            max_width=92,
+            max_lines=1,
+        )
+
+        assert compact == "Open details."
+        assert hidden == ""
     finally:
         pygame.quit()
 
@@ -2393,6 +2434,33 @@ def test_run_scene_endgame_panel_action_tooltip_mentions_handoff_destination() -
         pygame.quit()
 
 
+def test_run_scene_panel_action_tooltip_keeps_full_helper_copy() -> None:
+    pygame, fonts, surface = _build_pygame_bundle()
+    try:
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=31),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+        )
+        scene._set_deep_panel("team")
+        panel = scene.deep_panel
+        assert panel is not None
+        action = next(entry for entry in panel.actions if entry.label == "Reorg")
+
+        hint = scene._describe_click_target(
+            ClickTarget("panel_action", action.command, surface.get_rect())
+        )
+
+        assert action.detail in hint
+        assert "..." not in hint
+    finally:
+        pygame.quit()
+
+
 def test_run_scene_endgame_panel_reveals_advanced_actions_by_mouse_and_keyboard() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -2506,7 +2574,7 @@ def test_game_view_model_uses_compact_score_label() -> None:
     assert "(" in view_model.score_label
 
 
-def test_run_scene_overlay_button_detail_compacts_long_copy() -> None:
+def test_run_scene_panel_button_detail_preserves_full_copy_for_adaptive_rendering() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
         state = create_new_game("NEXUS TECH", "Nexus One")
@@ -2520,13 +2588,15 @@ def test_run_scene_overlay_button_detail_compacts_long_copy() -> None:
             show_ready_event=False,
         )
 
-        detail = scene._overlay_button_detail(
+        source_detail = "Refresh reserve, debt, and capital posture for the whole company."
+        detail = scene._button_detail(
             TurnAction.REVIEW_FINANCE.value,
-            "Refresh reserve, debt, and capital posture for the whole company.",
+            source_detail,
             enabled=True,
         )
 
-        assert len(detail) <= 32
+        assert detail == source_detail
+        assert "..." not in detail
     finally:
         pygame.quit()
 
@@ -4042,6 +4112,45 @@ def test_compact_inspector_separates_sections_close_and_top_lane() -> None:
         pygame.quit()
 
 
+def test_compact_report_inspector_keeps_every_section_inside_navigation() -> None:
+    pygame, _fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=create_fonts(
+                pygame,
+                UiScale.LARGE,
+                viewport_size=(820, 620),
+            ),
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=147),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.FULL,
+        )
+        scene._set_deep_panel("report")
+        scene._open_inspector("report")
+
+        start_typography_audit()
+        scene.draw(surface)
+        typography_events = finish_typography_audit()
+
+        section_targets = [
+            target for target in scene._click_targets if target.kind == "inspector_section"
+        ]
+        assert len(section_targets) == 6
+        assert all(target.rect.height >= 24 for target in section_targets)
+        assert all(target.rect.bottom <= surface.get_height() for target in section_targets)
+        assert not [event for event in typography_events if event.severe]
+        violations, *_metrics = visual_audit_module._layout_safety_metrics(scene, 820, 620)
+        assert violations == ()
+    finally:
+        finish_typography_audit()
+        pygame.quit()
+
+
 def test_compact_help_overlay_keeps_title_below_navigation() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -4248,6 +4357,41 @@ def test_picker_feedback_cues_do_not_cover_nav_or_modal_controls() -> None:
         assert scene.layout_safety_violations() == ()
         violations, *_metrics = visual_audit_module._layout_safety_metrics(scene, 820, 620)
         assert violations == ()
+    finally:
+        pygame.quit()
+
+
+def test_blocking_overlay_z_order_shows_picker_and_prevents_workspace_click_through() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        surface = pygame.display.set_mode((820, 620), pygame.HIDDEN)
+        scene = RunScene(
+            pygame=pygame,
+            fonts=fonts,
+            state=create_new_game("NEXUS TECH", "Nexus One"),
+            rng=RandomSource(seed=299),
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            show_ready_event=False,
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene._run_command(TurnAction.SET_CAPITAL_PLAN.value)
+        assert scene._deep_panel_key == "finance"
+        assert scene._context_picker is not None
+        assert scene.visible_overlay_key() == "picker"
+
+        scene.draw(surface)
+        target_kinds = {target.kind for target in scene._click_targets}
+
+        assert {"picker_option", "close_picker"} <= target_kinds
+        assert {"panel_action", "open_panel_inspector", "close_panel"}.isdisjoint(target_kinds)
+        assert scene.layout_safety_violations() == ()
+
+        scene._set_pause_overlay_visible(True)
+        assert scene.visible_overlay_key() == "pause"
+        scene.draw(surface)
+        assert all(target.kind.startswith("pause_") for target in scene._click_targets)
     finally:
         pygame.quit()
 
@@ -5340,12 +5484,20 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
 
     assert report.status == "pass"
     assert report.motion_mode == MotionMode.FULL.value
+    assert report.ui_scale == UiScale.STANDARD.value
     assert report.output_dir == str(tmp_path)
     scene_keys = {cell.scene_key for cell in report.cells}
     assert {
         "title_menu",
         "title_quick_start",
         "title_meta",
+        "title_slots",
+        "title_archives",
+        "title_wizard",
+        "title_settings",
+        "title_slot_detail",
+        "title_delete_confirmation",
+        "title_text_input",
         "run_dashboard",
         "run_drama_feedback",
         "run_pending_feedback",
@@ -5353,8 +5505,24 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         "run_blocked_feedback",
         "run_picker_feedback",
         "run_inspector",
+        "run_panel_team",
+        "run_panel_finance",
+        "run_panel_customers",
+        "run_panel_partnerships",
+        "run_panel_board",
+        "run_panel_pipeline",
+        "run_panel_report",
+        "run_inspector_team",
+        "run_inspector_finance",
+        "run_inspector_customers",
+        "run_inspector_partnerships",
+        "run_inspector_board",
+        "run_inspector_report",
+        "run_inspector_endgame",
         "run_help",
         "run_pause",
+        "run_pause_settings",
+        "run_text_input",
         "run_endgame_board",
         "run_outcome_overlay",
         "turn_summary",
@@ -5373,6 +5541,7 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
         cell.min_click_target_clearance >= MIN_CLICK_TARGET_CLEARANCE for cell in report.cells
     )
     assert all(cell.typography_violations == () for cell in report.cells)
+    assert all(cell.wrapped_clamp_count == 0 for cell in report.cells)
     assert all(0.0 <= cell.min_text_fit_ratio <= 1.0 for cell in report.cells)
     assert all(Path(cell.output_path or "").exists() for cell in report.cells)
     summary_path = tmp_path / VISUAL_AUDIT_SUMMARY_NAME
@@ -5522,7 +5691,7 @@ def test_title_visual_contrast_holds_across_responsive_breakpoints() -> None:
     title_cells = [cell for cell in report.cells if cell.scene_key.startswith("title_")]
 
     assert report.status == "pass"
-    assert len(title_cells) == 6
+    assert len(title_cells) == 20
     assert all(cell.status == "pass" for cell in title_cells)
     assert all(cell.non_dark_ratio >= cell.minimum_non_dark_ratio for cell in title_cells)
 
@@ -5655,7 +5824,7 @@ def test_run_2d_animation_audit_reports_required_and_advisory_layers() -> None:
     )
 
     assert report.status == "pass"
-    assert report.visual_report.baseline_signature.startswith("16:")
+    assert report.visual_report.baseline_signature.startswith("39:")
     areas = {cell.area: cell for cell in report.cells}
     assert areas["Title/Menu Actors"].status == "pass"
     assert "title-actor" in areas["Title/Menu Actors"].active_layers
@@ -7428,6 +7597,7 @@ def test_audit_2d_visual_command_reports_scene_matrix(monkeypatch, tmp_path: Pat
             difficulty="scenario",
             seed=kwargs["seed"],
             motion_mode=kwargs["motion_mode"].value,
+            ui_scale=kwargs["ui_scale"].value,
             output_dir=str(kwargs["output_dir"]),
             cells=(
                 VisualAuditCell(
@@ -7457,6 +7627,8 @@ def test_audit_2d_visual_command_reports_scene_matrix(monkeypatch, tmp_path: Pat
             "7",
             "--motion-mode",
             "reduced",
+            "--ui-scale",
+            "large",
             "--output-dir",
             str(tmp_path),
         ],
@@ -7469,6 +7641,7 @@ def test_audit_2d_visual_command_reports_scene_matrix(monkeypatch, tmp_path: Pat
     assert calls["scenario_id"] == "founder_journey"
     assert calls["seed"] == 7
     assert calls["motion_mode"] is MotionMode.REDUCED
+    assert calls["ui_scale"] is UiScale.LARGE
     assert calls["output_dir"] == tmp_path
 
 
@@ -7482,6 +7655,7 @@ def test_audit_2d_visual_command_accepts_focused_viewports(monkeypatch) -> None:
             difficulty="scenario",
             seed=kwargs["seed"],
             motion_mode=kwargs["motion_mode"].value,
+            ui_scale=kwargs["ui_scale"].value,
             cells=(),
         )
 
@@ -7516,16 +7690,19 @@ def test_audit_2d_visual_command_rejects_invalid_focused_viewport(monkeypatch) -
     assert "Use WIDTHxHEIGHT" in result.output
 
 
-def test_run_2d_layout_matrix_audit_aggregates_motion_modes(monkeypatch) -> None:
-    calls: list[tuple[MotionMode, tuple[tuple[int, int], ...]]] = []
+def test_run_2d_layout_matrix_audit_aggregates_motion_modes_and_ui_scales(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[MotionMode, UiScale, tuple[tuple[int, int], ...]]] = []
 
     def fake_run_2d_visual_audit(**kwargs):
-        calls.append((kwargs["motion_mode"], kwargs["sizes"]))
+        calls.append((kwargs["motion_mode"], kwargs["ui_scale"], kwargs["sizes"]))
         return VisualAuditReport(
             scenario_id=kwargs["scenario_id"],
             difficulty="scenario",
             seed=kwargs["seed"],
             motion_mode=kwargs["motion_mode"].value,
+            ui_scale=kwargs["ui_scale"].value,
             cells=(
                 VisualAuditCell(
                     scene_key="run_dashboard",
@@ -7554,18 +7731,22 @@ def test_run_2d_layout_matrix_audit_aggregates_motion_modes(monkeypatch) -> None
         seed=7,
         sizes=((820, 620),),
         motion_modes=(MotionMode.FULL, MotionMode.OFF),
+        ui_scales=(UiScale.COMPACT, UiScale.LARGE),
     )
 
     assert report.status == "pass"
     assert report.motion_modes == ("full", "off")
+    assert report.ui_scales == ("compact", "large")
     assert calls == [
-        (MotionMode.FULL, ((820, 620),)),
-        (MotionMode.OFF, ((820, 620),)),
+        (MotionMode.FULL, UiScale.COMPACT, ((820, 620),)),
+        (MotionMode.FULL, UiScale.LARGE, ((820, 620),)),
+        (MotionMode.OFF, UiScale.COMPACT, ((820, 620),)),
+        (MotionMode.OFF, UiScale.LARGE, ((820, 620),)),
     ]
-    assert len(report.cells) == 2
+    assert len(report.cells) == 4
     assert report.minimum_text_fit_ratio == 0.88
     assert report.minimum_click_target_clearance == 12
-    assert report.source_baselines[0].startswith("full:")
+    assert report.source_baselines[0].startswith("full:compact:")
 
 
 def test_write_2d_layout_matrix_report_flags_manual_followup(tmp_path: Path) -> None:
@@ -7617,6 +7798,7 @@ def test_audit_2d_layout_matrix_command_writes_report(monkeypatch, tmp_path: Pat
             difficulty="scenario",
             seed=kwargs["seed"],
             motion_modes=tuple(mode.value for mode in kwargs["motion_modes"]),
+            ui_scales=tuple(scale.value for scale in kwargs["ui_scales"]),
             sizes=kwargs["sizes"],
             source_baselines=("reduced:1:abc123", "off:1:def456"),
             cells=(
@@ -7653,6 +7835,10 @@ def test_audit_2d_layout_matrix_command_writes_report(monkeypatch, tmp_path: Pat
             "reduced",
             "--motion-mode",
             "off",
+            "--ui-scale",
+            "compact",
+            "--ui-scale",
+            "large",
             "--output",
             str(output_path),
         ],
@@ -7663,6 +7849,7 @@ def test_audit_2d_layout_matrix_command_writes_report(monkeypatch, tmp_path: Pat
     assert "Layout matrix status: PASS" in result.output
     assert calls["sizes"] == ((820, 620),)
     assert calls["motion_modes"] == (MotionMode.REDUCED, MotionMode.OFF)
+    assert calls["ui_scales"] == (UiScale.COMPACT, UiScale.LARGE)
     assert output_path.exists()
     assert "NEXUS TECH 2D Layout Matrix" in output_path.read_text(encoding="utf-8")
 
@@ -12372,6 +12559,20 @@ def test_play_2d_command_rejects_invalid_window_size(monkeypatch) -> None:
     assert "Invalid 2D Window Size" in result.output
     assert "Use WIDTHxHEIGHT" in result.output
     assert called is False
+
+
+def test_play_2d_command_rejects_viewport_below_safe_layout_contract(monkeypatch) -> None:
+    monkeypatch.setattr(
+        cli_module,
+        "start_new_game_2d",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("frontend should not launch")),
+    )
+
+    result = runner.invoke(app, ["play-2d", "--window-size", "640x480"])
+
+    assert result.exit_code == 1
+    assert "at least 820x620" in result.output
+    assert "keep text and controls separated" in result.output
 
 
 def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:

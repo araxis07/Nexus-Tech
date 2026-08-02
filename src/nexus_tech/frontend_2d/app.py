@@ -9,6 +9,7 @@ from typing import Callable
 
 from nexus_tech.domain.models import GameState
 from nexus_tech.frontend_2d.accessibility import ContrastMode, UiScale
+from nexus_tech.frontend_2d.layout import clamp_frontend_viewport_size
 from nexus_tech.frontend_2d.tween import MotionMode
 from nexus_tech.persistence.save_coordinator import SaveLoadCoordinator
 from nexus_tech.simulation.engine import create_new_game
@@ -68,6 +69,7 @@ def launch_2d_frontend(
     try:
         pygame.init()
         pygame.font.init()
+        window_size = clamp_frontend_viewport_size(window_size)
         flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
         surface = pygame.display.set_mode(window_size, flags)
         pygame.display.set_caption(f"NEXUS TECH 2D | {state.company.name}")
@@ -157,6 +159,7 @@ def launch_2d_menu(
     try:
         pygame.init()
         pygame.font.init()
+        window_size = clamp_frontend_viewport_size(window_size)
         flags = pygame.RESIZABLE | (pygame.HIDDEN if headless else 0)
         surface = pygame.display.set_mode(window_size, flags)
         pygame.display.set_caption("NEXUS TECH 2D | Menu")
@@ -287,9 +290,10 @@ def _run_frontend_loop(
             dt = clock.tick(60) / 1000
             for event in pygame.event.get():
                 if event.type == pygame.VIDEORESIZE:
-                    surface = pygame.display.set_mode(event.size, flags)
+                    safe_size = clamp_frontend_viewport_size(event.size)
+                    surface = pygame.display.set_mode(safe_size, flags)
                     if resize_fonts is not None:
-                        scene.fonts = resize_fonts(event.size)
+                        scene.fonts = resize_fonts(safe_size)
                     continue
                 scene.handle_event(event)
             scene.update(dt)

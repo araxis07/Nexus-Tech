@@ -87,7 +87,7 @@ def build_title_menu_presentation(
         )
         new_game_action = TitleActionPresentation(
             title="2 New Guided Game",
-            detail="Set up another campaign with guided opening steps.",
+            detail="Set up another guided campaign.",
             payload="new_wizard",
             tone="info",
         )
@@ -104,7 +104,7 @@ def build_title_menu_presentation(
         )
         new_game_action = TitleActionPresentation(
             title="2 Start Guided Game",
-            detail="Best first step: setup, coach prompts, and a safe opening.",
+            detail="Setup, coach prompts, and a safe opening.",
             payload="new_wizard",
             tone="success",
         )
@@ -117,7 +117,7 @@ def build_title_menu_presentation(
         secondary_actions=(
             TitleActionPresentation(
                 "3 Learn to Play",
-                "Five short lessons; mouse-friendly and always available.",
+                "Five beginner lessons and essential controls.",
                 "guide",
                 "info",
             ),
@@ -135,7 +135,7 @@ def build_title_menu_presentation(
             ),
             TitleActionPresentation(
                 "6 Progress",
-                f"First archive {safe_progress}; routes and rewards.",
+                f"First archive {safe_progress}; unlock routes.",
                 "meta",
                 "selection",
             ),

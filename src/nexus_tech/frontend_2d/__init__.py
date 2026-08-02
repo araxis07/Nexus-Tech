@@ -143,6 +143,7 @@ from nexus_tech.frontend_2d.motion_audit import (
 from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.frontend_2d.visual_audit import (
     DEFAULT_LAYOUT_MATRIX_MOTION_MODES,
+    DEFAULT_LAYOUT_MATRIX_UI_SCALES,
     DEFAULT_VISUAL_AUDIT_SIZES,
     VisualAuditCell,
     VisualAuditReport,
@@ -159,6 +160,7 @@ __all__ = [
     "DEFAULT_ANIMATION_MATRIX_SCENARIOS",
     "DEFAULT_ANIMATION_MATRIX_SEEDS",
     "DEFAULT_LAYOUT_MATRIX_MOTION_MODES",
+    "DEFAULT_LAYOUT_MATRIX_UI_SCALES",
     "DEFAULT_MOTION_AUDIT_SIZES",
     "DEFAULT_OPEN_WINDOW_PLAYTEST_CONTROL_CHECKS",
     "DEFAULT_OPEN_WINDOW_PLAYTEST_MOTION_MODES",

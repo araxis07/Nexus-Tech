@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.326.0 - 2026-08-03
+
+- Enforced an 820x620 minimum 2D viewport at launch and during live resizing so scene lanes cannot collapse into overlapping text or controls
+- Gave every live-run frame one blocking-overlay owner, removed hidden workspace click targets, and placed scene transitions below dialogs, navigation, and tooltips
+- Strengthened modal backdrops, enlarged compact typography, and rebuilt Pause Settings so control details remain readable in both single-column compact and two-column desktop layouts
+- Rebalanced Turn Summary phase chips and footer actions so labels remain complete, buttons stay inside their panel, and the large-text profile no longer shrinks key copy below a readable fit
+- Rebuilt compact menu, wizard, deep-panel, and inspector copy so cards use complete authored text or a clean title-only state instead of exposing clipped helper fragments
+- Reflowed every gameplay workspace and inspector at compact widths, separated actor/entity header lanes, and kept all six Report sections plus paging and item actions inside the modal
+- Expanded deterministic visual coverage from 16 to 39 menu/gameplay surfaces, including every deep panel and inspector, across compact, standard, and large text scales
+- Passed 1,404 automated visual captures across four viewports, three motion modes, and three text scales with zero layout, typography, or wrapped-text violations
+- Preserved gameplay outcomes, balance, controls, persistence schema 28, save compatibility, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.325.0 - 2026-07-31
 
 - Rebuilt the title shell around one clear Start or Continue route, a promoted Learn to Play route, quieter library/settings controls, and a deliberately subordinate Quit action
