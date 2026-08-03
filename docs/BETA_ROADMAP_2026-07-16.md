@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.327.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.328.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
 
 The latest presentation record is
 [Beginner UX Redesign Audit - 2026-07-31](BEGINNER_UX_REDESIGN_2026-07-31.md). The

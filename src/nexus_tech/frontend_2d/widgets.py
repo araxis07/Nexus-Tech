@@ -140,17 +140,17 @@ def create_fonts(
     *,
     viewport_size: tuple[int, int] | None = None,
 ) -> FontPack:
-    """Build a compact, readable font set with stable role heights."""
+    """Build readable font roles with stable rendered heights across platforms."""
 
     scale = normalize_ui_scale(ui_scale).factor
     if viewport_size is not None:
         scale *= resolve_viewport_typography_scale(*viewport_size)
     return FontPack(
-        title=_default_font(pygame, _scaled_font_size(34, scale), bold=True),
-        heading=_default_font(pygame, _scaled_font_size(24, scale), bold=True),
-        body=_default_font(pygame, _scaled_font_size(20, scale)),
-        small=_default_font(pygame, _scaled_font_size(17, scale)),
-        mono=_default_font(pygame, _scaled_font_size(18, scale), mono=True),
+        title=_default_font(pygame, _scaled_font_size(30, scale), bold=True),
+        heading=_default_font(pygame, _scaled_font_size(21, scale), bold=True),
+        body=_default_font(pygame, _scaled_font_size(16, scale)),
+        small=_default_font(pygame, _scaled_font_size(14, scale)),
+        mono=_default_font(pygame, _scaled_font_size(14, scale), mono=True),
     )
 
 
@@ -158,24 +158,24 @@ def _scaled_font_size(size: int, scale: float) -> int:
     return max(12, round(size * scale))
 
 
-def _default_font(pygame, size: int, *, bold: bool = False, mono: bool = False):
-    fallback = pygame.font.Font(None, size)
-    fallback.set_bold(bold)
+def _default_font(pygame, target_height: int, *, bold: bool = False, mono: bool = False):
     families = _MONO_FONT_FAMILIES if mono else _UI_FONT_FAMILIES
     font_path = pygame.font.match_font(families, bold=bold)
-    if font_path is None:
-        return fallback
 
-    target_height = fallback.get_height()
-    point_sizes = range(6, max(7, size + 1))
+    def build_font(point_size: int):
+        if font_path:
+            return pygame.font.Font(font_path, point_size)
+        return pygame.font.Font(None, point_size)
+
+    point_sizes = range(6, max(18, target_height * 2 + 1))
     matched_size = min(
         point_sizes,
         key=lambda point_size: (
-            abs(pygame.font.Font(font_path, point_size).get_height() - target_height),
+            abs(build_font(point_size).get_height() - target_height),
             point_size,
         ),
     )
-    font = pygame.font.Font(font_path, matched_size)
+    font = build_font(matched_size)
     font.set_bold(bold)
     return font
 
@@ -276,13 +276,6 @@ def draw_panel(
         border_top_left_radius=18,
         border_top_right_radius=18,
     )
-    pygame.draw.line(
-        surface,
-        blend_color(muted_border, accent, 0.18 + safe_emphasis * 0.18),
-        (header_rect.left + 12, header_rect.bottom - 1),
-        (header_rect.right - 12, header_rect.bottom - 1),
-        1,
-    )
     pygame.draw.rect(
         surface,
         blend_color(accent_line, TEXT, safe_emphasis * 0.12),
@@ -360,6 +353,7 @@ def draw_wrapped_text(
         return 0
     if " ".join(words).endswith("..."):
         _record_typography_event("pre-truncated-copy", 0.0, severe=True)
+    line_height = max(line_height, font.get_height())
     lines: list[str] = []
     current_line = _fit_word(font, words[0], rect.width)
     for raw_word in words[1:]:
@@ -568,18 +562,18 @@ def draw_button(
             (visual_rect.left + 1, visual_rect.bottom - 5, visual_rect.width - 2, 3),
             border_radius=3,
         )
-    detail_line_height = 13 if visual_rect.height < 58 else 15
-    detail_top = visual_rect.top + 28
+    title_height = title_font.get_height()
+    detail_line_height = max(15, detail_font.get_height() + 2)
+    title_top = visual_rect.top + 8
+    detail_top = title_top + title_height + 4
+    detail_height = max(0, visual_rect.bottom - detail_top - 7)
     detail_rect = pygame.Rect(
         visual_rect.left + 12,
         detail_top,
         visual_rect.width - 24,
-        max(0, visual_rect.bottom - detail_top - 5),
+        detail_height,
     )
-    detail_line_limit = min(
-        2 if visual_rect.height >= 58 else 1,
-        detail_rect.height // max(1, detail_line_height),
-    )
+    detail_line_limit = min(2, detail_height // max(1, detail_line_height))
     detail_copy = _resolve_button_detail_copy(
         detail_font,
         detail,
@@ -587,7 +581,7 @@ def draw_button(
         max_width=detail_rect.width,
         max_lines=detail_line_limit,
     )
-    show_detail = bool(detail_copy) and visual_rect.height >= 46
+    show_detail = bool(detail_copy) and detail_line_limit > 0
     clean_key_hint = " ".join(key_hint.split())
     key_badge_width = 0
     if clean_key_hint:
@@ -597,9 +591,9 @@ def draw_button(
         )
     title_rect = pygame.Rect(
         visual_rect.left + 12,
-        visual_rect.top + (8 if show_detail else 6),
+        title_top if show_detail else visual_rect.top + 6,
         visual_rect.width - 24 - key_badge_width - (8 if key_badge_width else 0),
-        22 if show_detail else visual_rect.height - 12,
+        title_height + 2 if show_detail else visual_rect.height - 12,
     )
     fitted_title = fit_text_line(title_font, title, title_rect.width)
     _record_text_fit_event(
@@ -612,7 +606,10 @@ def draw_button(
     )
     draw_text_line(surface, title_font, title, title_color, title_rect)
     if clean_key_hint:
-        key_badge_height = 20
+        key_badge_height = min(
+            max(20, detail_font.get_height() + 6),
+            max(20, visual_rect.height - 12),
+        )
         key_badge_rect = pygame.Rect(
             visual_rect.right - key_badge_width - 10,
             visual_rect.top + (7 if show_detail else (visual_rect.height - key_badge_height) // 2),

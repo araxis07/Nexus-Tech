@@ -775,8 +775,8 @@ def test_shared_frame_layout_centers_a_bounded_canvas_on_ultrawide_displays() ->
         profile=profile,
     )
 
-    assert MAX_FRONTEND_CANVAS == (1920, 1200)
-    assert canvas == RectBounds(left=480, top=300, width=1920, height=1200)
+    assert MAX_FRONTEND_CANVAS == (1440, 900)
+    assert canvas == RectBounds(left=720, top=450, width=1440, height=900)
     assert frame.canvas == canvas
     assert frame.header.left == canvas.left + profile.margin
     assert frame.footer.top + frame.footer.height <= canvas.top + canvas.height - profile.margin
@@ -1095,11 +1095,11 @@ def test_2d_accessible_profile_draws_compact_title_and_run_without_hidden_text(
 def test_2d_font_pack_keeps_compact_layout_metrics_stable() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
-        assert fonts.title.get_height() <= 28
-        assert fonts.heading.get_height() <= 20
-        assert fonts.body.get_height() <= 16
-        assert fonts.small.get_height() <= 13
-        assert fonts.mono.get_height() <= 14
+        assert 29 <= fonts.title.get_height() <= 31
+        assert 20 <= fonts.heading.get_height() <= 22
+        assert 15 <= fonts.body.get_height() <= 17
+        assert 13 <= fonts.small.get_height() <= 15
+        assert 13 <= fonts.mono.get_height() <= 15
         assert fonts.heading.size("Action Bar")[0] <= 120
         assert fonts.small.size("Space End Turn")[0] <= 120
     finally:
@@ -4094,7 +4094,7 @@ def test_compact_title_menu_keeps_quit_quiet_and_separate(tmp_path: Path) -> Non
         pygame.quit()
 
 
-def test_ultrawide_returning_player_menu_balances_five_utility_actions(
+def test_ultrawide_returning_player_menu_separates_guide_from_balanced_utilities(
     tmp_path: Path,
 ) -> None:
     pygame, _fonts, _surface = _build_pygame_bundle()
@@ -4122,10 +4122,11 @@ def test_ultrawide_returning_player_menu_balances_five_utility_actions(
             target.payload: target.rect for target in scene._click_targets if target.kind == "menu"
         }
         hero_rects = (menu_targets["continue"], menu_targets["new_wizard"])
+        guide_rect = menu_targets["guide"]
         utility_rects = tuple(
             rect
             for payload, rect in menu_targets.items()
-            if payload not in {"continue", "new_wizard", "quit"}
+            if payload not in {"continue", "new_wizard", "guide", "quit"}
         )
         rows = {
             top: sorted(
@@ -4137,10 +4138,14 @@ def test_ultrawide_returning_player_menu_balances_five_utility_actions(
         canvas = resolve_frontend_canvas_bounds(*viewport)
 
         assert abs(hero_rects[0].width - hero_rects[1].width) <= 1
-        assert len(utility_rects) == 5
+        assert guide_rect.top > max(rect.bottom for rect in hero_rects)
+        assert guide_rect.bottom < min(rect.top for rect in utility_rects)
+        assert guide_rect.left == hero_rects[0].left
+        assert guide_rect.right == hero_rects[1].right
+        assert len(utility_rects) == 4
         assert len({rect.width for rect in utility_rects}) == 1
-        assert (len(first_row), len(second_row)) == (3, 2)
-        assert second_row[0].left - first_row[0].left == first_row[-1].right - second_row[-1].right
+        assert (len(first_row), len(second_row)) == (2, 2)
+        assert [rect.left for rect in first_row] == [rect.left for rect in second_row]
         assert all(
             canvas.left <= rect.left and rect.right <= canvas.left + canvas.width
             for rect in menu_targets.values()
@@ -4667,7 +4672,8 @@ def test_title_scene_feed_visible_count_tracks_sidebar_height(tmp_path: Path) ->
         )
 
         assert scene._title_feed_visible_count(160) == 2
-        assert scene._title_feed_visible_count(220) == 3
+        assert scene._title_feed_visible_count(220) == 2
+        assert scene._title_feed_visible_count(230) == 3
         assert scene._title_feed_visible_count(320) == 4
     finally:
         pygame.quit()

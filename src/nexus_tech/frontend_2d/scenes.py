@@ -1356,7 +1356,7 @@ class TitleScene(BaseScene):
             return
         pygame = self.pygame
         width = resolve_frontend_canvas_bounds(*surface.get_size()).width
-        visible_count = 1 if width < 900 else 3
+        visible_count = 1 if width < 1180 else 3
         visible_clips = clips[:visible_count]
         gap = 8
         clip_height = 44
@@ -1518,23 +1518,9 @@ class TitleScene(BaseScene):
         footer_rect = pygame.Rect(frame.footer.as_tuple())
         content_rect = pygame.Rect(frame.content.as_tuple())
         layout_width = frame.canvas.width
-        if layout_width < 980:
+        if layout_width < 1180 or frame.canvas.height < 700:
             left_rect = content_rect.copy()
             right_rect = pygame.Rect(0, 0, 0, 0)
-        elif layout_width < 1180:
-            left_share = 0.68 if self._mode == "menu" else 0.62 if self._mode == "meta" else 0.6
-            left_rect = pygame.Rect(
-                content_rect.left,
-                content_rect.top,
-                content_rect.width,
-                int(content_rect.height * left_share),
-            )
-            right_rect = pygame.Rect(
-                content_rect.left,
-                left_rect.bottom + gap,
-                content_rect.width,
-                content_rect.bottom - left_rect.bottom - gap,
-            )
         else:
             left_width = int((content_rect.width - gap) * 0.62)
             right_width = content_rect.width - gap - left_width
@@ -2325,7 +2311,12 @@ class TitleScene(BaseScene):
             emphasis=header_motion,
             lift=int(header_motion * 3),
         )
-        actor_reserve = 150 if width < 900 and self.motion_mode is not MotionMode.OFF else 0
+        if self.motion_mode is MotionMode.OFF:
+            actor_reserve = 0
+        elif width < 1180:
+            actor_reserve = 150
+        else:
+            actor_reserve = 410
         copy_width = max(220, inner.width - actor_reserve)
         draw_text_line(
             surface,
@@ -2379,10 +2370,21 @@ class TitleScene(BaseScene):
     def _draw_title_menu(self, surface, rect) -> None:
         pygame = self.pygame
         menu_motion = self._motion_level("title:mode:menu", "title:content")
+        presentation = self._title_menu_presentation()
+        continue_action, new_game_action = presentation.primary_actions
+        guide_action = next(
+            action for action in presentation.secondary_actions if action.payload == "guide"
+        )
+        utility_actions = tuple(
+            action for action in presentation.secondary_actions if action.payload != "guide"
+        )
+        returning_player = continue_action.enabled
+        target_height = 428 if returning_player else 330
+        menu_rect = pygame.Rect(rect.left, rect.top, rect.width, min(rect.height, target_height))
         inner = draw_panel(
             surface,
             pygame,
-            rect,
+            menu_rect,
             title="Menu",
             accent=GOOD,
             emphasis=menu_motion,
@@ -2396,30 +2398,24 @@ class TitleScene(BaseScene):
             pygame.Rect(inner.left, inner.top - 28, inner.width, 24),
             valign="top",
         )
-        presentation = self._title_menu_presentation()
-        continue_action, new_game_action = presentation.primary_actions
-        guide_action = next(
-            action for action in presentation.secondary_actions if action.payload == "guide"
-        )
-        utility_actions = tuple(
-            action for action in presentation.secondary_actions if action.payload != "guide"
-        )
-        if continue_action.enabled:
+        if returning_player:
             hero_actions = (
                 (continue_action, "primary"),
                 (new_game_action, "secondary"),
             )
-            utility_actions = (guide_action, *utility_actions)
         else:
             hero_actions = (
                 (new_game_action, "primary"),
                 (guide_action, "secondary"),
             )
         quit_button = presentation.quit_action
-        gap = 8 if inner.height < 300 else 10
-        hero_height = max(58, min(86, int(inner.height * 0.25)))
-        utility_label_height = 18
-        quit_height = 34
+        compact = inner.height < 350
+        gap = 8 if compact else 10
+        hero_height = 68 if compact else 88
+        guide_height = 50 if compact else 58
+        utility_label_height = 16 if compact else 18
+        utility_height = 52 if compact else 58
+        quit_height = 38 if compact else 42
 
         def draw_menu_button(
             action: TitleActionPresentation,
@@ -2464,7 +2460,14 @@ class TitleScene(BaseScene):
             )
             hero_left += hero_widths[index] + gap
 
-        utility_label_top = inner.top + hero_height + gap
+        next_top = inner.top + hero_height + gap
+        guide_rect = None
+        if returning_player:
+            guide_rect = pygame.Rect(inner.left, next_top, inner.width, guide_height)
+            draw_menu_button(guide_action, guide_rect, priority="secondary")
+            next_top = guide_rect.bottom + gap
+
+        utility_label_top = next_top
         draw_text_line(
             surface,
             self.fonts.small,
@@ -2474,22 +2477,14 @@ class TitleScene(BaseScene):
             valign="top",
         )
         utility_top = utility_label_top + utility_label_height + 4
-        utility_bottom = inner.bottom - quit_height - gap
-        utility_columns = 3 if inner.width >= 780 else 2
+        utility_columns = 2 if inner.width >= 520 else 1
         utility_rows = (len(utility_actions) + utility_columns - 1) // utility_columns
-        utility_height = max(
-            38,
-            min(
-                54,
-                int((utility_bottom - utility_top - gap * max(0, utility_rows - 1)) / utility_rows),
-            ),
-        )
         utility_rects = []
         utility_bounds = RectBounds(
             inner.left,
             utility_top,
             inner.width,
-            max(0, utility_bottom - utility_top),
+            utility_height * utility_rows + gap * max(0, utility_rows - 1),
         )
         utility_cells = build_balanced_grid(
             utility_bounds,
@@ -2505,13 +2500,14 @@ class TitleScene(BaseScene):
             draw_menu_button(
                 button,
                 button_rect,
-                priority="secondary" if button.payload == "guide" else "quiet",
+                priority="quiet",
             )
 
-        quit_width = min(154, max(120, int(inner.width * 0.2)))
+        utility_bottom = utility_rects[-1].bottom if utility_rects else utility_top
+        quit_width = min(180, max(146, int(inner.width * 0.24)))
         quit_rect = pygame.Rect(
             inner.right - quit_width,
-            inner.bottom - quit_height,
+            utility_bottom + gap,
             quit_width,
             quit_height,
         )
@@ -2521,10 +2517,11 @@ class TitleScene(BaseScene):
             priority="danger",
         )
         if hero_rects and utility_rects:
+            lower_rects = ([guide_rect] if guide_rect is not None else []) + utility_rects
             self._record_layout_separation(
                 "title-hero-vs-utilities",
                 hero_rects[0].unionall(hero_rects[1:]),
-                utility_rects[0].unionall(utility_rects[1:]),
+                lower_rects[0].unionall(lower_rects[1:]),
             )
         if utility_rects:
             self._record_layout_separation(
@@ -2971,10 +2968,19 @@ class TitleScene(BaseScene):
             "title:content",
             "title:archive:comparison" if click_kind == "archive" else "title:content",
         )
+        browser_rect = rect
+        if not cards:
+            empty_height = 220 if click_kind == "archive" else 200
+            browser_rect = pygame.Rect(
+                rect.left,
+                rect.top,
+                rect.width,
+                min(rect.height, empty_height),
+            )
         inner = draw_panel(
             surface,
             pygame,
-            rect,
+            browser_rect,
             title=title,
             accent=SELECTION,
             emphasis=browser_motion,
@@ -3182,10 +3188,16 @@ class TitleScene(BaseScene):
     def _draw_new_game_wizard(self, surface, rect) -> None:
         pygame = self.pygame
         wizard_motion = self._motion_level("title:mode:wizard", "title:content")
+        wizard_rect = pygame.Rect(
+            rect.left,
+            rect.top,
+            rect.width,
+            min(rect.height, 380),
+        )
         inner = draw_panel(
             surface,
             pygame,
-            rect,
+            wizard_rect,
             title="New Game",
             accent=INFO,
             emphasis=wizard_motion,
@@ -3312,7 +3324,8 @@ class TitleScene(BaseScene):
                 detail_font=self.fonts.small,
             )
             self._click_targets.append(ClickTarget(kind, payload, button_rect))
-        launch_top = inner.bottom - launch_height
+        grid_bottom = inner.top + row_count * button_height + max(0, row_count - 1) * grid_gap
+        launch_top = min(inner.bottom - launch_height, grid_bottom + launch_gap)
         launch_rect = pygame.Rect(inner.left, launch_top, inner.width // 2 - 8, launch_height)
         back_rect = pygame.Rect(
             launch_rect.right + 16,
@@ -3348,20 +3361,27 @@ class TitleScene(BaseScene):
 
     def _draw_title_sidebar(self, surface, rect) -> None:
         pygame = self.pygame
-        summary_share = {
-            "guide": 0.5,
-            "meta": 0.56,
-            "settings": 0.44,
-            "wizard": 0.48,
-        }.get(self._mode, 0.36)
-        summary_rect = pygame.Rect(
-            rect.left, rect.top, rect.width, int(rect.height * summary_share)
-        )
+        gap = 12
+        if self._mode == "menu":
+            summary_height = min(220, max(190, rect.height - gap - 230))
+        else:
+            summary_share = {
+                "guide": 0.5,
+                "meta": 0.56,
+                "settings": 0.44,
+                "wizard": 0.48,
+            }.get(self._mode, 0.42)
+            summary_height = int(rect.height * summary_share)
+        remaining_height = max(0, rect.height - summary_height - gap)
+        visible_event_count = min(4, len(self._events))
+        target_events_height = 140 if visible_event_count == 0 else 50 + visible_event_count * 80
+        events_height = min(remaining_height, target_events_height)
+        summary_rect = pygame.Rect(rect.left, rect.top, rect.width, summary_height)
         events_rect = pygame.Rect(
             rect.left,
-            summary_rect.bottom + 12,
+            summary_rect.bottom + gap,
             rect.width,
-            rect.height - summary_rect.height - 12,
+            events_height,
         )
         status_motion = self._motion_level("title:status", f"title:mode:{self._mode}")
         inner = draw_panel(
@@ -3377,17 +3397,26 @@ class TitleScene(BaseScene):
         surface.blit(title_surface, (inner.left, inner.top - 24))
         lines = self._title_sidebar_lines()
         top = inner.top
+        line_height = max(18, self.fonts.small.get_height() + 4)
         for line in lines:
+            remaining_height = inner.bottom - top
+            if remaining_height < line_height:
+                break
             consumed = draw_wrapped_text(
                 surface,
                 self.fonts.small,
                 line,
                 MUTED,
-                pygame.Rect(inner.left, top, inner.width, 36),
-                line_height=15,
+                pygame.Rect(
+                    inner.left,
+                    top,
+                    inner.width,
+                    min(line_height * 2, remaining_height),
+                ),
+                line_height=line_height,
                 max_lines=2,
             )
-            top += max(24, consumed)
+            top += max(line_height + 4, consumed + 4)
 
         feed_motion = self._motion_level("title:feed")
         event_inner = draw_panel(
@@ -3406,7 +3435,7 @@ class TitleScene(BaseScene):
             surface.blit(idle_surface, (event_inner.left, event_inner.top))
             return
         top = event_inner.top
-        for timed_event in self._events[: self._title_feed_visible_count(events_rect.height)]:
+        for timed_event in self._events[: self._title_feed_visible_count(event_inner.height)]:
             card_rect = pygame.Rect(event_inner.left, top, event_inner.width, 70)
             self._draw_event_card(surface, card_rect, timed_event)
             top += 80
@@ -3541,11 +3570,7 @@ class TitleScene(BaseScene):
         )
 
     def _title_feed_visible_count(self, event_height: int) -> int:
-        if event_height < 170:
-            return 2
-        if event_height < 260:
-            return 3
-        return 4
+        return max(0, min(4, (event_height + 10) // 80))
 
     def _meta_board_compact_layout(self, rect) -> bool:
         return rect.height < 280 or rect.width < 900
@@ -3929,7 +3954,7 @@ class ReviewScene(BaseScene):
             return
         pygame = self.pygame
         width = resolve_frontend_canvas_bounds(*surface.get_size()).width
-        visible_count = 1 if width < 960 else 3
+        visible_count = 1 if width < 1180 else 3
         visible_clips = clips[:visible_count]
         gap = 8
         clip_height = 44
@@ -4076,7 +4101,12 @@ class ReviewScene(BaseScene):
             emphasis=header_motion,
             lift=int(header_motion * 3),
         )
-        actor_reserve = 150 if width < 960 and self.motion_mode is not MotionMode.OFF else 0
+        if self.motion_mode is MotionMode.OFF:
+            actor_reserve = 0
+        elif width < 1180:
+            actor_reserve = 150
+        else:
+            actor_reserve = 410
         copy_width = max(220, inner.width - actor_reserve)
         draw_text_line(
             surface,
@@ -4122,12 +4152,15 @@ class ReviewScene(BaseScene):
             surface.blit(idle_surface, (inner.left, inner.top))
             return
         top = inner.top
-        large_text = self.fonts.small.get_height() >= 13
+        body_height = self.fonts.body.get_height()
+        small_height = self.fonts.small.get_height()
+        cause_height = small_height * 2
+        minimum_card_height = 30 + body_height + small_height * 4
         finding_layout = build_review_finding_card_layout(
             available_height=inner.height,
             finding_count=len(self._view_model.findings),
-            minimum_card_height=124 if large_text else 120,
-            maximum_card_height=136 if large_text else 132,
+            minimum_card_height=minimum_card_height,
+            maximum_card_height=minimum_card_height + small_height * 2,
         )
         visible_findings = self._view_model.findings[: finding_layout.visible_count]
         for finding in visible_findings:
@@ -4169,10 +4202,11 @@ class ReviewScene(BaseScene):
                     animated_rect.left + 12,
                     animated_rect.top + 10,
                     animated_rect.width - 24,
-                    22,
+                    body_height,
                 ),
                 valign="top",
             )
+            cause_top = animated_rect.top + 14 + body_height
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
@@ -4180,13 +4214,14 @@ class ReviewScene(BaseScene):
                 MUTED,
                 pygame.Rect(
                     animated_rect.left + 12,
-                    animated_rect.top + 29,
+                    cause_top,
                     animated_rect.width - 24,
-                    30,
+                    cause_height,
                 ),
-                line_height=15,
+                line_height=small_height,
                 max_lines=2,
             )
+            lesson_top = cause_top + cause_height + 6
             draw_wrapped_text(
                 surface,
                 self.fonts.small,
@@ -4194,12 +4229,12 @@ class ReviewScene(BaseScene):
                 tone_color(finding.severity),
                 pygame.Rect(
                     animated_rect.left + 12,
-                    animated_rect.top + 62,
+                    lesson_top,
                     animated_rect.width - 24,
-                    max(0, animated_rect.height - 68),
+                    max(0, animated_rect.bottom - lesson_top - 10),
                 ),
-                line_height=15,
-                max_lines=4 if finding_layout.card_height >= 120 else 3,
+                line_height=small_height,
+                max_lines=4,
             )
             top += finding_layout.card_height + finding_layout.card_gap
         remaining = len(self._view_model.findings) - len(visible_findings)
@@ -8967,10 +9002,11 @@ class RunScene(BaseScene):
                 width=2 if status == "NEXT" else 1,
                 border_radius=11,
             )
+            step_label = step.label.partition(" ")[2] if compact else step.label
             draw_text_line(
                 surface,
                 self.fonts.small,
-                f"{status} {step.label}",
+                f"{status} {step_label}",
                 TEXT if step.done or status == "NEXT" else MUTED,
                 pygame.Rect(chip_rect.left + 8, chip_rect.top + 4, chip_rect.width - 16, 14),
                 valign="top",
@@ -10961,6 +10997,7 @@ class RunScene(BaseScene):
                     surface.blit(status_surface, (status_rect.left + 8, status_rect.top + 2))
             line_top = item_rect.top + 28
             visible_detail_lines = item.detail_lines[:detail_line_limit]
+            detail_line_height = max(14, self.fonts.small.get_height())
             for line_index, line in enumerate(visible_detail_lines):
                 action_summary_reserve = (
                     20 if selected and item.actions and item_height >= 86 else 6
@@ -10974,7 +11011,7 @@ class RunScene(BaseScene):
                     1,
                     min(
                         2,
-                        remaining_height // max(1, 14 * remaining_entries),
+                        remaining_height // max(1, detail_line_height * remaining_entries),
                     ),
                 )
                 consumed = draw_wrapped_text(
@@ -10986,12 +11023,12 @@ class RunScene(BaseScene):
                         item_rect.left + 10,
                         line_top,
                         item_rect.width - 20,
-                        line_budget * 14,
+                        line_budget * detail_line_height,
                     ),
-                    line_height=14,
+                    line_height=detail_line_height,
                     max_lines=line_budget,
                 )
-                line_top += max(16, consumed)
+                line_top += max(detail_line_height + 2, consumed)
             if selected and item.actions and item_height >= 86:
                 action_summary = " | ".join(
                     f"{index + 1}:{action.label}" for index, action in enumerate(item.actions[:4])
@@ -11013,7 +11050,8 @@ class RunScene(BaseScene):
 
         selected_item = self._selected_inspector_item()
         footer_top = rect.bottom - (108 if compact_footer else 72)
-        focus_note_height = 18 if compact_footer else 30
+        focus_line_height = max(15, self.fonts.small.get_height())
+        focus_note_height = 18 if compact_footer else focus_line_height * 2 + 2
         focus_note_rect = pygame.Rect(
             focus_inner.left,
             footer_top - focus_note_height - 10,
@@ -11027,7 +11065,7 @@ class RunScene(BaseScene):
                 self._inspector_focus_summary_text(selected_item, compact=False),
                 MUTED,
                 focus_note_rect,
-                line_height=15,
+                line_height=focus_line_height,
                 max_lines=2,
             )
         footer_rect = pygame.Rect(
@@ -12457,7 +12495,10 @@ class TurnSummaryScene(BaseScene):
         pygame = self.pygame
         visible_metrics = self._view_model.metrics[: self._visible_metric_count()]
         metric_rows = max(1, (len(visible_metrics) + 2) // 3)
-        metrics_height = 94 + metric_rows * 86
+        small_height = self.fonts.small.get_height()
+        body_height = self.fonts.body.get_height()
+        card_height = 36 + body_height + small_height * 3
+        metrics_height = 60 + metric_rows * card_height + max(0, metric_rows - 1) * 12
         metrics_rect = pygame.Rect(rect.left, rect.top, rect.width, metrics_height)
         products_rect = pygame.Rect(
             rect.left,
@@ -12480,7 +12521,6 @@ class TurnSummaryScene(BaseScene):
         cols = 3
         card_gap = 10
         card_width = int((inner.width - card_gap * (cols - 1)) / cols)
-        card_height = 74
         top = inner.top
         left = inner.left
         for index, metric in enumerate(visible_metrics):
@@ -12914,55 +12954,45 @@ class TurnSummaryScene(BaseScene):
             width=2 if metric_motion >= 0.4 or safe_reveal < 1.0 else 1,
             border_radius=14,
         )
-        label_surface = self.fonts.small.render(
+        small_height = self.fonts.small.get_height()
+        body_height = self.fonts.body.get_height()
+        label_top = visual_rect.top + 8
+        value_top = label_top + small_height + 3
+        detail_top = value_top + body_height + 3
+        draw_text_line(
+            surface,
+            self.fonts.small,
             metric.label.upper(),
-            True,
             blend_color(MUTED, color, metric_motion * 0.45),
+            pygame.Rect(visual_rect.left + 12, label_top, visual_rect.width - 24, small_height),
+            valign="top",
         )
-        value_surface = self.fonts.body.render(
+        draw_text_line(
+            surface,
+            self.fonts.body,
             metric.value_text,
-            True,
             blend_color(TEXT, color, metric_motion * 0.12),
+            pygame.Rect(visual_rect.left + 12, value_top, visual_rect.width - 24, body_height),
+            valign="top",
         )
-        compact = visual_rect.width < 320
-        surface.blit(label_surface, (visual_rect.left + 12, visual_rect.top + 10))
-        if compact:
-            detail_text = self._compact_summary_text(metric.detail, max_length=24)
-            draw_wrapped_text(
-                surface,
-                self.fonts.small,
-                detail_text,
-                MUTED,
-                pygame.Rect(
-                    visual_rect.left + 12,
-                    visual_rect.top + 24,
-                    visual_rect.width - 24,
-                    16,
-                ),
-                line_height=14,
-                max_lines=1,
-            )
-            surface.blit(value_surface, (visual_rect.left + 12, visual_rect.top + 40))
-        else:
-            surface.blit(value_surface, (visual_rect.left + 12, visual_rect.top + 28))
-            draw_wrapped_text(
-                surface,
-                self.fonts.small,
-                metric.detail,
-                MUTED,
-                pygame.Rect(
-                    visual_rect.left + 90,
-                    visual_rect.top + 12,
-                    visual_rect.width - 102,
-                    20,
-                ),
-                line_height=14,
-                max_lines=2,
-            )
+        draw_wrapped_text(
+            surface,
+            self.fonts.small,
+            metric.detail,
+            MUTED,
+            pygame.Rect(
+                visual_rect.left + 12,
+                detail_top,
+                visual_rect.width - 24,
+                small_height * 2,
+            ),
+            line_height=small_height,
+            max_lines=2,
+        )
         draw_progress_bar(
             surface,
             pygame,
-            pygame.Rect(visual_rect.left + 12, visual_rect.top + 52, visual_rect.width - 24, 10),
+            pygame.Rect(visual_rect.left + 12, visual_rect.bottom - 14, visual_rect.width - 24, 10),
             ratio=self._tweens.get(metric.key, metric.ratio),
             color=color,
             emphasis=metric_motion,

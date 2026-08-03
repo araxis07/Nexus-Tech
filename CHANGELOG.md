@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.328.0 - 2026-08-03
+
+- Reframed Retina and ultrawide rendering around a centered 1440x900 design canvas so menus and gameplay retain intentional desktop proportions instead of expanding into sparse oversized panels
+- Calibrated every font role by rendered pixel height and made wrapped copy, button titles, details, and shortcut badges consume measured font lanes across compact, standard, and large text profiles
+- Rebuilt the title decision hierarchy with a dedicated Learn to Play route, a balanced two-column utility grid, an adjacent Quit action, and compact intrinsic-height save, archive, wizard, status, and feed surfaces
+- Collapsed medium-width title layouts into one primary content lane and reserved matching actor lanes in title and review headers so decorative clips cannot compete with subtitles or progress copy
+- Reflowed Review findings into measured Cause and Lesson lanes and rebuilt Turn Summary metric cards so labels, values, details, and progress bars remain distinct at large text scale
+- Passed all 1,404 deterministic layout captures across 39 menu, gameplay, modal, inspector, summary, and review surfaces with zero layout or typography violations and an 8px minimum target clearance
+- Preserved gameplay outcomes, balance, controls, persistence schema 28, save compatibility, archive evidence `0/24`, and truthful human-session evidence `0/6`
+
 ## 0.327.0 - 2026-08-03
 
 - Added a centered 1920x1200 maximum design canvas so Retina and ultrawide windows no longer stretch menu, gameplay, summary, or review panels across the physical display
