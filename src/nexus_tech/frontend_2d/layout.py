@@ -8,6 +8,9 @@ from enum import StrEnum
 MIN_FRONTEND_WIDTH = 820
 MIN_FRONTEND_HEIGHT = 620
 MIN_FRONTEND_VIEWPORT = (MIN_FRONTEND_WIDTH, MIN_FRONTEND_HEIGHT)
+MAX_FRONTEND_CANVAS_WIDTH = 1920
+MAX_FRONTEND_CANVAS_HEIGHT = 1200
+MAX_FRONTEND_CANVAS = (MAX_FRONTEND_CANVAS_WIDTH, MAX_FRONTEND_CANVAS_HEIGHT)
 
 
 def clamp_frontend_viewport_size(size: tuple[int, int]) -> tuple[int, int]:
@@ -66,9 +69,60 @@ class FrameLayout:
     """Non-overlapping header, content, and footer regions."""
 
     profile: ResponsiveLayoutProfile
+    canvas: RectBounds
     header: RectBounds
     content: RectBounds
     footer: RectBounds
+
+
+def resolve_frontend_canvas_bounds(width: int, height: int) -> RectBounds:
+    """Return a centered design canvas that stays readable on very large displays."""
+
+    canvas_width = min(max(0, width), MAX_FRONTEND_CANVAS_WIDTH)
+    canvas_height = min(max(0, height), MAX_FRONTEND_CANVAS_HEIGHT)
+    return RectBounds(
+        left=max(0, (width - canvas_width) // 2),
+        top=max(0, (height - canvas_height) // 2),
+        width=canvas_width,
+        height=canvas_height,
+    )
+
+
+def build_balanced_grid(
+    bounds: RectBounds,
+    *,
+    item_count: int,
+    columns: int,
+    row_height: int,
+    column_gap: int,
+    row_gap: int,
+) -> tuple[RectBounds, ...]:
+    """Build equal-width grid cells and center an incomplete final row."""
+
+    if item_count <= 0 or bounds.width <= 0 or bounds.height <= 0:
+        return ()
+    safe_columns = max(1, min(columns, item_count))
+    card_width = max(
+        1,
+        (bounds.width - column_gap * (safe_columns - 1)) // safe_columns,
+    )
+    cells: list[RectBounds] = []
+    for index in range(item_count):
+        row = index // safe_columns
+        column = index % safe_columns
+        remaining = item_count - row * safe_columns
+        row_count = min(safe_columns, remaining)
+        row_width = card_width * row_count + column_gap * max(0, row_count - 1)
+        row_left = bounds.left + max(0, (bounds.width - row_width) // 2)
+        cells.append(
+            RectBounds(
+                left=row_left + column * (card_width + column_gap),
+                top=bounds.top + row * (row_height + row_gap),
+                width=card_width,
+                height=row_height,
+            )
+        )
+    return tuple(cells)
 
 
 def resolve_layout_profile(width: int, height: int) -> ResponsiveLayoutProfile:
@@ -119,20 +173,36 @@ def build_frame_layout(
 ) -> FrameLayout:
     """Build shell regions that reserve navigation and never overlap."""
 
-    selected = profile or resolve_layout_profile(width, height)
+    canvas = resolve_frontend_canvas_bounds(width, height)
+    selected = profile or resolve_layout_profile(canvas.width, canvas.height)
     margin = selected.margin
     gap = selected.gap
     nav_band = selected.nav_band if nav_visible else 0
-    available_width = max(0, width - margin * 2)
-    header = RectBounds(margin, margin + nav_band, available_width, header_height)
-    footer_top = max(header.top + header.height + gap, height - footer_height - margin)
-    footer = RectBounds(margin, footer_top, available_width, footer_height)
+    available_width = max(0, canvas.width - margin * 2)
+    content_left = canvas.left + margin
+    header = RectBounds(
+        content_left,
+        canvas.top + margin + nav_band,
+        available_width,
+        header_height,
+    )
+    footer_top = max(
+        header.top + header.height + gap,
+        canvas.top + canvas.height - footer_height - margin,
+    )
+    footer = RectBounds(content_left, footer_top, available_width, footer_height)
     content_top = header.top + header.height + gap
     content_bottom = max(content_top, footer.top - gap)
     content = RectBounds(
-        margin,
+        content_left,
         content_top,
         available_width,
         max(0, content_bottom - content_top),
     )
-    return FrameLayout(profile=selected, header=header, content=content, footer=footer)
+    return FrameLayout(
+        profile=selected,
+        canvas=canvas,
+        header=header,
+        content=content,
+        footer=footer,
+    )

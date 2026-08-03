@@ -59,7 +59,13 @@ from nexus_tech.frontend_2d.focus_presentation import (
     resolve_footer_grid_columns,
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
-from nexus_tech.frontend_2d.layout import build_frame_layout, resolve_layout_profile
+from nexus_tech.frontend_2d.layout import (
+    RectBounds,
+    build_balanced_grid,
+    build_frame_layout,
+    resolve_frontend_canvas_bounds,
+    resolve_layout_profile,
+)
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
 from nexus_tech.frontend_2d.panel_disclosure import build_panel_disclosure
 from nexus_tech.frontend_2d.pause_presentation import (
@@ -171,12 +177,12 @@ from nexus_tech.user_preferences import FrontendPreferences
 def _fit_modal_rect(pygame, surface, *, width: int, height: int, margin: int = 24):
     """Clamp a centered modal rect so it stays inside smaller windows."""
 
-    window_width, window_height = surface.get_size()
-    safe_width = min(width, max(320, window_width - margin * 2))
-    safe_height = min(height, max(240, window_height - margin * 2))
+    canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+    safe_width = min(width, max(320, canvas.width - margin * 2))
+    safe_height = min(height, max(240, canvas.height - margin * 2))
     return pygame.Rect(
-        window_width // 2 - safe_width // 2,
-        window_height // 2 - safe_height // 2,
+        canvas.left + (canvas.width - safe_width) // 2,
+        canvas.top + (canvas.height - safe_height) // 2,
         safe_width,
         safe_height,
     )
@@ -193,13 +199,13 @@ def _fit_nav_safe_modal_rect(
 ):
     """Fit a tall modal inside the workspace below the persistent navigation rail."""
 
-    window_width, window_height = surface.get_size()
-    safe_width = min(width, max(320, window_width - margin * 2))
-    usable_height = max(240, window_height - margin - nav_bottom)
+    canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+    safe_width = min(width, max(320, canvas.width - margin * 2))
+    usable_height = max(240, canvas.height - margin - nav_bottom)
     safe_height = min(height, usable_height)
-    top = nav_bottom + max(0, (usable_height - safe_height) // 2)
+    top = canvas.top + nav_bottom + max(0, (usable_height - safe_height) // 2)
     return pygame.Rect(
-        window_width // 2 - safe_width // 2,
+        canvas.left + (canvas.width - safe_width) // 2,
         top,
         safe_width,
         safe_height,
@@ -1014,8 +1020,10 @@ class BaseScene:
         if not items:
             return
         pygame = self.pygame
-        left = 24
-        top = 12
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        profile = resolve_layout_profile(canvas.width, canvas.height)
+        left = canvas.left + profile.margin
+        top = canvas.top + 12
         gap = 8
         height = 34
         for title, detail, kind, payload, accent in items:
@@ -1116,13 +1124,18 @@ class BaseScene:
             return None
         if self.scene_transition_progress() >= 0.62 or self._transition_intensity() <= 0.5:
             return None
-        width, _height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
         label, _accent = _SCENE_TRANSITION_LABELS.get(
             self._scene_transition_key,
             ("Scene Shift", INFO),
         )
         badge_width = min(140, max(80, self.fonts.small.size(label)[0] + 18))
-        return self.pygame.Rect(width - badge_width - 28, 28, badge_width, 24)
+        return self.pygame.Rect(
+            canvas.left + canvas.width - badge_width - 28,
+            canvas.top + 28,
+            badge_width,
+            24,
+        )
 
 
 class TitleScene(BaseScene):
@@ -1342,7 +1355,7 @@ class TitleScene(BaseScene):
         if not clips:
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         visible_count = 1 if width < 900 else 3
         visible_clips = clips[:visible_count]
         gap = 8
@@ -1484,7 +1497,8 @@ class TitleScene(BaseScene):
         self._reset_layout_separation_guards()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        profile = resolve_layout_profile(width, height)
+        canvas = resolve_frontend_canvas_bounds(width, height)
+        profile = resolve_layout_profile(canvas.width, canvas.height)
         chrome = resolve_title_scene_chrome(
             mode=self._mode,
             blocking_overlay_visible=(
@@ -1499,38 +1513,42 @@ class TitleScene(BaseScene):
             nav_visible=chrome.navigation_visible,
             profile=profile,
         )
-        margin = profile.margin
         gap = profile.gap
         header_rect = pygame.Rect(frame.header.as_tuple())
         footer_rect = pygame.Rect(frame.footer.as_tuple())
-        content_top = frame.content.top
-        content_height = frame.content.height
-        if width < 980:
-            left_rect = pygame.Rect(margin, content_top, width - margin * 2, content_height)
+        content_rect = pygame.Rect(frame.content.as_tuple())
+        layout_width = frame.canvas.width
+        if layout_width < 980:
+            left_rect = content_rect.copy()
             right_rect = pygame.Rect(0, 0, 0, 0)
-        elif width < 1180:
+        elif layout_width < 1180:
             left_share = 0.68 if self._mode == "menu" else 0.62 if self._mode == "meta" else 0.6
             left_rect = pygame.Rect(
-                margin,
-                content_top,
-                width - margin * 2,
-                int(content_height * left_share),
+                content_rect.left,
+                content_rect.top,
+                content_rect.width,
+                int(content_rect.height * left_share),
             )
             right_rect = pygame.Rect(
-                margin,
+                content_rect.left,
                 left_rect.bottom + gap,
-                width - margin * 2,
-                content_top + content_height - left_rect.bottom - gap,
+                content_rect.width,
+                content_rect.bottom - left_rect.bottom - gap,
             )
         else:
-            left_width = int((width - margin * 2 - gap) * 0.62)
-            right_width = width - margin * 2 - gap - left_width
-            left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+            left_width = int((content_rect.width - gap) * 0.62)
+            right_width = content_rect.width - gap - left_width
+            left_rect = pygame.Rect(
+                content_rect.left,
+                content_rect.top,
+                left_width,
+                content_rect.height,
+            )
             right_rect = pygame.Rect(
                 left_rect.right + gap,
-                content_top,
+                content_rect.top,
                 right_width,
-                content_height,
+                content_rect.height,
             )
 
         self._draw_title_header(surface, header_rect)
@@ -2296,7 +2314,7 @@ class TitleScene(BaseScene):
 
     def _draw_title_header(self, surface, rect) -> None:
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         header_motion = self._motion_level("title:header", f"title:mode:{self._mode}")
         inner = draw_panel(
             surface,
@@ -2426,8 +2444,8 @@ class TitleScene(BaseScene):
                 self._click_targets.append(ClickTarget("menu", action.payload, button_rect))
 
         hero_widths = (
-            int((inner.width - gap) * 0.58),
-            inner.width - gap - int((inner.width - gap) * 0.58),
+            (inner.width - gap) // 2,
+            inner.width - gap - (inner.width - gap) // 2,
         )
         hero_left = inner.left
         hero_rects = []
@@ -2457,7 +2475,7 @@ class TitleScene(BaseScene):
         )
         utility_top = utility_label_top + utility_label_height + 4
         utility_bottom = inner.bottom - quit_height - gap
-        utility_columns = 2
+        utility_columns = 3 if inner.width >= 780 else 2
         utility_rows = (len(utility_actions) + utility_columns - 1) // utility_columns
         utility_height = max(
             38,
@@ -2466,17 +2484,23 @@ class TitleScene(BaseScene):
                 int((utility_bottom - utility_top - gap * max(0, utility_rows - 1)) / utility_rows),
             ),
         )
-        utility_width = int((inner.width - gap) / utility_columns)
         utility_rects = []
-        for index, button in enumerate(utility_actions):
-            column = index % utility_columns
-            row = index // utility_columns
-            button_rect = pygame.Rect(
-                inner.left + column * (utility_width + gap),
-                utility_top + row * (utility_height + gap),
-                utility_width,
-                utility_height,
-            )
+        utility_bounds = RectBounds(
+            inner.left,
+            utility_top,
+            inner.width,
+            max(0, utility_bottom - utility_top),
+        )
+        utility_cells = build_balanced_grid(
+            utility_bounds,
+            item_count=len(utility_actions),
+            columns=utility_columns,
+            row_height=utility_height,
+            column_gap=gap,
+            row_gap=gap,
+        )
+        for button, cell in zip(utility_actions, utility_cells, strict=True):
+            button_rect = pygame.Rect(cell.as_tuple())
             utility_rects.append(button_rect)
             draw_menu_button(
                 button,
@@ -3904,7 +3928,7 @@ class ReviewScene(BaseScene):
         if not clips:
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         visible_count = 1 if width < 960 else 3
         visible_clips = clips[:visible_count]
         gap = 8
@@ -3958,8 +3982,9 @@ class ReviewScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        profile = resolve_layout_profile(width, height)
-        footer_height = 116 if height < 700 else 104
+        canvas = resolve_frontend_canvas_bounds(width, height)
+        profile = resolve_layout_profile(canvas.width, canvas.height)
+        footer_height = 116 if canvas.height < 700 else 104
         chrome = resolve_review_scene_chrome()
         frame = build_frame_layout(
             width,
@@ -4040,7 +4065,7 @@ class ReviewScene(BaseScene):
 
     def _draw_review_header(self, surface, rect) -> None:
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         header_motion = self._motion_level("review:header")
         inner = draw_panel(
             surface,
@@ -5202,8 +5227,9 @@ class RunScene(BaseScene):
         self._reset_layout_separation_guards()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        profile = resolve_layout_profile(width, height)
-        footer_height = self._footer_outer_height(width, height)
+        canvas = resolve_frontend_canvas_bounds(width, height)
+        profile = resolve_layout_profile(canvas.width, canvas.height)
+        footer_height = self._footer_outer_height(canvas.width, canvas.height)
         chrome = resolve_run_scene_chrome(
             pause_overlay_visible=self._pause_overlay_visible,
         )
@@ -5215,43 +5241,43 @@ class RunScene(BaseScene):
             nav_visible=chrome.navigation_visible,
             profile=profile,
         )
-        margin = profile.margin
         gap = profile.gap
         header_rect = pygame.Rect(frame.header.as_tuple())
         footer_rect = pygame.Rect(frame.footer.as_tuple())
-        content_top = frame.content.top
-        content_height = frame.content.height
-        content_rect = pygame.Rect(
-            margin,
-            content_top,
-            width - margin * 2,
-            content_height,
-        )
-        use_compact_focus = self._use_compact_run_focus(width, content_rect.height)
+        content_rect = pygame.Rect(frame.content.as_tuple())
+        content_top = content_rect.top
+        content_height = content_rect.height
+        layout_width = frame.canvas.width
+        use_compact_focus = self._use_compact_run_focus(layout_width, content_rect.height)
         if use_compact_focus:
             left_rect = content_rect
             center_rect = pygame.Rect(0, 0, 0, 0)
             right_rect = pygame.Rect(0, 0, 0, 0)
-        elif width < 940:
+        elif layout_width < 940:
             section_height = int((content_height - gap * 2) / 3)
-            left_rect = pygame.Rect(margin, content_top, width - margin * 2, section_height)
+            left_rect = pygame.Rect(
+                content_rect.left,
+                content_top,
+                content_rect.width,
+                section_height,
+            )
             center_rect = pygame.Rect(
-                margin,
+                content_rect.left,
                 left_rect.bottom + gap,
-                width - margin * 2,
+                content_rect.width,
                 section_height,
             )
             right_rect = pygame.Rect(
-                margin,
+                content_rect.left,
                 center_rect.bottom + gap,
-                width - margin * 2,
-                content_top + content_height - center_rect.bottom - gap,
+                content_rect.width,
+                content_rect.bottom - center_rect.bottom - gap,
             )
-        elif width < 1260:
+        elif layout_width < 1260:
             top_height = int((content_height - gap) * 0.52)
-            left_width = int((width - margin * 2 - gap) * 0.42)
-            center_width = width - margin * 2 - gap - left_width
-            left_rect = pygame.Rect(margin, content_top, left_width, top_height)
+            left_width = int((content_rect.width - gap) * 0.42)
+            center_width = content_rect.width - gap - left_width
+            left_rect = pygame.Rect(content_rect.left, content_top, left_width, top_height)
             center_rect = pygame.Rect(
                 left_rect.right + gap,
                 content_top,
@@ -5259,16 +5285,22 @@ class RunScene(BaseScene):
                 top_height,
             )
             right_rect = pygame.Rect(
-                margin,
+                content_rect.left,
                 left_rect.bottom + gap,
-                width - margin * 2,
-                content_top + content_height - left_rect.bottom - gap,
+                content_rect.width,
+                content_rect.bottom - left_rect.bottom - gap,
             )
         else:
-            left_width = int((width - margin * 2 - gap * 2) * 0.27)
-            center_width = int((width - margin * 2 - gap * 2) * 0.36)
-            right_width = width - margin * 2 - gap * 2 - left_width - center_width
-            left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+            usable_width = content_rect.width - gap * 2
+            left_width = int(usable_width * 0.27)
+            center_width = int(usable_width * 0.36)
+            right_width = usable_width - left_width - center_width
+            left_rect = pygame.Rect(
+                content_rect.left,
+                content_top,
+                left_width,
+                content_height,
+            )
             center_rect = pygame.Rect(
                 left_rect.right + gap,
                 content_top,
@@ -5327,7 +5359,7 @@ class RunScene(BaseScene):
                 ("P Pause", "Open pause, save, and menu controls.", "pause_toggle", "", WARN),
                 ("Esc Back", "Close overlay or open pause.", "run_back", "", INFO),
             ]
-            if width >= 940:
+            if layout_width >= 940:
                 nav_items.append(
                     (
                         "0 More" if self._focus_mode else "0 Focus",
@@ -5849,7 +5881,7 @@ class RunScene(BaseScene):
         if not clips:
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         visible_count = 1 if width < 980 else 2
         visible_clips = clips[:visible_count]
         gap = 8
@@ -6633,7 +6665,7 @@ class RunScene(BaseScene):
         if not self._overlay_exit_cues or self.motion_mode is MotionMode.OFF:
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
         for index, cue in enumerate(self._overlay_exit_cues[:3]):
             if cue.duration <= 0:
                 continue
@@ -6642,9 +6674,9 @@ class RunScene(BaseScene):
             alpha = int((1.0 - progress) * 76)
             if alpha <= 0:
                 continue
-            y = 104 + index * 34
-            sweep_width = max(150, int(width * 0.24))
-            sweep_x = int(eased * (width + sweep_width)) - sweep_width
+            y = canvas.top + 104 + index * 34
+            sweep_width = max(150, int(canvas.width * 0.24))
+            sweep_x = canvas.left + int(eased * (canvas.width + sweep_width)) - sweep_width
             sweep_rect = pygame.Rect(sweep_x, y, sweep_width, 8)
             pygame.draw.rect(surface, (*cue.accent, alpha), sweep_rect, border_radius=4)
             badge = self.fonts.small.render(
@@ -6652,7 +6684,12 @@ class RunScene(BaseScene):
                 True,
                 blend_color(MUTED, cue.accent, 0.8),
             )
-            badge_rect = pygame.Rect(24, y - 9, badge.get_width() + 18, 24)
+            badge_rect = pygame.Rect(
+                canvas.left + 24,
+                y - 9,
+                badge.get_width() + 18,
+                24,
+            )
             pygame.draw.rect(
                 surface,
                 (*blend_color((13, 22, 34), cue.accent, 0.18), min(210, alpha + 130)),
@@ -6672,10 +6709,10 @@ class RunScene(BaseScene):
         if not self._pending_choice_cues or self.motion_mode is MotionMode.OFF:
             return
         pygame = self.pygame
-        width, height = surface.get_size()
-        card_width = min(460, width - 48)
-        left = int((width - card_width) / 2)
-        top = max(24, int(height * 0.18))
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        card_width = min(460, canvas.width - 48)
+        left = canvas.left + (canvas.width - card_width) // 2
+        top = canvas.top + max(24, int(canvas.height * 0.18))
         for index, cue in enumerate(self._pending_choice_cues[:2]):
             if cue.duration <= 0:
                 continue
@@ -6742,15 +6779,15 @@ class RunScene(BaseScene):
         if not self._impact_cues or self.motion_mode is MotionMode.OFF:
             return
         pygame = self.pygame
-        width, height = surface.get_size()
-        compact = width < 920
-        card_width = min(300, max(190, width - 40))
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        compact = canvas.width < 920
+        card_width = min(300, max(190, canvas.width - 40))
         card_height = 42 if compact else 48
         gap = 8
-        left = 24
-        top = 112 if height < 680 else 146
+        left = canvas.left + 24
+        top = canvas.top + (112 if canvas.height < 680 else 146)
         if self._text_input is not None or self._context_picker is not None:
-            top = 24
+            top = canvas.top + 24
         for index, cue in enumerate(self._impact_cues[:4]):
             if cue.duration <= 0:
                 continue
@@ -6830,13 +6867,13 @@ class RunScene(BaseScene):
         if not self._action_feedback_cues or self.motion_mode is MotionMode.OFF:
             return
         pygame = self.pygame
-        width, height = surface.get_size()
-        compact = width < 920
-        card_width = min(330, max(180, width - 40))
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        compact = canvas.width < 920
+        card_width = min(330, max(180, canvas.width - 40))
         card_height = 40 if compact else 46
         gap = 8
-        left = max(20, width - card_width - 24)
-        top = 112 if height < 680 else 146
+        left = max(canvas.left + 20, canvas.left + canvas.width - card_width - 24)
+        top = canvas.top + (112 if canvas.height < 680 else 146)
         transition_badge_rect = self._scene_transition_badge_rect(surface)
         modal_overlay_active = self._text_input is not None or self._context_picker is not None
         tall_overlay_top_lane = (
@@ -6848,19 +6885,39 @@ class RunScene(BaseScene):
         if tall_overlay_top_lane:
             # The left side of this lane belongs to Pause/Back/Help, while the far
             # right may hold the transition badge. Keep one cue between both.
-            lane_left = 360
+            nav_titles = ["P Pause", "Esc Back"]
+            if canvas.width >= 940:
+                nav_titles.append("0 More" if self._focus_mode else "0 Focus")
+            nav_titles.append("F1 Help")
+            nav_width = sum(
+                min(190, max(104, self.fonts.small.size(title)[0] + 42)) for title in nav_titles
+            ) + 8 * (len(nav_titles) - 1)
+            nav_right = (
+                canvas.left
+                + resolve_layout_profile(
+                    canvas.width,
+                    canvas.height,
+                ).margin
+                + nav_width
+            )
+            lane_left = nav_right + 24
             lane_right = (
-                transition_badge_rect.left - 42 if transition_badge_rect is not None else width - 26
+                transition_badge_rect.left - 42
+                if transition_badge_rect is not None
+                else canvas.left + canvas.width - 26
             )
             card_width = min(330, max(140, lane_right - lane_left))
             left = max(lane_left, lane_right - card_width)
-            top = 12
+            top = canvas.top + 12
             max_visible = 1
         elif modal_overlay_active:
-            top = 62 if transition_badge_rect is not None else 24
+            top = canvas.top + (62 if transition_badge_rect is not None else 24)
             max_visible = 1
             if transition_badge_rect is not None:
-                left = min(left, max(20, transition_badge_rect.left - card_width - 24))
+                left = min(
+                    left,
+                    max(canvas.left + 20, transition_badge_rect.left - card_width - 24),
+                )
         for index, cue in enumerate(self._action_feedback_cues[:max_visible]):
             if cue.duration <= 0:
                 continue
@@ -6883,12 +6940,22 @@ class RunScene(BaseScene):
                 self._record_layout_separation(
                     "action-feedback-vs-nav",
                     rect,
-                    pygame.Rect(0, 0, 360, 54),
+                    pygame.Rect(
+                        canvas.left,
+                        canvas.top,
+                        nav_right - canvas.left + 12,
+                        54,
+                    ),
                 )
                 self._record_layout_separation(
                     "action-feedback-vs-overlay",
                     rect,
-                    pygame.Rect(0, 60, width, max(0, height - 60)),
+                    pygame.Rect(
+                        canvas.left,
+                        canvas.top + 60,
+                        canvas.width,
+                        max(0, canvas.height - 60),
+                    ),
                 )
             if transition_badge_rect is not None:
                 self._record_layout_separation(
@@ -6991,15 +7058,15 @@ class RunScene(BaseScene):
         if not self._late_game_choreography_cues or self.motion_mode is MotionMode.OFF:
             return
         pygame = self.pygame
-        width, height = surface.get_size()
-        card_width = min(440, max(240, width - 48))
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        card_width = min(440, max(240, canvas.width - 48))
         card_height = 56
-        left = max(24, (width - card_width) // 2)
-        top = 76 if height < 680 else 100
+        left = canvas.left + max(24, (canvas.width - card_width) // 2)
+        top = canvas.top + (76 if canvas.height < 680 else 100)
         max_visible = 2
         modal_overlay_active = self._context_picker is not None or self._text_input is not None
         if modal_overlay_active:
-            top = max(72, height - card_height - 54)
+            top = canvas.top + max(72, canvas.height - card_height - 54)
             max_visible = 1
         for index, cue in enumerate(self._late_game_choreography_cues[:max_visible]):
             if cue.duration <= 0:
@@ -7024,7 +7091,12 @@ class RunScene(BaseScene):
                 self._record_layout_separation(
                     "late-game-choreography-vs-modal-controls",
                     rect,
-                    pygame.Rect(0, height - 54, width, 54),
+                    pygame.Rect(
+                        canvas.left,
+                        canvas.top + canvas.height - 54,
+                        canvas.width,
+                        54,
+                    ),
                 )
             layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             layer_rect = layer.get_rect()
@@ -7918,7 +7990,8 @@ class RunScene(BaseScene):
         surface = self.pygame.display.get_surface()
         if surface is None:
             return 4
-        width, height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        width, height = canvas.width, canvas.height
         if width < 900:
             return 2
         if height < 700:
@@ -8099,7 +8172,7 @@ class RunScene(BaseScene):
 
     def _draw_header(self, surface, rect) -> None:
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         inner = draw_panel(surface, pygame, rect, title="Run Header", accent=INFO)
         compact = rect.height < 130 or inner.width < 760
         actor_reserve = 156 if width < 980 and self.motion_mode is not MotionMode.OFF else 0
@@ -9486,7 +9559,7 @@ class RunScene(BaseScene):
         surface = self.pygame.display.get_surface()
         if surface is None:
             return 1280
-        return surface.get_size()[0]
+        return resolve_frontend_canvas_bounds(*surface.get_size()).width
 
     def _compact_command_token(self, command: str, *, compact: bool) -> str:
         label = get_action_label(command)
@@ -10528,7 +10601,7 @@ class RunScene(BaseScene):
             emphasis=max(panel_motion, overlay_motion, inspector_motion),
             lift=int(max(panel_motion, overlay_motion, inspector_motion) * 5),
         )
-        viewport_width, _viewport_height = surface.get_size()
+        viewport_width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         actor_reserve = 0
         if self.inspector_actor_active():
             actor_width = 124 if viewport_width >= 1040 else 108
@@ -11216,7 +11289,8 @@ class RunScene(BaseScene):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill(self._overlay_fill("pause_settings"))
         surface.blit(overlay, (0, 0))
-        viewport_width, viewport_height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
+        viewport_width, viewport_height = canvas.width, canvas.height
         modal_width = min(920, max(560, int(viewport_width * 0.66)))
         modal_height = (
             360 if modal_width >= 620 else min(460, max(440, int(viewport_height * 0.64)))
@@ -11514,14 +11588,14 @@ class RunScene(BaseScene):
         if not self.outcome_cinematic_active():
             return
         pygame = self.pygame
-        width, height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
         intensity = 0.52 if self.motion_mode is MotionMode.REDUCED else 1.0
         phase = self._entity_motion_phase(speed=1.4)
         rail_alpha = int(50 + intensity * 60)
-        rail_top = max(24, modal_rect.top - 46)
-        rail_bottom = min(height - 24, modal_rect.bottom + 46)
-        left = max(24, modal_rect.left - 82)
-        right = min(width - 24, modal_rect.right + 82)
+        rail_top = max(canvas.top + 24, modal_rect.top - 46)
+        rail_bottom = min(canvas.top + canvas.height - 24, modal_rect.bottom + 46)
+        left = max(canvas.left + 24, modal_rect.left - 82)
+        right = min(canvas.left + canvas.width - 24, modal_rect.right + 82)
         for index, y in enumerate((rail_top, rail_bottom)):
             progress = (sin(phase + index * 1.7) + 1.0) / 2
             sweep_width = max(70, int((right - left) * (0.2 + progress * 0.24)))
@@ -11908,7 +11982,7 @@ class TurnSummaryScene(BaseScene):
         if not clips:
             return
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         visible_count = 1 if width < 940 else 4
         visible_clips = clips[:visible_count]
         gap = 8
@@ -11960,7 +12034,7 @@ class TurnSummaryScene(BaseScene):
         surface = self.pygame.display.get_surface()
         if surface is None:
             return 0.35
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         base = 0.45 if width < 1000 else 0.35
         if len(self._events) >= 4:
             base += 0.05
@@ -11997,41 +12071,53 @@ class TurnSummaryScene(BaseScene):
         self._reset_actor_sprite_bounds()
         draw_grid(surface, pygame)
         width, height = surface.get_size()
-        profile = resolve_layout_profile(width, height)
+        canvas = resolve_frontend_canvas_bounds(width, height)
+        profile = resolve_layout_profile(canvas.width, canvas.height)
         footer_height = 122
         chrome = resolve_turn_summary_scene_chrome()
         frame = build_frame_layout(
             width,
             height,
-            header_height=self._summary_header_height(height),
+            header_height=self._summary_header_height(canvas.height),
             footer_height=footer_height,
             nav_visible=chrome.navigation_visible,
             profile=profile,
         )
-        margin = profile.margin
         gap = profile.gap
         header_rect = pygame.Rect(frame.header.as_tuple())
         footer_rect = pygame.Rect(frame.footer.as_tuple())
-        content_top = frame.content.top
-        content_height = frame.content.height
-        if width < 1100:
-            top_height = int((content_height - gap) * self._summary_top_section_ratio(width))
-            left_rect = pygame.Rect(margin, content_top, width - margin * 2, top_height)
+        content_rect = pygame.Rect(frame.content.as_tuple())
+        layout_width = frame.canvas.width
+        if layout_width < 1100:
+            top_height = int(
+                (content_rect.height - gap) * self._summary_top_section_ratio(layout_width)
+            )
+            left_rect = pygame.Rect(
+                content_rect.left,
+                content_rect.top,
+                content_rect.width,
+                top_height,
+            )
             right_rect = pygame.Rect(
-                margin,
+                content_rect.left,
                 left_rect.bottom + gap,
-                width - margin * 2,
-                content_top + content_height - left_rect.bottom - gap,
+                content_rect.width,
+                content_rect.bottom - left_rect.bottom - gap,
             )
         else:
-            left_width = int((width - margin * 2 - gap) * 0.55)
-            right_width = width - margin * 2 - gap - left_width
-            left_rect = pygame.Rect(margin, content_top, left_width, content_height)
+            left_width = int((content_rect.width - gap) * 0.55)
+            right_width = content_rect.width - gap - left_width
+            left_rect = pygame.Rect(
+                content_rect.left,
+                content_rect.top,
+                left_width,
+                content_rect.height,
+            )
             right_rect = pygame.Rect(
                 left_rect.right + gap,
-                content_top,
+                content_rect.top,
                 right_width,
-                content_height,
+                content_rect.height,
             )
 
         self._draw_summary_header(surface, header_rect)
@@ -12118,7 +12204,11 @@ class TurnSummaryScene(BaseScene):
         intensity = _MOTION_INTENSITY.get(event.severity, 0.42)
         pressure = self._summary_motion_pressure_ratio()
         surface = self.pygame.display.get_surface()
-        width = surface.get_size()[0] if surface is not None else 1280
+        width = (
+            resolve_frontend_canvas_bounds(*surface.get_size()).width
+            if surface is not None
+            else 1280
+        )
         if width < 1000 and event.severity in {"info", "success"}:
             intensity *= 0.88
         if len(self._events) >= 4 and event.severity != "danger":
@@ -12155,7 +12245,7 @@ class TurnSummaryScene(BaseScene):
         if not self.summary_outcome_lanes_active():
             return
         pygame = self.pygame
-        width, height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
         metrics_by_key = {metric.key: metric for metric in self._view_model.metrics}
         lane_metrics = tuple(
             metric
@@ -12166,9 +12256,14 @@ class TurnSummaryScene(BaseScene):
             return
         lane_height = 18
         lane_gap = 6
-        panel_width = min(620, max(420, int(width * 0.5)))
-        left = 36
-        header_bottom = (20 if width < 900 else 24) + 46 + self._summary_header_height(height)
+        panel_width = min(620, max(420, int(canvas.width * 0.5)))
+        left = canvas.left + 36
+        header_bottom = (
+            canvas.top
+            + (20 if canvas.width < 900 else 24)
+            + 46
+            + self._summary_header_height(canvas.height)
+        )
         top = header_bottom - lane_height - 8
         lane_width = int((panel_width - lane_gap * (len(lane_metrics) - 1)) / len(lane_metrics))
         for index, metric in enumerate(lane_metrics):
@@ -12219,15 +12314,20 @@ class TurnSummaryScene(BaseScene):
         if not self.summary_cinematic_active():
             return
         pygame = self.pygame
-        width, height = surface.get_size()
+        canvas = resolve_frontend_canvas_bounds(*surface.get_size())
         progress = self._summary_cinematic_progress()
         eased = 1.0 - (1.0 - progress) * (1.0 - progress)
         intensity = 0.56 if self.motion_mode is MotionMode.REDUCED else 1.0
-        margin = 20 if width < 900 else 24
-        gap = 12 if height < 700 else 16
-        header_bottom = margin + 46 + self._summary_header_height(height)
+        margin = 20 if canvas.width < 900 else 24
+        gap = 12 if canvas.height < 700 else 16
+        header_bottom = canvas.top + margin + 46 + self._summary_header_height(canvas.height)
         rail_top = header_bottom + max(2, int((gap - 8) / 2))
-        rail_rect = pygame.Rect(36, rail_top, width - 72, 8)
+        rail_rect = pygame.Rect(
+            canvas.left + 36,
+            rail_top,
+            canvas.width - 72,
+            8,
+        )
         fill_alpha = int((1.0 - progress * 0.55) * 78 * intensity)
         pygame.draw.rect(
             surface,
@@ -12282,7 +12382,7 @@ class TurnSummaryScene(BaseScene):
 
     def _draw_summary_header(self, surface, rect) -> None:
         pygame = self.pygame
-        width, _height = surface.get_size()
+        width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         inner = draw_panel(surface, pygame, rect, title="Turn Summary", accent=INFO)
         actor_reserve = 156 if width < 940 and self.motion_mode is not MotionMode.OFF else 0
         phase_gap = 8

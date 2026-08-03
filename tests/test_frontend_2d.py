@@ -147,10 +147,14 @@ from nexus_tech.frontend_2d.focus_presentation import (
 )
 from nexus_tech.frontend_2d.input_map import FrontendIntent
 from nexus_tech.frontend_2d.layout import (
+    MAX_FRONTEND_CANVAS,
     MIN_FRONTEND_VIEWPORT,
+    RectBounds,
+    build_balanced_grid,
     build_frame_layout,
     clamp_frontend_viewport_size,
     frontend_viewport_is_supported,
+    resolve_frontend_canvas_bounds,
     resolve_layout_profile,
 )
 from nexus_tech.frontend_2d.outcome_presentation import build_outcome_overlay_view_model
@@ -758,6 +762,46 @@ def test_shared_frame_layout_reserves_non_overlapping_regions(
     assert frame.footer.top + frame.footer.height <= height - profile.margin
 
 
+def test_shared_frame_layout_centers_a_bounded_canvas_on_ultrawide_displays() -> None:
+    width, height = 2880, 1800
+    canvas = resolve_frontend_canvas_bounds(width, height)
+    profile = resolve_layout_profile(canvas.width, canvas.height)
+    frame = build_frame_layout(
+        width,
+        height,
+        header_height=profile.run_header_height,
+        footer_height=122,
+        nav_visible=True,
+        profile=profile,
+    )
+
+    assert MAX_FRONTEND_CANVAS == (1920, 1200)
+    assert canvas == RectBounds(left=480, top=300, width=1920, height=1200)
+    assert frame.canvas == canvas
+    assert frame.header.left == canvas.left + profile.margin
+    assert frame.footer.top + frame.footer.height <= canvas.top + canvas.height - profile.margin
+
+
+def test_balanced_grid_uses_equal_columns_and_centers_an_incomplete_row() -> None:
+    bounds = RectBounds(left=100, top=80, width=920, height=240)
+    cells = build_balanced_grid(
+        bounds,
+        item_count=5,
+        columns=3,
+        row_height=54,
+        column_gap=10,
+        row_gap=10,
+    )
+
+    assert len(cells) == 5
+    assert len({cell.width for cell in cells}) == 1
+    assert cells[0].left == bounds.left
+    assert cells[3].left > bounds.left
+    assert (
+        bounds.left + bounds.width - cells[4].left - cells[4].width == cells[3].left - bounds.left
+    )
+
+
 def test_frontend_viewport_contract_clamps_sizes_that_collapse_scene_lanes() -> None:
     assert MIN_FRONTEND_VIEWPORT == (820, 620)
     assert not frontend_viewport_is_supported((640, 480))
@@ -963,6 +1007,19 @@ def test_2d_viewport_typography_uses_spare_space_without_pressuring_compact_wind
             spacious_fonts.heading.size("Recommended Move")[0]
             > standard_fonts.heading.size("Recommended Move")[0]
         )
+    finally:
+        pygame.quit()
+
+
+def test_2d_font_roles_use_proportional_ui_copy_and_monospaced_data() -> None:
+    pygame, fonts, _surface = _build_pygame_bundle()
+    try:
+        body_delta = fonts.body.size("WWWW")[0] - fonts.body.size("iiii")[0]
+        mono_delta = abs(fonts.mono.size("WWWW")[0] - fonts.mono.size("iiii")[0])
+
+        assert body_delta > 0
+        assert mono_delta <= 1
+        assert body_delta > mono_delta
     finally:
         pygame.quit()
 
@@ -4037,6 +4094,62 @@ def test_compact_title_menu_keeps_quit_quiet_and_separate(tmp_path: Path) -> Non
         pygame.quit()
 
 
+def test_ultrawide_returning_player_menu_balances_five_utility_actions(
+    tmp_path: Path,
+) -> None:
+    pygame, _fonts, _surface = _build_pygame_bundle()
+    try:
+        viewport = (2880, 1800)
+        surface = pygame.display.set_mode(viewport, pygame.HIDDEN)
+        coordinator = SaveLoadCoordinator(tmp_path / "title-menu-ultrawide.db")
+        state = create_new_game("NEXUS TECH", "Nexus One")
+        rng = RandomSource(seed=144)
+        coordinator.save_game("active", state, rng)
+        scene = TitleScene(
+            pygame=pygame,
+            fonts=create_fonts(pygame, viewport_size=viewport),
+            state=state,
+            rng=rng,
+            slot_name="active",
+            save_callback=lambda *_args: None,
+            coordinator=coordinator,
+            initial_mode="menu",
+            motion_mode=MotionMode.OFF,
+        )
+
+        scene.draw(surface)
+        menu_targets = {
+            target.payload: target.rect for target in scene._click_targets if target.kind == "menu"
+        }
+        hero_rects = (menu_targets["continue"], menu_targets["new_wizard"])
+        utility_rects = tuple(
+            rect
+            for payload, rect in menu_targets.items()
+            if payload not in {"continue", "new_wizard", "quit"}
+        )
+        rows = {
+            top: sorted(
+                (rect for rect in utility_rects if rect.top == top), key=lambda rect: rect.left
+            )
+            for top in {rect.top for rect in utility_rects}
+        }
+        first_row, second_row = (rows[top] for top in sorted(rows))
+        canvas = resolve_frontend_canvas_bounds(*viewport)
+
+        assert abs(hero_rects[0].width - hero_rects[1].width) <= 1
+        assert len(utility_rects) == 5
+        assert len({rect.width for rect in utility_rects}) == 1
+        assert (len(first_row), len(second_row)) == (3, 2)
+        assert second_row[0].left - first_row[0].left == first_row[-1].right - second_row[-1].right
+        assert all(
+            canvas.left <= rect.left and rect.right <= canvas.left + canvas.width
+            for rect in menu_targets.values()
+        )
+        assert scene.layout_safety_violations() == ()
+    finally:
+        pygame.quit()
+
+
 def test_compact_deep_panel_keeps_actions_above_footer_controls() -> None:
     pygame, fonts, _surface = _build_pygame_bundle()
     try:
@@ -5696,6 +5809,22 @@ def test_run_2d_visual_audit_motion_off_drops_archive_comparison_layer() -> None
     assert report.motion_mode == MotionMode.OFF.value
     assert "archive-comparison" not in title_meta.expected_layers
     assert "archive-comparison" not in title_meta.active_layers
+
+
+def test_run_2d_visual_audit_keeps_every_scene_inside_ultrawide_canvas() -> None:
+    report = run_2d_visual_audit(
+        scenario_id="founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        sizes=((2880, 1800),),
+        motion_mode=MotionMode.OFF,
+    )
+
+    assert report.status == "pass"
+    assert len(report.cells) == 39
+    assert all(cell.status == "pass" for cell in report.cells)
+    assert all(cell.layout_violations == () for cell in report.cells)
+    assert all(cell.typography_violations == () for cell in report.cells)
 
 
 def test_title_visual_contrast_holds_across_responsive_breakpoints() -> None:

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.327.0 - 2026-08-03
+
+- Added a centered 1920x1200 maximum design canvas so Retina and ultrawide windows no longer stretch menu, gameplay, summary, or review panels across the physical display
+- Routed title, run, review, summary, navigation, modal, feedback, and cinematic geometry through the shared canvas contract so transient layers stay aligned with their owning scene
+- Replaced the chunky pygame fallback with proportional sans-serif UI roles and a dedicated monospace data role while preserving established line heights across compact, standard, and large text profiles
+- Moved panel dividers below the complete heading lane so borders no longer cross titles or make letters appear clipped
+- Rebalanced the title menu into equal primary columns and a responsive three-column utility grid whose incomplete final row remains centered
+- Made visual-health sampling and click-target bounds canvas-aware and added permanent 2880x1800 coverage across all 39 deterministic scene surfaces
+- Passed all 39 ultrawide captures at compact, standard, and large text scales with zero layout or typography violations and preserved gameplay, balance, controls, persistence schema 28, and save compatibility
+
 ## 0.326.0 - 2026-08-03
 
 - Enforced an 820x620 minimum 2D viewport at launch and during live resizing so scene lanes cannot collapse into overlapping text or controls

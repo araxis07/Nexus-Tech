@@ -63,6 +63,11 @@ INFO = _STANDARD_PALETTE["INFO"]
 SELECTION = _STANDARD_PALETTE["SELECTION"]
 OVERLAY = _STANDARD_PALETTE["OVERLAY"]
 
+_UI_FONT_FAMILIES = "helvetica,dejavu sans,liberation sans,arial"
+_MONO_FONT_FAMILIES = "menlo,dejavu sans mono,liberation mono,courier new,courier"
+_PANEL_HEADER_HEIGHT = 43
+_PANEL_CONTENT_OFFSET = 44
+
 
 @dataclass(frozen=True)
 class FontPack:
@@ -135,7 +140,7 @@ def create_fonts(
     *,
     viewport_size: tuple[int, int] | None = None,
 ) -> FontPack:
-    """Build a compact font set with deterministic metrics across OS runners."""
+    """Build a compact, readable font set with stable role heights."""
 
     scale = normalize_ui_scale(ui_scale).factor
     if viewport_size is not None:
@@ -145,7 +150,7 @@ def create_fonts(
         heading=_default_font(pygame, _scaled_font_size(24, scale), bold=True),
         body=_default_font(pygame, _scaled_font_size(20, scale)),
         small=_default_font(pygame, _scaled_font_size(17, scale)),
-        mono=_default_font(pygame, _scaled_font_size(18, scale)),
+        mono=_default_font(pygame, _scaled_font_size(18, scale), mono=True),
     )
 
 
@@ -153,8 +158,24 @@ def _scaled_font_size(size: int, scale: float) -> int:
     return max(12, round(size * scale))
 
 
-def _default_font(pygame, size: int, *, bold: bool = False):
-    font = pygame.font.Font(None, size)
+def _default_font(pygame, size: int, *, bold: bool = False, mono: bool = False):
+    fallback = pygame.font.Font(None, size)
+    fallback.set_bold(bold)
+    families = _MONO_FONT_FAMILIES if mono else _UI_FONT_FAMILIES
+    font_path = pygame.font.match_font(families, bold=bold)
+    if font_path is None:
+        return fallback
+
+    target_height = fallback.get_height()
+    point_sizes = range(6, max(7, size + 1))
+    matched_size = min(
+        point_sizes,
+        key=lambda point_size: (
+            abs(pygame.font.Font(font_path, point_size).get_height() - target_height),
+            point_size,
+        ),
+    )
+    font = pygame.font.Font(font_path, matched_size)
     font.set_bold(bold)
     return font
 
@@ -242,7 +263,12 @@ def draw_panel(
         width=chrome.border_width,
         border_radius=18,
     )
-    header_rect = pygame.Rect(visual_rect.left, visual_rect.top, visual_rect.width, 34)
+    header_rect = pygame.Rect(
+        visual_rect.left,
+        visual_rect.top,
+        visual_rect.width,
+        _PANEL_HEADER_HEIGHT,
+    )
     pygame.draw.rect(
         surface,
         header_fill,
@@ -270,7 +296,7 @@ def draw_panel(
     )
     return pygame.Rect(
         visual_rect.left + 16,
-        visual_rect.top + 44,
+        visual_rect.top + _PANEL_CONTENT_OFFSET,
         visual_rect.width - 32,
         visual_rect.height - 60,
     )

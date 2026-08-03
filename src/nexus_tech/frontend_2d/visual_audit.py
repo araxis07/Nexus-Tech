@@ -20,6 +20,7 @@ from nexus_tech.domain.models import (
 )
 from nexus_tech.frontend_2d.app import Frontend2DUnavailableError
 from nexus_tech.frontend_2d.context import ActionRequest
+from nexus_tech.frontend_2d.layout import resolve_frontend_canvas_bounds
 from nexus_tech.frontend_2d.tween import MotionMode, normalize_motion_mode
 from nexus_tech.frontend_2d.viewmodels import build_run_review_view_model
 from nexus_tech.frontend_2d.widgets import finish_typography_audit, start_typography_audit
@@ -1393,6 +1394,7 @@ def _capture_visual_cell(
     output_dir: Path | None,
 ) -> VisualAuditCell:
     width, height = surface.get_size()
+    canvas = resolve_frontend_canvas_bounds(width, height)
     _set_visual_audit_mouse_safe_point(pygame, width, height)
     for _index in range(2):
         scene.update(1 / 60)
@@ -1411,8 +1413,10 @@ def _capture_visual_cell(
         min_click_target_clearance,
     ) = _layout_safety_metrics(
         scene,
-        width,
-        height,
+        canvas.width,
+        canvas.height,
+        left=canvas.left,
+        top=canvas.top,
     )
     (
         typography_violations,
@@ -1422,13 +1426,15 @@ def _capture_visual_cell(
     ) = _typography_safety_metrics(typography_events)
     raw = pygame.image.tobytes(surface, "RGB")
     checksum = zlib.adler32(raw)
+    audit_surface = surface.subsurface(pygame.Rect(canvas.as_tuple()))
+    audit_raw = pygame.image.tobytes(audit_surface, "RGB")
     (
         unique_color_samples,
         luminance_spread,
         non_dark_ratio,
         edge_density,
         bright_ratio,
-    ) = _sample_frame_metrics(raw, width, height)
+    ) = _sample_frame_metrics(audit_raw, canvas.width, canvas.height)
     output_path = None
     if output_dir is not None:
         output_path = output_dir / f"{scene_key}_{width}x{height}.png"
@@ -1469,7 +1475,12 @@ def _typography_safety_metrics(events) -> tuple[tuple[str, ...], int, int, float
 
 
 def _layout_safety_metrics(
-    scene, width: int, height: int
+    scene,
+    width: int,
+    height: int,
+    *,
+    left: int = 0,
+    top: int = 0,
 ) -> tuple[tuple[str, ...], int, tuple[int, int], int]:
     targets = tuple(getattr(scene, "_click_targets", ()))
     violations: list[str] = []
@@ -1490,10 +1501,10 @@ def _layout_safety_metrics(
         if target_width < MIN_CLICK_TARGET_WIDTH or target_height < MIN_CLICK_TARGET_HEIGHT:
             violations.append(f"target-too-small:{kind}:{target_width}x{target_height}")
         if (
-            int(getattr(rect, "left", 0)) < 0
-            or int(getattr(rect, "top", 0)) < 0
-            or int(getattr(rect, "right", 0)) > width
-            or int(getattr(rect, "bottom", 0)) > height
+            int(getattr(rect, "left", 0)) < left
+            or int(getattr(rect, "top", 0)) < top
+            or int(getattr(rect, "right", 0)) > left + width
+            or int(getattr(rect, "bottom", 0)) > top + height
         ):
             violations.append(f"target-offscreen:{kind}")
 
