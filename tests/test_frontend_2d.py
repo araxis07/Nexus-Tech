@@ -5887,6 +5887,27 @@ def test_visual_audit_cell_fails_visual_fatigue_thresholds() -> None:
     assert "high flash pressure" in cluttered.notes
 
 
+def test_layout_matrix_ignores_renderer_specific_color_variance() -> None:
+    low_variance = VisualAuditCell(
+        scene_key="title_slots",
+        width=1280,
+        height=720,
+        checksum=12345,
+        unique_color_samples=17,
+        luminance_spread=128,
+        non_dark_ratio=0.42,
+        active_layers=("title-mode:slots",),
+        expected_layers=("title-mode:slots",),
+        click_target_count=2,
+        min_click_target_size=(104, 34),
+    )
+
+    assert low_variance.status == "fail"
+    assert "low color variance" in low_variance.notes
+    assert low_variance.layout_safety_status == "pass"
+    assert low_variance.layout_safety_notes == "captured"
+
+
 def test_visual_audit_cell_fails_layout_safety_violations() -> None:
     unsafe = VisualAuditCell(
         scene_key="run_dashboard",
@@ -7857,7 +7878,7 @@ def test_run_2d_layout_matrix_audit_aggregates_motion_modes_and_ui_scales(
                     width=820,
                     height=620,
                     checksum=42,
-                    unique_color_samples=48,
+                    unique_color_samples=17,
                     luminance_spread=140,
                     non_dark_ratio=0.32,
                     active_layers=("transition", "run-dashboard"),

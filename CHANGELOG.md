@@ -8,6 +8,7 @@
 - Moved panel dividers below the complete heading lane so borders no longer cross titles or make letters appear clipped
 - Rebalanced the title menu into equal primary columns and a responsive three-column utility grid whose incomplete final row remains centered
 - Made visual-health sampling and click-target bounds canvas-aware and added permanent 2880x1800 coverage across all 39 deterministic scene surfaces
+- Kept renderer-dependent color metrics in the visual-quality gate while making the responsive layout matrix report only layer, containment, target-spacing, and typography failures
 - Passed all 39 ultrawide captures at compact, standard, and large text scales with zero layout or typography violations and preserved gameplay, balance, controls, persistence schema 28, and save compatibility
 
 ## 0.326.0 - 2026-08-03

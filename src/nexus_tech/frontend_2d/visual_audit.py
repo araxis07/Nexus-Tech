@@ -216,6 +216,29 @@ class VisualAuditCell:
         return "; ".join(notes)
 
     @property
+    def layout_safety_status(self) -> str:
+        """Return the responsive-layout result without renderer-specific color metrics."""
+
+        if self.missing_layers or self.layout_violations or self.typography_violations:
+            return "fail"
+        return "pass"
+
+    @property
+    def layout_safety_notes(self) -> str:
+        """Return findings that belong to the layout and typography matrix."""
+
+        if self.layout_safety_status == "pass":
+            return "captured"
+        notes: list[str] = []
+        if self.missing_layers:
+            notes.append(f"missing {','.join(self.missing_layers)}")
+        if self.layout_violations:
+            notes.append(f"layout {','.join(self.layout_violations[:3])}")
+        if self.typography_violations:
+            notes.append(f"typography {','.join(self.typography_violations[:3])}")
+        return "; ".join(notes)
+
+    @property
     def minimum_non_dark_ratio(self) -> float:
         """Use a lower fill threshold for large presentation windows with intentional margins."""
 
@@ -382,8 +405,8 @@ def run_2d_layout_matrix_audit(
                         scene_key=cell.scene_key,
                         width=cell.width,
                         height=cell.height,
-                        status=cell.status,
-                        notes=cell.notes,
+                        status=cell.layout_safety_status,
+                        notes=cell.layout_safety_notes,
                         click_target_count=cell.click_target_count,
                         min_click_target_size=cell.min_click_target_size,
                         min_click_target_clearance=cell.min_click_target_clearance,
