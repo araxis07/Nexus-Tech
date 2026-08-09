@@ -4,6 +4,7 @@
 
 - Closed version 0.328.0 as a Stable Alpha without changing gameplay, balance, content, persistence schema, controls, or animation behavior
 - Added a single project-status record, explicit Known Issues, Beta promotion evidence rules, and a maintenance-only scope policy
+- Recorded the 2026-08-10 owner rehearsal as incomplete after a validated isolated run closed without a save or archive; human evidence remains unchanged
 - Kept the package version at 0.328.0 because this closure pass changes documentation and release classification only
 
 ## 0.328.0 - 2026-08-03

@@ -58,6 +58,16 @@ The first animation-matrix attempt ran concurrently with the layout matrix and r
 
 `NOT VERIFIED` means no truthful owner observation was available. It is not recorded as a product defect and cannot be promoted to `PASS` by an automated test.
 
+### Follow-up Owner Rehearsal - 2026-08-10
+
+- Baseline commit `aae1ad480d397cf3822ce164f350e694b2e9d58f` was clean, matched `origin/main`, and had a successful GitHub CI run before launch.
+- The new packet passed preflight and used separate fresh rehearsal, tester, and evidence database paths.
+- The visible window closed with reason `quit`; the rehearsal profile contained 0 saves, 0 archives, 0 complete target paths, and no recorded route.
+- Packet isolation passed, Save & Archive failed, and First Turn, Help, Pause/Back, Menu/Continue, both trade-offs, Guided/Full Endgame, Progress, and Route Atlas remain `NOT VERIFIED` without a direct owner report.
+- Human evidence remained 0/6 sessions and 0/6 represented campaigns. The rehearsal was not recorded as a human session.
+- Ruff, 1,260 tests, content and save validation, 702 layout captures, and all 21 animation cells passed after the window closed.
+- No reproducible P0/P1 was reported. The release remains Stable Alpha in maintenance mode.
+
 ## Manual Evidence Still Required
 
 - Owner Rehearsal: incomplete
