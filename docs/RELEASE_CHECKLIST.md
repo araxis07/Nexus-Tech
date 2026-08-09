@@ -2,6 +2,15 @@
 
 Use this checklist before tagging or presenting a release.
 
+## Closure Classification
+
+- Treat version 0.328.0 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
+- Do not convert automated checks, Owner Rehearsal, or generated reports into human-session evidence.
+- Promote to Beta Candidate only after Owner Rehearsal reaches Save & Archive with no open P0/P1 defect.
+- Promote to Beta Ready only after six valid human sessions cover all six featured campaigns and every P1 fix has a recorded retest.
+- During maintenance, accept only reproducible P0/P1 fixes, security or dependency compatibility work, release tooling, and factual documentation.
+- Do not create a release commit when the working tree has no real change.
+
 ## Version And Notes
 
 - Update `pyproject.toml`.

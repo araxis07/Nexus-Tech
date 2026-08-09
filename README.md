@@ -11,6 +11,14 @@ You start with a small software company, a limited cash reserve, and one early p
 
 Designed for local play and live demos, the project focuses on clean architecture, deterministic simulation, and a polished CLI experience instead of heavy graphics or web infrastructure.
 
+## Project Status
+
+**Stable Alpha | Version 0.328.0 | Maintenance mode**
+
+The complete local gameplay loop, persistence, six featured campaigns, authored endings, archive progression, terminal interface, and responsive 2D shell are implemented and covered by automated release gates. The project is not classified as Beta because the current Owner Rehearsal and the required six human playtest sessions have not been completed. No new features, campaigns, systems, or animation work are planned during maintenance.
+
+See [Project Status](docs/PROJECT_STATUS.md) for the release evidence and promotion rules, and [Known Issues](docs/KNOWN_ISSUES.md) for the remaining manual-validation and platform limitations.
+
 ## 🎮 What Kind of Game Is It?
 
 NEXUS TECH is a:
@@ -1200,6 +1208,8 @@ uv run ruff format src tests
 
 ## 📌 Project Notes
 
+- Version 0.328.0 is closed as a Stable Alpha and is now in maintenance mode
+- Maintenance changes are limited to reproducible P0/P1 defects, security or dependency compatibility, release tooling, and factual documentation
 - The project is intentionally **offline-first** and **local-only**
 - Save data is stored in `nexus-tech.db` by default
 - `--seed` is useful for repeatable demos and deterministic test scenarios

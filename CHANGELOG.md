@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Closed version 0.328.0 as a Stable Alpha without changing gameplay, balance, content, persistence schema, controls, or animation behavior
+- Added a single project-status record, explicit Known Issues, Beta promotion evidence rules, and a maintenance-only scope policy
+- Kept the package version at 0.328.0 because this closure pass changes documentation and release classification only
+
 ## 0.328.0 - 2026-08-03
 
 - Reframed Retina and ultrawide rendering around a centered 1440x900 design canvas so menus and gameplay retain intentional desktop proportions instead of expanding into sparse oversized panels

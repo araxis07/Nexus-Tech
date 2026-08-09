@@ -2,7 +2,7 @@
 
 ## Product Position
 
-NEXUS TECH 0.328.0 remains a late-alpha beta candidate at approximately 83% of a defensible beta. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. The release blocker is observed usability, not missing content.
+NEXUS TECH 0.328.0 is closed as a Stable Alpha in maintenance mode. The vertical slice, six featured campaigns, 24 authored campaign routes, three difficulties, persistence, archive progression, endgame, responsive 2D shell, and automated release gates exist. Promotion remains blocked by incomplete Owner Rehearsal and human-session evidence, not missing content. The former percentage estimate is retired because Beta status is now determined only by the evidence gates in [Project Status](PROJECT_STATUS.md).
 
 The latest presentation record is
 [Beginner UX Redesign Audit - 2026-07-31](BEGINNER_UX_REDESIGN_2026-07-31.md). The
@@ -13,7 +13,7 @@ The guarded owner-flow implementation record remains
 
 ## Current Engineering Slice
 
-The current beta candidate protects the complete owner-flow contract while retaining the executable next-session packet:
+The current Stable Alpha protects the complete owner-flow contract while retaining the executable next-session packet:
 
 - the title shell now exposes one primary Start or Continue route and one promoted Learn to Play route while moving utilities and Quit out of the first-time decision path;
 - one shared guide model provides five progressive beginner lessons plus an optional grouped shortcut reference in both the title shell and live-run Help;
