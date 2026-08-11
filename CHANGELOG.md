@@ -2,10 +2,15 @@
 
 ## Unreleased
 
-- Closed version 0.328.0 as a Stable Alpha without changing gameplay, balance, content, persistence schema, controls, or animation behavior
+## 0.328.1 - 2026-08-11
+
+- Closed SQLite transactions and connections deterministically across saves, beta evidence, diagnostics, and Owner Rehearsal paths instead of relying on garbage collection
+- Added success and exception-path connection lifecycle regressions and made the full CI test suite fail on warnings
+- Added an installed-wheel smoke gate that validates version, content, diagnostics, headless 2D launch, and save health outside the source tree
+- Recorded the 0.328.0 closure baseline as a Stable Alpha without changing gameplay, balance, content, persistence schema, controls, or animation behavior
 - Added a single project-status record, explicit Known Issues, Beta promotion evidence rules, and a maintenance-only scope policy
 - Recorded the 2026-08-10 owner rehearsal as incomplete after a validated isolated run closed without a save or archive; human evidence remains unchanged
-- Kept the package version at 0.328.0 because this closure pass changes documentation and release classification only
+- Kept persistence schema 28, frozen content, gameplay outcomes, controls, UI, animation, archive evidence, and human evidence unchanged in this maintenance patch
 
 ## 0.328.0 - 2026-08-03
 

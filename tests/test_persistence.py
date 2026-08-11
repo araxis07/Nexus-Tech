@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 
@@ -482,7 +483,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
 
     DatabaseManager(db_path).initialize()
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         table_names = {
             row[0]
             for row in connection.execute(
@@ -517,7 +518,7 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
         "frontend_preferences",
     }.issubset(table_names)
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         save_slot_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(save_slots)").fetchall()
         }
@@ -696,9 +697,33 @@ def test_schema_initialization_creates_required_tables(tmp_path: Path) -> None:
     assert user_version >= 22
 
 
+def test_database_manager_closes_connection_after_success(tmp_path: Path) -> None:
+    manager = DatabaseManager(tmp_path / "closed-after-success.db")
+
+    with manager.connect() as connection:
+        assert connection.execute("SELECT 1").fetchone()[0] == 1
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        connection.execute("SELECT 1")
+
+
+def test_database_manager_closes_connection_after_exception(tmp_path: Path) -> None:
+    manager = DatabaseManager(tmp_path / "closed-after-exception.db")
+
+    with (
+        pytest.raises(RuntimeError, match="stop transaction"),
+        manager.connect() as connection,
+    ):
+        connection.execute("CREATE TABLE transient (value INTEGER)")
+        raise RuntimeError("stop transaction")
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        connection.execute("SELECT 1")
+
+
 def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path) -> None:
     db_path = tmp_path / "archive-migration.db"
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE run_archives (
@@ -731,7 +756,7 @@ def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path)
 
     DatabaseManager(db_path).initialize()
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute(
             """
@@ -756,7 +781,7 @@ def test_schema_initialization_migrates_archive_evidence_columns(tmp_path: Path)
 
 def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -> None:
     db_path = tmp_path / "old-save.db"
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE save_slots (
@@ -838,7 +863,7 @@ def test_schema_initialization_migrates_older_additive_columns(tmp_path: Path) -
 
     DatabaseManager(db_path).initialize()
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         table_names = {
             row[0]
             for row in connection.execute(
@@ -1518,7 +1543,7 @@ def test_frontend_preferences_migrate_existing_profile_to_action_loadout(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "legacy-frontend-preferences.db"
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE frontend_preferences (
@@ -1548,7 +1573,7 @@ def test_frontend_preferences_migrate_existing_profile_to_action_loadout(
         motion_mode=MotionMode.REDUCED,
         action_loadout=ActionLoadout.CONTEXTUAL,
     )
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         columns = {
             row[1]
             for row in connection.execute("PRAGMA table_info(frontend_preferences)").fetchall()

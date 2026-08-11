@@ -2,13 +2,13 @@
 
 ## Current Classification
 
-- Version: 0.328.0
+- Version: 0.328.1
 - Status: Stable Alpha
 - Operating mode: maintenance
 - Persistence schema: 28
 - Scope: frozen; no new features, systems, campaigns, or animation work
 
-Version 0.328.0 contains a complete local vertical slice. Players can start a guided or full run, make turn-based operating decisions, pause and recover navigation, save and continue, reach guided or full endgame, archive a completed run, and inspect campaign progress and the Route Atlas. The terminal and 2D interfaces use the same simulation and SQLite persistence model.
+Version 0.328.1 contains a complete local vertical slice. Players can start a guided or full run, make turn-based operating decisions, pause and recover navigation, save and continue, reach guided or full endgame, archive a completed run, and inspect campaign progress and the Route Atlas. The terminal and 2D interfaces use the same simulation and SQLite persistence model.
 
 Stable Alpha is the highest defensible classification today. Automated checks establish implementation health, but they do not establish that a person completed and understood the full owner journey.
 
@@ -67,6 +67,13 @@ The first animation-matrix attempt ran concurrently with the layout matrix and r
 - Human evidence remained 0/6 sessions and 0/6 represented campaigns. The rehearsal was not recorded as a human session.
 - Ruff, 1,260 tests, content and save validation, 702 layout captures, and all 21 animation cells passed after the window closed.
 - No reproducible P0/P1 was reported. The release remains Stable Alpha in maintenance mode.
+
+### Maintenance Patch 0.328.1 - 2026-08-11
+
+- SQLite transactions now close their underlying connections explicitly after success or rollback instead of waiting for garbage collection.
+- Persistence, beta evidence, and Owner Rehearsal regressions run cleanly with warnings treated as errors.
+- CI installs the built wheel into an isolated environment and exercises version, content, diagnostics, headless 2D launch, and save health outside the source tree.
+- Persistence schema 28, gameplay, balance, controls, UI, animation, content, archive evidence, and human evidence are unchanged.
 
 ## Manual Evidence Still Required
 

@@ -48,6 +48,17 @@ jobs:
           missing = [item for item in required if not any(name.endswith(item) for name in names)];
           assert not missing, f"sdist missing required files: {missing}"'
 
+      - name: Smoke test installed wheel
+        run: |
+          uv venv /tmp/nexus-tech-wheel-smoke
+          uv pip install --python /tmp/nexus-tech-wheel-smoke/bin/python /tmp/nexus-tech-dist/nexus_tech-*.whl
+          cd /tmp
+          /tmp/nexus-tech-wheel-smoke/bin/nexus-tech --version
+          /tmp/nexus-tech-wheel-smoke/bin/nexus-tech validate-content
+          /tmp/nexus-tech-wheel-smoke/bin/nexus-tech doctor --db-path /tmp/nexus-tech-wheel-smoke.db
+          /tmp/nexus-tech-wheel-smoke/bin/nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced --db-path /tmp/nexus-tech-wheel-smoke.db
+          /tmp/nexus-tech-wheel-smoke/bin/nexus-tech check-saves --db-path /tmp/nexus-tech-wheel-smoke.db
+
       - name: Validate content catalog
         run: uv run nexus-tech validate-content
 
@@ -453,7 +464,7 @@ jobs:
           --input /tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md
 
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run pytest -q -W error
 
       - name: Check runtime version and doctor
         run: |

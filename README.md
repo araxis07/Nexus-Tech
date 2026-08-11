@@ -13,7 +13,7 @@ Designed for local play and live demos, the project focuses on clean architectur
 
 ## Project Status
 
-**Stable Alpha | Version 0.328.0 | Maintenance mode**
+**Stable Alpha | Version 0.328.1 | Maintenance mode**
 
 The complete local gameplay loop, persistence, six featured campaigns, authored endings, archive progression, terminal interface, and responsive 2D shell are implemented and covered by automated release gates. The project is not classified as Beta because the current Owner Rehearsal and the required six human playtest sessions have not been completed. No new features, campaigns, systems, or animation work are planned during maintenance.
 
@@ -1208,7 +1208,7 @@ uv run ruff format src tests
 
 ## 📌 Project Notes
 
-- Version 0.328.0 is closed as a Stable Alpha and is now in maintenance mode
+- Version 0.328.1 is closed as a Stable Alpha and remains in maintenance mode
 - Maintenance changes are limited to reproducible P0/P1 defects, security or dependency compatibility, release tooling, and factual documentation
 - The project is intentionally **offline-first** and **local-only**
 - Save data is stored in `nexus-tech.db` by default

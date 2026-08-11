@@ -3,7 +3,7 @@
 ## Release Blockers
 
 - Owner Rehearsal has not yet completed the path from a fresh `founder_journey` start through Save & Archive and Progress/Route Atlas.
-- Structured human evidence remains 0/6 sessions and 0/6 represented featured campaigns. Version 0.328.0 must not be described as Beta Ready.
+- Structured human evidence remains 0/6 sessions and 0/6 represented featured campaigns. Version 0.328.1 must not be described as Beta Ready.
 - Readability, pacing, decision comprehension, recovery controls, and motion comfort have automated coverage but still require direct human observation.
 
 These are evidence gaps, not proof of a software defect. If rehearsal exposes a reproducible P0 or P1, record the exact route and fix only that defect with regression coverage.

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from nexus_tech.persistence.schema import initialize_schema
@@ -19,13 +21,18 @@ class DatabaseManager:
 
         return self.db_path.exists()
 
-    def connect(self) -> sqlite3.Connection:
-        """Open a configured SQLite connection."""
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
+        """Open a transactional SQLite connection and always close it."""
 
         connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def initialize(self) -> None:
         """Create the database file and schema if needed."""

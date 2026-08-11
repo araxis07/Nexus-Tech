@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -67,7 +68,7 @@ def test_beta_playtest_repository_round_trip_and_schema_28(tmp_path: Path) -> No
     repository.save_session(session)
 
     assert repository.list_sessions() == [session]
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 28
 
 
@@ -76,7 +77,7 @@ def test_beta_playtest_repository_migrates_schema_27_without_losing_evidence(
 ) -> None:
     db_path = tmp_path / "schema-27-beta.db"
     session = make_session(1, "founder_journey")
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE beta_playtest_sessions (
@@ -122,7 +123,7 @@ def test_beta_playtest_repository_migrates_schema_27_without_losing_evidence(
         connection.execute("PRAGMA user_version = 27")
 
     assert BetaPlaytestRepository(db_path).list_sessions() == [session]
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         columns = {
             row[1]
             for row in connection.execute("PRAGMA table_info(beta_playtest_sessions)").fetchall()
@@ -169,7 +170,7 @@ def test_beta_playtest_repository_requires_new_current_version_tester(
 
 def test_beta_playtest_repository_reports_invalid_stored_interface(tmp_path: Path) -> None:
     db_path = tmp_path / "corrupt-beta.db"
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             """
             CREATE TABLE beta_playtest_sessions (
@@ -533,7 +534,7 @@ def test_beta_playtest_repository_allows_retest_of_legacy_placeholder_note(
     db_path = tmp_path / "beta.db"
     repository = BetaPlaytestRepository(db_path)
     repository.save_session(make_session(1, "founder_journey"))
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection, connection:
         connection.execute(
             "UPDATE beta_playtest_sessions SET notes = 'placeholder' WHERE session_key = ?",
             ("beta-001",),

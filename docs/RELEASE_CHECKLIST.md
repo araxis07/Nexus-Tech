@@ -4,7 +4,7 @@ Use this checklist before tagging or presenting a release.
 
 ## Closure Classification
 
-- Treat version 0.328.0 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
+- Treat version 0.328.1 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
 - Do not convert automated checks, Owner Rehearsal, or generated reports into human-session evidence.
 - Promote to Beta Candidate only after Owner Rehearsal reaches Save & Archive with no open P0/P1 defect.
 - Promote to Beta Ready only after six valid human sessions cover all six featured campaigns and every P1 fix has a recorded retest.
@@ -24,9 +24,16 @@ Use this checklist before tagging or presenting a release.
 uv sync --extra dev
 uv run ruff check src tests
 uv run ruff format --check src tests
-uv run pytest -q
+uv run pytest -q -W error
 uv run pytest -q tests/test_beta_convergence.py
 uv build --out-dir /tmp/nexus-tech-dist
+uv venv /tmp/nexus-tech-wheel-smoke
+uv pip install --python /tmp/nexus-tech-wheel-smoke/bin/python /tmp/nexus-tech-dist/nexus_tech-*.whl
+/tmp/nexus-tech-wheel-smoke/bin/nexus-tech --version
+/tmp/nexus-tech-wheel-smoke/bin/nexus-tech validate-content
+/tmp/nexus-tech-wheel-smoke/bin/nexus-tech doctor --db-path /tmp/nexus-tech-wheel-smoke.db
+/tmp/nexus-tech-wheel-smoke/bin/nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced --db-path /tmp/nexus-tech-wheel-smoke.db
+/tmp/nexus-tech-wheel-smoke/bin/nexus-tech check-saves --db-path /tmp/nexus-tech-wheel-smoke.db
 uv run nexus-tech --version
 uv run nexus-tech doctor
 uv run nexus-tech validate-content
