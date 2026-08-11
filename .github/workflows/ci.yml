@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -34,6 +38,9 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check src tests
 
+      - name: Run tests
+        run: uv run pytest -q -W error
+
       - name: Build package artifacts
         run: uv build --out-dir /tmp/nexus-tech-dist
 
@@ -47,6 +54,21 @@ jobs:
           "src/nexus_tech/simulation/beta_playtest_execution.py");
           missing = [item for item in required if not any(name.endswith(item) for name in names)];
           assert not missing, f"sdist missing required files: {missing}"'
+
+      - name: Rebuild and install source distribution offline
+        run: |
+          mkdir -p /tmp/nexus-tech-sdist-source /tmp/nexus-tech-sdist-rebuild
+          tar -xzf /tmp/nexus-tech-dist/nexus_tech-*.tar.gz -C /tmp/nexus-tech-sdist-source
+          sdist_root="$(find /tmp/nexus-tech-sdist-source -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          cd "$sdist_root"
+          uv run --offline --no-project --with 'hatchling>=1.27.0' \
+            python -m hatchling build --target wheel --directory /tmp/nexus-tech-sdist-rebuild
+          uv venv /tmp/nexus-tech-sdist-smoke
+          uv pip install --offline --python /tmp/nexus-tech-sdist-smoke/bin/python \
+            --no-deps /tmp/nexus-tech-sdist-rebuild/nexus_tech-*.whl
+          cd /tmp
+          /tmp/nexus-tech-sdist-smoke/bin/python -c \
+            'from importlib.metadata import version; import nexus_tech; assert nexus_tech.__version__ == version("nexus-tech")'
 
       - name: Smoke test installed wheel
         run: |
@@ -463,9 +485,6 @@ jobs:
           --intake /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
           --input /tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md
 
-      - name: Run tests
-        run: uv run pytest -q -W error
-
       - name: Check runtime version and doctor
         run: |
           uv run nexus-tech --version
@@ -538,39 +557,16 @@ jobs:
           uv run nexus-tech validate-animation-playtest-session-bundle \
             --command-prefix "uv run nexus-tech"
 
-      - name: Upload campaign readiness artifact
+      - name: Upload release readiness reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-tech-campaign-readiness
-          path: /tmp/nexus-tech-campaign-readiness.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload decision quality artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-decision-quality
-          path: /tmp/nexus-tech-decision-quality.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload structured human beta next-session packet
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-beta-playtest-next
-          path: /tmp/nexus-tech-beta-playtest-next.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload structured human beta execution plan
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-beta-playtest-plan
-          path: /tmp/nexus-tech-beta-playtest-plan.md
+          name: nexus-tech-release-readiness
+          path: |
+            /tmp/nexus-tech-campaign-readiness.md
+            /tmp/nexus-tech-decision-quality.md
+            /tmp/nexus-tech-beta-playtest-next.md
+            /tmp/nexus-tech-beta-playtest-plan.md
           if-no-files-found: warn
           retention-days: 7
 
@@ -583,201 +579,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload onboarding flow audit artifact
+      - name: Upload onboarding reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nexus-tech-onboarding-flow-audit
-          path: /tmp/nexus-tech-onboarding-flow-audit.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible playtest packet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-playtest
-          path: /tmp/nexus-tech-onboarding-visible-playtest.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible playtest report artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-playtest-report
-          path: /tmp/nexus-tech-onboarding-visible-playtest-report.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible next-step artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-playtest-next
-          path: /tmp/nexus-tech-onboarding-visible-playtest-next.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible focused batch packet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-playtest-batch-packet
-          path: /tmp/nexus-tech-onboarding-visible-playtest-batch-packet.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible focused batch preflight artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-batch-preflight
-          path: /tmp/nexus-tech-onboarding-visible-batch-preflight.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible terminal batch artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-terminal-batch
-          path: /tmp/nexus-tech-onboarding-visible-terminal-batch.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible terminal evidence sheet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-terminal-evidence-sheet
-          path: /tmp/nexus-tech-onboarding-visible-terminal-evidence-sheet.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible 820x620 evidence sheet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-820x620-evidence-sheet
-          path: /tmp/nexus-tech-onboarding-visible-820x620-evidence-sheet.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible 1280x720 evidence sheet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-1280x720-evidence-sheet
-          path: /tmp/nexus-tech-onboarding-visible-1280x720-evidence-sheet.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible 1440x900 evidence sheet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-1440x900-evidence-sheet
-          path: /tmp/nexus-tech-onboarding-visible-1440x900-evidence-sheet.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible evidence matrix artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-evidence-matrix
-          path: /tmp/nexus-tech-onboarding-visible-evidence-matrix.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible window preflight artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-window-preflight
-          path: /tmp/nexus-tech-onboarding-visible-window-preflight.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible manual session artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-manual-session
-          path: /tmp/nexus-tech-onboarding-visible-manual-session.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX issue intake artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-issue-intake
-          path: /tmp/nexus-tech-onboarding-visible-ux-issue-intake.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX fix plan artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-fix-plan
-          path: /tmp/nexus-tech-onboarding-visible-ux-fix-plan.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX triage sprint artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-triage-sprint
-          path: /tmp/nexus-tech-onboarding-visible-ux-triage-sprint.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX triage next artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-triage-next
-          path: /tmp/nexus-tech-onboarding-visible-ux-triage-next.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX recording queue artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-recording-queue
-          path: /tmp/nexus-tech-onboarding-visible-ux-recording-queue.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX progress artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-progress
-          path: /tmp/nexus-tech-onboarding-visible-ux-progress.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX batch packet artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-batch-packet
-          path: /tmp/nexus-tech-onboarding-visible-ux-batch-packet.md
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload onboarding visible UX batch closeout artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nexus-tech-onboarding-visible-ux-batch-closeout
-          path: /tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md
+          name: nexus-tech-onboarding-reports
+          path: /tmp/nexus-tech-onboarding*.md
           if-no-files-found: warn
           retention-days: 7
 

@@ -2109,8 +2109,8 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert (
         "uv run nexus-tech audit-onboarding-flow --output /tmp/nexus-tech-onboarding-flow-audit.md"
     ) in workflow
-    assert "nexus-tech-onboarding-flow-audit" in workflow
-    assert "path: /tmp/nexus-tech-onboarding-flow-audit.md" in workflow
+    assert "name: nexus-tech-onboarding-reports" in workflow
+    assert "path: /tmp/nexus-tech-onboarding*.md" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-packet" in workflow
     assert "uv run nexus-tech validate-onboarding-visible-playtest-packet" in workflow
     assert "uv run nexus-tech onboarding-visible-playtest-report" in workflow
@@ -2173,27 +2173,6 @@ def test_ci_workflow_runs_onboarding_flow_audit_artifact_gate() -> None:
     assert "/tmp/nexus-tech-onboarding-visible-ux-progress.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-batch-packet.md" in workflow
     assert "/tmp/nexus-tech-onboarding-visible-ux-batch-closeout.md" in workflow
-    assert "nexus-tech-onboarding-visible-playtest" in workflow
-    assert "nexus-tech-onboarding-visible-playtest-report" in workflow
-    assert "nexus-tech-onboarding-visible-playtest-next" in workflow
-    assert "nexus-tech-onboarding-visible-playtest-batch-packet" in workflow
-    assert "nexus-tech-onboarding-visible-batch-preflight" in workflow
-    assert "nexus-tech-onboarding-visible-terminal-batch" in workflow
-    assert "nexus-tech-onboarding-visible-terminal-evidence-sheet" in workflow
-    assert "nexus-tech-onboarding-visible-820x620-evidence-sheet" in workflow
-    assert "nexus-tech-onboarding-visible-1280x720-evidence-sheet" in workflow
-    assert "nexus-tech-onboarding-visible-1440x900-evidence-sheet" in workflow
-    assert "nexus-tech-onboarding-visible-evidence-matrix" in workflow
-    assert "nexus-tech-onboarding-visible-window-preflight" in workflow
-    assert "nexus-tech-onboarding-visible-manual-session" in workflow
-    assert "nexus-tech-onboarding-visible-ux-issue-intake" in workflow
-    assert "nexus-tech-onboarding-visible-ux-fix-plan" in workflow
-    assert "nexus-tech-onboarding-visible-ux-triage-sprint" in workflow
-    assert "nexus-tech-onboarding-visible-ux-triage-next" in workflow
-    assert "nexus-tech-onboarding-visible-ux-recording-queue" in workflow
-    assert "nexus-tech-onboarding-visible-ux-progress" in workflow
-    assert "nexus-tech-onboarding-visible-ux-batch-packet" in workflow
-    assert "nexus-tech-onboarding-visible-ux-batch-closeout" in workflow
 
 
 def test_glossary_command_renders_core_stat_help() -> None:

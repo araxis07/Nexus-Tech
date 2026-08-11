@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Made CI fail fast by running the warning-clean full suite before package and QA artifact generation, and cancel superseded runs on the same ref
+- Added an offline source-distribution rebuild/install smoke and release-metadata consistency regressions
+- Consolidated 32 short-lived CI artifact uploads into eight review-oriented bundles without removing generated reports
+- Removed a stale release number from the fixed-keyboard documentation
+
 ## 0.328.1 - 2026-08-11
 
 - Closed SQLite transactions and connections deterministically across saves, beta evidence, diagnostics, and Owner Rehearsal paths instead of relying on garbage collection
