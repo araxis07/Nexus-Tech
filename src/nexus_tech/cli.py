@@ -21,6 +21,7 @@ from rich.table import Table
 from rich.traceback import install as install_rich_traceback
 
 from nexus_tech import __version__
+from nexus_tech.artifact_path_safety import require_distinct_local_artifact_paths
 from nexus_tech.cli_beta_playtest import register_beta_playtest_commands
 from nexus_tech.cli_command_prefix import resolve_cli_command_prefix
 from nexus_tech.config import (
@@ -2211,6 +2212,10 @@ def prepare_2d_animation_playtest_command(
 
     if matrix_input is not None:
         try:
+            require_distinct_local_artifact_paths(
+                ("matrix input", matrix_input),
+                ("playtest prep output", output),
+            )
             matrix_report = read_2d_animation_matrix_report(matrix_input)
         except (OSError, ValueError) as error:
             console.print(

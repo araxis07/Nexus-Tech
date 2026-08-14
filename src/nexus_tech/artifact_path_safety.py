@@ -14,6 +14,20 @@ def normalize_local_path(value: str | Path) -> Path:
     return _absolute_local_path(value).resolve(strict=False)
 
 
+def require_distinct_local_artifact_paths(
+    *artifacts: tuple[str, str | Path],
+) -> None:
+    """Reject output paths that alias another local artifact path."""
+
+    seen_paths: dict[Path, str] = {}
+    for label, value in artifacts:
+        normalized_path = normalize_local_path(value)
+        previous_label = seen_paths.get(normalized_path)
+        if previous_label is not None:
+            raise ValueError(f"{label} must not overwrite {previous_label}: {normalized_path}")
+        seen_paths[normalized_path] = label
+
+
 def protected_sqlite_artifact_paths(
     *database_paths: str | Path,
 ) -> frozenset[Path]:

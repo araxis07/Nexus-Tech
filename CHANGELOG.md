@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prevented animation playtest preparation from overwriting its matrix input through direct paths or symlink aliases
 - Made CI fail fast by running the warning-clean full suite before package and QA artifact generation, and cancel superseded runs on the same ref
 - Added an offline source-distribution rebuild/install smoke and release-metadata consistency regressions
 - Consolidated 32 short-lived CI artifact uploads into eight review-oriented bundles without removing generated reports

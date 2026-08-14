@@ -8309,6 +8309,52 @@ def test_prepare_2d_animation_playtest_command_reuses_matrix_artifact(
     assert "`founder_journey` | `7` | `pass` | `15:abc12345`" in report_text
 
 
+@pytest.mark.parametrize("use_symlink", (False, True))
+def test_prepare_2d_animation_playtest_command_preserves_aliased_matrix_input(
+    tmp_path: Path,
+    use_symlink: bool,
+) -> None:
+    matrix_report = AnimationMatrixReport(
+        scenario_ids=("founder_journey",),
+        difficulty="scenario",
+        seeds=(7,),
+        frames=1,
+        cells=(
+            AnimationMatrixCell(
+                scenario_id="founder_journey",
+                difficulty="scenario",
+                seed=7,
+                status="pass",
+                visual_baseline="15:abc12345",
+                failed_areas=(),
+                advisory_gaps=("Manual open-window playtest is still required.",),
+            ),
+        ),
+    )
+    matrix_path = tmp_path / ANIMATION_MATRIX_REPORT_NAME
+    write_2d_animation_matrix_report(matrix_report, matrix_path)
+    original_matrix = matrix_path.read_text(encoding="utf-8")
+    matrix_input = matrix_path
+    if use_symlink:
+        matrix_input = tmp_path / "animation-matrix-alias.md"
+        matrix_input.symlink_to(matrix_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "prepare-2d-animation-playtest",
+            "--matrix-input",
+            str(matrix_input),
+            "--output",
+            str(matrix_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "playtest prep output must not overwrite matrix input" in result.output
+    assert matrix_path.read_text(encoding="utf-8") == original_matrix
+
+
 def test_prepare_2d_animation_playtest_command_rejects_incomplete_matrix_artifact(
     tmp_path: Path,
 ) -> None:
