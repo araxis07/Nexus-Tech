@@ -12692,6 +12692,50 @@ def test_prepare_animation_playtest_session_command_writes_draft_queue_and_plan(
     assert "internally consistent" in bundle_result.output
 
 
+@pytest.mark.parametrize("use_symlink", (False, True))
+def test_prepare_animation_playtest_session_command_preserves_aliased_outputs(
+    tmp_path: Path,
+    use_symlink: bool,
+) -> None:
+    report_path = tmp_path / "preserved-report.md"
+    report_path.write_text("preserve this report\n", encoding="utf-8")
+    commands_path = report_path
+    if use_symlink:
+        commands_path = tmp_path / "commands-alias.md"
+        commands_path.symlink_to(report_path)
+
+    remaining_outputs = {
+        "--plan-output": tmp_path / "plan.md",
+        "--recorder-output": tmp_path / "recorder.md",
+        "--route-batches-output": tmp_path / "routes.md",
+        "--next-batch-output": tmp_path / "next.md",
+        "--triage-output": tmp_path / "triage.md",
+        "--release-gate-output": tmp_path / "release.md",
+        "--progress-output": tmp_path / "progress.md",
+        "--execution-guide-output": tmp_path / "guide.md",
+        "--issue-backlog-output": tmp_path / "issues.md",
+        "--sprint-output": tmp_path / "sprint.md",
+        "--evidence-sheet-output": tmp_path / "evidence.md",
+        "--handoff-output": tmp_path / "handoff.md",
+    }
+    arguments = [
+        "prepare-animation-playtest-session",
+        "--report-output",
+        str(report_path),
+        "--commands-output",
+        str(commands_path),
+    ]
+    for option, output_path in remaining_outputs.items():
+        arguments.extend((option, str(output_path)))
+
+    result = runner.invoke(app, arguments)
+
+    assert result.exit_code == 1
+    assert "commands output must not overwrite report output" in result.output
+    assert report_path.read_text(encoding="utf-8") == "preserve this report\n"
+    assert all(not output_path.exists() for output_path in remaining_outputs.values())
+
+
 def test_ci_workflow_runs_animation_matrix_artifact_gate() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 

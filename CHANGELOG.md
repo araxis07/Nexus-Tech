@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prevented manual animation session outputs from aliasing and overwriting one another
 - Prevented animation playtest preparation from overwriting its matrix input through direct paths or symlink aliases
 - Made CI fail fast by running the warning-clean full suite before package and QA artifact generation, and cancel superseded runs on the same ref
 - Added an offline source-distribution rebuild/install smoke and release-metadata consistency regressions

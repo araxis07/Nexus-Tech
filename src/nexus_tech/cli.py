@@ -5452,6 +5452,32 @@ def prepare_animation_playtest_session_command(
     """Prepare report, command queue, and plan files for the manual animation playtest."""
 
     validate_scenario_id(scenario)
+    try:
+        require_distinct_local_artifact_paths(
+            ("report output", report_output),
+            ("commands output", commands_output),
+            ("plan output", plan_output),
+            ("recorder output", recorder_output),
+            ("route batches output", route_batch_output),
+            ("next batch output", next_batch_output),
+            ("triage output", triage_output),
+            ("release gate output", release_gate_output),
+            ("progress output", progress_output),
+            ("execution guide output", execution_guide_output),
+            ("issue backlog output", issue_backlog_output),
+            ("sprint output", sprint_output),
+            ("evidence sheet output", evidence_sheet_output),
+            ("handoff output", handoff_output),
+        )
+    except ValueError as error:
+        console.print(
+            Panel.fit(
+                str(error),
+                title="Animation Playtest Session",
+                border_style="red",
+            )
+        )
+        raise typer.Exit(code=1) from None
     resolved_commit = _resolve_animation_report_commit(commit, auto_commit=auto_commit)
     write_2d_animation_playtest_report_template(
         report_output,
