@@ -17,7 +17,7 @@ Designed for local play and live demos, the project focuses on clean architectur
 
 The complete local gameplay loop, persistence, six featured campaigns, authored endings, archive progression, terminal interface, and responsive 2D shell are implemented and covered by automated release gates. The project is not classified as Beta because the current Owner Rehearsal and the required six human playtest sessions have not been completed. No new features, campaigns, systems, or animation work are planned during maintenance.
 
-See [Project Status](docs/PROJECT_STATUS.md) for the release evidence and promotion rules, and [Known Issues](docs/KNOWN_ISSUES.md) for the remaining manual-validation and platform limitations.
+See [Project Status](docs/PROJECT_STATUS.md) for the release evidence and promotion rules, [Known Issues](docs/KNOWN_ISSUES.md) for the remaining manual-validation and platform limitations, and the [Gameplay Validation Backlog](docs/GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md) for evidence-gated work that remains deferred during maintenance.
 
 ## 🎮 What Kind of Game Is It?
 

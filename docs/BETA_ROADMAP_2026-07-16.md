@@ -10,6 +10,8 @@ current playtest-readiness record is
 [Beta Playtest Readiness - 2026-08-01](BETA_PLAYTEST_READINESS_2026-08-01.md).
 The guarded owner-flow implementation record remains
 [Beta Execution Audit - 2026-07-30](BETA_EXECUTION_AUDIT_2026-07-30.md).
+The evidence-gated future gameplay queue is maintained in
+[Gameplay Validation Backlog - 2026-08-19](GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md).
 
 ## Current Engineering Slice
 

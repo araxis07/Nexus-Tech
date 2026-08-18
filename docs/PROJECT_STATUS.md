@@ -85,6 +85,19 @@ The first animation-matrix attempt ran concurrently with the layout matrix and r
 
 Owner Rehearsal is an operator preflight only. It must never be inserted into the human evidence database or counted toward the six sessions.
 
+## Gameplay Change Control - 2026-08-19
+
+The current decision-quality baseline passed its automated ledger gate across 54
+heuristic runs. Thirteen of 18 scenario/difficulty cells retained an advisory
+watch, all led by repeated `Grow Demand`, with the highest autoplay repetition in
+`public_market_countdown`. This is not a gameplay failure and does not authorize
+balance work without matching real-player observations.
+
+Future gameplay discovery, conditional tuning, Debt Crunch late-game review, and
+post-beta capability order are bounded in the
+[Gameplay Validation Backlog](GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md). The
+backlog does not reopen maintenance scope or change the promotion rules below.
+
 ## Promotion Rules
 
 ### Beta Candidate

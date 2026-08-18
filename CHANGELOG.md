@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added an evidence-gated gameplay validation backlog with acceptance criteria for decision-variety review, conditional `Grow Demand` tuning, Debt Crunch late-game validation, post-beta capability order, and bounded test batches
 - Prevented manual animation session outputs from aliasing and overwriting one another
 - Prevented animation playtest preparation from overwriting its matrix input through direct paths or symlink aliases
 - Made CI fail fast by running the warning-clean full suite before package and QA artifact generation, and cancel superseded runs on the same ref
