@@ -89,9 +89,11 @@ Owner Rehearsal is an operator preflight only. It must never be inserted into th
 
 The current decision-quality baseline passed its automated ledger gate across 54
 heuristic runs. Thirteen of 18 scenario/difficulty cells retained an advisory
-watch, all led by repeated `Grow Demand`, with the highest autoplay repetition in
-`public_market_countdown`. This is not a gameplay failure and does not authorize
-balance work without matching real-player observations.
+watch, all led by repeated `Grow Demand`. In-memory policy attribution identifies
+the three `portfolio_machine` cells as 100% default-fallback autoplay-policy
+watches; the other ten remain possible gameplay candidates, with the highest raw
+repetition in `public_market_countdown`. Neither class is a gameplay failure or
+authorizes balance work without matching real-player observations.
 
 Future gameplay discovery, conditional tuning, Debt Crunch late-game review, and
 post-beta capability order are bounded in the

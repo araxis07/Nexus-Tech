@@ -14,7 +14,7 @@ These are evidence gaps, not proof of a software defect. If rehearsal exposes a 
 - The supported 2D viewport begins at 820x620. Larger Retina and ultrawide windows intentionally center a 1440x900 maximum design canvas instead of stretching every panel.
 - Saves are local SQLite files. Cloud sync, multiplayer, and cross-device account recovery are not included.
 - The game is English-only and terminal/shape-art first; recorded voice, a full audio layer, and production illustration assets are outside the closed scope.
-- Automated decision-quality audits retain 13 advisory watch cells, with `Grow Demand` as the repeated candidate and `public_market_countdown` showing the highest autoplay repetition. This is not authority to rebalance gameplay without matching human observations; see the [Gameplay Validation Backlog](GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md).
+- Automated decision-quality audits retain 13 advisory watch cells led by `Grow Demand`. Reason attribution classifies all three `portfolio_machine` cells as 100% default-fallback autoplay-policy watches and leaves ten cells as possible gameplay candidates, with `public_market_countdown` showing the highest raw repetition. Neither classification authorizes rebalancing without matching human observations; see the [Gameplay Validation Backlog](GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md).
 - Specialist human confirmation for the later `debt_crunch` campaign remains outstanding even though deterministic regression coverage protects its supported recovery envelope.
 
 ## Severity Policy

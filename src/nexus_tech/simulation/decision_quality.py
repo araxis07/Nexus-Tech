@@ -9,7 +9,11 @@ from math import ceil
 
 from nexus_tech.content.loader import get_scenario
 from nexus_tech.domain.models import CampaignGoalId, DifficultyMode
-from nexus_tech.simulation.balance_lab import run_autoplay
+from nexus_tech.simulation.balance_lab import (
+    AutoplayDecisionReason,
+    AutoplayDecisionTraceEntry,
+    run_autoplay,
+)
 from nexus_tech.simulation.campaign_journey import list_featured_campaign_journeys
 from nexus_tech.simulation.decision_patterns import build_decision_pattern
 from nexus_tech.simulation.engine import create_new_game
@@ -17,6 +21,7 @@ from nexus_tech.simulation.randomness import RandomSource
 
 MIN_AVERAGE_UNIQUE_COMMANDS = 7.0
 MIN_AVERAGE_FAMILIES = 4.0
+AUTOPLAY_POLICY_FALLBACK_THRESHOLD = 0.5
 
 
 @dataclass(frozen=True)
@@ -33,6 +38,16 @@ class DecisionQualityRun:
     repeated_count: int
     repeat_share: float
     repetition_watch: bool
+    repeated_command: str = ""
+    reason_breakdown: tuple[tuple[str, int], ...] = ()
+    fallback_count: int = 0
+    fallback_share: float = 0.0
+
+    @property
+    def leading_reason(self) -> str:
+        if not self.reason_breakdown:
+            return "not_attributed"
+        return self.reason_breakdown[0][0]
 
 
 @dataclass(frozen=True)
@@ -65,6 +80,18 @@ class DecisionQualityCell:
         return _average(run.repeat_share for run in self.runs)
 
     @property
+    def average_fallback_share(self) -> float:
+        leading_label = self.leading_repeat_label
+        matching_runs = tuple(
+            run
+            for run in self.runs
+            if run.repeated_count > 1 and run.repeated_label == leading_label
+        )
+        attributed_count = sum(count for run in matching_runs for _, count in run.reason_breakdown)
+        fallback_count = sum(run.fallback_count for run in matching_runs)
+        return fallback_count / attributed_count if attributed_count else 0.0
+
+    @property
     def repetition_watch_runs(self) -> int:
         return sum(run.repetition_watch for run in self.runs)
 
@@ -78,6 +105,29 @@ class DecisionQualityCell:
         if not counts:
             return "No repeated choice"
         return min(counts.items(), key=lambda item: (-item[1], item[0].casefold()))[0]
+
+    @property
+    def reason_breakdown(self) -> tuple[tuple[str, int], ...]:
+        leading_label = self.leading_repeat_label
+        counts: Counter[str] = Counter()
+        for run in self.runs:
+            if run.repeated_label == leading_label:
+                counts.update(dict(run.reason_breakdown))
+        return tuple(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+    @property
+    def leading_repeat_reason(self) -> str:
+        if not self.reason_breakdown:
+            return "not_attributed"
+        return self.reason_breakdown[0][0]
+
+    @property
+    def reason_breakdown_line(self) -> str:
+        if not self.reason_breakdown:
+            return "not attributed"
+        return ", ".join(
+            f"{_format_reason(reason)} {count}" for reason, count in self.reason_breakdown
+        )
 
 
 @dataclass(frozen=True)
@@ -142,6 +192,7 @@ def run_decision_quality_audit(
             run_results: list[DecisionQualityRun] = []
             for run_index in range(runs_per_cell):
                 seed = scenario_seed_base + run_index
+                decision_trace: list[AutoplayDecisionTraceEntry] = []
                 state = create_new_game(
                     scenario_id=scenario_id,
                     difficulty_mode=difficulty_mode,
@@ -151,8 +202,18 @@ def run_decision_quality_audit(
                     state,
                     RandomSource(seed=seed),
                     max_turns=turns,
+                    decision_trace=decision_trace,
                 )
                 pattern = build_decision_pattern(state.decision_history)
+                reason_breakdown = _build_reason_breakdown(
+                    decision_trace,
+                    repeated_command=pattern.most_repeated_command,
+                )
+                attributed_count = sum(count for _, count in reason_breakdown)
+                fallback_count = dict(reason_breakdown).get(
+                    AutoplayDecisionReason.DEFAULT_GROWTH_FALLBACK.value,
+                    0,
+                )
                 run_results.append(
                     DecisionQualityRun(
                         seed=seed,
@@ -169,6 +230,12 @@ def run_decision_quality_audit(
                             else 0.0
                         ),
                         repetition_watch=pattern.repetition_watch,
+                        repeated_command=pattern.most_repeated_command,
+                        reason_breakdown=reason_breakdown,
+                        fallback_count=fallback_count,
+                        fallback_share=(
+                            fallback_count / attributed_count if attributed_count else 0.0
+                        ),
                     )
                 )
             cells.append(
@@ -203,11 +270,22 @@ def evaluate_decision_quality_cell(
 
     watch_threshold = ceil(cell.run_count / 2)
     if cell.repetition_watch_runs >= watch_threshold:
+        if cell.average_fallback_share >= AUTOPLAY_POLICY_FALLBACK_THRESHOLD:
+            return DecisionQualityEvaluation(
+                "watch",
+                (
+                    f"Autoplay-policy watch: {cell.repetition_watch_runs}/{cell.run_count} "
+                    f"heuristic runs repeated {cell.leading_repeat_label}; "
+                    f"{cell.average_fallback_share:.0%} of attributed repeats came from "
+                    "the default policy fallback."
+                ),
+            )
         return DecisionQualityEvaluation(
             "watch",
             (
-                f"{cell.repetition_watch_runs}/{cell.run_count} heuristic runs repeated "
-                f"{cell.leading_repeat_label}; confirm distinct player intent before tuning."
+                f"Possible gameplay candidate: {cell.repetition_watch_runs}/{cell.run_count} "
+                f"heuristic runs repeated {cell.leading_repeat_label}; confirm distinct "
+                "player intent before tuning."
             ),
         )
     if (
@@ -248,9 +326,13 @@ def format_decision_quality_markdown(matrix: DecisionQualityMatrix) -> str:
         "",
         (
             "| Scenario | Goal | Difficulty | Status | Runs | Avg Decisions | Avg Unique | "
-            "Avg Families | Repeat Watches | Avg Repeat Share | Leading Repeat | Summary |"
+            "Avg Families | Repeat Watches | Avg Repeat Share | Avg Fallback Share | "
+            "Leading Repeat | Leading Reason | Summary |"
         ),
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+        (
+            "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | "
+            "---: | --- | --- | --- |"
+        ),
     ]
     for cell, evaluation in zip(matrix.cells, evaluations, strict=True):
         lines.append(
@@ -265,23 +347,38 @@ def format_decision_quality_markdown(matrix: DecisionQualityMatrix) -> str:
             f"{cell.average_family_count:.1f} | "
             f"{cell.repetition_watch_runs} | "
             f"{cell.average_repeat_share:.0%} | "
+            f"{cell.average_fallback_share:.0%} | "
             f"{cell.leading_repeat_label} | "
+            f"{_format_reason(cell.leading_repeat_reason)} | "
             f"{evaluation.summary} |"
         )
 
-    candidates = Counter(
-        cell.leading_repeat_label
-        for cell, evaluation in zip(matrix.cells, evaluations, strict=True)
-        if evaluation.status == "watch" and cell.leading_repeat_label != "No repeated choice"
+    repetition_cells = tuple(
+        cell for cell in matrix.cells if cell.repetition_watch_runs >= ceil(cell.run_count / 2)
     )
+    policy_watches = tuple(
+        cell
+        for cell in repetition_cells
+        if cell.average_fallback_share >= AUTOPLAY_POLICY_FALLBACK_THRESHOLD
+    )
+    possible_gameplay_candidates = tuple(
+        cell
+        for cell in repetition_cells
+        if cell.average_fallback_share < AUTOPLAY_POLICY_FALLBACK_THRESHOLD
+    )
+
     lines.extend(["", "## Candidate Review", ""])
-    if not candidates:
-        lines.append("- No cross-cell repetition candidate was detected by this heuristic pass.")
+    lines.extend(["### Autoplay Policy Watches", ""])
+    if not policy_watches:
+        lines.append("- No fallback-dominated autoplay repetition was detected.")
     else:
-        for label, count in sorted(
-            candidates.items(), key=lambda item: (-item[1], item[0].casefold())
-        ):
-            lines.append(f"- `{label}` led repetition in `{count}` advisory watch cell(s).")
+        lines.extend(_format_attribution_line(cell) for cell in policy_watches)
+
+    lines.extend(["", "### Possible Gameplay Candidates", ""])
+    if not possible_gameplay_candidates:
+        lines.append("- No non-fallback repetition candidate was detected.")
+    else:
+        lines.extend(_format_attribution_line(cell) for cell in possible_gameplay_candidates)
 
     lines.extend(
         [
@@ -290,8 +387,12 @@ def format_decision_quality_markdown(matrix: DecisionQualityMatrix) -> str:
             "",
             "- This audit measures the deterministic autoplay policy, not player behavior.",
             (
-                "- A watch result identifies a candidate for observed playtest review; "
-                "it is not a failure."
+                "- A fallback-dominated watch is an autoplay-policy signal, not a gameplay "
+                "candidate or failure."
+            ),
+            (
+                "- A possible gameplay candidate still requires matching observed player "
+                "notes before tuning."
             ),
             "- Do not remove, consolidate, or retune a command without matching real-player notes.",
             (
@@ -309,6 +410,29 @@ def _repeat_label_counts(runs: tuple[DecisionQualityRun, ...]) -> Counter[str]:
         if run.repeated_count > 1:
             counts[run.repeated_label] += run.repeated_count
     return counts
+
+
+def _build_reason_breakdown(
+    trace: Iterable[AutoplayDecisionTraceEntry],
+    *,
+    repeated_command: str,
+) -> tuple[tuple[str, int], ...]:
+    counts = Counter(
+        entry.reason.value for entry in trace if entry.action.value == repeated_command
+    )
+    return tuple(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _format_attribution_line(cell: DecisionQualityCell) -> str:
+    return (
+        f"- `{cell.scenario_id} / {cell.difficulty_mode.value}`: "
+        f"`{cell.leading_repeat_label}`; fallback `{cell.average_fallback_share:.0%}`; "
+        f"reasons: {cell.reason_breakdown_line}."
+    )
+
+
+def _format_reason(reason: str) -> str:
+    return reason.replace("_", " ").title()
 
 
 def _average(values: Iterable[int | float]) -> float:

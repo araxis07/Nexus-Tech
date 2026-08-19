@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from nexus_tech.domain.models import CampaignGoalId, DifficultyMode
+from nexus_tech.simulation.balance_lab import AutoplayDecisionReason
 from nexus_tech.simulation.decision_quality import (
     DecisionQualityCell,
     DecisionQualityMatrix,
@@ -20,6 +21,8 @@ def _run(
     repeated_label: str = "Grow Demand",
     repeated_count: int = 5,
     repetition_watch: bool = False,
+    reason_breakdown: tuple[tuple[str, int], ...] = (),
+    fallback_count: int = 0,
 ) -> DecisionQualityRun:
     return DecisionQualityRun(
         seed=seed,
@@ -32,6 +35,10 @@ def _run(
         repeated_count=repeated_count,
         repeat_share=(repeated_count / operating_decisions if operating_decisions else 0.0),
         repetition_watch=repetition_watch,
+        repeated_command="market_product",
+        reason_breakdown=reason_breakdown,
+        fallback_count=fallback_count,
+        fallback_share=(fallback_count / repeated_count if repeated_count else 0.0),
     )
 
 
@@ -61,6 +68,7 @@ def test_decision_quality_evaluation_separates_coverage_failures_from_watches() 
     assert evaluate_decision_quality_cell(missing).status == "fail"
     assert evaluate_decision_quality_cell(repetitive).status == "watch"
     assert "2/3 heuristic runs" in evaluate_decision_quality_cell(repetitive).summary
+    assert "Possible gameplay candidate" in evaluate_decision_quality_cell(repetitive).summary
     assert repetitive.leading_repeat_label == "Grow Demand"
     assert evaluate_decision_quality_cell(low_variety).status == "watch"
     assert "Average variety" in evaluate_decision_quality_cell(low_variety).summary
@@ -91,6 +99,47 @@ def test_decision_quality_markdown_preserves_human_tuning_boundary() -> None:
     assert "Do not remove, consolidate, or retune a command" in report
 
 
+def test_decision_quality_separates_fallback_dominated_policy_watches() -> None:
+    reasons = (
+        (AutoplayDecisionReason.DEFAULT_GROWTH_FALLBACK.value, 8),
+        (AutoplayDecisionReason.GROWTH_STABILIZATION.value, 2),
+    )
+    policy_watch = _cell(
+        _run(
+            1,
+            repeated_count=10,
+            repetition_watch=True,
+            reason_breakdown=reasons,
+            fallback_count=8,
+        ),
+        _run(
+            2,
+            repeated_count=10,
+            repetition_watch=True,
+            reason_breakdown=reasons,
+            fallback_count=8,
+        ),
+    )
+    matrix = DecisionQualityMatrix(
+        runs_per_cell=2,
+        turns=12,
+        seed_base=28600,
+        cells=(policy_watch,),
+    )
+
+    evaluation = evaluate_decision_quality_cell(policy_watch)
+    report = format_decision_quality_markdown(matrix)
+
+    assert evaluation.status == "watch"
+    assert evaluation.summary.startswith("Autoplay-policy watch")
+    assert policy_watch.average_fallback_share == 0.8
+    assert policy_watch.leading_repeat_reason == "default_growth_fallback"
+    assert "### Autoplay Policy Watches" in report
+    assert "fallback `80%`" in report
+    assert "Default Growth Fallback 16" in report
+    assert "### Possible Gameplay Candidates" in report
+
+
 def test_decision_quality_audit_uses_native_goal_and_shared_difficulty_seeds() -> None:
     matrix = run_decision_quality_audit(
         scenario_ids=["founder_journey"],
@@ -106,3 +155,9 @@ def test_decision_quality_audit_uses_native_goal_and_shared_difficulty_seeds() -
     assert all(cell.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE for cell in matrix.cells)
     assert {cell.runs[0].seed for cell in matrix.cells} == {28700}
     assert all(cell.runs[0].operating_decisions > 0 for cell in matrix.cells)
+    assert all(cell.runs[0].repeated_command for cell in matrix.cells)
+    assert all(cell.runs[0].reason_breakdown for cell in matrix.cells)
+    assert all(
+        sum(count for _, count in cell.runs[0].reason_breakdown) == cell.runs[0].repeated_count
+        for cell in matrix.cells
+    )

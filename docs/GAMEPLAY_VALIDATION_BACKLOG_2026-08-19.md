@@ -17,6 +17,8 @@ criteria pass.
 - Human beta evidence: 0/6 current-version sessions
 - Decision-quality audit: automated ledger gate passed across 54 heuristic runs
 - Advisory result: 13/18 scenario/difficulty cells repeated `Grow Demand`
+- Autoplay-policy attribution: 3/13 watches are 100% default-fallback
+  `portfolio_machine` cells; 10/13 remain possible gameplay candidates
 - Highest observed autoplay repetition: `public_market_countdown`, 60-65%
 
 The advisory result measures the deterministic autoplay policy, not player
@@ -67,6 +69,12 @@ Acceptance criteria:
 **Size:** 3 points for discovery; implementation estimated separately
 
 **Status:** Blocked by human evidence
+
+The audit-only attribution prerequisite is complete. Every autoplay action now
+has an explicit in-memory policy reason, and the report separates
+fallback-dominated policy watches from possible gameplay candidates without
+changing game state, saves, balance, content, or human evidence. This does not
+complete GV-002: only observed player notes can open a tuning story.
 
 As a strategy player, I want operating choices to represent distinct trade-offs
 so that one repeated action does not feel mandatory across unrelated campaigns.

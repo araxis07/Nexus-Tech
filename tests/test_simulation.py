@@ -70,6 +70,8 @@ from nexus_tech.domain.models import (
 from nexus_tech.persistence.save_coordinator import RunArchiveSummary
 from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.balance_lab import (
+    AutoplayDecisionReason,
+    AutoplayDecisionTraceEntry,
     BalanceMatrixCell,
     _choose_action,
     _choose_pricing_tier,
@@ -77,6 +79,7 @@ from nexus_tech.simulation.balance_lab import (
     evaluate_balance_cell,
     format_balance_matrix_csv,
     format_balance_report_markdown,
+    run_autoplay,
     run_balance_audit,
     run_balance_batch,
     run_balance_comparison,
@@ -3445,6 +3448,7 @@ def test_balance_autoplay_skips_angel_when_round_cap_is_already_hit() -> None:
     plan = _choose_action(state)
 
     assert plan.action is TurnAction.TAKE_LOAN
+    assert plan.reason is AutoplayDecisionReason.LIQUIDITY_LOAN
 
 
 def test_balance_autoplay_keeps_standard_pricing_for_profit_machine_opening() -> None:
@@ -3473,6 +3477,88 @@ def test_balance_autoplay_shifts_into_cash_guard_before_product_push() -> None:
 
     assert plan.action is TurnAction.SET_FUNCTIONAL_BUDGET
     assert plan.context.functional_budget_preset is FunctionalBudgetPreset.CASH_GUARD
+    assert plan.reason is AutoplayDecisionReason.CASH_GUARD_BUDGET
+
+
+def test_balance_autoplay_attributes_each_grow_demand_policy_path() -> None:
+    frontload_state = create_new_game(
+        scenario_id="public_market_countdown",
+        difficulty_mode=DifficultyMode.FOUNDER,
+    )
+    frontload_plan = _choose_action(frontload_state)
+
+    stabilization_state = create_new_game(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.FOUNDER,
+    )
+    stabilization_product = stabilization_state.products[0]
+    stabilization_state.employees = [
+        make_employee(
+            "Ada Growth",
+            EmployeeRole.ENGINEER,
+            assigned_product_id=stabilization_product.id,
+        )
+    ]
+    stabilization_state.company.strategy = CompanyStrategy.GROWTH
+    stabilization_state.roadmap_focus = RoadmapFocus.GROWTH_PUSH
+    stabilization_plan = _choose_action(stabilization_state)
+
+    fallback_state = stabilization_state.model_copy(deep=True)
+    fallback_product = fallback_state.products[0]
+    fallback_product.quality = 68
+    fallback_product.bug_level = 10
+    fallback_product.market_fit = 60
+    fallback_product.user_count = 50
+    fallback_product.feature_count = 3
+    fallback_product.acquisition_rate = Decimal("0.1700")
+    fallback_product.revenue_per_user = Decimal("40.00")
+    fallback_state.company.strategy = CompanyStrategy.QUALITY
+    fallback_state.roadmap_focus = RoadmapFocus.BALANCED_EXECUTION
+    fallback_plan = _choose_action(fallback_state)
+
+    assert frontload_plan.action is TurnAction.MARKET_PRODUCT
+    assert frontload_plan.reason is AutoplayDecisionReason.DEBT_GROWTH_FRONTLOAD
+    assert stabilization_plan.action is TurnAction.MARKET_PRODUCT
+    assert stabilization_plan.reason is AutoplayDecisionReason.GROWTH_STABILIZATION
+    assert fallback_plan.action is TurnAction.MARKET_PRODUCT
+    assert fallback_plan.reason is AutoplayDecisionReason.DEFAULT_GROWTH_FALLBACK
+
+
+def test_autoplay_decision_trace_is_optional_and_behavior_neutral() -> None:
+    baseline_state = create_new_game(
+        scenario_id="founder_journey",
+        difficulty_mode=DifficultyMode.STANDARD,
+    )
+    untraced_state = baseline_state.model_copy(deep=True)
+    traced_state = baseline_state.model_copy(deep=True)
+    trace: list[AutoplayDecisionTraceEntry] = []
+
+    untraced_result = run_autoplay(
+        untraced_state,
+        RandomSource(seed=91),
+        max_turns=3,
+    )
+    traced_result = run_autoplay(
+        traced_state,
+        RandomSource(seed=91),
+        max_turns=3,
+        decision_trace=trace,
+    )
+
+    traced_dump = traced_result.model_dump()
+    untraced_dump = untraced_result.model_dump()
+    for employee in traced_dump["employees"]:
+        employee.pop("id")
+    for employee in untraced_dump["employees"]:
+        employee.pop("id")
+
+    assert traced_dump == untraced_dump
+    assert [entry.command for entry in traced_result.decision_history] == [
+        entry.command for entry in untraced_result.decision_history
+    ]
+    assert trace
+    assert all(entry.turn >= 1 for entry in trace)
+    assert all(isinstance(entry.reason, AutoplayDecisionReason) for entry in trace)
 
 
 def test_cash_warning_threshold_scales_with_audit_horizon() -> None:

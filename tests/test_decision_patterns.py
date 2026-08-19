@@ -50,6 +50,7 @@ def test_decision_pattern_excludes_forced_event_responses_from_operating_mix() -
     assert pattern.unique_commands == 4
     assert pattern.family_count == 4
     assert pattern.style_label == "Balanced Operator"
+    assert pattern.most_repeated_command == "hire_employee"
     assert pattern.most_repeated_count == 1
     assert not pattern.repetition_watch
 
@@ -83,6 +84,7 @@ def test_decision_pattern_flags_concentrated_repetition_without_changing_state()
     assert pattern.style_label == "Product-Led"
     assert pattern.dominant_family == "Product"
     assert pattern.dominant_family_count == 4
+    assert pattern.most_repeated_command == "improve_quality"
     assert pattern.most_repeated_label == "Improve Quality"
     assert pattern.most_repeated_count == 3
     assert pattern.repetition_watch

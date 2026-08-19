@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import StrEnum
 
 from nexus_tech.domain.models import (
     BoardAsk,
@@ -231,8 +232,9 @@ def run_autoplay(
     *,
     max_turns: int,
     event_option_overrides: Mapping[str, str] | None = None,
+    decision_trace: list[AutoplayDecisionTraceEntry] | None = None,
 ) -> GameState:
-    """Advance one run using simple deterministic heuristics."""
+    """Advance one run using deterministic heuristics and optional in-memory tracing."""
 
     while (
         not state.company.game_over
@@ -247,10 +249,22 @@ def run_autoplay(
 
         while state.action_points_remaining > 0:
             planned_action = _choose_action(state)
+            executed_action = planned_action.action
+            executed_reason = planned_action.reason
             try:
                 outcome = apply_action(state, planned_action.action, context=planned_action.context)
             except ValueError:
+                executed_action = TurnAction.WAIT
+                executed_reason = AutoplayDecisionReason.INVALID_ACTION_FALLBACK
                 outcome = apply_action(state, TurnAction.WAIT, context=ActionContext())
+            if decision_trace is not None:
+                decision_trace.append(
+                    AutoplayDecisionTraceEntry(
+                        turn=state.company.current_turn,
+                        action=executed_action,
+                        reason=executed_reason,
+                    )
+                )
             state = outcome.state
             if state.pending_event is not None:
                 state = _resolve_pending_event_with_policy(
@@ -646,19 +660,74 @@ def format_balance_report_markdown(
 
 
 @dataclass(frozen=True)
+class AutoplayDecisionTraceEntry:
+    """One executed autoplay action with its policy reason, retained only by callers."""
+
+    turn: int
+    action: TurnAction
+    reason: AutoplayDecisionReason
+
+
+class AutoplayDecisionReason(StrEnum):
+    """Stable reasons for deterministic autoplay choices without gameplay state impact."""
+
+    NO_ACTIVE_PRODUCTS = "no_active_products"
+    PENDING_EVENT_REVIEW = "pending_event_review"
+    OPENING_HIRE = "opening_hire"
+    UNASSIGNED_TEAM_MEMBER = "unassigned_team_member"
+    QUARTER_PLANNING = "quarter_planning"
+    BOARD_RESPONSE = "board_response"
+    LIQUIDITY_ANGEL = "liquidity_angel"
+    LIQUIDITY_LOAN = "liquidity_loan"
+    PORTFOLIO_CONSOLIDATION = "portfolio_consolidation"
+    PRODUCT_REPAIR = "product_repair"
+    DEBT_GROWTH_FRONTLOAD = "debt_growth_frontload"
+    DEBT_PAYDOWN_ACCELERATION = "debt_paydown_acceleration"
+    GROWTH_STRATEGY_ALIGNMENT = "growth_strategy_alignment"
+    GROWTH_ROADMAP_ALIGNMENT = "growth_roadmap_alignment"
+    GROWTH_STABILIZATION = "growth_stabilization"
+    BOARD_RECOVERY = "board_recovery"
+    SUPPORT_LANE_REALIGNMENT = "support_lane_realignment"
+    CASH_GUARD_BUDGET = "cash_guard_budget"
+    CASH_GUARD_CAPITAL = "cash_guard_capital"
+    CASH_GUARD_STRATEGY = "cash_guard_strategy"
+    ROADMAP_REFRESH = "roadmap_refresh"
+    SURPLUS_DEBT_PAYDOWN = "surplus_debt_paydown"
+    PROFIT_PRICE_INCREASE = "profit_price_increase"
+    PORTFOLIO_EXPANSION = "portfolio_expansion"
+    TECH_DEBT_RELIEF = "tech_debt_relief"
+    PRODUCT_FIT_FEATURE = "product_fit_feature"
+    HEADCOUNT_EXPANSION = "headcount_expansion"
+    PRICING_ALIGNMENT = "pricing_alignment"
+    SEGMENT_EXPANSION = "segment_expansion"
+    STRATEGY_ALIGNMENT = "strategy_alignment"
+    DEFAULT_GROWTH_FALLBACK = "default_growth_fallback"
+    INVALID_ACTION_FALLBACK = "invalid_action_fallback"
+
+
+@dataclass(frozen=True)
 class PlannedAction:
     action: TurnAction
     context: ActionContext
+    reason: AutoplayDecisionReason
 
 
 def _choose_action(state: GameState) -> PlannedAction:
     active_products = [product for product in state.products if product.is_active]
     active_product_count = len(active_products)
     if not active_products:
-        return PlannedAction(TurnAction.WAIT, ActionContext())
+        return PlannedAction(
+            TurnAction.WAIT,
+            ActionContext(),
+            AutoplayDecisionReason.NO_ACTIVE_PRODUCTS,
+        )
 
     if state.pending_event is not None:
-        return PlannedAction(TurnAction.VIEW_STATUS, ActionContext())
+        return PlannedAction(
+            TurnAction.VIEW_STATUS,
+            ActionContext(),
+            AutoplayDecisionReason.PENDING_EVENT_REVIEW,
+        )
 
     if not state.employees and state.company.cash_on_hand >= BALANCE.finance_loan_amount:
         return PlannedAction(
@@ -669,6 +738,7 @@ def _choose_action(state: GameState) -> PlannedAction:
                 hire_seniority=Seniority.MID,
                 hire_specialization="opening",
             ),
+            AutoplayDecisionReason.OPENING_HIRE,
         )
 
     unassigned_employee = next(
@@ -683,16 +753,22 @@ def _choose_action(state: GameState) -> PlannedAction:
                 employee_id=unassigned_employee.id,
                 target_product_id=target.id,
             ),
+            AutoplayDecisionReason.UNASSIGNED_TEAM_MEMBER,
         )
 
     if is_quarter_plan_due(state):
         return PlannedAction(
             TurnAction.SET_BUDGET_STANCE,
             ActionContext(budget_stance=_choose_budget_stance(state)),
+            AutoplayDecisionReason.QUARTER_PLANNING,
         )
 
     if _can_execute_board_response(state):
-        return PlannedAction(TurnAction.EXECUTE_BOARD_RESPONSE, ActionContext())
+        return PlannedAction(
+            TurnAction.EXECUTE_BOARD_RESPONSE,
+            ActionContext(),
+            AutoplayDecisionReason.BOARD_RESPONSE,
+        )
 
     support_exposure = calculate_support_queue_exposure(state)
     liquidity_floor = max(
@@ -711,19 +787,28 @@ def _choose_action(state: GameState) -> PlannedAction:
         and funding_available
         and _can_take_angel_round(state)
     ):
-        return PlannedAction(TurnAction.RAISE_ANGEL, ActionContext())
+        return PlannedAction(
+            TurnAction.RAISE_ANGEL,
+            ActionContext(),
+            AutoplayDecisionReason.LIQUIDITY_ANGEL,
+        )
     if (
         state.company.cash_on_hand <= liquidity_floor
         and funding_available
         and state.finance.debt_principal < BALANCE.finance_max_total_debt
     ):
-        return PlannedAction(TurnAction.TAKE_LOAN, ActionContext())
+        return PlannedAction(
+            TurnAction.TAKE_LOAN,
+            ActionContext(),
+            AutoplayDecisionReason.LIQUIDITY_LOAN,
+        )
 
     consolidation_candidate = _pick_profit_consolidation_candidate(state)
     if consolidation_candidate is not None:
         return PlannedAction(
             TurnAction.SUNSET_PRODUCT,
             ActionContext(target_product_id=consolidation_candidate.id),
+            AutoplayDecisionReason.PORTFOLIO_CONSOLIDATION,
         )
 
     strongest_product = _pick_primary_product(state)
@@ -740,31 +825,40 @@ def _choose_action(state: GameState) -> PlannedAction:
         return PlannedAction(
             TurnAction.IMPROVE_QUALITY,
             ActionContext(target_product_id=worst_product.id),
+            AutoplayDecisionReason.PRODUCT_REPAIR,
         )
 
     if _should_frontload_debt_growth(state, strongest_product):
         return PlannedAction(
             TurnAction.MARKET_PRODUCT,
             ActionContext(target_product_id=strongest_product.id),
+            AutoplayDecisionReason.DEBT_GROWTH_FRONTLOAD,
         )
 
     if _should_accelerate_debt_paydown(state, strongest_product):
-        return PlannedAction(TurnAction.REPAY_DEBT, ActionContext())
+        return PlannedAction(
+            TurnAction.REPAY_DEBT,
+            ActionContext(),
+            AutoplayDecisionReason.DEBT_PAYDOWN_ACCELERATION,
+        )
 
     if _should_stabilize_growth(state, strongest_product):
         if state.company.strategy is not CompanyStrategy.GROWTH:
             return PlannedAction(
                 TurnAction.SET_COMPANY_STRATEGY,
                 ActionContext(strategy=CompanyStrategy.GROWTH),
+                AutoplayDecisionReason.GROWTH_STRATEGY_ALIGNMENT,
             )
         if state.roadmap_focus is not RoadmapFocus.GROWTH_PUSH:
             return PlannedAction(
                 TurnAction.SET_ROADMAP,
                 ActionContext(roadmap_focus=RoadmapFocus.GROWTH_PUSH),
+                AutoplayDecisionReason.GROWTH_ROADMAP_ALIGNMENT,
             )
         return PlannedAction(
             TurnAction.MARKET_PRODUCT,
             ActionContext(target_product_id=strongest_product.id),
+            AutoplayDecisionReason.GROWTH_STABILIZATION,
         )
 
     if (
@@ -773,7 +867,11 @@ def _choose_action(state: GameState) -> PlannedAction:
         and state.company.cash_on_hand
         >= BALANCE.board_recovery_plan_cost + BALANCE.base_operating_cost
     ):
-        return PlannedAction(TurnAction.START_BOARD_RECOVERY_PLAN, ActionContext())
+        return PlannedAction(
+            TurnAction.START_BOARD_RECOVERY_PLAN,
+            ActionContext(),
+            AutoplayDecisionReason.BOARD_RECOVERY,
+        )
 
     if (
         support_exposure.hotspot_lane_overflow > 0
@@ -783,6 +881,7 @@ def _choose_action(state: GameState) -> PlannedAction:
         return PlannedAction(
             TurnAction.SET_SUPPORT_LANE_FOCUS,
             ActionContext(support_lane_focus=support_exposure.hotspot_lane),
+            AutoplayDecisionReason.SUPPORT_LANE_REALIGNMENT,
         )
 
     if _should_shift_into_cash_guard(state):
@@ -790,6 +889,7 @@ def _choose_action(state: GameState) -> PlannedAction:
             return PlannedAction(
                 TurnAction.SET_FUNCTIONAL_BUDGET,
                 ActionContext(functional_budget_preset=FunctionalBudgetPreset.CASH_GUARD),
+                AutoplayDecisionReason.CASH_GUARD_BUDGET,
             )
         if (
             state.capital_plan.mode is not CapitalPlanMode.CONSERVE
@@ -801,17 +901,20 @@ def _choose_action(state: GameState) -> PlannedAction:
                     capital_plan_mode=CapitalPlanMode.CONSERVE,
                     capital_source_preference=CapitalSourcePreference.BOOTSTRAP,
                 ),
+                AutoplayDecisionReason.CASH_GUARD_CAPITAL,
             )
         if state.company.strategy is not CompanyStrategy.EFFICIENCY:
             return PlannedAction(
                 TurnAction.SET_COMPANY_STRATEGY,
                 ActionContext(strategy=CompanyStrategy.EFFICIENCY),
+                AutoplayDecisionReason.CASH_GUARD_STRATEGY,
             )
 
     if state.company.current_turn >= state.roadmap_set_turn + 4:
         return PlannedAction(
             TurnAction.SET_ROADMAP,
             ActionContext(roadmap_focus=_choose_roadmap_focus(state)),
+            AutoplayDecisionReason.ROADMAP_REFRESH,
         )
 
     if (
@@ -825,7 +928,11 @@ def _choose_action(state: GameState) -> PlannedAction:
         and strongest_product.market_fit >= 56
         and strongest_product.bug_level <= 18
     ):
-        return PlannedAction(TurnAction.REPAY_DEBT, ActionContext())
+        return PlannedAction(
+            TurnAction.REPAY_DEBT,
+            ActionContext(),
+            AutoplayDecisionReason.SURPLUS_DEBT_PAYDOWN,
+        )
 
     if (
         state.campaign_goal_id is CampaignGoalId.PROFIT_MACHINE
@@ -838,6 +945,7 @@ def _choose_action(state: GameState) -> PlannedAction:
         return PlannedAction(
             TurnAction.RUN_PRICE_INCREASE,
             ActionContext(target_product_id=strongest_product.id),
+            AutoplayDecisionReason.PROFIT_PRICE_INCREASE,
         )
 
     if _should_create_product(state):
@@ -848,12 +956,14 @@ def _choose_action(state: GameState) -> PlannedAction:
                 new_product_name=_build_product_name(state),
                 new_product_template_id=template_id,
             ),
+            AutoplayDecisionReason.PORTFOLIO_EXPANSION,
         )
 
     if worst_product.technical_debt >= 42 or operations.overload >= 4:
         return PlannedAction(
             TurnAction.REDUCE_TECHNICAL_DEBT,
             ActionContext(target_product_id=worst_product.id),
+            AutoplayDecisionReason.TECH_DEBT_RELIEF,
         )
     if (
         worst_product.market_fit < 44
@@ -877,6 +987,7 @@ def _choose_action(state: GameState) -> PlannedAction:
         return PlannedAction(
             TurnAction.ADD_FEATURE,
             ActionContext(target_product_id=worst_product.id),
+            AutoplayDecisionReason.PRODUCT_FIT_FEATURE,
         )
     if len(state.employees) < 4 and _should_expand_headcount(state):
         return PlannedAction(
@@ -887,6 +998,7 @@ def _choose_action(state: GameState) -> PlannedAction:
                 hire_seniority=Seniority.MID,
                 hire_specialization="generalist",
             ),
+            AutoplayDecisionReason.HEADCOUNT_EXPANSION,
         )
     target_pricing_tier = _choose_pricing_tier(state, strongest_product)
     if target_pricing_tier is not strongest_product.pricing_tier:
@@ -896,6 +1008,7 @@ def _choose_action(state: GameState) -> PlannedAction:
                 target_product_id=strongest_product.id,
                 pricing_tier=target_pricing_tier,
             ),
+            AutoplayDecisionReason.PRICING_ALIGNMENT,
         )
     if (
         strongest_product.target_segment is MarketSegment.STARTUP
@@ -909,6 +1022,7 @@ def _choose_action(state: GameState) -> PlannedAction:
                 target_product_id=strongest_product.id,
                 target_segment=MarketSegment.SMB,
             ),
+            AutoplayDecisionReason.SEGMENT_EXPANSION,
         )
     if state.company.strategy is CompanyStrategy.BALANCED and (
         state.company.current_turn >= 5 or _should_shift_into_cash_guard(state)
@@ -916,10 +1030,12 @@ def _choose_action(state: GameState) -> PlannedAction:
         return PlannedAction(
             TurnAction.SET_COMPANY_STRATEGY,
             ActionContext(strategy=_choose_company_strategy(state)),
+            AutoplayDecisionReason.STRATEGY_ALIGNMENT,
         )
     return PlannedAction(
         TurnAction.MARKET_PRODUCT,
         ActionContext(target_product_id=growth_product.id),
+        AutoplayDecisionReason.DEFAULT_GROWTH_FALLBACK,
     )
 
 

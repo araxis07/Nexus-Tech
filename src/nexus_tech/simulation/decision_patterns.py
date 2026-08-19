@@ -21,6 +21,7 @@ class DecisionPatternSummary:
     family_count: int
     dominant_family: str
     dominant_family_count: int
+    most_repeated_command: str
     most_repeated_label: str
     most_repeated_count: int
     repetition_watch: bool
@@ -91,6 +92,7 @@ def build_decision_pattern(
         family_count=len(family_counts),
         dominant_family=dominant_family,
         dominant_family_count=dominant_count,
+        most_repeated_command=repeated_command,
         most_repeated_label=repeated_label,
         most_repeated_count=repeated_count,
         repetition_watch=repetition_watch,

@@ -96,7 +96,7 @@ The current Stable Alpha protects the complete owner-flow contract while retaini
 - the first packet now embeds `validate-beta-owner-rehearsal`, which revalidates the packet and evidence snapshot after visible play, keeps the tester profile fresh, and fails until the rehearsal database contains the exact target scenario with both campaign choices archived;
 - the post-rehearsal gate explicitly leaves Pause, Back, Menu, Continue, Endgame switching, Progress, and Route Atlas confirmation as manual owner checks and never writes human-session evidence;
 - motion-mode differentiation now evaluates animation density and disabled-state behavior independently from transient reduced-mode timing watches, while genuine reduced-mode stability failures remain blocking;
-- `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, failing only missing ledger coverage while exporting repetition and low-variety candidates for human review;
+- `decision-quality-audit` compares operating-choice variety across the six campaigns and three difficulties, attributes repeated autoplay commands to in-memory policy reasons and default-fallback share, fails only missing ledger coverage, and keeps policy watches, possible gameplay candidates, and low-variety results advisory for human review;
 - `beta-playtest-status --require-review-ready` now exits non-zero until all current-version human criteria pass, preventing release scripts from confusing an informative status report with a successful gate while retaining the final manual reviewer decision;
 - no save migration, new catalog entry, control binding, or balance adjustment is introduced.
 

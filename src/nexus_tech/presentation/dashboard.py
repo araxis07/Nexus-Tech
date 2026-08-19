@@ -1271,6 +1271,7 @@ def render_decision_quality_audit(console: Console, matrix: DecisionQualityMatri
     table.add_column("Avg U/F", justify="right", width=7, no_wrap=True)
     table.add_column("Repeat", justify="right", width=6, no_wrap=True)
     table.add_column("Candidate", width=11, overflow="fold")
+    table.add_column("Fallback", justify="right", width=9, no_wrap=True)
     for cell, evaluation in zip(matrix.cells, evaluations, strict=True):
         table.add_row(
             cell.scenario_id.replace("_", " "),
@@ -1279,6 +1280,7 @@ def render_decision_quality_audit(console: Console, matrix: DecisionQualityMatri
             f"{cell.average_unique_commands:.1f}/{cell.average_family_count:.1f}",
             f"{cell.repetition_watch_runs}/{cell.run_count}",
             cell.leading_repeat_label,
+            f"{cell.average_fallback_share:.0%}",
         )
 
     console.print(Panel(overview, title="Decision Quality Audit", border_style="cyan", expand=True))
@@ -1289,7 +1291,8 @@ def render_decision_quality_audit(console: Console, matrix: DecisionQualityMatri
                 "",
                 (
                     "[yellow]Autoplayer variety evidence only.[/yellow]\n"
-                    "[dim]Watch cells need matching real-player notes.\n"
+                    "[dim]Fallback-heavy watches identify autoplay policy first.\n"
+                    "Other candidates still need matching real-player notes.\n"
                     "Do not consolidate or retune commands from autoplay alone.[/dim]"
                 ),
             ),
