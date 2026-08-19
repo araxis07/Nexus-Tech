@@ -100,6 +100,17 @@ post-beta capability order are bounded in the
 [Gameplay Validation Backlog](GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md). The
 backlog does not reopen maintenance scope or change the promotion rules below.
 
+### Follow-up Owner Rehearsal - 2026-08-20
+
+- Baseline commit `6385a0f0200b4491cff67f4f4edbf7198210aee8` was clean, matched `origin/main`, and had a successful GitHub CI run before launch.
+- A new 0.328.1 packet passed preflight at 1280x720 with full motion and allocated separate fresh rehearsal, tester, and evidence database paths.
+- The visible window closed with reason `quit`; the rehearsal profile contained 0 archives, 0 complete target paths, and no recorded route.
+- Save & Archive failed. First Turn, Help, Pause/Back, Menu/Continue, both trade-offs, Guided/Full Endgame, Progress, and Route Atlas remain `NOT VERIFIED` because no direct owner observations were supplied.
+- Human evidence remained 0/6 sessions and 0/6 represented campaigns. The rehearsal did not write a human-session row.
+- Post-close verification passed Ruff across 155 files, 1,271 tests, content validation, schema 28 save integrity, all 18 campaign-readiness cells and 72 route exercises, all 702 responsive layout captures, all 21 animation-matrix cells, and the 0.328.1 package build and tracked-file safety scan.
+- The 54-run decision ledger gate passed with the same 13 advisory watch cells. Those watches still require matching real-player observations before any balance work.
+- No reproducible P0/P1 was reported or inferred from the incomplete run. The release remains Stable Alpha in maintenance mode.
+
 ## Promotion Rules
 
 ### Beta Candidate
