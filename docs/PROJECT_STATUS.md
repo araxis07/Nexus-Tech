@@ -105,6 +105,8 @@ backlog does not reopen maintenance scope or change the promotion rules below.
 - Baseline commit `6385a0f0200b4491cff67f4f4edbf7198210aee8` was clean, matched `origin/main`, and had a successful GitHub CI run before launch.
 - A new 0.328.1 packet passed preflight at 1280x720 with full motion and allocated separate fresh rehearsal, tester, and evidence database paths.
 - The visible window closed with reason `quit`; the rehearsal profile contained 0 archives, 0 complete target paths, and no recorded route.
+- From clean baseline `50d5947f5009e1692a0e5e0cc19594ed6ec5dc9c` with successful CI run `32279625682`, a second fresh 0.328.1 packet passed preflight with new isolated profiles. Its visible window closed with reason `quit`, and post-close diagnostics confirmed schema 28 integrity with 0 save slots, 0 archives, 0 complete target paths, and no recorded route.
+- The second attempt did not establish a reproducible product failure; it established only that the owner route was not started or saved in that isolated profile.
 - Save & Archive failed. First Turn, Help, Pause/Back, Menu/Continue, both trade-offs, Guided/Full Endgame, Progress, and Route Atlas remain `NOT VERIFIED` because no direct owner observations were supplied.
 - Human evidence remained 0/6 sessions and 0/6 represented campaigns. The rehearsal did not write a human-session row.
 - Post-close verification passed Ruff across 155 files, 1,271 tests, content validation, schema 28 save integrity, all 18 campaign-readiness cells and 72 route exercises, all 702 responsive layout captures, all 21 animation-matrix cells, and the 0.328.1 package build and tracked-file safety scan.
