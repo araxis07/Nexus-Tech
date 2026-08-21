@@ -12840,8 +12840,9 @@ def test_play_2d_command_rejects_viewport_below_safe_layout_contract(monkeypatch
     assert "keep text and controls separated" in result.output
 
 
-def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
+def test_menu_2d_command_routes_to_menu_launcher(monkeypatch, tmp_path: Path) -> None:
     captured: dict[str, object] = {}
+    db_path = tmp_path / "menu-command.db"
 
     def fake_launch_2d_menu(**kwargs):
         captured.update(kwargs)
@@ -12858,6 +12859,8 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
         app,
         [
             "menu-2d",
+            "--db-path",
+            str(db_path),
             "--headless",
             "--max-frames",
             "2",
@@ -12879,6 +12882,43 @@ def test_menu_2d_command_routes_to_menu_launcher(monkeypatch) -> None:
     assert captured["motion_mode"] is MotionMode.REDUCED
     assert captured["ui_scale"] is UiScale.COMPACT
     assert captured["contrast_mode"] is ContrastMode.HIGH
+    assert "Save slots after close: 0" in result.output
+    assert "Continue is unavailable" in result.output
+    assert "remained available" not in result.output
+
+
+def test_menu_2d_command_reports_persisted_save_slots(monkeypatch, tmp_path: Path) -> None:
+    db_path = tmp_path / "menu-command-saved.db"
+    SaveLoadCoordinator(db_path).save_game(
+        "owner-checkpoint",
+        create_new_game("NEXUS TECH", "Nexus One"),
+        RandomSource(seed=313),
+    )
+
+    def fake_launch_2d_menu(**_kwargs):
+        class Result:
+            exit_reason = "quit"
+            slot_name = "active"
+
+        return Result()
+
+    monkeypatch.setattr(cli_module, "launch_2d_menu", fake_launch_2d_menu)
+
+    result = runner.invoke(
+        app,
+        [
+            "menu-2d",
+            "--db-path",
+            str(db_path),
+            "--headless",
+            "--max-frames",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Save slots after close: 1 (owner-checkpoint)" in result.output
+    assert "Continue is available" in result.output
 
 
 def test_play_2d_omitted_display_flags_defer_to_saved_preferences(monkeypatch) -> None:

@@ -9218,11 +9218,28 @@ def menu_2d_command(
         )
         raise typer.Exit(code=1) from error
 
+    try:
+        save_summaries = SaveLoadCoordinator(db_path).list_save_slots()
+    except PersistenceError as error:
+        save_status = f"Save status unavailable: {error}"
+    else:
+        if save_summaries:
+            visible_names = ", ".join(summary.slot_name for summary in save_summaries[:3])
+            remaining_count = len(save_summaries) - 3
+            if remaining_count > 0:
+                visible_names = f"{visible_names}, +{remaining_count} more"
+            save_status = (
+                f"Save slots after close: {len(save_summaries)} ({visible_names}). "
+                "Continue is available."
+            )
+        else:
+            save_status = "Save slots after close: 0. Continue is unavailable."
+
     console.print(
         Panel.fit(
             (
                 f"2D menu closed with reason '{result.exit_reason}'. "
-                f"Slot '{result.slot_name}' remained available."
+                f"{save_status}"
             ),
             title="2D Menu Closed",
             border_style="cyan",

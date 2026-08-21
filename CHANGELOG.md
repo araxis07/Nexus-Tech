@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Made the `menu-2d` closing summary report the actual persisted save-slot count and names instead of claiming the default slot remained available when no save existed
 - Recorded both 2026-08-20 owner rehearsal attempts as incomplete after validated isolated runs closed with no archive or complete route; human evidence remains unchanged
 - Added behavior-neutral in-memory autoplay decision attribution, including explicit policy reasons for every planned action, separate debt-frontload, growth-stabilization, and default-fallback `Grow Demand` paths, and decision-quality reason/fallback reporting that distinguishes autoplay-policy watches from possible gameplay candidates
 - Added an evidence-gated gameplay validation backlog with acceptance criteria for decision-variety review, conditional `Grow Demand` tuning, Debt Crunch late-game validation, post-beta capability order, and bounded test batches
