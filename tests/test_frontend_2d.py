@@ -12917,7 +12917,8 @@ def test_menu_2d_command_reports_persisted_save_slots(monkeypatch, tmp_path: Pat
     )
 
     assert result.exit_code == 0
-    assert "Save slots after close: 1 (owner-checkpoint)" in result.output
+    assert "Save slots after close: 1" in result.output
+    assert "- owner-checkpoint" in result.output
     assert "Continue is available" in result.output
 
 

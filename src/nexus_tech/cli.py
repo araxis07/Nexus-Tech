@@ -9224,20 +9224,21 @@ def menu_2d_command(
         save_status = f"Save status unavailable: {error}"
     else:
         if save_summaries:
-            visible_names = ", ".join(summary.slot_name for summary in save_summaries[:3])
+            visible_slots = "\n".join(f"- {summary.slot_name}" for summary in save_summaries[:3])
             remaining_count = len(save_summaries) - 3
             if remaining_count > 0:
-                visible_names = f"{visible_names}, +{remaining_count} more"
+                visible_slots = f"{visible_slots}\n- +{remaining_count} more"
             save_status = (
-                f"Save slots after close: {len(save_summaries)} ({visible_names}). "
+                f"Save slots after close: {len(save_summaries)}.\n"
+                f"Available slots:\n{visible_slots}\n"
                 "Continue is available."
             )
         else:
-            save_status = "Save slots after close: 0. Continue is unavailable."
+            save_status = "Save slots after close: 0.\nContinue is unavailable."
 
     console.print(
         Panel.fit(
-            (f"2D menu closed with reason '{result.exit_reason}'. {save_status}"),
+            (f"2D menu closed with reason '{result.exit_reason}'.\n{save_status}"),
             title="2D Menu Closed",
             border_style="cyan",
         )
