@@ -9237,10 +9237,7 @@ def menu_2d_command(
 
     console.print(
         Panel.fit(
-            (
-                f"2D menu closed with reason '{result.exit_reason}'. "
-                f"{save_status}"
-            ),
+            (f"2D menu closed with reason '{result.exit_reason}'. {save_status}"),
             title="2D Menu Closed",
             border_style="cyan",
         )
