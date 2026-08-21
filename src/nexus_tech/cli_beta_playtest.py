@@ -214,6 +214,17 @@ def _build_current_owner_rehearsal_status(
     )
 
 
+def _latest_owner_rehearsal_save_scenario(rehearsal_path: Path) -> str | None:
+    """Return the scenario Continue would open, or None when no save exists."""
+
+    if not rehearsal_path.is_file():
+        return None
+    coordinator = SaveLoadCoordinator(rehearsal_path)
+    if not coordinator.list_save_slots():
+        return None
+    return coordinator.continue_last_game().state.scenario_id
+
+
 def register_beta_playtest_commands(
     app: typer.Typer,
     get_console: Callable[[], Console],
@@ -454,11 +465,7 @@ def register_beta_playtest_commands(
                     rehearsal_path,
                     label="Owner rehearsal profile",
                 )
-            has_save = (
-                bool(SaveLoadCoordinator(rehearsal_path).list_save_slots())
-                if profile_exists
-                else False
-            )
+            saved_scenario_id = _latest_owner_rehearsal_save_scenario(rehearsal_path)
             if launch_owner_rehearsal is None:
                 raise ValueError("The visible 2D owner-rehearsal launcher is unavailable.")
 
@@ -466,7 +473,7 @@ def register_beta_playtest_commands(
                 console,
                 preparation,
                 profile_exists=profile_exists,
-                has_save=has_save,
+                saved_scenario_id=saved_scenario_id,
             )
             exit_reason = launch_owner_rehearsal(
                 rehearsal_path,
@@ -474,11 +481,7 @@ def register_beta_playtest_commands(
                 preparation.motion_mode,
             )
             status = _build_current_owner_rehearsal_status(preparation)
-            has_save_after_launch = (
-                bool(SaveLoadCoordinator(rehearsal_path).list_save_slots())
-                if rehearsal_path.is_file()
-                else False
-            )
+            saved_scenario_id_after_launch = _latest_owner_rehearsal_save_scenario(rehearsal_path)
         except (OSError, PersistenceError, ValueError) as error:
             _exit_with_error(console, "Owner Rehearsal Run Failed", str(error))
 
@@ -491,14 +494,27 @@ def register_beta_playtest_commands(
         )
         render_beta_owner_rehearsal_status(console, status)
         if not status.completed:
-            next_launch = "Continue existing save" if has_save_after_launch else "New Game"
-            retry_instruction = (
-                "Re-run the guarded command to Continue this rehearsal profile, "
-                "then finish the route and choose Save & Archive before closing the window."
-                if has_save_after_launch
-                else "Re-run the guarded command, choose New Game, then finish the route "
-                "and choose Save & Archive before closing the window."
-            )
+            target_scenario_id = preparation.target_scenario_id or ""
+            if saved_scenario_id_after_launch == target_scenario_id:
+                next_launch = "Continue existing target save"
+                retry_instruction = (
+                    "Re-run the guarded command to Continue this rehearsal profile, "
+                    "then finish the route and choose Save & Archive before closing the window."
+                )
+            elif saved_scenario_id_after_launch:
+                next_launch = f"New Game: {target_scenario_id} required"
+                retry_instruction = (
+                    f"The newest save is {saved_scenario_id_after_launch}, not "
+                    f"{target_scenario_id}. Re-run the guarded command, choose New Game, "
+                    "select the exact target campaign, then finish the route and choose "
+                    "Save & Archive before closing the window."
+                )
+            else:
+                next_launch = "New Game"
+                retry_instruction = (
+                    "Re-run the guarded command, choose New Game, then finish the route "
+                    "and choose Save & Archive before closing the window."
+                )
             console.print(
                 Panel(
                     Group(

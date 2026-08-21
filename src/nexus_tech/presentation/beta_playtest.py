@@ -443,11 +443,12 @@ def render_beta_owner_rehearsal_briefing(
     preparation: BetaPlaytestPreparation,
     *,
     profile_exists: bool,
-    has_save: bool,
+    saved_scenario_id: str | None,
 ) -> None:
     """Render the exact visible route before the guarded rehearsal launch."""
 
-    if has_save:
+    target_scenario_id = preparation.target_scenario_id or ""
+    if saved_scenario_id == target_scenario_id:
         launch_mode = "Continue existing save"
         selection_instruction = (
             f"Choose Continue, then finish "
@@ -456,6 +457,18 @@ def render_beta_owner_rehearsal_briefing(
         first_check = (
             "Confirm this is the dedicated rehearsal profile, choose Continue, and "
             "resume the visible route without counting it as human evidence."
+        )
+    elif saved_scenario_id:
+        launch_mode = "New Game required"
+        selection_instruction = (
+            f"The newest save is {saved_scenario_id}, not {target_scenario_id}. "
+            f"Choose New Game, then {preparation.target_track_label} / "
+            f"{target_scenario_id}; do not choose Continue."
+        )
+        first_check = (
+            f"Confirm the saved {saved_scenario_id} run does not match the rehearsal "
+            f"target {target_scenario_id}, then choose New Game without counting this "
+            "rehearsal as human evidence."
         )
     elif profile_exists:
         launch_mode = "Retry existing profile"

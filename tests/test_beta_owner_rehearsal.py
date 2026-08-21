@@ -133,6 +133,19 @@ def _persist_incomplete_founder_save(path: Path) -> None:
     )
 
 
+def _persist_incomplete_non_target_save(path: Path) -> None:
+    state = create_new_game(
+        "NEXUS TECH",
+        "Nexus One",
+        scenario_id="channel_margin_squeeze",
+    )
+    SaveLoadCoordinator(path).save_game(
+        "active",
+        state,
+        RandomSource(seed=3222),
+    )
+
+
 def test_owner_rehearsal_status_fails_closed_without_profile() -> None:
     status = build_beta_owner_rehearsal_status(
         [],
@@ -290,7 +303,7 @@ def test_guarded_owner_rehearsal_launch_fails_closed_without_archive(
     assert "Owner Rehearsal Window Closed" in result.output
     assert "Owner Rehearsal Incomplete" in result.output
     assert "Owner Rehearsal Next Action" in result.output
-    assert "Next launch: Continue existing save" in result.output
+    assert "Next launch: Continue existing target save" in result.output
     assert calls == [
         {
             "db_path": rehearsal_path,
@@ -330,7 +343,7 @@ def test_guarded_owner_rehearsal_close_without_save_retries_new_game(
     assert result.exit_code == 1
     assert "Owner Rehearsal Incomplete" in result.output
     assert "Next launch: New Game" in result.output
-    assert "Next launch: Continue existing save" not in result.output
+    assert "Next launch: Continue existing target save" not in result.output
     assert rehearsal_path.is_file()
     assert not tester_path.exists()
     assert BetaPlaytestRepository(evidence_path).list_sessions() == []
@@ -396,6 +409,38 @@ def test_guarded_owner_rehearsal_resumes_existing_profile(
     assert "Continue existing save" in result.output
     assert "Choose Continue" in result.output
     assert "Owner Rehearsal Validated" in result.output
+    assert not tester_path.exists()
+    assert BetaPlaytestRepository(evidence_path).list_sessions() == []
+
+
+def test_guarded_owner_rehearsal_rejects_continue_for_non_target_save(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    evidence_path, packet_path, tester_path, rehearsal_path = _prepare_first_packet(tmp_path)
+    _persist_incomplete_non_target_save(rehearsal_path)
+
+    def fake_launch_2d_menu(**kwargs):
+        return SimpleNamespace(exit_reason="quit")
+
+    monkeypatch.setattr(cli_module, "launch_2d_menu", fake_launch_2d_menu)
+
+    result = runner.invoke(
+        app,
+        [
+            "run-beta-owner-rehearsal",
+            "--input",
+            str(packet_path),
+            "--db-path",
+            str(evidence_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "New Game required" in result.output
+    assert "do not choose Continue" in result.output
+    assert "Next launch: New Game: founder_journey required" in result.output
+    assert "newest save is channel_margin_squeeze, not founder_journey" in result.output
     assert not tester_path.exists()
     assert BetaPlaytestRepository(evidence_path).list_sessions() == []
 
