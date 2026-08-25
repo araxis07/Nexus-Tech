@@ -6,6 +6,8 @@
 - Structured human evidence remains 0/6 sessions and 0/6 represented featured campaigns. Version 0.328.1 must not be described as Beta Ready.
 - Readability, pacing, decision comprehension, recovery controls, and motion comfort have automated coverage but still require direct human observation.
 
+The 2026-08-23 through 2026-08-25 operator attempts used validated isolated profiles but closed with 0 companies, 0 saves, and 0 archives. They confirm neither a gameplay pass nor a defect; all unobserved owner checks remain `NOT VERIFIED`.
+
 These are evidence gaps, not proof of a software defect. If rehearsal exposes a reproducible P0 or P1, record the exact route and fix only that defect with regression coverage.
 
 ## Known Constraints

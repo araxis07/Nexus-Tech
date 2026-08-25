@@ -11,12 +11,25 @@ Use this checklist before tagging or presenting a release.
 - During maintenance, accept only reproducible P0/P1 fixes, security or dependency compatibility work, release tooling, and factual documentation.
 - Do not create a release commit when the working tree has no real change.
 
+## Owner Rehearsal Launch Readiness
+
+- Do not prepare or open the visible rehearsal until the owner is present and able to complete an uninterrupted run.
+- Generate one packet immediately before the first launch, run its standalone packet validator once, and confirm the rehearsal, tester, and evidence databases are distinct.
+- Use `run-beta-owner-rehearsal` for the visible run. Do not use the tester launch or human-session recorder for an owner rehearsal.
+- If an incomplete close created the rehearsal profile, retry with the same guarded runner command. It accepts the existing rehearsal profile and directs the owner to New Game or Continue from the actual latest save.
+- Do not rerun the standalone packet validator on a used rehearsal profile; that validator intentionally requires every gameplay profile to be untouched before first launch.
+- Regenerate the packet only when it is stale, edited, moved, bound to changed evidence, has a contaminated tester profile, or the existing rehearsal profile is intentionally abandoned.
+- Do not close the visible window until the owner completes `Save & Archive`, opens Progress, and confirms the target route in Route Atlas.
+- Treat a profile with 0 companies, 0 saves, and 0 archives as an unstarted attempt, not a software defect. Keep all unobserved checklist rows `NOT VERIFIED`.
+- After the owner closes the window, require the archive gate to report a complete target path. Never infer Help, recovery, Endgame switching, or Route Atlas observations from the database alone.
+
 ## Version And Notes
 
-- Update `pyproject.toml`.
-- Update `src/nexus_tech/__init__.py`.
+- Update `pyproject.toml` for a versioned runtime release.
+- Update `src/nexus_tech/__init__.py` for a versioned runtime release.
 - Add a dated entry to `CHANGELOG.md`.
 - Confirm the README lists any new commands, systems, or content.
+- Do not bump the version for a factual documentation-only maintenance correction.
 
 ## Local Verification
 

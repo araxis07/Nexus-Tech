@@ -113,6 +113,17 @@ backlog does not reopen maintenance scope or change the promotion rules below.
 - The 54-run decision ledger gate passed with the same 13 advisory watch cells. Those watches still require matching real-player observations before any balance work.
 - No reproducible P0/P1 was reported or inferred from the incomplete run. The release remains Stable Alpha in maintenance mode.
 
+### Operator-only Owner Rehearsal Attempts - 2026-08-23 through 2026-08-25
+
+- Baseline commit `c1a7ce317810e2b831885dff3037a57cdbfa2253` was clean, matched `origin/main`, and retained successful GitHub CI run `32516291442` throughout the attempts.
+- Three new 0.328.1 packets passed first-launch preflight at 1280x720 with full motion. Each allocated separate rehearsal, tester, and evidence database paths.
+- Each visible window later closed with reason `quit`. Read-only post-close inspection found 0 companies, 0 save slots, and 0 archives in every rehearsal profile.
+- These attempts establish only packet isolation and fail-closed archive behavior. They do not establish that New Game began, and they provide no direct observation for First Turn, Help, Pause/Back, Menu/Continue, campaign trade-offs, Guided/Full Endgame, Progress, or Route Atlas.
+- Save & Archive remains incomplete, but the empty profiles do not establish a reproducible product defect. No P0/P1 was reported or inferred.
+- Human evidence remained 0/6 sessions and 0/6 represented campaigns. None of the owner attempts wrote a human-session row.
+- No local automated matrix was rerun for these operator-only attempts because runtime code did not change. The previously successful CI result remains the implementation baseline.
+- Version 0.328.1 remains a Stable Alpha in maintenance mode.
+
 ## Promotion Rules
 
 ### Beta Candidate
