@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Recorded the 2026-08-28 partial owner rehearsal with a resumable `founder_journey` Turn 3 save, no archive, no reproducible defect, and no human-session evidence
 - Recorded the three 2026-08-23 through 2026-08-25 owner rehearsal attempts as unstarted, isolated profiles with no company, save, archive, route, defect evidence, or human-session evidence, and clarified first-launch versus guarded-retry operation
 - Prevented Owner Rehearsal retries from recommending Continue when the newest save belongs to a different campaign than the packet target
 - Made the `menu-2d` closing summary report the actual persisted save-slot count and names instead of claiming the default slot remained available when no save existed

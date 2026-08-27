@@ -124,6 +124,17 @@ backlog does not reopen maintenance scope or change the promotion rules below.
 - No local automated matrix was rerun for these operator-only attempts because runtime code did not change. The previously successful CI result remains the implementation baseline.
 - Version 0.328.1 remains a Stable Alpha in maintenance mode.
 
+### Partial Owner Rehearsal - 2026-08-28
+
+- Baseline commit `6bd02f8a1877714a753730ff0c428cdefa5a28b3` was clean, matched `origin/main`, and had successful GitHub CI run `32873625652` before launch.
+- A new 0.328.1 packet passed first-launch preflight at 1280x720 with full motion and allocated distinct rehearsal, tester, and evidence database paths.
+- The first visible run created an `active` save for the exact `founder_journey` target at Turn 3 with `game_over=0`; no archive or complete target path existed when the window closed.
+- The guarded runner correctly offered `Continue existing target save`. The retry window then closed without changing the save, which remained at Turn 3 with 0 archives.
+- Database state proves that the target run began and is resumable, but it cannot prove whether First Turn, Help, Pause/Back, Menu/Continue, campaign trade-offs, or any other visible checklist item passed. Those rows remain `NOT VERIFIED` without a direct owner report.
+- No reproducible P0/P1 was reported or inferred. Human evidence remained 0/6 sessions, and the owner rehearsal wrote no human-session row.
+- The next owner action is to rerun the same guarded command, choose Continue, finish the route, use Save & Archive, confirm Progress/Route Atlas, and then close the window.
+- Version 0.328.1 remains a Stable Alpha in maintenance mode.
+
 ## Promotion Rules
 
 ### Beta Candidate

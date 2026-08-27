@@ -8,6 +8,8 @@
 
 The 2026-08-23 through 2026-08-25 operator attempts used validated isolated profiles but closed with 0 companies, 0 saves, and 0 archives. They confirm neither a gameplay pass nor a defect; all unobserved owner checks remain `NOT VERIFIED`.
 
+The 2026-08-28 rehearsal progressed further and left a valid `founder_journey` save at Turn 3, but it still produced no archive. The resumable save is operational progress, not manual evidence or proof that the visible owner checklist passed.
+
 These are evidence gaps, not proof of a software defect. If rehearsal exposes a reproducible P0 or P1, record the exact route and fix only that defect with regression coverage.
 
 ## Known Constraints
