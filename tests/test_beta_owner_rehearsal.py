@@ -408,6 +408,8 @@ def test_guarded_owner_rehearsal_resumes_existing_profile(
     assert result.exit_code == 0
     assert "Continue existing save" in result.output
     assert "Choose Continue" in result.output
+    assert "Continue the saved target route" in result.output
+    assert "Choose New Game and complete Guided Opening" not in result.output
     assert "Owner Rehearsal Validated" in result.output
     assert not tester_path.exists()
     assert BetaPlaytestRepository(evidence_path).list_sessions() == []
@@ -439,6 +441,7 @@ def test_guarded_owner_rehearsal_rejects_continue_for_non_target_save(
     assert result.exit_code == 1
     assert "New Game required" in result.output
     assert "do not choose Continue" in result.output
+    assert "Choose New Game and complete Guided Opening" in result.output
     assert "Next launch: New Game: founder_journey required" in result.output
     assert "newest save is channel_margin_squeeze, not founder_journey" in result.output
     assert not tester_path.exists()

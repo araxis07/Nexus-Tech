@@ -135,6 +135,15 @@ backlog does not reopen maintenance scope or change the promotion rules below.
 - The next owner action is to rerun the same guarded command, choose Continue, finish the route, use Save & Archive, confirm Progress/Route Atlas, and then close the window.
 - Version 0.328.1 remains a Stable Alpha in maintenance mode.
 
+### Owner Rehearsal Resume Guidance Fix - 2026-08-29
+
+- A subsequent guarded retry opened the correct `founder_journey` Turn 3 save but closed without changing the save or creating an archive.
+- The rendered briefing reproducibly showed `Continue existing save` and `Choose Continue` while checklist step 2 still said `Choose New Game`. Those simultaneous instructions were contradictory on the required owner path.
+- The resume briefing now replaces the stale New Game checklist row with a saved-route continuation instruction. Fresh, empty-profile, and wrong-scenario launches retain their required New Game guidance.
+- Regression coverage requires resume output to contain the continuation instruction and reject the stale New Game instruction while preserving New Game guidance for a non-target save.
+- The fix changes operator copy only. Gameplay, balance, content, controls, persistence schema 28, saves, archives, and human evidence remain unchanged.
+- Owner Rehearsal still requires a completed archive and direct owner observations; version 0.328.1 remains a Stable Alpha in maintenance mode.
+
 ## Promotion Rules
 
 ### Beta Candidate

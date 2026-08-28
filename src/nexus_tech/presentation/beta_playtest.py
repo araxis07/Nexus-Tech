@@ -448,6 +448,7 @@ def render_beta_owner_rehearsal_briefing(
     """Render the exact visible route before the guarded rehearsal launch."""
 
     target_scenario_id = preparation.target_scenario_id or ""
+    second_check = preparation.owner_rehearsal_checklist[1]
     if saved_scenario_id == target_scenario_id:
         launch_mode = "Continue existing save"
         selection_instruction = (
@@ -457,6 +458,10 @@ def render_beta_owner_rehearsal_briefing(
         first_check = (
             "Confirm this is the dedicated rehearsal profile, choose Continue, and "
             "resume the visible route without counting it as human evidence."
+        )
+        second_check = (
+            "Continue the saved target route and complete any remaining Guided Opening "
+            "steps without using developer tools or source-code knowledge."
         )
     elif saved_scenario_id:
         launch_mode = "New Game required"
@@ -498,7 +503,13 @@ def render_beta_owner_rehearsal_briefing(
     checklist.add_column("Step", justify="right", style="bold yellow")
     checklist.add_column("Verify")
     for index, item in enumerate(preparation.owner_rehearsal_checklist, start=1):
-        checklist.add_row(str(index), first_check if index == 1 else item)
+        if index == 1:
+            rendered_item = first_check
+        elif index == 2:
+            rendered_item = second_check
+        else:
+            rendered_item = item
+        checklist.add_row(str(index), rendered_item)
 
     console.print(
         Panel(
