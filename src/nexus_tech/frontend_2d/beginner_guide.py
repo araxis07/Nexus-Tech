@@ -168,6 +168,36 @@ BEGINNER_GUIDE_PAGES: tuple[BeginnerGuidePage, ...] = (
         tip="Advanced panel shortcuts remain available, but they are never required.",
     ),
     BeginnerGuidePage(
+        key="empire",
+        eyebrow="OPTIONAL LONG RUN",
+        title="Grow from startup to empire",
+        summary=(
+            "Empire Mode extends a run through five eras. Use Report to read territory control, "
+            "your Scale Thesis, the next milestone, and any empire-scale crisis."
+        ),
+        steps=(
+            BeginnerGuideStep(
+                "1",
+                "Choose a thesis",
+                "Your campaign goal becomes the long-run Scale Thesis.",
+                "info",
+            ),
+            BeginnerGuideStep(
+                "2",
+                "Expand deliberately",
+                "Build products across territories without neglecting the core.",
+                "success",
+            ),
+            BeginnerGuideStep(
+                "3",
+                "Answer pressure",
+                "Rivals counter strong territories; resolve crises before they compound.",
+                "warning",
+            ),
+        ),
+        tip="Empire victory is locked until Turn 25; Standard runs keep their original pacing.",
+    ),
+    BeginnerGuidePage(
         key="advanced",
         eyebrow="OPTIONAL REFERENCE",
         title="Power keys for experienced players",

@@ -2,15 +2,45 @@
 
 ## Current Classification
 
-- Version: 0.328.1
+- Version: 0.329.0
 - Status: Stable Alpha
-- Operating mode: maintenance
+- Operating mode: bounded Empire Mode preview
 - Persistence schema: 28
-- Scope: frozen; no new features, systems, campaigns, or animation work
+- Scope: Standard baseline frozen; Empire vertical slice open for validation
 
-Version 0.328.1 contains a complete local vertical slice. Players can start a guided or full run, make turn-based operating decisions, pause and recover navigation, save and continue, reach guided or full endgame, archive a completed run, and inspect campaign progress and the Route Atlas. The terminal and 2D interfaces use the same simulation and SQLite persistence model.
+Version 0.329.0 retains the complete local vertical slice and adds an optional long-form `Founder Empire` scenario. Players can start a guided, full, or Empire run, make turn-based operating decisions, pause and recover navigation, save and continue, reach guided or full endgame, archive a completed run, and inspect campaign progress and the Route Atlas. The terminal and 2D interfaces use the same simulation and SQLite persistence model.
 
-Stable Alpha is the highest defensible classification today. Automated checks establish implementation health, but they do not establish that a person completed and understood the full owner journey.
+Stable Alpha is the highest defensible classification today. Automated checks establish implementation health, but they do not establish that a person completed and understood the full owner journey or the new Turn 25 Empire pacing.
+
+## Empire Mode Preview - 2026-08-31
+
+- `empire_founder_journey` is a separate opt-in scenario; Standard scenarios retain their original pacing and victory rules.
+- The five Empire eras are Foundation (1-5), Growth (6-10), Scale (11-16), Expansion (17-24), and Legacy (25+).
+- The selected campaign goal becomes an Operating Flywheel, Platform Ecosystem, or Category Standard Scale Thesis.
+- Territory control is derived from existing products, users, accounts, partners, and competitors across the four existing customer segments.
+- Rivals counter the strongest territory on a deterministic late-run cadence, while platform, market, and leadership state can surface one dominant crisis.
+- Empire state requires no schema migration. Save/load persists the existing source state and reconstructs the strategy layer deterministically.
+- Empire automated gates do not count as human evidence. Its pacing, comprehension, and Turn 25 completion path remain manually unverified.
+
+### 0.329.0 Automated Verification
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Ruff lint and format | PASS | 157 Python files; no lint or format findings |
+| Full test suite | PASS | 1,296 tests with warnings treated as errors |
+| Content catalog | PASS | 50 total scenarios, 49 templates, 32 rivals, 202 events, 0 issues |
+| Frozen Beta catalog | PASS | Original 49-scenario Beta ceiling remains unchanged; Empire is an explicit preview lane |
+| Persistence | PASS | Installed-wheel Empire save; schema 28, SQLite integrity, and foreign keys healthy |
+| Responsive Empire layout | PASS | 117/117 captures across 820x620, 960x640, and 1440x900; large text 39/39 at 820x620 |
+| Empire animation | PASS WITH ADVISORY | Automated animation gate passed; human timing and control feel remain unverified |
+| Long-run stability | PASS WITH ADVISORY | Three deterministic 30-turn runs survived without crash or shutdown; autoplay did not complete the portfolio goal |
+| Package build | PASS | 0.329.0 source distribution and wheel built; installed-wheel version, content, 2D launch, and save health passed |
+| Secret and file scan | PASS | No database, environment file, credential, private key, token, personal path, or generated capture is included |
+| Empire human completion | NOT VERIFIED | No owner or tester has completed the Turn 25 Empire path |
+
+The long-run batch is a stability check only. It does not establish that the
+Empire economy is well paced, that the objective is easy to understand, or that
+a human can complete the selected Scale Thesis without decision fatigue.
 
 ## Implemented And Automated
 
@@ -20,6 +50,7 @@ Stable Alpha is the highest defensible classification today. Automated checks es
 - Pause, Back, Menu, Continue, Help, Guided/Full Endgame, Save & Archive, Progress, and Route Atlas flows
 - Responsive 2D layout coverage across 39 surfaces, supported viewports, text scales, contrast profiles, and motion modes
 - Deterministic gameplay, content, persistence, layout, visual, animation, package-build, and CI gates
+- Optional Empire scenario, era pacing, Scale Thesis, territory map, rival response, and save-compatible derived strategy state
 
 The closure sprint reruns these gates on the final commit. Their result must be reported with the commit and CI link; this document does not replace executable evidence.
 
@@ -87,7 +118,7 @@ Owner Rehearsal is an operator preflight only. It must never be inserted into th
 
 ## Gameplay Change Control - 2026-08-19
 
-The current decision-quality baseline passed its automated ledger gate across 54
+The 0.328.1 decision-quality baseline passed its automated ledger gate across 54
 heuristic runs. Thirteen of 18 scenario/difficulty cells retained an advisory
 watch, all led by repeated `Grow Demand`. In-memory policy attribution identifies
 the three `portfolio_machine` cells as 100% default-fallback autoplay-policy
@@ -98,7 +129,8 @@ authorizes balance work without matching real-player observations.
 Future gameplay discovery, conditional tuning, Debt Crunch late-game review, and
 post-beta capability order are bounded in the
 [Gameplay Validation Backlog](GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md). The
-backlog does not reopen maintenance scope or change the promotion rules below.
+backlog did not reopen maintenance scope. The owner explicitly reopened a separate,
+bounded Empire vertical slice on 2026-08-31; it does not change the promotion rules below.
 
 ### Follow-up Owner Rehearsal - 2026-08-20
 
@@ -154,8 +186,8 @@ All automated release gates pass, Owner Rehearsal reaches Save & Archive, the Pr
 
 Beta Candidate requirements pass, six valid human sessions cover all six featured campaigns, no P0 is open, and every P1 has valid retest evidence. Automated runs, generated packets, and owner-only rehearsal cannot substitute for these sessions.
 
-## Maintenance Policy
+## Change Policy
 
-Accepted work is limited to reproducible P0/P1 defects, security or dependency compatibility, release and test infrastructure, and factual documentation. P2 polish, redesigns, balance changes based only on autoplay, new content, and feature expansion remain deferred unless the project is explicitly reopened.
+Standard Mode remains the compatibility baseline and accepts only reproducible defects, security or dependency compatibility, release infrastructure, and factual documentation. Empire Mode may receive targeted pacing and clarity work only when automated or human playtest evidence identifies a concrete problem. Unbounded systems, campaigns, currencies, workspaces, and animation expansion remain deferred.
 
 See [Known Issues](KNOWN_ISSUES.md) and [Release Checklist](RELEASE_CHECKLIST.md).

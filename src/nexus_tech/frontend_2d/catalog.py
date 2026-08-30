@@ -12,6 +12,7 @@ from nexus_tech.simulation.campaign import list_campaign_goals
 from nexus_tech.simulation.campaign_journey import get_campaign_journey
 from nexus_tech.simulation.campaign_starts import CampaignStartDefinition, list_campaign_starts
 from nexus_tech.simulation.difficulty import get_difficulty_profile
+from nexus_tech.simulation.empire import EMPIRE_SCENARIO_ID
 from nexus_tech.simulation.meta_progression import is_reward_unlocked
 from nexus_tech.simulation.scenarios import get_available_scenarios
 
@@ -135,6 +136,7 @@ def _build_scenario_choice(
         reward_id=scenario.scenario_id,
     )
     journey = get_campaign_journey(scenario.scenario_id)
+    is_empire = scenario.scenario_id == EMPIRE_SCENARIO_ID
     return ScenarioChoice(
         scenario_id=scenario.scenario_id,
         title=scenario.title,
@@ -142,14 +144,28 @@ def _build_scenario_choice(
         objective=scenario.objective,
         default_difficulty=scenario.difficulty_mode,
         default_goal_id=scenario.campaign_goal_id,
-        track_label=journey.track_label if journey is not None else "Challenge",
-        stage_hint=(
-            journey.chapters[0].objective if journey is not None else "Optional specialist scenario"
+        track_label=(
+            journey.track_label if journey is not None else "Empire" if is_empire else "Challenge"
         ),
-        journey_theme=journey.theme if journey is not None else scenario.objective,
+        stage_hint=(
+            journey.chapters[0].objective
+            if journey is not None
+            else "25-turn strategic expansion"
+            if is_empire
+            else "Optional specialist scenario"
+        ),
+        journey_theme=(
+            journey.theme
+            if journey is not None
+            else "Build a multi-market company through five strategic eras."
+            if is_empire
+            else scenario.objective
+        ),
         act_preview=(
             " > ".join(chapter.title for chapter in journey.chapters)
             if journey is not None
+            else "Foundation > Growth > Scale > Expansion > Legacy"
+            if is_empire
             else "Specialist challenge"
         ),
         featured_rank=journey.featured_rank if journey is not None else None,

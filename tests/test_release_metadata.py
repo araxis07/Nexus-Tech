@@ -15,7 +15,7 @@ def test_current_release_version_is_consistent() -> None:
     assert __version__ == project_version
 
     expected_markers = {
-        "README.md": f"**Stable Alpha | Version {project_version} | Maintenance mode**",
+        "README.md": f"**Stable Alpha | Version {project_version} | Empire Mode preview**",
         "docs/PROJECT_STATUS.md": f"- Version: {project_version}",
         "docs/KNOWN_ISSUES.md": (f"Version {project_version} must not be described as Beta Ready."),
         "docs/RELEASE_CHECKLIST.md": (f"Treat version {project_version} as a Stable Alpha"),

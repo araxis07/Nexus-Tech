@@ -12,6 +12,7 @@ from nexus_tech.simulation.balance import BALANCE
 from nexus_tech.simulation.campaign import check_campaign_goal_victory, evaluate_campaign_goal
 from nexus_tech.simulation.customers import calculate_account_revenue
 from nexus_tech.simulation.difficulty import get_difficulty_profile
+from nexus_tech.simulation.empire import EMPIRE_MIN_VICTORY_TURN, is_empire_scenario
 
 
 @dataclass(frozen=True)
@@ -234,6 +235,11 @@ def calculate_run_badges(
 def check_victory(state: GameState) -> str | None:
     """Return a victory reason when the company has reached durable scale."""
 
+    if (
+        is_empire_scenario(state.scenario_id)
+        and state.company.current_turn < EMPIRE_MIN_VICTORY_TURN
+    ):
+        return None
     campaign_victory = check_campaign_goal_victory(state)
     if campaign_victory is not None:
         return campaign_victory

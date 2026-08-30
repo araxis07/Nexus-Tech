@@ -104,6 +104,7 @@ from nexus_tech.simulation.economy import (
     calculate_total_salary_cost,
     is_game_over,
 )
+from nexus_tech.simulation.empire import apply_empire_turn_effects
 from nexus_tech.simulation.employee_progression import (
     apply_end_of_turn_employee_progression,
     promote_employee,
@@ -3043,6 +3044,14 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         market_cycle=next_state.market_cycle,
         portfolio_products=next_state.products,
     )
+    empire_summary = apply_empire_turn_effects(
+        next_state,
+        resolved_turn=resolved_turn,
+        net_cash_flow=net_cash_flow,
+    )
+    if empire_summary is not None:
+        reputation_delta += empire_summary.reputation_delta
+        team_condition = calculate_team_condition(next_state.employees)
     record_competitor_intel(
         next_state,
         previous_competitors,
@@ -3104,6 +3113,8 @@ def resolve_turn(state: GameState, rng: RandomLike) -> TurnResolution:
         underperforming_count=progression_summary.underperforming_count,
         resigned_employees=progression_summary.resigned_employees,
     )
+    if empire_summary is not None:
+        narrative = f"{narrative} Empire: {empire_summary.summary}."
     logger.debug("Resolved turn %s.", resolved_turn)
 
     return TurnResolution(

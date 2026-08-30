@@ -117,7 +117,7 @@ def build_title_menu_presentation(
         secondary_actions=(
             TitleActionPresentation(
                 "3 Learn to Play",
-                "Five beginner lessons and essential controls.",
+                "Seven short lessons and essential controls.",
                 "guide",
                 "info",
             ),

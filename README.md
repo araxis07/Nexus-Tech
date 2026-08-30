@@ -13,11 +13,21 @@ Designed for local play and live demos, the project focuses on clean architectur
 
 ## Project Status
 
-**Stable Alpha | Version 0.328.1 | Maintenance mode**
+**Stable Alpha | Version 0.329.0 | Empire Mode preview**
 
-The complete local gameplay loop, persistence, six featured campaigns, authored endings, archive progression, terminal interface, and responsive 2D shell are implemented and covered by automated release gates. The project is not classified as Beta because the current Owner Rehearsal and the required six human playtest sessions have not been completed. No new features, campaigns, systems, or animation work are planned during maintenance.
+The complete local gameplay loop, persistence, six featured campaigns, authored endings, archive progression, terminal interface, and responsive 2D shell are implemented. Version 0.329.0 adds an optional long-form `Founder Empire` preview while leaving Standard runs and schema 28 saves compatible. The project is not classified as Beta because the current Owner Rehearsal, Empire pacing validation, and the required six human playtest sessions have not been completed.
 
-See [Project Status](docs/PROJECT_STATUS.md) for the release evidence and promotion rules, [Known Issues](docs/KNOWN_ISSUES.md) for the remaining manual-validation and platform limitations, and the [Gameplay Validation Backlog](docs/GAMEPLAY_VALIDATION_BACKLOG_2026-08-19.md) for evidence-gated work that remains deferred during maintenance.
+See [Project Status](docs/PROJECT_STATUS.md) for release evidence and promotion rules, [Empire Mode](docs/EMPIRE_MODE.md) for the long-run rules, and [Known Issues](docs/KNOWN_ISSUES.md) for remaining manual-validation and platform limitations.
+
+### Empire Mode Preview
+
+Choose `Founder Empire` from New Game or launch it directly:
+
+```bash
+.venv313/bin/nexus-tech play-2d --scenario empire_founder_journey
+```
+
+Empire Mode extends the normal company loop to a Turn 25 victory gate. It adds five strategic eras, a Scale Thesis derived from the chosen campaign goal, control scores for the existing `indie`, `startup`, `SMB`, and `enterprise` markets, adaptive rival counters, and cross-system crisis pressure. It reuses the existing Report workspace and persistence model instead of adding another control layer.
 
 ## 🎮 What Kind of Game Is It?
 
@@ -64,7 +74,7 @@ Each turn represents a business interval. You review the company, choose actions
 - Play six featured campaigns with persistent Commitment and Consequence choices that change real product, cash, debt, team, and governance state
 - Audit featured campaigns against their scenario-native goals with per-route goal progress and completion evidence instead of forcing every journey through one profit metric
 - Turn both campaign choices into a Campaign Legacy that explains the completed route, its future event pressure, and the final act mandate
-- Keep the beta catalog frozen at 49 scenarios, 49 product templates, 32 rival archetypes, 194 internal actions, 99 player-facing programs, and 202 systemic events while validation replaces expansion
+- Use a 50-scenario catalog, including the optional `Founder Empire` long-run preview, alongside 49 product templates, 32 rival archetypes, 194 internal actions, 99 player-facing programs, and 202 systemic events
 - Gate select reward scenarios behind archive progression while still surfacing them in the catalog with explicit locked or unlocked status
 - Use reusable product templates such as SaaS tools, growth apps, developer platforms, and workflow suites
 - Gate select reward templates and rival archetypes behind archive progression so repeat runs can unlock new starts without changing the offline scope
@@ -1208,8 +1218,8 @@ uv run ruff format src tests
 
 ## 📌 Project Notes
 
-- Version 0.328.1 is closed as a Stable Alpha and remains in maintenance mode
-- Maintenance changes are limited to reproducible P0/P1 defects, security or dependency compatibility, release tooling, and factual documentation
+- Version 0.329.0 remains a Stable Alpha and introduces the bounded Empire Mode preview
+- Standard gameplay is the compatibility baseline; future Empire work requires pacing or human-playtest evidence rather than unbounded feature accumulation
 - The project is intentionally **offline-first** and **local-only**
 - Save data is stored in `nexus-tech.db` by default
 - `--seed` is useful for repeatable demos and deterministic test scenarios

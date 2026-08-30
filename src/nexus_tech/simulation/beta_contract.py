@@ -11,6 +11,7 @@ from nexus_tech.content.loader import (
 )
 from nexus_tech.domain.models import TurnAction
 from nexus_tech.simulation.action_catalog import get_action_presentation
+from nexus_tech.simulation.empire import EMPIRE_SCENARIO_ID
 from nexus_tech.simulation.event_registry import get_event_registry
 
 
@@ -77,8 +78,11 @@ MANUAL_BETA_TARGETS = (
 def capture_catalog_snapshot() -> CatalogSnapshot:
     """Capture the current catalog sizes used by the beta feature-freeze gate."""
 
+    beta_scenarios = tuple(
+        scenario for scenario in list_scenarios() if scenario.scenario_id != EMPIRE_SCENARIO_ID
+    )
     return CatalogSnapshot(
-        scenarios=len(list_scenarios()),
+        scenarios=len(beta_scenarios),
         product_templates=len(list_product_templates()),
         competitor_archetypes=len(list_competitor_archetypes()),
         turn_actions=len(TurnAction),

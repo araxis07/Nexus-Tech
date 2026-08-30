@@ -4018,5 +4018,91 @@
         "archetype_id": "margin_channel_house"
       }
     ]
+  },
+  {
+    "scenario_id": "empire_founder_journey",
+    "title": "Founder Empire",
+    "description": "A long-form strategic run that grows one durable product into a multi-market company across five eras.",
+    "objective": "Reach the Legacy era, sustain your Scale Thesis, and survive adaptive rival pressure.",
+    "company_name": "NEXUS EMPIRE",
+    "company_strategy": "balanced",
+    "difficulty_mode": "standard",
+    "campaign_goal_id": "portfolio_empire",
+    "roadmap_focus": "balanced_execution",
+    "budget_stance": "balanced",
+    "market_cycle": "steady",
+    "market_cycle_turns_remaining": 3,
+    "cash_on_hand": "16500.00",
+    "reputation": 52,
+    "products": [
+      {
+        "key": "core",
+        "template_id": "developer_platform",
+        "name": "Nexus Core",
+        "lifecycle_stage": "growth",
+        "quality": 62,
+        "bug_level": 15,
+        "market_fit": 56,
+        "technical_debt": 16,
+        "user_count": 50,
+        "revenue_per_user": "34.00",
+        "feature_count": 2,
+        "maintenance_cost": "280.00",
+        "acquisition_rate": "0.0550",
+        "churn_rate": "0.0450",
+        "target_segment": "startup",
+        "pricing_tier": "standard",
+        "packaging_strategy": "modular"
+      }
+    ],
+    "employees": [
+      {
+        "full_name": "Rin Mercer",
+        "role": "engineer",
+        "seniority": "mid",
+        "specialization": "platform",
+        "assigned_product_key": "core",
+        "energy": 78,
+        "morale": 75
+      }
+    ],
+    "competitors": [
+      {
+        "name": "Solo Circuit",
+        "focus_segment": "indie",
+        "strength": 46,
+        "aggression": 52,
+        "pricing_tier": "budget",
+        "active_product_count": 1
+      },
+      {
+        "name": "Launch Dominion",
+        "focus_segment": "startup",
+        "strength": 56,
+        "aggression": 55,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      },
+      {
+        "name": "Market Foundry",
+        "focus_segment": "smb",
+        "strength": 58,
+        "aggression": 50,
+        "pricing_tier": "standard",
+        "active_product_count": 2
+      },
+      {
+        "name": "Titan Systems",
+        "focus_segment": "enterprise",
+        "strength": 64,
+        "aggression": 47,
+        "pricing_tier": "premium",
+        "active_product_count": 2
+      }
+    ],
+    "finance": {
+      "investor_pressure": 8,
+      "board_confidence": 58
+    }
   }
 ]

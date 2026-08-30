@@ -621,6 +621,7 @@ def test_beginner_guide_is_ordered_and_keeps_advanced_keys_optional() -> None:
         "screen",
         "recovery",
         "controls",
+        "empire",
         "advanced",
     ]
     assert all(len(page.steps) == 3 for page in BEGINNER_GUIDE_PAGES)

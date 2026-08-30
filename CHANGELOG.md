@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.329.0 - 2026-08-31
+
+- Added the optional `Founder Empire` long-run scenario with Foundation, Growth, Scale, Expansion, and Legacy eras and a Turn 25 victory gate
+- Added Scale Theses derived from existing campaign goals, four derived market-territory control scores, adaptive rival counters, and cross-system Empire crisis pressure without changing persistence schema 28
+- Reused the existing Report workspace as an Empire Plan / Market Map and added catalog and beginner-guide explanations without adding another navigation layer
+- Kept Empire Report and Turn Summary copy within the existing responsive text budget across compact, standard, and large UI profiles
+- Kept Standard scenarios behavior-neutral and added regression coverage for era boundaries, thesis mapping, territory state, rival response, victory gating, UI presentation, and Empire save round trips
+- Reopened only the explicitly approved long-run gameplay slice while retaining Stable Alpha classification and truthful 0/6 human evidence
+
 - Removed the contradictory New Game checklist instruction from Owner Rehearsal resume briefings while preserving New Game guidance for fresh, empty, and wrong-scenario profiles
 - Recorded the 2026-08-28 partial owner rehearsal with a resumable `founder_journey` Turn 3 save, no archive, no reproducible defect, and no human-session evidence
 - Recorded the three 2026-08-23 through 2026-08-25 owner rehearsal attempts as unstarted, isolated profiles with no company, save, archive, route, defect evidence, or human-session evidence, and clarified first-launch versus guarded-retry operation

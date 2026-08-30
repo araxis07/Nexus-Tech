@@ -23,6 +23,7 @@ from nexus_tech.simulation.campaign_decisions import (
 from nexus_tech.simulation.campaign_journey import get_campaign_journey_progress
 from nexus_tech.simulation.decision_patterns import build_decision_pattern
 from nexus_tech.simulation.difficulty import get_difficulty_profile
+from nexus_tech.simulation.empire import build_empire_snapshot, is_empire_scenario
 from nexus_tech.simulation.end_turn_preview import build_end_turn_preview
 from nexus_tech.simulation.endgame import (
     calculate_endgame_pressure,
@@ -767,6 +768,9 @@ def build_deep_dive_panel_view_models(
     )
     latest_turn = state.turn_history[-1] if state.turn_history else None
     run_score = calculate_run_score(state)
+    empire_snapshot = (
+        build_empire_snapshot(state) if is_empire_scenario(state.scenario_id) else None
+    )
     decision_pattern = build_decision_pattern(state.decision_history)
     endgame_readiness = calculate_endgame_readiness(state, run_score)
     endgame_pressure = calculate_endgame_pressure(state, endgame_readiness)
@@ -1233,48 +1237,98 @@ def build_deep_dive_panel_view_models(
         ),
         inspectors=_build_pipeline_inspectors(state, product_by_id=product_by_id),
     )
+    report_title = "Report / Run Summary Desk"
+    report_summary = "Read the current run at a higher level before you commit the next turn."
+    report_metrics = (
+        DeepDiveMetricViewModel("Score", str(run_score.total_score), "info"),
+        DeepDiveMetricViewModel(
+            "Tier",
+            run_score.score_tier,
+            "success" if run_score.total_score >= 170 else "warning",
+        ),
+        DeepDiveMetricViewModel(
+            "Valuation",
+            format_money(run_score.estimated_valuation),
+            "info",
+        ),
+        DeepDiveMetricViewModel("Decisions", str(len(state.decision_history)), "info"),
+    )
+    report_detail_lines = (
+        f"Scenario objective: {state.scenario_objective or 'None set.'}",
+        f"Campaign goal: {state.campaign_goal_id.value.replace('_', ' ')}",
+        (
+            f"Latest turn: revenue {format_money(latest_turn.total_revenue)} | "
+            f"net {format_money(latest_turn.net_cash_flow)} | users {latest_turn.total_users}"
+            if latest_turn is not None
+            else "No turn ledger exists yet."
+        ),
+        f"Milestones unlocked: {len(state.milestone_history)}",
+        (
+            f"Decision pattern: {decision_pattern.style_label} | "
+            f"{decision_pattern.dominant_family_count}/"
+            f"{decision_pattern.operating_decisions} in the largest family share"
+            if decision_pattern.operating_decisions
+            else "Decision pattern: waiting for the first operating choice."
+        ),
+        (
+            f"Latest decision: {state.decision_history[-1].label} | "
+            f"{state.decision_history[-1].impact_summary}"
+            if state.decision_history
+            else "No state-changing decisions recorded yet."
+        ),
+    )
+    if empire_snapshot is not None:
+        crisis_title = (
+            empire_snapshot.dominant_crisis.title
+            if empire_snapshot.dominant_crisis is not None
+            else "Clear"
+        )
+        report_title = "Empire Plan / Market Map"
+        report_summary = f"{empire_snapshot.thesis.title}: {empire_snapshot.era.objective}"
+        report_metrics = (
+            DeepDiveMetricViewModel("Era", empire_snapshot.era.title, "selection"),
+            DeepDiveMetricViewModel(
+                "Empire",
+                str(empire_snapshot.empire_score),
+                "success" if empire_snapshot.empire_score >= 60 else "warning",
+            ),
+            DeepDiveMetricViewModel(
+                "Control",
+                f"{empire_snapshot.controlled_territories}/4",
+                "success" if empire_snapshot.controlled_territories >= 2 else "warning",
+            ),
+            DeepDiveMetricViewModel(
+                "Crisis",
+                crisis_title,
+                "warning" if empire_snapshot.dominant_crisis is not None else "success",
+            ),
+        )
+        territory_lines = tuple(
+            (
+                f"{territory.segment.value.upper()}: {territory.status.value.replace('_', ' ')} "
+                f"| C{territory.score} U{territory.users} R{territory.rival_pressure}"
+            )
+            for territory in empire_snapshot.territories
+        )
+        crisis_line = (
+            f"Crisis: {empire_snapshot.dominant_crisis.title} "
+            f"({empire_snapshot.dominant_crisis.severity})"
+            if empire_snapshot.dominant_crisis is not None
+            else "Crisis: no empire-scale crisis is active."
+        )
+        report_detail_lines = territory_lines + (
+            crisis_line,
+            (
+                f"Next: {empire_snapshot.next_milestone} | "
+                f"Priority: {empire_snapshot.strategic_priority}"
+            ),
+        )
     report_panel = DeepDivePanelViewModel(
         key="report",
-        title="Report / Run Summary Desk",
-        summary="Read the current run at a higher level before you commit the next turn.",
-        metrics=(
-            DeepDiveMetricViewModel("Score", str(run_score.total_score), "info"),
-            DeepDiveMetricViewModel(
-                "Tier",
-                run_score.score_tier,
-                "success" if run_score.total_score >= 170 else "warning",
-            ),
-            DeepDiveMetricViewModel(
-                "Valuation",
-                format_money(run_score.estimated_valuation),
-                "info",
-            ),
-            DeepDiveMetricViewModel("Decisions", str(len(state.decision_history)), "info"),
-        ),
-        detail_lines=(
-            f"Scenario objective: {state.scenario_objective or 'None set.'}",
-            f"Campaign goal: {state.campaign_goal_id.value.replace('_', ' ')}",
-            (
-                f"Latest turn: revenue {format_money(latest_turn.total_revenue)} | "
-                f"net {format_money(latest_turn.net_cash_flow)} | users {latest_turn.total_users}"
-                if latest_turn is not None
-                else "No turn ledger exists yet."
-            ),
-            f"Milestones unlocked: {len(state.milestone_history)}",
-            (
-                f"Decision pattern: {decision_pattern.style_label} | "
-                f"{decision_pattern.dominant_family_count}/"
-                f"{decision_pattern.operating_decisions} in the largest family share"
-                if decision_pattern.operating_decisions
-                else "Decision pattern: waiting for the first operating choice."
-            ),
-            (
-                f"Latest decision: {state.decision_history[-1].label} | "
-                f"{state.decision_history[-1].impact_summary}"
-                if state.decision_history
-                else "No state-changing decisions recorded yet."
-            ),
-        ),
+        title=report_title,
+        summary=report_summary,
+        metrics=report_metrics,
+        detail_lines=report_detail_lines,
         actions=(
             DeepDiveActionViewModel(
                 "view_report",

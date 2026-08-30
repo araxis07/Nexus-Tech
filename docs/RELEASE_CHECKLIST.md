@@ -4,11 +4,11 @@ Use this checklist before tagging or presenting a release.
 
 ## Closure Classification
 
-- Treat version 0.328.1 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
+- Treat version 0.329.0 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
 - Do not convert automated checks, Owner Rehearsal, or generated reports into human-session evidence.
 - Promote to Beta Candidate only after Owner Rehearsal reaches Save & Archive with no open P0/P1 defect.
 - Promote to Beta Ready only after six valid human sessions cover all six featured campaigns and every P1 fix has a recorded retest.
-- During maintenance, accept only reproducible P0/P1 fixes, security or dependency compatibility work, release tooling, and factual documentation.
+- Keep Standard Mode frozen except for reproducible P0/P1 fixes; require concrete pacing or playtest evidence for further Empire changes.
 - Do not create a release commit when the working tree has no real change.
 
 ## Owner Rehearsal Launch Readiness
@@ -46,6 +46,7 @@ uv pip install --python /tmp/nexus-tech-wheel-smoke/bin/python /tmp/nexus-tech-d
 /tmp/nexus-tech-wheel-smoke/bin/nexus-tech validate-content
 /tmp/nexus-tech-wheel-smoke/bin/nexus-tech doctor --db-path /tmp/nexus-tech-wheel-smoke.db
 /tmp/nexus-tech-wheel-smoke/bin/nexus-tech play-2d --scenario founder_journey --seed 7 --headless --max-frames 2 --motion-mode reduced --db-path /tmp/nexus-tech-wheel-smoke.db
+/tmp/nexus-tech-wheel-smoke/bin/nexus-tech play-2d --scenario empire_founder_journey --seed 37 --headless --max-frames 2 --motion-mode reduced --db-path /tmp/nexus-tech-wheel-smoke.db
 /tmp/nexus-tech-wheel-smoke/bin/nexus-tech check-saves --db-path /tmp/nexus-tech-wheel-smoke.db
 uv run nexus-tech --version
 uv run nexus-tech doctor
