@@ -176,6 +176,17 @@ bounded Empire vertical slice on 2026-08-31; it does not change the promotion ru
 - The fix changes operator copy only. Gameplay, balance, content, controls, persistence schema 28, saves, archives, and human evidence remain unchanged.
 - Owner Rehearsal still requires a completed archive and direct owner observations; version 0.328.1 remains a Stable Alpha in maintenance mode.
 
+### Empire Gameplay Validation Attempt - 2026-09-01
+
+- Baseline commit `ec1d362c6c770149816163f51393fd726303e5fb` was clean, matched `origin/main`, and retained successful GitHub CI run `33322363062` before launch.
+- A fresh temporary gameplay profile was isolated from the project and human-evidence databases. Its exact `empire_founder_journey` launch passed the headless preflight on Standard difficulty with the Platform Ecosystem thesis.
+- The first owner-controlled visible window closed with reason `quit` and left one healthy active save for the target scenario at Turn 3 with 0 archives.
+- A second owner-controlled visible window used the same profile and also closed with reason `quit`. The final profile contained one healthy active target save at Turn 1, with `game_over=0`, `victory_achieved=0`, and 0 archives.
+- Database state cannot establish whether the second window used New Game or Continue, and no direct owner observations were supplied. First Turn, Help, Pause/Resume, Back, Menu/Continue, era and crisis comprehension, rival pressure, Victory, Save & Archive, Progress, and Route Atlas therefore remain `NOT VERIFIED`.
+- The archive gate is `INCOMPLETE`. The Turn 3 to Turn 1 state change is not classified as a defect without confirmation of the visible route or a reproducible Continue failure.
+- Post-close verification passed Ruff, 1,296 tests with warnings treated as errors, content validation, save integrity, 117/117 responsive Empire captures, 39/39 large-text captures, the Empire animation audit, all 21 animation-matrix cells, package build, installed-wheel Empire smoke, and the repository safety scan.
+- No reproducible P0/P1 was reported or inferred. The attempt was not recorded as human evidence, human sessions remain 0/6, and the release remains Stable Alpha.
+
 ## Promotion Rules
 
 ### Beta Candidate

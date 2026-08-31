@@ -11,6 +11,8 @@ The 2026-08-23 through 2026-08-25 operator attempts used validated isolated prof
 
 The 2026-08-28 rehearsal progressed further and left a valid `founder_journey` save at Turn 3, but it still produced no archive. The resumable save is operational progress, not manual evidence or proof that the visible owner checklist passed.
 
+The 2026-09-01 Empire validation attempt used an isolated `empire_founder_journey` profile and produced no archive. Its first close left an active Turn 3 save; its second close left the same slot active at Turn 1. Without a direct report of whether New Game or Continue was selected, this difference is an unresolved observation rather than a reproducible defect. Empire Victory, Save & Archive, Progress, Route Atlas, pacing, and visible controls remain unverified.
+
 These are evidence gaps, not proof of a software defect. If rehearsal exposes a reproducible P0 or P1, record the exact route and fix only that defect with regression coverage.
 
 ## Known Constraints
