@@ -187,6 +187,17 @@ bounded Empire vertical slice on 2026-08-31; it does not change the promotion ru
 - Post-close verification passed Ruff, 1,296 tests with warnings treated as errors, content validation, save integrity, 117/117 responsive Empire captures, 39/39 large-text captures, the Empire animation audit, all 21 animation-matrix cells, package build, installed-wheel Empire smoke, and the repository safety scan.
 - No reproducible P0/P1 was reported or inferred. The attempt was not recorded as human evidence, human sessions remain 0/6, and the release remains Stable Alpha.
 
+### Empire Continue Integrity Check - 2026-09-03
+
+- Baseline commit `4e22efbe393d6b21c5c3a7511032820e86415122` was clean, matched `origin/main`, and had successful GitHub CI run `33407906408` before the check.
+- A fresh isolated `empire_founder_journey` save was advanced deterministically to Turn 3 on Standard difficulty with the Platform Ecosystem thesis. A separate pre-Continue snapshot captured the slot, scenario, goal, company, product, cash, reputation, turn, and RNG identities.
+- `continue-last-game-2d` loaded that exact slot directly, avoiding any New Game versus Continue menu ambiguity. The owner-controlled window later closed with reason `quit` and autosaved successfully.
+- The post-close save retained the same slot, scenario, goal, company ID, product ID, Turn 3, and RNG state. The continued run also persisted a `Competitor Pressure` decision and its expected product and team consequences without replacing the company or resetting progression.
+- A separate headless copy and an installed-wheel copy both opened the same Turn 3 save through the direct Continue path without changing its identity or persistence health.
+- The suspected Continue reset is `NOT REPRODUCED`, so it is not classified as P1 and no speculative runtime change or regression test was added. The earlier Turn 3 to Turn 1 observation remains attributable only to an unknown visible route, not to the direct Continue implementation.
+- Verification passed Ruff, 1,296 tests with warnings treated as errors, content and save validation, 117/117 responsive Empire captures, the Empire animation audit, all 21 animation-matrix cells, package build, installed-wheel Continue smoke, and repository safety checks.
+- The run did not advance beyond Turn 3 and created no archive. Turn 25 pacing, Victory, Save & Archive, Progress, Route Atlas, and the remaining visible owner checklist are still `NOT VERIFIED`; no human evidence was written.
+
 ## Promotion Rules
 
 ### Beta Candidate
