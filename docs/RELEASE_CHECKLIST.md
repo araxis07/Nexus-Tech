@@ -4,7 +4,7 @@ Use this checklist before tagging or presenting a release.
 
 ## Closure Classification
 
-- Treat version 0.329.0 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
+- Treat version 0.329.1 as a Stable Alpha until the manual evidence in `docs/PROJECT_STATUS.md` is complete.
 - Do not convert automated checks, Owner Rehearsal, or generated reports into human-session evidence.
 - Promote to Beta Candidate only after Owner Rehearsal reaches Save & Archive with no open P0/P1 defect.
 - Promote to Beta Ready only after six valid human sessions cover all six featured campaigns and every P1 fix has a recorded retest.

@@ -2,13 +2,13 @@
 
 ## Current Classification
 
-- Version: 0.329.0
+- Version: 0.329.1
 - Status: Stable Alpha
 - Operating mode: bounded Empire Mode preview
 - Persistence schema: 28
 - Scope: Standard baseline frozen; Empire vertical slice open for validation
 
-Version 0.329.0 retains the complete local vertical slice and adds an optional long-form `Founder Empire` scenario. Players can start a guided, full, or Empire run, make turn-based operating decisions, pause and recover navigation, save and continue, reach guided or full endgame, archive a completed run, and inspect campaign progress and the Route Atlas. The terminal and 2D interfaces use the same simulation and SQLite persistence model.
+Version 0.329.1 retains the complete local vertical slice and optional long-form `Founder Empire` scenario while fixing one supported-viewport Turn Summary readability defect. Players can start a guided, full, or Empire run, make turn-based operating decisions, pause and recover navigation, save and continue, reach guided or full endgame, archive a completed run, and inspect campaign progress and the Route Atlas. The terminal and 2D interfaces use the same simulation and SQLite persistence model.
 
 Stable Alpha is the highest defensible classification today. Automated checks establish implementation health, but they do not establish that a person completed and understood the full owner journey or the new Turn 25 Empire pacing.
 
@@ -22,19 +22,19 @@ Stable Alpha is the highest defensible classification today. Automated checks es
 - Empire state requires no schema migration. Save/load persists the existing source state and reconstructs the strategy layer deterministically.
 - Empire automated gates do not count as human evidence. Its pacing, comprehension, and Turn 25 completion path remain manually unverified.
 
-### 0.329.0 Automated Verification
+### 0.329.1 Automated Verification
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
 | Ruff lint and format | PASS | 157 Python files; no lint or format findings |
-| Full test suite | PASS | 1,296 tests with warnings treated as errors |
+| Full test suite | PASS | 1,297 tests with warnings treated as errors |
 | Content catalog | PASS | 50 total scenarios, 49 templates, 32 rivals, 202 events, 0 issues |
 | Frozen Beta catalog | PASS | Original 49-scenario Beta ceiling remains unchanged; Empire is an explicit preview lane |
 | Persistence | PASS | Installed-wheel Empire save; schema 28, SQLite integrity, and foreign keys healthy |
-| Responsive Empire layout | PASS | 117/117 captures across 820x620, 960x640, and 1440x900; large text 39/39 at 820x620 |
+| Responsive Empire layout | PASS | 351/351 reduced-motion captures across 820x620, 960x640, and 1440x900 with compact, standard, and large text |
 | Empire animation | PASS WITH ADVISORY | Automated animation gate passed; human timing and control feel remain unverified |
 | Long-run stability | PASS WITH ADVISORY | Three deterministic 30-turn runs survived without crash or shutdown; autoplay did not complete the portfolio goal |
-| Package build | PASS | 0.329.0 source distribution and wheel built; installed-wheel version, content, 2D launch, and save health passed |
+| Package build | PASS | 0.329.1 source distribution and wheel built; installed-wheel version, content, 2D launch, and save health passed |
 | Secret and file scan | PASS | No database, environment file, credential, private key, token, personal path, or generated capture is included |
 | Empire human completion | NOT VERIFIED | No owner or tester has completed the Turn 25 Empire path |
 
@@ -197,6 +197,17 @@ bounded Empire vertical slice on 2026-08-31; it does not change the promotion ru
 - The suspected Continue reset is `NOT REPRODUCED`, so it is not classified as P1 and no speculative runtime change or regression test was added. The earlier Turn 3 to Turn 1 observation remains attributable only to an unknown visible route, not to the direct Continue implementation.
 - Verification passed Ruff, 1,296 tests with warnings treated as errors, content and save validation, 117/117 responsive Empire captures, the Empire animation audit, all 21 animation-matrix cells, package build, installed-wheel Continue smoke, and repository safety checks.
 - The run did not advance beyond Turn 3 and created no archive. Turn 25 pacing, Victory, Save & Archive, Progress, Route Atlas, and the remaining visible owner checklist are still `NOT VERIFIED`; no human evidence was written.
+
+### Empire Full-Route Attempt and Turn Summary Fix - 2026-09-04
+
+- Baseline commit `686aeee96489feee32e7973b1fe4a912c048b32b` was clean, matched `origin/main`, and had successful GitHub CI run `33668577415` before launch.
+- The existing healthy Turn 3 `empire_founder_journey` save was copied into a new isolated temporary profile. An immutable pre-run snapshot preserved the slot, scenario, goal, company, product, RNG, and history state outside the repository and human-evidence database.
+- The owner-controlled direct Continue window closed with reason `quit` and autosaved. The same slot, scenario, goal, company ID, and product ID advanced normally from Turn 3 to Turn 4; SQLite integrity and foreign keys remained healthy on schema 28.
+- The run did not reach Turn 25, Victory, or Save & Archive. Progress still reports zero archived runs and Route Atlas discovery remains 0/24, so the full-route archive gate is `INCOMPLETE`.
+- No direct owner observations were supplied for Help, Pause/Resume, Back, Menu/Continue, era or crisis comprehension, rival pressure, Full Endgame, Progress, or Route Atlas. Those visible checks remain `NOT VERIFIED`, and the owner run wrote no human-session evidence.
+- The expanded Empire layout gate reproduced one P1 readability defect: Turn Summary narrative text clamped and competed with the actor strip at 960x640 with Large Text. The header now follows the same 1100px compact breakpoint as its content, preserving the narrative lane and a single non-overlapping actor.
+- Focused regression coverage passes, and the corrected reduced-motion Empire layout matrix passes 351/351 captures across three supported viewports and all three text scales. The Empire animation audit and all 21 default animation-matrix cells also pass; subjective timing and control feel remain manual advisories.
+- No gameplay, balance, content, campaign, persistence schema, archive, or human-evidence behavior changed. The release remains Stable Alpha.
 
 ## Promotion Rules
 

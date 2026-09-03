@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.329.1 - 2026-09-04
+
+- Fixed the Empire Turn Summary at 960x640 with Large Text by aligning its header actor and phase-chip breakpoint with the compact content layout, preventing narrative truncation and actor overlap
+- Added focused regression coverage for the supported Empire viewport and passed the reduced-motion responsive matrix across compact, standard, and large text profiles
+- Recorded an incomplete owner-controlled Empire continuation from Turn 3 to Turn 4 with healthy persistence, no victory or archive, no direct visible-checklist report, and no human-session evidence
+
 ## 0.329.0 - 2026-08-31
 
 - Added the optional `Founder Empire` long-run scenario with Foundation, Growth, Scale, Expansion, and Legacy eras and a Turn 25 victory gate

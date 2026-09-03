@@ -5801,6 +5801,23 @@ def test_run_2d_visual_audit_captures_core_scene_layers(tmp_path: Path) -> None:
     assert "review-nav-controls" in review.active_layers
 
 
+def test_empire_turn_summary_large_text_stays_readable_at_medium_viewport() -> None:
+    report = run_2d_visual_audit(
+        scenario_id="empire_founder_journey",
+        difficulty_mode=None,
+        seed=7,
+        sizes=((960, 640),),
+        motion_mode=MotionMode.REDUCED,
+        ui_scale=UiScale.LARGE,
+    )
+
+    summary = next(cell for cell in report.cells if cell.scene_key == "turn_summary")
+
+    assert summary.status == "pass"
+    assert summary.typography_violations == ()
+    assert summary.wrapped_clamp_count == 0
+
+
 def test_run_2d_visual_audit_motion_off_drops_archive_comparison_layer() -> None:
     report = run_2d_visual_audit(
         scenario_id="founder_journey",

@@ -13,7 +13,7 @@ Designed for local play and live demos, the project focuses on clean architectur
 
 ## Project Status
 
-**Stable Alpha | Version 0.329.0 | Empire Mode preview**
+**Stable Alpha | Version 0.329.1 | Empire Mode preview**
 
 The complete local gameplay loop, persistence, six featured campaigns, authored endings, archive progression, terminal interface, and responsive 2D shell are implemented. Version 0.329.0 adds an optional long-form `Founder Empire` preview while leaving Standard runs and schema 28 saves compatible. The project is not classified as Beta because the current Owner Rehearsal, Empire pacing validation, and the required six human playtest sessions have not been completed.
 
@@ -1218,7 +1218,7 @@ uv run ruff format src tests
 
 ## 📌 Project Notes
 
-- Version 0.329.0 remains a Stable Alpha and introduces the bounded Empire Mode preview
+- Version 0.329.1 remains a Stable Alpha; the bounded Empire Mode preview was introduced in 0.329.0
 - Standard gameplay is the compatibility baseline; future Empire work requires pacing or human-playtest evidence rather than unbounded feature accumulation
 - The project is intentionally **offline-first** and **local-only**
 - Save data is stored in `nexus-tech.db` by default

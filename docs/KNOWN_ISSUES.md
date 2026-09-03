@@ -3,7 +3,7 @@
 ## Release Blockers
 
 - Owner Rehearsal has not yet completed the path from a fresh `founder_journey` start through Save & Archive and Progress/Route Atlas.
-- Structured human evidence remains 0/6 sessions and 0/6 represented featured campaigns. Version 0.329.0 must not be described as Beta Ready.
+- Structured human evidence remains 0/6 sessions and 0/6 represented featured campaigns. Version 0.329.1 must not be described as Beta Ready.
 - `Founder Empire` has automated regression coverage but has not been completed by a human through its Turn 25 victory gate; its pacing and balance remain preview quality.
 - Readability, pacing, decision comprehension, recovery controls, and motion comfort have automated coverage but still require direct human observation.
 
@@ -12,6 +12,8 @@ The 2026-08-23 through 2026-08-25 operator attempts used validated isolated prof
 The 2026-08-28 rehearsal progressed further and left a valid `founder_journey` save at Turn 3, but it still produced no archive. The resumable save is operational progress, not manual evidence or proof that the visible owner checklist passed.
 
 The 2026-09-01 Empire validation attempt used an isolated `empire_founder_journey` profile and produced no archive. Its first close left an active Turn 3 save; its second close left the same slot active at Turn 1. A controlled 2026-09-03 check then loaded a fresh Turn 3 Empire save through `continue-last-game-2d`, preserved the same scenario, goal, company, product, turn, and RNG identities, accepted an event decision in that run, and autosaved it without reset. The earlier difference is therefore not a reproducible Continue defect. Empire Victory, Save & Archive, Progress, Route Atlas, pacing, and the remaining visible controls remain unverified.
+
+The 2026-09-04 full-route attempt resumed an isolated copy of that healthy Turn 3 save and closed at Turn 4 with the same run identity, no victory, and no archive. The attempt therefore remains incomplete and supplies no human evidence or direct visible-checklist results. Its expanded automated layout pass exposed and fixed a reproducible Turn Summary Large Text clamp at 960x640; focused regression and the 351-cell reduced-motion Empire layout matrix now pass.
 
 These are evidence gaps, not proof of a software defect. If rehearsal exposes a reproducible P0 or P1, record the exact route and fix only that defect with regression coverage.
 

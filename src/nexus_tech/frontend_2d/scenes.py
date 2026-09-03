@@ -11790,6 +11790,8 @@ class RunScene(BaseScene):
 class TurnSummaryScene(BaseScene):
     """Animated turn-resolution scene shown after each resolved turn."""
 
+    _WIDE_LAYOUT_MIN_WIDTH = 1100
+
     def __init__(
         self,
         *,
@@ -12021,7 +12023,7 @@ class TurnSummaryScene(BaseScene):
             return
         pygame = self.pygame
         width = resolve_frontend_canvas_bounds(*surface.get_size()).width
-        visible_count = 1 if width < 940 else 4
+        visible_count = 1 if width < self._WIDE_LAYOUT_MIN_WIDTH else 4
         visible_clips = clips[:visible_count]
         gap = 8
         clip_height = 46
@@ -12126,7 +12128,7 @@ class TurnSummaryScene(BaseScene):
         footer_rect = pygame.Rect(frame.footer.as_tuple())
         content_rect = pygame.Rect(frame.content.as_tuple())
         layout_width = frame.canvas.width
-        if layout_width < 1100:
+        if layout_width < self._WIDE_LAYOUT_MIN_WIDTH:
             top_height = int(
                 (content_rect.height - gap) * self._summary_top_section_ratio(layout_width)
             )
@@ -12422,10 +12424,13 @@ class TurnSummaryScene(BaseScene):
         pygame = self.pygame
         width = resolve_frontend_canvas_bounds(*surface.get_size()).width
         inner = draw_panel(surface, pygame, rect, title="Turn Summary", accent=INFO)
-        actor_reserve = 156 if width < 940 and self.motion_mode is not MotionMode.OFF else 0
+        compact_header = width < self._WIDE_LAYOUT_MIN_WIDTH
+        actor_reserve = 156 if compact_header and self.motion_mode is not MotionMode.OFF else 0
         phase_gap = 8
         phase_width = min(540, max(360, int(inner.width * 0.43)))
-        phase_left = inner.right if width < 940 or inner.width < 620 else inner.right - phase_width
+        phase_left = (
+            inner.right if compact_header or inner.width < 620 else inner.right - phase_width
+        )
         copy_width = max(220, min(phase_left - inner.left - 12, inner.width - actor_reserve))
         draw_text_line(
             surface,
@@ -12444,7 +12449,7 @@ class TurnSummaryScene(BaseScene):
             valign="top",
         )
         phase_labels = self._view_model.phase_labels
-        if width >= 940 and inner.width >= 620 and phase_labels:
+        if not compact_header and inner.width >= 620 and phase_labels:
             phase_count = len(phase_labels)
             chip_width = int((phase_width - phase_gap * max(0, phase_count - 1)) / phase_count)
             compact_labels = ("Cash", "Pressure", "Outlook")
